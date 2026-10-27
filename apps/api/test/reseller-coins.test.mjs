@@ -36,7 +36,7 @@ before(async () => {
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
   afrippaAdmin = await afrippaAdminClient(server);
-  const update = async (id, values) => assert.equal((await admin.put(`/v1/admin/integrations/${id}`, { values, code: await adminCode(server, admin) })).status, 200);
+  const update = async (id, values) => assert.equal((await afrippaAdmin.put(`/v1/afrippa/admin/integrations/${id}`, { values, code: await adminCode(server, afrippaAdmin) })).status, 200);
   await update('crypto_keys', { CRYPTO_TEST_XPUB_EVM: testnet.derive("m/44'/60'/0'").publicExtendedKey });
   await update('getblock', { GETBLOCK_ETHEREUM_URL: `${chain.url}/evm`, GETBLOCK_SANDBOX: true });
   const usdt = await prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: 'USDT', chain: 'ETHEREUM' } } });

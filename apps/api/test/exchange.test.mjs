@@ -3,10 +3,12 @@
 // the reserve, held for 30 seconds, settled once in one balanced entry, never coin to coin.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
+/** Afrippa's admin: the price settings are Afrippa's. */
+let afrippaAdmin;
 let finance;
 let prisma;
 let prices;
@@ -27,12 +29,13 @@ before(async () => {
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   prices = server.app.get((await import('../dist/crypto/prices.js')).CryptoPricesService);
   admin = await adminClient(server);
+  afrippaAdmin = await afrippaAdminClient(server);
   finance = await adminClient(server, ['finance']);
   // Two sources 1490 and 1510: the mid rate is 1500, with no conversion margin.
   for (const [source, rate] of [['open_exchange_rates', 1490], ['flutterwave', 1510]]) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: rate, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
-  const saved = await admin.put('/v1/admin/integrations/crypto_prices', { values: { COINGECKO_API_URL: coingecko.url }, code: await adminCode(server, admin) });
+  const saved = await afrippaAdmin.put('/v1/afrippa/admin/integrations/crypto_prices', { values: { COINGECKO_API_URL: coingecko.url }, code: await adminCode(server, afrippaAdmin) });
   assert.equal(saved.status, 200, JSON.stringify(saved.json));
   for (const key of ['crypto_wallets', 'crypto_exchange']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled: true })).status, 200);
   for (const asset of ['BTC', 'USDT']) {

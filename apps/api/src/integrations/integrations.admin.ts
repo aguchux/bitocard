@@ -18,7 +18,8 @@ import { checkPrices } from '../crypto/price-feed.js';
 import { screener } from '../crypto/custody/screening.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { connectable } from '../reseller-integrations/connectable.js';
-import { integrationGroups, isPlatformKey, type IntegrationField, type IntegrationGroup } from './definitions.js';
+import { groupsFor, isPlatformKey, sharedKeys, type IntegrationField, type IntegrationGroup } from './definitions.js';
+import type { Platform } from '../generated/prisma/client.js';
 import { inSandbox, urlsFor } from './endpoints.js';
 import { IntegrationsService, schemaFor } from './integrations.service.js';
 import { linksFor } from './links.js';
@@ -37,7 +38,11 @@ const invalidValue = (key: string, message: string) => new ApiError(HttpStatus.B
 /** The last four characters of a secret, so an admin can tell which key is set without it ever being shown. */
 const hintOf = (value: string) => (value.length > 8 ? `…${value.slice(-4)}` : '…');
 
-/** The admin view of integrations: what is set and where it comes from, never a secret's value. */
+/**
+ * The admin view of integrations: what is set and where it comes from, never a secret's value. Each product's admin
+ * sees and sets only its own groups and values (`platforms` on each group): BitoCard's admins BitoCard's, Afrippa's
+ * admins Afrippa's (docs/CRYPTO_SPINOFF_PLAN.md, step 2 item 8).
+ */
 @Injectable()
 export class IntegrationsAdminService {
   constructor(
@@ -47,27 +52,30 @@ export class IntegrationsAdminService {
     private readonly audit: AuditService,
   ) {}
 
-  async list() {
+  async list(platform: Platform = 'bitocard') {
     await this.integrations.refresh(true);
     const access = await this.resellerAccess();
-    // The blockchain integrations (wallet keys, chain providers, the signer, screening, prices) are Afrippa's now, not
-    // BitoCard's (docs/CRYPTO_SPINOFF_PLAN.md): listed only while crypto's routes are open (tests, local development).
-    const groups = this.integrations.env.CRYPTO_ROUTES === 'open' ? integrationGroups : integrationGroups.filter(group => group.section !== 'blockchain');
-    return { object: 'list' as const, data: groups.map(group => this.presentGroup(group, access)) };
+    return { object: 'list' as const, data: groupsFor(platform).map(group => this.presentGroup(group, access, platform)) };
+  }
+
+  /** One of the product's own groups; another product's is as unknown as a made-up one. */
+  private group(groupId: string, platform: Platform) {
+    const group = groupsFor(platform).find(item => item.id === groupId);
+    if (!group) throw notFound();
+    return group;
   }
 
   /**
    * Tests BitoCard's own credentials for an integration with a harmless call (a token, a balance), at the provider's
    * sandbox address when its Sandbox switch is on, otherwise live. Changes nothing; the outcome is audited.
    */
-  async test(adminId: string, groupId: string) {
-    const group = integrationGroups.find(item => item.id === groupId);
-    if (!group) throw notFound();
+  async test(adminId: string, groupId: string, platform: Platform = 'bitocard') {
+    const group = this.group(groupId, platform);
     if (group.section === 'blockchain') return this.testBlockchain(adminId, group);
     if (group.id === 'domains') return this.testDomains(adminId);
     if (group.id === 'store_hosts') return this.testStoreHosts(adminId);
-    if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id);
-    if (group.id === 'github') return this.testGithub(adminId);
+    if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id, platform);
+    if (group.id === 'github') return this.testGithub(adminId, platform);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -96,10 +104,10 @@ export class IntegrationsAdminService {
     return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
   }
 
-  /** Engineering escalations: the repository read with the token. */
-  private async testGithub(adminId: string) {
+  /** Engineering escalations: the repository read with the product's own token. */
+  private async testGithub(adminId: string, platform: Platform) {
     await this.integrations.refresh(true);
-    const config = this.integrations.config;
+    const config = this.integrations.configFor(platform);
     const github = new GithubIssues({ token: config.GITHUB_TOKEN as string | undefined, repo: config.GITHUB_REPO as string | undefined, baseUrl: String(config.GITHUB_API_URL ?? 'https://api.github.com') });
     let ok = false;
     let message: string | null = null;
@@ -117,10 +125,10 @@ export class IntegrationsAdminService {
     return { object: 'integration_test' as const, integration: 'github', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
-  /** An AI provider for support bots: its model list read with BitoCard's key. */
-  private async testAi(adminId: string, provider: AiProviderName) {
+  /** An AI provider: its model list read with the product's own key. */
+  private async testAi(adminId: string, provider: AiProviderName, platform: Platform) {
     await this.integrations.refresh(true);
-    const config = this.integrations.config;
+    const config = this.integrations.configFor(platform);
     const apiKey = String(config[`${provider.toUpperCase()}_API_KEY` as keyof typeof config] ?? '').trim();
     const baseUrl = String(config[`${provider.toUpperCase()}_API_URL` as keyof typeof config] ?? '');
     let ok = false;
@@ -206,33 +214,32 @@ export class IntegrationsAdminService {
    * Sets or clears (null) some of one integration's fields. Needs the admin's current authenticator code. Cleared fields
    * fall back to the environment, then the default.
    */
-  async update(adminId: string, groupId: string, values: Record<string, unknown>, code: string) {
-    const group = integrationGroups.find(item => item.id === groupId);
-    if (!group) throw notFound();
+  async update(adminId: string, groupId: string, values: Record<string, unknown>, code: string, platform: Platform = 'bitocard') {
+    const group = this.group(groupId, platform);
     const changes = Object.entries(values);
     if (changes.length === 0) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Change at least one field.', 'values');
     const prepared = changes.map(([key, value]) => this.prepare(group, key, value));
     await this.adminAuth.confirmCode(adminId, code);
 
     await this.integrations.refresh(true);
-    const before = this.auditView(group);
+    const before = this.auditView(group, platform);
     await this.prisma.$transaction(async tx => {
       for (const change of prepared) {
         if (change.value === null) {
-          await tx.integrationSetting.deleteMany({ where: { key: change.field.key } });
+          await tx.integrationSetting.deleteMany({ where: { platform, key: change.field.key } });
         } else {
           const value = change.field.secret ? this.encryption().encrypt(change.value) : change.value;
           await tx.integrationSetting.upsert({
-            where: { key: change.field.key },
-            create: { key: change.field.key, value, encrypted: change.field.secret, updatedById: adminId },
+            where: { platform_key: { platform, key: change.field.key } },
+            create: { platform, key: change.field.key, value, encrypted: change.field.secret, updatedById: adminId },
             update: { value, encrypted: change.field.secret, updatedById: adminId },
           });
         }
       }
     });
     await this.integrations.refresh(true);
-    await this.audit.record({ actorId: adminId, action: 'integration.updated', targetType: 'integration', targetId: group.id, before, after: this.auditView(group) });
-    return this.presentGroup(group, await this.resellerAccess());
+    await this.audit.record({ actorId: adminId, action: 'integration.updated', targetType: 'integration', targetId: group.id, before, after: this.auditView(group, platform), platform });
+    return this.presentGroup(group, await this.resellerAccess(), platform);
   }
 
   /** Validates one submitted value against the same rules as the environment variable it replaces. */
@@ -255,8 +262,8 @@ export class IntegrationsAdminService {
     return typeof value === 'string' ? value.trim() : null;
   }
 
-  private presentGroup(group: IntegrationGroup, access: Set<string>) {
-    const fields = group.fields.map(field => this.presentField(field));
+  private presentGroup(group: IntegrationGroup, access: Set<string>, platform: Platform) {
+    const fields = group.fields.map(field => this.presentField(field, platform));
     const sandboxField = fields.find(field => field.kind === 'flag' && field.key.endsWith('_SANDBOX'));
     const required = fields.filter(field => field.required);
     const secrets = fields.filter(field => field.secret);
@@ -275,26 +282,28 @@ export class IntegrationsAdminService {
       section: group.section,
       /** False while the supplier's adapter is not built: its credentials are saved for later and not used yet. */
       adapter_ready: group.adapterReady,
-      webhook_url: group.webhookPath ? `https://api.bitocard.com${group.webhookPath}` : null,
+      webhook_url: group.webhookPath ? `${platform === 'afrippa' ? 'https://api.afrippa.com' : 'https://api.bitocard.com'}${group.webhookPath}` : null,
       /** The Sandbox switch: true while BitoCard's account uses the provider's sandbox (never live); null without one. */
       sandbox: sandboxField ? sandboxField.value === true : null,
       /** Whether Test connection can check these credentials (a built adapter with a check). */
       testable: group.section === 'blockchain' || ownTests.has(group.id) || Boolean(connectable(group.id)),
-      /** Resellers' own accounts: `available` once BitoCard's adapter can take them, `enabled` when an admin allows it. */
-      reseller_access: { available: Boolean(connectable(group.id)), enabled: access.has(group.id) },
+      /** Resellers' own accounts (BitoCard's only): `available` once BitoCard's adapter can take them, `enabled` when an admin allows it. */
+      reseller_access: platform === 'bitocard' ? { available: Boolean(connectable(group.id)), enabled: access.has(group.id) } : { available: false, enabled: false },
       updated_at: updates.sort().at(-1) ?? null,
       fields,
     };
   }
 
-  private presentField(field: IntegrationField) {
-    const stored = this.integrations.stored.get(field.key);
-    // Supplier credentials live only in the admin app; platform settings fall back to the environment, then the default.
+  private presentField(field: IntegrationField, product: Platform = 'bitocard') {
+    const stored = this.integrations.storedFor(product).get(field.key);
+    // Supplier credentials live only in the admin app; platform settings fall back to the environment, then the default
+    // (Afrippa's own accounts for shared services never fall back to the environment, which is BitoCard's).
     const platform = isPlatformKey(field.key);
+    const config = this.integrations.configFor(product);
     // Switches stored for suppliers whose adapter is not built are read as booleans, like platform flags.
-    const effective: unknown = platform ? this.integrations.config[field.key as keyof AppConfig] : field.kind === 'flag' && stored ? stored.value === 'on' : stored?.value;
+    const effective: unknown = platform ? config[field.key as keyof AppConfig] : field.kind === 'flag' && stored ? stored.value === 'on' : stored?.value;
     const fallback = platform ? configSchema.shape[field.key as keyof typeof configSchema.shape].safeParse(undefined) : null;
-    const fromEnv: unknown = platform ? this.integrations.env[field.key as keyof AppConfig] : undefined;
+    const fromEnv: unknown = platform && !(product === 'afrippa' && sharedKeys.has(field.key)) ? this.integrations.env[field.key as keyof AppConfig] : platform ? fallback?.data : undefined;
     const source: Source = stored
       ? 'admin'
       : fromEnv === undefined
@@ -320,10 +329,10 @@ export class IntegrationsAdminService {
   }
 
   /** What the audit log keeps: values of plain settings, and only whether a secret is set (with its hint). */
-  private auditView(group: IntegrationGroup) {
+  private auditView(group: IntegrationGroup, platform: Platform) {
     return Object.fromEntries(
       group.fields.map(field => {
-        const presented = this.presentField(field);
+        const presented = this.presentField(field, platform);
         return [field.key, field.secret ? { set: presented.source !== 'unset', source: presented.source, hint: presented.hint } : { value: presented.value, source: presented.source }];
       }),
     );
@@ -343,31 +352,51 @@ class UpdateIntegrationDto {
   @IsString() @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code from your authenticator app' }) code!: string;
 }
 
-/** Service credentials and settings (Settings > Integrations). Super admins only; never in the public API description. */
-@ApiExcludeController()
-@RealmOnly('admin')
-@AdminRoles('super_admin')
-@Controller('admin/integrations')
-export class IntegrationsAdminController {
-  constructor(private readonly service: IntegrationsAdminService) {}
+/** Service credentials and settings (Settings > Integrations), for one product's super admins. */
+@Injectable()
+abstract class IntegrationsRoutes {
+  protected abstract readonly platform: Platform;
+
+  constructor(protected readonly service: IntegrationsAdminService) {}
 
   @Get()
   list() {
-    return this.service.list();
+    return this.service.list(this.platform);
   }
 
   @Put(':id')
   update(@CurrentCaller() caller: Caller, @Param('id') id: string, @Body() body: UpdateIntegrationDto) {
-    return this.service.update(caller.kind === 'session' ? caller.userId : '', id, body.values, body.code);
+    return this.service.update(caller.kind === 'session' ? caller.userId : '', id, body.values, body.code, this.platform);
   }
 
   /** Tests the saved credentials (sandbox or live, as the Sandbox switch says). */
   @Post(':id/test')
   @HttpCode(HttpStatus.OK)
   test(@CurrentCaller() caller: Caller, @Param('id') id: string) {
-    return this.service.test(caller.kind === 'session' ? caller.userId : '', id);
+    return this.service.test(caller.kind === 'session' ? caller.userId : '', id, this.platform);
   }
 }
 
-@Module({ imports: [AuthModule], controllers: [IntegrationsAdminController], providers: [IntegrationsAdminService] })
+/** BitoCard's (admin.bitocard.com). Super admins only; never in the public API description. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('super_admin')
+@Controller('admin/integrations')
+export class IntegrationsAdminController extends IntegrationsRoutes {
+  protected readonly platform = 'bitocard';
+}
+
+/**
+ * Afrippa's own (admin.afrippa.com): its crypto settings and its own account for each service both products use, set
+ * and tested only by Afrippa's super admins with their authenticator code, never shown to BitoCard's admins.
+ */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('super_admin')
+@Controller('afrippa/admin/integrations')
+export class AfrippaIntegrationsAdminController extends IntegrationsRoutes {
+  protected readonly platform = 'afrippa';
+}
+
+@Module({ imports: [AuthModule], controllers: [IntegrationsAdminController, AfrippaIntegrationsAdminController], providers: [IntegrationsAdminService] })
 export class IntegrationsAdminModule {}

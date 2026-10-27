@@ -1,4 +1,5 @@
 import type { AppConfig } from '../config/config.js';
+import type { Platform } from '../generated/prisma/client.js';
 import { chainProviders, walletKeyFields } from '../crypto/chains/providers.js';
 import { screeners } from '../crypto/custody/screening.js';
 import { signerFields } from '../crypto/custody/signer.js';
@@ -39,6 +40,12 @@ export type IntegrationGroup = {
   section: 'platform' | 'suppliers' | 'blockchain';
   /** False while the supplier's adapter is a stub: its credentials are stored for later and nothing uses them yet. */
   adapterReady: boolean;
+  /**
+   * The products that use it, each with its own values, set in its own admin (docs/CRYPTO_SPINOFF_PLAN.md, step 2
+   * item 8): BitoCard's alone (payments, suppliers, domains, its store addresses and links), Afrippa's alone (every
+   * crypto setting), or both (email, SMS, Google, AI, files, push, GitHub), never sharing a value.
+   */
+  platforms: Platform[];
 };
 
 const integrationKeyList = [
@@ -191,7 +198,7 @@ const field = (key: string, label: string, options: Partial<Omit<IntegrationFiel
 });
 const secret = (key: string, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}) => field(key, label, { secret: true, required: true, ...options });
 
-const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> = [
+const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 'platforms'>> = [
   {
     id: 'general',
     name: 'Links and alerts',
@@ -615,7 +622,7 @@ const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapa
 /** Credential groups whose adapter transport is implemented. They stay unavailable until their Supplier row and markets are enabled. */
 const builtCredentialSuppliers = new Set(['vpnresellers']);
 
-export const integrationGroups: IntegrationGroup[] = [
+const groupsWithoutPlatforms: Array<Omit<IntegrationGroup, 'platforms'>> = [
   ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),
   ...supplierCredentialGroups.map(group => ({
     id: group.code,
@@ -673,6 +680,29 @@ export const integrationGroups: IntegrationGroup[] = [
     fields: priceFields,
   },
 ];
+
+/** Services both products use, each with its own account: Afrippa's are set in Afrippa's admin, BitoCard's in BitoCard's. */
+const sharedGroupIds = new Set(['email', 'sms', 'sms_africas_talking', 'web_push', 'file_storage', 'kyc_storage', 'google', 'anthropic', 'openai', 'deepseek', 'github']);
+
+/** Crypto is Afrippa's alone (BitoCard keeps no crypto setting); the shared services are both's; the rest BitoCard's. */
+function platformsOf(group: Omit<IntegrationGroup, 'platforms'>): Platform[] {
+  if (group.section === 'blockchain') return ['afrippa'];
+  return sharedGroupIds.has(group.id) ? ['bitocard', 'afrippa'] : ['bitocard'];
+}
+
+export const integrationGroups: IntegrationGroup[] = groupsWithoutPlatforms.map(group => ({ ...group, platforms: platformsOf(group) }));
+
+/** The integration groups a product's admin sees and sets. */
+export const groupsFor = (platform: Platform) => integrationGroups.filter(group => group.platforms.includes(platform));
+
+/** Settings only Afrippa uses (its crypto): read from Afrippa's values whoever reads them. */
+export const afrippaOnlyKeys: ReadonlySet<string> = new Set(integrationGroups.filter(group => group.platforms.length === 1 && group.platforms[0] === 'afrippa').flatMap(group => group.fields.map(item => item.key)));
+
+/** Settings both products use, each with its own value. */
+export const sharedKeys: ReadonlySet<string> = new Set(integrationGroups.filter(group => group.platforms.length > 1).flatMap(group => group.fields.map(item => item.key)));
+
+/** The product whose value of a setting a reader gets when it does not say: Afrippa's for its crypto, else BitoCard's. */
+export const ownerOf = (key: string): Platform => (afrippaOnlyKeys.has(key) ? 'afrippa' : 'bitocard');
 
 export const integrationFields = new Map(integrationGroups.flatMap(group => group.fields.map(item => [item.key, item] as const)));
 

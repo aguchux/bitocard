@@ -38,7 +38,7 @@ before(async () => {
   for (const [source, rate] of [['open_exchange_rates', 1490], ['flutterwave', 1510]]) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: rate, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
-  const saved = await admin.put('/v1/admin/integrations/crypto_prices', { values: { COINGECKO_API_URL: coingecko.url, COINBASE_PRICE_URL: coinbase.url }, code: await adminCode(server, admin) });
+  const saved = await afrippaAdmin.put('/v1/afrippa/admin/integrations/crypto_prices', { values: { COINGECKO_API_URL: coingecko.url, COINBASE_PRICE_URL: coinbase.url }, code: await adminCode(server, afrippaAdmin) });
   assert.equal(saved.status, 200, JSON.stringify(saved.json));
   for (const key of ['crypto_wallets', 'crypto_exchange']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled: true })).status, 200);
   for (const asset of ['BTC', 'USDT']) {
@@ -199,7 +199,7 @@ describe('BitoCard desk', () => {
 
   test('prices that disagree with Coinbase pause the coin', async () => {
     const values = { COINGECKO_API_URL: coingecko.url, COINBASE_PRICE_URL: coinbase.url, CRYPTO_PRICE_SECONDARY: true };
-    assert.equal((await admin.put('/v1/admin/integrations/crypto_prices', { values, code: await adminCode(server, admin) })).status, 200);
+    assert.equal((await afrippaAdmin.put('/v1/afrippa/admin/integrations/crypto_prices', { values, code: await adminCode(server, afrippaAdmin) })).status, 200);
     try {
       const shopper = await customer();
       prices.forget();
@@ -212,7 +212,7 @@ describe('BitoCard desk', () => {
     } finally {
       second.BTC = '60100';
       prices.forget();
-      assert.equal((await admin.put('/v1/admin/integrations/crypto_prices', { values: { CRYPTO_PRICE_SECONDARY: false }, code: await adminCode(server, admin) })).status, 200);
+      assert.equal((await afrippaAdmin.put('/v1/afrippa/admin/integrations/crypto_prices', { values: { CRYPTO_PRICE_SECONDARY: false }, code: await adminCode(server, afrippaAdmin) })).status, 200);
     }
   });
 });

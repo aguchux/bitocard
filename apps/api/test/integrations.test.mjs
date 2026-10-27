@@ -83,7 +83,7 @@ describe('integration settings', () => {
     assert.equal(await email.send({ to: 'ada@example.com', subject: 'After', text: 'Hi', html: '<p>Hi</p>' }), 'resend');
     assert.equal(resend.calls.at(-1).headers.authorization, `Bearer ${key}`);
 
-    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { key: 'RESEND_API_KEY' } });
+    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { platform_key: { platform: 'bitocard', key: 'RESEND_API_KEY' } } });
     assert.equal(row.encrypted, true);
     assert.ok(!row.value.includes(key));
 
@@ -144,7 +144,7 @@ describe('integration settings', () => {
 
   test('other instances pick up changes on their next refresh, within 30 seconds', async () => {
     await prisma.integrationSetting.upsert({
-      where: { key: 'VTPASS_CONTACT_PHONE' },
+      where: { platform_key: { platform: 'bitocard', key: 'VTPASS_CONTACT_PHONE' } },
       create: { key: 'VTPASS_CONTACT_PHONE', value: '08099999999', encrypted: false },
       update: { value: '08099999999' },
     });
@@ -167,7 +167,7 @@ describe('integration settings', () => {
     assert.equal(fieldOf(saved.json, 'AIRALO_API_URL').value, 'https://sandbox-partners-api.airalo.com');
     assert.ok(!JSON.stringify(saved.json).includes(key));
     assert.deepEqual(integrations.supplier('airalo'), { CLIENT_ID: 'airalo-client', CLIENT_SECRET: key, API_URL: 'https://sandbox-partners-api.airalo.com' });
-    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { key: 'AIRALO_CLIENT_SECRET' } });
+    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { platform_key: { platform: 'bitocard', key: 'AIRALO_CLIENT_SECRET' } } });
     assert.ok(row.encrypted && !row.value.includes(key));
 
     assert.equal((await update('airalo', { AIRALO_API_URL: 'not a url' })).json.error.param, 'values.AIRALO_API_URL');

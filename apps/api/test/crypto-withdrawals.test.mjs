@@ -96,7 +96,7 @@ function mine(state, { hash, to, raw, block }) {
 }
 
 const update = async (id, values) => {
-  const res = await admin.put(`/v1/admin/integrations/${id}`, { values, code: await adminCode(server, admin) });
+  const res = await afrippaAdmin.put(`/v1/afrippa/admin/integrations/${id}`, { values, code: await adminCode(server, afrippaAdmin) });
   assert.equal(res.status, 200, JSON.stringify(res.json));
   return res.json;
 };
@@ -177,19 +177,19 @@ const settle = async id => {
 
 describe('signer and screening integrations', () => {
   test('the signer and both screeners have cards in the Blockchain section; the shared secret must be long', async () => {
-    const list = (await admin.get('/v1/admin/integrations')).json.data.filter(item => item.section === 'blockchain').map(item => item.id);
+    const list = (await afrippaAdmin.get('/v1/afrippa/admin/integrations')).json.data.filter(item => item.section === 'blockchain').map(item => item.id);
     assert.deepEqual(list.slice(-4), ['crypto_signer', 'chainalysis', 'trm', 'crypto_prices']);
-    const short = await admin.put('/v1/admin/integrations/crypto_signer', { values: { CRYPTO_SIGNER_SECRET: 'short' }, code: await adminCode(server, admin) });
+    const short = await afrippaAdmin.put('/v1/afrippa/admin/integrations/crypto_signer', { values: { CRYPTO_SIGNER_SECRET: 'short' }, code: await adminCode(server, afrippaAdmin) });
     assert.deepEqual([short.status, short.json.error.param], [400, 'values.CRYPTO_SIGNER_SECRET']);
     await update('chainalysis', { CHAINALYSIS_API_KEY: 'ca-key-1234', CHAINALYSIS_API_URL: `${fakes.url}/screen` });
-    const screened = (await admin.post('/v1/admin/integrations/chainalysis/test')).json;
+    const screened = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/chainalysis/test')).json;
     assert.equal(screened.ok, true, screened.message);
     assert.equal(fakes.calls.at(-1).headers['x-api-key'], 'ca-key-1234');
   });
 
   test('the signer and screeners are reached over HTTPS only', async () => {
     for (const [id, key] of [['crypto_signer', 'CRYPTO_SIGNER_URL'], ['chainalysis', 'CHAINALYSIS_API_URL']]) {
-      const plain = await admin.put(`/v1/admin/integrations/${id}`, { values: { [key]: 'http://signer.example.com' }, code: await adminCode(server, admin) });
+      const plain = await afrippaAdmin.put(`/v1/afrippa/admin/integrations/${id}`, { values: { [key]: 'http://signer.example.com' }, code: await adminCode(server, afrippaAdmin) });
       assert.deepEqual([plain.status, plain.json.error?.param], [400, `values.${key}`], `${key} over plain HTTP is refused`);
     }
   });
@@ -353,7 +353,7 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
 describe('withdrawals through BitoCard’s signer', () => {
   before(async () => {
     await update('crypto_signer', { CRYPTO_SIGNER_URL: `${fakes.url}/signer`, CRYPTO_SIGNER_SECRET: signerSecret, CRYPTO_SIGNER_SANDBOX: true });
-    const tested = (await admin.post('/v1/admin/integrations/crypto_signer/test')).json;
+    const tested = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/crypto_signer/test')).json;
     assert.deepEqual([tested.ok, tested.environment], [true, 'sandbox'], tested.message);
   });
 

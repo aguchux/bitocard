@@ -82,7 +82,7 @@ function evmTransfer(state, { hash, to, raw, block, contract = usdtContract }) {
 
 const txHash = n => `0x${String(n).padStart(64, 'a')}`;
 const update = async (id, values) => {
-  const res = await admin.put(`/v1/admin/integrations/${id}`, { values, code: await adminCode(server, admin) });
+  const res = await afrippaAdmin.put(`/v1/afrippa/admin/integrations/${id}`, { values, code: await adminCode(server, afrippaAdmin) });
   assert.equal(res.status, 200, JSON.stringify(res.json));
   return res.json;
 };
@@ -128,19 +128,19 @@ const balance = async (shopper, asset) => (await shopper.get('/v1/afrippa/crypto
 
 describe('blockchain providers in Settings > Integrations', () => {
   test('every provider and the wallet keys have a card in the Blockchain section, with links; keys are checked', async () => {
-    const list = (await admin.get('/v1/admin/integrations')).json.data.filter(item => item.section === 'blockchain');
+    const list = (await afrippaAdmin.get('/v1/afrippa/admin/integrations')).json.data.filter(item => item.section === 'blockchain');
     assert.deepEqual(
       list.map(item => item.id),
       ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'litecoinspace', 'crypto_signer', 'chainalysis', 'trm', 'crypto_prices'],
     );
     assert.ok(list.filter(item => item.id !== 'crypto_keys').every(item => item.links.length && item.testable && item.sandbox !== true));
-    assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.bitocard.com/v1/afrippa/webhooks/chain/alchemy?chain=<CHAIN>');
+    assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.afrippa.com/v1/afrippa/webhooks/chain/alchemy?chain=<CHAIN>');
 
     const xprv = testnet.derive("m/44'/60'/0'").privateExtendedKey;
-    const refused = await admin.put('/v1/admin/integrations/crypto_keys', { values: { CRYPTO_TEST_XPUB_EVM: xprv }, code: await adminCode(server, admin) });
+    const refused = await afrippaAdmin.put('/v1/afrippa/admin/integrations/crypto_keys', { values: { CRYPTO_TEST_XPUB_EVM: xprv }, code: await adminCode(server, afrippaAdmin) });
     assert.deepEqual([refused.status, refused.json.error.param], [400, 'values.CRYPTO_TEST_XPUB_EVM'], 'a private key is never accepted');
     await update('crypto_keys', keys);
-    const checked = (await admin.post('/v1/admin/integrations/crypto_keys/test')).json;
+    const checked = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/crypto_keys/test')).json;
     assert.equal(checked.ok, true, checked.message);
     assert.match(checked.message, /bitcoin test: first address tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl/);
     assert.match(checked.message, /evm test: first address 0x/);
@@ -148,14 +148,14 @@ describe('blockchain providers in Settings > Integrations', () => {
 
   test('Test connection reads the latest block from each chain a provider is set up for', async () => {
     await update('quicknode', { QUICKNODE_ETHEREUM_URL: `${chain.url}/evm1`, QUICKNODE_TRON_URL: `${chain.url}/tron`, QUICKNODE_WEBHOOK_SECRET: 'qn-secret-value-1234', QUICKNODE_SANDBOX: true });
-    const tested = (await admin.post('/v1/admin/integrations/quicknode/test')).json;
+    const tested = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/quicknode/test')).json;
     assert.deepEqual([tested.ok, tested.environment, tested.message], [true, 'sandbox', 'Ethereum block 100, TRON block 5000 (test networks).']);
     chain.state.down.add('/evm1');
-    const failing = (await admin.post('/v1/admin/integrations/quicknode/test')).json;
+    const failing = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/quicknode/test')).json;
     assert.equal(failing.ok, false);
     assert.match(failing.message, /^Ethereum: unreachable: HTTP 503/);
     chain.state.down.delete('/evm1');
-    const nothing = (await admin.post('/v1/admin/integrations/infura/test')).json;
+    const nothing = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/infura/test')).json;
     assert.deepEqual([nothing.ok, nothing.message], [false, 'Set Infura’s API key first.']);
   });
 });
@@ -552,7 +552,7 @@ describe('providers on the wrong network', () => {
     // Sandbox off (live), but the pasted endpoint is on Sepolia.
     chain.state.chainIds['/evm3'] = '0xaa36a7';
     await update('chainstack', { CHAINSTACK_ETHEREUM_URL: `${chain.url}/evm3` });
-    const tested = (await admin.post('/v1/admin/integrations/chainstack/test')).json;
+    const tested = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/chainstack/test')).json;
     assert.equal(tested.ok, false);
     assert.equal(tested.environment, 'live');
     assert.match(tested.message, /^Ethereum: refused: the endpoint is on a test network \(11155111\)/);
@@ -565,12 +565,12 @@ describe('providers on the wrong network', () => {
     // On the main network it serves live stores.
     chain.state.chainIds['/evm3'] = '0x1';
     forgetNetworks();
-    assert.equal((await admin.post('/v1/admin/integrations/chainstack/test')).json.ok, true);
+    assert.equal((await afrippaAdmin.post('/v1/afrippa/admin/integrations/chainstack/test')).json.ok, true);
     assert.deepEqual((await deposits.routes('ETHEREUM', 'live')).map(item => item.provider.id), ['chainstack']);
 
     // A sandbox endpoint on the main network is refused too (real coins never reach sandbox wallets).
     await update('chainstack', { CHAINSTACK_SANDBOX: true });
-    const sandbox = (await admin.post('/v1/admin/integrations/chainstack/test')).json;
+    const sandbox = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/chainstack/test')).json;
     assert.deepEqual([sandbox.ok, sandbox.environment], [false, 'sandbox']);
     assert.match(sandbox.message, /main network/);
     assert.ok(!(await deposits.routes('ETHEREUM', 'test')).some(item => item.provider.id === 'chainstack'));
@@ -582,14 +582,14 @@ describe('providers on the wrong network', () => {
     forgetNetworks();
     // Blockstream switched to live, but pointed at the testnet Esplora.
     await update('blockstream', { BLOCKSTREAM_ENABLED: true, BLOCKSTREAM_API_URL: `${chain.url}/btc` });
-    const tested = (await admin.post('/v1/admin/integrations/blockstream/test')).json;
+    const tested = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/blockstream/test')).json;
     assert.equal(tested.ok, false);
     assert.match(tested.message, /test network/);
     const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
     assert.deepEqual((await server.app.get(CryptoDepositsService).routes('BITCOIN', 'live')).length, 0);
     await update('blockstream', { BLOCKSTREAM_ENABLED: false });
     // mempool.space in the sandbox (testnet4) is fine.
-    assert.equal((await admin.post('/v1/admin/integrations/mempool/test')).json.ok, true);
+    assert.equal((await afrippaAdmin.post('/v1/afrippa/admin/integrations/mempool/test')).json.ok, true);
   });
 
   test('a TRON endpoint is checked by its genesis block', async () => {
@@ -599,7 +599,7 @@ describe('providers on the wrong network', () => {
     forgetNetworks();
     // GetBlock switched to live, but its pasted TRON endpoint is on Nile.
     await update('getblock', { GETBLOCK_TRON_URL: `${chain.url}/tron`, GETBLOCK_SANDBOX: false });
-    const tested = (await admin.post('/v1/admin/integrations/getblock/test')).json;
+    const tested = (await afrippaAdmin.post('/v1/afrippa/admin/integrations/getblock/test')).json;
     assert.equal(tested.ok, false);
     assert.match(tested.message, /TRON: refused: the endpoint is on a test network/);
     assert.ok(!(await deposits.routes('TRON', 'live')).some(item => item.provider.id === 'getblock'), 'never routed for live deposits');

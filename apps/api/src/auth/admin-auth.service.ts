@@ -175,7 +175,8 @@ export class AdminAuthService {
     const { appUrl, product, platform } = this.settings(realm);
     const link = `${new URL('/set-password', appUrl).toString()}#token=${token}`;
     try {
-      const sentWith = await this.email.send(adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product }));
+      // Each product's admins are emailed through its own email settings.
+      const sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product }));
       this.logger.log({ userId: user.id, kind, sentWith }, sentWith === 'outbox' ? 'Admin password link NOT sent: no email provider is set up' : 'Admin password link emailed');
     } catch (error) {
       this.logger.error({ err: error, userId: user.id }, 'Could not email an admin password link');
@@ -218,7 +219,7 @@ export class AdminAuthService {
       if (resetAuthenticator) await tx.totpCredential.deleteMany({ where: { userId: user.id } });
     });
     await this.audit.record({ actorId: user.id, action: 'admin.password_set', targetType: 'user', targetId: user.id, after: { email: user.email, authenticator_reset: resetAuthenticator }, platform });
-    if (user.passwordHash) await this.email.send(passwordChangedEmail(user.email, product)).catch(() => undefined);
+    if (user.passwordHash) await this.email.sendFor(platform, passwordChangedEmail(user.email, product)).catch(() => undefined);
     return { object: 'admin_password_set' as const, email: user.email, authenticator_reset: resetAuthenticator };
   }
 

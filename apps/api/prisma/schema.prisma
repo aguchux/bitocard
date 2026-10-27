@@ -2147,12 +2147,16 @@ model IdentityVerification {
 /// `key` is the environment variable name it replaces; an admin value wins over the environment. Secrets are encrypted
 /// with ENCRYPTION_KEY and never returned by the API.
 model IntegrationSetting {
-  key         String   @id
+  /// The product the value is for: BitoCard's admin sets BitoCard's, Afrippa's admin Afrippa's (its crypto, and its own
+  /// account for each service both use); never shared.
+  platform    Platform @default(bitocard)
+  key         String
   value       String
   encrypted   Boolean
   updatedById String?  @map("updated_by_id") @db.Uuid
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@id([platform, key])
   @@map("integration_settings")
 }
 

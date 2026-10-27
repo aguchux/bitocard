@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { domainSender } from '../domains/sender.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
+import type { AppConfig } from '../config/config.js';
+import type { Platform } from '../generated/prisma/client.js';
 
 /** `from` is set only on captured messages (the outbox), to show which sender was chosen. */
 export type EmailMessage = { to: string; subject: string; text: string; html: string; from?: string };
@@ -64,6 +66,8 @@ export class MailerSendProvider implements EmailProvider {
 export class EmailService {
   private readonly logger = new Logger('Email');
   private readonly configured: () => { from: string; providers: EmailProvider[] };
+  /** Afrippa's own email account (its admin's settings), never BitoCard's. */
+  private readonly afrippaConfigured: () => { from: string; providers: EmailProvider[] };
   /** Messages captured when no provider is configured. */
   readonly outbox: EmailMessage[] = [];
 
@@ -71,13 +75,38 @@ export class EmailService {
     integrations: IntegrationsService,
     private readonly prisma: PrismaService,
   ) {
-    this.configured = integrations.derive(config => ({
+    const build = (config: AppConfig) => ({
       from: config.EMAIL_FROM,
       providers: ([
         config.RESEND_API_KEY ? new ResendProvider(config.RESEND_API_KEY, config.RESEND_API_URL) : null,
         config.MAILERSEND_API_KEY ? new MailerSendProvider(config.MAILERSEND_API_KEY, config.MAILERSEND_API_URL) : null,
       ] as Array<EmailProvider | null>).filter((provider): provider is EmailProvider => provider !== null),
-    }));
+    });
+    this.configured = integrations.derive(build);
+    this.afrippaConfigured = integrations.deriveFor('afrippa', build);
+  }
+
+  /**
+   * Afrippa's email (its admins' sign-in links, later its traders'), through Afrippa's own email settings only. Until
+   * Afrippa sets its own, messages are held in the outbox: never sent with BitoCard's account.
+   */
+  async sendFor(platform: Platform, message: EmailMessage): Promise<string> {
+    if (platform === 'bitocard') return this.send(message);
+    const { from, providers } = this.afrippaConfigured();
+    if (providers.length === 0) {
+      this.outbox.push({ ...message, from: `${platform}:outbox` });
+      this.logger.log({ to: message.to, subject: message.subject, platform }, 'Email captured (no provider configured for this product)');
+      return 'outbox';
+    }
+    for (const provider of providers) {
+      try {
+        await provider.send(from, message);
+        return provider.name;
+      } catch (error) {
+        this.logger.warn({ err: error, provider: provider.name, platform }, 'Email provider failed; trying the next one');
+      }
+    }
+    throw new Error('Every email provider failed');
   }
 
   private get providers() {
