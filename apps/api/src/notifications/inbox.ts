@@ -217,6 +217,7 @@ export const notificationTypes = {
   'customer.security.bank_account_added': { realm: 'customer', severity: 'warning', label: 'Bank account added', push: true, locked: true },
   'customer.verification.updated': { realm: 'customer', severity: 'info', label: 'Identity check updated', push: true },
   'customer.security.password_changed': { realm: 'customer', severity: 'warning', label: 'Password changed', push: true, locked: true },
+  'customer.security.two_step_changed': { realm: 'customer', severity: 'warning', label: 'Two-step sign-in changed', push: true, locked: true },
   'customer.security.email_changed': { realm: 'customer', severity: 'warning', label: 'Sign-in email changed', push: true, locked: true },
 } satisfies Record<string, ResellerType | AdminType | PersonalType | CustomerType>;
 

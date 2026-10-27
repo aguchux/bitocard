@@ -84,11 +84,11 @@ export class CustomersService {
   ) {}
 
   /** The customer signed in with this token, or null (ended, expired or suspended). */
-  async resolve(token: string): Promise<{ customer: CustomerWithStore; sessionId: string } | null> {
+  async resolve(token: string): Promise<{ customer: CustomerWithStore; sessionId: string; mfaVerifiedAt: Date | null; mfaReconfirmedAt: Date | null } | null> {
     const session = await this.prisma.customerSession.findUnique({ where: { tokenHash: sha256(token) }, include: { customer: { include: { store: { include: { reseller: { select: { house: true } } } }, market: true } } } });
     if (!session || session.revokedAt || session.expiresAt <= new Date() || session.customer.status !== 'active') return null;
     if (Date.now() - session.lastSeenAt.getTime() > touchEveryMs) await this.prisma.customerSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
-    return { customer: session.customer, sessionId: session.id };
+    return { customer: session.customer, sessionId: session.id, mfaVerifiedAt: session.mfaVerifiedAt, mfaReconfirmedAt: session.mfaReconfirmedAt };
   }
 
   /** Country stores by subdomain, briefly: asked on every signed-in request to one. */
@@ -126,7 +126,8 @@ export class CustomersService {
    * store the reseller's (whatever was sent).
    */
   private async signupCountry(store: Store & { reseller: { house: boolean } }, asked: string | undefined) {
-    if (!store.reseller.house) {
+    // Afrippa's traders choose their country too: its markets are the same countries.
+    if (!store.reseller.house && store.platform !== 'afrippa') {
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: store.resellerId }, select: { country: true } });
       return reseller.country;
     }
@@ -184,8 +185,8 @@ export class CustomersService {
     return { customer: await this.present(customer), session: await this.startSession(customer.id) };
   }
 
-  /** Counts a wrong password atomically (parallel guesses each count) and locks the account at the limit. */
-  private async recordFailedSignIn(customerId: string) {
+  /** Counts a wrong password (or two-step code) atomically (parallel guesses each count) and locks the account at the limit. */
+  async recordFailedSignIn(customerId: string) {
     const { failedSignIns } = await this.prisma.customer.update({ where: { id: customerId }, data: { failedSignIns: { increment: 1 } }, select: { failedSignIns: true } });
     if (failedSignIns < maxFailedSignIns) return;
     await this.prisma.customer.updateMany({
@@ -247,7 +248,10 @@ export class CustomersService {
       this.prisma.customerCode.create({ data: { customerId: customer.id, purpose, codeHash: digest(customer.id, purpose, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
     ]);
     try {
-      await this.email.send(customerCodeEmail(customer.email, { store: store.name, code, purpose }), { resellerId: store.resellerId, name: store.name });
+      const message = customerCodeEmail(customer.email, { store: store.name, code, purpose });
+      // Afrippa's traders hear from Afrippa, through its own email account.
+      if (store.platform === 'afrippa') await this.email.sendFor('afrippa', message);
+      else await this.email.send(message, { resellerId: store.resellerId, name: store.name });
     } catch (error) {
       // Not sent: cancel it so another can be asked for at once.
       await this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
@@ -255,7 +259,30 @@ export class CustomersService {
     }
   }
 
-  private async consumeCode(customer: Customer, purpose: CustomerCodePurpose, code: string) {
+  /**
+   * A new 6-digit code for a purpose (the latest replaces any earlier), sent by the caller. At most one a minute
+   * (`code_recently_sent`) and ten a day (`code_daily_limit`).
+   */
+  async issueCode(customer: Customer, purpose: CustomerCodePurpose, target: string, lifetimeMs = codeLifetimeMs) {
+    const latest = await this.prisma.customerCode.findFirst({ where: { customerId: customer.id, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
+    if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
+    const sentToday = await this.prisma.customerCode.count({ where: { customerId: customer.id, purpose, createdAt: { gt: new Date(Date.now() - 24 * 60 * minute) } } });
+    if (sentToday >= 10) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_daily_limit', 'Too many codes were sent today. Try again tomorrow.');
+    const code = numericCode();
+    await this.prisma.$transaction([
+      this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.customerCode.create({ data: { customerId: customer.id, purpose, target, codeHash: digest(customer.id, purpose, code), expiresAt: new Date(Date.now() + lifetimeMs) } }),
+    ]);
+    return code;
+  }
+
+  /** Withdraws an unsent code (its delivery failed), so another can be asked for at once. */
+  async cancelCode(customerId: string, purpose: CustomerCodePurpose) {
+    await this.prisma.customerCode.updateMany({ where: { customerId, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
+  }
+
+  /** Uses a code (5 attempts, claimed before comparing); returns what it was sent to. */
+  async consumeCode(customer: Customer, purpose: CustomerCodePurpose, code: string) {
     const record = await this.prisma.customerCode.findFirst({ where: { customerId: customer.id, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (!record) throw codeInvalid();
     if (record.expiresAt <= new Date()) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_expired', 'That code has expired. Ask for a new one.', 'code');
@@ -272,7 +299,7 @@ export class CustomersService {
   }
 
   /** A customer has one confirmed number. Changing it leaves the old number in place until the new one is confirmed. */
-  async addPhone(customer: Customer, raw: string) {
+  async addPhone(customer: Customer & { store?: Pick<Store, 'platform'> }, raw: string) {
     // A number from the customer's own country only (normalisePhone refuses others, and asks for the country first).
     const phone = normalisePhone(raw, customer.country);
     const taken = await this.prisma.customer.findFirst({ where: { storeId: customer.storeId, phone, id: { not: customer.id } } });
@@ -288,7 +315,9 @@ export class CustomersService {
       this.prisma.customerCode.create({ data: { customerId: customer.id, purpose, target: phone, codeHash: digest(customer.id, purpose, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
     ]);
     try {
-      await this.sms.sendForCountry(customer.country, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+      // Afrippa's traders get Afrippa's text, through Afrippa's own SMS account.
+      const afrippa = customer.store?.platform === 'afrippa';
+      await this.sms.sendForCountry(customer.country, { to: phone, text: `Your ${afrippa ? 'Afrippa' : 'BitoCard'} code is ${code}. It expires in 30 minutes. Never share it.` }, afrippa ? 'afrippa' : 'bitocard');
     } catch (error) {
       await this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
       if (error instanceof ApiError) throw error;

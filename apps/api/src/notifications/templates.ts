@@ -137,6 +137,37 @@ export function twoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 
   };
 }
 
+/** An Afrippa trader's two-step code (setting a method up, or signing in), in Afrippa's name. */
+export function traderTwoStepCodeEmail(to: string, code: string, purpose: 'sign_in' | 'setup'): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your Afrippa ${purpose === 'setup' ? 'two-step set-up' : 'sign-in'} code`,
+    ...layout(
+      purpose === 'setup' ? 'Set up two-step sign-in' : 'Your sign-in code',
+      [
+        purpose === 'setup' ? 'Enter this code on Afrippa to use emailed codes for two-step sign-in. It expires in 10 minutes.' : 'Enter this code on Afrippa to finish signing in. It expires in 10 minutes.',
+        'Never share it. Afrippa will never ask you for it. If you did not just sign in, change your password.',
+      ],
+      code,
+      'Afrippa',
+    ),
+  };
+}
+
+/** An Afrippa trader's two-step sign-in changed (set up, changed, or reset by Afrippa's operations). */
+export function traderTwoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 'reset', method: string | null): EmailMessage {
+  const lines = {
+    enabled: `Two-step sign-in is set up for your Afrippa account (${method}). You will be asked for a code each time you sign in.`,
+    changed: `Your two-step sign-in method was changed to ${method}.`,
+    reset: 'Afrippa reset your two-step sign-in and signed you out everywhere. Set it up again when you next sign in. Withdrawals wait 24 hours.',
+  } as const;
+  return {
+    to,
+    subject: change === 'reset' ? 'Your two-step sign-in was reset' : 'Your two-step sign-in changed',
+    ...layout('Two-step sign-in', [lines[change], 'If this was not you, change your password and tell the Afrippa team at once.'], undefined, 'Afrippa'),
+  };
+}
+
 /** A set-password link for an admin (from the admin sign-in page: a first visit, or Forgot password). */
 export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number; product?: EmailProduct }): EmailMessage {
   const created = input.kind === 'create';

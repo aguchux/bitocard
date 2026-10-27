@@ -42,7 +42,7 @@ test('customer phone stays unverified until its SMS code is confirmed and is gat
 test('Africa’s Talking uses its assigned country route and checks the recipient result', async () => {
   const { SmsService } = await import('../dist/notifications/sms.service.js');
   const service = new SmsService(
-    { config: { AFRICASTALKING_USERNAME: 'sandbox', AFRICASTALKING_API_KEY: 'test-key' } },
+    { configFor: () => ({ AFRICASTALKING_USERNAME: 'sandbox', AFRICASTALKING_API_KEY: 'test-key' }) },
     { country: { findUnique: async () => ({ smsProvider: 'africas_talking' }) } },
   );
   const original = globalThis.fetch;
@@ -92,7 +92,7 @@ test('a reseller’s numbers are from its business country; extra numbers sign i
 test('Africa’s Talking’s address can be set (tests and sandbox), and a refused recipient is an error', async () => {
   const { SmsService } = await import('../dist/notifications/sms.service.js');
   const service = new SmsService(
-    { config: { AFRICASTALKING_USERNAME: 'live-app', AFRICASTALKING_API_KEY: 'test-key', AFRICASTALKING_API_URL: 'https://sms.example.test/' } },
+    { configFor: () => ({ AFRICASTALKING_USERNAME: 'live-app', AFRICASTALKING_API_KEY: 'test-key', AFRICASTALKING_API_URL: 'https://sms.example.test/' }) },
     { country: { findUnique: async () => ({ smsProvider: 'africas_talking' }) } },
   );
   const original = globalThis.fetch;

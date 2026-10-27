@@ -337,6 +337,10 @@ export class CryptoWithdrawalsService {
   /** Previews or asks for a withdrawal; asking moves the amount and fee out of the wallet and emails the code. */
   async create(customer: CustomerWithStore, input: { asset: string; chain: string; address_id: string; amount: string; preview?: boolean }) {
     const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
+    // After Afrippa's operations reset a trader's two-step sign-in, withdrawals wait 24 hours.
+    if (!input.preview && customer.withdrawalsHeldUntil && customer.withdrawalsHeldUntil > new Date()) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawals_held', `Your two-step sign-in was reset, so withdrawals wait until ${customer.withdrawalsHeldUntil.toISOString()}.`);
+    }
     return this.createFor(this.customerHolder(customer, context.mode), input);
   }
 

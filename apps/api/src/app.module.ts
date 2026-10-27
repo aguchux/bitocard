@@ -45,6 +45,7 @@ import { ResaleModule } from './resale/resale.module.js';
 import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
 import { DisputesModule } from './disputes/disputes.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
+import { AfrippaModule } from './afrippa/afrippa.module.js';
 import { SpinsModule } from './spins/spins.module.js';
 import { ManualTopUpsModule } from './top-ups/manual-top-ups.module.js';
 import { AddressRateLimitGuard, RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
@@ -114,6 +115,7 @@ export class AppModule {
     ResaleModule,
         ShopAssistantModule,
         CryptoModule,
+        AfrippaModule,
         SpinsModule,
         NumbersModule,
         EsimsModule,

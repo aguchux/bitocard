@@ -6,12 +6,12 @@ import { afrippaSubdomain } from './ids.js';
 import { afrippaSignatureHeader, verifyAfrippaRequest } from './signature.js';
 
 /**
- * Afrippa's customer and public routes (`/v1/afrippa/crypto`, `/p2p`, `/markets`, `/traders`): only Afrippa's server
+ * Afrippa's customer and public routes (`/v1/afrippa/account`, `/crypto`, `/p2p`, `/markets`, `/traders`): only Afrippa's server
  * reaches them, by signing each request (`Afrippa-Signature`, `./signature.ts`, with `AFRIPPA_SERVER_SECRET`).
  * Afrippa's admin (`/v1/afrippa/admin/…`) and chain providers' notifications (`/v1/afrippa/webhooks/chain/…`) are not
  * among them: they have their own sign-in and signatures.
  */
-export const afrippaSignedRoutes = /^\/v1\/afrippa\/(?:crypto|p2p|markets|traders)(?:\/|$)/;
+export const afrippaSignedRoutes = /^\/v1\/afrippa\/(?:account|crypto|p2p|markets|traders)(?:\/|$)/;
 
 /** Crypto routes retired with BitoCard's crypto (the exchange, resellers' coins): no one reaches them; step 3 removes them. */
 export const retiredCryptoRoutes = /^\/v1\/(?:store\/exchange|crypto|exchange)(?:\/|$)/;

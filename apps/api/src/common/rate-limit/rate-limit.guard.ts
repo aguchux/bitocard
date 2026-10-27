@@ -63,7 +63,7 @@ function limiterFor(config: AppConfig, limit: number): Limiter {
  * keeps counting in memory instead.
  */
 const sensitivePath =
-  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|disable|recovery-codes))|admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|store\/account\/(signup|signin|handoff\/exchange|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|store\/support\/visitor-chat|kyc\/session)(\?|$)/;
+  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|disable|recovery-codes))|(afrippa\/)?admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|afrippa\/account\/(signup|signin|password\/(forgot|reset|change)|email\/(resend|verify)|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|recovery-codes))|store\/account\/(signup|signin|handoff\/exchange|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|store\/support\/visitor-chat|kyc\/session)(\?|$)/;
 
 export const isSensitive = (method: string, url: string) => method === 'POST' && sensitivePath.test(url);
 

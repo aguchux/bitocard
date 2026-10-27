@@ -2578,6 +2578,20 @@ model Customer {
   ledgerAccounts            LedgerAccount[]
   payments                  Payment[]
   reservedAccounts          ReservedAccount[]
+  /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
+  /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
+  /// secret, encrypted) until its first code.
+  mfaMethod                 MfaMethod?                @map("mfa_method")
+  mfaEnabledAt              DateTime?                 @map("mfa_enabled_at")
+  mfaRecoveryCodeHashes     String[]                  @default([]) @map("mfa_recovery_code_hashes")
+  mfaSetupMethod            MfaMethod?                @map("mfa_setup_method")
+  mfaSetupSecretEncrypted   String?                   @map("mfa_setup_secret_encrypted")
+  mfaSetupAt                DateTime?                 @map("mfa_setup_at")
+  /// The authenticator's secret (encrypted) and the last time step used, so a code is never used twice.
+  totpSecretEncrypted       String?                   @map("totp_secret_encrypted")
+  totpLastStep              BigInt?                   @map("totp_last_step")
+  /// After Afrippa's operations reset a trader's two-step sign-in, on-chain withdrawals wait until then (24 hours).
+  withdrawalsHeldUntil      DateTime?                 @map("withdrawals_held_until")
   /// An admin froze the customer's crypto account: no ads, trades or withdrawals until unfrozen.
   cryptoFrozenAt            DateTime?                 @map("crypto_frozen_at")
   cryptoFrozenReason        String?                   @map("crypto_frozen_reason")
@@ -2649,6 +2663,10 @@ model CustomerSession {
   lastSeenAt DateTime  @default(now()) @map("last_seen_at")
   expiresAt  DateTime  @map("expires_at")
   revokedAt  DateTime? @map("revoked_at")
+  /// Afrippa's traders: when the second step was finished on this session. Until then it can only finish signing in.
+  mfaVerifiedAt     DateTime? @map("mfa_verified_at")
+  /// The trader proved their current method on this session, but admins no longer allow it: they choose another next.
+  mfaReconfirmedAt  DateTime? @map("mfa_reconfirmed_at")
   customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
@@ -2659,6 +2677,20 @@ enum CustomerCodePurpose {
   email_verification
   phone_verification
   password_reset
+  /// Afrippa's two-step sign-in: the first code of an emailed or texted method, and each sign-in's code.
+  mfa_setup
+  mfa_sign_in
+}
+
+/// Which two-step methods Afrippa's traders may use: for all of Afrippa (`WW`) and per market (the trader's country,
+/// winning over `WW`). At least one method each; set by Afrippa's operations.
+model AfrippaTwoStepPolicy {
+  market      String      @id @db.VarChar(2)
+  methods     MfaMethod[]
+  updatedById String?     @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@map("afrippa_two_step_policies")
 }
 
 /// Single-use 6-digit codes emailed to customers. Only a hash is stored.
