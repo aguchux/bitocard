@@ -7,7 +7,20 @@ import { TakeAdForm } from "./crypto-forms";
 const button = "inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600";
 
 /** Collect only the intent here. The dedicated route holds the money-moving form. */
-export function PostAdLauncher({ assets, initialAsset = "USDT", initialSide = "buy", label = "Post ad" }: { assets: string[]; initialAsset?: string; initialSide?: "buy" | "sell"; label?: string }) {
+export function PostAdLauncher({
+  assets,
+  initialAsset = "USDT",
+  initialSide = "buy",
+  initialMarket = "",
+  label = "Post ad",
+}: {
+  assets: string[];
+  initialAsset?: string;
+  initialSide?: "buy" | "sell";
+  /** The market the ad is posted in ("" for the customer's own). */
+  initialMarket?: string;
+  label?: string;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const router = useRouter();
   return (
@@ -27,7 +40,7 @@ export function PostAdLauncher({ assets, initialAsset = "USDT", initialSide = "b
           const side = data.get("side") === "sell" ? "sell" : "buy";
           const asset = String(data.get("asset") ?? "USDT");
           dialog.current?.close();
-          router.push(`/account/crypto/ads/post?${new URLSearchParams({ side, asset })}`);
+          router.push(`/account/crypto/ads/post?${new URLSearchParams({ side, asset, ...(initialMarket ? { market: initialMarket } : {}) })}`);
         }}>
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">I want to</legend>

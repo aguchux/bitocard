@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { StoreCryptoWallets, StoreList, StoreP2pAd } from "@bitocard/api-client/storefront";
+import type { StoreCryptoWallets, StoreList, StoreP2pAd, StoreP2pMarket } from "@bitocard/api-client/storefront";
+import { MarketSwitcher } from "@bitocard/crypto-ui/market-switcher";
 import { card, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/crypto";
 import { PostAdLauncher } from "@/components/app/p2p-dialogs";
 import { MarketAds, MarketFilters } from "@/components/app/p2p-market";
 import { customerApi } from "@/lib/customer";
-import { marketHref, marketQuery, marketState, shownAds } from "@/lib/p2p-market";
+import { marketHref, marketQuery, marketState, shownAds, type MarketChoice } from "@/lib/p2p-market";
 
 export const metadata: Metadata = { title: "P2P market" };
 
@@ -21,11 +22,16 @@ type Search = Record<string, string | string[] | undefined>;
  */
 export default async function MarketPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
-  const overview = await customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto");
+  const [overview, open] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"), customerApi<StoreList<StoreP2pMarket>>("GET", "/v1/store/p2p/markets")]);
   const wallets = overview.ok ? overview.data : null;
-  if (wallets && (!wallets.enabled || !wallets.p2p_enabled)) redirect("/account/crypto/wallets");
+  // P2P open nowhere for the customer (neither their own market nor the global one): the tab opens on their wallets.
+  if (wallets && (!wallets.enabled || (!wallets.p2p_enabled && !wallets.global_enabled))) redirect("/account/crypto/wallets");
   const assets = tradableAssets(wallets);
-  const state = marketState(params, assets, wallets?.currency ?? "USD");
+  // The markets the customer may trade in (their own, the global market, countries taking cross-border trades).
+  const markets: MarketChoice[] | undefined = open.ok && open.data.data.length ? open.data.data.map(({ market, name, currencies, home }) => ({ market, name, currencies, home })) : undefined;
+  const state = marketState(params, assets, wallets?.currency ?? "USD", markets);
+  const chosen = markets?.find(item => (state.market ? item.market === state.market : item.home)) ?? markets?.[0];
+  const marketTab = (item: MarketChoice) => marketHref(state, { market: item.home ? "" : item.market, currency: item.currencies[0], amount: "" });
   // Trading needs the account's declaration (not a US or UK citizen or resident), asked here once per version.
   const blocked = !wallets || wallets.frozen || !wallets.verified || wallets.declaration?.declared === false;
   const book = blocked || !assets.length ? null : await customerApi<StoreList<StoreP2pAd>>("GET", `/v1/store/p2p/market?${marketQuery(state)}`);
@@ -44,19 +50,20 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
             <Link href="/account/crypto/ads" className="hidden min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400 sm:inline-flex">
               My ads
             </Link>
-            <PostAdLauncher assets={assets} initialAsset={state.asset} initialSide={state.side} />
+            <PostAdLauncher assets={assets} initialAsset={state.asset} initialSide={state.side} initialMarket={state.market} />
           </span>
         ) : null}
       </div>
       <CryptoNav current="/account/crypto" />
+      {markets && chosen && !blocked ? <MarketSwitcher markets={markets} current={marketTab(chosen)} href={marketTab} /> : null}
       {blocked ? <CryptoGate wallets={wallets} p2p /> : null}
       {!blocked && assets.length ? (
         <>
-          <MarketFilters state={state} assets={assets} currencies={[...new Set([wallets!.currency, "USD"])]} />
+          <MarketFilters state={state} assets={assets} currencies={chosen?.currencies ?? [...new Set([wallets!.currency, "USD"])]} />
           <p className="text-sm text-slate-600" role="status">
             {book && !book.ok
               ? "The market cannot be shown right now. Try again shortly."
-              : `${ads.length} ${ads.length === 1 ? "ad" : "ads"} ${state.side === "buy" ? `selling ${state.asset}` : `buying ${state.asset}`} for ${state.currency}`}
+              : `${ads.length} ${ads.length === 1 ? "ad" : "ads"} ${state.side === "buy" ? `selling ${state.asset}` : `buying ${state.asset}`} for ${state.currency}${state.market && chosen ? ` in ${chosen.name}` : ""}`}
           </p>
           {ads.length ? (
             <MarketAds ads={ads} state={state} />
@@ -70,7 +77,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
                     Clear filters
                   </Link>
                 ) : null}
-                <PostAdLauncher assets={assets} initialAsset={state.asset} initialSide={state.side === "buy" ? "sell" : "buy"} label="Post an ad" />
+                <PostAdLauncher assets={assets} initialAsset={state.asset} initialSide={state.side === "buy" ? "sell" : "buy"} initialMarket={state.market} label="Post an ad" />
               </div>
             </div>
           ) : null}

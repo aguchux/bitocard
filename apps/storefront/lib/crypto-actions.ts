@@ -108,6 +108,7 @@ export async function postAd(_state: FormState, form: FormData): Promise<FormSta
     side: text(form, "side") === "buy" ? "buy" : "sell",
     asset: text(form, "asset"),
     ...(text(form, "currency") ? { currency: text(form, "currency") } : {}),
+    ...(/^[A-Z]{2}$/.test(text(form, "market")) ? { market: text(form, "market") } : {}),
     price,
     amount,
     min_fiat: min,

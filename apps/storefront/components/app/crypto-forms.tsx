@@ -276,13 +276,31 @@ export function ConfirmTradeForm({ adId, price, feeBps, fiat, label, nonce }: { 
 }
 
 /** Posting an ad: sell (your crypto is locked for the market) or buy (the money it needs is locked). */
-export function PostAdForm({ asset, currency, side, suggestedPrice, suggestedAmount, suggestedMax }: { asset: string; currency: string; side: "buy" | "sell"; suggestedPrice?: string; suggestedAmount?: string; suggestedMax?: string }) {
+export function PostAdForm({
+  asset,
+  currency,
+  side,
+  market = "",
+  suggestedPrice,
+  suggestedAmount,
+  suggestedMax,
+}: {
+  asset: string;
+  currency: string;
+  side: "buy" | "sell";
+  /** The market the ad goes in ("" for the customer's own). */
+  market?: string;
+  suggestedPrice?: string;
+  suggestedAmount?: string;
+  suggestedMax?: string;
+}) {
   const [state, action, pending] = useActionState<FormState, FormData>(postAd, {});
   return (
     <form action={action} className="space-y-4" aria-label="Post an ad">
       <input type="hidden" name="side" value={side} />
       <input type="hidden" name="asset" value={asset} />
       <input type="hidden" name="currency" value={currency} />
+      {market ? <input type="hidden" name="market" value={market} /> : null}
       <FormMessage state={state} />
       <div className="grid gap-3 sm:grid-cols-2">
         <TextField label={`Your price per ${asset} (${currency})`} name="price" inputMode="decimal" defaultValue={suggestedPrice} placeholder="Enter a price" required state={state} hint={suggestedPrice ? "Filled from the current market price and desk markup. You can edit it." : "Enter the price you want to offer."} />

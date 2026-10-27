@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { StoreCryptoWallets, StoreP2pAd } from "@bitocard/api-client/storefront";
+import type { MarketChoice } from "@bitocard/crypto-ui/market";
 
 const customerApi = vi.fn();
 vi.mock("@/lib/customer", () => ({ customerApi: (...args: unknown[]) => customerApi(...args) }));
@@ -14,6 +15,7 @@ vi.mock("next/navigation", () => ({
 
 const { amountMinor, cleanAmount, marketHref, marketQuery, marketState, shownAds } = await import("@/lib/p2p-market");
 const { MarketAds, MarketFilters } = await import("@/components/app/p2p-market");
+const { MarketSwitcher } = await import("@bitocard/crypto-ui/market-switcher");
 const { CryptoNav } = await import("@/components/app/crypto");
 const { default: MarketPage } = await import("@/app/(app)/account/crypto/page");
 const { default: MarketMoved } = await import("@/app/(app)/account/crypto/market/page");
@@ -62,9 +64,9 @@ const ok = <T>(data: T) => ({ ok: true, status: 200, data });
 
 describe("the P2P market's filters", () => {
   test("read from the address, keeping only what is open and valid", () => {
-    expect(marketState({}, ["USDT", "BTC"], "NGN")).toEqual({ side: "buy", asset: "USDT", currency: "NGN", amount: "", q: "", experienced: false, sort: "price", view: "grid" });
+    expect(marketState({}, ["USDT", "BTC"], "NGN")).toEqual({ path: "/account/crypto", market: "", side: "buy", asset: "USDT", currency: "NGN", amount: "", q: "", experienced: false, sort: "price", view: "grid" });
     const state = marketState({ side: "sell", asset: "btc", currency: "usd", amount: "50,000", q: "  Ada ", experienced: "1", sort: "trades", view: "list" }, ["USDT", "BTC"], "NGN");
-    expect(state).toEqual({ side: "sell", asset: "BTC", currency: "USD", amount: "50000", q: "Ada", experienced: true, sort: "trades", view: "list" });
+    expect(state).toEqual({ path: "/account/crypto", market: "", side: "sell", asset: "BTC", currency: "USD", amount: "50000", q: "Ada", experienced: true, sort: "trades", view: "list" });
     // A coin that is not open, another currency and nonsense fall back.
     expect(marketState({ asset: "XRP", currency: "EUR", side: "steal", view: "tiles", amount: "-5" }, ["USDT"], "NGN")).toMatchObject({ asset: "USDT", currency: "NGN", side: "buy", view: "grid", amount: "" });
   });
@@ -90,6 +92,39 @@ describe("the P2P market's filters", () => {
     expect(shownAds(ads, state).map(item => item.id)).toEqual(["a", "b", "c", "d"]);
     expect(shownAds(ads, { ...state, experienced: true }).map(item => item.id)).toEqual(["b", "c", "d"]);
     expect(shownAds(ads, { ...state, sort: "trades" }).map(item => item.id)).toEqual(["b", "d", "c", "a"]);
+  });
+});
+
+describe("choosing a market", () => {
+  const markets = [
+    { market: "NG", name: "Nigeria", currencies: ["NGN", "USD"], home: true },
+    { market: "WW", name: "Global", currencies: ["USD"], home: false },
+    { market: "GH", name: "Ghana", currencies: ["GHS"], home: false },
+  ];
+
+  test("?market= picks one the customer may trade in, in its currencies; anything else is their own", () => {
+    const ghana = marketState({ market: "gh", currency: "USD" }, ["USDT"], "NGN", markets);
+    expect([ghana.market, ghana.currency]).toEqual(["GH", "GHS"]);
+    expect(marketHref(ghana)).toBe("/account/crypto?market=GH&side=buy&asset=USDT&currency=GHS");
+    expect(marketQuery(ghana)).toBe("market=GH&asset=USDT&side=buy&currency=GHS");
+    const global = marketState({ market: "WW" }, ["USDT"], "NGN", markets);
+    expect([global.market, global.currency]).toEqual(["WW", "USD"]);
+    expect(marketState({ market: "KE" }, ["USDT"], "NGN", markets)).toMatchObject({ market: "", currency: "NGN" });
+    expect(marketState({ market: "NG", currency: "USD" }, ["USDT"], "NGN", markets)).toMatchObject({ market: "", currency: "USD" });
+    // Their own market closed (only the global one open to them): the page opens on the global market.
+    expect(marketState({}, ["USDT"], "NGN", markets.slice(1))).toMatchObject({ market: "WW", currency: "USD" });
+  });
+
+  test("the switcher: the standard tabs, one per market with its currencies, the chosen one marked", () => {
+    const state = marketState({ market: "GH" }, ["USDT"], "NGN", markets);
+    const href = (item: MarketChoice) => marketHref(state, { market: item.home ? "" : item.market, currency: item.currencies[0] });
+    const html = renderToStaticMarkup(createElement(MarketSwitcher, { markets, current: href(markets[2]), href }));
+    expect(html).toContain('aria-label="Market"');
+    expect(html).toContain("Nigeria (NGN, USD)");
+    expect(html).toContain("Global (USD)");
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*>Ghana \(GHS\)<\/a>/);
+    expect(html).toContain('href="/account/crypto?side=buy&amp;asset=USDT&amp;currency=NGN"');
+    expect(renderToStaticMarkup(createElement(MarketSwitcher, { markets: markets.slice(0, 1), current: "", href }))).toBe("");
   });
 });
 
@@ -127,7 +162,9 @@ describe("the Crypto tab opens on the market", () => {
   beforeEach(() => customerApi.mockReset());
 
   test("full width, Post ad at the top right, the ads asked with the filters", async () => {
-    customerApi.mockImplementation(async (_method: string, path: string) => (path === "/v1/store/crypto" ? ok(wallets()) : ok({ object: "list", data: [ad("a", 12), ad("b", 3)] })));
+    customerApi.mockImplementation(async (_method: string, path: string) =>
+      path === "/v1/store/crypto" ? ok(wallets()) : path === "/v1/store/p2p/markets" ? ok({ object: "list", data: [] }) : ok({ object: "list", data: [ad("a", 12), ad("b", 3)] }),
+    );
     const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({ asset: "BTC", amount: "1000", experienced: "1" }) }));
     expect(customerApi).toHaveBeenCalledWith("GET", "/v1/store/p2p/market?asset=BTC&side=buy&currency=NGN&fiat=100000");
     expect(html).toContain("data-full-bleed");
@@ -140,14 +177,14 @@ describe("the Crypto tab opens on the market", () => {
   });
 
   test("before trading, the declaration: not a citizen or resident of the US or UK, and no market until it is made", async () => {
-    customerApi.mockImplementation(async () => ok(wallets({ declaration: { version: "2026-10-27", declared: false } })));
+    customerApi.mockImplementation(async (_method: string, path: string) => (path === "/v1/store/crypto" ? ok(wallets({ declaration: { version: "2026-10-27", declared: false } })) : ok({ object: "list", data: [] })));
     const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain("One question before you trade");
     expect(html).toContain("I am not a citizen or a resident of the United States or the United Kingdom.");
     expect(html).toContain('name="version" value="2026-10-27"');
     expect(html).toMatch(/<input type="checkbox" required=""[^>]*name="confirm" value="yes"/);
     expect(html).not.toContain("Post ad");
-    expect(customerApi).toHaveBeenCalledTimes(1);
+    expect(customerApi.mock.calls.some(call => String(call[1]).startsWith("/v1/store/p2p/market?"))).toBe(false);
   });
 
   test("with nothing matching, it says so and offers to clear the filters", async () => {
@@ -158,12 +195,41 @@ describe("the Crypto tab opens on the market", () => {
   });
 
   test("where P2P is not open to the customer the tab opens on their wallets; unverified, it explains why", async () => {
-    customerApi.mockResolvedValueOnce(ok(wallets({ p2p_enabled: false })));
+    const answer = (over: Partial<StoreCryptoWallets>) => customerApi.mockImplementation(async (_method: string, path: string) => (path === "/v1/store/crypto" ? ok(wallets(over)) : ok({ object: "list", data: [] })));
+    answer({ p2p_enabled: false });
     await expect(MarketPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/account/crypto/wallets");
-    customerApi.mockResolvedValueOnce(ok(wallets({ verified: false })));
+    answer({ verified: false });
     const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({}) }));
-    expect(customerApi).toHaveBeenCalledTimes(2);
+    expect(customerApi.mock.calls.some(call => String(call[1]).startsWith("/v1/store/p2p/market?"))).toBe(false);
     expect(html).not.toContain("Post ad");
+  });
+
+  test("with markets to choose, the switcher, and the chosen market's book asked in its currency", async () => {
+    const markets = [
+      { object: "p2p_market", market: "NG", name: "Nigeria", currencies: ["NGN", "USD"], home: true, cross_border: false },
+      { object: "p2p_market", market: "GH", name: "Ghana", currencies: ["GHS"], home: false, cross_border: true },
+    ];
+    customerApi.mockImplementation(async (_method: string, path: string) =>
+      path === "/v1/store/crypto" ? ok(wallets()) : path === "/v1/store/p2p/markets" ? ok({ object: "list", data: markets }) : ok({ object: "list", data: [ad("a", 4, { market: "GH", country: "GH", currency: "GHS" })] }),
+    );
+    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({ market: "GH" }) }));
+    expect(customerApi).toHaveBeenCalledWith("GET", "/v1/store/p2p/market?market=GH&asset=USDT&side=buy&currency=GHS");
+    expect(html).toContain('aria-label="Market"');
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*>Ghana \(GHS\)<\/a>/);
+    expect(html).toContain("1 ad selling USDT for GHS in Ghana");
+    expect(html).toContain('name="market" value="GH"');
+  });
+
+  test("their own market closed, the global market open: the tab opens on the global market", async () => {
+    customerApi.mockImplementation(async (_method: string, path: string) =>
+      path === "/v1/store/crypto"
+        ? ok(wallets({ p2p_enabled: false, global_enabled: true }))
+        : path === "/v1/store/p2p/markets"
+          ? ok({ object: "list", data: [{ object: "p2p_market", market: "WW", name: "Global", currencies: ["USD"], home: false, cross_border: true }] })
+          : ok({ object: "list", data: [] }),
+    );
+    await MarketPage({ searchParams: Promise.resolve({}) });
+    expect(customerApi).toHaveBeenCalledWith("GET", "/v1/store/p2p/market?market=WW&asset=USDT&side=buy&currency=USD");
   });
 
   test("the old Market address goes to the tab with its filters", async () => {
