@@ -18,6 +18,7 @@ Decided by the owner on 27 October 2026. This plan replaces `docs/BITOCARD_CRYPT
 4. **Markets as today:** the global market for everyone, plus a market per African country. Addresses: see Market addresses below (recommended `afrippa.com/ng`).
 5. **All nine coins,** each switched on by admins (per coin and per market; off until switched on).
 6. **Both sides pay a fee, the seller more,** at rates admins set per coin and market.
+7. **BitoCard keeps no crypto at all: no signing keys, no signer, no custody.** Everything crypto that was built (the signer `apps/signer` and its Turnkey wallet, the account xpubs, the chain providers, sanctions screening, the custody check, the coin wallets and their ledger accounts, `apps/crypto` and `@bitocard/crypto-ui`) is rebranded to serve Afrippa and belongs to it alone.
 
 **Afrippa's addresses:** `afrippa.com` (the site and its markets), `admin.afrippa.com` (its admin), `verify.afrippa.com` (identity checks), `api.afrippa.com` (its door to the API).
 
@@ -106,7 +107,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
    - **Its own sections:** overview, markets, coins and networks (switched on per market), ads, orders and appeals, traders (members: profile, identity check, limits, freezes, standing, sessions, suspension), deposits and withdrawals, custody and the signer, fees, limits, help desk and live chat, the assistant, moderation and reports, notifications, settings and integrations, admins and their roles, the audit log.
    - **Its own settings:** feature switches, integrations (email sender, chain providers, the signer and its keys, screening, AI keys), legal documents and markets, so an Afrippa change never touches BitoCard.
    - **Brands in the data:** a `brands` table (BitoCard, Afrippa) still tags every brand-owned record, so the shared instruments keep each brand's data apart and either admin reads only its own.
-5. **Ready to leave.** Afrippa should have **its own wallet keys and signer** (its own xpubs, its own Turnkey wallet), so custody is separate from day one. Nothing in Afrippa reads BitoCard tables except the shared infrastructure above, so it can later move to its own database and service (needed if a separate company or a licence requires it) as a deployment change, not a rewrite.
+5. **Ready to leave.** **The signer and the keys are Afrippa's** (answer 7): the signer serves only Afrippa's API surface, its xpubs and Turnkey wallet are Afrippa's, and BitoCard has no crypto keys or signing of its own, so custody is Afrippa's from day one. Nothing in Afrippa reads BitoCard tables except the shared infrastructure above, so it can later move to its own database and service (needed if a separate company or a licence requires it) as a deployment change, not a rewrite.
 
 ## The escrow P2P engine (new)
 
@@ -147,8 +148,9 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
    - The `spin_rewards` switch no longer needs crypto to be on (`CryptoWalletsService.require` comes off it); the terms of use's Spin and win section is rewritten for dollars.
 6. **Legal documents:** the crypto, P2P and spin sections leave BitoCard's terms of use, reseller terms and privacy notice (`legalUpdated` bumped); Afrippa gets its own documents on afrippa.com.
 7. **Data:** confirm there are no live crypto balances, ads or withdrawals (crypto was never switched on live). If any exist, the holders are told and can withdraw on chain for a set period; sandbox data is archived.
-8. `crypto.bitocard.com` is never created: drop the plan's Vercel and DNS steps and remove `crypto` from the handoff targets and `isHouseOrigin`.
-9. Docs: `AGENTS.md`, `PLANS.md` and this plan updated; the old plan marked superseded.
+8. **Crypto settings leave BitoCard's admin:** Settings > Integrations > Blockchain (wallet keys `CRYPTO_XPUB_*`/`CRYPTO_TEST_XPUB_*`, the chain providers, the Crypto signer, Chainalysis and TRM screening) and CoinGecko prices go from BitoCard's integrations; their saved values are carried over to Afrippa's settings (step 2), never deleted. BitoCard's admin loses its Crypto section (customers' coins, freezes, deposits, withdrawals, chains, assets, custody check, P2P, exchange); the jobs `crypto`, `chain-health` and `crypto-reconcile` run for Afrippa only.
+9. `crypto.bitocard.com` is never created: drop the plan's Vercel and DNS steps and remove `crypto` from the handoff targets and `isHouseOrigin`.
+10. Docs: `AGENTS.md`, `PLANS.md` and this plan updated; the old plan marked superseded.
 
 ### 2. Afrippa's own surface in the API
 1. Brands in the API: the `brands` table, BitoCard's data tagged `bitocard` by migration; the **Afrippa admin realm** (`afrippa_admin`: accounts, two-step, step-up, sessions on admin.afrippa.com, its own setup list and email domain, its own audit log) and its routes under `/v1/afrippa/admin/…`, each realm refusing the other.
@@ -157,8 +159,9 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 4. The crypto routes under their own prefix, signed by Afrippa's server only, left out of OpenAPI.
 5. Afrippa's accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from afrippa.com.
 6. **verify.afrippa.com:** the Verify API serves Afrippa's cases under its brand (links on verify.afrippa.com, documents in Afrippa's own private storage, reviewed only through Afrippa's admin realm).
-7. Ledger accounts and reports under the operator account.
-8. Tests on PGlite and Docker: no BitoCard caller can reach any Afrippa route, and no Afrippa caller any BitoCard route.
+7. Ledger accounts and reports under the operator account; the coin wallets, custody, fees, deposits, withdrawals, addresses and chain records all Afrippa's.
+8. **Crypto integrations become Afrippa's:** the wallet keys, chain providers, signer, screening and price feed are Afrippa's integration settings (carried over from BitoCard's, edited only in Afrippa's admin), read only by Afrippa's services.
+9. Tests on PGlite and Docker: no BitoCard caller can reach any Afrippa route, and no Afrippa caller any BitoCard route.
 
 ### 3. The escrow engine
 1. Payment methods (saved, encrypted, name-checked).
@@ -177,6 +180,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 4. **Market addresses:** the global market at `afrippa.com`, each country at `afrippa.com/ng` (as built), and `ng.afrippa.com`-style short addresses redirecting there for good (see Market addresses).
 5. **verify.afrippa.com:** the Verify app (`apps/verify`) made brand-configurable (name, colours, logo, domain, the review console's sign-in) and deployed a second time as its own Vercel project for Afrippa.
 6. **admin.afrippa.com:** `apps/afrippa-admin`, its own Vercel project, on the shared admin components, with the sections in Architecture 4.
+7. **The signer rebranded:** `apps/signer` becomes Afrippa's (`@afrippa/signer`, its Vercel project and team renamed or moved to Afrippa, its address on afrippa.com), `docs/crypto-signer.md` rewritten as Afrippa's protocol, its Turnkey organisation and wallet named for Afrippa; the API asks it only for Afrippa. Its secrets are rotated in the move.
 
 ### 5. Hardening
 1. A security review of escrow, release and appeals.
