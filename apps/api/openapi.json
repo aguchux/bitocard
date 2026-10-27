@@ -1706,6 +1706,10 @@
                     "reseller_exchange": false,
                     "reseller_desks": false,
                     "spin_rewards": false,
+                    "crypto_app": false,
+                    "crypto_global": false,
+                    "crypto_cross_border": false,
+                    "crypto_install_prompt": false,
                     "store_template_all_in_one": true,
                     "store_template_topups": true,
                     "store_template_gift_cards": true,
@@ -50838,6 +50842,10 @@
               "reseller_exchange",
               "reseller_desks",
               "spin_rewards",
+              "crypto_app",
+              "crypto_global",
+              "crypto_cross_border",
+              "crypto_install_prompt",
               "store_template_all_in_one",
               "store_template_topups",
               "store_template_gift_cards",
@@ -50915,6 +50923,22 @@
               "spin_rewards": {
                 "type": "boolean",
                 "description": "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared."
+              },
+              "crypto_app": {
+                "type": "boolean",
+                "description": "BitoCard Crypto (crypto.bitocard.com) shows this country's market. Its residents and its ID documents are allowed in BitoCard Crypto only where it, or global trading, is on."
+              },
+              "crypto_global": {
+                "type": "boolean",
+                "description": "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off. Needs both."
+              },
+              "crypto_cross_border": {
+                "type": "boolean",
+                "description": "Residents of other allowed countries may trade in this country's local-currency P2P market (a Nigerian selling USDT for cedis in Ghana's), within its cross-border limits."
+              },
+              "crypto_install_prompt": {
+                "type": "boolean",
+                "description": "BitoCard Crypto offers to install itself as an app, at most three times per visitor."
               },
               "store_template_all_in_one": {
                 "type": "boolean",

@@ -549,6 +549,8 @@ export type StoreP2pAd = {
   decimals: number;
   currency: string;
   country: string;
+  /** The ad's market: a country code, or `WW` for the global market (US dollars, across countries). */
+  market: string;
   price: number;
   available: string;
   total: string;
@@ -564,6 +566,12 @@ export type StoreP2pAd = {
   updated_at: string;
 };
 
+/**
+ * A market the customer may trade in now (`GET /v1/store/p2p/markets`): their own (`home`, local currency and US
+ * dollars), the global market (`WW`, US dollars) and other countries taking cross-border trades (their currency only).
+ */
+export type StoreP2pMarket = { object: 'p2p_market'; market: string; name: string; currencies: string[]; home: boolean; cross_border: boolean };
+
 /** What a trade would be: the crypto, BitoCard's fee, what the buyer receives and the fiat (minor units). */
 export type StoreP2pTerms = { asset: string; currency: string; price: number; amount: string; fee: string; received: string; fiat: number };
 /** `side`: what the viewer does (buy from a sell ad, sell to a buy ad). */
@@ -578,6 +586,8 @@ export type StoreP2pTrade = StoreP2pTerms & {
   side: 'buy' | 'sell';
   role: 'maker' | 'taker';
   ad_id: string;
+  /** The market traded in: a country code, or `WW` for the global market. */
+  market: string;
   counterparty: { nickname: string };
   settlement: 'instant' | 'classic';
   status: string;

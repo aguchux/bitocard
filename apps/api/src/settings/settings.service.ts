@@ -67,6 +67,23 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared.",
   },
+  crypto_app: {
+    scopes: ['global', 'country'],
+    description: "BitoCard Crypto (crypto.bitocard.com) shows this country's market. Its residents and its ID documents are allowed in BitoCard Crypto only where it, or global trading, is on.",
+  },
+  crypto_global: {
+    scopes: ['global', 'country'],
+    description:
+      "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off. Needs both.",
+  },
+  crypto_cross_border: {
+    scopes: ['country'],
+    description: "Residents of other allowed countries may trade in this country's local-currency P2P market (a Nigerian selling USDT for cedis in Ghana's), within its cross-border limits.",
+  },
+  crypto_install_prompt: {
+    scopes: ['global', 'country'],
+    description: 'BitoCard Crypto offers to install itself as an app, at most three times per visitor.',
+  },
   store_template_all_in_one: {
     scopes: ['global', 'country', 'reseller'],
     default: true,
@@ -243,6 +260,12 @@ export class SettingsService {
       pick(row => row.countryCode === null && row.resellerId === null) ??
       switchDefault(key)
     );
+  }
+
+  /** A switch's global value alone (its global row, else its default): for switches whose global level means the feature itself. */
+  async isOnGlobally(key: SwitchKey) {
+    const row = await this.prisma.featureSwitch.findFirst({ where: { key, countryCode: null, resellerId: null } });
+    return row?.enabled ?? switchDefault(key);
   }
 
   /** Whether a switch is on for a market as a whole: its country, else the global one, else its default. No reseller in mind. */

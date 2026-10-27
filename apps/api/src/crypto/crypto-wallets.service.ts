@@ -108,12 +108,20 @@ export class CryptoWalletsService {
 
   /** The checks before any new crypto business (deposits, ads, trades): the store open and crypto on for it, then `requireHolder`'s. */
   async require(customer: CustomerWithStore) {
-    if (!this.stores.isHouse(customer.store)) await this.stores.seller(customer.store, '');
-    const context = await this.requireHolder(customer, 'using crypto');
+    const context = await this.requireOpen(customer);
     if (!(await this.enabled(context.seller))) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'crypto_not_enabled', 'Crypto is not available in your country yet.');
     }
     return context;
+  }
+
+  /**
+   * `require` without the crypto switch: the store open, then `requireHolder`'s checks. For the P2P markets, whose
+   * switches depend on the market (the global market does not need the customer's own country's crypto on).
+   */
+  async requireOpen(customer: CustomerWithStore) {
+    if (!this.stores.isHouse(customer.store)) await this.stores.seller(customer.store, '');
+    return this.requireHolder(customer, 'using crypto');
   }
 
   /**

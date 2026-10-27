@@ -46,6 +46,10 @@ class NicknameDto {
 }
 
 class MarketQueryDto {
+  /** The market: a country code, or WW for the global market. Default: the customer's own country. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'market must be a country code such as NG, or WW' })
+  market?: string;
+
   @Transform(upper) @assetCode()
   asset: string;
 
@@ -68,6 +72,10 @@ class MarketQueryDto {
 }
 
 class QuoteQueryDto {
+  /** The market: a country code, or WW for the global market. Default: the customer's own country. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'market must be a country code such as NG, or WW' })
+  market?: string;
+
   @Transform(upper) @assetCode()
   asset: string;
 
@@ -85,6 +93,10 @@ class QuoteQueryDto {
 }
 
 class CreateAdDto {
+  /** The market: a country code, or WW for the global market. Default: the customer's own country. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'market must be a country code such as NG, or WW' })
+  market?: string;
+
   @IsIn(['buy', 'sell'])
   side: AdSide;
 
@@ -418,6 +430,12 @@ export class CustomerP2pController {
   @Put('profile')
   setNickname(@CurrentCustomer() caller: CustomerCaller, @Body() body: NicknameDto) {
     return this.p2p.setNickname(caller.customer, body.nickname);
+  }
+
+  /** The markets the customer may trade in now: their own, the global market, and countries taking cross-border trades. */
+  @Get('markets')
+  markets(@CurrentCustomer() caller: CustomerCaller) {
+    return this.p2p.markets(caller.customer);
   }
 
   @Get('market')

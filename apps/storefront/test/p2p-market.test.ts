@@ -27,6 +27,7 @@ const ad = (id: string, trades: number, extra: Partial<StoreP2pAd> = {}): StoreP
   decimals: 6,
   currency: "NGN",
   country: "NG",
+  market: "NG",
   price: 165000,
   available: "250.000000",
   total: "300.000000",

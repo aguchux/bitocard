@@ -1,6 +1,6 @@
 # BitoCard Crypto (`crypto.bitocard.com`): plan
 
-**Status:** planned 27 October 2026; the owner's decisions recorded the same day (below). Built so far: `crypto` reserved as a subdomain no store can take. Everything else is to build.
+**Status:** planned 27 October 2026; the owner's decisions recorded the same day (below). Built so far: `crypto` reserved as a subdomain no store can take; stage 1a (below).
 
 BitoCard Crypto is a public crypto market app in the style of BitoCard Shop: `apps/crypto` at `https://crypto.bitocard.com`, with the **global market** at `/` (US dollars, traded across BitoCard's African markets) and a **country market** at `/<cc>` (`/ng` in naira, `/ke` in shillings, `/gh` in cedis). It is built on what already exists: the P2P order books, ads, instant trades, crypto wallets, deposits and withdrawals, cash-out and the sign-in handoff BitoCard Shop uses. What is new is the global book, the app itself, and **global money rails**: ways to pay USD in and take USD out that admins integrate and switch on.
 
@@ -135,6 +135,8 @@ Built like `apps/shop` (Next.js App Router, server components reading the API on
 
 0. **Decisions and protection.** Done: the decisions above, and `crypto` reserved. Still to do: legal intake (licensing per market, the cross-border model, the entity). Ask Flutterwave, Paystack and Payoneer the payout questions.
 1. **Markets in the API.**
+   - **1a, built 27 October 2026:** the `market` parameter on the market, quote and ad routes (`GET /v1/store/p2p/markets` lists the customer's), `P2pService.access` (home, global `WW` in USD, other countries' local books), the switches `crypto_app`, `crypto_global`, `crypto_cross_border` and `crypto_install_prompt` (`SettingsService.isOnGlobally` for the global level), ads and trades carrying `market`, and every sale credited as P2P money in its currency. Tests in `test/p2p.test.mjs` (markets: global trades between a Nigerian and a Ghanaian whose own market is off, cross-border cedi trades and spending them, refusals, switching off).
+   - **Next (1b to 1d):** on-chain deposits and the crypto overview for global-only residents (today `crypto_wallets` gates them); every currency held listed in `GET /v1/store/crypto`; cash-out only through the customer's own country's rails; the declaration and the allowed document countries; per-market limits and holds; public reads.
    - The `market` parameter, home, cross-border and global access, the three switches, and the `WW` book.
    - All sale money withdrawable by currency; holdings in other markets' currencies.
    - Per-market limits and holds; the citizenship declaration and the refused document countries; public reads.
