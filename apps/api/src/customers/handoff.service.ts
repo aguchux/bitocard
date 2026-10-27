@@ -29,8 +29,8 @@ export class HandoffService {
 
   /**
    * The origin, if it is one of BitoCard's own sites a customer may be handed to: bitocard.com (`STOREFRONT_URL`), a
-   * published BitoCard country store under it (`<cc>.<host>`, same scheme and port), BitoCard Shop (`SHOP_URL`) or
-   * BitoCard Crypto (`CRYPTO_URL`).
+   * published BitoCard country store under it (`<cc>.<host>`, same scheme and port) or BitoCard Shop (`SHOP_URL`).
+   * Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): its site has accounts of its own and is never a target.
    */
   async target(to: string) {
     let url: URL;
@@ -41,7 +41,7 @@ export class HandoffService {
     }
     if (`${url.origin}` !== to.replace(/\/+$/, '')) return null;
     const store = new URL(this.integrations.config.STOREFRONT_URL);
-    const sites = [this.integrations.config.SHOP_URL, this.integrations.config.CRYPTO_URL].map(site => new URL(site).origin);
+    const sites = [new URL(this.integrations.config.SHOP_URL).origin];
     if (url.origin === store.origin || sites.includes(url.origin)) return url.origin;
     const suffix = `.${store.host}`;
     if (url.protocol === store.protocol && url.host.endsWith(suffix)) {

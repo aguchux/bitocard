@@ -13,7 +13,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { paymentGateways } from '../payments/payment-providers.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { cryptoSiteFor, desktopNavFor, installPromptFor } from '../stores/stores.service.js';
+import { desktopNavFor, installPromptFor } from '../stores/stores.service.js';
 import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.service.js';
 import { EsimsService } from '../esims/esims.service.js';
 import { StoreSellers } from './store-sellers.js';
@@ -404,8 +404,6 @@ export class CheckoutController {
       object: 'store_app' as const,
       desktop_nav: await desktopNavFor(this.settings, store),
       install_prompt: await installPromptFor(this.settings, store),
-      /** BitoCard's own stores hand their Crypto tab over to BitoCard Crypto while it is live. */
-      crypto_site: await cryptoSiteFor(this.settings, store),
     };
   }
 

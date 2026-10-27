@@ -100,14 +100,6 @@ export async function desktopNavFor(settings: SettingsService, store: Pick<Store
 }
 
 /**
- * Whether a store's Crypto tab hands its customers over to BitoCard Crypto (crypto.bitocard.com): only BitoCard's own
- * stores, once BitoCard Crypto is live (`crypto_app` at the global level). Resellers' stores keep their own Crypto tab.
- */
-export async function cryptoSiteFor(settings: SettingsService, store: { reseller: Pick<Reseller, 'house'> }): Promise<boolean> {
-  return store.reseller.house && (await settings.isOnGlobally('crypto_app'));
-}
-
-/**
  * Whether a store asks shoppers to install bitocard.com as an app: only BitoCard's own stores (root bitocard.com and
  * each market's country store, whose house account resolves the market's `storefront_install_prompt`, root's the
  * global one), never a reseller's, whose site is installed under BitoCard's name.
@@ -303,7 +295,7 @@ export class StoresService {
       house: store.reseller.house,
       /** The store's plan has Your brand only: its pages leave BitoCard's name out. */
       white_label: await this.planAccess.storeHas(store.id, 'white_label'),
-      app: { desktop_nav: await desktopNavFor(this.settings, store), install_prompt: await installPromptFor(this.settings, store), crypto_site: await cryptoSiteFor(this.settings, store) },
+      app: { desktop_nav: await desktopNavFor(this.settings, store), install_prompt: await installPromptFor(this.settings, store) },
       domain: (await this.prisma.storeDomain.findFirst({ where: { storeId: store.id, status: 'active', primary: true }, select: { name: true } }))?.name ?? null,
     };
   }

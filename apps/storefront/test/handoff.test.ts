@@ -14,7 +14,6 @@ let reply: (url: string, method: string) => Response | null;
 beforeEach(() => {
   vi.stubEnv("STOREFRONT_URL", "https://bitocard.com");
   vi.stubEnv("SHOP_URL", "https://shop.bitocard.com");
-  vi.stubEnv("CRYPTO_URL", "https://crypto.bitocard.com");
   calls = [];
   reply = () => null;
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
@@ -35,8 +34,8 @@ afterEach(() => {
 
 describe("the signed-in cookie", () => {
   test("names only BitoCard's own sites, on the parent domain", () => {
-    for (const origin of ["https://bitocard.com", "https://ng.bitocard.com", "https://shop.bitocard.com", "https://crypto.bitocard.com"]) expect(isHouseOrigin(origin), origin).toBe(true);
-    for (const origin of ["https://evil.com", "https://acme-store.bitocard.com", "http://ng.bitocard.com", "https://ng.bitocard.com/", "https://bitocard.com.evil.com", "https://crypto.bitocard.com.evil.com", "nope"]) expect(isHouseOrigin(origin), origin).toBe(false);
+    for (const origin of ["https://bitocard.com", "https://ng.bitocard.com", "https://shop.bitocard.com"]) expect(isHouseOrigin(origin), origin).toBe(true);
+    for (const origin of ["https://evil.com", "https://acme-store.bitocard.com", "http://ng.bitocard.com", "https://ng.bitocard.com/", "https://bitocard.com.evil.com", "https://crypto.bitocard.com", "nope"]) expect(isHouseOrigin(origin), origin).toBe(false);
     expect(signedInDomain()).toBe(".bitocard.com");
     vi.stubEnv("STOREFRONT_URL", "http://localhost:3000");
     expect(signedInDomain()).toBeUndefined();

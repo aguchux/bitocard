@@ -7802,8 +7802,7 @@
                   "white_label": true,
                   "app": {
                     "desktop_nav": "rail",
-                    "install_prompt": false,
-                    "crypto_site": false
+                    "install_prompt": false
                   },
                   "domain": "adadigital.com"
                 }
@@ -51986,8 +51985,7 @@
             "description": "How the customer account app looks.",
             "required": [
               "desktop_nav",
-              "install_prompt",
-              "crypto_site"
+              "install_prompt"
             ],
             "additionalProperties": false,
             "properties": {
@@ -52002,10 +52000,6 @@
               "install_prompt": {
                 "type": "boolean",
                 "description": "Whether the store asks shoppers to install it as an app: only BitoCard’s own stores, where an admin switched it on; always false on resellers’ stores."
-              },
-              "crypto_site": {
-                "type": "boolean",
-                "description": "Whether the store’s Crypto tab hands its customers over to BitoCard Crypto (crypto.bitocard.com): only BitoCard’s own stores, once BitoCard Crypto is live; always false on resellers’ stores, which keep their own Crypto tab."
               }
             }
           },

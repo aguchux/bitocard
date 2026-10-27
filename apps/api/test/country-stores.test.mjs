@@ -249,21 +249,6 @@ describe('country stores: storefront routing and the root redirect (Stage 4)', (
     }
   });
 
-  test('BitoCard’s own stores hand their Crypto tab to BitoCard Crypto once it is live (the global level of crypto_app)', async () => {
-    const site = async store => (await (await fetch(`${server.base}/v1/store/app${store ? `?store=${store}` : ''}`)).json()).crypto_site;
-    assert.deepEqual([await site(null), await site('ng')], [false, false]);
-    try {
-      // A country switched on alone is not BitoCard Crypto going live.
-      assert.equal((await admin.put('/v1/admin/switches/crypto_app', { country_code: 'NG', enabled: true })).status, 200);
-      assert.deepEqual([await site(null), await site('ng')], [false, false]);
-      assert.equal((await admin.put('/v1/admin/switches/crypto_app', { enabled: true })).status, 200);
-      assert.deepEqual([await site(null), await site('ng')], [true, true]);
-    } finally {
-      await admin.put('/v1/admin/switches/crypto_app', { country_code: 'NG', enabled: null });
-      await admin.put('/v1/admin/switches/crypto_app', { enabled: null });
-    }
-  });
-
   test('root offers a market’s live, ready country store; a market with no switch or no ready store stays null', async () => {
     const gh = await house.storeFor('GH');
     // GH's store exists (as NG's did before its switch and ready host were set) but is not yet switched on or ready.
