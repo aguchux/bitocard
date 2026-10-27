@@ -1,11 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { CryptoMarkets } from "@bitocard/api-client/crypto";
 import type { StoreP2pAd } from "@bitocard/api-client/storefront";
+import { setRequest } from "./request";
 
 const { book, bookQuery, cryptoApi, marketAt, marketPath } = await import("@/lib/api");
 const { MarketBook } = await import("@/components/book");
-const { MarketNav } = await import("@/components/header");
+const { AccountArea, MarketNav } = await import("@/components/header");
+const { GET: handoffGo } = await import("@/app/handoff/go/route");
 const { MarketsList } = await import("@/components/markets-list");
 const { TraderCard } = await import("@/components/trader-card");
 const { marketMetadata, pageState } = await import("@/components/market-page");
@@ -15,8 +18,8 @@ const shown: CryptoMarkets = {
   mode: "live",
   assets: ["USDT", "BTC"],
   data: [
-    { object: "crypto_market", market: "WW", name: "Global", currencies: ["USD"], ads: { USD: 3 } },
-    { object: "crypto_market", market: "NG", name: "Nigeria", currencies: ["NGN", "USD"], ads: { NGN: 5, USD: 1 } },
+    { object: "crypto_market", market: "WW", name: "Global", currencies: ["USD"], ads: { USD: 3 }, install_prompt: false },
+    { object: "crypto_market", market: "NG", name: "Nigeria", currencies: ["NGN", "USD"], ads: { NGN: 5, USD: 1 }, install_prompt: true },
   ],
 };
 
@@ -52,7 +55,13 @@ const fetchMock = vi.fn();
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  vi.stubEnv("STOREFRONT_URL", "https://bitocard.com");
+  vi.stubEnv("CRYPTO_URL", "https://crypto.bitocard.com");
+  setRequest({});
 });
+afterEach(() => vi.unstubAllEnvs());
+
+const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", email_verified: true, country: "NG", currency: "NGN", created_at: "2026-10-01T00:00:00.000Z" };
 afterEach(() => vi.unstubAllGlobals());
 
 /** Answers the API's public crypto endpoints from fixtures. */
@@ -60,6 +69,8 @@ const answer = (ads: StoreP2pAd[] = [ad("a")]) =>
   fetchMock.mockImplementation(async (url: string) => {
     if (url.endsWith("/v1/crypto/markets")) return json(shown);
     if (url.includes("/ads?")) return json({ object: "list", market: "NG", asset: "USDT", currency: "NGN", side: "buy", data: ads });
+    if (url.endsWith("/v1/store/account")) return json(customer);
+    if (url.endsWith("/v1/store/account/handoff")) return json({ object: "customer_handoff", code: "bch_abcdefghijklmnopqrstuvwxyz0123456789", to: "https://ng.bitocard.com" });
     if (url.includes("/v1/crypto/traders/TraderA")) return json({ object: "p2p_trader", nickname: "TraderA", trades_30d: 4, trades_total: 15, open_ads: 2, markets: ["NG", "WW"], since: "2026-09-01T00:00:00.000Z" });
     return json({ error: { code: "resource_missing" } }, 404);
   });
@@ -97,14 +108,48 @@ describe("reading the public data, cached", () => {
 describe("the small parts of a market page", () => {
   const nigeria = shown.data[1];
 
-  test("the book: its ads, each traded on the customer's BitoCard account in the same market", async () => {
+  test("the book: its ads; signed out, taking one signs in here first and comes back to this very view", async () => {
     answer([ad("a"), ad("b", { trader: { nickname: "Traderb", trades_30d: 0, trades_total: 1 } })]);
     const state = pageState(nigeria, shown.assets, {});
     const html = renderToStaticMarkup(await MarketBook({ market: "NG", name: "Nigeria", state }));
     expect(html).toContain("2 ads selling USDT for NGN in Nigeria");
     expect(html).toContain("Tradera");
-    expect(html).toMatch(/href="http:\/\/localhost:3000\/account\/crypto\?market=NG&amp;side=buy&amp;asset=USDT&amp;currency=NGN"/);
+    expect(html).toContain('href="/signin?next=%2Fng%3Fside%3Dbuy%26asset%3DUSDT%26currency%3DNGN&amp;for=trade"');
     expect(html).toContain("Buy USDT");
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/v1/store/account")), "no session, no account asked").toBe(false);
+  });
+
+  test("signed in, taking an ad goes straight to their country store's Crypto tab, signed in there through the handoff", async () => {
+    setRequest({}, { bc_customer: "bcc_token" });
+    answer();
+    const html = renderToStaticMarkup(await MarketBook({ market: "WW", name: "the global market", state: pageState(shown.data[0], shown.assets, {}) }));
+    const href = new URL(html.match(/href="([^"]+)"[^>]*>Buy USDT/)![1].replaceAll("&amp;", "&"));
+    expect(href.origin + href.pathname).toBe("https://crypto.bitocard.com/handoff/go");
+    expect(href.searchParams.get("to")).toBe("https://ng.bitocard.com");
+    expect(href.searchParams.get("next")).toBe("/account/crypto?market=WW&side=buy&asset=USDT&currency=NGN");
+  });
+
+  test("the account area: Sign in and Trade now signed out; Sign out with their first name and their own Trade now signed in", async () => {
+    answer();
+    const out = renderToStaticMarkup(await AccountArea());
+    expect(out).toContain('href="/signin?next=%2F"');
+    expect(out).toContain('href="/signin?next=%2F&amp;for=trade"');
+    setRequest({}, { bc_customer: "bcc_token" });
+    const signedIn = renderToStaticMarkup(await AccountArea());
+    expect(signedIn).toContain("Sign out (Ada)");
+    expect(signedIn).toContain("https://crypto.bitocard.com/handoff/go?to=https%3A%2F%2Fng.bitocard.com&amp;next=%2Faccount%2Fcrypto");
+  });
+
+  test("handing off from here: only to BitoCard's own sites, signed in; else sign in first", async () => {
+    const go = (query: string) => handoffGo(new NextRequest(`https://crypto.bitocard.com/handoff/go?${query}`));
+    const toStore = "to=https%3A%2F%2Fng.bitocard.com&next=%2Faccount%2Fcrypto";
+    expect((await go(toStore)).headers.get("location")).toBe(`https://crypto.bitocard.com/signin?next=${encodeURIComponent(`/handoff/go?${toStore}`)}`);
+    expect((await go("to=https%3A%2F%2Fevil.example&next=%2Fng")).headers.get("location")).toBe("https://crypto.bitocard.com/ng");
+    setRequest({}, { bc_customer: "bcc_token" });
+    answer();
+    const sent = await go(toStore);
+    expect(sent.status).toBe(303);
+    expect(sent.headers.get("location")).toBe("https://ng.bitocard.com/handoff#c=bch_abcdefghijklmnopqrstuvwxyz0123456789&n=%2Faccount%2Fcrypto");
   });
 
   test("an empty book offers to clear the filters; an unreachable one says so in its own place", async () => {

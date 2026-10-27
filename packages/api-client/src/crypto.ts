@@ -6,7 +6,8 @@ import type { StoreP2pAd } from "./storefront";
  */
 
 /** A market shown on crypto.bitocard.com: the global market (`WW`, US dollars) or a country, with ads per currency. */
-export type CryptoMarket = { object: "crypto_market"; market: string; name: string; currencies: string[]; ads: Record<string, number> };
+/** `install_prompt`: whether visitors are asked to install BitoCard Crypto as an app on this market's pages. */
+export type CryptoMarket = { object: "crypto_market"; market: string; name: string; currencies: string[]; ads: Record<string, number>; install_prompt: boolean };
 
 /** `GET /v1/crypto/markets`: the mode bitocard.com trades in, the coins on sale (in order) and the markets shown. */
 export type CryptoMarkets = { object: "list"; mode: "live" | "test"; assets: string[]; data: CryptoMarket[] };

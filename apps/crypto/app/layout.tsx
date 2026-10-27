@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { legalDocuments } from "@bitocard/ui/legal";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { colors } from "@bitocard/ui/tokens";
+import { InstallSupport } from "@bitocard/ui/install-ui";
+import { installCaptureScript } from "@bitocard/ui/install";
 import "./globals.css";
 
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
@@ -50,12 +52,16 @@ function Footer() {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-GB" className={inter.variable}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
+      </head>
       <body className="min-h-dvh overflow-x-clip font-sans">
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
           Skip to content
         </a>
         {children}
         <Footer />
+        <InstallSupport />
       </body>
     </html>
   );

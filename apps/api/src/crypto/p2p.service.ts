@@ -385,12 +385,17 @@ export class P2pService {
       _count: { _all: true },
     });
     const ads = (market: string, currency: string) => counts.find(row => row.country === market && row.currency === currency)?._count._all ?? 0;
+    // Whether visitors are asked to install BitoCard Crypto as an app: the global level on the global market, each
+    // country's own (else the global level) on its market.
+    const installGlobal = await this.settings.isOnGlobally('crypto_install_prompt');
+    const install = new Map(await Promise.all(shown.map(async country => [country.code, await this.settings.isOnForCountry('crypto_install_prompt', country.code)] as const)));
     const entry = (market: string, name: string, currencies: string[]) => ({
       object: 'crypto_market' as const,
       market,
       name,
       currencies,
       ads: Object.fromEntries(currencies.map(currency => [currency, ads(market, currency)])),
+      install_prompt: market === globalMarket ? installGlobal : (install.get(market) ?? false),
     });
     return {
       object: 'list' as const,

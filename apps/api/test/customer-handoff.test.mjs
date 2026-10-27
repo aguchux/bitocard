@@ -9,7 +9,7 @@ let server;
 let prisma;
 
 before(async () => {
-  server = await startApp({ env: { STOREFRONT_URL: 'https://bitocard.com', SHOP_URL: 'https://shop.bitocard.com' } });
+  server = await startApp({ env: { STOREFRONT_URL: 'https://bitocard.com', SHOP_URL: 'https://shop.bitocard.com', CRYPTO_URL: 'https://crypto.bitocard.com' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   const house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
   const ng = await house.storeFor('NG');
@@ -69,6 +69,18 @@ describe('sign-in handoff', () => {
     assert.notEqual(shop.token(), shopper.token(), 'a session of its own');
     assert.equal((await shop.get('/v1/store/account')).json.id, shopper.id);
     assert.equal((await storeServer().post('/v1/store/account/handoff/exchange', { code: issued.json.code, origin: 'https://shop.bitocard.com' })).json.error.code, 'handoff_invalid', 'once');
+  });
+
+  test('BitoCard Crypto is one of the sites: bitocard.com to crypto.bitocard.com and on to BitoCard Shop', async () => {
+    const shopper = await customer();
+    const toCrypto = (await shopper.post('/v1/store/account/handoff', { to: 'https://crypto.bitocard.com' })).json;
+    assert.equal(toCrypto.to, 'https://crypto.bitocard.com');
+    const crypto = storeServer();
+    assert.equal((await crypto.post('/v1/store/account/handoff/exchange', { code: toCrypto.code, origin: 'https://crypto.bitocard.com' })).status, 200);
+    assert.equal((await crypto.get('/v1/store/account')).json.id, shopper.id);
+    const toShop = (await crypto.post('/v1/store/account/handoff', { to: 'https://shop.bitocard.com' })).json;
+    assert.equal((await storeServer().post('/v1/store/account/handoff/exchange', { code: toShop.code, origin: 'https://shop.bitocard.com' })).status, 200);
+    for (const to of ['https://crypto.bitocard.com/markets', 'http://crypto.bitocard.com']) assert.equal((await shopper.post('/v1/store/account/handoff', { to })).status, 400, to);
   });
 
   test('a country store and back; codes expire after a minute', async () => {

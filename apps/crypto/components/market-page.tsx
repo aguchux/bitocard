@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { CryptoMarket } from "@bitocard/api-client/crypto";
 import { globalMarket, marketState, type MarketState } from "@bitocard/crypto-ui/market";
 import { MarketFilters } from "@bitocard/crypto-ui/market-view";
+import { InstallPrompt } from "@bitocard/ui/install-ui";
 import { BookSkeleton, MarketBook } from "@/components/book";
 import { Header } from "@/components/header";
 import { MarketsList, MarketsListSkeleton } from "@/components/markets-list";
@@ -63,6 +64,8 @@ export function MarketPage({ market, assets, search }: { market: CryptoMarket; a
           <MarketsList current={market.market} />
         </Suspense>
       </main>
+      {/* Where an admin switched it on for this market (`crypto_install_prompt`). */}
+      <InstallPrompt enabled={market.install_prompt} appName="BitoCard Crypto" />
     </>
   );
 }

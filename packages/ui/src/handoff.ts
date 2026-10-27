@@ -1,8 +1,8 @@
 import { appUrl } from "./site";
 
 /**
- * The sign-in handoff between BitoCard's own sites: bitocard.com, its country stores (ng.bitocard.com…) and BitoCard Shop
- * (shop.bitocard.com) share one customer account but each keeps its own session cookie. So that a site can offer
+ * The sign-in handoff between BitoCard's own sites: bitocard.com, its country stores (ng.bitocard.com…), BitoCard Shop
+ * (shop.bitocard.com) and BitoCard Crypto (crypto.bitocard.com) share one customer account but each keeps its own session cookie. So that a site can offer
  * "Continue as Adaeze" before anyone clicks, the site a customer signs in on also sets `bc_signed_in` across the parent
  * domain: their first name and the site they are signed in on, nothing else. It is not a credential: continuing still
  * goes through a one-time code from that site (`/handoff/go`), so a forged cookie only changes a button's words.
@@ -13,14 +13,15 @@ export const signedInMaxAge = 60 * 60 * 24 * 30;
 
 export type SignedIn = { name: string; origin: string };
 
-/** bitocard.com (or the configured store address) and BitoCard Shop, as URLs. */
+/** bitocard.com (or the configured store address), BitoCard Shop and BitoCard Crypto, as URLs. */
 function bases() {
-  return { store: new URL(appUrl("storefront")), shop: new URL(appUrl("shop")) };
+  return { store: new URL(appUrl("storefront")), shop: new URL(appUrl("shop")), crypto: new URL(appUrl("crypto")) };
 }
 
 /**
  * Whether an origin is one of BitoCard's own sites a customer can be handed between: bitocard.com, a two-letter
- * country store under it (same scheme and port), or BitoCard Shop. Whether a country store is open is the API's to say.
+ * country store under it (same scheme and port), BitoCard Shop or BitoCard Crypto. Whether a country store is open is
+ * the API's to say.
  */
 export function isHouseOrigin(origin: string) {
   let url: URL;
@@ -30,8 +31,8 @@ export function isHouseOrigin(origin: string) {
     return false;
   }
   if (url.origin !== origin) return false;
-  const { store, shop } = bases();
-  if (url.origin === store.origin || url.origin === shop.origin) return true;
+  const { store, shop, crypto } = bases();
+  if (url.origin === store.origin || url.origin === shop.origin || url.origin === crypto.origin) return true;
   return url.protocol === store.protocol && new RegExp(`^[a-z]{2}\\.${store.host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`).test(url.host);
 }
 

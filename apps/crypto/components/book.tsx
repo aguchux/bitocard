@@ -1,20 +1,22 @@
 import Link from "next/link";
 import { amountMinor, marketHref, shownAds, type MarketState } from "@bitocard/crypto-ui/market";
 import { MarketAds, type AdAction } from "@bitocard/crypto-ui/market-view";
-import { appUrl } from "@bitocard/ui/site";
 import { book, bookQuery } from "@/lib/api";
+import { currentCustomer, signInPath } from "@/lib/customer";
+import { tradeHref } from "@/lib/handoff";
 
 /**
  * Taking an ad from the public pages: trading happens signed in, on the customer's BitoCard account, in the same market
- * and book (bitocard.com's Crypto tab for now; it asks them to sign in first).
+ * and book: `hrefFor` gives the Crypto tab's address with the market and filters (`/account/crypto?market=…`), turned
+ * into a link that signs the customer in there (`tradeHref`) or asks them to sign in here first.
  */
-export function tradeOnBitoCard(market: string): AdAction {
+export function tradeOnBitoCard(market: string, hrefFor: (path: string) => string): AdAction {
   return function TradeOnBitoCard(ad, side) {
     // The store reads `market` as the customer's own market when it is theirs, else the market they may trade in.
     const params = new URLSearchParams({ market, side, asset: ad.asset, currency: ad.currency });
     return (
       <a
-        href={appUrl("storefront", `/account/crypto?${params}`)}
+        href={hrefFor(`/account/crypto?${params}`)}
         className="inline-flex min-h-11 items-center justify-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white hover:bg-navy-800"
       >
         {side === "buy" ? `Buy ${ad.asset}` : `Sell ${ad.asset}`}
@@ -28,7 +30,9 @@ export function tradeOnBitoCard(market: string): AdAction {
  * currency and amount) and streaming in under the filters. An unreachable API says so here alone.
  */
 export async function MarketBook({ market, name, state }: { market: string; name: string; state: MarketState }) {
-  const result = await book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount) }));
+  const [result, customer] = await Promise.all([book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount) })), currentCustomer()]);
+  // Signed in: straight to trading. Signed out: sign in here first, then back to this very view.
+  const hrefFor = (path: string) => (customer ? tradeHref(customer.country, path) : signInPath(marketHref(state), "trade"));
   if (!result.ok) return <p className="rounded-3xl bg-white p-5 text-sm text-slate-600 ring-1 ring-slate-200/70">This market cannot be shown right now. Try again shortly.</p>;
   const ads = shownAds(result.data.data, state);
   const filtered = Boolean(state.q || state.amount || state.experienced);
@@ -38,7 +42,7 @@ export async function MarketBook({ market, name, state }: { market: string; name
         {ads.length} {ads.length === 1 ? "ad" : "ads"} {state.side === "buy" ? `selling ${state.asset}` : `buying ${state.asset}`} for {state.currency} in {name}
       </p>
       {ads.length ? (
-        <MarketAds ads={ads} state={state} action={tradeOnBitoCard(market)} />
+        <MarketAds ads={ads} state={state} action={tradeOnBitoCard(market, hrefFor)} />
       ) : (
         <div className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
           <p className="font-semibold">{filtered ? "No ads match your filters" : `Nobody is ${state.side === "buy" ? "selling" : "buying"} ${state.asset} for ${state.currency} here right now`}</p>
