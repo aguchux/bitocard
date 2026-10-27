@@ -108,6 +108,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
    - **Its own settings:** feature switches, legal documents and markets, so an Afrippa change never touches BitoCard.
    - **It owns all its integrations** (the owner, 27 October 2026): Afrippa's admin has its own Settings > Integrations, with **its own account and credentials for every service Afrippa uses**, set, tested and changed only there (super admins of Afrippa, with their authenticator code, audited in Afrippa's log), never visible to BitoCard's admins and never shared with BitoCard's values:
      - **crypto** (moved from BitoCard, which keeps none): wallet keys, chain providers and their routing, the signer, Chainalysis and TRM screening, CoinGecko and the Coinbase check;
+     - **Google sign-in** (its own OAuth client ID and secret, Afrippa's consent screen);
      - **email** (Resend, MailerSend) sending from afrippa.com; **SMS** (Termii, Africa's Talking) under Afrippa's sender name;
      - **identity:** Verify's private storage (`KYC_SPACES_*`) and its links on verify.afrippa.com;
      - **AI** (Anthropic, OpenAI) for its assistant, with its own prices and monthly budget;
@@ -165,6 +166,9 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 3. The operator account and Afrippa's store row, tied to its brand; `AFRIPPA_URL` and `AFRIPPA_SERVER_SECRET`.
 4. The crypto routes under their own prefix, signed by Afrippa's server only, left out of OpenAPI.
 5. Afrippa's accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from afrippa.com.
+   - **Sign in with Google** (the owner, 27 October 2026), with Afrippa's own Google OAuth client (consent screen in Afrippa's name, redirect addresses on afrippa.com and api.afrippa.com), as resellers' Google sign-in works today: **signing up with Google is deliberate** (`intent=signup` creates the account, its email confirmed by Google, no password), signing in with a Google account that never signed up creates nothing and says to sign up, and a Google account **never links itself** to an existing email-and-password account with the same address. A Google-only trader can add a password later with Forgot password, after which both work.
+   - Google sign-in never skips the rest: the US/UK declaration and terms on first use, two-step where on or required, and the identity check before trading live.
+   - **Afrippa's admins do not use Google** (email, password and authenticator only, as BitoCard's).
 6. **verify.afrippa.com:** the Verify API serves Afrippa's cases under its brand (links on verify.afrippa.com, documents in Afrippa's own private storage, reviewed only through Afrippa's admin realm).
 7. Ledger accounts and reports under the operator account; the coin wallets, custody, fees, deposits, withdrawals, addresses and chain records all Afrippa's.
 8. **Integrations per brand:** `integration_settings.brand`, groups declaring their brands, services reading their brand's settings; the crypto settings moved to Afrippa (carried over, never deleted), and Afrippa's own email, SMS, identity storage, AI, files, push, GitHub and Cloudflare settings added, all in Afrippa's admin only. Tests: no Afrippa call reads a BitoCard credential, and no BitoCard call an Afrippa one.
