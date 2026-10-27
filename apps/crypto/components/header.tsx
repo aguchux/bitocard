@@ -5,7 +5,6 @@ import { MarketSwitcher } from "@bitocard/crypto-ui/market-switcher";
 import { signOut } from "@/lib/account-actions";
 import { marketPath, markets } from "@/lib/api";
 import { currentCustomer, signInPath } from "@/lib/customer";
-import { tradeHref } from "@/lib/handoff";
 
 /** The lockup on white, as on bitocard.com: the "b" mark, "Bito" navy, "card" pink, then "Crypto". */
 export function CryptoWordmark() {
@@ -35,8 +34,8 @@ export function MarketNavSkeleton() {
 }
 
 /**
- * Trading and the account: signed in, **Trade now** opens their Crypto tab (on their country store, signed in there
- * through the handoff) with their first name and Sign out; signed out, Sign in. Its own small part: it reads the
+ * The account: signed in, their wallets, ads and trades here (Wallets alone on phones, where the account's tabs do the
+ * rest) and Sign out with their first name; signed out, Sign in and Trade now. Its own small part: it reads the
  * signed-in customer (once per request, shared with the book's buttons) and streams in, so the header never waits.
  */
 export async function AccountArea() {
@@ -54,16 +53,23 @@ export async function AccountArea() {
       </span>
     );
   }
+  const link = "hidden min-h-11 items-center px-2 text-sm font-semibold text-navy-900 hover:underline sm:inline-flex";
   return (
-    <span className="flex items-center gap-2">
-      <form action={signOut} className="hidden sm:block">
+    <span className="flex items-center gap-1">
+      <Link href="/ads" className={link}>
+        My ads
+      </Link>
+      <Link href="/trades" className={link}>
+        Trades
+      </Link>
+      <form action={signOut} className="hidden lg:block">
         <button type="submit" className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-slate-600 hover:text-navy-900">
           Sign out ({customer.name.split(/\s+/)[0]})
         </button>
       </form>
-      <a href={tradeHref(customer.country, "/account/crypto")} className={button}>
-        Trade now
-      </a>
+      <Link href="/wallets" className={button}>
+        Wallets
+      </Link>
     </span>
   );
 }

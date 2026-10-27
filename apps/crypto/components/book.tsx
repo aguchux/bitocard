@@ -1,24 +1,22 @@
 import Link from "next/link";
 import { amountMinor, marketHref, shownAds, type MarketState } from "@bitocard/crypto-ui/market";
+import { TakeAdDialog } from "@bitocard/crypto-ui/forms";
 import { MarketAds, type AdAction } from "@bitocard/crypto-ui/market-view";
 import { book, bookQuery } from "@/lib/api";
 import { currentCustomer, signInPath } from "@/lib/customer";
-import { tradeHref } from "@/lib/handoff";
 
-/**
- * Taking an ad from the public pages: trading happens signed in, on the customer's BitoCard account, in the same market
- * and book: `hrefFor` gives the Crypto tab's address with the market and filters (`/account/crypto?market=…`), turned
- * into a link that signs the customer in there (`tradeHref`) or asks them to sign in here first.
- */
-export function tradeOnBitoCard(market: string, hrefFor: (path: string) => string): AdAction {
-  return function TradeOnBitoCard(ad, side) {
-    // The store reads `market` as the customer's own market when it is theirs, else the market they may trade in.
-    const params = new URLSearchParams({ market, side, asset: ad.asset, currency: ad.currency });
+const major = (minor: number) => (minor / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 });
+
+/** Signed in, an ad is taken right here: the amount in a dialog, then the confirmation (the shared trading forms). */
+export const takeHere: AdAction = (ad, side) => (
+  <TakeAdDialog adId={ad.id} price={ad.price} currency={ad.currency} side={side} min={major(ad.min_fiat)} max={major(ad.max_fiat)} asset={ad.asset} />
+);
+
+/** Signed out, taking an ad signs in here first and comes back to the very view (`next`). */
+export function signInToTake(next: string): AdAction {
+  return function SignInToTake(ad, side) {
     return (
-      <a
-        href={hrefFor(`/account/crypto?${params}`)}
-        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white hover:bg-navy-800"
-      >
+      <a href={signInPath(next, "trade")} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white hover:bg-navy-800">
         {side === "buy" ? `Buy ${ad.asset}` : `Sell ${ad.asset}`}
       </a>
     );
@@ -31,8 +29,8 @@ export function tradeOnBitoCard(market: string, hrefFor: (path: string) => strin
  */
 export async function MarketBook({ market, name, state }: { market: string; name: string; state: MarketState }) {
   const [result, customer] = await Promise.all([book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount) })), currentCustomer()]);
-  // Signed in: straight to trading. Signed out: sign in here first, then back to this very view.
-  const hrefFor = (path: string) => (customer ? tradeHref(customer.country, path) : signInPath(marketHref(state), "trade"));
+  // Signed in: taken right here. Signed out: sign in here first, then back to this very view.
+  const action = customer ? takeHere : signInToTake(marketHref(state));
   if (!result.ok) return <p className="rounded-3xl bg-white p-5 text-sm text-slate-600 ring-1 ring-slate-200/70">This market cannot be shown right now. Try again shortly.</p>;
   const ads = shownAds(result.data.data, state);
   const filtered = Boolean(state.q || state.amount || state.experienced);
@@ -42,7 +40,7 @@ export async function MarketBook({ market, name, state }: { market: string; name
         {ads.length} {ads.length === 1 ? "ad" : "ads"} {state.side === "buy" ? `selling ${state.asset}` : `buying ${state.asset}`} for {state.currency} in {name}
       </p>
       {ads.length ? (
-        <MarketAds ads={ads} state={state} action={tradeOnBitoCard(market, hrefFor)} />
+        <MarketAds ads={ads} state={state} action={action} />
       ) : (
         <div className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
           <p className="font-semibold">{filtered ? "No ads match your filters" : `Nobody is ${state.side === "buy" ? "selling" : "buying"} ${state.asset} for ${state.currency} here right now`}</p>

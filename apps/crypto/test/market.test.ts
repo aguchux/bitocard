@@ -1,3 +1,4 @@
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -9,6 +10,14 @@ const { book, bookQuery, cryptoApi, marketAt, marketPath } = await import("@/lib
 const { MarketBook } = await import("@/components/book");
 const { AccountArea, MarketNav } = await import("@/components/header");
 const { GET: handoffGo } = await import("@/app/handoff/go/route");
+const { GET: goPlace } = await import("@/app/go/[place]/route");
+const { default: WalletsPage } = await import("@/app/wallets/page");
+const { CryptoActionsProvider } = await import("@bitocard/crypto-ui/forms");
+
+/** Renders as the root layout does: the shared trading forms get this site's actions (stubbed here). */
+const stub = async () => ({});
+const render = (element: ReactElement) =>
+  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, changeAd: stub, chooseNickname: stub }, links: { postAd: "/ads/post", wallet: "/go/wallet" } }, element));
 const { MarketsList } = await import("@/components/markets-list");
 const { TraderCard } = await import("@/components/trader-card");
 const { marketMetadata, pageState } = await import("@/components/market-page");
@@ -49,6 +58,23 @@ const ad = (id: string, extra: Partial<StoreP2pAd> = {}): StoreP2pAd => ({
   ...extra,
 });
 
+const overview = {
+  object: "crypto_wallets",
+  mode: "live",
+  country: "NG",
+  currency: "NGN",
+  enabled: true,
+  p2p_enabled: true,
+  global_enabled: true,
+  verified: true,
+  declaration: { version: "2026-10-27", declared: false },
+  frozen: false,
+  assets: [{ object: "crypto_balance", asset: "USDT", name: "Tether", decimals: 6, enabled: true, available: "12.500000", locked: "0.000000", frozen: "0.000000", withdrawing: "0.000000", total: "12.500000" }],
+  cash: { currency: "NGN", proceeds: 50_000_00, wallet: 0, locked: 0, paying_out: 0 },
+  usd_cash: { currency: "USD", proceeds: 40_00, wallet: 0, locked: 0, paying_out: 0 },
+  other_cash: [{ currency: "GHS", proceeds: 90_00, locked: 0 }],
+};
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const fetchMock = vi.fn();
 
@@ -70,6 +96,8 @@ const answer = (ads: StoreP2pAd[] = [ad("a")]) =>
     if (url.endsWith("/v1/crypto/markets")) return json(shown);
     if (url.includes("/ads?")) return json({ object: "list", market: "NG", asset: "USDT", currency: "NGN", side: "buy", data: ads });
     if (url.endsWith("/v1/store/account")) return json(customer);
+    if (url.endsWith("/v1/store/crypto")) return json(overview);
+    if (url.endsWith("/v1/store/p2p/profile")) return json({ object: "p2p_profile", nickname: "TraderA", nickname_chosen: true, trades_30d: 1, trades_total: 4 });
     if (url.endsWith("/v1/store/account/handoff")) return json({ object: "customer_handoff", code: "bch_abcdefghijklmnopqrstuvwxyz0123456789", to: "https://ng.bitocard.com" });
     if (url.includes("/v1/crypto/traders/TraderA")) return json({ object: "p2p_trader", nickname: "TraderA", trades_30d: 4, trades_total: 15, open_ads: 2, markets: ["NG", "WW"], since: "2026-09-01T00:00:00.000Z" });
     return json({ error: { code: "resource_missing" } }, 404);
@@ -119,17 +147,17 @@ describe("the small parts of a market page", () => {
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/v1/store/account")), "no session, no account asked").toBe(false);
   });
 
-  test("signed in, taking an ad goes straight to their country store's Crypto tab, signed in there through the handoff", async () => {
+  test("signed in, an ad is taken right here: a dialog asking the amount, through this site's own actions", async () => {
     setRequest({}, { bc_customer: "bcc_token" });
     answer();
-    const html = renderToStaticMarkup(await MarketBook({ market: "WW", name: "the global market", state: pageState(shown.data[0], shown.assets, {}) }));
-    const href = new URL(html.match(/href="([^"]+)"[^>]*>Buy USDT/)![1].replaceAll("&amp;", "&"));
-    expect(href.origin + href.pathname).toBe("https://crypto.bitocard.com/handoff/go");
-    expect(href.searchParams.get("to")).toBe("https://ng.bitocard.com");
-    expect(href.searchParams.get("next")).toBe("/account/crypto?market=WW&side=buy&asset=USDT&currency=NGN");
+    const html = render(await MarketBook({ market: "WW", name: "the global market", state: pageState(shown.data[0], shown.assets, {}) }));
+    expect(html).toContain("Buy USDT");
+    expect(html).toContain('aria-label="Buy from this ad"');
+    expect(html).toContain('name="ad_id" value="a"');
+    expect(html).not.toContain("/handoff/go");
   });
 
-  test("the account area: Sign in and Trade now signed out; Sign out with their first name and their own Trade now signed in", async () => {
+  test("the account area: Sign in and Trade now signed out; their wallets, ads, trades and Sign out signed in", async () => {
     answer();
     const out = renderToStaticMarkup(await AccountArea());
     expect(out).toContain('href="/signin?next=%2F"');
@@ -137,7 +165,29 @@ describe("the small parts of a market page", () => {
     setRequest({}, { bc_customer: "bcc_token" });
     const signedIn = renderToStaticMarkup(await AccountArea());
     expect(signedIn).toContain("Sign out (Ada)");
-    expect(signedIn).toContain("https://crypto.bitocard.com/handoff/go?to=https%3A%2F%2Fng.bitocard.com&amp;next=%2Faccount%2Fcrypto");
+    for (const href of ["/wallets", "/ads", "/trades"]) expect(signedIn).toContain(`href="${href}"`);
+  });
+
+  test("money in and out opens the customer's account app, signed in there; signed out, signing in here first", async () => {
+    const go = (place: string) => goPlace(new NextRequest(`https://crypto.bitocard.com/go/${place}`), { params: Promise.resolve({ place }) });
+    expect((await go("deposit")).headers.get("location")).toBe("https://crypto.bitocard.com/signin?next=%2Fgo%2Fdeposit");
+    expect((await go("nowhere")).headers.get("location")).toBe("https://crypto.bitocard.com/");
+    setRequest({}, { bc_customer: "bcc_token" });
+    answer();
+    const sent = new URL((await go("deposit")).headers.get("location")!);
+    expect(sent.origin + sent.pathname).toBe("https://crypto.bitocard.com/handoff/go");
+    expect([sent.searchParams.get("to"), sent.searchParams.get("next")]).toEqual(["https://ng.bitocard.com", "/account/crypto/deposit"]);
+  });
+
+  test("the account pages ask to sign in first; signed in, the wallets show every currency of P2P money", async () => {
+    await expect(WalletsPage()).rejects.toThrow("NEXT_REDIRECT");
+    setRequest({}, { bc_customer: "bcc_token" });
+    answer();
+    const html = render(await WalletsPage());
+    expect(html).toContain("You trade as TraderA");
+    expect(html).toContain("GHS");
+    expect(html).toContain('href="/go/cash-out"');
+    expect(html).toContain("One question before you trade");
   });
 
   test("handing off from here: only to BitoCard's own sites, signed in; else sign in first", async () => {

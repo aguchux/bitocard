@@ -5,6 +5,8 @@ import { appUrl, brand } from "@bitocard/ui/site";
 import { colors } from "@bitocard/ui/tokens";
 import { InstallSupport } from "@bitocard/ui/install-ui";
 import { installCaptureScript } from "@bitocard/ui/install";
+import { CryptoActionsProvider } from "@bitocard/crypto-ui/forms";
+import { changeAd, chooseNickname, confirmTrade, postAd, repriceAd, takeAd } from "@/lib/trade";
 import "./globals.css";
 
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
@@ -59,7 +61,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
           Skip to content
         </a>
-        {children}
+        {/* The shared trading forms act through this site's own server actions and pages. */}
+        <CryptoActionsProvider actions={{ takeAd, confirmTrade, postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post", wallet: "/go/wallet" }}>
+          {children}
+        </CryptoActionsProvider>
         <Footer />
         <InstallSupport />
       </body>
