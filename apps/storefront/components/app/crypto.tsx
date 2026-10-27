@@ -3,6 +3,7 @@ import { Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade } from "@bitocard/api-client/storefront";
 import { cryptoSections } from "./sub-menus";
 import { CoinBadge } from "@bitocard/crypto-ui/coins";
+import { CryptoDeclaration as SharedDeclaration, TradeRow as SharedTradeRow } from "@bitocard/crypto-ui/trade-views";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { declareCrypto } from "@/lib/crypto-actions";
 
@@ -161,47 +162,15 @@ export function CryptoGate({ wallets, p2p = false, withdraw = false }: { wallets
   return null;
 }
 
-/** The declaration every account makes before trading: not a citizen or resident of the United States or the United Kingdom. */
+/** The declaration every account makes before trading (`@bitocard/crypto-ui`), recorded by the store's action. */
 export function CryptoDeclaration({ version }: { version: string }) {
-  return (
-    <form action={declareCrypto} className={card}>
-      <p className="flex items-center gap-2 font-semibold">
-        <ShieldCheck className="size-5 text-brand-500" aria-hidden="true" /> One question before you trade
-      </p>
-      <p className="mt-1 text-sm text-slate-600">Crypto trading is open only to residents of the countries we serve.</p>
-      <input type="hidden" name="version" value={version} />
-      <label className="mt-4 flex items-start gap-3 text-sm font-medium text-navy-900">
-        <input type="checkbox" name="confirm" value="yes" required className="mt-0.5 size-5 shrink-0 accent-brand-500" />
-        I am not a citizen or a resident of the United States or the United Kingdom.
-      </label>
-      <button type="submit" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
-        Confirm and continue
-      </button>
-    </form>
-  );
+  return <SharedDeclaration version={version} action={declareCrypto} />;
 }
 
 export const perCoin = (price: number, currency: string, asset: string) => `${formatFace(price, currency)} / ${asset}`;
 export const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 
-/** A trade as a list row: what moved, with whom, and when. */
+/** A trade as a list row (`@bitocard/crypto-ui`), linking to its receipt on the Crypto tab. */
 export function TradeRow({ trade }: { trade: StoreP2pTrade }) {
-  const bought = trade.side === "buy";
-  return (
-    <Link href={`/account/crypto/trades/${trade.id}`} className="flex items-center gap-3 py-3 hover:bg-slate-50">
-      <CoinBadge asset={trade.asset} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold">
-          {bought ? "Bought" : "Sold"} {formatCrypto(bought ? trade.received : trade.amount, trade.asset)}
-        </span>
-        <span className="block truncate text-sm text-slate-500">
-          {trade.number} · {bought ? "from" : "to"} {trade.counterparty.nickname} · {date(trade.created_at)}
-        </span>
-      </span>
-      <span className={`shrink-0 font-semibold ${bought ? "text-navy-900" : "text-emerald-700"}`}>
-        {bought ? "−" : "+"}
-        {formatFace(trade.fiat, trade.currency)}
-      </span>
-    </Link>
-  );
+  return <SharedTradeRow trade={trade} href={`/account/crypto/trades/${trade.id}`} />;
 }

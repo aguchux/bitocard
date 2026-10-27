@@ -9,7 +9,8 @@
     "./market-view": "./src/market-view.tsx",
     "./market-switcher": "./src/market-switcher.tsx",
     "./forms": "./src/forms.tsx",
-    "./trade-actions": "./src/trade-actions.ts"
+    "./trade-actions": "./src/trade-actions.ts",
+    "./trade-views": "./src/trade-views.tsx"
   },
   "scripts": {
     "lint": "eslint .",

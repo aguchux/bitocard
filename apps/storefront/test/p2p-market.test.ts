@@ -67,7 +67,7 @@ const ok = <T>(data: T) => ({ ok: true, status: 200, data });
 const { CryptoActionsProvider } = await import("@bitocard/crypto-ui/forms");
 const stub = async () => ({});
 const render = (element: ReactElement) =>
-  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, chooseNickname: stub }, links: { postAd: "/account/crypto/ads/post", wallet: "/account/wallet" } }, element));
+  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, changeAd: stub, chooseNickname: stub }, links: { postAd: "/account/crypto/ads/post", wallet: "/account/wallet" } }, element));
 
 describe("the P2P market's filters", () => {
   test("read from the address, keeping only what is open and valid", () => {

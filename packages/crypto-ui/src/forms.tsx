@@ -20,6 +20,8 @@ export type TradeActions = {
   confirmTrade: Action<NonceFormState>;
   postAd: Action<FormState>;
   repriceAd: Action<FormState>;
+  /** Pauses, resumes or closes an ad (`op`: pause, resume, cancel). */
+  changeAd: Action<FormState>;
   chooseNickname: Action<FormState>;
 };
 
@@ -211,6 +213,40 @@ export function RepriceForm({ id, currency, price }: { id: string; currency: str
       </button>
       {state.error || state.notice ? <p className={`basis-full text-sm ${state.error ? "text-red-700" : "text-emerald-700"}`}>{state.error ?? state.notice}</p> : null}
     </form>
+  );
+}
+
+/** One button changing an ad (pause, resume or close), with its error under it. */
+function AdButton({ id, op, children, danger = false }: { id: string; op: "pause" | "resume" | "cancel"; children: string; danger?: boolean }) {
+  const [state, run, pending] = useActionState<FormState, FormData>(useTrade().actions.changeAd, {});
+  return (
+    <form action={run} className="inline-flex flex-col items-start gap-1">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="op" value={op} />
+      <button type="submit" disabled={pending} className={`min-h-12 rounded-xl px-4 text-sm font-semibold ring-1 disabled:opacity-60 ${danger ? "text-red-700 ring-red-200 hover:ring-red-300" : "ring-slate-300 hover:ring-slate-400"}`}>
+        {children}
+      </button>
+      {state.error ? (
+        <p className="max-w-xs text-sm text-red-700" role="alert">
+          {state.error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+/** An open ad's controls: a new price, pause or resume, and close (which gives back what it locks). */
+export function AdControls({ id, status, currency, price }: { id: string; status: "active" | "paused" | "completed" | "cancelled"; currency: string; price: number }) {
+  return (
+    <>
+      <RepriceForm id={id} currency={currency} price={String(price / 100)} />
+      <AdButton id={id} op={status === "active" ? "pause" : "resume"}>
+        {status === "active" ? "Pause" : "Resume"}
+      </AdButton>
+      <AdButton id={id} op="cancel" danger>
+        Close ad
+      </AdButton>
+    </>
   );
 }
 
