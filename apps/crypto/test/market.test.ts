@@ -17,7 +17,7 @@ const { CryptoActionsProvider } = await import("@bitocard/crypto-ui/forms");
 /** Renders as the root layout does: the shared trading forms get this site's actions (stubbed here). */
 const stub = async () => ({});
 const render = (element: ReactElement) =>
-  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, changeAd: stub, chooseNickname: stub }, links: { postAd: "/ads/post", wallet: "/go/wallet" } }, element));
+  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, changeAd: stub, chooseNickname: stub }, links: { postAd: "/ads/post", wallet: "/add-money" } }, element));
 const { MarketsList } = await import("@/components/markets-list");
 const { TraderCard } = await import("@/components/trader-card");
 const { marketMetadata, pageState } = await import("@/components/market-page");
@@ -168,9 +168,9 @@ describe("the small parts of a market page", () => {
     for (const href of ["/wallets", "/ads", "/trades"]) expect(signedIn).toContain(`href="${href}"`);
   });
 
-  test("adding money and the identity check open the customer's account app, signed in there; deposits are on this site", async () => {
+  test("the identity check opens the customer's account app, signed in there; money in and out is on this site", async () => {
     const go = (place: string) => goPlace(new NextRequest(`https://crypto.bitocard.com/go/${place}`), { params: Promise.resolve({ place }) });
-    expect((await go("wallet")).headers.get("location")).toBe("https://crypto.bitocard.com/signin?next=%2Fgo%2Fwallet");
+    expect((await go("verification")).headers.get("location")).toBe("https://crypto.bitocard.com/signin?next=%2Fgo%2Fverification");
     expect((await go("nowhere")).headers.get("location")).toBe("https://crypto.bitocard.com/");
     expect((await go("deposit")).headers.get("location")).toBe("https://crypto.bitocard.com/");
     setRequest({}, { bc_customer: "bcc_token" });
@@ -187,7 +187,7 @@ describe("the small parts of a market page", () => {
     const html = render(await WalletsPage());
     expect(html).toContain("You trade as TraderA");
     expect(html).toContain("GHS");
-    for (const href of ["/deposit", "/withdraw", "/cash-out", "/go/wallet"]) expect(html).toContain(`href="${href}"`);
+    for (const href of ["/add-money", "/deposit", "/withdraw", "/cash-out"]) expect(html).toContain(`href="${href}"`);
     expect(html).toContain("One question before you trade");
   });
 

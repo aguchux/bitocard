@@ -76,7 +76,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
         {/* The shared trading and money forms act through this site's own server actions and pages. */}
-        <CryptoActionsProvider actions={{ takeAd, confirmTrade, postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post", wallet: "/go/wallet" }}>
+        <CryptoActionsProvider actions={{ takeAd, confirmTrade, postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post", wallet: "/add-money" }}>
           <MoneyActionsProvider
             actions={{ addWithdrawalAddress, removeWithdrawalAddress, reviewWithdrawal, createWithdrawal, confirmWithdrawal, resendWithdrawalCode, cancelWithdrawal, addCashOutAccount, removeCashOutAccount, cashOut, simulateCashOut }}
           >{children}</MoneyActionsProvider>

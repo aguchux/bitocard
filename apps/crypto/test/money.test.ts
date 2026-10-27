@@ -16,6 +16,8 @@ const { default: ReviewPage } = await import("@/app/withdraw/confirm/page");
 const { default: WithdrawalPage } = await import("@/app/withdrawals/[id]/page");
 const { default: CashOutPage } = await import("@/app/cash-out/page");
 const money = await import("@/lib/money");
+const topUp = await import("@/lib/top-up");
+const { default: AddMoneyPage } = await import("@/app/add-money/page");
 const { MoneyActionsProvider } = await import("@bitocard/crypto-ui/money-forms");
 
 /**
@@ -73,6 +75,38 @@ const form = (values: Record<string, string>) => {
   return data;
 };
 
+const wallet = {
+  object: "customer_wallet",
+  mode: "test",
+  country: "NG",
+  currency: "NGN",
+  enabled: true,
+  balance: 20_000_00,
+  top_up_methods: [{ id: "paystack", label: "Paystack", description: "Card, bank or USSD", networks: [] }],
+  reserved_accounts: [{ id: "ra1", bank_name: "Sandbox Bank", account_number: "0123456789", account_name: "ADA OBI" }],
+  reserved_accounts_available: true,
+  reserved_account_needs_bvn: true,
+  wallets: [
+    { currency: "NGN", primary: true, balance: 20_000_00 },
+    { currency: "USD", primary: false, balance: 12_00 },
+  ],
+};
+const pendingTopUp = {
+  object: "customer_top_up",
+  id: "t1",
+  mode: "test",
+  status: "pending",
+  source: "checkout",
+  amount: 5_000_00,
+  currency: "NGN",
+  method: { id: "sandbox", label: "Sandbox" },
+  charged: null,
+  checkout_url: null,
+  failure_reason: null,
+  created_at: "2026-10-27T10:00:00.000Z",
+  completed_at: null,
+};
+
 /** The signed-in customer's API, from fixtures; `wallets` overrides the crypto overview. */
 const answer = (wallets = overview()) =>
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
@@ -93,8 +127,13 @@ const answer = (wallets = overview()) =>
     if (path === "/v1/store/crypto/cash/bank-accounts") return json({ object: "list", data: [{ object: "customer_bank_account", id: "b1", bank_name: "Sandbox Bank", account_number_last4: "6789", account_name: "ADA OBI", ready: true, payouts_available_from: "2026-10-26T10:00:00.000Z" }] });
     if (path === "/v1/store/crypto/cash/banks") return json({ object: "list", data: [{ code: "SBX001", name: "Sandbox Bank" }] });
     if (path === "/v1/store/crypto/cash/payouts") return json({ object: "list", data: [{ object: "customer_payout", id: "p1", mode: "test", amount: 5_000_00, currency: "NGN", status: "pending", failure_reason: null, bank_account: { bank_name: "Sandbox Bank", account_number_last4: "6789" }, created_at: "2026-10-27T10:00:00.000Z" }] });
+    if (path.startsWith("/v1/store/wallet/top-ups/") && path.endsWith("/simulate")) return json({});
+    if (path.startsWith("/v1/store/wallet/top-ups/")) return json(pendingTopUp);
+    if (path === "/v1/store/wallet/top-ups") return json({ ...pendingTopUp, mode: wallet.mode, checkout_url: wallet.mode === "live" ? "https://pay.example/p/1" : null });
+    if (path.startsWith("/v1/store/wallet")) return json(path.includes("currency=USD") ? { ...wallet, currency: "USD", balance: 12_00, reserved_accounts: [] } : wallet);
     return json({ error: { code: "resource_missing", message: "Not found." } }, 404);
   });
+
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -182,5 +221,34 @@ describe("money in and out, on this site", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
     fetchMock.mockImplementationOnce(async () => json({ error: { code: "authentication_required", message: "Sign in." } }, 401));
     await expect(money.addCashOutAccount({}, form({ bank_code: "SBX001", account_number: "0123456789" }))).rejects.toThrow("redirect:/signin?next=%2Fcash-out");
+  });
+
+  test("adding money: each wallet a tab, its balance, the top-up form, the customer's bank account number, and a top-up waiting", async () => {
+    answer();
+    const html = await render(await AddMoneyPage({ searchParams: Promise.resolve({ top_up: "t1" }) }));
+    expect(html).toContain('href="/add-money?wallet=USD"');
+    expect(html).toContain("20,000");
+    expect(html).toContain("Paystack");
+    expect(html).toContain("Add test money");
+    expect(html).toContain("0123456789");
+    expect(html).toContain("Simulate a transfer");
+    expect(html).toContain("Waiting for your payment of");
+    expect(html).toContain("Simulate paid");
+    const usd = await render(await AddMoneyPage({ searchParams: Promise.resolve({ wallet: "usd" }) }));
+    expect(usd).toContain('name="currency" value="USD"');
+    expect(usd).not.toContain("Bank transfer");
+  });
+
+  test("a top-up returns to this site's Add money page; the sandbox shows it there, live goes to the payment page", async () => {
+    answer();
+    await expect(topUp.topUpWallet({}, form({ amount: "1,000", currency: "USD", method: "paystack" }))).rejects.toThrow("redirect:/add-money?wallet=USD&top_up=t1");
+    const sent = JSON.parse(String(calls().at(-1)![1].body));
+    expect(sent).toEqual({ amount: 100000, method: "paystack", return_url: "https://crypto.bitocard.com/add-money?wallet=USD", currency: "USD" });
+    wallet.mode = "live";
+    await expect(topUp.topUpWallet({}, form({ amount: "50" }))).rejects.toThrow("redirect:https://pay.example/p/1");
+    wallet.mode = "test";
+    expect(await topUp.topUpWallet({}, form({ amount: "0.5" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
+    await topUp.simulateTopUp(form({ id: "t1", outcome: "succeeded" }));
+    expect(revalidatePath).toHaveBeenCalledWith("/add-money", undefined);
   });
 });

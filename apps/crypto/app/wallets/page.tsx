@@ -15,8 +15,7 @@ const button = "inline-flex min-h-11 items-center justify-center rounded-xl px-4
 
 /**
  * The customer's wallets for trading: each coin (available, in ads, frozen), their P2P money in every currency they
- * hold, and their nickname. Deposits, withdrawals and cash out are on this site; adding money opens their account app
- * (`/go/wallet`).
+ * hold, and their nickname. Adding money, deposits, withdrawals and cash out are on this site.
  */
 export default async function WalletsPage() {
   await requireCustomer("/wallets");
@@ -47,9 +46,9 @@ export default async function WalletsPage() {
         <CryptoDeclaration version={wallets.declaration.version} action={declareCrypto} />
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <AccountLink place="wallet" className={button}>
+        <Link href="/add-money" className={button}>
           Add money
-        </AccountLink>
+        </Link>
         <Link href="/deposit" className={button}>
           Deposit coins
         </Link>

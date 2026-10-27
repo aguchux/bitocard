@@ -12,12 +12,12 @@ export async function requireCustomer(next: string): Promise<Customer> {
 }
 
 /**
- * What stays on the customer's account app (their country store) for now: adding money to their wallets and the
- * identity check. `/go/<place>` takes them there, signed in. Deposits, withdrawals and cash out are on this site.
+ * What stays on the customer's account app (their country store): the identity check, and choosing the country of an
+ * older account. `/go/<place>` takes them there, signed in. Money in and out is on this site.
  */
 export const accountPlaces = {
-  wallet: "/account/wallet",
   verification: "/account/verification",
+  profile: "/account/profile/details#country",
 } as const;
 
 const chosen = (asset: string, chain?: string) => `?${new URLSearchParams({ asset, ...(chain ? { chain } : {}) })}`;
