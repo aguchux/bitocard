@@ -56,7 +56,13 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 1. **Its own front door.** <Brand>'s site calls the API at `api.<domain>` (a second hostname on the same droplet, its own Cloudflare zone and Caddy site). Crypto routes move under their own prefix (`/v1/x/…`, named once the brand is chosen) and answer **only** <Brand>'s server: a dedicated shared secret (like `STORE_SERVER_SECRET`, its own `<BRAND>_SERVER_SECRET`) signs every request, and the routes refuse API keys, reseller and admin BitoCard sessions, store customers and any other host. They are left out of the public OpenAPI document and the docs.
 2. **Its own accounts.** <Brand> gets its own account space: a dedicated store row owned by a dedicated operator account (the customer code already scopes accounts per store), so an email at bitocard.com and at <Brand> are two unrelated accounts, with no handoff and no shared cookie (`bc_signed_in` never set). Emails come from <domain> under <Brand>'s name.
 3. **Its own books.** Every ledger account and entry belongs to <Brand>'s operator account, so BitoCard's reports, P&L and reconciliation never include it, and <Brand>'s can be produced alone.
-4. **Its own operations.** Admins work on <Brand> in its own admin area (first a separate section in admin.bitocard.com restricted to a new `brand_operations` role, later its own console on `admin.<domain>`).
+4. **One central admin platform for every brand** (the owner, 27 October 2026). The admin app stays the single place where Golojan's team runs everything, like multi-domain management: BitoCard and <Brand> (and any later brand) are **brands** in it, each with its own domains, settings, members, books and queues. Nothing about <Brand> is run from a separate console.
+   - **Brands as a first-class idea:** a `brands` table (BitoCard, <Brand>; name, domains, logo, sending address, support email, legal entity), and every brand-owned record (the operator account, its store row, accounts, ledger accounts, settings, notifications) tied to one. BitoCard's existing data is brand `bitocard` by migration.
+   - **A brand switcher** in the admin shell's top bar, kept in the address (`?brand=`): each brand shows only its own sections (BitoCard: stores, resellers, catalogue, orders, Shop; <Brand>: markets, ads, orders and appeals, traders, custody, limits, fees), and a brand-wide overview shows each brand side by side.
+   - **Membership managed centrally:** admins are one team with one sign-in, two-step and step-up, but their roles are **per brand** (`admin_brand_roles`: an admin may be operations on <Brand> and support on BitoCard, or nothing on one of them). Super admins add and remove admins, give and take brand roles, and every change is audited. The API checks the brand role on every admin route (`@AdminRoles(...)` gains the brand), so a BitoCard-only admin can never see a <Brand> trader, and the reverse.
+   - **<Brand>'s members** (its traders) are managed there too: search, profile, identity check, limits, freezes, appeals, sessions and devices, sign-out everywhere, suspension, all audited per brand.
+   - **Settings per brand:** feature switches, integrations (each brand its own email sender, identity provider, chain providers and signer), legal documents and markets, so a <Brand> change never touches BitoCard.
+   - **Where it lives:** admin.bitocard.com for now. If <Brand> must not be seen as part of BitoCard (a separate company), the same admin app can be served on a neutral operator address (for example `admin.golojan.<tld>`) with both brands inside it; its cookies, origins and two-step stay as today.
 5. **Ready to leave.** Nothing in <Brand> reads BitoCard tables except the shared infrastructure above, so it can later move to its own database and service (needed if a separate company or a licence requires it) as a deployment change, not a rewrite.
 
 ## The escrow P2P engine (new)
@@ -96,12 +102,13 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 9. Docs: `AGENTS.md`, `PLANS.md` and this plan updated; the old plan marked superseded.
 
 ### 2. <Brand>'s own surface in the API
-1. The operator account and <Brand>'s store row; `<BRAND>_URL` and `<BRAND>_SERVER_SECRET`.
-2. The crypto routes under their own prefix, signed by <Brand>'s server only, left out of OpenAPI.
-3. <Brand>'s accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from <domain>.
-4. The identity check chosen in step 0.
-5. Ledger accounts and reports under the operator account.
-6. Tests on PGlite and Docker: no BitoCard caller can reach any <Brand> route, and no <Brand> caller any BitoCard route.
+1. Brands in the API: the `brands` table, BitoCard's data tagged `bitocard` by migration, per-brand admin roles (`admin_brand_roles`) checked on every admin route, super admins managing admins and their brand roles in the admin app, the brand switcher.
+2. The operator account and <Brand>'s store row, tied to its brand; `<BRAND>_URL` and `<BRAND>_SERVER_SECRET`.
+3. The crypto routes under their own prefix, signed by <Brand>'s server only, left out of OpenAPI.
+4. <Brand>'s accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from <domain>.
+5. The identity check chosen in step 0.
+6. Ledger accounts and reports under the operator account.
+7. Tests on PGlite and Docker: no BitoCard caller can reach any <Brand> route, and no <Brand> caller any BitoCard route.
 
 ### 3. The escrow engine
 1. Payment methods (saved, encrypted, name-checked).
@@ -116,7 +123,7 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 1. Rename `apps/crypto` and `@bitocard/crypto-ui` to the brand; its own Vercel project, domain, brand assets, manifest and icons.
 2. Pages: markets and ads (as built), sign-up and sign-in, the order room, wallets with deposit and withdraw (as built), payment methods, profile and trader page, appeals, notifications.
 3. SEO from day one (as built: market and trader pages indexed).
-4. Its own admin area: orders and appeals queue, traders, ads, deposits and withdrawals, custody, limits, fees, markets.
+4. <Brand> in the central admin platform (see Architecture 4): the brand switcher, per-brand admin roles, and <Brand>'s sections: orders and appeals queue, traders (members), ads, deposits and withdrawals, custody, limits, fees, markets.
 
 ### 5. Hardening
 1. A security review of escrow, release and appeals.
@@ -131,7 +138,7 @@ Move <Brand> to its own database and service when the entity or a licence requir
 
 ## Questions for the owner
 
-1. Will <Brand> be operated by a separate company? (Recommended.)
+1. Will <Brand> be operated by a separate company? (Recommended.) If so, should the central admin platform move to a neutral operator address rather than admin.bitocard.com?
 2. Didit, or BitoCard Verify under the <Brand> name?
 3. Spin and win: end it, or pay its rewards as store credit?
 4. Keep a global US dollar market (traders paying through Wise, Payoneer or PayPal between themselves), or country markets only at first?
