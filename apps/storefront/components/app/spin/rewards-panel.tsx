@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRightLeft, Coins, Loader2 } from "lucide-react";
-import { formatCrypto, formatPrice, type StoreSpinExchangePreview, type StoreSpinRewardBalance } from "@bitocard/api-client/storefront";
+import { formatPrice, type StoreSpinExchangePreview, type StoreSpinRewardBalance } from "@bitocard/api-client/storefront";
 import { exchangeRewards, previewExchange } from "@/lib/spin-actions";
 import { usd } from "@/lib/spin";
-import { CoinToken } from "./coin-token";
 import styles from "./spin.module.css";
 
 /**
@@ -58,18 +57,7 @@ export function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewar
         <span className={`shrink-0 font-display text-3xl font-black tabular-nums ${styles.goldText}`}>{usd(rewards.usd)}</span>
       </div>
 
-      {rewards.coins.length ? (
-        <ul className="mt-4 flex flex-wrap gap-2 text-sm" aria-label="Rewards by coin">
-          {rewards.coins.map(coin => (
-            <li key={coin.asset} className="inline-flex items-center gap-2 rounded-full bg-white/8 py-1 pr-3 pl-1 ring-1 ring-white/10">
-              <CoinToken asset={coin.asset} size="sm" />
-              {formatCrypto(coin.amount, coin.asset)}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-4 text-sm text-white/65">What you win collects here.</p>
-      )}
+      {Number(rewards.usd) > 0 ? null : <p className="mt-4 text-sm text-white/65">What you win collects here.</p>}
 
       {has ? (
         <div className="mt-5 space-y-3">

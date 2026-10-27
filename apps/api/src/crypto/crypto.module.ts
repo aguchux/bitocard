@@ -29,8 +29,6 @@ import { ReservesService } from './exchange/reserves.service.js';
 import { CryptoMarketLimitsService } from './market-limits.service.js';
 import { P2pService } from './p2p.service.js';
 import { CryptoPricesService } from './prices.js';
-import { AdminSpinsController, CustomerSpinsController, PublicSpinsController } from './spins.controller.js';
-import { SpinsService } from './spins.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
 import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.js';
 
@@ -46,14 +44,11 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     CustomerCashController,
     CustomerP2pController,
     PublicCryptoController,
-    CustomerSpinsController,
-    PublicSpinsController,
     CustomerExchangeController,
     ResellerExchangeController,
     ResellerCoinsController,
     AdminCryptoController,
     AdminExchangeController,
-    AdminSpinsController,
     AdminP2pController,
     AdminChainsController,
     AdminWithdrawalsController,
@@ -61,7 +56,7 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     AdminReconciliationsController,
     ChainWebhooksController,
   ],
-  providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, SpinsService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
+  providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
   exports: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}

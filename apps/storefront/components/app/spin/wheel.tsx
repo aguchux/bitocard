@@ -1,7 +1,7 @@
 import type { Ref } from "react";
 import type { StoreSpinSegment } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
-import { coinFor, segmentTones, type SegmentTone, usd } from "@/lib/spin";
+import { dollar, segmentTones, type SegmentTone, usd } from "@/lib/spin";
 import styles from "./spin.module.css";
 
 /** The disc is drawn in 400 units; the fixed rim around it in 440 (the disc sits 20 units inside the rim's edge). */
@@ -61,7 +61,6 @@ export function WheelDisc({ segments, won }: { segments: StoreSpinSegment[]; won
       {segments.map((segment, i) => {
         const start = i * width;
         const tone = tones[i];
-        const coin = coinFor(segment.asset);
         return (
           <g key={segment.index}>
             <path d={wedge(start, start + width)} fill={fill[tone]} stroke={colors.gold400} strokeOpacity={0.75} strokeWidth={1.25} />
@@ -82,9 +81,9 @@ export function WheelDisc({ segments, won }: { segments: StoreSpinSegment[]; won
               >
                 {usd(segment.usd)}
               </text>
-              <rect x={centre - 24} y={centre - radius * 0.53 - 10} width={48} height={20} rx={10} fill={coin.colour} stroke="white" strokeOpacity={0.55} />
-              <text x={centre} y={centre - radius * 0.53} textAnchor="middle" dominantBaseline="middle" fill={coin.dark ? colors.navy900 : "white"} fontSize={10.5} fontWeight={800} className="font-display">
-                {segment.asset}
+              <rect x={centre - 24} y={centre - radius * 0.53 - 10} width={48} height={20} rx={10} fill={dollar.colour} stroke="white" strokeOpacity={0.55} />
+              <text x={centre} y={centre - radius * 0.53} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={10.5} fontWeight={800} className="font-display">
+                USD
               </text>
             </g>
           </g>

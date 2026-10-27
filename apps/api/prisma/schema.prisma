@@ -959,8 +959,10 @@ enum AccountKind {
   crypto_withdrawing
   /// A customer's P2P money on its way to their bank account: back to `customer_withdrawable` if the transfer fails.
   customer_payouts_pending
-  /// A customer's Spin and win rewards, one account per coin, in its base units: never withdrawn on chain or traded,
-  /// only exchanged into their store wallet (`customer_wallet`). Never below zero.
+  /// A store customer's Spin and win rewards in US cents: spend-only, never withdrawn, moved into their store wallet
+  /// (`customer_wallet`). Never below zero.
+  spin_rewards
+  /// Spin and win rewards in coins, from before it paid in US dollars (sandbox only). Never below zero.
   crypto_spin_rewards
   /// What BitoCard has granted in Spin and win rewards, in each coin (a marketing expense, debit-normal): given back
   /// when rewards are exchanged, whose cost is then booked in money to `promotions`.
@@ -3557,7 +3559,8 @@ model SpinAllowance {
   @@map("spin_allowances")
 }
 
-/// One spin of the wheel: what it won (US cents), paid in which coin and how much, credited once (ledger `crypto_spin:<id>`).
+/// One spin of the wheel: what it won (US cents), credited once (ledger `spin_win:<id>`; `crypto_spin:<id>` and a coin
+/// before Spin and win moved to US dollars).
 model Spin {
   id          String        @id @default(uuid()) @db.Uuid
   allowanceId String        @map("allowance_id") @db.Uuid

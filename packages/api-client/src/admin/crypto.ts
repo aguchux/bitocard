@@ -234,18 +234,6 @@ export type CryptoReconciliation = {
   created_at: string;
 };
 
-/** One spin of a customer's one-time $1 "Spin and win" reward, credited to their spin rewards (spent in the store, never withdrawn). */
-export type SpinReward = { object: 'spin_reward'; id: string; customer: { id: string; email: string }; mode: Mode; number: number; asset: string; amount: string; usd: string; created_at: string };
-
-/** Paid out so far, per mode and coin: `amount` in the coin, `usd` its value when won. */
-export type SpinRewardTotal = { mode: Mode; asset: string; amount: string; usd: string; spins: number };
-
-/** `GET /v1/admin/crypto/spins`: the spins, totals per coin and how many customers have started their allowance. */
-/** Rewards exchanged into customers' store wallets, per currency: `amount` in its minor units, `usd` what the rewards were worth. */
-export type SpinExchangeTotal = { currency: string; amount: number; usd: string; exchanges: number };
-
-export type SpinRewardList = List<SpinReward> & { totals: SpinRewardTotal[]; customers: number; exchanged: SpinExchangeTotal[] };
-
 export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer_id?: string; limit?: number };
 
 const cryptoApi = bitocardApi.injectEndpoints({
@@ -313,7 +301,6 @@ const cryptoApi = bitocardApi.injectEndpoints({
       query: mode => ({ url: '/v1/admin/crypto/reconciliations/run', method: 'POST', body: { mode } }),
       invalidatesTags: ['Crypto'],
     }),
-    spinRewards: build.query<SpinRewardList, { mode?: Mode; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/spins', params }), providesTags: ['Crypto'] }),
     p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/ads', params }), providesTags: ['P2p'] }),
     p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/trades', params }), providesTags: ['P2p'] }),
     cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
@@ -347,5 +334,4 @@ export const {
   useCustomerPayoutsQuery,
   useCryptoReconciliationsQuery,
   useRunCryptoReconciliationMutation,
-  useSpinRewardsQuery,
 } = cryptoApi;

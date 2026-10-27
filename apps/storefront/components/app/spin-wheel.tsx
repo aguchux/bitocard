@@ -82,7 +82,7 @@ export function SpinWheel({ initial, onChange, sound, visitor = false }: { initi
     const { spin } = done;
     setAllowance(spin.allowance);
     if (visitor) setRewards(current => ({ ...current, usd: spin.allowance.won_usd }));
-    setRecent(list => [{ id: spin.id, number: spin.number, asset: spin.asset, amount: spin.amount, usd: spin.usd, segment: spin.segment, created_at: new Date().toISOString() }, ...list.filter(item => item.id !== spin.id)]);
+    setRecent(list => [{ id: spin.id, number: spin.number, usd: spin.usd, segment: spin.segment, created_at: new Date().toISOString() }, ...list.filter(item => item.id !== spin.id)]);
     setWin(spin);
     setPhase("idle");
     sound?.win();

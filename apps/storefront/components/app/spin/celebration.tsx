@@ -1,10 +1,10 @@
 "use client";
 
 import { type CSSProperties, useEffect, useState } from "react";
-import { formatCrypto, type StoreSpin } from "@bitocard/api-client/storefront";
+import type { StoreSpin } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { usd } from "@/lib/spin";
-import { CoinToken } from "./coin-token";
+import { DollarToken } from "./coin-token";
 import styles from "./spin.module.css";
 
 const confettiColours = [colors.brand500, colors.gold400, colors.gold200, colors.azure500, colors.mint500, colors.brand300];
@@ -88,7 +88,7 @@ export function WinPlaque({ win }: { win: StoreSpin }) {
   return (
     <div className={styles.plaque}>
       <p className="sr-only">
-        You won {formatCrypto(win.amount, win.asset)} ({usd(win.usd)})
+        You won {usd(win.usd)}
       </p>
       <span aria-hidden="true" className="text-[11px] font-bold tracking-[0.3em] text-gold-200 uppercase">
         You won
@@ -97,8 +97,8 @@ export function WinPlaque({ win }: { win: StoreSpin }) {
         {usd(String(shown))}
       </span>
       <span aria-hidden="true" className="mt-0.5 inline-flex items-center gap-2 text-sm font-semibold text-white/85">
-        <CoinToken asset={win.asset} size="sm" />
-        {formatCrypto(win.amount, win.asset)}
+        <DollarToken size="sm" />
+        In your spin rewards
       </span>
     </div>
   );

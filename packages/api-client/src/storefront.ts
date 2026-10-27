@@ -775,14 +775,11 @@ export function formatCrypto(amount: string, asset?: string) {
 
 // -- Spin and win ---------------------------------------------------------------------------------------------------
 
-/** The coins the wheel pays in. */
-export type StoreSpinAsset = 'USDT' | 'USDC' | 'BNB';
-
 /** Why a customer cannot spin (null when they can). */
-export type StoreSpinBlock = 'not_enabled' | 'crypto_not_enabled' | 'email_not_verified' | 'customer_verification_required' | 'crypto_account_frozen' | 'claimed_elsewhere';
+export type StoreSpinBlock = 'not_enabled' | 'email_not_verified' | 'claimed_elsewhere';
 
-/** One of the wheel's segments, clockwise from the top (index 0 first). `usd`: its value, "0.05". */
-export type StoreSpinSegment = { index: number; asset: StoreSpinAsset; usd: string };
+/** One of the wheel's segments, clockwise from the top (index 0 first). `usd`: its value in US dollars, "0.05". */
+export type StoreSpinSegment = { index: number; usd: string };
 
 /**
  * The customer's spins: what they have won so far and today's spins (up to `daily_limit` a day). The total and the
@@ -799,17 +796,13 @@ export type StoreSpinAllowance = {
 };
 
 /**
- * What the customer holds in spin rewards: per coin (`usd` its value now, null while BNB has no price) and in all.
- * Rewards are never withdrawn or traded: they are exchanged into the store wallet, in `exchange_currencies`.
+ * What the customer holds in spin rewards, in US dollars. Rewards are never withdrawn: they are moved into the store
+ * wallet, in one of `exchange_currencies` (their country's currency at BitoCard's rate, or US dollars as they are).
  */
-export type StoreSpinRewardBalance = {
-  coins: Array<{ asset: StoreSpinAsset | string; amount: string; usd: string | null }>;
-  usd: string;
-  exchange_currencies: string[];
-};
+export type StoreSpinRewardBalance = { usd: string; exchange_currencies: string[] };
 
-/** A spin won: `amount` in the coin (a decimal string), `usd` its value, `segment` where the wheel landed. */
-export type StoreSpinWin = { id: string; number: number; asset: StoreSpinAsset | string; amount: string; usd: string; segment: number; created_at: string };
+/** A spin won: `usd` what it won in US dollars, `segment` where the wheel landed. */
+export type StoreSpinWin = { id: string; number: number; usd: string; segment: number; created_at: string };
 
 /** `GET /v1/store/spins`: the wheel, whether the customer can spin (and why not), their allowance and latest wins. */
 export type StoreSpinRewards = {
@@ -827,10 +820,10 @@ export type StoreSpinRewards = {
 };
 
 /** `POST /v1/store/spins`: the spin's outcome, decided by the server, and the allowance after it. */
-export type StoreSpin = { object: 'spin'; id: string; number: number; segment: number; asset: StoreSpinAsset | string; amount: string; usd: string; allowance: StoreSpinAllowance };
+export type StoreSpin = { object: 'spin'; id: string; number: number; segment: number; usd: string; allowance: StoreSpinAllowance };
 
 /** `POST /v1/store/spins/exchange { preview: true }`: what the rewards are worth in a wallet's currency now. */
-export type StoreSpinExchangePreview = { object: 'spin_exchange_preview'; usd: string; currency: string; amount: number; rate: string; coins: StoreSpinRewardBalance['coins'] };
+export type StoreSpinExchangePreview = { object: 'spin_exchange_preview'; usd: string; currency: string; amount: number; rate: string };
 
 /** `POST /v1/store/spins/exchange`: the rewards moved into the store wallet (`amount` in its minor units). */
 export type StoreSpinExchange = { object: 'spin_exchange'; id: string; usd: string; currency: string; amount: number; rate: string; created_at: string };

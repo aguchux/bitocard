@@ -1,41 +1,31 @@
-// Spin and win: each customer (one per person across every store) wins exactly $1 in BNB, USDT and USDC over 50 to
-// 100 spins, at most two a day, never told the total. Wins are fixed on the server and credited once to spin rewards
-// (never withdrawn or traded); parallel spins never pay twice; rewards are exchanged into the store wallet.
+// Spin and win: each customer (one per person across every store) wins exactly $1 in US dollars over 50 to 100 spins,
+// at most two a day, never told the total. Wins are fixed on the server and credited once to spin rewards (US cents,
+// never withdrawn); parallel spins never pay twice; rewards are moved into the store wallet in dollars or the local
+// currency. Crypto has left BitoCard, so none of this touches crypto.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
 let prisma;
-let coingecko;
-const bnbPrice = { usd: 600 };
 
 before(async () => {
-  coingecko = await fakeService(call => {
-    const url = new URL(call.url, 'http://x');
-    if (url.pathname !== '/api/v3/simple/price') return { status: 404, body: {} };
-    if (bnbPrice.down) return { status: 503, body: {} };
-    return { body: { binancecoin: { usd: bnbPrice.usd } } };
-  });
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
   for (const source of ['open_exchange_rates', 'flutterwave']) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
-  const saved = await admin.put('/v1/admin/integrations/crypto_prices', { values: { COINGECKO_API_URL: coingecko.url, COINGECKO_API_KEY: 'cg-demo-key' }, code: await adminCode(server, admin) });
-  assert.equal(saved.status, 200, JSON.stringify(saved.json));
 });
 
 after(async () => {
   await server?.close();
-  await coingecko?.close();
 });
 
 const switches = async enabled => {
-  for (const key of ['crypto_wallets', 'spin_rewards']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+  for (const key of ['spin_rewards']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
 };
 const ledgerOk = async () => assert.equal((await admin.get('/v1/admin/ledger/check')).json.ok, true);
 
@@ -108,7 +98,7 @@ function publicVisitor(subdomain = null) {
 
 describe('the schedule', () => {
   test('50 to 100 wins of 1 to 10 cents, on the wheel, adding up to exactly $1', async () => {
-    const { spinSchedule, spinSegments } = await import('../dist/crypto/spins.service.js');
+    const { spinSchedule, spinSegments } = await import('../dist/spins/spins.service.js');
     const onWheel = new Set(spinSegments.map(item => item.cents));
     for (let count = 50; count <= 100; count += 1) {
       for (let run = 0; run < 5; run += 1) {
@@ -122,7 +112,7 @@ describe('the schedule', () => {
     assert.ok(spinSchedule(100).every(value => value === 1));
     assert.throws(() => spinSchedule(5), /cannot add up/);
     assert.equal(spinSegments.length, 12);
-    for (const asset of ['USDT', 'USDC', 'BNB']) assert.ok(spinSegments.some(item => item.asset === asset && item.cents === 1), `${asset} has the smallest win`);
+    assert.ok(spinSegments.every(item => !('asset' in item)), 'dollars, no coins');
   });
 });
 
@@ -159,10 +149,10 @@ describe('spin and win', () => {
     const segment = before.segments[first.json.segment];
     assert.equal(segment.usd, first.json.usd, 'it lands on a segment showing what it won');
     const rewards = (await shopper.get('/v1/store/spins')).json.rewards;
-    assert.deepEqual(rewards.coins.map(item => [item.asset, item.amount]), [[first.json.asset, first.json.amount]], 'credited to spin rewards at once');
+    assert.equal(rewards.usd, first.json.usd, 'credited to spin rewards at once');
     assert.deepEqual(rewards.exchange_currencies, ['NGN', 'USD']);
-    const wallets = (await shopper.get('/v1/store/crypto')).json.assets;
-    assert.ok(wallets.every(item => Number(item.available) === 0), 'never in the crypto wallet: rewards cannot be withdrawn or traded');
+    assert.equal('asset' in first.json, false, 'no coin');
+    assert.equal((await shopper.get('/v1/store/wallet?currency=USD')).json.balance, 0, 'not in the wallet until moved');
 
     assert.equal((await shopper.post('/v1/store/spins')).status, 200);
     const limited = await shopper.post('/v1/store/spins');
@@ -187,16 +177,13 @@ describe('spin and win', () => {
     const more = await shopper.post('/v1/store/spins');
     assert.deepEqual([more.status, more.json.error.code], [409, 'spins_finished']);
 
-    // Exactly $1 in all: stablecoins at $1, BNB at the price it was paid at.
+    // Exactly $1 in all, in US cents.
     const spins = await prisma.spin.findMany({ where: { customerId: shopper.id } });
     assert.equal(spins.length, total);
     assert.equal(spins.reduce((sum, item) => sum + item.cents, 0), 100);
-    for (const item of spins.filter(row => row.asset === 'BNB')) {
-      assert.equal(item.priceUsd, '600');
-      assert.equal(item.amount, (BigInt(item.cents) * 10n ** 8n * 100_000_000n) / (100n * 60_000_000_000n), 'BNB worth the win, rounded down');
-    }
-    for (const item of spins.filter(row => row.asset !== 'BNB')) assert.equal(item.amount, BigInt(item.cents) * 10_000n);
-    const credited = await prisma.journalEntry.count({ where: { reference: { startsWith: 'crypto_spin:' }, postings: { some: { account: { customerId: shopper.id } } } } });
+    assert.ok(spins.every(item => item.asset === 'USD' && item.amount === BigInt(item.cents) && item.priceUsd === null));
+    assert.equal((await shopper.get('/v1/store/spins')).json.rewards.usd, '1.00');
+    const credited = await prisma.journalEntry.count({ where: { reference: { startsWith: 'spin_win:' }, postings: { some: { account: { customerId: shopper.id } } } } });
     assert.equal(credited, total, 'one ledger entry per spin');
     await ledgerOk();
   });
@@ -255,38 +242,26 @@ describe('spin and win', () => {
     assert.deepEqual([spin.status, spin.json.error.code], [409, 'claimed_elsewhere']);
   });
 
-  test('BNB without a price pays its win in a stablecoin; a frozen account cannot spin', async () => {
-    const { SpinsService } = await import('../dist/crypto/spins.service.js');
-    const { CryptoPricesService } = await import('../dist/crypto/prices.js');
-    const spins = server.app.get(SpinsService);
-    const assets = new Map((await prisma.cryptoAsset.findMany({ where: { code: { in: ['USDT', 'USDC', 'BNB'] } } })).map(asset => [asset.code, asset]));
-    server.app.get(CryptoPricesService).forget();
-    const priced = await spins.payout(5, assets);
-    assert.deepEqual([priced.asset.code, priced.segment, priced.priceUsd], ['BNB', 1, '600'], 'only BNB shows 5 cents');
-    bnbPrice.down = true;
-    server.app.get(CryptoPricesService).forget();
-    try {
-      const fallback = await spins.payout(5, assets);
-      assert.deepEqual([fallback.asset.code, fallback.amount, fallback.segment], ['USDT', 50_000n, 1], 'still lands on the segment, paid in USDT');
-    } finally {
-      bnbPrice.down = false;
-    }
-
+  test('no crypto is needed: crypto switched off and a crypto freeze change nothing', async () => {
     const shopper = await customer();
-    await admin.put(`/v1/admin/crypto/customers/${shopper.id}/account-freeze`, { frozen: true, reason: 'checking' });
-    const status = (await shopper.get('/v1/store/spins')).json;
-    assert.deepEqual([status.enabled, status.reason], [false, 'crypto_account_frozen']);
-    assert.equal((await shopper.post('/v1/store/spins')).json.error.code, 'crypto_account_frozen');
+    assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: false })).status, 200);
+    try {
+      await prisma.customer.update({ where: { id: shopper.id }, data: { cryptoFrozenAt: new Date() } });
+      const status = (await shopper.get('/v1/store/spins')).json;
+      assert.deepEqual([status.enabled, status.reason], [true, null]);
+      assert.equal((await shopper.post('/v1/store/spins')).status, 200);
+    } finally {
+      await admin.put('/v1/admin/switches/crypto_wallets', { enabled: null });
+    }
   });
 
-  test('rewards are exchanged into the store wallet, in US dollars or the local currency, once', async () => {
+  test('rewards are moved into the store wallet, in US dollars or the local currency, once', async () => {
     const shopper = await customer();
     assert.equal((await shopper.post('/v1/store/spins/exchange', { preview: true })).json.error.code, 'nothing_to_exchange');
     for (let spin = 0; spin < 2; spin += 1) assert.equal((await shopper.post('/v1/store/spins')).status, 200);
     const cents = (await prisma.spin.findMany({ where: { customerId: shopper.id } })).reduce((sum, item) => sum + item.cents, 0);
     const rewards = (await shopper.get('/v1/store/spins')).json.rewards;
-    // BNB is paid rounded down, so its value can fall a cent short.
-    assert.ok([cents, cents - 1].includes(Math.round(Number(rewards.usd) * 100)), `${rewards.usd} for ${cents} cents`);
+    assert.equal(Math.round(Number(rewards.usd) * 100), cents, 'exactly what was won');
 
     assert.equal((await shopper.post('/v1/store/spins/exchange', { currency: 'GHS' })).json.error.code, 'currency_unsupported');
     const preview = await shopper.post('/v1/store/spins/exchange', { currency: 'NGN', preview: true });
@@ -306,11 +281,10 @@ describe('spin and win', () => {
     assert.equal(wallet.balance, preview.json.amount, 'credited to the store wallet');
     const activity = (await shopper.get('/v1/store/wallet/transactions')).json.data;
     assert.deepEqual([activity[0].type, activity[0].amount], ['spin_exchange', preview.json.amount]);
-    assert.deepEqual((await shopper.get('/v1/store/spins')).json.rewards.coins, [], 'nothing left in rewards');
+    assert.equal((await shopper.get('/v1/store/spins')).json.rewards.usd, '0.00', 'nothing left in rewards');
     assert.equal((await shopper.post('/v1/store/spins/exchange', {})).json.error.code, 'nothing_to_exchange');
 
-    // Into US dollars: a stablecoin cent is a cent.
-    // Two spins, so a BNB win paid rounded down still adds up to a whole cent.
+    // Into US dollars: a cent is a cent.
     await nextDay(shopper);
     for (let spin = 0; spin < 2; spin += 1) await shopper.post('/v1/store/spins');
     const later = (await shopper.get('/v1/store/spins')).json.rewards;
@@ -331,19 +305,15 @@ describe('spin and win', () => {
     await ledgerOk();
   });
 
-  test('admins see every spin with totals per coin; Test connection reads the BNB price', async () => {
-    const list = await admin.get('/v1/admin/crypto/spins?mode=test');
+  test('admins see every spin and what it won in all', async () => {
+    const list = await admin.get('/v1/admin/spins?mode=test');
     assert.equal(list.status, 200, JSON.stringify(list.json));
     assert.ok(list.json.data.length > 0 && list.json.customers >= 3);
-    assert.ok(list.json.data.every(item => item.customer.email && item.mode === 'test'));
-    const usd = list.json.totals.reduce((sum, item) => sum + Number(item.usd), 0);
-    assert.ok(usd >= 1, 'at least the finished customer’s $1');
+    assert.ok(list.json.data.every(item => item.customer.email && item.mode === 'test' && item.usd));
+    assert.ok(Number(list.json.totals.usd) >= 1, 'at least the finished customer’s $1');
     assert.ok(list.json.exchanged.some(item => item.currency === 'NGN' && item.exchanges === 1 && item.amount > 0), JSON.stringify(list.json.exchanged));
     const support = await adminClient(server, ['support']);
-    assert.equal((await support.get('/v1/admin/crypto/spins')).status, 200);
-    const tested = (await admin.post('/v1/admin/integrations/crypto_prices/test')).json;
-    assert.deepEqual([tested.ok, tested.message], [true, 'BNB is $600.']);
-    assert.equal(coingecko.calls.at(-1).headers['x-cg-demo-api-key'], 'cg-demo-key');
+    assert.equal((await support.get('/v1/admin/spins')).status, 200);
   });
 });
 

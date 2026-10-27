@@ -3,14 +3,11 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { type CryptoAsset, type LedgerMode, Prisma, type Spin, type SpinAllowance } from '../generated/prisma/client.js';
+import { type LedgerMode, Prisma, type Reseller, type Spin, type SpinAllowance } from '../generated/prisma/client.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { fromUnits } from './amounts.js';
-import { type CryptoContext, CryptoWalletsService } from './crypto-wallets.service.js';
 import { FxService } from '../fx/fx.service.js';
 import { walletCurrencies } from '../ledger/wallet.service.js';
-import { CryptoPricesService, unitsForCents } from './prices.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
 
 /** What every customer can win in all, in US cents. */
@@ -20,27 +17,23 @@ export const spinCount = { min: 50, max: 100 } as const;
 /** Spins a customer may take per day (UTC) where the market sets none (admins set it per market: `countries.spin_daily_limit`). */
 export const spinDailyLimit = 2;
 
-/** The coins Spin and win pays: dollar stablecoins at $1, BNB at CoinGecko's price. */
-type SpinAsset = 'USDT' | 'USDC' | 'BNB';
-const stablecoins: SpinAsset[] = ['USDT', 'USDC'];
-
 /**
- * The wheel, clockwise from the top: each segment a coin and a win in US cents. Every win the schedule can hold
- * (1, 2, 3, 4, 5, 6, 8 or 10 cents) has at least one segment, and the smallest win has one per coin.
+ * The wheel, clockwise from the top: each segment a win in US cents. Every win the schedule can hold (1, 2, 3, 4, 5,
+ * 6, 8 or 10 cents) has at least one segment; the smallest win has three.
  */
-export const spinSegments: ReadonlyArray<{ asset: SpinAsset; cents: number }> = [
-  { asset: 'USDT', cents: 1 },
-  { asset: 'BNB', cents: 5 },
-  { asset: 'USDC', cents: 2 },
-  { asset: 'USDT', cents: 10 },
-  { asset: 'BNB', cents: 1 },
-  { asset: 'USDC', cents: 3 },
-  { asset: 'USDT', cents: 4 },
-  { asset: 'BNB', cents: 2 },
-  { asset: 'USDC', cents: 1 },
-  { asset: 'USDT', cents: 8 },
-  { asset: 'BNB', cents: 3 },
-  { asset: 'USDC', cents: 6 },
+export const spinSegments: ReadonlyArray<{ cents: number }> = [
+  { cents: 1 },
+  { cents: 5 },
+  { cents: 2 },
+  { cents: 10 },
+  { cents: 1 },
+  { cents: 3 },
+  { cents: 4 },
+  { cents: 2 },
+  { cents: 1 },
+  { cents: 8 },
+  { cents: 3 },
+  { cents: 6 },
 ];
 const winValues = [...new Set(spinSegments.map(item => item.cents))].sort((a, b) => a - b);
 
@@ -74,6 +67,12 @@ export function spinSchedule(count: number, total = spinTotalCents, random: (max
   return wins;
 }
 
+/** A segment showing this win, chosen at random among those that do. */
+const segmentFor = (cents: number) => {
+  const showing = spinSegments.map((item, index) => ({ ...item, index })).filter(item => item.cents === cents);
+  return showing[randomInt(showing.length)].index;
+};
+
 const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
 const usd = (cents: number) => (cents / 100).toFixed(2);
 const startOfDay = (now = new Date()) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -81,28 +80,39 @@ const nextDay = (now = new Date()) => new Date(startOfDay(now).getTime() + 24 * 
 const publicClaimDays = 30;
 const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 /** The gates whose refusal the status page explains instead of failing. */
-const gateCodes = ['crypto_not_enabled', 'email_not_verified', 'customer_verification_required', 'crypto_account_frozen', 'store_unavailable', 'country_required'];
+const gateCodes = ['email_not_verified', 'store_unavailable', 'country_required'];
+
+/** Where a customer spins: their store's seller, its mode, and the seller's country and currency. */
+type SpinContext = { mode: LedgerMode; seller: Reseller; country: string; currency: string };
 
 /**
- * Spin and win (`spin_rewards` switch, off by default; needs crypto wallets): each customer, once per person (email)
- * and mode across every store, wins $1 in BNB, USDT and USDC over 50 to 100 spins, at most the market's daily limit
- * (two unless admins change it). The wins are
- * fixed on the server when they start; the wheel only shows them, and customers are not shown the total. Each win is
- * credited at once to the customer's **spin rewards** (`crypto_promotions` to `crypto_spin_rewards`, reference
- * `crypto_spin:<id>`): kept apart from their own crypto, never withdrawn on chain or traded, only exchanged into their
- * store wallet (`exchange`) to buy the store's products. No crypto leaves BitoCard, so nothing is paid out of custody.
+ * Spin and win (`spin_rewards` switch, off by default), a BitoCard promotion paid in **US dollars** (crypto has left
+ * BitoCard; `docs/CRYPTO_SPINOFF_PLAN.md`): each customer, once per person (email) and mode across every store, wins
+ * $1 over 50 to 100 spins, at most the market's daily limit (two unless admins change it). The wins are fixed on the
+ * server when they start; the wheel only shows them, and customers are not shown the total. Each win is credited at
+ * once to the customer's **spin rewards** (`promotions` to `spin_rewards`, US cents, reference `spin_win:<id>`): kept
+ * apart from their wallet, never withdrawn, only moved into their store wallet (`exchange`), in US dollars as they are
+ * or in their country's currency at BitoCard's rate, to buy the store's products.
  */
 @Injectable()
 export class SpinsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
-    private readonly wallets: CryptoWalletsService,
     private readonly settings: SettingsService,
-    private readonly prices: CryptoPricesService,
     private readonly fx: FxService,
     private readonly stores: StoreSellers,
   ) {}
+
+  /** The customer's store seller, mode and market (`store_unavailable` without a country). */
+  private async context(customer: CustomerWithStore): Promise<SpinContext> {
+    const seller = this.stores.isHouse(customer.store)
+      ? await this.stores.sellerFor(customer)
+      : await this.prisma.reseller.findUniqueOrThrow({ where: { id: customer.store.resellerId } });
+    if (!seller.country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
+    const market = await this.prisma.country.findUniqueOrThrow({ where: { code: seller.country }, select: { code: true, currency: true } });
+    return { mode: this.stores.mode(customer.store), seller, country: market.code, currency: market.currency };
+  }
 
   /** The public Customer Catcher is BitoCard-only and separately enabled per market in Admin > Spin rewards. */
   private async publicContext(storeKey: string | null, askedCountry?: string) {
@@ -118,7 +128,11 @@ export class SpinsService {
   }
 
   private publicWins(row: { wins: Prisma.JsonValue }) {
-    return (Array.isArray(row.wins) ? row.wins : []) as Array<{ id: string; number: number; asset: string; amount: string; usd: string; segment: number; created_at: string }>;
+    return (Array.isArray(row.wins) ? row.wins : []) as Array<{ id: string; number: number; usd: string; segment: number; created_at: string }>;
+  }
+
+  private segments() {
+    return spinSegments.map((item, index) => ({ index, usd: usd(item.cents) }));
   }
 
   private presentPublic(row: { status: string; limit: number; spinsUsed: number; wonCents: number; wins: Prisma.JsonValue; expiresAt: Date; invalidatedReason: string | null }) {
@@ -127,7 +141,7 @@ export class SpinsService {
       object: 'public_spin_rewards' as const,
       enabled: active && row.spinsUsed < row.limit,
       reason: active ? null : row.status === 'invalidated' ? row.invalidatedReason : row.status,
-      segments: spinSegments.map((item, index) => ({ index, asset: item.asset, usd: usd(item.cents) })),
+      segments: this.segments(),
       daily_limit: row.limit,
       allowance: {
         won_usd: usd(row.wonCents),
@@ -138,7 +152,7 @@ export class SpinsService {
         finished: row.spinsUsed >= row.limit,
       },
       recent: this.publicWins(row).toReversed(),
-      rewards: { coins: [], usd: usd(row.wonCents), exchange_currencies: [] },
+      rewards: { usd: usd(row.wonCents), exchange_currencies: [] },
       claim_expires_at: row.expiresAt.toISOString(),
     };
   }
@@ -185,17 +199,7 @@ export class SpinsService {
     if (claim.status !== 'active' || claim.expiresAt <= new Date()) throw conflict('claim_expired', 'This spin claim is no longer available.');
     if (claim.spinsUsed >= claim.limit) throw conflict('public_spins_finished', 'Create an account to claim your wins and keep spinning.');
     const cents = claim.schedule[claim.spinsUsed];
-    const assets = await this.assets();
-    const payout = await this.payout(cents, assets);
-    const outcome = {
-      id: randomUUID(),
-      number: claim.spinsUsed + 1,
-      asset: payout.asset.code,
-      amount: fromUnits(payout.amount, payout.asset.decimals),
-      usd: usd(cents),
-      segment: payout.segment,
-      created_at: new Date().toISOString(),
-    };
+    const outcome = { id: randomUUID(), number: claim.spinsUsed + 1, usd: usd(cents), segment: segmentFor(cents), created_at: new Date().toISOString() };
     const updated = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM public_spin_claims WHERE id = ${claim!.id}::uuid FOR UPDATE`;
       const fresh = await tx.publicSpinClaim.findUniqueOrThrow({ where: { id: claim!.id } });
@@ -217,12 +221,12 @@ export class SpinsService {
     if (!token) return null;
     const claim = await this.prisma.publicSpinClaim.findUnique({ where: { tokenHash: tokenHash(token) } });
     if (!claim || claim.storeId !== customer.storeId) return null;
-    if (claim.status !== 'active') return { object: 'public_spin_claim', status: claim.status, reason: claim.invalidatedReason, message: claim.invalidatedReason === 'daily_limit' ? 'Your saved visitor spins expired because you already used today\u2019s registered spins.' : null };
+    if (claim.status !== 'active') return { object: 'public_spin_claim', status: claim.status, reason: claim.invalidatedReason, message: claim.invalidatedReason === 'daily_limit' ? 'Your saved visitor spins expired because you already used today’s registered spins.' : null };
     if (claim.expiresAt <= new Date()) {
       await this.prisma.publicSpinClaim.update({ where: { id: claim.id }, data: { status: 'expired' } });
       return { object: 'public_spin_claim', status: 'expired', reason: 'expired', message: 'Your saved visitor spins have expired.' };
     }
-    const context = await this.wallets.context(customer);
+    const context = await this.context(customer);
     if (context.mode !== claim.mode || context.country !== claim.countryCode) {
       await this.invalidatePublicClaim(claim.id, 'market_changed');
       return { object: 'public_spin_claim', status: 'invalidated', reason: 'market_changed', message: 'Those visitor spins were for another market and cannot be claimed here.' };
@@ -239,7 +243,7 @@ export class SpinsService {
       await this.invalidatePublicClaim(claim.id, reason);
       return {
         object: 'public_spin_claim', status: 'invalidated', reason,
-        message: reason === 'daily_limit' ? 'Your saved visitor spins were removed because you already used today\u2019s registered spins.' : 'This account has already started Spin and win, so the visitor claim cannot be added.',
+        message: reason === 'daily_limit' ? 'Your saved visitor spins were removed because you already used today’s registered spins.' : 'This account has already started Spin and win, so the visitor claim cannot be added.',
       };
     }
     const currencies = walletCurrencies(context.currency);
@@ -293,19 +297,22 @@ export class SpinsService {
     return { object: 'public_spin_claim', id, status: 'claimed', usd: usd(claim.wonCents), currency: selected.currency, amount: Number(amount) };
   }
 
-  /** The customer's crypto context once every gate passes; throws the gate's refusal otherwise. */
-  private async gate(customer: CustomerWithStore): Promise<CryptoContext> {
-    const context = await this.wallets.require(customer);
+  /**
+   * The customer's context once every gate passes; throws the gate's refusal otherwise: a confirmed email, their store
+   * open (a reseller's published), the promotion switched on for the store's seller, and not started at another store.
+   */
+  private async gate(customer: CustomerWithStore): Promise<SpinContext> {
+    if (!customer.emailVerifiedAt) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
+    }
+    if (!this.stores.isHouse(customer.store)) await this.stores.seller(customer.store, '');
+    const context = await this.context(customer);
     if (!(await this.settings.isOn('spin_rewards', context.seller.id))) {
       throw conflict('spins_not_enabled', 'Spin and win is not available in your country yet.');
     }
     const other = await this.prisma.spinAllowance.findUnique({ where: { mode_emailKey: { mode: context.mode, emailKey: customer.email.toLowerCase() } }, select: { customerId: true } });
     if (other && other.customerId !== customer.id) throw conflict('claimed_elsewhere', 'You have already had your Spin and win at another store.');
     return context;
-  }
-
-  private async assets() {
-    return new Map((await this.prisma.cryptoAsset.findMany({ where: { code: { in: ['USDT', 'USDC', 'BNB'] }, enabled: true } })).map(asset => [asset.code, asset]));
   }
 
   /** The customer's progress, without the total or how many spins are left: what they have won and today's spins. */
@@ -323,46 +330,18 @@ export class SpinsService {
     };
   }
 
-  /**
-   * The customer's spin rewards per coin and their value now, in 1e-8 US dollars (stablecoins at $1, BNB at its price;
-   * BNB without a price cannot be valued, so it waits).
-   */
+  private rewardsRef(customerId: string) {
+    return { kind: 'spin_rewards' as const, currency: 'USD', customerId };
+  }
+
+  /** The customer's spin rewards in US cents, not yet moved into their wallet. */
   private async rewards(customerId: string, mode: LedgerMode) {
-    const [accounts, assets] = await Promise.all([
-      this.prisma.ledgerAccount.findMany({ where: { kind: 'crypto_spin_rewards', customerId, mode, balanceMinor: { gt: 0 } }, orderBy: { currency: 'asc' } }),
-      this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } }),
-    ]);
-    const decimals = new Map(assets.map(asset => [asset.code, asset.decimals]));
-    const bnb = accounts.some(account => account.currency === 'BNB') ? await this.prices.usd('BNB') : null;
-    const coins = accounts.map(account => {
-      const places = decimals.get(account.currency) ?? 8;
-      const priceE8 = stablecoins.includes(account.currency as SpinAsset) ? 100_000_000n : account.currency === 'BNB' ? (bnb?.e8 ?? null) : null;
-      const usdE8 = priceE8 === null ? null : (account.balanceMinor * priceE8) / 10n ** BigInt(places);
-      return { asset: account.currency, units: account.balanceMinor, amount: fromUnits(account.balanceMinor, places), usdE8 };
-    });
-    const valued = coins.filter(coin => coin.usdE8 !== null);
-    const usdE8 = valued.reduce((sum, coin) => sum + coin.usdE8!, 0n);
-    return { coins, valued, cents: Number(usdE8 / 1_000_000n) };
+    const account = await this.prisma.ledgerAccount.findFirst({ where: { kind: 'spin_rewards', customerId, mode, currency: 'USD' }, select: { balanceMinor: true } });
+    return Number(account?.balanceMinor ?? 0n);
   }
 
-  private presentRewards(rewards: Awaited<ReturnType<SpinsService['rewards']>>, currencies: string[]) {
-    return {
-      coins: rewards.coins.map(coin => ({ asset: coin.asset, amount: coin.amount, usd: coin.usdE8 === null ? null : usd(Number(coin.usdE8 / 1_000_000n)) })),
-      usd: usd(rewards.cents),
-      exchange_currencies: currencies,
-    };
-  }
-
-  private presentSpin(spin: Spin, assets: Map<string, Pick<CryptoAsset, 'decimals'>>) {
-    return {
-      id: spin.id,
-      number: spin.number,
-      asset: spin.asset,
-      amount: fromUnits(spin.amount, assets.get(spin.asset)?.decimals ?? 8),
-      usd: usd(spin.cents),
-      segment: spin.segment,
-      created_at: spin.createdAt.toISOString(),
-    };
+  private presentSpin(spin: Spin) {
+    return { id: spin.id, number: spin.number, usd: usd(spin.cents), segment: spin.segment, created_at: spin.createdAt.toISOString() };
   }
 
   /** The market's spins per day (`countries.spin_daily_limit`, set by admins on Settings > Markets). */
@@ -378,32 +357,29 @@ export class SpinsService {
 
   /** The wheel, the customer's progress and their latest wins; why they cannot spin, if they cannot. */
   async status(customer: CustomerWithStore) {
-    const segments = spinSegments.map((item, index) => ({ index, asset: item.asset, usd: usd(item.cents) }));
     let reason: string | null = null;
-    let mode: LedgerMode;
     try {
-      mode = (await this.gate(customer)).mode;
+      await this.gate(customer);
     } catch (error) {
       if (!(error instanceof ApiError) || !(gateCodes.includes(error.code) || error.code === 'spins_not_enabled' || error.code === 'claimed_elsewhere')) throw error;
       reason = error.code === 'spins_not_enabled' || error.code === 'store_unavailable' || error.code === 'country_required' ? 'not_enabled' : error.code;
-      mode = (await this.wallets.context(customer).catch(() => null))?.mode ?? 'live';
     }
+    const market = await this.context(customer).catch(() => null);
+    const mode = market?.mode ?? this.stores.mode(customer.store);
     const allowance = await this.prisma.spinAllowance.findFirst({ where: { customerId: customer.id, mode } });
-    const market = await this.wallets.context(customer).catch(() => null);
     const limit = await this.dailyLimit(market?.country);
     // Every win, newest first: an allowance has at most 100 spins, so the dialog pages through them all.
     const recent = allowance ? await this.prisma.spin.findMany({ where: { allowanceId: allowance.id }, orderBy: { number: 'desc' }, take: 100 }) : [];
-    const assets = await this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } });
     return {
       object: 'spin_rewards' as const,
       mode,
       enabled: reason === null && (!allowance || allowance.spinsUsed < allowance.schedule.length),
       reason,
-      segments,
+      segments: this.segments(),
       daily_limit: limit,
       allowance: this.present(allowance, allowance ? await this.spinsToday(allowance.id) : 0, limit),
-      recent: recent.map(spin => this.presentSpin(spin, new Map(assets.map(asset => [asset.code, asset])))),
-      rewards: this.presentRewards(await this.rewards(customer.id, mode), walletCurrencies(market?.currency)),
+      recent: recent.map(spin => this.presentSpin(spin)),
+      rewards: { usd: usd(await this.rewards(customer.id, mode)), exchange_currencies: walletCurrencies(market?.currency) },
     };
   }
 
@@ -425,22 +401,6 @@ export class SpinsService {
     }
   }
 
-  /** The coin and amount for a win: a segment showing it (enabled coins first), BNB at its price or else a stablecoin. */
-  private async payout(cents: number, assets: Map<string, CryptoAsset>) {
-    const showing = spinSegments.map((item, index) => ({ ...item, index })).filter(item => item.cents === cents);
-    const usable = showing.filter(item => assets.has(item.asset));
-    const segment = (usable.length ? usable : showing)[randomInt((usable.length ? usable : showing).length)];
-    if (segment.asset === 'BNB' && assets.has('BNB')) {
-      const price = await this.prices.usd('BNB');
-      const amount = price ? unitsForCents(cents, assets.get('BNB')!.decimals, price.e8) : 0n;
-      if (price && amount > 0n) return { segment: segment.index, asset: assets.get('BNB')!, amount, priceUsd: price.text };
-    }
-    // A stablecoin at $1: the segment's own, or the first one on (BNB without a price, or a coin switched off).
-    const stable = stablecoins.includes(segment.asset) && assets.has(segment.asset) ? assets.get(segment.asset)! : stablecoins.map(code => assets.get(code)).find(Boolean);
-    if (!stable) throw conflict('spins_not_enabled', 'Spin and win is not available right now.');
-    return { segment: segment.index, asset: stable, amount: BigInt(cents) * 10n ** BigInt(stable.decimals - 2), priceUsd: null };
-  }
-
   /** One spin: the next win of the customer's schedule, credited to their spin rewards at once. Once per number. */
   async spin(customer: CustomerWithStore) {
     const context = await this.gate(customer);
@@ -449,18 +409,16 @@ export class SpinsService {
     const number = allowance.spinsUsed + 1;
     if (number > allowance.schedule.length) throw conflict('spins_finished', 'You have used all your spins.');
     const cents = allowance.schedule[number - 1];
-    const assets = await this.assets();
-    const win = await this.payout(cents, assets);
     const id = randomUUID();
     const entry = await this.ledger.prepare({
       mode: context.mode,
-      type: 'crypto_spin',
-      reference: `crypto_spin:${id}`,
-      description: `Spin and win: ${fromUnits(win.amount, win.asset.decimals)} ${win.asset.code}`,
-      metadata: { spin_id: id, asset: win.asset.code, usd: usd(cents) },
+      type: 'spin_win',
+      reference: `spin_win:${id}`,
+      description: `Spin and win: $${usd(cents)}`,
+      metadata: { spin_id: id, usd: usd(cents) },
       lines: [
-        { account: { kind: 'crypto_promotions', currency: win.asset.code }, debit: win.amount },
-        { account: this.wallets.ref(customer.id, 'crypto_spin_rewards', win.asset.code), credit: win.amount },
+        { account: { kind: 'promotions', currency: 'USD' }, debit: BigInt(cents) },
+        { account: this.rewardsRef(customer.id), credit: BigInt(cents) },
       ],
     });
     const spin = await this.prisma.$transaction(async tx => {
@@ -472,83 +430,70 @@ export class SpinsService {
         throw conflict('spin_limit_today', `You have used today’s ${limit === 1 ? 'spin' : `${limit} spins`}. Come back from ${nextDay().toISOString()}.`);
       }
       const created = await tx.spin.create({
-        data: { id, allowanceId: allowance.id, customerId: customer.id, mode: context.mode, number, cents, asset: win.asset.code, amount: win.amount, segment: win.segment, priceUsd: win.priceUsd },
+        data: { id, allowanceId: allowance.id, customerId: customer.id, mode: context.mode, number, cents, asset: 'USD', amount: BigInt(cents), segment: segmentFor(cents), priceUsd: null },
       });
       await tx.spinAllowance.update({ where: { id: allowance.id }, data: { spinsUsed: number, wonCents: { increment: cents } } });
       await this.ledger.write(tx, entry);
       return created;
     });
     const updated = await this.prisma.spinAllowance.findUniqueOrThrow({ where: { id: allowance.id } });
-    return {
-      object: 'spin' as const,
-      ...this.presentSpin(spin, assets),
-      allowance: this.present(updated, await this.spinsToday(allowance.id), limit)!,
-    };
+    return { object: 'spin' as const, ...this.presentSpin(spin), allowance: this.present(updated, await this.spinsToday(allowance.id), limit)! };
   }
 
   /**
-   * Exchanges every spin reward the customer holds into their store wallet in US dollars or their country's currency:
-   * valued in US cents (stablecoins at $1, BNB at CoinGecko's price; rounded down), then at BitoCard's `receive` rate for
-   * the country's currency (rounded down), the rate of wallet conversions. One entry moves the coins back to
-   * `crypto_promotions` and books the money from `promotions` to the customer's `customer_wallet`. `preview` only
-   * quotes; `expected_amount` (what the preview showed) refuses a lower amount (`rate_changed`). Needs no switch:
-   * rewards already won are never trapped (`requireHolder`).
+   * Moves every spin reward the customer holds into their store wallet: in US dollars as they are, or in their
+   * country's currency at BitoCard's `receive` rate (rounded down), the rate of wallet conversions. One entry: US
+   * dollars straight from `spin_rewards` to the wallet; another currency gives the dollars back to `promotions` and
+   * books the money from `promotions` to the wallet. `preview` only quotes; `expected_amount` (what the preview showed)
+   * refuses a lower amount (`rate_changed`). Needs no switch: rewards already won are never trapped.
    */
   async exchange(customer: CustomerWithStore, input: { currency?: string; preview?: boolean; expected_amount?: number }) {
-    const context = await this.wallets.requireHolder(customer, 'exchanging your rewards');
+    if (!customer.emailVerifiedAt) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
+    }
+    const context = await this.context(customer);
     const currencies = walletCurrencies(context.currency);
     const currency = (input.currency ?? context.currency).toUpperCase();
     if (!currencies.includes(currency)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', `Rewards go to your ${currencies.join(' or ')} wallet.`, 'currency');
     }
-    const rewards = await this.rewards(customer.id, context.mode);
-    if (rewards.cents < 1) {
-      const message = !rewards.coins.length
-        ? 'You have no rewards to exchange yet.'
-        : rewards.valued.length < rewards.coins.length
-          ? 'Your rewards cannot be valued right now. Try again shortly.'
-          : 'Your rewards are too small to exchange yet: keep spinning.';
-      throw conflict('nothing_to_exchange', message);
-    }
-    const converted = await this.fx.exchange(BigInt(rewards.cents), 'USD', currency);
-    if (converted.amount < 1n) throw conflict('nothing_to_exchange', 'Your rewards are too small to exchange yet.');
-    const quote = { usd: usd(rewards.cents), currency, amount: Number(converted.amount), rate: converted.rate.toString() };
-    if (input.preview) return { object: 'spin_exchange_preview' as const, ...quote, coins: this.presentRewards(rewards, currencies).coins };
+    const cents = await this.rewards(customer.id, context.mode);
+    if (cents < 1) throw conflict('nothing_to_exchange', 'You have no rewards to move yet.');
+    const converted = currency === 'USD' ? { amount: BigInt(cents), rate: '1' } : await this.fx.exchange(BigInt(cents), 'USD', currency);
+    if (converted.amount < 1n) throw conflict('nothing_to_exchange', 'Your rewards are too small to move yet: keep spinning.');
+    const quote = { usd: usd(cents), currency, amount: Number(converted.amount), rate: converted.rate.toString() };
+    if (input.preview) return { object: 'spin_exchange_preview' as const, ...quote };
     if (input.expected_amount !== undefined && converted.amount < BigInt(input.expected_amount)) {
       throw conflict('rate_changed', 'The rate changed. Check the new amount and try again.');
     }
     const id = randomUUID();
+    const wallet = { kind: 'customer_wallet' as const, currency, customerId: customer.id };
     const entry = await this.ledger.prepare({
       mode: context.mode,
       type: 'spin_exchange',
       reference: `spin_exchange:${id}`,
       description: 'Spin and win rewards',
-      metadata: { spin_exchange_id: id, usd: usd(rewards.cents) },
-      lines: [
-        ...rewards.valued.flatMap(coin => [
-          { account: this.wallets.ref(customer.id, 'crypto_spin_rewards', coin.asset), debit: coin.units },
-          { account: { kind: 'crypto_promotions' as const, currency: coin.asset }, credit: coin.units },
-        ]),
-        { account: { kind: 'promotions', currency }, debit: converted.amount },
-        { account: { kind: 'customer_wallet', currency, customerId: customer.id }, credit: converted.amount },
-      ],
+      metadata: { spin_exchange_id: id, usd: usd(cents) },
+      lines:
+        currency === 'USD'
+          ? [
+              { account: this.rewardsRef(customer.id), debit: BigInt(cents) },
+              { account: wallet, credit: BigInt(cents) },
+            ]
+          : [
+              { account: this.rewardsRef(customer.id), debit: BigInt(cents) },
+              { account: { kind: 'promotions', currency: 'USD' }, credit: BigInt(cents) },
+              { account: { kind: 'promotions', currency }, debit: converted.amount },
+              { account: wallet, credit: converted.amount },
+            ],
     });
     const created = await this.prisma.$transaction(async tx => {
       const row = await tx.spinExchange.create({
-        data: {
-          id,
-          customerId: customer.id,
-          mode: context.mode,
-          amounts: Object.fromEntries(rewards.valued.map(coin => [coin.asset, coin.units.toString()])),
-          usdCents: rewards.cents,
-          currency,
-          amountMinor: converted.amount,
-          rate: converted.rate.toString(),
-        },
+        data: { id, customerId: customer.id, mode: context.mode, amounts: { USD: String(cents) }, usdCents: cents, currency, amountMinor: converted.amount, rate: converted.rate.toString() },
       });
       // A parallel exchange already moved them: the rewards account's balance check refuses this one.
       await this.ledger.write(tx, entry).catch((error: unknown) => {
-        throw error instanceof ApiError && error.code === 'insufficient_funds' ? conflict('nothing_to_exchange', 'Your rewards were just exchanged.') : error;
+        throw error instanceof ApiError && error.code === 'insufficient_funds' ? conflict('nothing_to_exchange', 'Your rewards were just moved.') : error;
       });
       return row;
     });
@@ -557,22 +502,20 @@ export class SpinsService {
 
   // -- Admin ----------------------------------------------------------------------------------------------------
 
-  /** Spins in a mode (newest first), totals per coin and how many customers have started. */
+  /** Spins in a mode (newest first), what they won in all and how many customers have started. */
   async adminList(query: { mode?: LedgerMode; customer_id?: string }) {
     const mode = query.mode ?? 'live';
     const where = { mode, ...(query.customer_id ? { customerId: query.customer_id } : {}) };
-    const [rows, totals, customers, assets, exchanged] = await Promise.all([
+    const [rows, totals, customers, exchanged] = await Promise.all([
       this.prisma.spin.findMany({ where, include: { customer: { select: { email: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
-      this.prisma.spin.groupBy({ by: ['asset'], where, _sum: { amount: true, cents: true }, _count: { _all: true } }),
+      this.prisma.spin.aggregate({ where, _sum: { cents: true }, _count: { _all: true } }),
       this.prisma.spinAllowance.count({ where: { mode, ...(query.customer_id ? { customerId: query.customer_id } : {}) } }),
-      this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } }),
       this.prisma.spinExchange.groupBy({ by: ['currency'], where, _sum: { usdCents: true, amountMinor: true }, _count: { _all: true } }),
     ]);
-    const decimals = new Map(assets.map(asset => [asset.code, asset]));
     return {
       object: 'list' as const,
-      data: rows.map(row => ({ ...this.presentSpin(row, decimals), mode: row.mode, customer: { id: row.customerId, email: row.customer.email } })),
-      totals: totals.map(item => ({ mode, asset: item.asset, amount: fromUnits(item._sum.amount ?? 0n, decimals.get(item.asset)?.decimals ?? 8), usd: usd(item._sum.cents ?? 0), spins: item._count._all })),
+      data: rows.map(row => ({ ...this.presentSpin(row), mode: row.mode, customer: { id: row.customerId, email: row.customer.email } })),
+      totals: { mode, usd: usd(totals._sum.cents ?? 0), spins: totals._count._all },
       customers,
       exchanged: exchanged.map(item => ({ currency: item.currency, amount: Number(item._sum.amountMinor ?? 0n), usd: usd(item._sum.usdCents ?? 0), exchanges: item._count._all })),
     };

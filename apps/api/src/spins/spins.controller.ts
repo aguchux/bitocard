@@ -98,11 +98,11 @@ export class PublicSpinsController {
   }
 }
 
-/** Admin: every Spin and win, with totals per coin (BitoCard's promotion spend). */
+/** Admin: every Spin and win, with what it won in all (BitoCard's promotion spend). */
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
-@Controller('admin/crypto/spins')
+@Controller('admin/spins')
 export class AdminSpinsController {
   constructor(private readonly spins: SpinsService) {}
 

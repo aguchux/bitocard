@@ -1,5 +1,4 @@
 import type { StoreSpinAllowance, StoreSpinRewards } from "@bitocard/api-client/storefront";
-import { colors } from "@bitocard/ui/tokens";
 
 /**
  * The wheel's geometry, shared by the wheel and its tests. Segments run clockwise from the top: segment `i` covers
@@ -48,17 +47,8 @@ export function segmentTones(segments: Array<{ usd: string }>): SegmentTone[] {
   return segments.map((segment, i) => (segments.length > 2 && Number(segment.usd) === top ? "gold" : i % 2 ? "pink" : "navy"));
 }
 
-/**
- * Each coin's own colour and mark, for the wheel's chips and the coin tokens (the coins' brand colours, illustration
- * only). `dark`: the mark is navy on it (BNB's yellow is too light for white).
- */
-const coins: Record<string, { colour: string; glyph: string; dark?: boolean }> = {
-  USDT: { colour: "#26a17b", glyph: "₮" },
-  USDC: { colour: "#2775ca", glyph: "$" },
-  BNB: { colour: "#f3ba2f", glyph: "B", dark: true },
-};
-
-export const coinFor = (asset: string) => coins[asset] ?? { colour: colors.azure500, glyph: asset.slice(0, 1) };
+/** The dollar token on the wheel's chips, the wins and the rewards: Spin and win pays in US dollars. */
+export const dollar = { colour: "#16a34a", glyph: "$" } as const;
 
 /** Today's spins as lights: one per spin a day, lit for each still to spin (all lit before the first spin). */
 export function todayLights(allowance: StoreSpinAllowance | null, dailyLimit: number) {
@@ -85,10 +75,7 @@ export function winsPage(count: number, page: number, size = winsPerPage) {
 export const spinBlocks: Record<string, { title: string; text: string; link?: { href: string; label: string } }> = {
   not_enabled: { title: "Spin and win is not open here yet", text: "We open it store by store and country by country. We will tell you when you can spin." },
   spins_not_enabled: { title: "Spin and win is not open here yet", text: "We open it store by store and country by country. We will tell you when you can spin." },
-  crypto_not_enabled: { title: "Crypto is not available in your country yet", text: "Rewards are won in crypto, so the wheel opens when crypto does." },
   email_not_verified: { title: "Confirm your email address first", text: "Enter the code we emailed you, then come back to spin.", link: { href: "/account/verify", label: "Confirm my email" } },
-  customer_verification_required: { title: "Verify your identity to spin", text: "Rewards are won in crypto, which needs a quick identity check, once.", link: { href: "/account/verification", label: "Verify my identity" } },
-  crypto_account_frozen: { title: "Your crypto account is frozen", text: "You cannot spin until BitoCard has looked into your account. Contact support to find out more." },
   claimed_elsewhere: { title: "You have had your spins already", text: "Spin and win is once per person across every store, and yours started at another store." },
 };
 

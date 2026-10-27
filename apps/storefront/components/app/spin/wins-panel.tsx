@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, History } from "lucide-react";
-import { formatCrypto, type StoreSpinWin } from "@bitocard/api-client/storefront";
+import type { StoreSpinWin } from "@bitocard/api-client/storefront";
 import { usd, winsPage } from "@/lib/spin";
-import { CoinToken } from "./coin-token";
+import { DollarToken } from "./coin-token";
 import styles from "./spin.module.css";
 
 /** "17 Oct, 03:57": short, so a win fits one compact row. */
@@ -40,9 +40,9 @@ export function WinsPanel({ wins }: { wins: StoreSpinWin[] }) {
           <ul key={current} className={`divide-y divide-white/10 ${styles.pageIn} ${pages > 1 ? "min-h-65" : ""}`}>
             {shown.map(item => (
               <li key={item.id} className="flex h-13 items-center gap-3">
-                <CoinToken asset={item.asset} size="sm" />
+                <DollarToken size="sm" />
                 <span className="min-w-0 flex-1 leading-tight">
-                  <span className="block truncate text-sm font-semibold">{formatCrypto(item.amount, item.asset)}</span>
+                  <span className="block truncate text-sm font-semibold">{usd(item.usd)}</span>
                   <span className="block truncate text-xs text-white/50" suppressHydrationWarning>
                     Spin {item.number} · {winDate(item.created_at)}
                   </span>

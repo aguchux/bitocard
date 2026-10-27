@@ -13,7 +13,7 @@ import { usd } from "@/lib/spin";
 /** What the card on Home says: what is won so far and today's spins, never a total. */
 export function spinNote(rewards: StoreSpinRewards) {
   const allowance = rewards.allowance;
-  if (!allowance) return "Spin the wheel and win crypto rewards to spend in the store.";
+  if (!allowance) return "Spin the wheel and win dollar rewards to spend in the store.";
   const won = `${usd(allowance.won_usd)} won`;
   if (allowance.finished) return Number(rewards.rewards.usd) > 0 ? `${usd(rewards.rewards.usd)} of rewards to move to your wallet` : won;
   return allowance.today_left > 0 && rewards.enabled ? `${won} · ${allowance.today_left} ${allowance.today_left === 1 ? "spin" : "spins"} left today` : `${won} · come back tomorrow`;

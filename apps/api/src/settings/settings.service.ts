@@ -65,7 +65,7 @@ export const switchDefinitions = {
   },
   spin_rewards: {
     scopes: ['global', 'country', 'reseller'],
-    description: "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared.",
+    description: "Spin and win: each store customer (one per person across every store) wins $1 over 50 to 100 spins, a few a day, paid by BitoCard into their spin rewards and moved into their store wallet in US dollars or their own currency. Off until the promotion's terms are cleared.",
   },
   crypto_app: {
     scopes: ['global', 'country'],

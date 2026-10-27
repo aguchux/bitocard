@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { StoreSpinAllowance, StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
 import { spinNote } from "@/components/app/spin-dialog";
-import { coinFor, landingAngle, restingAngle, segmentAt, segmentTones, segmentWidth, showSpin, spinBlocks, todayLights, usd, winsPage, winsPerPage } from "@/lib/spin";
+import { dollar, landingAngle, restingAngle, segmentAt, segmentTones, segmentWidth, showSpin, spinBlocks, todayLights, usd, winsPage, winsPerPage } from "@/lib/spin";
 
 const redirect = vi.fn((url: string) => {
   throw new Error(`redirect:${url}`);
@@ -16,7 +16,7 @@ const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body)
 const calls = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls as unknown as Call[];
 
 const allowance: StoreSpinAllowance = { won_usd: "0.35", spins_used: 8, today_left: 2, daily_limit: 2, next_spin_at: null, finished: false };
-const spin = { object: "spin", id: "spn_1", number: 9, segment: 4, asset: "BNB", amount: "0.000081", usd: "0.05", allowance: { ...allowance, won_usd: "0.40", spins_used: 9, today_left: 1 } };
+const spin = { object: "spin", id: "spn_1", number: 9, segment: 4, usd: "0.05", allowance: { ...allowance, won_usd: "0.40", spins_used: 9, today_left: 1 } };
 const nonce = "0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
 
 beforeEach(() => {
@@ -81,7 +81,7 @@ describe("spinning", () => {
 });
 
 describe("exchanging rewards", () => {
-  const preview = { object: "spin_exchange_preview", usd: "0.37", currency: "NGN", amount: 55_500, rate: "1500", coins: [] };
+  const preview = { object: "spin_exchange_preview", usd: "0.37", currency: "NGN", amount: 55_500, rate: "1500" };
 
   test("a preview asks for the quote only; exchanging sends the amount shown and the button's nonce", async () => {
     const fetch = vi.fn(async (_url: string, init: RequestInit) => reply(JSON.parse(String(init.body)).preview ? preview : { object: "spin_exchange", id: "x", usd: "0.37", currency: "NGN", amount: 55_500, rate: "1500", created_at: "" }));
@@ -151,10 +151,8 @@ describe("the wheel's look", () => {
     expect(segmentTones([{ usd: "0.01" }, { usd: "0.01" }])).toEqual(["navy", "pink"]);
   });
 
-  test("every coin has a colour and a mark, unknown ones a fallback", () => {
-    for (const asset of ["USDT", "USDC", "BNB"]) expect(coinFor(asset).colour).toMatch(/^#[0-9a-f]{6}$/);
-    expect(coinFor("BNB").dark).toBe(true);
-    expect(coinFor("ETH").glyph).toBe("E");
+  test("wins are dollars: one dollar token, no coins", () => {
+    expect(dollar).toEqual({ colour: expect.stringMatching(/^#[0-9a-f]{6}$/), glyph: "$" });
   });
 
   test("today's lights: all lit before the first spin, the spins left today, none once finished", () => {
@@ -180,14 +178,14 @@ describe("the wheel's look", () => {
 });
 
 describe("where Spin and win shows", () => {
-  const none = { coins: [], usd: "0.00", exchange_currencies: ["NGN", "USD"] };
+  const none = { usd: "0.00", exchange_currencies: ["NGN", "USD"] };
   const rewards = (patch: Partial<StoreSpinRewards>): StoreSpinRewards => ({ object: "spin_rewards", mode: "live", enabled: true, reason: null, segments: [], daily_limit: 2, allowance: null, recent: [], rewards: none, ...patch });
 
   test("on Home while the customer can spin, has spins to come, or rewards to move to the wallet", () => {
     expect(showSpin(null)).toBe(false);
     expect(showSpin(rewards({}))).toBe(true);
-    expect(showSpin(rewards({ enabled: false, reason: "crypto_not_enabled" }))).toBe(false);
-    expect(showSpin(rewards({ enabled: false, reason: "customer_verification_required", allowance }))).toBe(true);
+    expect(showSpin(rewards({ enabled: false, reason: "not_enabled" }))).toBe(false);
+    expect(showSpin(rewards({ enabled: false, reason: "email_not_verified", allowance }))).toBe(true);
     expect(showSpin(rewards({ enabled: false, reason: "not_enabled", allowance: { ...allowance, finished: true } }))).toBe(false);
     expect(showSpin(rewards({ enabled: false, reason: "not_enabled", allowance: { ...allowance, finished: true }, rewards: { ...none, usd: "0.12" } }))).toBe(true);
   });
@@ -200,7 +198,7 @@ describe("where Spin and win shows", () => {
       spinNote(rewards({ allowance: { ...allowance, finished: true }, rewards: { ...none, usd: "0.40" } })),
     ];
     expect(notes).toEqual([
-      "Spin the wheel and win crypto rewards to spend in the store.",
+      "Spin the wheel and win dollar rewards to spend in the store.",
       "$0.35 won · 2 spins left today",
       "$0.35 won · come back tomorrow",
       "$0.40 of rewards to move to your wallet",
@@ -208,8 +206,9 @@ describe("where Spin and win shows", () => {
     expect(notes.join(" ")).not.toMatch(/\$1\b|of \$|total/i);
   });
 
-  test("every reason the API gives has words, and verification links to the check", () => {
-    for (const reason of ["not_enabled", "spins_not_enabled", "crypto_not_enabled", "email_not_verified", "customer_verification_required", "crypto_account_frozen", "claimed_elsewhere"]) expect(spinBlocks[reason]?.title).toBeTruthy();
-    expect(spinBlocks.customer_verification_required.link?.href).toBe("/account/verification");
+  test("every reason the API gives has words, and an unconfirmed email links to confirming it", () => {
+    for (const reason of ["not_enabled", "spins_not_enabled", "email_not_verified", "claimed_elsewhere"]) expect(spinBlocks[reason]?.title).toBeTruthy();
+    expect(spinBlocks.email_not_verified.link?.href).toBe("/account/verify");
+    expect(spinBlocks.crypto_not_enabled).toBeUndefined();
   });
 });
