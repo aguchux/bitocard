@@ -20,6 +20,12 @@ Decided by the owner on 27 October 2026. This plan replaces `docs/BITOCARD_CRYPT
 6. **Both sides pay a fee, the seller more,** at rates admins set per coin and market.
 7. **BitoCard keeps no crypto at all: no signing keys, no signer, no custody.** Everything crypto that was built (the signer `apps/signer` and its Turnkey wallet, the account xpubs, the chain providers, sanctions screening, the custody check, the coin wallets and their ledger accounts, `apps/crypto` and `@bitocard/crypto-ui`) is rebranded to serve Afrippa and belongs to it alone.
 
+## Brand (the owner, 27 October 2026)
+
+- **The mark** is BitoCard's, with the "b" recreated as an "a" that keeps the pink arrow and the pink cap: the "b" mirrored (so the arrow points forward), its stem cut to the bowl's height with the cap sitting on it, making a single-storey "a". Two drafts are in `assets/afrippa/drafts/` (A keeps the b's rounded foot, B runs the stem straight down to the baseline, which reads more clearly as an "a"; `scripts/afrippa-mark-draft.py`). Once one is chosen it is **redrawn as a vector** (SVG) by a designer, with its two colours as theme slots (below), and the master kept as `assets/afrippa/logo.svg`; the generated icons, favicons and manifest images come from it as BitoCard's come from `scripts/brand-assets.py`.
+- **The wordmark:** "Afrippa" beside the mark, as BitoCard's lockup (proposed: "Afri" in the ink colour, "ppa" in the accent, as "Bito" and "card"). The name stands alone; its origin is never spelled out in copy.
+- **The theme** is BitoCard's (navy and pink, Inter, the same components and white space) by default, and **admins choose the colour theme in Afrippa's admin**: a few ready-made themes (BitoCard's navy and pink first, the default) and custom colours (primary, accent, ink, page), each checked for readable contrast before it is saved, previewed before it goes live, and audited. The site reads it from the API (cached) and applies it as the colour variables the components already use (as reseller stores' themes do), so every page, the mark and the emails follow it. The admin app and verify.afrippa.com follow the same theme.
+
 **Afrippa's addresses:** `afrippa.com` (the site and its markets), `admin.afrippa.com` (its admin), `verify.afrippa.com` (identity checks), `api.afrippa.com` (its door to the API).
 
 ## Market addresses (advice)
