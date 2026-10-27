@@ -1,29 +1,104 @@
 """
-Draft Afrippa marks from BitoCard's "b" (assets/logo.png), for the owner to choose from: the "b" mirrored so its
-arrow points forward, its stem cut to the bowl's height and its pink cap moved down onto it, which makes a
-single-storey "a". Draft A (mark-a-curved.png) keeps the b's rounded foot; draft B (mark-b-straight.png, made here)
-runs the stem straight down to the baseline, as an "a" stands. Drafts only: the approved mark is redrawn as a vector.
-Run from the repository root: python scripts/afrippa-mark-draft.py
+Draft Afrippa marks (a lowercase "a") drawn from BitoCard's "b" mark's own geometry and colours (assets/logo.png):
+the same bowl, counter, pink arrow wedge and its cut lines, and the pink cap, but with the stem on the right at the
+bowl's height, so nothing rises above the bowl and it reads as a small "a", never a "d".
+  C (mark-c-single.png): a single-storey "a": the stem from the bowl's top to the baseline, its top the pink cap.
+Drafts only: the approved mark is redrawn as a vector. Run from the repository root:
+python scripts/afrippa-mark-draft.py
 """
-from PIL import Image
-import numpy as np
-S='assets/afrippa/drafts/'
-src=np.array(Image.open('assets/logo.png').convert('RGBA'))
-a=src.copy(); a[:,:,3]=np.where(a[:,:,3]<30,0,a[:,:,3])
-solid=(a[:,:,3]>=250)&(a[:,:,2]>100)&(a[:,:,0]<60)
-colour=np.array([0,43,134,255],dtype=a.dtype)
-base=np.where(solid.any(axis=1))[0].max()
-for y in range(700, base+1):
-    xs=np.where(solid[y,270:700])[0]
-    first=270+xs[0] if len(xs) else 502
-    if first>282: a[y,282:min(first,502)]=colour
-x0,x1=272,512; Y0=416; shift=Y0-250
-cap=a[140:250, x0:x1].copy(); a[140:Y0, x0:x1]=0; a[140+shift:250+shift, x0:x1]=cap
-a=a[:, ::-1]
-ys,xs=np.where(a[:,:,3]>0); top,bottom,left,right=ys.min(),ys.max(),xs.min(),xs.max()
-out=np.zeros_like(a); h=bottom-top+1; w=right-left+1; Y=(1254-h)//2; X=(1254-w)//2
-out[Y:Y+h, X:X+w]=a[top:bottom+1, left:right+1]
-Image.fromarray(out).save(S+'mark-b-straight.png')
-A=Image.open(S+'mark-a-curved.png').convert('RGBA'); B=Image.fromarray(out)
-sheet=Image.new('RGBA',(1254*2,1254),(255,255,255,255)); sheet.alpha_composite(A,(0,0)); sheet.alpha_composite(B,(1254,0))
-sheet.convert('RGB').resize((1254,627)).save(S+'mark-options.png')
+import math
+from PIL import Image, ImageDraw
+
+OUT = "assets/afrippa/drafts/"
+NAVY, PINK = (0, 43, 134, 255), (255, 20, 108, 255)
+K = 4                      # drawn at 4x, then scaled down for smooth edges
+N = 1254 * K
+
+
+def P(v):
+    return v * K
+
+
+# The b mark's measurements (pixels of the 1254 px master): bowl and counter radii, stem width, gaps.
+R, r = 343, 184            # outer and inner radius of the bowl
+STEM = 219                 # stem width
+GAP = 14                   # the white gap under the cap and along the arrow's cuts
+CAP = 86                   # the cap's height
+WEDGE = 25                 # half-angle of the pink arrow, degrees
+CUT = 29                   # half-angle of the cut in the bowl around it
+
+
+def bowl(draw, cx, cy):
+    draw.ellipse([P(cx - R), P(cy - R), P(cx + R), P(cy + R)], fill=NAVY)
+    draw.ellipse([P(cx - r), P(cy - r), P(cx + r), P(cy + r)], fill=(0, 0, 0, 0))
+
+
+def arrow(im, cx, cy):
+    """The cut on the bowl's left and the pink arrow in it, pointing right into the counter."""
+    ax, ay = cx - 10, cy               # the arrow's point, just inside the counter's centre
+    far = 2 * (R + 60)
+
+    def wedge(draw, half, colour):
+        a1, a2 = math.radians(180 - half), math.radians(180 + half)
+        pts = [(ax, ay), (ax + far * math.cos(a1), ay - far * math.sin(a1)), (ax + far * math.cos(a2), ay - far * math.sin(a2))]
+        draw.polygon([(P(x), P(y)) for x, y in pts], fill=colour)
+
+    wedge(ImageDraw.Draw(im), CUT, (0, 0, 0, 0))
+    # The pink arrow stays inside the bowl's outer circle (it is part of the ring).
+    layer = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    wedge(ImageDraw.Draw(layer), WEDGE, PINK)
+    mask = Image.new("L", im.size, 0)
+    ImageDraw.Draw(mask).ellipse([P(cx - R), P(cy - R), P(cx + R), P(cy + R)], fill=255)
+    clipped = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    clipped.paste(layer, (0, 0), mask)
+    im.alpha_composite(clipped)
+    return im
+
+
+def finish(im, name):
+    small = im.resize((1254, 1254), Image.LANCZOS)
+    box = small.getbbox()
+    out = Image.new("RGBA", (1254, 1254), (0, 0, 0, 0))
+    part = small.crop(box)
+    out.paste(part, ((1254 - part.width) // 2, (1254 - part.height) // 2))
+    out.save(OUT + name)
+    return out
+
+
+def single():
+    im = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = 560, 627
+    bowl(d, cx, cy)
+    sx = cx + R - STEM + 15            # the stem's left edge, as far right as the b's stem was left
+    d.rectangle([P(sx), P(cy - R), P(sx + STEM), P(cy + R)], fill=NAVY)
+    d.ellipse([P(cx - r), P(cy - r), P(cx + r), P(cy + r)], fill=(0, 0, 0, 0))
+    # The cap: the stem's top, pink, with the white gap under it running across the stem.
+    d.rectangle([P(sx), P(cy - R), P(sx + STEM), P(cy - R + CAP)], fill=PINK)
+    d.rectangle([P(sx), P(cy - R + CAP), P(sx + STEM), P(cy - R + CAP + GAP)], fill=(0, 0, 0, 0))
+    return finish(arrow(im, cx, cy), "mark-c-single.png")
+
+
+def light(mark):
+    """For navy and dark backgrounds: navy turned white, pink kept (as bitocard-mark-light.png)."""
+    out = mark.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r_, g, b, a = px[x, y]
+            if a and b > r_:
+                px[x, y] = (255, 255, 255, a)
+    return out
+
+
+if __name__ == "__main__":
+    c = single()
+    small = c.resize((160, 160), Image.LANCZOS)
+    sheet = Image.new("RGBA", (1254 * 2, 1254), (255, 255, 255, 255))
+    sheet.alpha_composite(c, (0, 0))
+    dark = Image.new("RGBA", (1254, 1254), NAVY)
+    dark.alpha_composite(light(c))
+    sheet.alpha_composite(dark, (1254, 0))
+    for i, size in enumerate((160, 96, 48)):
+        sheet.alpha_composite(c.resize((size, size), Image.LANCZOS), (40 + sum((160, 96, 48)[:i]) + 20 * i, 1254 - 200))
+    sheet.convert("RGB").resize((1254, 627)).save(OUT + "mark-options.png")
