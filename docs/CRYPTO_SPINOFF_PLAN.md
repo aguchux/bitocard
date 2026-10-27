@@ -31,7 +31,28 @@ Built and tested, kept for <Brand>:
 - **Custody:** customer coin wallets (`crypto_wallet`, `crypto_locked`, `crypto_frozen`, `crypto_custody`, `crypto_fees`), deposit addresses from xpubs, the chain providers and routing, deposit scanning and crediting, withdrawals with saved addresses, the emailed code, review and sanctions screening, the signer (Turnkey), the custody check.
 - **Market rules:** coins and networks, the allow-list of countries (account and document), the US/UK declaration, per-market limits, nicknames, the ad book, freezes and the account freeze.
 - **The site:** `apps/crypto` (market and trader pages, small cached server components, SEO, install prompt) and `@bitocard/crypto-ui` (market views, coin badges, the switcher, the trading forms and the money views), rebranded.
-- **Infrastructure:** sessions, codes and passwords (the customer account code), chat with file attachments (for the order room), notifications and push, the audit log.
+- **Infrastructure:** sessions, codes and passwords (the customer account code), notifications and push, the audit log.
+
+## Instruments lifted from BitoCard (the owner, 27 October 2026)
+
+Every instrument BitoCard has built is lifted to serve <Brand> too. **Lifted, not copied:** one codebase, each instrument made **brand-aware** (its records carry the brand, its settings, knowledge, senders and queues are per brand, and the central admin shows each brand's on its own), so a fix or feature lands in both.
+
+| Instrument (BitoCard) | In <Brand> |
+|---|---|
+| **Buyer and seller chat** (BitoCard Shop's chats: messages, photos, offers, block, report, unread digests, moderators reading reported chats) | The **order room** (one chat per order: payment details, receipts and evidence as photos and PDFs, system messages at every step) and **chat with a trader before trading** (questions about an ad); block and report |
+| **Disputes** (Safe pay disputes with evidence, BitoCard's decision, whose fault, strikes; the `D-` disputes queue) | **Appeals** on orders: evidence from both sides, deadlines to respond, operations decide release to buyer or return to seller with whose fault, strikes on the side at fault, audited |
+| **Standing and guards** (Safe pay's new-seller limits, strikes, lost disputes, the same-person check) | **Trader standing:** limits for new traders, strikes from lost appeals and cancellations, suspension at a limit, the same-person check between buyer and seller |
+| **Deadline reminders** (Safe pay's accept, pay, hand-over and confirm reminders) | Order timers: pay before the window ends, release once paid, respond to an appeal |
+| **Support tickets and live chat** (tickets `T-`, live chat with signed-out visitors, files, staff notes, turning a chat into a ticket, engineering escalations to GitHub) | <Brand>'s own help desk on <domain>: tickets, live chat, files, staff notes, escalations, in its own queue in the central admin |
+| **AI assistants** (support assistants with knowledge, tools, hand-over and redaction; BitoCard Shop's Anjio with tools, per-country knowledge, cards, ratings, reports, evals, monthly budget) | <Brand>'s **assistant**: answers about markets, ads, fees, limits, the steps of an order and safety; tools that search ads, explain an order's state and fees and show the safety checks, never acting on money; hands over to a person; knowledge generated per country from live settings |
+| **Moderation and reports** (the Shop's queue, reports, refused words) | Ad terms and nicknames checked against refused words (no phone numbers, links or off-platform contact), reports on traders and ads, the moderation queue |
+| **Terms accepted by version** (BitoCard Shop terms) | <Brand>'s terms and P2P rules accepted by version before trading |
+| **Identity** (BitoCard Verify: KYC with human review, liveness, documents sealed in private storage) | <Brand>'s identity checks (Verify under the <Brand> name, or Didit), names matched against payment methods |
+| **Sign-in security** (two-step sign-in with an app, email or SMS, recovery codes; phone confirmation by SMS) | Two-step for every trader, phone confirmation, new-device and new-payment-method alerts |
+| **Notifications** (inbox, browser push, emails from the brand's own domain) | Every order step, deposit, withdrawal and appeal, from <domain> |
+| **Install as an app** (offline worker, install prompt) | <Brand>'s app on phones |
+| **Files** (private sealed storage, public media) | Receipts and evidence sealed privately; brand images public |
+| **Reports** (P&L, statements, growth) | <Brand>'s fee revenue, custody and volume, on its own |
 
 ## What is retired
 
@@ -103,25 +124,27 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 
 ### 2. <Brand>'s own surface in the API
 1. Brands in the API: the `brands` table, BitoCard's data tagged `bitocard` by migration, per-brand admin roles (`admin_brand_roles`) checked on every admin route, super admins managing admins and their brand roles in the admin app, the brand switcher.
-2. The operator account and <Brand>'s store row, tied to its brand; `<BRAND>_URL` and `<BRAND>_SERVER_SECRET`.
-3. The crypto routes under their own prefix, signed by <Brand>'s server only, left out of OpenAPI.
-4. <Brand>'s accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from <domain>.
-5. The identity check chosen in step 0.
-6. Ledger accounts and reports under the operator account.
-7. Tests on PGlite and Docker: no BitoCard caller can reach any <Brand> route, and no <Brand> caller any BitoCard route.
+2. **The instruments made brand-aware** (see Instruments lifted): chats, disputes, standing, reminders, tickets and live chat, AI assistants and their knowledge, moderation and refused words, terms by version, identity checks, two-step, notifications and email senders, files and reports carry the brand, each brand's settings and queues apart, and the central admin filtering every one of them by brand.
+3. The operator account and <Brand>'s store row, tied to its brand; `<BRAND>_URL` and `<BRAND>_SERVER_SECRET`.
+4. The crypto routes under their own prefix, signed by <Brand>'s server only, left out of OpenAPI.
+5. <Brand>'s accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from <domain>.
+6. The identity check chosen in step 0.
+7. Ledger accounts and reports under the operator account.
+8. Tests on PGlite and Docker: no BitoCard caller can reach any <Brand> route, and no <Brand> caller any BitoCard route.
 
 ### 3. The escrow engine
 1. Payment methods (saved, encrypted, name-checked).
 2. Ads with payment methods and windows; buy ads lock nothing.
 3. Orders: open with escrow, mark paid, release, cancel, expire (a job), appeal and decide; every step once, under row locks, tested with parallel requests.
 4. Fees in crypto.
-5. Trust figures, feedback, blocks and reports.
-6. The fraud controls above.
-7. Retire the fiat code paths (instant fiat trades, buy-ad fiat locks, P2P money, exchange desks and reserves), then drop their tables once empty or archived.
+5. The order room on the lifted chat, appeals on the lifted disputes, trader standing and the deadline reminders.
+6. Trust figures, feedback, blocks and reports (on the lifted moderation).
+7. The fraud controls above.
+8. Retire the fiat code paths (instant fiat trades, buy-ad fiat locks, P2P money, exchange desks and reserves), then drop their tables once empty or archived.
 
 ### 4. The <Brand> site
 1. Rename `apps/crypto` and `@bitocard/crypto-ui` to the brand; its own Vercel project, domain, brand assets, manifest and icons.
-2. Pages: markets and ads (as built), sign-up and sign-in, the order room, wallets with deposit and withdraw (as built), payment methods, profile and trader page, appeals, notifications.
+2. Pages: markets and ads (as built), sign-up and sign-in, the order room, wallets with deposit and withdraw (as built), payment methods, profile and trader page, appeals, notifications, help (tickets and live chat) and the assistant.
 3. SEO from day one (as built: market and trader pages indexed).
 4. <Brand> in the central admin platform (see Architecture 4): the brand switcher, per-brand admin roles, and <Brand>'s sections: orders and appeals queue, traders (members), ads, deposits and withdrawals, custody, limits, fees, markets.
 
