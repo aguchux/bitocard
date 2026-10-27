@@ -32,6 +32,8 @@ describe('subdomains', () => {
       assert.equal((await check(bad)).available, false, bad);
     }
     assert.deepEqual([(await check('admin')).available, (await check('admin')).reason], [false, 'This name is reserved.']);
+    // BitoCard's own apps' addresses: BitoCard Shop and BitoCard Crypto.
+    for (const name of ['shop', 'crypto']) assert.deepEqual([(await check(name)).available, (await check(name)).reason], [false, 'This name is reserved.'], name);
 
     const name = sub('taken');
     await browser.post('/v1/stores', { name: 'Taken Store', subdomain: name });
