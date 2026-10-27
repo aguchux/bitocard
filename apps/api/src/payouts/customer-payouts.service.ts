@@ -222,7 +222,7 @@ export class CustomerPayoutsService {
       subject: account.id,
       title: 'Bank account added',
       body: `${bank.name} ending ${account.accountNumberLast4} can receive your P2P money from ${when}. If this was not you, remove it and change your password.`,
-      link: '/account/crypto/cash-out',
+      link: '/shop/payouts',
       mode,
     });
     return presentCustomerBankAccount(account);
@@ -364,7 +364,7 @@ export class CustomerPayoutsService {
         body: paid
           ? `Your P2P money was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
           : `The payout to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your P2P balance.`,
-        link: '/account/crypto/cash-out',
+        link: '/shop/payouts',
         mode: updated.mode,
       });
     }

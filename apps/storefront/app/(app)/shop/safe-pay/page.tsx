@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import type { ShopReadiness } from "@bitocard/api-client/classifieds";
 import type { StoreCustomerBankAccount, StoreList } from "@bitocard/api-client/storefront";
-import { CashOutAccountForm } from "@/components/app/crypto-forms";
+import { PayoutAccountForm } from "@/components/app/shop/payout-forms";
 import { ShopPills, ShopTitle } from "@/components/app/shop/shop-nav";
 import { customerApi } from "@/lib/customer";
 import { requireShop } from "@/lib/shop-server";
@@ -33,8 +33,8 @@ export default async function SafePaySetup() {
   const { shop } = await requireShop("/shop/safe-pay");
   const [readiness, accounts, banks] = await Promise.all([
     customerApi<ShopReadiness>("GET", "/v1/classifieds/me/safe-pay"),
-    customerApi<StoreList<StoreCustomerBankAccount>>("GET", "/v1/store/crypto/cash/bank-accounts"),
-    customerApi<StoreList<{ code: string; name: string }>>("GET", "/v1/store/crypto/cash/banks"),
+    customerApi<StoreList<StoreCustomerBankAccount>>("GET", "/v1/store/cash/bank-accounts"),
+    customerApi<StoreList<{ code: string; name: string }>>("GET", "/v1/store/cash/banks"),
   ]);
   const ready = readiness.ok ? readiness.data : null;
   const saved = accounts.ok ? accounts.data.data : [];
@@ -77,7 +77,7 @@ export default async function SafePaySetup() {
               </ul>
             ) : null}
             {ready.identity_checked && banks.ok ? (
-              <CashOutAccountForm banks={banks.data.data} />
+              <PayoutAccountForm banks={banks.data.data} />
             ) : !ready.identity_checked ? (
               <p className="text-sm text-slate-600">Add it once your identity check has passed.</p>
             ) : (
@@ -86,7 +86,7 @@ export default async function SafePaySetup() {
           </Step>
           <p className="text-sm text-slate-600">
             What Safe pay sales pay you is withdrawable after the payout hold, from{" "}
-            <Link href="/account/crypto/cash-out" className="font-semibold text-brand-700 hover:underline">
+            <Link href="/shop/payouts" className="font-semibold text-brand-700 hover:underline">
               Cash out
             </Link>
             .

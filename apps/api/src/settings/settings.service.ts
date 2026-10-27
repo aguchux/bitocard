@@ -189,6 +189,27 @@ type SwitchScope = { countryCode?: string | null; resellerId?: string | null };
 export const isOptionKey = (key: string): key is OptionKey => key in optionDefinitions;
 export const isSwitchKey = (key: string): key is SwitchKey => key in switchDefinitions;
 /** A switch's value where no admin has set it: off, unless its definition says `default: true`. */
+/**
+ * Crypto's switches, kept for Afrippa (crypto has left BitoCard; `docs/CRYPTO_SPINOFF_PLAN.md`): never listed to
+ * BitoCard's admins or resellers. Their routes are closed (`CryptoClosedGuard`), so they change nothing in BitoCard.
+ */
+export const afrippaSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
+  'crypto_wallets',
+  'p2p_trading',
+  'crypto_exchange',
+  'reseller_exchange',
+  'reseller_desks',
+  'crypto_app',
+  'crypto_global',
+  'crypto_cross_border',
+  'crypto_trade_abroad',
+  'crypto_install_prompt',
+  'store_template_crypto_desk',
+]);
+
+/** The switches BitoCard's admins and resellers see. */
+export const bitocardSwitchKeys = (Object.keys(switchDefinitions) as SwitchKey[]).filter(key => !afrippaSwitches.has(key));
+
 export const switchDefault = (key: SwitchKey): boolean => ('default' in switchDefinitions[key] ? Boolean(switchDefinitions[key].default) : false);
 
 const unknownSetting = (param: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such setting.', param);
@@ -290,7 +311,7 @@ export class SettingsService {
   }
 
   async switchesFor(resellerId: string) {
-    const keys = Object.keys(switchDefinitions) as SwitchKey[];
+    const keys = bitocardSwitchKeys;
     return Object.fromEntries(await Promise.all(keys.map(async key => [key, await this.isOn(key, resellerId)] as const)));
   }
 
@@ -332,8 +353,8 @@ export class SettingsService {
     return {
       object: 'list' as const,
       /** Each switch's scopes, description and `default` (its value where nothing is set). */
-      definitions: Object.fromEntries((Object.keys(switchDefinitions) as SwitchKey[]).map(key => [key, { ...switchDefinitions[key], default: switchDefault(key) }])),
-      data: rows.map(row => ({
+      definitions: Object.fromEntries(bitocardSwitchKeys.map(key => [key, { ...switchDefinitions[key], default: switchDefault(key) }])),
+      data: rows.filter(row => !afrippaSwitches.has(row.key as SwitchKey)).map(row => ({
         object: 'switch' as const,
         key: row.key,
         scope: row.resellerId ? 'reseller' : row.countryCode ? 'country' : 'global',

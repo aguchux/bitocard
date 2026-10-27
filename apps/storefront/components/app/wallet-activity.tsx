@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowDownLeft, ArrowUpRight, ChevronRight } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoTransaction, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
+import { formatFace, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 
@@ -43,24 +43,6 @@ export function MoneyActivityList({ items }: { items: StoreWalletTransaction[] }
           href={item.checkout_id ? `/account/orders/${item.checkout_id}` : null}
           at={item.created_at}
           amount={formatFace(Math.abs(item.amount), item.currency)}
-        />
-      ))}
-    </ul>
-  );
-}
-
-/** The coins' activity: deposits, trades, withdrawals and rewards, each trade linking to its receipt. */
-export function CryptoActivityList({ items }: { items: StoreCryptoTransaction[] }) {
-  return (
-    <ul className="divide-y divide-slate-100">
-      {items.map(item => (
-        <ActivityRow
-          key={item.id}
-          credit={!item.amount.startsWith("-")}
-          label={item.description}
-          href={item.trade_id ? `/account/crypto/trades/${item.trade_id}` : null}
-          at={item.created_at}
-          amount={formatCrypto(item.amount.replace(/^-/, ""), item.asset)}
         />
       ))}
     </ul>

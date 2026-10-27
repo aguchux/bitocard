@@ -30,6 +30,8 @@ const baseEnv = {
   ADDRESS_RATE_LIMIT_PER_MINUTE: '100000',
   AUTH_RATE_LIMIT_PER_MINUTE: '100000',
   PASSWORD_BREACH_CHECK: 'off',
+  // Crypto's routes are closed for BitoCard (crypto/closed.guard.ts); its tests run them until they move to Afrippa.
+  CRYPTO_ROUTES: 'open',
   ALLOWED_ORIGINS: `${appOrigin},https://*.bitocard.com`,
   COOKIE_SECURE: 'off',
   RESEND_API_KEY: '',

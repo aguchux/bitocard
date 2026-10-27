@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { type Caller, CurrentCaller, resellerOf, Roles, SessionOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -88,6 +88,7 @@ export class ResellerCoinsService {
 }
 
 /** SHQ's coin wallet: balances, on-chain deposits and withdrawals (Premium). Sessions only: an API key never moves coins. */
+@ApiExcludeController()
 @ApiTags('Crypto')
 @ApiBearerAuth()
 @modeHeader

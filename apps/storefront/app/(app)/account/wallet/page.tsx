@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, ChevronLeft, Coins, Landmark, Lock, Snowflake, Wallet } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoTransaction, type StoreCryptoWallets, type StoreExchange, type StoreList, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
-import { canWithdraw, CoinBadge, hasP2pMoney, heldAssets } from "@/components/app/crypto";
-import { ActivityHeading, CryptoActivityList, MoneyActivityList } from "@/components/app/wallet-activity";
+import { ChevronLeft, Landmark, Wallet } from "lucide-react";
+import { formatFace, type StoreList, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
+import { ActivityHeading, MoneyActivityList } from "@/components/app/wallet-activity";
 import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/wallet-forms";
-import { activityHref, cryptoMoves, recentItems } from "@/lib/activity";
-import { walletExchangeLinks } from "@/lib/exchange";
+import { activityHref, recentItems } from "@/lib/activity";
 import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
-import { TopUpStatus } from "@bitocard/crypto-ui/top-up-views";
-import { cancelTopUp, simulateTopUp, walletFor } from "@/lib/wallet";
+import { TopUpStatus } from "@/components/app/top-up-status";
+import { walletFor } from "@/lib/wallet";
 
 export const metadata: Metadata = { title: "Wallet" };
 
@@ -26,149 +24,14 @@ const walletLabel = (currency: string) => (currency === "USD" ? "US dollars" : c
  * account number), and what went in and out. Spent only in this store, never withdrawn. It is in the customer's own
  * country's currency, chosen at sign-up and fixed (Account shows it); an older account chooses it there first.
  */
-/** "3 coins", or how many wallets there are while none holds anything (or "P2P money" with crypto closed): the Crypto tab's summary. */
-const coinsSummary = (wallets: StoreCryptoWallets) => {
-  const held = heldAssets(wallets).length;
-  if (held) return `${held} coin${held === 1 ? "" : "s"}`;
-  return wallets.enabled ? `${wallets.assets.length} wallets` : "P2P money";
-};
-
-/**
- * The Crypto tab: every coin wallet with its balance (available, in ads, frozen, on its way out), the P2P money, and
- * the last 24 hours of coin activity (a few, View all for the rest). With crypto closed to them, only what they still
- * hold, which they can still withdraw or cash out.
- */
-function CryptoWallets({ wallets, activity, exchange }: { wallets: StoreCryptoWallets; activity: StoreCryptoTransaction[] | null; exchange: StoreExchange | null }) {
-  const usable = wallets.enabled && !wallets.frozen && wallets.verified;
-  const withdraw = canWithdraw(wallets);
-  const coins = wallets.enabled ? wallets.assets : heldAssets(wallets);
-  const moves = cryptoMoves(activity ?? []);
-  const recent = recentItems(moves);
-  return (
-    <>
-      <section aria-label="Crypto wallets" className="rounded-3xl bg-navy-900 p-6 text-white">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <p className="flex items-center gap-2 text-sm text-white/70">
-            <Coins className="size-4" aria-hidden="true" /> Crypto wallets{wallets.mode === "test" ? " (test)" : ""}
-          </p>
-          {usable || withdraw ? (
-            <span className="flex flex-wrap gap-2">
-              {usable ? (
-                <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
-                  Deposit
-                </Link>
-              ) : null}
-              {withdraw ? (
-                <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
-                  Withdraw
-                </Link>
-              ) : null}
-              {usable ? (
-                <Link href="/account/crypto" className="inline-flex min-h-10 items-center rounded-xl bg-brand-500 px-3 text-sm font-semibold hover:bg-brand-600">
-                  Buy or sell
-                </Link>
-              ) : null}
-            </span>
-          ) : null}
-        </div>
-        {!wallets.enabled ? <p className="mt-2 text-sm text-white/70">Crypto is closed in your country. You can still withdraw what you hold and cash out your P2P money.</p> : null}
-        <ul className="mt-3 divide-y divide-white/10">
-          {coins.map(asset => {
-            // Buy and Sell straight from BitoCard's reserve, where the instant exchange is offered to them.
-            const links = usable ? walletExchangeLinks(exchange, asset.asset, asset.available) : { buy: null, sell: null };
-            return (
-            <li key={asset.asset} className="py-3">
-              <div className="flex items-center gap-3">
-              <CoinBadge asset={asset.asset} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{asset.name}</span>
-                <span className="flex flex-wrap gap-x-3 text-xs text-white/60">
-                  <span>{asset.asset}</span>
-                  {Number(asset.locked) > 0 ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Lock className="size-3" aria-hidden="true" /> {formatCrypto(asset.locked)} in your ads
-                    </span>
-                  ) : null}
-                  {Number(asset.frozen) > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-red-300">
-                      <Snowflake className="size-3" aria-hidden="true" /> {formatCrypto(asset.frozen)} frozen
-                    </span>
-                  ) : null}
-                  {Number(asset.withdrawing) > 0 ? (
-                    <span className="inline-flex items-center gap-1">
-                      <ArrowUpRight className="size-3" aria-hidden="true" /> {formatCrypto(asset.withdrawing)} on its way out
-                    </span>
-                  ) : null}
-                </span>
-              </span>
-              <span className="shrink-0 text-right">
-                <span className="block font-bold">{formatCrypto(asset.total, asset.asset)}</span>
-                {asset.total !== asset.available ? <span className="block text-xs text-white/60">{formatCrypto(asset.available)} available</span> : null}
-              </span>
-              </div>
-              {links.buy || links.sell ? (
-                <span className="mt-2 flex gap-2 pl-13">
-                  {links.buy ? (
-                    <Link href={links.buy} aria-label={`Buy ${asset.asset}`} className="inline-flex min-h-11 items-center rounded-xl bg-white/10 px-4 text-sm font-semibold hover:bg-white/20">
-                      Buy
-                    </Link>
-                  ) : null}
-                  {links.sell ? (
-                    <Link href={links.sell} aria-label={`Sell ${asset.asset}`} className="inline-flex min-h-11 items-center rounded-xl bg-white/10 px-4 text-sm font-semibold hover:bg-white/20">
-                      Sell
-                    </Link>
-                  ) : null}
-                </span>
-              ) : null}
-            </li>
-            );
-          })}
-        </ul>
-        {wallets.enabled || hasP2pMoney(wallets) ? (
-          <div className="mt-3 border-t border-white/10 pt-3 text-sm">
-            <p className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <span className="text-white/70">P2P money (from your sales)</span>
-              <Link href="/account/crypto/cash-out" className="font-bold hover:underline">
-                {formatFace(wallets.cash.proceeds, wallets.cash.currency)} · Cash out
-              </Link>
-            </p>
-            {wallets.cash.paying_out > 0 ? <p className="mt-1 text-xs text-white/60">{formatFace(wallets.cash.paying_out, wallets.cash.currency)} on its way to your bank</p> : null}
-          </div>
-        ) : null}
-      </section>
-      <section aria-labelledby="crypto-activity" className={card}>
-        <ActivityHeading id="crypto-activity" note="Last 24 hours" viewAll={activityHref("crypto")} />
-        {recent.length ? (
-          <CryptoActivityList items={recent} />
-        ) : (
-          <p className="text-slate-600">{moves.length ? "Nothing in the last 24 hours. View all for older transactions." : "Deposits and trades show here."}</p>
-        )}
-      </section>
-    </>
-  );
-}
-
 export default async function WalletPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
-  // The country wallet unless `?wallet=USD` chose the US dollar one, or `?wallet=crypto` the coins.
-  const showCrypto = params.wallet === "crypto";
+  // The country wallet unless `?wallet=USD` chose the US dollar one.
   const asked = /^[A-Za-z]{3}$/.test(params.wallet ?? "") ? params.wallet!.toUpperCase() : undefined;
-  const [customer, chosen, activity, overview, cryptoActivity, exchange] = await Promise.all([
-    currentCustomer(),
-    walletFor(asked),
-    showCrypto ? null : customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20"),
-    customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"),
-    // Enough to find the last 24 hours' few once lock moves are left out.
-    showCrypto ? customerApi<StoreList<StoreCryptoTransaction>>("GET", "/v1/store/crypto/transactions?limit=30") : null,
-    // Whether the coins' rows get Buy and Sell from BitoCard's reserve.
-    showCrypto ? customerApi<StoreExchange>("GET", "/v1/store/exchange") : null,
-  ]);
+  const [customer, chosen, activity] = await Promise.all([currentCustomer(), walletFor(asked), customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20")]);
   const wallet = chosen ?? (asked ? await walletFor() : null);
   // The money wallets' last 24 hours (a few); everything else is on Transactions.
-  const recentMoney = activity?.ok ? recentItems(activity.data.data) : [];
-  // The Crypto tab is there where the store offers crypto, or while the customer still holds coins or P2P money.
-  const crypto = overview.ok && (overview.data.enabled || heldAssets(overview.data).length > 0 || hasP2pMoney(overview.data)) ? overview.data : null;
-  const cryptoTab = showCrypto && crypto !== null;
+  const recentMoney = activity.ok ? recentItems(activity.data.data) : [];
   const back = params.back ? safeNext(params.back, "") : "";
   const primary = wallet?.wallets.find(item => item.primary)?.currency ?? wallet?.currency;
 
@@ -180,14 +43,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <ChevronLeft className="size-4" aria-hidden="true" /> Back to your purchase
         </Link>
       ) : null}
-      {params.top_up ? <TopUpStatus api={customerApi} cancel={cancelTopUp} simulate={simulateTopUp} id={params.top_up} back={params.wallet ? `/account/wallet?wallet=${encodeURIComponent(params.wallet)}` : "/account/wallet"} cancelError={params.cancel_error} /> : null}
-      {/* The sub rail's Crypto item where the store offers no crypto and nothing is held: say so above the money wallet. */}
-      {showCrypto && overview.ok && !crypto ? (
-        <p className={`${card} text-slate-600`} role="status">
-          Crypto wallets are not offered in your country yet. Your money wallet is below.
-        </p>
-      ) : null}
-
+      {params.top_up ? <TopUpStatus id={params.top_up} back={params.wallet ? `/account/wallet?wallet=${encodeURIComponent(params.wallet)}` : "/account/wallet"} cancelError={params.cancel_error} /> : null}
       {customer && !customer.country ? (
         <div className={card}>
           <p className="font-semibold">Choose your country first</p>
@@ -200,11 +56,11 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         <p className={card}>Your wallet cannot be shown right now. Try again shortly.</p>
       ) : (
         <>
-          {wallet.wallets.length > 1 || crypto ? (
+          {wallet.wallets.length > 1 ? (
             // On desktop the sub rail lists the wallets instead.
-            <nav aria-label="Your wallets" className={`grid gap-1 rounded-2xl bg-slate-100 p-1 sm:gap-2 lg:hidden ${wallet.wallets.length + (crypto ? 1 : 0) >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+            <nav aria-label="Your wallets" className={`grid gap-1 rounded-2xl bg-slate-100 p-1 sm:gap-2 lg:hidden grid-cols-2`}>
               {wallet.wallets.map(item => {
-                const active = !cryptoTab && item.currency === wallet.currency;
+                const active = item.currency === wallet.currency;
                 const query = new URLSearchParams({ ...(item.primary ? {} : { wallet: item.currency }), ...(back ? { back } : {}) }).toString();
                 return (
                   <Link
@@ -218,22 +74,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                   </Link>
                 );
               })}
-              {crypto ? (
-                <Link
-                  href={`/account/wallet?${new URLSearchParams({ wallet: "crypto", ...(back ? { back } : {}) }).toString()}`}
-                  aria-current={cryptoTab ? "page" : undefined}
-                  className={`flex min-h-14 min-w-0 flex-col justify-center rounded-xl px-3 py-2 ${cryptoTab ? "bg-white shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-navy-900"}`}
-                >
-                  <span className="text-xs font-semibold text-slate-500">Crypto</span>
-                  <span className="truncate font-bold text-navy-900">{coinsSummary(crypto)}</span>
-                </Link>
-              ) : null}
             </nav>
           ) : null}
-          {cryptoTab ? (
-            <CryptoWallets wallets={crypto} activity={cryptoActivity?.ok ? cryptoActivity.data.data : null} exchange={exchange?.ok ? exchange.data : null} />
-          ) : (
-          <>
           <section aria-label="Balance" className="rounded-3xl bg-navy-900 p-6 text-white">
             {/* Top row: the label on the left, the customer's own bank account (or the link to get one) top right. */}
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
@@ -272,22 +114,18 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           {wallet.enabled && wallet.reserved_accounts_available && !wallet.reserved_accounts.length ? (
             <BankAccountDialog needsBvn={wallet.reserved_account_needs_bvn} />
           ) : null}
-          </>
-          )}
         </>
       )}
 
-      {cryptoTab ? null : (
       <section aria-labelledby="activity" className={card}>
         {/* Only the last day here, to keep the page short; View all opens Transactions with everything. */}
-        <ActivityHeading id="activity" note="Last 24 hours" viewAll={activityHref("money")} />
+        <ActivityHeading id="activity" note="Last 24 hours" viewAll={activityHref()} />
         {recentMoney.length ? (
           <MoneyActivityList items={recentMoney} />
         ) : (
-          <p className="text-slate-600">{activity?.ok && activity.data.data.length ? "Nothing in the last 24 hours. View all for older transactions." : "Top-ups and purchases show here."}</p>
+          <p className="text-slate-600">{activity.ok && activity.data.data.length ? "Nothing in the last 24 hours. View all for older transactions." : "Top-ups and purchases show here."}</p>
         )}
       </section>
-      )}
     </div>
   );
 }

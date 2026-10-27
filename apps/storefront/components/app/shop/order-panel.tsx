@@ -77,7 +77,7 @@ export function OrderPanel({
               {!readiness.limited ? (
                 <ol className="grid gap-2">
                   <SetupStep done={readiness.identity_checked} label={readiness.identity_checked ? "Identity check passed" : "Pass the identity check"} href="/account/verification" />
-                  <SetupStep done={readiness.payout_account} label={readiness.payout_account ? "Payout account added" : "Add a payout account in your verified name"} href="/account/crypto/cash-out" />
+                  <SetupStep done={readiness.payout_account} label={readiness.payout_account ? "Payout account added" : "Add a payout account in your verified name"} href="/shop/payouts" />
                 </ol>
               ) : null}
             </div>

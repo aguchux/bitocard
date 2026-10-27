@@ -22,6 +22,10 @@ export default createNextConfig({
       { source: "/legal", destination: legals, permanent: true },
       // The wallet's Activity screen is now Transactions.
       { source: "/account/wallet/activity", destination: "/account/wallet/transactions", permanent: true },
+      // Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): its old addresses go to the wallet; cash-out is the Shop tab's Payouts.
+      { source: "/account/crypto/cash-out", destination: "/shop/payouts", permanent: false },
+      { source: "/account/crypto/spin", destination: "/account?spin=1", permanent: false },
+      { source: "/account/crypto/:path*", destination: "/account/wallet", permanent: false },
       { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/documents/:doc`, permanent: true },
       // Nothing public about a listing lives on the country stores: an old or mistaken /shop/l/<listing> on one goes to
       // the listing's one address on BitoCard Shop (the Shop tab itself, /shop, stays here, signed in).

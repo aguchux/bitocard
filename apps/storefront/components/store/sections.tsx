@@ -8,7 +8,7 @@ import { BrandArt, ProductCard, ProductRow } from "./product-card";
 import { SearchForm } from "./layout";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 import { groupInk, trustIcon } from "./theme";
-import { CryptoQuote, Faq, Features, P2pMarket, ProductSpotlight, QuickBuy, VariantHero } from "./template-sections";
+import { Faq, Features, ProductSpotlight, QuickBuy, VariantHero } from "./template-sections";
 import { ListingGrid, ListingRail, ResaleCategories } from "./resale";
 
 // Literal class names, so Tailwind generates them.
@@ -353,8 +353,10 @@ function isEmpty(section: ResolvedSection) {
       return section.data.categories.length === 0;
     case "quick_buy":
       return !section.data.categories.some(tab => tab.products.length);
+    // Crypto has left BitoCard: a crypto desk's sections show nothing.
     case "crypto_quote":
-      return section.data.assets.length === 0;
+    case "p2p_market":
+      return true;
     case "listing_rail":
     case "listing_grid":
       return section.data.listings.length === 0;
@@ -393,8 +395,6 @@ export function HomeSections({ sections, groups, countries, design, afterHero }:
           {section.type === "promo" ? <Promo section={section} /> : null}
           {section.type === "trust_bar" ? <TrustBar section={section} /> : null}
           {section.type === "quick_buy" && style ? <QuickBuy section={section} style={style} /> : null}
-          {section.type === "crypto_quote" && style ? <CryptoQuote section={section} style={style} /> : null}
-          {section.type === "p2p_market" && style ? <P2pMarket section={section} style={style} /> : null}
           {section.type === "product_spotlight" && style ? <ProductSpotlight section={section} style={style} /> : null}
           {section.type === "features" ? <Features section={section} /> : null}
           {section.type === "faq" ? <Faq section={section} /> : null}

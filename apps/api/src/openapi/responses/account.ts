@@ -1,7 +1,7 @@
 import { apiKeyScopes } from '../../api-keys/api-keys.service.js';
 import { productCategories } from '../../countries/countries.service.js';
 import { planFeatures } from '../../plans/plans.service.js';
-import { optionDefinitions, switchDefinitions } from '../../settings/settings.service.js';
+import { bitocardSwitchKeys, optionDefinitions, switchDefinitions } from '../../settings/settings.service.js';
 import { staffRoles } from '../../team/team.service.js';
 import { eventDocs } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, nullableStr, nullableTime, objectSchema, oneOf, ref, shape, str, time, uuid } from '../schema.js';
@@ -20,7 +20,7 @@ const checkReason = nullableStr(
 );
 
 const optionKeys = Object.keys(optionDefinitions) as (keyof typeof optionDefinitions)[];
-const switchKeys = Object.keys(switchDefinitions) as (keyof typeof switchDefinitions)[];
+const switchKeys = bitocardSwitchKeys;
 
 const options = shape(
   Object.fromEntries(
@@ -285,7 +285,7 @@ export const accountDocs: DocsArea = {
       status: 200,
       description: 'Your settings.',
       schema: 'Settings',
-      example: { object: 'settings', options: exampleOptions, features: { startup_allowance: true, welcome_bonus: false, reserved_accounts: true, custom_domains: false, own_integrations: false, own_payment_gateways: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, crypto_wallets: false, p2p_trading: false, crypto_exchange: false, reseller_exchange: false, reseller_desks: false, spin_rewards: false, crypto_app: false, crypto_global: false, crypto_cross_border: false, crypto_trade_abroad: true, crypto_install_prompt: false, store_template_all_in_one: true, store_template_topups: true, store_template_gift_cards: true, store_template_crypto_desk: true, store_template_single_product: true, store_template_vpn_shop: true, store_template_rdp_shop: true, store_template_resale_shop: true, reseller_two_step: false, manual_reseller_approval: false, country_stores: true, classifieds: false, classifieds_safe_pay: false, classifieds_assistant: false, classifieds_install_prompt: false, classifieds_resale: false, reseller_resale: false, shq_install_prompt: false, storefront_install_prompt: false } },
+      example: { object: 'settings', options: exampleOptions, features: { startup_allowance: true, welcome_bonus: false, reserved_accounts: true, custom_domains: false, own_integrations: false, own_payment_gateways: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, spin_rewards: false, store_template_all_in_one: true, store_template_topups: true, store_template_gift_cards: true, store_template_single_product: true, store_template_vpn_shop: true, store_template_rdp_shop: true, store_template_resale_shop: true, reseller_two_step: false, manual_reseller_approval: false, country_stores: true, classifieds: false, classifieds_safe_pay: false, classifieds_assistant: false, classifieds_install_prompt: false, classifieds_resale: false, reseller_resale: false, shq_install_prompt: false, storefront_install_prompt: false } },
     },
     'PUT /v1/settings/options/{key}': {
       status: 200,

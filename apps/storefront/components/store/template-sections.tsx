@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, BarChart3, Check, ChevronDown, Coins, ShieldCheck, Sparkles, TrendingUp, Users, Zap } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ShieldCheck, Sparkles, TrendingUp, Zap } from "lucide-react";
 import type { ResolvedSection, StoreBrand, StoreCountry, StoreDesign, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { BrandArt } from "./product-card";
 import { ProductDetail } from "./product-detail";
@@ -178,14 +178,6 @@ export function VariantHero({ section, style, groups, countries, bleed }: { sect
           <div className={`${bleed ? inner : "px-6"} py-12 sm:py-16`}>
             <Title id={id} section={section} className="max-w-3xl text-4xl leading-tight sm:text-6xl" accentClass="opacity-80" />
             {section.subtitle ? <p className="mt-4 max-w-2xl text-lg opacity-85">{section.subtitle}</p> : null}
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/account/crypto" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 font-semibold text-[var(--st-primary)] shadow-md hover:opacity-90">
-                <Users className="size-5" aria-hidden="true" /> Open the P2P market
-              </Link>
-              <Link href="/account/crypto/exchange" className="inline-flex min-h-12 items-center gap-2 rounded-xl px-5 font-semibold ring-1 ring-current hover:bg-white/10">
-                <Zap className="size-5" aria-hidden="true" /> Instant buy and sell
-              </Link>
-            </div>
             <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm opacity-85">
               {[
                 [ShieldCheck, "Verified traders"],
@@ -251,102 +243,6 @@ export function QuickBuy({ section, style }: { section: Of<"quick_buy">; style: 
       <div className={lead ? "rounded-2xl bg-white/95 p-4 sm:p-5" : ""}>
         <QuickBuyForm id={id} tabs={tabs} tone="light" />
       </div>
-    </section>
-  );
-}
-
-/** The crypto desk's quote form: pick a coin, buy or sell, an amount in the store's money; the exchange page quotes it. */
-export function CryptoQuote({ section, style }: { section: Of<"crypto_quote">; style: Style }) {
-  const id = `quote-${section.id}`;
-  const lead = style.hero === "swap" || style.hero === "terminal";
-  const assets = section.data.assets;
-  return (
-    <section aria-labelledby={id} className={`h-full rounded-3xl p-5 sm:p-8 ${lead ? "" : "border border-slate-200 bg-white shadow-sm"} ${style.hero === "swap" ? "mx-auto max-w-xl text-center" : ""}`} style={lead ? heroBand : undefined}>
-      <SectionTitle id={id} title={section.title} subtitle={section.subtitle} light={lead} />
-      {assets.length ? (
-        <form action="/account/crypto/exchange" method="get" className={`space-y-4 text-left ${lead ? "rounded-2xl bg-white/95 p-4 text-navy-900 sm:p-5" : ""}`}>
-          <fieldset>
-            <legend className="text-sm font-semibold">I want to</legend>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {(["buy", "sell"] as const).map(side => (
-                <label key={side} className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 font-semibold has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
-                  <input type="radio" name="side" value={side} defaultChecked={side === section.side} className="sr-only" />
-                  {side === "buy" ? "Buy" : "Sell"}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label htmlFor={`${id}-asset`} className="block text-sm font-semibold">
-                Coin
-              </label>
-              <select id={`${id}-asset`} name="asset" className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3">
-                {assets.map(asset => (
-                  <option key={asset.code} value={asset.code}>
-                    {asset.code} · {asset.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor={`${id}-fiat`} className="block text-sm font-semibold">
-                Amount
-              </label>
-              <input id={`${id}-fiat`} name="fiat" inputMode="decimal" placeholder="10000" className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3" />
-            </div>
-          </div>
-          <button type="submit" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 font-semibold text-white hover:bg-brand-600">
-            <ArrowLeftRight className="size-4" aria-hidden="true" /> See my price
-          </button>
-          <p className="text-xs text-slate-500">The live price is held for 30 seconds once quoted. You sign in first.</p>
-        </form>
-      ) : (
-        <p className={lead ? "opacity-80" : "text-slate-500"}>Coins are not on sale here yet.</p>
-      )}
-    </section>
-  );
-}
-
-/** The P2P market for a coin: what it is and a way in (offers are live, so they are read on the market page). */
-export function P2pMarket({ section, style }: { section: Of<"p2p_market">; style: Style }) {
-  const id = `p2p-${section.id}`;
-  const asset = section.data.asset;
-  const dense = style.density === "compact";
-  return (
-    <section aria-labelledby={id} className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-      <SectionTitle id={id} title={section.title} subtitle={section.subtitle} />
-      {asset ? (
-        <>
-          <div className={`flex items-center gap-3 rounded-2xl bg-slate-50 ${dense ? "p-3" : "p-4"}`}>
-            <span className="grid size-11 place-items-center rounded-full bg-brand-500 font-bold text-white">
-              <Coins className="size-5" aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block font-display font-bold text-navy-900">{asset.code}</span>
-              <span className="text-sm text-slate-500">{asset.name}</span>
-            </span>
-          </div>
-          <ul className="mt-4 space-y-2 text-sm text-slate-600">
-            <li className="flex items-center gap-2">
-              <BarChart3 className="size-4 text-brand-500" aria-hidden="true" /> Traders’ best prices, cheapest first
-            </li>
-            <li className="flex items-center gap-2">
-              <Zap className="size-4 text-brand-500" aria-hidden="true" /> Paid instantly from your wallet
-            </li>
-          </ul>
-          <div className="mt-auto flex flex-wrap gap-2 pt-5">
-            <Link href={`/account/crypto?asset=${asset.code}&side=buy`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
-              Buy {asset.code}
-            </Link>
-            <Link href={`/account/crypto?asset=${asset.code}&side=sell`} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 font-semibold text-navy-900 hover:border-slate-300">
-              Sell {asset.code}
-            </Link>
-          </div>
-        </>
-      ) : (
-        <p className="text-slate-500">This coin is not traded here yet.</p>
-      )}
     </section>
   );
 }

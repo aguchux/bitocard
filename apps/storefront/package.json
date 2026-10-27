@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@bitocard/api-client": "*",
-    "@bitocard/crypto-ui": "*",
     "@bitocard/next-config": "*",
     "@bitocard/ui": "*",
     "country-flag-icons": "^1.6.20",

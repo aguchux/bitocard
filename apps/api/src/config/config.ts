@@ -318,6 +318,12 @@ export const configSchema = z.object({
   /** Local development and tests only: allows http:// and private addresses as webhook endpoints. Refused in production. */
   WEBHOOK_ALLOW_PRIVATE_URLS: flag.prefault('off'),
   /**
+   * Crypto's routes for store customers, resellers and the public are closed (crypto has left BitoCard; see
+   * `docs/CRYPTO_SPINOFF_PLAN.md`). `open` keeps them for tests and local development until they move to Afrippa's own
+   * surface; refused in production.
+   */
+  CRYPTO_ROUTES: z.enum(['closed', 'open']).default('closed'),
+  /**
    * How deliveries are scheduled: vercel (Vercel Queues pushes each endpoint's work and retries to the API) or database
    * (runs after each change plus the cron). Defaults to vercel on Vercel, database elsewhere.
    */
@@ -348,6 +354,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const appEnv = config.APP_ENV ?? config.VERCEL_ENV;
   if (config.WEBHOOK_ALLOW_PRIVATE_URLS && appEnv === 'production') {
     throw new Error('Invalid environment configuration: WEBHOOK_ALLOW_PRIVATE_URLS must be off in production');
+  }
+  if (config.CRYPTO_ROUTES === 'open' && appEnv === 'production') {
+    throw new Error('Invalid environment configuration: CRYPTO_ROUTES must be closed in production');
   }
   // Session cookies over plain HTTP in production would leak sessions: refuse to start rather than run that way.
   if (config.COOKIE_SECURE === false && appEnv === 'production') {

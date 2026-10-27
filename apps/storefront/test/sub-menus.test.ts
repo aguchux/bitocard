@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { accountSections } from "@/components/app/account-sections";
-import { cryptoSections, subMenuFor, subMenusFor, type SubMenuContext } from "@/components/app/sub-menus";
+import { subMenuFor, subMenusFor, type SubMenuContext } from "@/components/app/sub-menus";
 import { appTabs } from "@/components/app/tabs";
 
 const context: SubMenuContext = {
@@ -15,10 +15,10 @@ const active = (path: string, search = "", ctx = context) => subMenuFor(path, se
 describe("desktop sub rails", () => {
   test("every tab but Home has one, in tab order, with every item at its own address", () => {
     const menus = subMenusFor(context);
-    expect(menus.map(menu => menu.key)).toEqual(["catalog", "orders", "wallet", "crypto", "account"]);
+    expect(menus.map(menu => menu.key)).toEqual(["catalog", "orders", "wallet", "account"]);
     expect(menus.map(menu => menu.href)).toEqual(appTabs.filter(tab => tab.href !== "/account").map(tab => tab.href));
     for (const menu of menus) expect(new Set(menu.items.map(item => item.href)).size).toBe(menu.items.length);
-    expect(menus[4]!.items.map(item => item.href)).toEqual(accountSections.map(item => item.href));
+    expect(menus[3]!.items.map(item => item.href)).toEqual(accountSections.map(item => item.href));
   });
 
   test("Catalog lists everything, then each group on sale, picked by ?group=", () => {
@@ -44,31 +44,23 @@ describe("desktop sub rails", () => {
     expect(active("/account/disputes/new", "checkout=chk_1")).toBe("/account/disputes");
   });
 
-  test("Wallet lists the country's wallet, US dollars, the coins and the transactions", () => {
-    expect(subMenusFor(context)[2]!.items.map(item => item.label)).toEqual(["NGN wallet", "US dollars", "Crypto", "Transactions"]);
+  test("Wallet lists the country's wallet, US dollars and the transactions (crypto has left BitoCard)", () => {
+    expect(subMenusFor(context)[2]!.items.map(item => item.label)).toEqual(["NGN wallet", "US dollars", "Transactions"]);
     // The Transactions screen has its own item, whatever its list or page; the wallets are not current there.
     expect(active("/account/wallet/transactions")).toBe("/account/wallet/transactions");
     expect(active("/account/wallet/transactions", "show=crypto&after=x")).toBe("/account/wallet/transactions");
     expect(active("/account/wallet")).toBe("/account/wallet");
     expect(active("/account/wallet", "wallet=usd")).toBe("/account/wallet?wallet=USD");
-    expect(active("/account/wallet", "wallet=crypto&back=/account/p/x")).toBe("/account/wallet?wallet=crypto");
     expect(active("/account/wallet", "wallet=NGN")).toBe("/account/wallet");
     // A dollar country has one money wallet; an account without a country its default.
-    expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Crypto", "Transactions"]);
+    expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Transactions"]);
     expect(active("/account/wallet", "wallet=USD", { ...context, currency: "USD" })).toBe("/account/wallet");
-    expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Crypto", "Transactions"]);
+    expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Transactions"]);
   });
 
-  test("every crypto page shows the Crypto rail, with the most specific item current", () => {
-    // The P2P market is the tab's first screen; the coins are in Wallets.
-    expect(subMenuFor("/account/crypto", "side=sell&asset=BTC")).toMatchObject({ menu: { key: "crypto" }, active: "/account/crypto" });
-    expect(subMenuFor("/account/crypto/wallets")?.active).toBe("/account/crypto/wallets");
-    expect(subMenuFor("/account/crypto/trades/abc")?.active).toBe("/account/crypto/trades");
-    expect(subMenuFor("/account/crypto/withdraw/confirm")?.active).toBe("/account/crypto/withdraw");
-    expect(subMenuFor("/account/crypto/withdrawals/123")?.active).toBe("/account/crypto/withdraw");
-    // A trade's confirmation belongs to no one place.
-    expect(subMenuFor("/account/crypto/confirm")).toMatchObject({ menu: { key: "crypto" }, active: null });
-    expect(cryptoSections.slice(0, 2).map(item => item.label)).toEqual(["P2P market", "Wallets"]);
+  test("crypto has no rail: its old addresses are no tab's place", () => {
+    expect(subMenuFor("/account/crypto")).toBeNull();
+    expect(subMenuFor("/account/crypto/wallets")).toBeNull();
   });
 
   test("the Account rail shows on its screens only; Home and the Account page have none", () => {

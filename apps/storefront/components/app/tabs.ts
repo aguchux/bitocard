@@ -1,4 +1,4 @@
-import { Coins, Home, LayoutGrid, ReceiptText, Store, UserRound, Wallet, type LucideIcon } from "lucide-react";
+import { Home, LayoutGrid, ReceiptText, Store, UserRound, Wallet, type LucideIcon } from "lucide-react";
 
 export type AppTab = { href: string; label: string; icon: LucideIcon };
 
@@ -8,7 +8,6 @@ export const appTabs: AppTab[] = [
   { href: "/account/catalog", label: "Catalog", icon: LayoutGrid },
   { href: "/account/orders", label: "Orders", icon: ReceiptText },
   { href: "/account/wallet", label: "Wallet", icon: Wallet },
-  { href: "/account/crypto", label: "Crypto", icon: Coins },
   { href: "/account/profile", label: "Account", icon: UserRound },
 ];
 

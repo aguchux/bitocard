@@ -158,7 +158,7 @@ describe("listings and orders", () => {
 describe("the Shop tab and Account in the header", () => {
   test("where Shop is open it takes the last tab and Account leaves the tabs", () => {
     expect(tabsFor(false)).toBe(appTabs);
-    expect(tabsFor(true).map(tab => tab.label)).toEqual(["Home", "Catalog", "Orders", "Wallet", "Crypto", "Shop"]);
+    expect(tabsFor(true).map(tab => tab.label)).toEqual(["Home", "Catalog", "Orders", "Wallet", "Shop"]);
     expect(activeTab("/shop/orders/abc", tabsFor(true))).toBe("/shop");
     // Account's screens belong to no tab once Account is in the header; without the Shop they are Account's.
     expect(activeTab("/account/profile/details", tabsFor(true))).toBeNull();
@@ -171,7 +171,7 @@ describe("the Shop tab and Account in the header", () => {
     const context = { groups: [], currency: "NGN", shop };
     expect(subMenusFor({ groups: [], currency: "NGN" }).map(menu => menu.key)).not.toContain("shop");
     const menu = subMenusFor(context).find(item => item.key === "shop")!;
-    expect(menu.items.map(item => item.label)).toEqual(["Browse", "Post an ad", "My listings", "Messages", "Orders", "Favourites", "Safe pay"]);
+    expect(menu.items.map(item => item.label)).toEqual(["Browse", "Post an ad", "My listings", "Messages", "Orders", "Favourites", "Safe pay", "Payouts"]);
     expect(menu.items.find(item => item.label === "Messages")?.badge).toBe(3);
     const active = (path: string) => subMenuFor(path, "", context)?.active;
     expect(active("/shop")).toBe("/shop");
@@ -187,7 +187,7 @@ describe("the Shop tab and Account in the header", () => {
     const labels = (shop: typeof base & { resellers?: { count: number; waiting: number } }) => subMenusFor({ groups: [], currency: "NGN", shop }).find(item => item.key === "shop")!.items;
     expect(labels({ ...base, resellers: { count: 0, waiting: 0 } }).map(item => item.label)).not.toContain("My Resellers");
     const items = labels({ ...base, resellers: { count: 2, waiting: 3 } });
-    expect(items.map(item => item.label)).toEqual(["Browse", "Post an ad", "My listings", "Messages", "Orders", "Favourites", "My Resellers", "Safe pay"]);
+    expect(items.map(item => item.label)).toEqual(["Browse", "Post an ad", "My listings", "Messages", "Orders", "Favourites", "My Resellers", "Safe pay", "Payouts"]);
     expect(items.find(item => item.label === "My Resellers")?.badge).toBe(3);
     const context = { groups: [], currency: "NGN", shop: { ...base, resellers: { count: 2, waiting: 0 } } };
     expect(subMenuFor(`/shop/resellers/${listing}`, "", context)?.active).toBe("/shop/resellers");

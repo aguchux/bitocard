@@ -397,11 +397,14 @@ class SimulatePayoutDto {
   outcome: 'paid' | 'failed';
 }
 
-/** A store customer's P2P money (from selling crypto) paid out to their own bank account. */
+/**
+ * A store customer's withdrawable money (BitoCard Shop's Safe pay sales; P2P money before crypto left) paid out to their
+ * own bank account. `/v1/store/cash`; the old `/v1/store/crypto/cash` is closed with the rest of crypto.
+ */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
-@Controller('store/crypto/cash')
+@Controller(['store/cash', 'store/crypto/cash'])
 export class CustomerCashController {
   constructor(
     private readonly wallets: CryptoWalletsService,

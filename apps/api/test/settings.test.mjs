@@ -21,7 +21,7 @@ describe('settings chain', () => {
     assert.equal(status, 200);
     assert.deepEqual(json.options.gift_card_payout, { value: 'wallet', allowed: ['wallet', 'bank'], source: 'country_default' });
     assert.equal(json.options.fixed_price_earning, undefined, 'discount products always sell at face value at most');
-    assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, reserved_accounts: false, custom_domains: false, own_integrations: false, own_payment_gateways: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, crypto_wallets: false, p2p_trading: false, crypto_exchange: false, reseller_exchange: false, reseller_desks: false, spin_rewards: false, crypto_app: false, crypto_global: false, crypto_cross_border: false, crypto_trade_abroad: true, crypto_install_prompt: false, store_template_all_in_one: true, store_template_topups: true, store_template_gift_cards: true, store_template_crypto_desk: true, store_template_single_product: true, store_template_vpn_shop: true, store_template_rdp_shop: true, store_template_resale_shop: true, reseller_two_step: false, manual_reseller_approval: false, country_stores: true, classifieds: false, classifieds_safe_pay: false, classifieds_assistant: false, classifieds_install_prompt: false, classifieds_resale: false, reseller_resale: false, shq_install_prompt: false, storefront_install_prompt: false }, 'customer wallets and store templates are on unless switched off; every market has its country store on');
+    assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, reserved_accounts: false, custom_domains: false, own_integrations: false, own_payment_gateways: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, spin_rewards: false, store_template_all_in_one: true, store_template_topups: true, store_template_gift_cards: true, store_template_single_product: true, store_template_vpn_shop: true, store_template_rdp_shop: true, store_template_resale_shop: true, reseller_two_step: false, manual_reseller_approval: false, country_stores: true, classifieds: false, classifieds_safe_pay: false, classifieds_assistant: false, classifieds_install_prompt: false, classifieds_resale: false, reseller_resale: false, shq_install_prompt: false, storefront_install_prompt: false }, 'customer wallets and store templates are on unless switched off; every market has its country store on; crypto switches (kept for Afrippa) are never shown');
   });
 
   test('a reseller can choose only what their country allows', async () => {
@@ -112,6 +112,12 @@ describe('feature switches', () => {
     const listed = await admin.get('/v1/admin/switches');
     assert.ok(listed.json.definitions.startup_allowance);
     assert.ok(listed.json.data.some(s => s.key === 'welcome_bonus' && s.scope === 'reseller'));
+    // Crypto's switches are kept for Afrippa but never listed in BitoCard, even once set.
+    assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: true })).status, 200);
+    const again = await admin.get('/v1/admin/switches');
+    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_exchange', 'crypto_app', 'store_template_crypto_desk']) assert.equal(again.json.definitions[key], undefined, key);
+    assert.equal(again.json.data.some(s => s.key === 'crypto_wallets'), false);
+    assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: null })).status, 200);
   });
 
   test('support admins cannot change switches', async () => {

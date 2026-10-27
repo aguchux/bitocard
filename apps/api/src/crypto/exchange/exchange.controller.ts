@@ -209,6 +209,7 @@ class ResellerQuoteDto extends ResellerOverviewDto {
 }
 
 /** A reseller's own exchange desk: balances and prices are visible to the reseller, movements use its funded wallet. */
+@ApiExcludeController()
 @ApiTags('Exchange')
 @ApiBearerAuth()
 @modeHeader

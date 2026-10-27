@@ -1,19 +1,13 @@
 import {
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ArrowUpFromLine,
   CircleCheck,
-  Coins,
   Compass,
   DollarSign,
   Gift,
   Heart,
-  History,
   Landmark,
   LayoutGrid,
   LayoutList,
   ListOrdered,
-  Megaphone,
   MessageSquareWarning,
   MessagesSquare,
   ReceiptText,
@@ -23,7 +17,6 @@ import {
   SquarePlus,
   Truck,
   Wallet,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { groupIcon } from "@/components/store/theme";
@@ -44,7 +37,7 @@ export type SubMenuItem = {
   badge?: number;
 };
 
-export type SubMenuKey = "catalog" | "orders" | "wallet" | "crypto" | "shop" | "account";
+export type SubMenuKey = "catalog" | "orders" | "wallet" | "shop" | "account";
 
 export type SubMenu = {
   key: SubMenuKey;
@@ -76,19 +69,7 @@ export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenu
   // B2B reselling: suppliers whose listings resellers carry.
   ...(shop.resellers?.count ? [{ href: "/shop/resellers", label: "My Resellers", icon: Store, ...(shop.resellers.waiting ? { badge: shop.resellers.waiting } : {}) }] : []),
   { href: "/shop/safe-pay", label: "Safe pay", icon: ShieldCheck },
-];
-
-/** The Crypto tab's places: underlined tabs under the title on phones and tablets, the sub rail on desktop. The market comes first. */
-export const cryptoSections: SubMenuItem[] = [
-  // The P2P market is the tab's first screen (BitoCard's biggest crypto market); the coins themselves are in Wallets.
-  { href: "/account/crypto", label: "P2P market", icon: ArrowLeftRight },
-  { href: "/account/crypto/wallets", label: "Wallets", icon: Wallet },
-  { href: "/account/crypto/exchange", label: "Exchange", icon: Zap },
-  { href: "/account/crypto/ads", label: "My ads", icon: Megaphone },
-  { href: "/account/crypto/trades", label: "Trades", icon: History },
-  { href: "/account/crypto/deposit", label: "Deposit", icon: ArrowDownToLine },
-  { href: "/account/crypto/withdraw", label: "Withdraw", icon: ArrowUpFromLine, also: ["/account/crypto/withdrawals"] },
-  { href: "/account/crypto/cash-out", label: "Cash out", icon: Landmark },
+  { href: "/shop/payouts", label: "Payouts", icon: Landmark },
 ];
 
 /** The Orders tab: its filters (the API's `?show=` groups, as the page's chips) and the customer's disputes. */
@@ -107,14 +88,13 @@ export const catalogSections = (groups: SubMenuContext["groups"]): SubMenuItem[]
 ];
 
 /**
- * The Wallet tab: the country's wallet (the page's default), the US dollar wallet and the coins (`?wallet=`, as the
- * page's tabs), then all their activity (its own screen, reached on phones by each activity card's View all). A
+ * The Wallet tab: the country's wallet (the page's default) and the US dollar wallet (`?wallet=`, as the page's
+ * tabs), then all their activity (its own screen, reached on phones by each activity card's View all). A
  * country that uses dollars has one money wallet; an account still without a country has its default.
  */
 export const walletSections = (currency: string | null): SubMenuItem[] => [
   { href: "/account/wallet", label: !currency ? "Your wallet" : currency === "USD" ? "US dollars" : `${currency} wallet`, icon: Wallet },
   ...(currency && currency !== "USD" ? [{ href: "/account/wallet?wallet=USD", label: "US dollars", icon: DollarSign }] : []),
-  { href: "/account/wallet?wallet=crypto", label: "Crypto", icon: Coins },
   { href: "/account/wallet/transactions", label: "Transactions", icon: ReceiptText },
 ];
 
@@ -124,7 +104,6 @@ export function subMenusFor(context: SubMenuContext): SubMenu[] {
     { key: "catalog", label: "Catalog", href: "/account/catalog", param: "group", owns: ["/account/catalog", "/account/p"], items: catalogSections(context.groups) },
     { key: "orders", label: "Orders", href: "/account/orders", param: "show", owns: ["/account/orders", "/account/disputes"], items: orderSections },
     { key: "wallet", label: "Wallet", href: "/account/wallet", param: "wallet", owns: ["/account/wallet"], items: walletSections(context.currency) },
-    { key: "crypto", label: "Crypto", href: "/account/crypto", owns: ["/account/crypto"], items: cryptoSections },
     ...(context.shop ? [{ key: "shop" as const, label: "Shop", href: "/shop", owns: ["/shop"], items: shopSections(context.shop) }] : []),
     // Shown only on its screens (activeAccountSection), not on the Account page, whose rows are its menu.
     { key: "account", label: "Account", href: "/account/profile", owns: [], items: accountSections.map(({ href, label, icon, soon }) => ({ href, label, icon, soon })) },

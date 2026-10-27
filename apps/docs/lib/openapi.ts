@@ -122,7 +122,7 @@ export const operations: Operation[] = Object.entries(document.paths).flatMap(([
  * sections are what SHQ (the reseller dashboard) uses with its own sign-in; `public` needs no sign-in.
  */
 export const sections: Array<{ title: string; kind: "api" | "dashboard" | "public"; tags: string[] }> = [
-  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "eSIMs", "VPN", "Wallet", "Exchange", "Crypto", "Payouts", "Customers", "Resale", "Disputes", "Support"] },
+  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "eSIMs", "VPN", "Wallet", "Payouts", "Customers", "Resale", "Disputes", "Support"] },
   { title: "Webhooks and events", kind: "api", tags: ["Webhooks", "Events"] },
   { title: "Stores and markets", kind: "api", tags: ["Stores", "Countries", "Exchange rates", "Plans", "Invoices", "Settings"] },
   { title: "Dashboard (SHQ)", kind: "dashboard", tags: ["Authentication", "API keys", "Team", "Notifications", "Integrations"] },
@@ -152,8 +152,6 @@ export const tagIntros: Record<string, string> = {
   VPN: "VPN access your orders bought (30 days, never renewed automatically): its state and expiry, and resetting its password. The username and password are only on the order.",
   Wallet: "Your pre-funded wallet: balances, ledger transactions, top-ups, reserved bank accounts and BitoCard's fees.",
   Resale: "Sell BitoCard Shop suppliers' listings on your Resale shop stores: browse their resale listings in your country, add them at your own price inside each supplier's limits, add a note the supplier approves, set auto-listing rules, and work with suppliers in a chat with deals. Your store always shows the supplier's own words and names them.",
-  Crypto: "Your own coin wallet on chain: deposit coins to your own addresses (Premium) and withdraw them to addresses you saved, each confirmed by a code emailed to the person who asked. Dashboard sessions only.",
-  Exchange: "Trade your local or US dollar wallet against BitoCard's coin reserves, then fund your own customer exchange desk. Quotes last 30 seconds and trades never exceed the available reserve.",
   Payouts: "Withdraw matured earnings to your verified bank account.",
   Customers: "Check your customers' identity by your own customer reference: BVN in Nigeria, ID document and face check elsewhere.",
   Disputes:

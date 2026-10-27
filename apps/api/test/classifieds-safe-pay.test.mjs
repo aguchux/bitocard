@@ -421,13 +421,13 @@ describe('Safe pay protections', () => {
     // With no payout hold in the market, only the review holds it.
     await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: 0 } });
     try {
-      const cash = await seller.get('/v1/store/crypto/cash');
+      const cash = await seller.get('/v1/store/cash');
       assert.equal(cash.status, 200, JSON.stringify(cash.json));
       assert.deepEqual([cash.json.held, cash.json.available], [released.payout, 0]);
       const finance = await adminClient(server, ['finance']);
       const approved = await finance.post(`/v1/admin/classifieds/orders/${order.id}/payout-review`, { decision: 'approve', note: 'Card payment settled, no dispute.' });
       assert.equal(approved.json.payout_review, 'approved');
-      const after = (await seller.get('/v1/store/crypto/cash')).json;
+      const after = (await seller.get('/v1/store/cash')).json;
       assert.deepEqual([after.held, after.available], [0, released.payout]);
       assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.payout_review_decided', targetId: order.id } }), 1);
     } finally {
