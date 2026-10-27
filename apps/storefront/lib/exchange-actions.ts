@@ -30,7 +30,7 @@ export async function tradeExchange(quoteId: string, nonce: string): Promise<Exc
     return { ok: false, code: result.code, message: result.message, param: result.param };
   }
   revalidatePath("/account/crypto/exchange");
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   revalidatePath("/account/wallet");
   return result;
 }

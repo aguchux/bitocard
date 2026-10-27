@@ -56,7 +56,7 @@ export function ExchangeSheet({ pair, side, currency, desk, balances, quoteSecon
         <p className="mt-1 text-sm text-slate-600">
           {pair.closed === "not_offered" ? "Try another coin, or trade with other people on the P2P market." : "Try again in a minute. We never trade on an old price."}
         </p>
-        <Link href={`/account/crypto/market?asset=${coin}&side=${side}`} className="mt-4 inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400 focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700">
+        <Link href={`/account/crypto?asset=${coin}&side=${side}`} className="mt-4 inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400 focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700">
           Go to the P2P market
         </Link>
       </section>
@@ -392,7 +392,7 @@ function ReviewDialog({ quote, desk, seconds, onRequote, onClose, onTraded }: { 
             <button type="button" onClick={close} className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600 focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700">
               Back to Exchange
             </button>
-            <Link href="/account/crypto" className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl px-5 font-semibold text-navy-900 ring-1 ring-slate-300">
+            <Link href="/account/crypto/wallets" className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl px-5 font-semibold text-navy-900 ring-1 ring-slate-300">
               See my coins
             </Link>
           </div>

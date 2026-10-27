@@ -78,11 +78,12 @@ export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenu
   { href: "/shop/safe-pay", label: "Safe pay", icon: ShieldCheck },
 ];
 
-/** The Crypto tab's places: pills under the title on phones and tablets, the sub rail on desktop. */
+/** The Crypto tab's places: pills under the title on phones and tablets, the sub rail on desktop. The market comes first. */
 export const cryptoSections: SubMenuItem[] = [
-  { href: "/account/crypto", label: "Wallets", icon: Wallet },
+  // The P2P market is the tab's first screen (BitoCard's biggest crypto market); the coins themselves are in Wallets.
+  { href: "/account/crypto", label: "P2P market", icon: ArrowLeftRight },
+  { href: "/account/crypto/wallets", label: "Wallets", icon: Wallet },
   { href: "/account/crypto/exchange", label: "Exchange", icon: Zap },
-  { href: "/account/crypto/market", label: "Market", icon: ArrowLeftRight },
   { href: "/account/crypto/ads", label: "My ads", icon: Megaphone },
   { href: "/account/crypto/trades", label: "Trades", icon: History },
   { href: "/account/crypto/deposit", label: "Deposit", icon: ArrowDownToLine },

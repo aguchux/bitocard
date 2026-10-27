@@ -56,7 +56,7 @@ export default async function ExchangePage({ searchParams }: { searchParams: Pro
           <div className={card}>
             <p className="font-semibold">{exchange.message ?? "The instant exchange is not available here yet."}</p>
             <p className="mt-1 text-sm text-slate-600">You can still trade with other people on the P2P market where it is open.</p>
-            <Link href="/account/crypto/market" className="mt-4 inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400">
+            <Link href="/account/crypto" className="mt-4 inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400">
               Go to the P2P market
             </Link>
           </div>
@@ -129,7 +129,7 @@ export default async function ExchangePage({ searchParams }: { searchParams: Pro
                   </p>
                 </section>
               ) : null}
-              <Link href={`/account/crypto/market?asset=${asset}&side=${side}`} className="flex min-h-11 items-center gap-2 rounded-2xl px-4 font-semibold text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300">
+              <Link href={`/account/crypto?asset=${asset}&side=${side}`} className="flex min-h-11 items-center gap-2 rounded-2xl px-4 font-semibold text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300">
                 <ArrowLeftRight className="size-4" aria-hidden="true" /> Bigger amount? Try the P2P market
               </Link>
             </aside>

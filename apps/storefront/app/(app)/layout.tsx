@@ -115,7 +115,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <SubRail context={subMenus} />
         </Suspense>
         <div className={`flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
-          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
+          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8 has-[[data-full-bleed]]:max-w-none">
             {children}
           </main>
           <footer className="px-4 pb-6 text-center text-xs text-slate-500">

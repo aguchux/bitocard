@@ -37,8 +37,8 @@ export default async function WithdrawPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href="/account/crypto" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
-        <ChevronLeft className="size-4" aria-hidden="true" /> Crypto
+      <Link href="/account/crypto/wallets" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
+        <ChevronLeft className="size-4" aria-hidden="true" /> Wallets
       </Link>
       <h1 className="font-display text-2xl font-extrabold text-navy-900">Withdraw crypto{wallets?.mode === "test" ? " (test network)" : ""}</h1>
       <CryptoNav current="/account/crypto/withdraw" />

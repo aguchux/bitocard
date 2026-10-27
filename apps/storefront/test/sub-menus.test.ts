@@ -60,14 +60,15 @@ describe("desktop sub rails", () => {
   });
 
   test("every crypto page shows the Crypto rail, with the most specific item current", () => {
-    expect(subMenuFor("/account/crypto")).toMatchObject({ menu: { key: "crypto" }, active: "/account/crypto" });
-    expect(subMenuFor("/account/crypto/market?asset=USDT")?.active).toBe("/account/crypto/market");
+    // The P2P market is the tab's first screen; the coins are in Wallets.
+    expect(subMenuFor("/account/crypto", "side=sell&asset=BTC")).toMatchObject({ menu: { key: "crypto" }, active: "/account/crypto" });
+    expect(subMenuFor("/account/crypto/wallets")?.active).toBe("/account/crypto/wallets");
     expect(subMenuFor("/account/crypto/trades/abc")?.active).toBe("/account/crypto/trades");
     expect(subMenuFor("/account/crypto/withdraw/confirm")?.active).toBe("/account/crypto/withdraw");
     expect(subMenuFor("/account/crypto/withdrawals/123")?.active).toBe("/account/crypto/withdraw");
     // A trade's confirmation belongs to no one place.
     expect(subMenuFor("/account/crypto/confirm")).toMatchObject({ menu: { key: "crypto" }, active: null });
-    expect(cryptoSections[0]!.label).toBe("Wallets");
+    expect(cryptoSections.slice(0, 2).map(item => item.label)).toEqual(["P2P market", "Wallets"]);
   });
 
   test("the Account rail shows on its screens only; Home and the Account page have none", () => {

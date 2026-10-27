@@ -179,7 +179,7 @@ export function VariantHero({ section, style, groups, countries, bleed }: { sect
             <Title id={id} section={section} className="max-w-3xl text-4xl leading-tight sm:text-6xl" accentClass="opacity-80" />
             {section.subtitle ? <p className="mt-4 max-w-2xl text-lg opacity-85">{section.subtitle}</p> : null}
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/account/crypto/market" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 font-semibold text-[var(--st-primary)] shadow-md hover:opacity-90">
+              <Link href="/account/crypto" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 font-semibold text-[var(--st-primary)] shadow-md hover:opacity-90">
                 <Users className="size-5" aria-hidden="true" /> Open the P2P market
               </Link>
               <Link href="/account/crypto/exchange" className="inline-flex min-h-12 items-center gap-2 rounded-xl px-5 font-semibold ring-1 ring-current hover:bg-white/10">
@@ -336,10 +336,10 @@ export function P2pMarket({ section, style }: { section: Of<"p2p_market">; style
             </li>
           </ul>
           <div className="mt-auto flex flex-wrap gap-2 pt-5">
-            <Link href={`/account/crypto/market?asset=${asset.code}&side=buy`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
+            <Link href={`/account/crypto?asset=${asset.code}&side=buy`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
               Buy {asset.code}
             </Link>
-            <Link href={`/account/crypto/market?asset=${asset.code}&side=sell`} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 font-semibold text-navy-900 hover:border-slate-300">
+            <Link href={`/account/crypto?asset=${asset.code}&side=sell`} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 font-semibold text-navy-900 hover:border-slate-300">
               Sell {asset.code}
             </Link>
           </div>

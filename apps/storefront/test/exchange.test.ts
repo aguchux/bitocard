@@ -64,8 +64,8 @@ describe("words", () => {
     expect(usdText("0.9996")).toBe("$0.9996");
   });
 
-  test("Exchange sits in the Crypto rail right after Wallets", () => {
-    expect(cryptoSections.map(item => item.label).slice(0, 3)).toEqual(["Wallets", "Exchange", "Market"]);
+  test("Exchange sits in the Crypto rail right after the P2P market and Wallets", () => {
+    expect(cryptoSections.map(item => item.label).slice(0, 3)).toEqual(["P2P market", "Wallets", "Exchange"]);
     expect(subMenuFor("/account/crypto/exchange", "asset=BTC&side=sell")).toMatchObject({ menu: { key: "crypto" }, active: "/account/crypto/exchange" });
   });
 });

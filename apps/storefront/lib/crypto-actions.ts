@@ -41,7 +41,7 @@ export async function addTestCrypto(_state: FormState, form: FormData): Promise<
   if (!amount) return { error: "Enter an amount above zero.", field: "amount" };
   const result = await customerApi("POST", "/v1/store/crypto/test-deposits", { asset: text(form, "asset"), amount });
   if (!result.ok) return { error: result.message, field: result.param };
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   return { notice: `Added ${amount} test ${text(form, "asset")}.` };
 }
 
@@ -83,7 +83,7 @@ export async function confirmTrade(_state: NonceFormState, form: FormData): Prom
     if (result.code === "insufficient_funds") return fresh({ error: result.message, field: "funds" });
     return fresh({ error: result.message });
   }
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   redirect(`/account/crypto/trades/${result.data.id}?done=1`);
 }
 
@@ -111,7 +111,7 @@ export async function postAd(_state: FormState, form: FormData): Promise<FormSta
     signInFirst(result.status, "/account/crypto/ads");
     return { error: result.message, field: result.param };
   }
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   redirect("/account/crypto/ads?posted=1");
 }
 
@@ -125,7 +125,7 @@ export async function changeAd(_state: FormState, form: FormData): Promise<FormS
     return { error: result.message };
   }
   revalidatePath("/account/crypto/ads");
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   return {};
 }
 
@@ -143,7 +143,7 @@ export async function repriceAd(_state: FormState, form: FormData): Promise<Form
 export async function chooseNickname(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<StoreP2pProfile>("PUT", "/v1/store/p2p/profile", { nickname: text(form, "nickname") });
   if (!result.ok) return { error: result.message, field: "nickname" };
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   return { notice: `You trade as ${result.data.nickname}.` };
 }
 
@@ -197,7 +197,7 @@ export async function createWithdrawal(_state: NonceFormState, form: FormData): 
     signInFirst(result.status, "/account/crypto/withdraw");
     return fresh({ error: result.message });
   }
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   redirect(`/account/crypto/withdrawals/${result.data.id}`);
 }
 
@@ -226,7 +226,7 @@ export async function cancelWithdrawal(_state: FormState, form: FormData): Promi
     return { error: result.message };
   }
   revalidatePath(`/account/crypto/withdrawals/${id}`);
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   return {};
 }
 
@@ -271,7 +271,7 @@ export async function cashOut(_state: NonceFormState, form: FormData): Promise<N
     return fresh({ error: result.message, field: result.param === "amount" ? "amount" : null });
   }
   revalidatePath("/account/crypto/cash-out");
-  revalidatePath("/account/crypto");
+  revalidatePath("/account/crypto", "layout");
   // A fresh nonce: another payout from the same form is a new request.
   return fresh({ notice: result.data.status === "failed" ? `The bank refused it: ${result.data.failure_reason ?? "try another account"}. The money is back in your balance.` : "On its way to your bank." });
 }
