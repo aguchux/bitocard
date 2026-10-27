@@ -1,6 +1,6 @@
 # Crypto spin-off: plan
 
-Decided by the owner on 27 October 2026. This plan replaces `docs/BITOCARD_CRYPTO_APP_PLAN.md` (crypto.bitocard.com), whose stages 5 to 7 are cancelled. The brand and domain are to come: below they are **<Brand>** and **<domain>**.
+Decided by the owner on 27 October 2026. This plan replaces `docs/BITOCARD_CRYPTO_APP_PLAN.md` (crypto.bitocard.com), whose stages 5 to 7 are cancelled. The brand is **Afrippa**, at **afrippa.com** (chosen by the owner on 27 October 2026; the name stands on its own, its origin is not spelled out in copy). On 27 October 2026 afrippa.com was unregistered (no match in Verisign's WHOIS and RDAP), as were afrippa.net, afrippa.africa and afrippa.io: register it, and the defensive names wanted, before announcing the brand.
 
 ## The decision
 
@@ -8,13 +8,13 @@ Decided by the owner on 27 October 2026. This plan replaces `docs/BITOCARD_CRYPT
 2. **It becomes its own product** on its own site and domain: a full peer-to-peer crypto market.
 3. **People pay people.** Fiat never touches the platform: no payment gateways (no Paystack, Flutterwave, Stripe, pawaPay), no fiat wallets, no top-ups, no cash-out. The buyer pays the seller directly (bank transfer, mobile money and the like) and the platform only holds crypto.
 4. **The platform holds only crypto wallets and escrow.** Customers' custodial wallets (deposits and withdrawals on chain) and an escrow that holds the seller's coins during each order.
-5. **The database and the API stay**: the same NestJS API and Postgres database serve <Brand>, but crypto is closed to everything BitoCard (resellers, store customers, the public OpenAPI document and the docs).
+5. **The database and the API stay**: the same NestJS API and Postgres database serve Afrippa, but crypto is closed to everything BitoCard (resellers, store customers, the public OpenAPI document and the docs).
 
 ## What changes in the model
 
-| | Today (built, never live) | <Brand> |
+| | Today (built, never live) | Afrippa |
 |---|---|---|
-| Accounts | bitocard.com and store accounts, sign-in handoff | <Brand>'s own accounts, signed up on <domain> |
+| Accounts | bitocard.com and store accounts, sign-in handoff | Afrippa's own accounts, signed up on afrippa.com |
 | Fiat | Store wallets and P2P money in BitoCard's ledger, top-ups, bank cash-out | None on the platform: the buyer pays the seller directly |
 | A trade | Instant: coins and fiat move in one ledger entry | An **order**: coins to escrow, buyer pays off-platform, seller confirms, escrow releases |
 | Buy ads | Lock the buyer's fiat | Lock nothing (the seller's coins go to escrow when an order opens) |
@@ -26,7 +26,7 @@ Decided by the owner on 27 October 2026. This plan replaces `docs/BITOCARD_CRYPT
 
 ## What is reused
 
-Built and tested, kept for <Brand>:
+Built and tested, kept for Afrippa:
 
 - **Custody:** customer coin wallets (`crypto_wallet`, `crypto_locked`, `crypto_frozen`, `crypto_custody`, `crypto_fees`), deposit addresses from xpubs, the chain providers and routing, deposit scanning and crediting, withdrawals with saved addresses, the emailed code, review and sanctions screening, the signer (Turnkey), the custody check.
 - **Market rules:** coins and networks, the allow-list of countries (account and document), the US/UK declaration, per-market limits, nicknames, the ad book, freezes and the account freeze.
@@ -35,24 +35,24 @@ Built and tested, kept for <Brand>:
 
 ## Instruments lifted from BitoCard (the owner, 27 October 2026)
 
-Every instrument BitoCard has built is lifted to serve <Brand> too. **Lifted, not copied:** one codebase, each instrument made **brand-aware** (its records carry the brand, its settings, knowledge, senders and queues are per brand, and the central admin shows each brand's on its own), so a fix or feature lands in both.
+Every instrument BitoCard has built is lifted to serve Afrippa too. **Lifted, not copied:** one codebase, each instrument made **brand-aware** (its records carry the brand, its settings, knowledge, senders and queues are per brand, and the central admin shows each brand's on its own), so a fix or feature lands in both.
 
-| Instrument (BitoCard) | In <Brand> |
+| Instrument (BitoCard) | In Afrippa |
 |---|---|
 | **Buyer and seller chat** (BitoCard Shop's chats: messages, photos, offers, block, report, unread digests, moderators reading reported chats) | The **order room** (one chat per order: payment details, receipts and evidence as photos and PDFs, system messages at every step) and **chat with a trader before trading** (questions about an ad); block and report |
 | **Disputes** (Safe pay disputes with evidence, BitoCard's decision, whose fault, strikes; the `D-` disputes queue) | **Appeals** on orders: evidence from both sides, deadlines to respond, operations decide release to buyer or return to seller with whose fault, strikes on the side at fault, audited |
 | **Standing and guards** (Safe pay's new-seller limits, strikes, lost disputes, the same-person check) | **Trader standing:** limits for new traders, strikes from lost appeals and cancellations, suspension at a limit, the same-person check between buyer and seller |
 | **Deadline reminders** (Safe pay's accept, pay, hand-over and confirm reminders) | Order timers: pay before the window ends, release once paid, respond to an appeal |
-| **Support tickets and live chat** (tickets `T-`, live chat with signed-out visitors, files, staff notes, turning a chat into a ticket, engineering escalations to GitHub) | <Brand>'s own help desk on <domain>: tickets, live chat, files, staff notes, escalations, in its own queue in the central admin |
-| **AI assistants** (support assistants with knowledge, tools, hand-over and redaction; BitoCard Shop's Anjio with tools, per-country knowledge, cards, ratings, reports, evals, monthly budget) | <Brand>'s **assistant**: answers about markets, ads, fees, limits, the steps of an order and safety; tools that search ads, explain an order's state and fees and show the safety checks, never acting on money; hands over to a person; knowledge generated per country from live settings |
+| **Support tickets and live chat** (tickets `T-`, live chat with signed-out visitors, files, staff notes, turning a chat into a ticket, engineering escalations to GitHub) | Afrippa's own help desk on afrippa.com: tickets, live chat, files, staff notes, escalations, in its own queue in the central admin |
+| **AI assistants** (support assistants with knowledge, tools, hand-over and redaction; BitoCard Shop's Anjio with tools, per-country knowledge, cards, ratings, reports, evals, monthly budget) | Afrippa's **assistant**: answers about markets, ads, fees, limits, the steps of an order and safety; tools that search ads, explain an order's state and fees and show the safety checks, never acting on money; hands over to a person; knowledge generated per country from live settings |
 | **Moderation and reports** (the Shop's queue, reports, refused words) | Ad terms and nicknames checked against refused words (no phone numbers, links or off-platform contact), reports on traders and ads, the moderation queue |
-| **Terms accepted by version** (BitoCard Shop terms) | <Brand>'s terms and P2P rules accepted by version before trading |
-| **Identity** (BitoCard Verify: KYC with human review, liveness, documents sealed in private storage) | <Brand>'s identity checks (Verify under the <Brand> name, or Didit), names matched against payment methods |
+| **Terms accepted by version** (BitoCard Shop terms) | Afrippa's terms and P2P rules accepted by version before trading |
+| **Identity** (BitoCard Verify: KYC with human review, liveness, documents sealed in private storage) | Afrippa's identity checks (Verify under the Afrippa name, or Didit), names matched against payment methods |
 | **Sign-in security** (two-step sign-in with an app, email or SMS, recovery codes; phone confirmation by SMS) | Two-step for every trader, phone confirmation, new-device and new-payment-method alerts |
-| **Notifications** (inbox, browser push, emails from the brand's own domain) | Every order step, deposit, withdrawal and appeal, from <domain> |
-| **Install as an app** (offline worker, install prompt) | <Brand>'s app on phones |
+| **Notifications** (inbox, browser push, emails from the brand's own domain) | Every order step, deposit, withdrawal and appeal, from afrippa.com |
+| **Install as an app** (offline worker, install prompt) | Afrippa's app on phones |
 | **Files** (private sealed storage, public media) | Receipts and evidence sealed privately; brand images public |
-| **Reports** (P&L, statements, growth) | <Brand>'s fee revenue, custody and volume, on its own |
+| **Reports** (P&L, statements, growth) | Afrippa's fee revenue, custody and volume, on its own |
 
 ## What is retired
 
@@ -62,29 +62,29 @@ Every instrument BitoCard has built is lifted to serve <Brand> too. **Lifted, no
 - **Stage 5, payout rails:** cancelled. Nothing is paid out in fiat.
 - **Spin and win** pays its rewards in crypto (BNB, USDT, USDC) inside BitoCard: it is either ended or changed to pay store credit (an owner decision; see Questions).
 
-Retired code is switched off and closed first (step 1), then removed once <Brand>'s engine replaces it (step 3); no table is dropped until the data is confirmed empty or archived.
+Retired code is switched off and closed first (step 1), then removed once Afrippa's engine replaces it (step 3); no table is dropped until the data is confirmed empty or archived.
 
 ## Careful: what BitoCard keeps
 
 - **Bank payouts of customer money** (`CustomerPayoutsService`, `customer_bank_accounts`, `customer_payouts`, `customer_withdrawable`) also pay **BitoCard Shop's Safe pay** sellers (and resale suppliers). They stay in BitoCard. Today the cash-out page is the Crypto tab's (`/account/crypto/cash-out`): it moves to the Shop tab (or the Wallet tab) before the Crypto tab goes.
-- **The top-up forms and status** moved into `@bitocard/crypto-ui` (`top-up-*`) this week are used by the storefront's Wallet tab: they move back to the storefront (or `@bitocard/ui`) before the package goes to <Brand>.
+- **The top-up forms and status** moved into `@bitocard/crypto-ui` (`top-up-*`) this week are used by the storefront's Wallet tab: they move back to the storefront (or `@bitocard/ui`) before the package goes to Afrippa.
 - `CryptoPricesService` (CoinGecko) is used by Spin and win's valuation; it goes with whichever side keeps it.
 
 ## Architecture (recommended)
 
 **One API and database, two separate products inside it.**
 
-1. **Its own front door.** <Brand>'s site calls the API at `api.<domain>` (a second hostname on the same droplet, its own Cloudflare zone and Caddy site). Crypto routes move under their own prefix (`/v1/x/…`, named once the brand is chosen) and answer **only** <Brand>'s server: a dedicated shared secret (like `STORE_SERVER_SECRET`, its own `<BRAND>_SERVER_SECRET`) signs every request, and the routes refuse API keys, reseller and admin BitoCard sessions, store customers and any other host. They are left out of the public OpenAPI document and the docs.
-2. **Its own accounts.** <Brand> gets its own account space: a dedicated store row owned by a dedicated operator account (the customer code already scopes accounts per store), so an email at bitocard.com and at <Brand> are two unrelated accounts, with no handoff and no shared cookie (`bc_signed_in` never set). Emails come from <domain> under <Brand>'s name.
-3. **Its own books.** Every ledger account and entry belongs to <Brand>'s operator account, so BitoCard's reports, P&L and reconciliation never include it, and <Brand>'s can be produced alone.
-4. **One central admin platform for every brand** (the owner, 27 October 2026). The admin app stays the single place where Golojan's team runs everything, like multi-domain management: BitoCard and <Brand> (and any later brand) are **brands** in it, each with its own domains, settings, members, books and queues. Nothing about <Brand> is run from a separate console.
-   - **Brands as a first-class idea:** a `brands` table (BitoCard, <Brand>; name, domains, logo, sending address, support email, legal entity), and every brand-owned record (the operator account, its store row, accounts, ledger accounts, settings, notifications) tied to one. BitoCard's existing data is brand `bitocard` by migration.
-   - **A brand switcher** in the admin shell's top bar, kept in the address (`?brand=`): each brand shows only its own sections (BitoCard: stores, resellers, catalogue, orders, Shop; <Brand>: markets, ads, orders and appeals, traders, custody, limits, fees), and a brand-wide overview shows each brand side by side.
-   - **Membership managed centrally:** admins are one team with one sign-in, two-step and step-up, but their roles are **per brand** (`admin_brand_roles`: an admin may be operations on <Brand> and support on BitoCard, or nothing on one of them). Super admins add and remove admins, give and take brand roles, and every change is audited. The API checks the brand role on every admin route (`@AdminRoles(...)` gains the brand), so a BitoCard-only admin can never see a <Brand> trader, and the reverse.
-   - **<Brand>'s members** (its traders) are managed there too: search, profile, identity check, limits, freezes, appeals, sessions and devices, sign-out everywhere, suspension, all audited per brand.
-   - **Settings per brand:** feature switches, integrations (each brand its own email sender, identity provider, chain providers and signer), legal documents and markets, so a <Brand> change never touches BitoCard.
-   - **Where it lives:** admin.bitocard.com for now. If <Brand> must not be seen as part of BitoCard (a separate company), the same admin app can be served on a neutral operator address (for example `admin.golojan.<tld>`) with both brands inside it; its cookies, origins and two-step stay as today.
-5. **Ready to leave.** Nothing in <Brand> reads BitoCard tables except the shared infrastructure above, so it can later move to its own database and service (needed if a separate company or a licence requires it) as a deployment change, not a rewrite.
+1. **Its own front door.** Afrippa's site calls the API at `api.afrippa.com` (a second hostname on the same droplet, its own Cloudflare zone and Caddy site). Crypto routes move under their own prefix (`/v1/afrippa/…`) and answer **only** Afrippa's server: a dedicated shared secret (like `STORE_SERVER_SECRET`, its own `AFRIPPA_SERVER_SECRET`) signs every request, and the routes refuse API keys, reseller and admin BitoCard sessions, store customers and any other host. They are left out of the public OpenAPI document and the docs.
+2. **Its own accounts.** Afrippa gets its own account space: a dedicated store row owned by a dedicated operator account (the customer code already scopes accounts per store), so an email at bitocard.com and at Afrippa are two unrelated accounts, with no handoff and no shared cookie (`bc_signed_in` never set). Emails come from afrippa.com under Afrippa's name.
+3. **Its own books.** Every ledger account and entry belongs to Afrippa's operator account, so BitoCard's reports, P&L and reconciliation never include it, and Afrippa's can be produced alone.
+4. **One central admin platform for every brand** (the owner, 27 October 2026). The admin app stays the single place where Golojan's team runs everything, like multi-domain management: BitoCard and Afrippa (and any later brand) are **brands** in it, each with its own domains, settings, members, books and queues. Nothing about Afrippa is run from a separate console.
+   - **Brands as a first-class idea:** a `brands` table (BitoCard, Afrippa; name, domains, logo, sending address, support email, legal entity), and every brand-owned record (the operator account, its store row, accounts, ledger accounts, settings, notifications) tied to one. BitoCard's existing data is brand `bitocard` by migration.
+   - **A brand switcher** in the admin shell's top bar, kept in the address (`?brand=`): each brand shows only its own sections (BitoCard: stores, resellers, catalogue, orders, Shop; Afrippa: markets, ads, orders and appeals, traders, custody, limits, fees), and a brand-wide overview shows each brand side by side.
+   - **Membership managed centrally:** admins are one team with one sign-in, two-step and step-up, but their roles are **per brand** (`admin_brand_roles`: an admin may be operations on Afrippa and support on BitoCard, or nothing on one of them). Super admins add and remove admins, give and take brand roles, and every change is audited. The API checks the brand role on every admin route (`@AdminRoles(...)` gains the brand), so a BitoCard-only admin can never see a Afrippa trader, and the reverse.
+   - **Afrippa's members** (its traders) are managed there too: search, profile, identity check, limits, freezes, appeals, sessions and devices, sign-out everywhere, suspension, all audited per brand.
+   - **Settings per brand:** feature switches, integrations (each brand its own email sender, identity provider, chain providers and signer), legal documents and markets, so a Afrippa change never touches BitoCard.
+   - **Where it lives:** admin.bitocard.com for now. If Afrippa must not be seen as part of BitoCard (a separate company), the same admin app can be served on a neutral operator address (for example `admin.golojan.<tld>`) with both brands inside it; its cookies, origins and two-step stay as today.
+5. **Ready to leave.** Nothing in Afrippa reads BitoCard tables except the shared infrastructure above, so it can later move to its own database and service (needed if a separate company or a licence requires it) as a deployment change, not a rewrite.
 
 ## The escrow P2P engine (new)
 
@@ -104,10 +104,10 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 ## Steps
 
 ### 0. Owner inputs
-1. The brand, the domain, and its Cloudflare zone.
+1. ~~The brand~~ Afrippa. Register afrippa.com (and any defensive names), then its Cloudflare zone.
 2. **The operating entity:** a separate company is recommended (it is the data controller and, where needed, the licensed virtual asset service provider), not Golojan's BitoCard entities.
 3. **Licensing:** custodial wallets and an escrowed P2P market are virtual asset services in Nigeria (SEC), Ghana and Kenya (VASP Act 2025); take advice per market before going live.
-4. **Identity checks:** Didit (independent of BitoCard) or BitoCard Verify white-labelled on <domain>.
+4. **Identity checks:** Didit (independent of BitoCard) or BitoCard Verify white-labelled on afrippa.com.
 5. The first markets, coins and fee rates.
 6. **Spin and win:** end it, or pay its rewards as BitoCard store credit.
 
@@ -117,20 +117,20 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 3. **Storefront:** the Crypto tab, the header's Crypto link and drawer tile, the Wallet tab's Crypto wallet and crypto activity, Quick buy or sell, the exchange page, the hand-over to crypto.bitocard.com, and the store sections (`crypto_quote`, `p2p_market`) go. The cash-out page moves to the Shop tab for Safe pay sellers first.
 4. **SHQ:** the Exchange section (trade with BitoCard, coins, desk, trades) goes; the plan features `onchain_crypto` and `reseller_desks` are removed (a migration takes them off every plan); the `crypto_desk` template goes (no store uses it live).
 5. **Spin and win:** as decided in step 0.
-6. **Legal documents:** the crypto, P2P and spin sections leave BitoCard's terms of use, reseller terms and privacy notice (`legalUpdated` bumped); <Brand> gets its own documents on <domain>.
+6. **Legal documents:** the crypto, P2P and spin sections leave BitoCard's terms of use, reseller terms and privacy notice (`legalUpdated` bumped); Afrippa gets its own documents on afrippa.com.
 7. **Data:** confirm there are no live crypto balances, ads or withdrawals (crypto was never switched on live). If any exist, the holders are told and can withdraw on chain for a set period; sandbox data is archived.
 8. `crypto.bitocard.com` is never created: drop the plan's Vercel and DNS steps and remove `crypto` from the handoff targets and `isHouseOrigin`.
 9. Docs: `AGENTS.md`, `PLANS.md` and this plan updated; the old plan marked superseded.
 
-### 2. <Brand>'s own surface in the API
+### 2. Afrippa's own surface in the API
 1. Brands in the API: the `brands` table, BitoCard's data tagged `bitocard` by migration, per-brand admin roles (`admin_brand_roles`) checked on every admin route, super admins managing admins and their brand roles in the admin app, the brand switcher.
 2. **The instruments made brand-aware** (see Instruments lifted): chats, disputes, standing, reminders, tickets and live chat, AI assistants and their knowledge, moderation and refused words, terms by version, identity checks, two-step, notifications and email senders, files and reports carry the brand, each brand's settings and queues apart, and the central admin filtering every one of them by brand.
-3. The operator account and <Brand>'s store row, tied to its brand; `<BRAND>_URL` and `<BRAND>_SERVER_SECRET`.
-4. The crypto routes under their own prefix, signed by <Brand>'s server only, left out of OpenAPI.
-5. <Brand>'s accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from <domain>.
+3. The operator account and Afrippa's store row, tied to its brand; `AFRIPPA_URL` and `AFRIPPA_SERVER_SECRET`.
+4. The crypto routes under their own prefix, signed by Afrippa's server only, left out of OpenAPI.
+5. Afrippa's accounts: sign-up, sign-in, email confirmation, password reset, two-step sign-in (recommended for every trader), sessions, emails from afrippa.com.
 6. The identity check chosen in step 0.
 7. Ledger accounts and reports under the operator account.
-8. Tests on PGlite and Docker: no BitoCard caller can reach any <Brand> route, and no <Brand> caller any BitoCard route.
+8. Tests on PGlite and Docker: no BitoCard caller can reach any Afrippa route, and no Afrippa caller any BitoCard route.
 
 ### 3. The escrow engine
 1. Payment methods (saved, encrypted, name-checked).
@@ -142,27 +142,27 @@ Retired code is switched off and closed first (step 1), then removed once <Brand
 7. The fraud controls above.
 8. Retire the fiat code paths (instant fiat trades, buy-ad fiat locks, P2P money, exchange desks and reserves), then drop their tables once empty or archived.
 
-### 4. The <Brand> site
+### 4. The Afrippa site
 1. Rename `apps/crypto` and `@bitocard/crypto-ui` to the brand; its own Vercel project, domain, brand assets, manifest and icons.
 2. Pages: markets and ads (as built), sign-up and sign-in, the order room, wallets with deposit and withdraw (as built), payment methods, profile and trader page, appeals, notifications, help (tickets and live chat) and the assistant.
 3. SEO from day one (as built: market and trader pages indexed).
-4. <Brand> in the central admin platform (see Architecture 4): the brand switcher, per-brand admin roles, and <Brand>'s sections: orders and appeals queue, traders (members), ads, deposits and withdrawals, custody, limits, fees, markets.
+4. Afrippa in the central admin platform (see Architecture 4): the brand switcher, per-brand admin roles, and Afrippa's sections: orders and appeals queue, traders (members), ads, deposits and withdrawals, custody, limits, fees, markets.
 
 ### 5. Hardening
 1. A security review of escrow, release and appeals.
-2. The legal documents on <domain> (terms, privacy, P2P rules, fees, risk warnings), reviewed by lawyers per market.
+2. The legal documents on afrippa.com (terms, privacy, P2P rules, fees, risk warnings), reviewed by lawyers per market.
 3. Browser checks at phone width; the operations runbook for appeals.
 
 ### 6. Pilot
 Nigeria, Ghana and Kenya with low limits, stablecoins first, then other coins and markets as operations prove trustworthy.
 
 ### 7. Later
-Move <Brand> to its own database and service when the entity or a licence requires it.
+Move Afrippa to its own database and service when the entity or a licence requires it.
 
 ## Questions for the owner
 
-1. Will <Brand> be operated by a separate company? (Recommended.) If so, should the central admin platform move to a neutral operator address rather than admin.bitocard.com?
-2. Didit, or BitoCard Verify under the <Brand> name?
+1. Will Afrippa be operated by a separate company? (Recommended.) If so, should the central admin platform move to a neutral operator address rather than admin.bitocard.com?
+2. Didit, or BitoCard Verify under the Afrippa name?
 3. Spin and win: end it, or pay its rewards as store credit?
 4. Keep a global US dollar market (traders paying through Wise, Payoneer or PayPal between themselves), or country markets only at first?
 5. Which coins at launch: stablecoins only (USDT, USDC), or all nine?
