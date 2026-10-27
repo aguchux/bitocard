@@ -7,6 +7,9 @@ import type { MarketChoice } from "@bitocard/crypto-ui/market";
 
 const customerApi = vi.fn();
 vi.mock("@/lib/customer", () => ({ customerApi: (...args: unknown[]) => customerApi(...args) }));
+/** Whether this store hands its Crypto tab to BitoCard Crypto (off unless a test says so). */
+let cryptoSiteOn = false;
+vi.mock("@/lib/crypto-site", async importOriginal => ({ ...(await importOriginal<typeof import("@/lib/crypto-site")>()), cryptoSite: async () => cryptoSiteOn }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);
@@ -237,6 +240,18 @@ describe("the Crypto tab opens on the market", () => {
     );
     await MarketPage({ searchParams: Promise.resolve({}) });
     expect(customerApi).toHaveBeenCalledWith("GET", "/v1/store/p2p/market?market=WW&asset=USDT&side=buy&currency=USD");
+  });
+
+  test("on BitoCard's own stores, while BitoCard Crypto is live, the tab hands the customer over to it, signed in", async () => {
+    cryptoSiteOn = true;
+    try {
+      await expect(MarketPage({ searchParams: Promise.resolve({ market: "GH" }) })).rejects.toThrow("redirect:/handoff/go?to=http%3A%2F%2Flocalhost%3A3008&next=%2Fgh");
+      await expect(MarketPage({ searchParams: Promise.resolve({ market: "WW" }) })).rejects.toThrow("redirect:/handoff/go?to=http%3A%2F%2Flocalhost%3A3008&next=%2F");
+      await expect(MarketPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("next=%2F");
+      expect(customerApi).not.toHaveBeenCalled();
+    } finally {
+      cryptoSiteOn = false;
+    }
   });
 
   test("the old Market address goes to the tab with its filters", async () => {

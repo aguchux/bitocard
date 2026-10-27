@@ -7,6 +7,7 @@ import { card, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/cr
 import { PostAdLauncher } from "@/components/app/p2p-dialogs";
 import { MarketAds, MarketFilters } from "@/components/app/p2p-market";
 import { customerApi } from "@/lib/customer";
+import { cryptoSite, cryptoSiteHref } from "@/lib/crypto-site";
 import { marketHref, marketQuery, marketState, shownAds, type MarketChoice } from "@/lib/p2p-market";
 
 export const metadata: Metadata = { title: "P2P market" };
@@ -22,6 +23,8 @@ type Search = Record<string, string | string[] | undefined>;
  */
 export default async function MarketPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
+  // BitoCard's own stores send their Crypto tab to BitoCard Crypto while it is live (resellers' stores never do).
+  if (await cryptoSite()) redirect(cryptoSiteHref(params));
   const [overview, open] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"), customerApi<StoreList<StoreP2pMarket>>("GET", "/v1/store/p2p/markets")]);
   const wallets = overview.ok ? overview.data : null;
   // P2P open nowhere for the customer (neither their own market nor the global one): the tab opens on their wallets.
