@@ -50,7 +50,10 @@ export class IntegrationsAdminService {
   async list() {
     await this.integrations.refresh(true);
     const access = await this.resellerAccess();
-    return { object: 'list' as const, data: integrationGroups.map(group => this.presentGroup(group, access)) };
+    // The blockchain integrations (wallet keys, chain providers, the signer, screening, prices) are Afrippa's now, not
+    // BitoCard's (docs/CRYPTO_SPINOFF_PLAN.md): listed only while crypto's routes are open (tests, local development).
+    const groups = this.integrations.env.CRYPTO_ROUTES === 'open' ? integrationGroups : integrationGroups.filter(group => group.section !== 'blockchain');
+    return { object: 'list' as const, data: groups.map(group => this.presentGroup(group, access)) };
   }
 
   /**

@@ -13,7 +13,6 @@ export const sections: NavItem[] = [
   { key: 'verifications', label: 'Identity', href: '/verifications', icon: ShieldCheck },
   { key: 'activity', label: 'Activity', href: '/activity', icon: History },
   { key: 'storefront', label: 'Storefront', href: '/storefront', icon: LayoutGrid },
-  { key: 'crypto', label: 'Crypto', href: '/crypto', icon: Coins },
   { key: 'classifieds', label: 'Shop', href: '/classifieds', icon: Store },
   { key: 'reports', label: 'Reports', href: '/reports', icon: TrendingUp },
   { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy },

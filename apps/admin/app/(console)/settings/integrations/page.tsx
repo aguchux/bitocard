@@ -354,7 +354,6 @@ export default function IntegrationsPage() {
             items={[
               { value: "platform", label: "Platform", count: data.data.filter(item => item.section === "platform").length },
               { value: "suppliers", label: "Suppliers", count: data.data.filter(item => item.section === "suppliers").length },
-              { value: "blockchain", label: "Blockchain", count: data.data.filter(item => item.section === "blockchain").length },
               { value: "resellers", label: "Reseller access", count: data.data.filter(item => item.reseller_access.enabled).length },
             ]}
           />

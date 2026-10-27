@@ -2,11 +2,10 @@
 
 import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftRight, CreditCard, KeyRound, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
+import { CreditCard, KeyRound, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
 import { Card, categoryName, PanelNav, SettingsPanel, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
-import { ExchangeLimits } from "./exchange-limits";
 import { IdentityProvider } from "./identity-provider";
 import { SmsProvider } from "./sms-provider";
 import { PaymentMethods } from "./payment-methods";
@@ -27,7 +26,6 @@ const panels = [
   { id: "phone", label: "Phone verification", icon: Smartphone },
   { id: "payments", label: "Payment methods", icon: CreditCard },
   { id: "tax", label: "Tax", icon: Receipt },
-  { id: "exchange", label: "Exchange", icon: ArrowLeftRight },
   { id: "two-step", label: "Two-step sign-in", icon: KeyRound },
 ];
 
@@ -191,17 +189,6 @@ function Markets() {
           </SettingsPanel>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <SettingsPanel id="exchange" icon={ArrowLeftRight} title="Exchange" description="Limits for reseller desks and BitoCard's money reserve here.">
-              <ExchangeLimits
-                key={`${country.code}:${country.exchange_markup_cap_bps ?? ""}:${country.exchange_reserve_alert_minor ?? ""}`}
-                code={country.code}
-                country={country.name}
-                currency={country.currency}
-                capBps={country.exchange_markup_cap_bps}
-                alertMinor={country.exchange_reserve_alert_minor}
-                editable={editable}
-              />
-            </SettingsPanel>
             <SettingsPanel id="two-step" icon={KeyRound} title="Two-step sign-in" description={`Whether resellers in ${country.name} must use it in SHQ, and how.`}>
               <TwoStepSignIn key={country.code} code={country.code} country={country.name} allowed={country.reseller_two_step_methods} smsProvider={country.sms_provider ?? null} editable={editable} />
             </SettingsPanel>

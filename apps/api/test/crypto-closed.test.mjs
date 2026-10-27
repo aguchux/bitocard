@@ -3,7 +3,7 @@
 // use stays at /v1/store/cash. Production refuses to open them.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 const { loadConfig } = await import('../dist/config/config.js');
 const { closedCryptoRoutes } = await import('../dist/crypto/closed.guard.js');
@@ -78,6 +78,13 @@ describe('crypto is closed to BitoCard', () => {
     for (const path of ['/v1/store/crypto', '/v1/store/crypto/cash', '/v1/store/p2p/ads', '/v1/store/exchange/quotes', '/v1/crypto', '/v1/crypto/markets', '/v1/exchange/desk']) {
       assert.equal(closedCryptoRoutes.test(path), true, path);
     }
+  });
+
+  test("BitoCard's admins no longer see the blockchain integrations (they are Afrippa's)", async () => {
+    const admin = await adminClient(server);
+    const list = (await admin.get('/v1/admin/integrations')).json.data;
+    assert.equal(list.some(item => item.section === 'blockchain'), false);
+    assert.ok(list.some(item => item.section === 'platform'));
   });
 
   test('production refuses to open them', () => {
