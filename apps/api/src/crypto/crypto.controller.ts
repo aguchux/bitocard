@@ -214,7 +214,7 @@ export class DepositAddressDto extends DepositNetworksDto {
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
-@Controller('store/crypto')
+@Controller('afrippa/crypto')
 export class CustomerCryptoController {
   constructor(
     private readonly wallets: CryptoWalletsService,
@@ -316,7 +316,7 @@ export class CodeDto {
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
-@Controller('store/crypto')
+@Controller('afrippa/crypto')
 export class CustomerWithdrawalsController {
   constructor(private readonly withdrawals: CryptoWithdrawalsService) {}
 
@@ -399,12 +399,12 @@ class SimulatePayoutDto {
 
 /**
  * A store customer's withdrawable money (BitoCard Shop's Safe pay sales; P2P money before crypto left) paid out to their
- * own bank account. `/v1/store/cash`; the old `/v1/store/crypto/cash` is closed with the rest of crypto.
+ * own bank account, at `/v1/store/cash`. BitoCard's, not Afrippa's: Afrippa never pays out fiat.
  */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
-@Controller(['store/cash', 'store/crypto/cash'])
+@Controller('store/cash')
 export class CustomerCashController {
   constructor(
     private readonly wallets: CryptoWalletsService,
@@ -459,12 +459,12 @@ export class CustomerCashController {
 }
 
 /**
- * BitoCard Crypto's public pages (crypto.bitocard.com): the markets, each market's ads and traders' cards, with no
- * sign-in and cached for a minute. Nicknames only, never customers.
+ * Afrippa's public pages: the markets, each market's ads and traders' cards (`/v1/afrippa/markets`,
+ * `/v1/afrippa/traders`), with no sign-in and cached for a minute. Nicknames only, never customers.
  */
 @ApiExcludeController()
 @Public()
-@Controller('crypto')
+@Controller('afrippa')
 export class PublicCryptoController {
   constructor(private readonly p2p: P2pService) {}
 
@@ -493,7 +493,7 @@ export class PublicCryptoController {
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
-@Controller('store/p2p')
+@Controller('afrippa/p2p')
 export class CustomerP2pController {
   constructor(private readonly p2p: P2pService) {}
 
@@ -671,7 +671,7 @@ class AdminListDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
-@Controller('admin/crypto')
+@Controller('afrippa/admin/crypto')
 export class AdminCryptoController {
   constructor(
     private readonly wallets: CryptoWalletsService,
@@ -755,7 +755,7 @@ export class AdminCryptoController {
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
-@Controller('admin/p2p')
+@Controller('afrippa/admin/p2p')
 export class AdminP2pController {
   constructor(private readonly p2p: P2pService) {}
 
@@ -831,7 +831,7 @@ class DepositListDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
-@Controller('admin/crypto')
+@Controller('afrippa/admin/crypto')
 export class AdminChainsController {
   constructor(private readonly deposits: CryptoDepositsService) {}
 
@@ -893,7 +893,7 @@ class WithdrawalListDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
-@Controller('admin/crypto/withdrawals')
+@Controller('afrippa/admin/crypto/withdrawals')
 export class AdminWithdrawalsController {
   constructor(private readonly withdrawals: CryptoWithdrawalsService) {}
 
@@ -935,7 +935,7 @@ class ModeDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance')
-@Controller('admin/crypto/reconciliations')
+@Controller('afrippa/admin/crypto/reconciliations')
 export class AdminReconciliationsController {
   constructor(private readonly reconciliation: CryptoReconciliationService) {}
 
@@ -980,7 +980,7 @@ export class AdminCustomerPayoutsController {
 @ApiExcludeController()
 @Public()
 @SkipIdempotency()
-@Controller('webhooks/chain')
+@Controller('afrippa/webhooks/chain')
 export class ChainWebhooksController {
   constructor(private readonly deposits: CryptoDepositsService) {}
 

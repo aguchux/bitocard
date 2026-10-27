@@ -648,7 +648,7 @@ export const integrationGroups: IntegrationGroup[] = [
     description: provider.description,
     section: 'blockchain' as const,
     adapterReady: true,
-    webhookPath: provider.verify ? `/v1/webhooks/chain/${provider.id}?chain=<CHAIN>` : undefined,
+    webhookPath: provider.verify ? `/v1/afrippa/webhooks/chain/${provider.id}?chain=<CHAIN>` : undefined,
     fields: provider.fields,
   })),
   {

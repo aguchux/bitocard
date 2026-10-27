@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Trades", robots: { index: false, fol
 /** The customer's trades, in every market, newest first. */
 export default async function TradesPage() {
   await requireCustomer("/trades");
-  const result = await customerApi<StoreList<StoreP2pTrade>>("GET", "/v1/store/p2p/trades?limit=50");
+  const result = await customerApi<StoreList<StoreP2pTrade>>("GET", "/v1/afrippa/p2p/trades?limit=50");
   const trades = result.ok ? result.data.data : [];
   return (
     <AccountShell title="Trades" current="/trades">

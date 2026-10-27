@@ -121,7 +121,7 @@ async function customer() {
 }
 
 const network = async (asset, chainName) => prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset, chain: chainName } } });
-const balance = async (shopper, asset) => (await shopper.get('/v1/store/crypto')).json.assets.find(item => item.asset === asset).available;
+const balance = async (shopper, asset) => (await shopper.get('/v1/afrippa/crypto')).json.assets.find(item => item.asset === asset).available;
 
 describe('blockchain providers in Settings > Integrations', () => {
   test('every provider and the wallet keys have a card in the Blockchain section, with links; keys are checked', async () => {
@@ -131,7 +131,7 @@ describe('blockchain providers in Settings > Integrations', () => {
       ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'litecoinspace', 'crypto_signer', 'chainalysis', 'trm', 'crypto_prices'],
     );
     assert.ok(list.filter(item => item.id !== 'crypto_keys').every(item => item.links.length && item.testable && item.sandbox !== true));
-    assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.bitocard.com/v1/webhooks/chain/alchemy?chain=<CHAIN>');
+    assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.bitocard.com/v1/afrippa/webhooks/chain/alchemy?chain=<CHAIN>');
 
     const xprv = testnet.derive("m/44'/60'/0'").privateExtendedKey;
     const refused = await admin.put('/v1/admin/integrations/crypto_keys', { values: { CRYPTO_TEST_XPUB_EVM: xprv }, code: await adminCode(server, admin) });
@@ -163,7 +163,7 @@ describe('deposits', () => {
     await update('mempool', { MEMPOOL_ENABLED: true, MEMPOOL_API_URL: `${chain.url}/btc`, MEMPOOL_SANDBOX: true });
     for (const [asset, chainName, testContract] of [['USDT', 'ETHEREUM', usdtContract], ['USDT', 'BSC', bscUsdt], ['USDT', 'TRON', 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'], ['BTC', 'BITCOIN', null]]) {
       const found = await network(asset, chainName);
-      const changed = await admin.patch(`/v1/admin/crypto/networks/${found.id}`, { deposits_enabled: true, ...(testContract ? { test_contract: testContract } : {}) });
+      const changed = await admin.patch(`/v1/afrippa/admin/crypto/networks/${found.id}`, { deposits_enabled: true, ...(testContract ? { test_contract: testContract } : {}) });
       assert.equal(changed.status, 200, JSON.stringify(changed.json));
     }
   });
@@ -171,44 +171,44 @@ describe('deposits', () => {
   test('each customer gets their own address per family, the same every time; none before keys and providers', async () => {
     const first = await customer();
     const second = await customer();
-    const networks = await first.get('/v1/store/crypto/deposit-networks?asset=USDT');
+    const networks = await first.get('/v1/afrippa/crypto/deposit-networks?asset=USDT');
     assert.deepEqual(networks.json.data.map(item => [item.chain, item.token]), [['BSC', 'BEP-20'], ['ETHEREUM', 'ERC-20'], ['TRON', 'TRC-20']]);
-    const a = await first.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' });
+    const a = await first.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' });
     assert.equal(a.status, 200, JSON.stringify(a.json));
-    const b = await second.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' });
+    const b = await second.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' });
     const indexOf = address => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].find(i => derive.deriveAddress('evm', keys.CRYPTO_TEST_XPUB_EVM, i) === address);
     assert.ok(indexOf(a.json.address) !== undefined && indexOf(b.json.address) === indexOf(a.json.address) + 1, 'consecutive indexes from the xpub');
-    assert.equal((await first.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address, a.json.address, 'one EVM address for Ethereum and BNB Chain');
-    assert.equal((await first.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address, a.json.address, 'the same every time');
+    assert.equal((await first.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address, a.json.address, 'one EVM address for Ethereum and BNB Chain');
+    assert.equal((await first.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address, a.json.address, 'the same every time');
     assert.deepEqual([a.json.contract, a.json.confirmations, a.json.mode], [usdtContract, 12, 'test']);
-    const btc = await first.post('/v1/store/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' });
+    const btc = await first.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' });
     assert.match(btc.json.address, /^tb1q/);
-    const usdc = await first.post('/v1/store/crypto/deposit-addresses', { asset: 'USDC', chain: 'SOLANA' });
+    const usdc = await first.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDC', chain: 'SOLANA' });
     assert.deepEqual([usdc.status, usdc.json.error.code], [409, 'deposits_unavailable']);
   });
 
   test('Polygon, Arbitrum, Base and Optimism give the customer the same EVM address as Ethereum', async () => {
     await update('getblock', { GETBLOCK_POLYGON_URL: `${chain.url}/evm2` });
     const usdc = await network('USDC', 'POLYGON');
-    assert.equal((await admin.patch(`/v1/admin/crypto/networks/${usdc.id}`, { deposits_enabled: true })).status, 200);
+    assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdc.id}`, { deposits_enabled: true })).status, 200);
     try {
       const shopper = await customer();
-      const networks = (await shopper.get('/v1/store/crypto/deposit-networks?asset=USDC')).json.data;
+      const networks = (await shopper.get('/v1/afrippa/crypto/deposit-networks?asset=USDC')).json.data;
       assert.deepEqual(networks.find(item => item.chain === 'POLYGON'), { object: 'crypto_network', asset: 'USDC', chain: 'POLYGON', name: 'Polygon', token: 'ERC-20', confirmations: 256 });
-      const polygon = await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDC', chain: 'POLYGON' });
+      const polygon = await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDC', chain: 'POLYGON' });
       assert.equal(polygon.status, 200, JSON.stringify(polygon.json));
-      assert.equal(polygon.json.address, (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address, 'one EVM address');
+      assert.equal(polygon.json.address, (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address, 'one EVM address');
       assert.equal(polygon.json.contract, usdc.testContract, 'the test network token in the sandbox');
       // Arbitrum is switched off: not offered.
-      assert.equal((await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDC', chain: 'ARBITRUM' })).json.error.code, 'deposits_unavailable');
+      assert.equal((await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDC', chain: 'ARBITRUM' })).json.error.code, 'deposits_unavailable');
     } finally {
-      await admin.patch(`/v1/admin/crypto/networks/${usdc.id}`, { deposits_enabled: false });
+      await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdc.id}`, { deposits_enabled: false });
     }
   });
 
   test('a token deposit is found by scanning, credited only after its confirmations, and only once', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     chain.state.latest = 300n;
     evmTransfer(chain.state, { hash: txHash(1), to: address, raw: 25_500_000n, block: 295n });
     // A fake token with the same symbol on another contract is never credited.
@@ -224,7 +224,7 @@ describe('deposits', () => {
     assert.equal(await balance(shopper, 'USDT'), '25.500000');
     await cron('crypto');
     assert.equal(await balance(shopper, 'USDT'), '25.500000', 'credited once');
-    const deposits = (await shopper.get('/v1/store/crypto/deposits')).json.data;
+    const deposits = (await shopper.get('/v1/afrippa/crypto/deposits')).json.data;
     assert.deepEqual(deposits.map(item => [item.status, item.amount, item.network]), [['credited', '25.500000', 'Ethereum']]);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.crypto.deposit_credited' } }));
     await ledgerOk();
@@ -232,7 +232,7 @@ describe('deposits', () => {
 
   test('a provider that fails is passed over for the next; its error shows on the route', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address;
     chain.state.down.add('/evm1');
     try {
       evmTransfer(chain.state, { hash: txHash(3), to: address, raw: 1_500_000_000_000_000_000n, block: 320n, contract: bscUsdt });
@@ -240,7 +240,7 @@ describe('deposits', () => {
       await cron('crypto');
       await cron('crypto');
       assert.equal(await balance(shopper, 'USDT'), '1.500000', 'BEP-20 USDT has 18 places on chain, 6 in the wallet');
-      const chains = (await admin.get('/v1/admin/crypto/chains')).json.data;
+      const chains = (await admin.get('/v1/afrippa/admin/crypto/chains')).json.data;
       const ethereum = chains.find(item => item.chain === 'ETHEREUM');
       assert.match(ethereum.routes.find(item => item.provider === 'quicknode').last_error, /HTTP 503/);
       assert.deepEqual(ethereum.keys, { live: false, test: true });
@@ -251,11 +251,11 @@ describe('deposits', () => {
 
   test('large deposits wait for a second provider to agree; admins reorder and switch providers', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     const usdt = await network('USDT', 'ETHEREUM');
-    assert.equal((await admin.patch(`/v1/admin/crypto/networks/${usdt.id}`, { double_check_from: '1000' })).status, 200);
+    assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { double_check_from: '1000' })).status, 200);
     // Only GetBlock serves Ethereum for now.
-    assert.equal((await admin.put('/v1/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock'], disabled: ['quicknode'] })).status, 200);
+    assert.equal((await admin.put('/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock'], disabled: ['quicknode'] })).status, 200);
     evmTransfer(chain.state, { hash: txHash(4), to: address, raw: 1_200_000_000n, block: 345n });
     chain.state.latest = 360n;
     await cron('crypto');
@@ -266,7 +266,7 @@ describe('deposits', () => {
     assert.ok(told.length, 'operations are told a large deposit has no second provider');
     await cron('crypto');
     assert.equal(await prisma.notification.count({ where: { dedupeKey: `admin.crypto.deposit_stuck:double_check:${waiting.id}` } }), told.length, 'once');
-    assert.equal((await admin.put('/v1/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock', 'quicknode'], disabled: [] })).status, 200);
+    assert.equal((await admin.put('/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock', 'quicknode'], disabled: [] })).status, 200);
     await cron('crypto');
     const done = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
     assert.deepEqual([done.status, done.confirmedBy.sort()], ['credited', ['getblock', 'quicknode']]);
@@ -277,7 +277,7 @@ describe('deposits', () => {
 
   test('a webhook only names transactions: a bad signature is refused, a body is kept once, each transaction is re-read (TRON)', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'TRON' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'TRON' })).json.address;
     assert.match(address, /^T/);
     const hash = 'b'.repeat(64);
     chain.state.tron.set(hash, {
@@ -288,9 +288,9 @@ describe('deposits', () => {
     });
     const body = JSON.stringify({ matchedTransactions: [{ txid: hash, amount: '999999' }] });
     const sign = (nonce, timestamp) => createHmac('sha256', 'qn-secret-value-1234').update(`${nonce}${timestamp}${body}`).digest('hex');
-    const post = headers => fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=TRON`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body });
+    const post = headers => fetch(`${server.base}/v1/afrippa/webhooks/chain/quicknode?chain=TRON`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body });
     assert.equal((await post({ 'x-qn-nonce': 'n1', 'x-qn-timestamp': '1', 'x-qn-signature': 'wrong' })).status, 401);
-    assert.equal((await fetch(`${server.base}/v1/webhooks/chain/infura?chain=TRON`, { method: 'POST', body })).status, 401, 'providers without webhooks refuse');
+    assert.equal((await fetch(`${server.base}/v1/afrippa/webhooks/chain/infura?chain=TRON`, { method: 'POST', body })).status, 401, 'providers without webhooks refuse');
     const headers = { 'x-qn-nonce': 'n1', 'x-qn-timestamp': '1', 'x-qn-signature': sign('n1', '1') };
     assert.equal((await post(headers)).status, 200);
     assert.equal((await post(headers)).status, 200);
@@ -305,7 +305,7 @@ describe('deposits', () => {
 
   test('Bitcoin deposits are found by address history and credited after 2 confirmations', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' })).json.address;
     const id = 'c'.repeat(64);
     chain.state.btc.set(id, { txid: id, status: { confirmed: true, block_height: 800 }, vout: [{ scriptpubkey_address: 'tb1qsomeoneelse', value: 5000 }, { scriptpubkey_address: address, value: 123_456 }] });
     await cron('crypto');
@@ -315,7 +315,7 @@ describe('deposits', () => {
     assert.equal(await balance(shopper, 'BTC'), '0.00123456');
     const row = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
     assert.equal(row.outputIndex, 1);
-    const listed = (await admin.get(`/v1/admin/crypto/deposits?customer_id=${shopper.id}`)).json.data;
+    const listed = (await admin.get(`/v1/afrippa/admin/crypto/deposits?customer_id=${shopper.id}`)).json.data;
     assert.deepEqual(listed.map(item => [item.status, item.amount, item.confirmed_by]), [['credited', '0.00123456', ['mempool']]]);
     await ledgerOk();
   });
@@ -323,7 +323,7 @@ describe('deposits', () => {
   test('the health job records each provider’s latest block', async () => {
     const result = await cron('chain-health');
     assert.ok(result.result.results.some(item => item.provider === 'getblock' && item.ok));
-    const bitcoin = (await admin.get('/v1/admin/crypto/chains')).json.data.find(item => item.chain === 'BITCOIN');
+    const bitcoin = (await admin.get('/v1/afrippa/admin/crypto/chains')).json.data.find(item => item.chain === 'BITCOIN');
     const mempool = bitcoin.routes.find(item => item.provider === 'mempool');
     assert.deepEqual([mempool.configured, mempool.environment, mempool.last_block, mempool.lists_deposits], [true, 'sandbox', '801', true]);
   });
@@ -332,19 +332,19 @@ describe('deposits', () => {
 describe('deposits are never silently missed', () => {
   test('a chain whose providers cannot list a kind of deposit says so instead of reporting nothing', async () => {
     const eth = await network('ETH', 'ETHEREUM');
-    assert.equal((await admin.patch(`/v1/admin/crypto/networks/${eth.id}`, { deposits_enabled: true })).status, 200);
+    assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${eth.id}`, { deposits_enabled: true })).status, 200);
     try {
       const run = await cron('crypto');
       assert.deepEqual(run.result.deposits['test:ETHEREUM'].notes, ['coin deposits: webhooks only (no provider here lists them)'], 'only Alchemy lists plain ETH deposits');
       assert.equal(run.result.deposits['test:TRON'].skipped, 'no provider lists token deposits (webhooks only)', 'only TronGrid lists TRON token deposits');
     } finally {
-      await admin.patch(`/v1/admin/crypto/networks/${eth.id}`, { deposits_enabled: false });
+      await admin.patch(`/v1/afrippa/admin/crypto/networks/${eth.id}`, { deposits_enabled: false });
     }
   });
 
   test('a deposit is failed only when no provider shows it for hours, and comes back when the chain shows it again', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     chain.state.latest += 5n;
     const block = chain.state.latest - 3n;
     evmTransfer(chain.state, { hash: txHash(7), to: address, raw: 3_000_000n, block });
@@ -366,7 +366,7 @@ describe('deposits are never silently missed', () => {
     assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'failed');
     chain.state.txs.set(txHash(7), saved);
     chain.state.latest += 20n;
-    const rechecked = await admin.post(`/v1/admin/crypto/deposits/${row.id}/recheck`);
+    const rechecked = await admin.post(`/v1/afrippa/admin/crypto/deposits/${row.id}/recheck`);
     assert.deepEqual([rechecked.status, rechecked.json.status], [200, 'credited']);
     assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).missingSince, null, 'seen again: no longer missing');
     assert.equal(await balance(shopper, 'USDT'), '3.000000');
@@ -376,8 +376,8 @@ describe('deposits are never silently missed', () => {
 
   test('an address is the customer’s for good: deposits long after it was last shown are still found', async () => {
     const shopper = await customer();
-    const evm = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
-    const btc = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' })).json.address;
+    const evm = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const btc = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' })).json.address;
     await prisma.cryptoAddress.updateMany({ where: { customerId: shopper.id }, data: { watchUntil: new Date(Date.now() - 30 * 86_400_000) } });
     chain.state.latest += 10n;
     evmTransfer(chain.state, { hash: txHash(9), to: evm, raw: 2_000_000n, block: chain.state.latest - 5n });
@@ -394,7 +394,7 @@ describe('deposits are never silently missed', () => {
 
   test('a webhook that came while every provider was down is processed by the next run', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     // Out of the watch window, so only the webhook can find it.
     await prisma.cryptoAddress.updateMany({ where: { customerId: shopper.id }, data: { watchUntil: new Date(Date.now() - 1000) } });
     const hash = txHash(8);
@@ -404,7 +404,7 @@ describe('deposits are never silently missed', () => {
     chain.state.down.add('/evm1');
     chain.state.down.add('/evm2');
     try {
-      const res = await fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n8', 'x-qn-timestamp': 't8', 'x-qn-signature': signature }, body });
+      const res = await fetch(`${server.base}/v1/afrippa/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n8', 'x-qn-timestamp': 't8', 'x-qn-signature': signature }, body });
       assert.equal(res.status, 200);
       let notice = null;
       for (let i = 0; i < 20 && !(notice = await prisma.chainNotice.findFirst({ where: { hashes: { has: hash }, attempts: { gt: 0 } } })); i += 1) await new Promise(resolve => setTimeout(resolve, 100));
@@ -421,7 +421,7 @@ describe('deposits are never silently missed', () => {
 
   test('a transfer a scan lists but no provider shows yet is kept and recorded later; the cursor still moves', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     const hash = txHash(11);
     chain.state.latest += 5n;
     evmTransfer(chain.state, { hash, to: address, raw: 6_000_000n, block: chain.state.latest - 3n });
@@ -442,14 +442,14 @@ describe('deposits are never silently missed', () => {
 
   test('a webhook naming a transaction no provider shows yet is kept for the next run, not dropped', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     await prisma.cryptoAddress.updateMany({ where: { customerId: shopper.id }, data: { watchUntil: new Date(Date.now() - 1000) } });
     const hash = txHash(12);
     evmTransfer(chain.state, { hash, to: address, raw: 1_000_000n, block: chain.state.latest - 1n });
     chain.state.hidden.add(hash);
     const body = JSON.stringify({ matchedTransactions: [{ hash }] });
     const signature = createHmac('sha256', 'qn-secret-value-1234').update(`n12t12${body}`).digest('hex');
-    const res = await fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n12', 'x-qn-timestamp': 't12', 'x-qn-signature': signature }, body });
+    const res = await fetch(`${server.base}/v1/afrippa/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n12', 'x-qn-timestamp': 't12', 'x-qn-signature': signature }, body });
     assert.equal(res.status, 200);
     let notice = null;
     for (let i = 0; i < 20 && !(notice = await prisma.chainNotice.findFirst({ where: { provider: 'quicknode', hashes: { has: hash }, attempts: { gt: 0 } } })); i += 1) await new Promise(resolve => setTimeout(resolve, 100));
@@ -466,7 +466,7 @@ describe('deposits are never silently missed', () => {
     assert.deepEqual(hashesIn(`{"a":"0x${'AB'.repeat(32)}","b":"0x${'ab'.repeat(32)}"}`, 'ETHEREUM'), [`0x${'ab'.repeat(32)}`]);
     assert.deepEqual(hashesIn(`"${'CD'.repeat(32)}"`, 'BITCOIN'), ['cd'.repeat(32)]);
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     const hash = txHash(13);
     chain.state.latest += 5n;
     evmTransfer(chain.state, { hash, to: address, raw: 2_500_000n, block: chain.state.latest - 3n });
@@ -477,7 +477,7 @@ describe('deposits are never silently missed', () => {
     const upper = `0x${hash.slice(2).toUpperCase()}`;
     const body = JSON.stringify({ matchedTransactions: [{ hash: upper }] });
     const signature = createHmac('sha256', 'qn-secret-value-1234').update(`n13t13${body}`).digest('hex');
-    assert.equal((await fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n13', 'x-qn-timestamp': 't13', 'x-qn-signature': signature }, body })).status, 200);
+    assert.equal((await fetch(`${server.base}/v1/afrippa/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n13', 'x-qn-timestamp': 't13', 'x-qn-signature': signature }, body })).status, 200);
     let notice = null;
     for (let i = 0; i < 20 && !(notice = await prisma.chainNotice.findFirst({ where: { provider: 'quicknode', hashes: { has: hash }, processedAt: { not: null } } })); i += 1) await new Promise(resolve => setTimeout(resolve, 100));
     assert.ok(notice, 'the notification is kept with the hash in lower case and processed');
@@ -489,7 +489,7 @@ describe('deposits are never silently missed', () => {
 
   test('a transfer too large for the ledger is ignored, never credited, and never jams the scan', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address;
     chain.state.latest += 5n;
     const block = chain.state.latest - 3n;
     // BEP-20 USDT has 18 places on chain and 6 in the ledger: this is 2^70 ledger units, above a BIGINT.
@@ -507,7 +507,7 @@ describe('deposits are never silently missed', () => {
 
   test('a deposit that cannot move never holds up the others; operations are told when a mode has no provider', async () => {
     const shopper = await customer();
-    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     // 60 old pending sandbox deposits on a chain with no provider: more than one run's batch.
     const old = new Date(Date.now() - 86_400_000);
     await prisma.cryptoDeposit.createMany({
@@ -556,7 +556,7 @@ describe('providers on the wrong network', () => {
     const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
     const deposits = server.app.get(CryptoDepositsService);
     assert.deepEqual((await deposits.routes('ETHEREUM', 'live')).map(route => route.provider.id), [], 'never routed for live deposits');
-    const route = (await admin.get('/v1/admin/crypto/chains')).json.data.find(item => item.chain === 'ETHEREUM').routes.find(item => item.provider === 'chainstack');
+    const route = (await admin.get('/v1/afrippa/admin/crypto/chains')).json.data.find(item => item.chain === 'ETHEREUM').routes.find(item => item.provider === 'chainstack');
     assert.match(route.last_error, /test network/);
 
     // On the main network it serves live stores.

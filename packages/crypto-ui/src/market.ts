@@ -9,7 +9,7 @@ export const globalMarket = "WW";
 export type MarketView = "grid" | "list";
 export type MarketSort = "price" | "trades";
 
-/** A market a customer may trade in (`GET /v1/store/p2p/markets`), or one BitoCard Crypto shows (`GET /v1/crypto/markets`). */
+/** A market a customer may trade in (`GET /v1/afrippa/p2p/markets`), or one BitoCard Crypto shows (`GET /v1/afrippa/markets`). */
 export type MarketChoice = { market: string; name: string; currencies: string[]; home?: boolean };
 
 /** What the market's filters say, read from the address (so every filter is a link or a GET form, and shareable). */

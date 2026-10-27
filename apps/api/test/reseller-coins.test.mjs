@@ -38,8 +38,8 @@ before(async () => {
   await update('crypto_keys', { CRYPTO_TEST_XPUB_EVM: testnet.derive("m/44'/60'/0'").publicExtendedKey });
   await update('getblock', { GETBLOCK_ETHEREUM_URL: `${chain.url}/evm`, GETBLOCK_SANDBOX: true });
   const usdt = await prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: 'USDT', chain: 'ETHEREUM' } } });
-  assert.equal((await admin.patch(`/v1/admin/crypto/networks/${usdt.id}`, { deposits_enabled: true, withdrawals_enabled: true, test_contract: usdtContract, withdrawal_fee: '1.5', min_withdrawal: '5' })).status, 200);
-  assert.equal((await admin.patch('/v1/admin/crypto/assets/USDT', { withdrawal_daily_limit: '500', withdrawal_review_from: '300' })).status, 200);
+  assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { deposits_enabled: true, withdrawals_enabled: true, test_contract: usdtContract, withdrawal_fee: '1.5', min_withdrawal: '5' })).status, 200);
+  assert.equal((await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { withdrawal_daily_limit: '500', withdrawal_review_from: '300' })).status, 200);
 });
 
 after(async () => {
@@ -91,7 +91,7 @@ describe('a reseller’s own coins on chain', () => {
     const held = asset => browser.get('/v1/crypto', headers).then(res => res.json.assets.find(item => item.asset === asset));
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['100.000000', '0.000000']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'crypto.deposit_credited', resellerId } }), 'the reseller is told');
-    const adminDeposit = (await admin.get(`/v1/admin/crypto/deposits?reseller_id=${resellerId}`)).json.data;
+    const adminDeposit = (await admin.get(`/v1/afrippa/admin/crypto/deposits?reseller_id=${resellerId}`)).json.data;
     assert.deepEqual(adminDeposit.map(item => [item.customer, item.reseller?.id]), [[null, resellerId]]);
 
     const added = await browser.post('/v1/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Treasury' }, headers);
@@ -133,7 +133,7 @@ describe('a reseller’s own coins on chain', () => {
     assert.equal(done.status, 'completed', JSON.stringify(done));
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['78.500000', '0.000000']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'crypto.withdrawal_sent', resellerId } }));
-    const listed = (await admin.get(`/v1/admin/crypto/withdrawals?reseller_id=${resellerId}`)).json.data;
+    const listed = (await admin.get(`/v1/afrippa/admin/crypto/withdrawals?reseller_id=${resellerId}`)).json.data;
     assert.deepEqual(listed.map(item => [item.status, item.customer, item.reseller?.id]), [['completed', null, resellerId]]);
     const entries = await prisma.journalEntry.findMany({ where: { reference: { startsWith: `crypto_withdrawal:${asked.json.id}` } }, select: { resellerId: true } });
     assert.ok(entries.length === 2 && entries.every(entry => entry.resellerId === resellerId), 'the entries carry the reseller');

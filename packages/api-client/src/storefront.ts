@@ -509,7 +509,7 @@ export type StoreVpn = {
  */
 export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; enabled: boolean; available: string; locked: string; frozen: string; withdrawing: string; total: string };
 
-/** `GET /v1/store/crypto`: the customer's crypto wallets, their P2P cash (minor units) and what they can do now. */
+/** `GET /v1/afrippa/crypto`: the customer's crypto wallets, their P2P cash (minor units) and what they can do now. */
 export type StoreCryptoWallets = {
   object: 'crypto_wallets';
   mode: 'live' | 'test';
@@ -519,7 +519,7 @@ export type StoreCryptoWallets = {
   p2p_enabled: boolean;
   /** The global market (US dollars, across countries) is open to the customer, even where their own market is off. */
   global_enabled: boolean;
-  /** The crypto declaration (not a US or UK citizen or resident), needed to trade: confirm it with `POST /v1/store/crypto/declaration { version }`. */
+  /** The crypto declaration (not a US or UK citizen or resident), needed to trade: confirm it with `POST /v1/afrippa/crypto/declaration { version }`. */
   declaration: { version: string; declared: boolean };
   verified: boolean;
   frozen: boolean;
@@ -573,7 +573,7 @@ export type StoreP2pAd = {
 };
 
 /**
- * A market the customer may trade in now (`GET /v1/store/p2p/markets`): their own (`home`, local currency and US
+ * A market the customer may trade in now (`GET /v1/afrippa/p2p/markets`): their own (`home`, local currency and US
  * dollars), the global market (`WW`, US dollars) and other countries taking cross-border trades (their currency only).
  */
 export type StoreP2pMarket = { object: 'p2p_market'; market: string; name: string; currencies: string[]; home: boolean; cross_border: boolean };
@@ -622,7 +622,7 @@ export type StoreCryptoDeposit = {
   credited_at: string | null;
 };
 
-/** `GET /v1/store/crypto/withdrawal-networks`: where an asset can be sent now, with BitoCard's fee and the minimum. */
+/** `GET /v1/afrippa/crypto/withdrawal-networks`: where an asset can be sent now, with BitoCard's fee and the minimum. */
 export type StoreWithdrawalNetworks = {
   object: 'crypto_withdrawal_networks';
   asset: string;
@@ -657,7 +657,7 @@ export type StoreCryptoWithdrawal = {
   completed_at: string | null;
 };
 
-/** `GET /v1/store/crypto/cash`: P2P money (minor units): what can be paid out now, and what waits for the payout hold. */
+/** `GET /v1/store/cash`: P2P money (minor units): what can be paid out now, and what waits for the payout hold. */
 export type StoreP2pCash = { object: 'p2p_cash'; mode: 'live' | 'test'; currency: string; balance: number; held: number; available: number; hold_days: number; minimum: number };
 
 export type StoreCustomerBankAccount = {

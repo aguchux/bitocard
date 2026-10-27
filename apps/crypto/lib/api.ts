@@ -18,7 +18,7 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; 
 export const revalidate = 60;
 
 /**
- * GET a public `/v1/crypto` endpoint through Next's data cache: kept a minute and tagged, so every page and every small
+ * GET a public Afrippa endpoint (`/v1/afrippa/markets`, `/v1/afrippa/traders`) through Next's data cache: kept a minute and tagged, so every page and every small
  * component asking the same thing shares one answer across requests (`crypto`, plus the tags given, can be revalidated
  * on demand). Never throws: an unreachable API comes back as status 0, so each part of a page degrades on its own
  * (including during builds) instead of failing the page.
@@ -41,7 +41,7 @@ const noMarkets: CryptoMarkets = { object: "list", mode: "live", assets: [], dat
 
 /** The markets BitoCard Crypto shows now (empty while the API is unreachable). */
 export const markets = cache(async (): Promise<CryptoMarkets> => {
-  const result = await cryptoApi<CryptoMarkets>("/v1/crypto/markets", ["crypto:markets"]);
+  const result = await cryptoApi<CryptoMarkets>("/v1/afrippa/markets", ["crypto:markets"]);
   return result.ok ? result.data : noMarkets;
 });
 
@@ -67,12 +67,12 @@ export const bookQuery = (query: BookQuery) =>
  * a string (`bookQuery`): `cache()` compares arguments by identity, so an object would never be shared.
  */
 export const book = cache(async (market: string, query: string): Promise<ApiResult<CryptoBook>> =>
-  cryptoApi<CryptoBook>(`/v1/crypto/markets/${market}/ads?${query}`, [`crypto:book:${market}`]),
+  cryptoApi<CryptoBook>(`/v1/afrippa/markets/${market}/ads?${query}`, [`crypto:book:${market}`]),
 );
 
 /** A trader's public card by nickname, or null. */
 export const trader = cache(async (nickname: string): Promise<CryptoTrader | null> => {
   if (!/^[A-Za-z0-9_]{3,20}$/.test(nickname)) return null;
-  const result = await cryptoApi<CryptoTrader>(`/v1/crypto/traders/${nickname}`, [`crypto:trader:${nickname.toLowerCase()}`]);
+  const result = await cryptoApi<CryptoTrader>(`/v1/afrippa/traders/${nickname}`, [`crypto:trader:${nickname.toLowerCase()}`]);
   return result.ok ? result.data : null;
 });

@@ -21,13 +21,13 @@ const randomId = '00000000-0000-4000-8000-00000000f00d';
 
 /** Every protected route, as the admin app calls it; without the window each is refused before anything else runs. */
 const protectedRoutes = [
-  ['post', `/v1/admin/crypto/withdrawals/${randomId}/approve`, { note: 'ok' }],
-  ['post', `/v1/admin/crypto/freezes/${randomId}/seize`, { note: 'ok' }],
-  ['post', `/v1/admin/crypto/freezes/${randomId}/release`, { note: 'ok' }],
-  ['patch', '/v1/admin/crypto/assets/USDT', { p2p_fee_bps: 10 }],
-  ['put', '/v1/admin/crypto/market-limits', { mode: 'test', market: 'NG', currency: 'NGN', per_trade: 100 }],
-  ['patch', `/v1/admin/crypto/networks/${randomId}`, { withdrawals_enabled: false }],
-  ['put', '/v1/admin/crypto/chains/ETHEREUM/routes', { order: [], disabled: [] }],
+  ['post', `/v1/afrippa/admin/crypto/withdrawals/${randomId}/approve`, { note: 'ok' }],
+  ['post', `/v1/afrippa/admin/crypto/freezes/${randomId}/seize`, { note: 'ok' }],
+  ['post', `/v1/afrippa/admin/crypto/freezes/${randomId}/release`, { note: 'ok' }],
+  ['patch', '/v1/afrippa/admin/crypto/assets/USDT', { p2p_fee_bps: 10 }],
+  ['put', '/v1/afrippa/admin/crypto/market-limits', { mode: 'test', market: 'NG', currency: 'NGN', per_trade: 100 }],
+  ['patch', `/v1/afrippa/admin/crypto/networks/${randomId}`, { withdrawals_enabled: false }],
+  ['put', '/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: [], disabled: [] }],
   ['post', `/v1/admin/orders/${randomId}/refund`, { reason: 'x' }],
   ['post', `/v1/admin/classifieds/orders/${randomId}/dispute/decide`, { decision: 'release', note: 'ok' }],
   ['put', '/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 100 }],

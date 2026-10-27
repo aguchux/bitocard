@@ -93,31 +93,31 @@ afterEach(() => vi.unstubAllGlobals());
 /** Answers the API's public crypto endpoints from fixtures. */
 const answer = (ads: StoreP2pAd[] = [ad("a")]) =>
   fetchMock.mockImplementation(async (url: string) => {
-    if (url.endsWith("/v1/crypto/markets")) return json(shown);
+    if (url.endsWith("/v1/afrippa/markets")) return json(shown);
     if (url.includes("/ads?")) return json({ object: "list", market: "NG", asset: "USDT", currency: "NGN", side: "buy", data: ads });
     if (url.endsWith("/v1/store/account")) return json(customer);
-    if (url.endsWith("/v1/store/crypto")) return json(overview);
-    if (url.endsWith("/v1/store/p2p/profile")) return json({ object: "p2p_profile", nickname: "TraderA", nickname_chosen: true, trades_30d: 1, trades_total: 4 });
+    if (url.endsWith("/v1/afrippa/crypto")) return json(overview);
+    if (url.endsWith("/v1/afrippa/p2p/profile")) return json({ object: "p2p_profile", nickname: "TraderA", nickname_chosen: true, trades_30d: 1, trades_total: 4 });
     if (url.endsWith("/v1/store/account/handoff")) return json({ object: "customer_handoff", code: "bch_abcdefghijklmnopqrstuvwxyz0123456789", to: "https://ng.bitocard.com" });
-    if (url.includes("/v1/crypto/traders/TraderA")) return json({ object: "p2p_trader", nickname: "TraderA", trades_30d: 4, trades_total: 15, open_ads: 2, markets: ["NG", "WW"], since: "2026-09-01T00:00:00.000Z" });
+    if (url.includes("/v1/afrippa/traders/TraderA")) return json({ object: "p2p_trader", nickname: "TraderA", trades_30d: 4, trades_total: 15, open_ads: 2, markets: ["NG", "WW"], since: "2026-09-01T00:00:00.000Z" });
     return json({ error: { code: "resource_missing" } }, 404);
   });
 
 describe("reading the public data, cached", () => {
   test("every read goes through the data cache for a minute, tagged; an unreachable API never throws", async () => {
     answer();
-    expect((await cryptoApi("/v1/crypto/markets", ["crypto:markets"])).ok).toBe(true);
+    expect((await cryptoApi("/v1/afrippa/markets", ["crypto:markets"])).ok).toBe(true);
     expect(fetchMock.mock.calls[0][1]).toEqual({ next: { revalidate: 60, tags: ["crypto", "crypto:markets"] } });
     fetchMock.mockRejectedValueOnce(new Error("down"));
-    expect(await cryptoApi("/v1/crypto/markets")).toEqual({ ok: false, status: 0, code: null });
-    expect(await cryptoApi("/v1/crypto/traders/nobody")).toEqual({ ok: false, status: 404, code: "resource_missing" });
+    expect(await cryptoApi("/v1/afrippa/markets")).toEqual({ ok: false, status: 0, code: null });
+    expect(await cryptoApi("/v1/afrippa/traders/nobody")).toEqual({ ok: false, status: 404, code: "resource_missing" });
   });
 
   test("a book's query is always written in one order, so the same book is one cache entry; each market is tagged", async () => {
     expect(bookQuery({ asset: "USDT", side: "buy", currency: "NGN", fiat: 100000, q: "" })).toBe("asset=USDT&side=buy&currency=NGN&fiat=100000");
     answer();
     await book("NG", "asset=USDT&side=buy&currency=NGN");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/v1\/crypto\/markets\/NG\/ads\?asset=USDT&side=buy&currency=NGN$/);
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/v1\/afrippa\/markets\/NG\/ads\?asset=USDT&side=buy&currency=NGN$/);
     expect(fetchMock.mock.calls[0][1].next.tags).toEqual(["crypto", "crypto:book:NG"]);
   });
 

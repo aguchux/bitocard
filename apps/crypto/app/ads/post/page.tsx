@@ -16,7 +16,7 @@ type Search = { side?: string; asset?: string; currency?: string; market?: strin
 export default async function PostAdPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
   await requireCustomer(`/ads/post?${new URLSearchParams(params as Record<string, string>)}`);
-  const [overview, open] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"), customerApi<StoreList<StoreP2pMarket>>("GET", "/v1/store/p2p/markets")]);
+  const [overview, open] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/afrippa/crypto"), customerApi<StoreList<StoreP2pMarket>>("GET", "/v1/afrippa/p2p/markets")]);
   const wallets = overview.ok ? overview.data : null;
   const assets = tradableAssets(wallets);
   const markets = open.ok ? open.data.data : [];

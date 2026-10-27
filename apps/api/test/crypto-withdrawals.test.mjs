@@ -110,10 +110,10 @@ before(async () => {
   await update('crypto_keys', { CRYPTO_TEST_XPUB_EVM: testnet.derive("m/44'/60'/0'").publicExtendedKey });
   await update('getblock', { GETBLOCK_ETHEREUM_URL: `${fakes.url}/evm`, GETBLOCK_SANDBOX: true });
   const usdt = await prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: 'USDT', chain: 'ETHEREUM' } } });
-  const changed = await admin.patch(`/v1/admin/crypto/networks/${usdt.id}`, { deposits_enabled: true, withdrawals_enabled: true, test_contract: usdtContract, withdrawal_fee: '1.5', min_withdrawal: '5' });
+  const changed = await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { deposits_enabled: true, withdrawals_enabled: true, test_contract: usdtContract, withdrawal_fee: '1.5', min_withdrawal: '5' });
   assert.equal(changed.status, 200, JSON.stringify(changed.json));
   assert.deepEqual([changed.json.withdrawals_enabled, changed.json.withdrawal_fee, changed.json.min_withdrawal], [true, '1.5', '5']);
-  const limits = await admin.patch('/v1/admin/crypto/assets/USDT', { withdrawal_daily_limit: '500', withdrawal_review_from: '300' });
+  const limits = await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { withdrawal_daily_limit: '500', withdrawal_review_from: '300' });
   assert.deepEqual([limits.status, limits.json.withdrawal_daily_limit, limits.json.withdrawal_review_from], [200, '500', '300']);
 });
 
@@ -139,15 +139,15 @@ async function customer() {
   const signup = await request('POST', '/v1/store/account/signup', { name: 'Ada Sender', email, password: 'correct horse battery', country: 'NG' });
   await request('POST', '/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) });
   const shopper = { id: signup.json.customer.id, email, get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), del: path => request('DELETE', path) };
-  await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '1000' });
+  await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1000' });
   return shopper;
 }
 
-const balance = async (shopper, asset = 'USDT') => (await shopper.get('/v1/store/crypto')).json.assets.find(item => item.asset === asset).available;
+const balance = async (shopper, asset = 'USDT') => (await shopper.get('/v1/afrippa/crypto')).json.assets.find(item => item.asset === asset).available;
 
 /** A saved address made usable now (the 24-hour wait is tested on its own). */
 async function readyAddress(shopper, address = outside) {
-  const added = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address, label: 'My wallet' });
+  const added = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address, label: 'My wallet' });
   assert.equal(added.status, 201, JSON.stringify(added.json));
   await prisma.cryptoWithdrawalAddress.update({ where: { id: added.json.id }, data: { usableFrom: new Date(Date.now() - 1000) } });
   return added.json;
@@ -155,9 +155,9 @@ async function readyAddress(shopper, address = outside) {
 
 /** Asks for and confirms a withdrawal with the emailed code. */
 async function withdraw(shopper, addressId, amount) {
-  const asked = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: addressId, amount });
+  const asked = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: addressId, amount });
   assert.equal(asked.status, 201, JSON.stringify(asked.json));
-  const confirmed = await shopper.post(`/v1/store/crypto/withdrawals/${asked.json.id}/confirm`, { code: await lastEmailCode(server.app, shopper.email) });
+  const confirmed = await shopper.post(`/v1/afrippa/crypto/withdrawals/${asked.json.id}/confirm`, { code: await lastEmailCode(server.app, shopper.email) });
   assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
   return confirmed.json;
 }
@@ -193,38 +193,38 @@ describe('signer and screening integrations', () => {
 describe('withdrawal addresses', () => {
   test('addresses are checked for the network, never a BitoCard deposit address, and refused when sanctioned', async () => {
     const shopper = await customer();
-    const bad = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: '0x52908400098527886E0F7030069857D2E4169Ee7', label: 'Typo' });
+    const bad = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: '0x52908400098527886E0F7030069857D2E4169Ee7', label: 'Typo' });
     assert.deepEqual([bad.status, bad.json.error.code], [400, 'address_invalid'], 'a wrong checksum is refused');
-    const own = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
-    const internal = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: own.toLowerCase(), label: 'Mine' });
+    const own = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const internal = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: own.toLowerCase(), label: 'Mine' });
     assert.deepEqual([internal.status, internal.json.error.code], [400, 'address_internal']);
-    const sanctioned = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: flagged, label: 'Bad' });
+    const sanctioned = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: flagged, label: 'Bad' });
     assert.deepEqual([sanctioned.status, sanctioned.json.error.code], [400, 'address_refused']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.crypto.address_flagged' } }), 'admins are told');
-    const btc = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'BITCOIN', address: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', label: 'Mainnet' });
+    const btc = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'BITCOIN', address: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', label: 'Mainnet' });
     assert.deepEqual([btc.status, btc.json.error.code], [400, 'address_invalid'], 'sandbox stores take test network addresses only');
-    const testBtc = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'BITCOIN', address: 'tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', label: 'Testnet' });
+    const testBtc = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'BITCOIN', address: 'tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', label: 'Testnet' });
     assert.equal(testBtc.status, 201, JSON.stringify(testBtc.json));
   });
 
   test('a new address can be used only after 24 hours; the customer is emailed and told', async () => {
     const shopper = await customer();
-    const added = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside.toLowerCase(), label: 'Cold wallet' });
+    const added = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside.toLowerCase(), label: 'Cold wallet' });
     assert.equal(added.status, 201, JSON.stringify(added.json));
     assert.equal(added.json.address, outside, 'kept checksummed');
     assert.equal(added.json.ready, false);
     assert.ok(new Date(added.json.usable_from).getTime() > Date.now() + 23 * 3_600_000);
-    const again = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Twice' });
+    const again = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Twice' });
     assert.deepEqual([again.status, again.json.error.code], [409, 'address_exists']);
-    const early = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '10' });
+    const early = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '10' });
     assert.deepEqual([early.status, early.json.error.code], [409, 'address_not_ready']);
     const { EmailService } = await import('../dist/notifications/email.service.js');
     assert.ok(server.app.get(EmailService).outbox.some(item => item.to === shopper.email && /withdrawal address was added/.test(item.subject)));
     assert.ok(await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.crypto.address_added' } }));
-    const listed = (await shopper.get('/v1/store/crypto/withdrawal-addresses')).json.data;
+    const listed = (await shopper.get('/v1/afrippa/crypto/withdrawal-addresses')).json.data;
     assert.deepEqual(listed.map(item => item.label), ['Cold wallet']);
-    assert.equal((await shopper.del(`/v1/store/crypto/withdrawal-addresses/${added.json.id}`)).status, 200);
-    assert.equal((await shopper.get('/v1/store/crypto/withdrawal-addresses')).json.data.length, 0);
+    assert.equal((await shopper.del(`/v1/afrippa/crypto/withdrawal-addresses/${added.json.id}`)).status, 200);
+    assert.equal((await shopper.get('/v1/afrippa/crypto/withdrawal-addresses')).json.data.length, 0);
   });
   test('a saved address is screened again once its last check is a day old, and refused if now sanctioned', async () => {
     const shopper = await customer();
@@ -232,11 +232,11 @@ describe('withdrawal addresses', () => {
     const address = await readyAddress(shopper, later);
     fakes.state.flagged.add(later.toLowerCase());
     try {
-      const recent = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '10' });
+      const recent = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '10' });
       assert.equal(recent.status, 201, 'checked today: not asked again');
-      await shopper.post(`/v1/store/crypto/withdrawals/${recent.json.id}/cancel`);
+      await shopper.post(`/v1/afrippa/crypto/withdrawals/${recent.json.id}/cancel`);
       await prisma.cryptoWithdrawalAddress.update({ where: { id: address.id }, data: { screenedAt: new Date(Date.now() - 25 * 3_600_000) } });
-      const refused = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '10' });
+      const refused = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '10' });
       assert.deepEqual([refused.status, refused.json.error?.code], [400, 'address_refused']);
       assert.equal((await prisma.cryptoWithdrawalAddress.findUniqueOrThrow({ where: { id: address.id } })).screening, 'flagged');
       assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.crypto.address_flagged', body: { contains: shopper.email } } }));
@@ -251,21 +251,21 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
   test('the amount and fee leave the wallet at once, the emailed code confirms it, and it settles once', async () => {
     const shopper = await customer();
     const address = await readyAddress(shopper);
-    const preview = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '100', preview: true });
+    const preview = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '100', preview: true });
     assert.deepEqual([preview.json.amount, preview.json.fee, preview.json.total, preview.json.needs_approval], ['100.000000', '1.500000', '101.500000', false]);
     assert.equal(await balance(shopper), '1000.000000', 'a preview moves nothing');
-    const small = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '4' });
+    const small = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '4' });
     assert.deepEqual([small.status, small.json.error.code], [400, 'amount_too_small']);
 
-    const asked = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '100' });
+    const asked = await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '100' });
     assert.deepEqual([asked.status, asked.json.status, asked.json.number.startsWith('CW-')], [201, 'awaiting_code', true]);
     assert.equal(await balance(shopper), '898.500000');
     const { EmailService } = await import('../dist/notifications/email.service.js');
     const mail = server.app.get(EmailService).outbox.filter(item => item.to === shopper.email).at(-1);
     assert.match(mail.text, /send 100\.000000 USDT on Ethereum to 0x52908400098527886E0F7030069857D2E4169EE7/);
-    const wrong = await shopper.post(`/v1/store/crypto/withdrawals/${asked.json.id}/confirm`, { code: '000000' });
+    const wrong = await shopper.post(`/v1/afrippa/crypto/withdrawals/${asked.json.id}/confirm`, { code: '000000' });
     assert.deepEqual([wrong.status, wrong.json.error.code], [400, 'code_invalid']);
-    const confirmed = await shopper.post(`/v1/store/crypto/withdrawals/${asked.json.id}/confirm`, { code: await lastEmailCode(server.app, shopper.email) });
+    const confirmed = await shopper.post(`/v1/afrippa/crypto/withdrawals/${asked.json.id}/confirm`, { code: await lastEmailCode(server.app, shopper.email) });
     assert.ok(['queued', 'submitting', 'broadcast'].includes(confirmed.json.status), 'on its way to the signer');
     const done = await settle(asked.json.id);
     assert.equal(done.status, 'completed');
@@ -275,9 +275,9 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
     const fees = (await prisma.ledgerAccount.aggregate({ where: { kind: 'crypto_fees', mode: 'test', currency: 'USDT' }, _sum: { balanceMinor: true } }))._sum.balanceMinor;
     assert.ok(fees >= 1_500_000n);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.crypto.withdrawal_sent' } }));
-    const listed = (await shopper.get('/v1/store/crypto/withdrawals')).json.data;
+    const listed = (await shopper.get('/v1/afrippa/crypto/withdrawals')).json.data;
     assert.deepEqual(listed.map(item => [item.status, item.total]), [['completed', '101.500000']]);
-    const transactions = (await shopper.get('/v1/store/crypto/transactions?asset=USDT')).json.data;
+    const transactions = (await shopper.get('/v1/afrippa/crypto/transactions?asset=USDT')).json.data;
     assert.ok(transactions.some(item => item.type === 'crypto_withdrawal' && item.amount === '-101.500000'));
     await ledgerOk();
   });
@@ -285,14 +285,14 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
   test('the 24-hour limit holds even for parallel requests; cancelling and expired codes return the money', async () => {
     const shopper = await customer();
     const address = await readyAddress(shopper);
-    const results = await Promise.all([1, 2, 3].map(() => shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '200' })));
+    const results = await Promise.all([1, 2, 3].map(() => shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '200' })));
     assert.deepEqual(results.map(item => item.status).sort(), [201, 201, 400], 'only 400 of the 500 limit fit');
     assert.equal(results.find(item => item.status === 400).json.error.code, 'withdrawal_limit');
     const [first, second] = results.filter(item => item.status === 201).map(item => item.json);
     assert.equal(await balance(shopper), '597.000000');
-    const cancelled = await shopper.post(`/v1/store/crypto/withdrawals/${first.id}/cancel`);
+    const cancelled = await shopper.post(`/v1/afrippa/crypto/withdrawals/${first.id}/cancel`);
     assert.equal(cancelled.json.status, 'cancelled');
-    assert.equal((await shopper.post(`/v1/store/crypto/withdrawals/${first.id}/cancel`)).status, 409, 'once');
+    assert.equal((await shopper.post(`/v1/afrippa/crypto/withdrawals/${first.id}/cancel`)).status, 409, 'once');
     await prisma.cryptoWithdrawal.update({ where: { id: second.id }, data: { codeExpiresAt: new Date(Date.now() - 1000) } });
     await cron('crypto');
     assert.equal((await prisma.cryptoWithdrawal.findUniqueOrThrow({ where: { id: second.id } })).status, 'cancelled');
@@ -307,15 +307,15 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
     assert.deepEqual([big.status, big.review_reason], ['review', 'amount']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.crypto.withdrawal_review' } }));
     const support = await adminClient(server, ['support']);
-    assert.equal((await support.post(`/v1/admin/crypto/withdrawals/${big.id}/approve`, { note: 'looks fine' })).status, 403);
-    const rejected = await admin.post(`/v1/admin/crypto/withdrawals/${big.id}/reject`, { note: 'unusual pattern' });
+    assert.equal((await support.post(`/v1/afrippa/admin/crypto/withdrawals/${big.id}/approve`, { note: 'looks fine' })).status, 403);
+    const rejected = await admin.post(`/v1/afrippa/admin/crypto/withdrawals/${big.id}/reject`, { note: 'unusual pattern' });
     assert.deepEqual([rejected.status, rejected.json.status], [200, 'rejected']);
     assert.equal(await balance(shopper), '1000.000000');
     assert.ok(await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.crypto.withdrawal_failed' } }));
 
     // The limit counts only withdrawals still on their way or sent.
     const next = await withdraw(shopper, address.id, '300');
-    const approved = await finance.post(`/v1/admin/crypto/withdrawals/${next.id}/approve`, { note: 'called the customer' });
+    const approved = await finance.post(`/v1/afrippa/admin/crypto/withdrawals/${next.id}/approve`, { note: 'called the customer' });
     assert.deepEqual([approved.status, approved.json.status === 'queued' || approved.json.status === 'submitting' || approved.json.status === 'broadcast'], [200, true]);
     assert.equal((await settle(next.id)).status, 'completed');
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'crypto.withdrawal_approved', targetId: next.id } }));
@@ -323,7 +323,7 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
   });
 
   test('without a real signer the custody check says it could not be asked', async () => {
-    const run = await finance.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' });
+    const run = await finance.post('/v1/afrippa/admin/crypto/reconciliations/run', { mode: 'test' });
     assert.equal(run.status, 200, JSON.stringify(run.json));
     assert.match(run.json.error, /No signer/);
     assert.ok(run.json.data.every(item => item.status === 'unavailable'));
@@ -331,9 +331,9 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
   test('a frozen account sends nothing more', async () => {
     const shopper = await customer();
     const address = await readyAddress(shopper);
-    const asked = (await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '20' })).json;
-    await admin.put(`/v1/admin/crypto/customers/${shopper.id}/account-freeze`, { frozen: true, reason: 'investigation' });
-    const confirm = await shopper.post(`/v1/store/crypto/withdrawals/${asked.id}/confirm`, { code: await lastEmailCode(server.app, shopper.email) });
+    const asked = (await shopper.post('/v1/afrippa/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '20' })).json;
+    await admin.put(`/v1/afrippa/admin/crypto/customers/${shopper.id}/account-freeze`, { frozen: true, reason: 'investigation' });
+    const confirm = await shopper.post(`/v1/afrippa/crypto/withdrawals/${asked.id}/confirm`, { code: await lastEmailCode(server.app, shopper.email) });
     assert.deepEqual([confirm.status, confirm.json.error.code], [403, 'crypto_account_frozen']);
     // Confirmed, then frozen before the signer is asked: returned to the wallet, never sent.
     await prisma.cryptoWithdrawal.update({ where: { id: asked.id }, data: { status: 'queued', codeHash: null, nextCheckAt: null } });
@@ -417,7 +417,7 @@ describe('withdrawals through BitoCard’s signer', () => {
     fakes.state.mode = 'ok';
     assert.equal(await balance(shopper), '1000.000000');
     assert.equal((await prisma.notification.count({ where: { customerId: shopper.id, type: 'customer.crypto.withdrawal_failed' } })), 2);
-    const listed = (await admin.get(`/v1/admin/crypto/withdrawals?customer_id=${shopper.id}`)).json.data;
+    const listed = (await admin.get(`/v1/afrippa/admin/crypto/withdrawals?customer_id=${shopper.id}`)).json.data;
     assert.deepEqual(listed.map(item => item.status), ['failed', 'failed']);
     await ledgerOk();
   });
@@ -450,7 +450,7 @@ describe('withdrawals through BitoCard’s signer', () => {
 
   test('the custody check compares the ledger with what the signer holds, and tells admins of a shortfall', async t => {
     const run = async () => {
-      const res = await finance.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' });
+      const res = await finance.post('/v1/afrippa/admin/crypto/reconciliations/run', { mode: 'test' });
       assert.equal(res.status, 200, JSON.stringify(res.json));
       return res.json;
     };
@@ -474,11 +474,11 @@ describe('withdrawals through BitoCard’s signer', () => {
     fakes.state.holdings[0].amount = String(expected + 2_000_000n);
     const surplus = (await run()).data.find(item => item.asset === 'USDT');
     assert.deepEqual([surplus.status, surplus.difference], ['surplus', '2.000000']);
-    const latest = (await admin.get('/v1/admin/crypto/reconciliations?mode=test')).json.data.find(item => item.asset === 'USDT');
+    const latest = (await admin.get('/v1/afrippa/admin/crypto/reconciliations?mode=test')).json.data.find(item => item.asset === 'USDT');
     assert.equal(latest.status, 'surplus');
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'crypto.reconciliation_run' } }));
     const support = await adminClient(server, ['support']);
-    assert.equal((await support.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' })).status, 403);
+    assert.equal((await support.post('/v1/afrippa/admin/crypto/reconciliations/run', { mode: 'test' })).status, 403);
   });
 
   test('live withdrawals are not offered without a live signer', async () => {

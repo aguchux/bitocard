@@ -16,7 +16,7 @@ export default async function TradePage({ params, searchParams }: { params: Prom
   const { done } = await searchParams;
   await requireCustomer(`/trades/${id}`);
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const result = await customerApi<StoreP2pTrade>("GET", `/v1/store/p2p/trades/${id}`);
+  const result = await customerApi<StoreP2pTrade>("GET", `/v1/afrippa/p2p/trades/${id}`);
   if (!result.ok) notFound();
   const trade = result.data;
   const bought = trade.side === "buy";

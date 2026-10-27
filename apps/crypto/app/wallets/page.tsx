@@ -19,7 +19,7 @@ const button = "inline-flex min-h-11 items-center justify-center rounded-xl px-4
  */
 export default async function WalletsPage() {
   await requireCustomer("/wallets");
-  const [overview, profile] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"), customerApi<StoreP2pProfile>("GET", "/v1/store/p2p/profile")]);
+  const [overview, profile] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/afrippa/crypto"), customerApi<StoreP2pProfile>("GET", "/v1/afrippa/p2p/profile")]);
   if (!overview.ok) {
     return (
       <AccountShell title="Wallets" current="/wallets">

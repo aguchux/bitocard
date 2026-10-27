@@ -13,9 +13,9 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
   const { posted } = await searchParams;
   await requireCustomer("/ads");
   const [overview, open, closed] = await Promise.all([
-    customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"),
-    customerApi<StoreList<StoreP2pAd>>("GET", "/v1/store/p2p/ads"),
-    customerApi<StoreList<StoreP2pAd>>("GET", "/v1/store/p2p/ads?status=closed"),
+    customerApi<StoreCryptoWallets>("GET", "/v1/afrippa/crypto"),
+    customerApi<StoreList<StoreP2pAd>>("GET", "/v1/afrippa/p2p/ads"),
+    customerApi<StoreList<StoreP2pAd>>("GET", "/v1/afrippa/p2p/ads?status=closed"),
   ]);
   const assets = tradableAssets(overview.ok ? overview.data : null);
   const ads = [...(open.ok ? open.data.data : []), ...(closed.ok ? closed.data.data.slice(0, 10) : [])];

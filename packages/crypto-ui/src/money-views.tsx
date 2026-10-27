@@ -83,7 +83,7 @@ type Search = { asset?: string; chain?: string };
  * show below. `api` is the app's customer API (the signed-in customer's session).
  */
 export async function DepositBody({ api, params, links }: { api: CustomerCall; params: Search; links: MoneyLinks }) {
-  const overview = await api<StoreCryptoWallets>("GET", "/v1/store/crypto");
+  const overview = await api<StoreCryptoWallets>("GET", "/v1/afrippa/crypto");
   const wallets = overview.ok ? overview.data : null;
   // Only coins still open for deposits (a coin switched off is listed while held, but takes no deposits).
   const assets = tradableAssets(wallets);
@@ -92,12 +92,12 @@ export async function DepositBody({ api, params, links }: { api: CustomerCall; p
   const blocked = !wallets || !wallets.enabled || wallets.frozen || !wallets.verified;
   if (blocked) return <CryptoGate wallets={wallets} verifyHref={links.verification} />;
   const [networks, deposits] = await Promise.all([
-    api<StoreList<StoreCryptoNetwork>>("GET", `/v1/store/crypto/deposit-networks?asset=${encodeURIComponent(asset)}`),
-    api<StoreList<StoreCryptoDeposit>>("GET", "/v1/store/crypto/deposits"),
+    api<StoreList<StoreCryptoNetwork>>("GET", `/v1/afrippa/crypto/deposit-networks?asset=${encodeURIComponent(asset)}`),
+    api<StoreList<StoreCryptoDeposit>>("GET", "/v1/afrippa/crypto/deposits"),
   ]);
   const options = networks.ok ? networks.data.data : [];
   const network = options.find(item => item.chain === (params.chain ?? "").toUpperCase()) ?? (options.length === 1 ? options[0] : undefined);
-  const address = network ? await api<StoreCryptoDepositAddress>("POST", "/v1/store/crypto/deposit-addresses", { asset, chain: network.chain }) : null;
+  const address = network ? await api<StoreCryptoDepositAddress>("POST", "/v1/afrippa/crypto/deposit-addresses", { asset, chain: network.chain }) : null;
   const qr = address?.ok ? await addressQr(address.data.address) : null;
 
   return (
@@ -162,7 +162,7 @@ const withdrawalTone = (status: StoreCryptoWithdrawal["status"]) => (status === 
  * an emailed code confirms it. Withdrawing needs no crypto switch while they hold coins: only a verified, unfrozen account.
  */
 export async function WithdrawBody({ api, params, links }: { api: CustomerCall; params: Search; links: MoneyLinks }) {
-  const overview = await api<StoreCryptoWallets>("GET", "/v1/store/crypto");
+  const overview = await api<StoreCryptoWallets>("GET", "/v1/afrippa/crypto");
   const wallets = overview.ok ? overview.data : null;
   // What they hold, plus every tradable coin while crypto is open (a coin switched off can still be withdrawn).
   const assets = withdrawableAssets(wallets);
@@ -171,9 +171,9 @@ export async function WithdrawBody({ api, params, links }: { api: CustomerCall; 
   const balance = wallets?.assets.find(item => item.asset === asset);
   if (!wallets || assets.length === 0 || wallets.frozen || !wallets.verified) return <CryptoGate wallets={wallets} withdraw verifyHref={links.verification} />;
   const [networks, saved, history] = await Promise.all([
-    api<StoreWithdrawalNetworks>("GET", `/v1/store/crypto/withdrawal-networks?asset=${encodeURIComponent(asset)}`),
-    api<StoreList<StoreWithdrawalAddress>>("GET", "/v1/store/crypto/withdrawal-addresses"),
-    api<StoreList<StoreCryptoWithdrawal>>("GET", "/v1/store/crypto/withdrawals"),
+    api<StoreWithdrawalNetworks>("GET", `/v1/afrippa/crypto/withdrawal-networks?asset=${encodeURIComponent(asset)}`),
+    api<StoreList<StoreWithdrawalAddress>>("GET", "/v1/afrippa/crypto/withdrawal-addresses"),
+    api<StoreList<StoreCryptoWithdrawal>>("GET", "/v1/afrippa/crypto/withdrawals"),
   ]);
   const options = networks.ok ? networks.data.data : [];
   const network = options.find(item => item.chain === (params.chain ?? "").toUpperCase()) ?? (options.length === 1 ? options[0] : null);
@@ -275,7 +275,7 @@ export const reviewValid = (params: ReviewSearch) =>
 /** The withdrawal exactly as it will be sent: the address, the amount, BitoCard's fee and the total. Nothing moves yet. */
 export async function WithdrawReviewBody({ api, params, links }: { api: CustomerCall; params: ReviewSearch; links: MoneyLinks }) {
   const preview = reviewValid(params)
-    ? await api<StoreWithdrawalPreview>("POST", "/v1/store/crypto/withdrawals", { asset: params.asset, chain: params.chain, address_id: params.address, amount: params.amount, preview: true })
+    ? await api<StoreWithdrawalPreview>("POST", "/v1/afrippa/crypto/withdrawals", { asset: params.asset, chain: params.chain, address_id: params.address, amount: params.amount, preview: true })
     : null;
   const back = links.withdraw(params.asset ?? "", params.chain ?? "");
   if (!preview?.ok) {
@@ -394,11 +394,11 @@ export function WithdrawalBody({ item }: { item: StoreCryptoWithdrawal }) {
  */
 export async function CashOutBody({ api, links }: { api: CustomerCall; links: Pick<MoneyLinks, "verification"> }) {
   const [cash, accounts, payouts] = await Promise.all([
-    api<StoreP2pCash>("GET", "/v1/store/crypto/cash"),
-    api<StoreList<StoreCustomerBankAccount>>("GET", "/v1/store/crypto/cash/bank-accounts"),
-    api<StoreList<StoreCustomerPayout>>("GET", "/v1/store/crypto/cash/payouts"),
+    api<StoreP2pCash>("GET", "/v1/store/cash"),
+    api<StoreList<StoreCustomerBankAccount>>("GET", "/v1/store/cash/bank-accounts"),
+    api<StoreList<StoreCustomerPayout>>("GET", "/v1/store/cash/payouts"),
   ]);
-  const banks = cash.ok ? await api<StoreList<{ code: string; name: string }>>("GET", "/v1/store/crypto/cash/banks") : null;
+  const banks = cash.ok ? await api<StoreList<{ code: string; name: string }>>("GET", "/v1/store/cash/banks") : null;
   const money = cash.ok ? cash.data : null;
   const saved = accounts.ok ? accounts.data.data : [];
 

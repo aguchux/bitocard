@@ -13,7 +13,7 @@ export default async function WithdrawalPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   await requireCustomer(`/withdrawals/${id}`);
   if (!isId(id)) notFound();
-  const result = await customerApi<StoreCryptoWithdrawal>("GET", `/v1/store/crypto/withdrawals/${id}`);
+  const result = await customerApi<StoreCryptoWithdrawal>("GET", `/v1/afrippa/crypto/withdrawals/${id}`);
   if (!result.ok) notFound();
   return (
     <AccountShell title={`Withdrawal ${result.data.number}`} current="/wallets">

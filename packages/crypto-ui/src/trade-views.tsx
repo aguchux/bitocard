@@ -9,7 +9,7 @@ export const cardClass = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
 /**
  * The declaration every account makes before trading: not a citizen or resident of the United States or the United
- * Kingdom. `action` is the app's server action recording it (`POST /v1/store/crypto/declaration { version }`).
+ * Kingdom. `action` is the app's server action recording it (`POST /v1/afrippa/crypto/declaration { version }`).
  */
 export function CryptoDeclaration({ version, action }: { version: string; action: (form: FormData) => Promise<void> }) {
   return (

@@ -112,21 +112,21 @@ const answer = (wallets = overview()) =>
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     const path = new URL(url).pathname + new URL(url).search;
     if (path === "/v1/store/account") return json(customer);
-    if (path === "/v1/store/crypto") return json(wallets);
-    if (path.startsWith("/v1/store/crypto/deposit-networks")) return json({ object: "list", data: [{ object: "crypto_network", chain: "TRON", name: "TRON", token: "TRC-20", confirmations: 19 }] });
-    if (path === "/v1/store/crypto/deposit-addresses") return json({ object: "crypto_deposit_address", asset: "USDT", chain: "TRON", address: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8", contract: null });
-    if (path === "/v1/store/crypto/deposits") return json({ object: "list", data: [{ object: "crypto_deposit", id: "d1", asset: "USDT", network: "TRON", amount: "5", status: "pending", confirmations: 3, confirmations_needed: 19, created_at: "2026-10-27T10:00:00.000Z" }] });
-    if (path.startsWith("/v1/store/crypto/withdrawal-networks")) return json({ object: "list", remaining_today: "500", data: [{ object: "crypto_withdrawal_network", chain: "TRON", name: "TRON", fee: "1", minimum: "5" }] });
-    if (path === "/v1/store/crypto/withdrawal-addresses") return json({ object: "list", data: [{ object: "crypto_withdrawal_address", id: address, chain: "TRON", label: "Cold", address: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8", ready: true, usable_from: "2026-10-26T10:00:00.000Z" }] });
-    if (path === "/v1/store/crypto/withdrawals" && init?.method === "POST") {
+    if (path === "/v1/afrippa/crypto") return json(wallets);
+    if (path.startsWith("/v1/afrippa/crypto/deposit-networks")) return json({ object: "list", data: [{ object: "crypto_network", chain: "TRON", name: "TRON", token: "TRC-20", confirmations: 19 }] });
+    if (path === "/v1/afrippa/crypto/deposit-addresses") return json({ object: "crypto_deposit_address", asset: "USDT", chain: "TRON", address: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8", contract: null });
+    if (path === "/v1/afrippa/crypto/deposits") return json({ object: "list", data: [{ object: "crypto_deposit", id: "d1", asset: "USDT", network: "TRON", amount: "5", status: "pending", confirmations: 3, confirmations_needed: 19, created_at: "2026-10-27T10:00:00.000Z" }] });
+    if (path.startsWith("/v1/afrippa/crypto/withdrawal-networks")) return json({ object: "list", remaining_today: "500", data: [{ object: "crypto_withdrawal_network", chain: "TRON", name: "TRON", fee: "1", minimum: "5" }] });
+    if (path === "/v1/afrippa/crypto/withdrawal-addresses") return json({ object: "list", data: [{ object: "crypto_withdrawal_address", id: address, chain: "TRON", label: "Cold", address: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8", ready: true, usable_from: "2026-10-26T10:00:00.000Z" }] });
+    if (path === "/v1/afrippa/crypto/withdrawals" && init?.method === "POST") {
       return json({ object: "crypto_withdrawal_preview", asset: "USDT", chain: "TRON", network: "TRON", address: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8", amount: "10", fee: "1", total: "11", needs_approval: true });
     }
-    if (path === "/v1/store/crypto/withdrawals") return json({ object: "list", data: [withdrawal] });
-    if (path === `/v1/store/crypto/withdrawals/${withdrawal.id}`) return json(withdrawal);
-    if (path === "/v1/store/crypto/cash") return json({ object: "p2p_cash", mode: "test", currency: "NGN", balance: 60_000_00, held: 10_000_00, available: 50_000_00, hold_days: 7, minimum: 1_000_00 });
-    if (path === "/v1/store/crypto/cash/bank-accounts") return json({ object: "list", data: [{ object: "customer_bank_account", id: "b1", bank_name: "Sandbox Bank", account_number_last4: "6789", account_name: "ADA OBI", ready: true, payouts_available_from: "2026-10-26T10:00:00.000Z" }] });
-    if (path === "/v1/store/crypto/cash/banks") return json({ object: "list", data: [{ code: "SBX001", name: "Sandbox Bank" }] });
-    if (path === "/v1/store/crypto/cash/payouts") return json({ object: "list", data: [{ object: "customer_payout", id: "p1", mode: "test", amount: 5_000_00, currency: "NGN", status: "pending", failure_reason: null, bank_account: { bank_name: "Sandbox Bank", account_number_last4: "6789" }, created_at: "2026-10-27T10:00:00.000Z" }] });
+    if (path === "/v1/afrippa/crypto/withdrawals") return json({ object: "list", data: [withdrawal] });
+    if (path === `/v1/afrippa/crypto/withdrawals/${withdrawal.id}`) return json(withdrawal);
+    if (path === "/v1/store/cash") return json({ object: "p2p_cash", mode: "test", currency: "NGN", balance: 60_000_00, held: 10_000_00, available: 50_000_00, hold_days: 7, minimum: 1_000_00 });
+    if (path === "/v1/store/cash/bank-accounts") return json({ object: "list", data: [{ object: "customer_bank_account", id: "b1", bank_name: "Sandbox Bank", account_number_last4: "6789", account_name: "ADA OBI", ready: true, payouts_available_from: "2026-10-26T10:00:00.000Z" }] });
+    if (path === "/v1/store/cash/banks") return json({ object: "list", data: [{ code: "SBX001", name: "Sandbox Bank" }] });
+    if (path === "/v1/store/cash/payouts") return json({ object: "list", data: [{ object: "customer_payout", id: "p1", mode: "test", amount: 5_000_00, currency: "NGN", status: "pending", failure_reason: null, bank_account: { bank_name: "Sandbox Bank", account_number_last4: "6789" }, created_at: "2026-10-27T10:00:00.000Z" }] });
     if (path.startsWith("/v1/store/wallet/top-ups/") && path.endsWith("/simulate")) return json({});
     if (path.startsWith("/v1/store/wallet/top-ups/")) return json(pendingTopUp);
     if (path === "/v1/store/wallet/top-ups") return json({ ...pendingTopUp, mode: wallet.mode, checkout_url: wallet.mode === "live" ? "https://pay.example/p/1" : null });
@@ -165,7 +165,7 @@ describe("money in and out, on this site", () => {
     expect(html).toContain("TJRabPrwbZy45sbavfcjinPJC18kjpRTv8");
     expect(html).toContain("<svg");
     expect(html).toContain("Confirming 3/19");
-    const asked = calls().find(([url]) => url.endsWith("/v1/store/crypto/deposit-addresses"))!;
+    const asked = calls().find(([url]) => url.endsWith("/v1/afrippa/crypto/deposit-addresses"))!;
     expect(JSON.parse(String(asked[1].body))).toEqual({ asset: "USDT", chain: "TRON" });
   });
 

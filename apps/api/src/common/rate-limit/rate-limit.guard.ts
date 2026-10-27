@@ -147,7 +147,8 @@ export class RateLimitGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
     if (!req.originalUrl.startsWith('/v1/')) return true;
-    const store = req.originalUrl.startsWith('/v1/store/');
+    // Customers' routes: the stores' (`/v1/store/`) and Afrippa's (`/v1/afrippa/`), both called by a site's server.
+    const store = /^\/v1\/(?:store|afrippa)\//.test(req.originalUrl);
     if (store) await this.identifyCustomer(req);
     const scope = callerScope(req);
     // Signed-out shoppers reach the API through their store's server: limit them by the address it vouches for.

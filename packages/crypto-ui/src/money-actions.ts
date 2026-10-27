@@ -42,7 +42,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
       const label = text(form, "label");
       if (!address) return { error: "Paste the address.", field: "address" };
       if (!label) return { error: "Give the address a name you will recognise.", field: "label" };
-      const result = await api<StoreWithdrawalAddress>("POST", "/v1/store/crypto/withdrawal-addresses", { chain: text(form, "chain"), address, label });
+      const result = await api<StoreWithdrawalAddress>("POST", "/v1/afrippa/crypto/withdrawal-addresses", { chain: text(form, "chain"), address, label });
       if (!result.ok) {
         signInFirst(result.status, paths.withdraw);
         return { error: result.message, field: result.param === "address" || result.param === "label" ? result.param : null };
@@ -52,7 +52,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
     },
 
     async removeWithdrawalAddress(form: FormData): Promise<FormState> {
-      const result = await api("DELETE", `/v1/store/crypto/withdrawal-addresses/${encodeURIComponent(text(form, "id"))}`);
+      const result = await api("DELETE", `/v1/afrippa/crypto/withdrawal-addresses/${encodeURIComponent(text(form, "id"))}`);
       if (!result.ok) {
         signInFirst(result.status, paths.withdraw);
         return { error: result.message };
@@ -68,7 +68,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
       if (!addressId) return { error: "Choose where to send it.", field: "address_id" };
       if (!amount) return { error: "Enter how much to send.", field: "amount" };
       const body = { asset: text(form, "asset"), chain: text(form, "chain"), address_id: addressId, amount, preview: true };
-      const result = await api("POST", "/v1/store/crypto/withdrawals", body);
+      const result = await api("POST", "/v1/afrippa/crypto/withdrawals", body);
       if (!result.ok) {
         signInFirst(result.status, paths.withdraw);
         return { error: result.message, field: result.param === "amount" ? "amount" : null };
@@ -79,7 +79,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
     /** Asks for the withdrawal: its amount and fee leave the wallet, and a code is emailed to confirm it. */
     async createWithdrawal(form: FormData): Promise<NonceFormState> {
       const body = { asset: text(form, "asset"), chain: text(form, "chain"), address_id: text(form, "address_id"), amount: text(form, "amount") };
-      const result = await api<StoreCryptoWithdrawal>("POST", "/v1/store/crypto/withdrawals", body, { idempotencyKey: text(form, "nonce") || undefined });
+      const result = await api<StoreCryptoWithdrawal>("POST", "/v1/afrippa/crypto/withdrawals", body, { idempotencyKey: text(form, "nonce") || undefined });
       if (!result.ok) {
         signInFirst(result.status, paths.withdraw);
         return fresh({ error: result.message });
@@ -93,21 +93,21 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
       const id = text(form, "id");
       const code = text(form, "code").replace(/\s/g, "");
       if (!/^\d{6}$/.test(code)) return { error: "Enter the 6-digit code we emailed you.", field: "code" };
-      const result = await api<StoreCryptoWithdrawal>("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/confirm`, { code });
+      const result = await api<StoreCryptoWithdrawal>("POST", `/v1/afrippa/crypto/withdrawals/${encodeURIComponent(id)}/confirm`, { code });
       if (!result.ok) return { error: result.message, field: "code" };
       page(paths.withdrawal(id));
       return { notice: result.data.status === "review" ? "Confirmed. BitoCard checks this withdrawal before it is sent." : "Confirmed. Your withdrawal is on its way." };
     },
 
     async resendWithdrawalCode(form: FormData): Promise<FormState> {
-      const result = await api("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(text(form, "id"))}/resend-code`);
+      const result = await api("POST", `/v1/afrippa/crypto/withdrawals/${encodeURIComponent(text(form, "id"))}/resend-code`);
       if (!result.ok) return { error: result.message };
       return { notice: "A new code is on its way to your email." };
     },
 
     async cancelWithdrawal(form: FormData): Promise<FormState> {
       const id = text(form, "id");
-      const result = await api("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/cancel`);
+      const result = await api("POST", `/v1/afrippa/crypto/withdrawals/${encodeURIComponent(id)}/cancel`);
       if (!result.ok) {
         signInFirst(result.status, paths.withdrawal(id));
         return { error: result.message };
@@ -123,7 +123,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
       const accountNumber = text(form, "account_number").replace(/\s/g, "");
       if (!bankCode) return { error: "Choose your bank.", field: "bank_code" };
       if (!/^\d{6,20}$/.test(accountNumber)) return { error: "Enter your account number, digits only.", field: "account_number" };
-      const result = await api<StoreCustomerBankAccount>("POST", "/v1/store/crypto/cash/bank-accounts", { bank_code: bankCode, account_number: accountNumber });
+      const result = await api<StoreCustomerBankAccount>("POST", "/v1/store/cash/bank-accounts", { bank_code: bankCode, account_number: accountNumber });
       if (!result.ok) {
         signInFirst(result.status, paths.cashOut);
         return { error: result.message, field: result.param === "account_number" || result.param === "bank_code" ? result.param : null };
@@ -133,7 +133,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
     },
 
     async removeCashOutAccount(form: FormData): Promise<FormState> {
-      const result = await api("DELETE", `/v1/store/crypto/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
+      const result = await api("DELETE", `/v1/store/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
       if (!result.ok) {
         signInFirst(result.status, paths.cashOut);
         return { error: result.message };
@@ -148,7 +148,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
       const account = text(form, "bank_account_id");
       if (!account) return { error: "Choose the account to pay into.", field: "bank_account_id" };
       if (!amount) return { error: "Enter how much to pay out.", field: "amount" };
-      const result = await api<StoreCustomerPayout>("POST", "/v1/store/crypto/cash/payouts", { amount, bank_account_id: account }, { idempotencyKey: text(form, "nonce") || undefined });
+      const result = await api<StoreCustomerPayout>("POST", "/v1/store/cash/payouts", { amount, bank_account_id: account }, { idempotencyKey: text(form, "nonce") || undefined });
       if (!result.ok) {
         signInFirst(result.status, paths.cashOut);
         return fresh({ error: result.message, field: result.param === "amount" ? "amount" : null });
@@ -161,7 +161,7 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
 
     /** Sandbox only: settles a test payout as paid or failed. */
     async simulateCashOut(form: FormData): Promise<FormState> {
-      const result = await api("POST", `/v1/store/crypto/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
+      const result = await api("POST", `/v1/store/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
       if (!result.ok) return { error: result.message };
       page(paths.cashOut);
       return {};

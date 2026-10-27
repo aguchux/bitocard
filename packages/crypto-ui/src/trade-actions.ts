@@ -61,7 +61,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
       // The fee rate the customer was shown: a changed fee is refused, like a changed price.
       const feeBps = text(form, "fee_bps");
       const body = { ad_id: text(form, "ad_id"), price: Number(text(form, "price")), ...(feeBps ? { fee_bps: Number(feeBps) } : {}), fiat: Number(text(form, "fiat")) };
-      const result = await api<StoreP2pTrade>("POST", "/v1/store/p2p/trades", body, { idempotencyKey: text(form, "nonce") || undefined });
+      const result = await api<StoreP2pTrade>("POST", "/v1/afrippa/p2p/trades", body, { idempotencyKey: text(form, "nonce") || undefined });
       if (!result.ok) {
         signInFirst(result.status, paths.confirm);
         if (result.code === "insufficient_funds") return fresh({ error: result.message, field: "funds" });
@@ -81,7 +81,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
       if (!amount) return { error: "Enter how much to trade.", field: "amount" };
       if (!min) return { error: "Enter the smallest trade you take.", field: "min_fiat" };
       if (!max) return { error: "Enter the largest trade you take.", field: "max_fiat" };
-      const result = await api<StoreP2pAd>("POST", "/v1/store/p2p/ads", {
+      const result = await api<StoreP2pAd>("POST", "/v1/afrippa/p2p/ads", {
         side: text(form, "side") === "buy" ? "buy" : "sell",
         asset: text(form, "asset"),
         ...(text(form, "currency") ? { currency: text(form, "currency") } : {}),
@@ -104,7 +104,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
     async changeAd(form: FormData): Promise<FormState> {
       const id = encodeURIComponent(text(form, "id"));
       const op = text(form, "op");
-      const result = op === "cancel" ? await api("POST", `/v1/store/p2p/ads/${id}/cancel`) : await api("PATCH", `/v1/store/p2p/ads/${id}`, { status: op === "resume" ? "active" : "paused" });
+      const result = op === "cancel" ? await api("POST", `/v1/afrippa/p2p/ads/${id}/cancel`) : await api("PATCH", `/v1/afrippa/p2p/ads/${id}`, { status: op === "resume" ? "active" : "paused" });
       if (!result.ok) {
         signInFirst(result.status, paths.ads);
         return { error: result.message };
@@ -117,7 +117,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
     async repriceAd(form: FormData): Promise<FormState> {
       const price = toMinor(text(form, "price"));
       if (!price) return { error: "Enter your new price.", field: "price" };
-      const result = await api("PATCH", `/v1/store/p2p/ads/${encodeURIComponent(text(form, "id"))}`, { price });
+      const result = await api("PATCH", `/v1/afrippa/p2p/ads/${encodeURIComponent(text(form, "id"))}`, { price });
       if (!result.ok) return { error: result.message, field: "price" };
       refresh();
       return { notice: "Price updated." };
@@ -125,7 +125,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
 
     /** Chooses the nickname others see on the market, once. */
     async chooseNickname(form: FormData): Promise<FormState> {
-      const result = await api<StoreP2pProfile>("PUT", "/v1/store/p2p/profile", { nickname: text(form, "nickname") });
+      const result = await api<StoreP2pProfile>("PUT", "/v1/afrippa/p2p/profile", { nickname: text(form, "nickname") });
       if (!result.ok) return { error: result.message, field: "nickname" };
       refresh();
       return { notice: `You trade as ${result.data.nickname}.` };
@@ -134,7 +134,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
     /** The crypto declaration (not a US or UK citizen or resident), made once per version before trading. */
     async declare(form: FormData): Promise<void> {
       if (form.get("confirm") !== "yes") return;
-      await api("POST", "/v1/store/crypto/declaration", { version: text(form, "version") });
+      await api("POST", "/v1/afrippa/crypto/declaration", { version: text(form, "version") });
       refresh();
     },
   };

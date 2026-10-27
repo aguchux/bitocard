@@ -19,7 +19,7 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
   const price = Number(params.price);
   const fiat = Number(params.fiat);
   const valid = /^[0-9a-f-]{36}$/.test(params.ad ?? "") && Number.isInteger(price) && price > 0 && Number.isInteger(fiat) && fiat > 0;
-  const preview = valid ? await customerApi<StoreP2pQuote>("POST", "/v1/store/p2p/trades", { ad_id: params.ad, price, fiat, preview: true }) : null;
+  const preview = valid ? await customerApi<StoreP2pQuote>("POST", "/v1/afrippa/p2p/trades", { ad_id: params.ad, price, fiat, preview: true }) : null;
   const quote = preview?.ok ? preview.data : null;
   const buying = quote?.side !== "sell";
   return (

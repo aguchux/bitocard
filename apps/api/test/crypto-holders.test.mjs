@@ -57,7 +57,7 @@ async function customer(subdomain = null) {
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   shopper.id = signup.json.customer.id;
   // Trading needs the crypto declaration (not a US or UK citizen or resident).
-  assert.equal((await shopper.post('/v1/store/crypto/declaration', { version: (await shopper.get('/v1/store/crypto/declaration')).json.version })).status, 200);
+  assert.equal((await shopper.post('/v1/afrippa/crypto/declaration', { version: (await shopper.get('/v1/afrippa/crypto/declaration')).json.version })).status, 200);
   return shopper;
 }
 
@@ -71,7 +71,7 @@ async function resellerStore() {
   return { id: created.json.id, subdomain: created.json.subdomain };
 }
 
-const usdt = async shopper => (await shopper.get('/v1/store/crypto')).json.assets.find(item => item.asset === 'USDT');
+const usdt = async shopper => (await shopper.get('/v1/afrippa/crypto')).json.assets.find(item => item.asset === 'USDT');
 
 describe('a closed store', () => {
   before(() => switches(true));
@@ -80,28 +80,28 @@ describe('a closed store', () => {
   test("its customers still see their crypto, close their ads and withdraw; they cannot start anything new", async () => {
     const store = await resellerStore();
     const shopper = await customer(store.subdomain);
-    assert.equal((await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '100' })).status, 201);
-    const ad = await shopper.post('/v1/store/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '40', min_fiat: 100_00, max_fiat: 500_000_00 });
+    assert.equal((await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '100' })).status, 201);
+    const ad = await shopper.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '40', min_fiat: 100_00, max_fiat: 500_000_00 });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
 
     await prisma.store.update({ where: { id: store.id }, data: { status: 'suspended' } });
-    const overview = await shopper.get('/v1/store/crypto');
+    const overview = await shopper.get('/v1/afrippa/crypto');
     assert.equal(overview.status, 200, JSON.stringify(overview.json));
     assert.deepEqual([overview.json.assets.find(item => item.asset === 'USDT').locked, overview.json.cash.paying_out], ['40.000000', 0]);
-    assert.equal((await shopper.get('/v1/store/p2p/ads')).status, 200);
-    const closed = await shopper.post(`/v1/store/p2p/ads/${ad.json.id}/cancel`);
+    assert.equal((await shopper.get('/v1/afrippa/p2p/ads')).status, 200);
+    const closed = await shopper.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`);
     assert.equal(closed.status, 200, JSON.stringify(closed.json));
     assert.equal((await usdt(shopper)).available, '100.000000', 'the locked crypto is back');
 
-    const again = await shopper.post('/v1/store/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '10', min_fiat: 100_00, max_fiat: 500_000_00 });
+    const again = await shopper.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '10', min_fiat: 100_00, max_fiat: 500_000_00 });
     assert.deepEqual([again.status, again.json.error.code], [404, 'store_unavailable'], 'no new ads');
-    const deposit = await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '1' });
+    const deposit = await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' });
     assert.deepEqual([deposit.status, deposit.json.error.code], [404, 'store_unavailable'], 'no new deposits');
 
-    const address = await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'My wallet' });
+    const address = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'My wallet' });
     assert.equal(address.status, 201, JSON.stringify(address.json));
-    assert.equal((await shopper.get('/v1/store/crypto/withdrawal-networks?asset=USDT')).status, 200);
-    assert.equal((await shopper.get('/v1/store/crypto/cash')).status, 200, 'P2P money can be paid out');
+    assert.equal((await shopper.get('/v1/afrippa/crypto/withdrawal-networks?asset=USDT')).status, 200);
+    assert.equal((await shopper.get('/v1/store/cash')).status, 200, 'P2P money can be paid out');
   });
 });
 
@@ -109,25 +109,25 @@ describe('crypto switched off, a coin delisted', () => {
   test('withdrawing what is held needs neither switch; a delisted coin is still shown while held', async () => {
     await switches(true);
     const shopper = await customer();
-    assert.equal((await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '25' })).status, 201);
+    assert.equal((await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '25' })).status, 201);
     await switches(false);
     try {
-      const deposit = await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '1' });
+      const deposit = await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' });
       assert.deepEqual([deposit.status, deposit.json.error.code], [409, 'crypto_not_enabled']);
-      assert.equal((await shopper.post('/v1/store/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Mine' })).status, 201);
-      const networks = await shopper.get('/v1/store/crypto/withdrawal-networks?asset=USDT');
+      assert.equal((await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Mine' })).status, 201);
+      const networks = await shopper.get('/v1/afrippa/crypto/withdrawal-networks?asset=USDT');
       assert.equal(networks.status, 200, JSON.stringify(networks.json));
 
-      assert.equal((await admin.patch('/v1/admin/crypto/assets/USDT', { enabled: false })).status, 200);
-      const overview = (await shopper.get('/v1/store/crypto')).json;
+      assert.equal((await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { enabled: false })).status, 200);
+      const overview = (await shopper.get('/v1/afrippa/crypto')).json;
       const held = overview.assets.find(item => item.asset === 'USDT');
       assert.deepEqual([held?.enabled, held?.available], [false, '25.000000'], 'listed while held, marked switched off');
       assert.equal(overview.assets.some(item => item.asset === 'BNB'), true, 'enabled coins stay listed');
       const other = await customer();
-      assert.equal((await other.get('/v1/store/crypto')).json.assets.some(item => item.asset === 'USDT'), false, 'not listed for someone holding none');
-      assert.equal((await shopper.get('/v1/store/crypto/withdrawal-networks?asset=USDT')).status, 200, 'a delisted coin can still be withdrawn');
+      assert.equal((await other.get('/v1/afrippa/crypto')).json.assets.some(item => item.asset === 'USDT'), false, 'not listed for someone holding none');
+      assert.equal((await shopper.get('/v1/afrippa/crypto/withdrawal-networks?asset=USDT')).status, 200, 'a delisted coin can still be withdrawn');
     } finally {
-      await admin.patch('/v1/admin/crypto/assets/USDT', { enabled: true });
+      await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { enabled: true });
       await switches(null);
     }
   });

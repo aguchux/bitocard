@@ -238,38 +238,38 @@ export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer
 
 const cryptoApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
-    cryptoAssets: build.query<List<CryptoAsset>, void>({ query: () => '/v1/admin/crypto/assets', providesTags: ['Crypto'] }),
+    cryptoAssets: build.query<List<CryptoAsset>, void>({ query: () => '/v1/afrippa/admin/crypto/assets', providesTags: ['Crypto'] }),
     updateCryptoAsset: build.mutation<
       CryptoAsset,
       { code: string; enabled?: boolean; p2p_fee_bps?: number; withdrawal_daily_limit?: string; withdrawal_review_from?: string; exchange_daily_limit?: string | null; exchange_reserve_alert?: string | null }
     >({
-      query: ({ code, ...body }) => ({ url: `/v1/admin/crypto/assets/${code}`, method: 'PATCH', body }),
+      query: ({ code, ...body }) => ({ url: `/v1/afrippa/admin/crypto/assets/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Crypto'],
     }),
-    cryptoCustomers: build.query<List<CryptoCustomer>, { q?: string }>({ query: params => ({ url: '/v1/admin/crypto/customers', params }), providesTags: ['Crypto'] }),
-    cryptoCustomer: build.query<CryptoCustomerDetail, string>({ query: id => `/v1/admin/crypto/customers/${id}`, providesTags: ['Crypto'] }),
+    cryptoCustomers: build.query<List<CryptoCustomer>, { q?: string }>({ query: params => ({ url: '/v1/afrippa/admin/crypto/customers', params }), providesTags: ['Crypto'] }),
+    cryptoCustomer: build.query<CryptoCustomerDetail, string>({ query: id => `/v1/afrippa/admin/crypto/customers/${id}`, providesTags: ['Crypto'] }),
     creditTestCrypto: build.mutation<CryptoCustomerDetail, { id: string; asset: string; amount: string; reason: string }>({
-      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/test-credits`, method: 'POST', body }),
+      query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/crypto/customers/${id}/test-credits`, method: 'POST', body }),
       invalidatesTags: ['Crypto'],
     }),
     freezeCrypto: build.mutation<CryptoFreeze, { id: string; asset: string; amount: string; reason: string; mode: Mode }>({
-      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/freezes`, method: 'POST', body }),
+      query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/crypto/customers/${id}/freezes`, method: 'POST', body }),
       invalidatesTags: ['Crypto'],
     }),
     resolveCryptoFreeze: build.mutation<CryptoFreeze, { id: string; outcome: 'release' | 'seize'; note: string }>({
-      query: ({ id, outcome, note }) => ({ url: `/v1/admin/crypto/freezes/${id}/${outcome}`, method: 'POST', body: { note } }),
+      query: ({ id, outcome, note }) => ({ url: `/v1/afrippa/admin/crypto/freezes/${id}/${outcome}`, method: 'POST', body: { note } }),
       invalidatesTags: ['Crypto'],
     }),
     setCryptoAccountFrozen: build.mutation<CryptoCustomerDetail, { id: string; frozen: boolean; reason: string }>({
-      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/account-freeze`, method: 'PUT', body }),
+      query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/crypto/customers/${id}/account-freeze`, method: 'PUT', body }),
       invalidatesTags: ['Crypto', 'P2p'],
     }),
-    chains: build.query<List<ChainView>, void>({ query: () => '/v1/admin/crypto/chains', providesTags: ['Crypto'] }),
+    chains: build.query<List<ChainView>, void>({ query: () => '/v1/afrippa/admin/crypto/chains', providesTags: ['Crypto'] }),
     setChainRoutes: build.mutation<List<ChainView>, { chain: string; order: string[]; disabled: string[] }>({
-      query: ({ chain, ...body }) => ({ url: `/v1/admin/crypto/chains/${chain}/routes`, method: 'PUT', body }),
+      query: ({ chain, ...body }) => ({ url: `/v1/afrippa/admin/crypto/chains/${chain}/routes`, method: 'PUT', body }),
       invalidatesTags: ['Crypto'],
     }),
-    checkChains: build.mutation<unknown, void>({ query: () => ({ url: '/v1/admin/crypto/chains/check', method: 'POST' }), invalidatesTags: ['Crypto'] }),
+    checkChains: build.mutation<unknown, void>({ query: () => ({ url: '/v1/afrippa/admin/crypto/chains/check', method: 'POST' }), invalidatesTags: ['Crypto'] }),
     updateCryptoNetwork: build.mutation<
       CryptoNetworkSetting,
       {
@@ -284,27 +284,27 @@ const cryptoApi = bitocardApi.injectEndpoints({
         min_withdrawal?: string;
       }
     >({
-      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/networks/${id}`, method: 'PATCH', body }),
+      query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/crypto/networks/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Crypto'],
     }),
-    cryptoDeposits: build.query<List<CryptoDeposit>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/deposits', params }), providesTags: ['Crypto'] }),
-    recheckCryptoDeposit: build.mutation<CryptoDeposit, string>({ query: id => ({ url: `/v1/admin/crypto/deposits/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
-    cryptoWithdrawals: build.query<List<CryptoWithdrawal>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/withdrawals', params }), providesTags: ['Crypto'] }),
+    cryptoDeposits: build.query<List<CryptoDeposit>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/afrippa/admin/crypto/deposits', params }), providesTags: ['Crypto'] }),
+    recheckCryptoDeposit: build.mutation<CryptoDeposit, string>({ query: id => ({ url: `/v1/afrippa/admin/crypto/deposits/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
+    cryptoWithdrawals: build.query<List<CryptoWithdrawal>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/afrippa/admin/crypto/withdrawals', params }), providesTags: ['Crypto'] }),
     decideCryptoWithdrawal: build.mutation<CryptoWithdrawal, { id: string; decision: 'approve' | 'reject'; note: string }>({
-      query: ({ id, decision, note }) => ({ url: `/v1/admin/crypto/withdrawals/${id}/${decision}`, method: 'POST', body: { note } }),
+      query: ({ id, decision, note }) => ({ url: `/v1/afrippa/admin/crypto/withdrawals/${id}/${decision}`, method: 'POST', body: { note } }),
       invalidatesTags: ['Crypto'],
     }),
-    recheckCryptoWithdrawal: build.mutation<CryptoWithdrawal, string>({ query: id => ({ url: `/v1/admin/crypto/withdrawals/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
+    recheckCryptoWithdrawal: build.mutation<CryptoWithdrawal, string>({ query: id => ({ url: `/v1/afrippa/admin/crypto/withdrawals/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
     customerPayouts: build.query<List<CustomerPayout>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/payouts', params }), providesTags: ['Crypto'] }),
-    cryptoReconciliations: build.query<List<CryptoReconciliation>, Mode>({ query: mode => ({ url: '/v1/admin/crypto/reconciliations', params: { mode } }), providesTags: ['Crypto'] }),
+    cryptoReconciliations: build.query<List<CryptoReconciliation>, Mode>({ query: mode => ({ url: '/v1/afrippa/admin/crypto/reconciliations', params: { mode } }), providesTags: ['Crypto'] }),
     runCryptoReconciliation: build.mutation<{ object: 'crypto_reconciliation_run'; error: string | null; data: CryptoReconciliation[] }, Mode>({
-      query: mode => ({ url: '/v1/admin/crypto/reconciliations/run', method: 'POST', body: { mode } }),
+      query: mode => ({ url: '/v1/afrippa/admin/crypto/reconciliations/run', method: 'POST', body: { mode } }),
       invalidatesTags: ['Crypto'],
     }),
-    p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/ads', params }), providesTags: ['P2p'] }),
-    p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/trades', params }), providesTags: ['P2p'] }),
+    p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/afrippa/admin/p2p/ads', params }), providesTags: ['P2p'] }),
+    p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/afrippa/admin/p2p/trades', params }), providesTags: ['P2p'] }),
     cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
-      query: ({ id, reason }) => ({ url: `/v1/admin/p2p/ads/${id}/cancel`, method: 'POST', body: { reason } }),
+      query: ({ id, reason }) => ({ url: `/v1/afrippa/admin/p2p/ads/${id}/cancel`, method: 'POST', body: { reason } }),
       invalidatesTags: ['P2p', 'Crypto'],
     }),
   }),
