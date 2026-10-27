@@ -36,7 +36,7 @@ export default function PnlReportPage() {
     <AdminShell section="reports" current="/reports" crumbs={[{ label: "Reports", href: "/reports" }, { label: "P&L" }]}>
       <PageHeader
         title="Profit and loss"
-        description="Revenue BitoCard keeps for itself, less what suppliers charge for fulfilled orders and what it costs to run the business. Crypto revenue and spin rewards are not yet priced into this report."
+        description="Revenue BitoCard keeps for itself, less what suppliers charge for fulfilled orders and what it costs to run the business. Spin and win rewards count as promotions."
         actions={
           data ? (
             <div className="flex flex-wrap gap-2">
