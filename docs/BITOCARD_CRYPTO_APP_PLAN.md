@@ -1,5 +1,7 @@
 # BitoCard Crypto (`crypto.bitocard.com`): plan
 
+**Superseded on 27 October 2026:** crypto leaves BitoCard for its own brand and domain as a peer-to-peer market with escrow. See `docs/CRYPTO_SPINOFF_PLAN.md`; stages 5 to 7 below are cancelled.
+
 **Status:** planned 27 October 2026; the owner's decisions recorded the same day (below). Built so far: `crypto` reserved as a subdomain no store can take; stage 1, the API (below).
 
 BitoCard Crypto is a public crypto market app in the style of BitoCard Shop: `apps/crypto` at `https://crypto.bitocard.com`, with the **global market** at `/` (US dollars, traded across BitoCard's African markets) and a **country market** at `/<cc>` (`/ng` in naira, `/ke` in shillings, `/gh` in cedis). It is built on what already exists: the P2P order books, ads, instant trades, crypto wallets, deposits and withdrawals, cash-out and the sign-in handoff BitoCard Shop uses. What is new is the global book, the app itself, and **global money rails**: ways to pay USD in and take USD out that admins integrate and switch on.
