@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, lastEmailCode, startApp } from './helpers.mjs';
 
 const { signAfrippaRequest, verifyAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { afrippaOperatorId, afrippaStoreId } = await import('../dist/afrippa/ids.js');
@@ -111,7 +111,7 @@ describe('the gate in front of Afrippa’s routes', () => {
   });
 
   test("Afrippa's admin and chain notifications have their own checks, and the retired routes stay shut even signed", async () => {
-    const admin = await adminClient(server);
+    const admin = await afrippaAdminClient(server);
     assert.equal((await admin.get('/v1/afrippa/admin/crypto/assets')).status, 200);
     missing(await afrippa(server, 'GET', '/v1/crypto'));
     missing(await afrippa(server, 'GET', '/v1/exchange/desk'));

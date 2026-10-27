@@ -2,16 +2,18 @@
 // traps their crypto or P2P money. They can still see it, close their ads and withdraw; only new business is refused.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
+let afrippaAdmin;
 let prisma;
 
 before(async () => {
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
+  afrippaAdmin = await afrippaAdminClient(server);
 });
 
 after(async () => {
@@ -118,7 +120,7 @@ describe('crypto switched off, a coin delisted', () => {
       const networks = await shopper.get('/v1/afrippa/crypto/withdrawal-networks?asset=USDT');
       assert.equal(networks.status, 200, JSON.stringify(networks.json));
 
-      assert.equal((await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { enabled: false })).status, 200);
+      assert.equal((await afrippaAdmin.patch('/v1/afrippa/admin/crypto/assets/USDT', { enabled: false })).status, 200);
       const overview = (await shopper.get('/v1/afrippa/crypto')).json;
       const held = overview.assets.find(item => item.asset === 'USDT');
       assert.deepEqual([held?.enabled, held?.available], [false, '25.000000'], 'listed while held, marked switched off');
@@ -127,7 +129,7 @@ describe('crypto switched off, a coin delisted', () => {
       assert.equal((await other.get('/v1/afrippa/crypto')).json.assets.some(item => item.asset === 'USDT'), false, 'not listed for someone holding none');
       assert.equal((await shopper.get('/v1/afrippa/crypto/withdrawal-networks?asset=USDT')).status, 200, 'a delisted coin can still be withdrawn');
     } finally {
-      await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { enabled: true });
+      await afrippaAdmin.patch('/v1/afrippa/admin/crypto/assets/USDT', { enabled: true });
       await switches(null);
     }
   });

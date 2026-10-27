@@ -46,6 +46,8 @@ class PreferenceDto {
 /** The signed-in person (sessions only: API keys never register devices). */
 function pushCaller(caller: Caller): PushCaller {
   if (caller.kind !== 'session') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'session_required', 'Sign in to do this; API keys cannot.');
+  // Afrippa's admins get their own notifications with the shared tools made product-aware (plan step 2, item 2).
+  if (caller.realm === 'afrippa_admin') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'This account cannot use this endpoint.');
   return { owner: { userId: caller.userId }, audience: caller.realm, sessionId: caller.sessionId, adminRoles: caller.adminRoles };
 }
 

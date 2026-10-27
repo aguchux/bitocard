@@ -5,7 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { Realm, ResellerRole } from '../generated/prisma/client.js';
-import { type Caller, type CallerRequest, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, ROUTE_TWO_STEP_PENDING, requireStepUp } from './caller.js';
+import { type Caller, type CallerRequest, isAdminRealm, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, ROUTE_TWO_STEP_PENDING, requireStepUp } from './caller.js';
 import { twoStepPending } from './mfa-policy.js';
 import { freePlanCode } from '../plans/features.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
@@ -64,8 +64,11 @@ export class AuthGuard implements CanActivate {
 
     if (caller?.kind === 'session' && !safeMethods.has(req.method)) {
       const origin = req.get('origin');
-      if (!origin || !originAllowed(origin, this.config.ALLOWED_ORIGINS)) {
-        throw forbidden('This request must come from a BitoCard app.');
+      // Afrippa's admins change things only from their own app, and nothing of BitoCard's is changed from it.
+      const afrippaAdmin = new URL(this.config.AFRIPPA_ADMIN_APP_URL).origin;
+      const allowed = caller.realm === 'afrippa_admin' ? origin === afrippaAdmin : Boolean(origin) && origin !== afrippaAdmin && originAllowed(origin!, this.config.ALLOWED_ORIGINS);
+      if (!allowed) {
+        throw forbidden(caller.realm === 'afrippa_admin' ? 'This request must come from Afrippa\'s admin app.' : 'This request must come from a BitoCard app.');
       }
     }
 
@@ -96,10 +99,10 @@ export class AuthGuard implements CanActivate {
     }
 
     const adminRoles = meta<string[]>(ROUTE_ADMIN_ROLES);
-    if (realm === 'admin' && adminRoles && !caller.adminRoles.includes('super_admin') && !adminRoles.some(role => caller.adminRoles.includes(role))) {
+    if (isAdminRealm(realm) && adminRoles && !caller.adminRoles.includes('super_admin') && !adminRoles.some(role => caller.adminRoles.includes(role))) {
       throw forbidden('Your admin role does not allow this.');
     }
-    if (realm === 'admin' && meta<boolean>(ROUTE_STEP_UP)) requireStepUp(caller);
+    if (isAdminRealm(realm) && meta<boolean>(ROUTE_STEP_UP)) requireStepUp(caller);
 
     const roles = meta<ResellerRole[]>(ROUTE_ROLES);
     if (realm === 'reseller' && roles) {
@@ -144,7 +147,7 @@ export class AuthGuard implements CanActivate {
       resellerId,
       role,
       adminRoles: session.user.adminRoles,
-      stepUpUntil: realm === 'admin' ? session.stepUpUntil : null,
+      stepUpUntil: isAdminRealm(realm) ? session.stepUpUntil : null,
       twoStepPending: realm === 'reseller' && Boolean(await twoStepPending(this.prisma, session)),
     };
   }

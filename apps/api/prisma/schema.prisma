@@ -42,11 +42,13 @@ model IdempotencyKey {
 // M2: sign-in and access
 // ---------------------------------------------------------------------------
 
-/// Two separate worlds: resellers (and their staff) sign in to the dashboard; admins sign in to admin.bitocard.com.
-/// The same email can exist once in each realm.
+/// Separate worlds: resellers (and their staff) sign in to the dashboard; BitoCard's admins to admin.bitocard.com;
+/// Afrippa's admins to admin.afrippa.com (docs/CRYPTO_SPINOFF_PLAN.md). The same email can exist once in each realm,
+/// and no realm's session or account reaches another's routes.
 enum Realm {
   reseller
   admin
+  afrippa_admin
 }
 
 enum UserStatus {
@@ -888,9 +890,12 @@ model AuditLog {
   targetId   String   @map("target_id")
   before     Json?
   after      Json?
+  /// Whose admin made the change: BitoCard's admins read BitoCard's trail, Afrippa's admins Afrippa's.
+  platform   Platform @default(bitocard)
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([targetType, targetId])
+  @@index([platform, createdAt])
   @@index([createdAt])
   @@map("audit_logs")
 }

@@ -4,13 +4,15 @@ import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sha256 } from '../common/crypto.js';
 import type { Realm } from '../generated/prisma/client.js';
+import { isAdminRealm } from './caller.js';
 
 const hour = 60 * 60 * 1000;
 
-/** Each realm has its own cookie, so a reseller session can never reach the admin app and vice versa. */
+/** Each realm has its own cookie, so a session of one realm never reaches another's app or routes. */
 export const sessionPolicy: Record<Realm, { cookie: string; lifetimeMs: number }> = {
   reseller: { cookie: 'bc_session', lifetimeMs: 30 * 24 * hour },
   admin: { cookie: 'bc_admin_session', lifetimeMs: 12 * hour },
+  afrippa_admin: { cookie: 'afr_admin_session', lifetimeMs: 12 * hour },
 };
 
 const touchEveryMs = 5 * 60 * 1000;
@@ -67,12 +69,12 @@ export class SessionsService {
   }
 
   /**
-   * Resellers' `bc_session` is shared on SESSION_COOKIE_DOMAIN (the docs read it). The admin cookie is host-only and
-   * SameSite=Strict: it only ever goes to the API's own host, never to resellers' `<store>.bitocard.com` or any other
-   * subdomain, and never with a request started from another site.
+   * Resellers' `bc_session` is shared on SESSION_COOKIE_DOMAIN (the docs read it). Both admin cookies (BitoCard's and
+   * Afrippa's) are host-only and SameSite=Strict: they only ever go to the API host that set them, never to resellers'
+   * `<store>.bitocard.com` or any other subdomain, and never with a request started from another site.
    */
   private cookieOptions(realm: Realm): CookieOptions {
-    return realm === 'admin' ? { httpOnly: true, secure: this.config.cookieSecure, sameSite: 'strict', path: '/' } : this.sharedCookieOptions();
+    return isAdminRealm(realm) ? { httpOnly: true, secure: this.config.cookieSecure, sameSite: 'strict', path: '/' } : this.sharedCookieOptions();
   }
 
   private sharedCookieOptions(): CookieOptions {

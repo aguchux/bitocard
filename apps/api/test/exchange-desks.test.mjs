@@ -4,11 +4,12 @@
 // (resends capped); notices after trades and when a reserve runs low; the Coinbase cross-check; desk and trade lists.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
 let finance;
+let afrippaAdmin;
 let prisma;
 let prices;
 let coingecko;
@@ -33,6 +34,7 @@ before(async () => {
   prices = server.app.get((await import('../dist/crypto/prices.js')).CryptoPricesService);
   admin = await adminClient(server);
   finance = await adminClient(server, ['finance']);
+  afrippaAdmin = await afrippaAdminClient(server);
   for (const [source, rate] of [['open_exchange_rates', 1490], ['flutterwave', 1510]]) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: rate, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
@@ -172,7 +174,7 @@ describe('BitoCard desk', () => {
   test('the daily limit per customer and coin holds across trades', async () => {
     const shopper = await customer();
     await fund(shopper, 50_000_000_00);
-    assert.equal((await admin.patch('/v1/afrippa/admin/crypto/assets/BTC', { exchange_daily_limit: '0.015' })).json.exchange_daily_limit, '0.015');
+    assert.equal((await afrippaAdmin.patch('/v1/afrippa/admin/crypto/assets/BTC', { exchange_daily_limit: '0.015' })).json.exchange_daily_limit, '0.015');
     try {
       const first = await shopper.post('/v1/store/exchange/quotes', { asset: 'BTC', side: 'buy', amount: '0.01' });
       assert.equal((await shopper.post('/v1/store/exchange/trades', { quote_id: first.json.id })).status, 201);
@@ -181,7 +183,7 @@ describe('BitoCard desk', () => {
       assert.equal(refused.json.error.code, 'exchange_limit');
       assert.match(refused.json.error.message, /0\.005/);
     } finally {
-      assert.equal((await admin.patch('/v1/afrippa/admin/crypto/assets/BTC', { exchange_daily_limit: null })).json.exchange_daily_limit, null);
+      assert.equal((await afrippaAdmin.patch('/v1/afrippa/admin/crypto/assets/BTC', { exchange_daily_limit: null })).json.exchange_daily_limit, null);
     }
   });
 

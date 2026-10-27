@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, adminCode, afrippaAdminClient, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let prisma;
@@ -72,8 +72,11 @@ const protectedRoutes = [
 
 describe('admin step-up window', () => {
   test('every protected route refuses without the window, before validation or lookups', async () => {
-    const admin = await adminClient(server, ['super_admin'], { stepUp: false });
+    const bitocard = await adminClient(server, ['super_admin'], { stepUp: false });
+    // Afrippa's admin routes are its own admins' (their own realm), with their own step-up.
+    const afrippa = await afrippaAdminClient(server, ['super_admin'], { stepUp: false });
     for (const [method, path, body] of protectedRoutes) {
+      const admin = path.startsWith('/v1/afrippa/admin/') ? afrippa : bitocard;
       const res = method === 'delete' ? await admin.delete(path) : await admin[method](path, body);
       assert.deepEqual([res.status, res.json?.error?.code], [403, 'step_up_required'], `${method.toUpperCase()} ${path}`);
     }

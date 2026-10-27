@@ -669,7 +669,7 @@ class AdminListDto {
 
 /** Admin: crypto assets, customers' crypto wallets and freezes. */
 @ApiExcludeController()
-@RealmOnly('admin')
+@RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/crypto')
 export class AdminCryptoController {
@@ -753,7 +753,7 @@ export class AdminCryptoController {
 
 /** Admin: the P2P market's ads and trades. */
 @ApiExcludeController()
-@RealmOnly('admin')
+@RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/p2p')
 export class AdminP2pController {
@@ -829,7 +829,7 @@ class DepositListDto {
 
 /** Admin: chains (providers in order, their health, networks) and deposits. */
 @ApiExcludeController()
-@RealmOnly('admin')
+@RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/crypto')
 export class AdminChainsController {
@@ -891,7 +891,7 @@ class WithdrawalListDto {
 
 /** Admin: on-chain withdrawals (approve or reject those waiting for review, recheck stuck ones). */
 @ApiExcludeController()
-@RealmOnly('admin')
+@RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/crypto/withdrawals')
 export class AdminWithdrawalsController {
@@ -933,7 +933,7 @@ class ModeDto {
 
 /** Admin: the daily custody check (crypto_custody against the signer's wallets), and running it now. */
 @ApiExcludeController()
-@RealmOnly('admin')
+@RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance')
 @Controller('afrippa/admin/crypto/reconciliations')
 export class AdminReconciliationsController {

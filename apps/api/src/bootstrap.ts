@@ -32,9 +32,11 @@ export async function createApp(options: AppOptions = {}) {
   app.use(securityHeaders);
   app.use(cookieParser());
   const config = app.get<AppConfig>(APP_CONFIG);
-  // Browsers on BitoCard apps may call the API with cookies; anything else uses API keys and needs no CORS.
+  // Browsers on BitoCard apps, and Afrippa's admin app, may call the API with cookies; anything else uses API keys and
+  // needs no CORS.
+  const afrippaAdmin = new URL(config.AFRIPPA_ADMIN_APP_URL).origin;
   const cors = {
-    origin: (origin: string | undefined, done: (error: Error | null, allow?: boolean) => void) => done(null, !origin || originAllowed(origin, config.ALLOWED_ORIGINS)),
+    origin: (origin: string | undefined, done: (error: Error | null, allow?: boolean) => void) => done(null, !origin || origin === afrippaAdmin || originAllowed(origin, config.ALLOWED_ORIGINS)),
     credentials: true,
     // `authorization`: the docs send a short-lived "Try it" token (never a stored API key) from the browser.
     allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'bitocard-reseller', 'bitocard-mode', 'x-request-id'],

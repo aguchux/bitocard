@@ -2,16 +2,18 @@
 // admin freezes. Races from other P2P systems (two buyers on one ad, cancel against a trade) must never move money twice.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
+let afrippaAdmin;
 let prisma;
 
 before(async () => {
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
+  afrippaAdmin = await afrippaAdminClient(server);
 });
 
 after(async () => {
@@ -305,41 +307,41 @@ describe('admin freezes', () => {
     const ad = await trader.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'ETH', price: 500_000_000, amount: '1', min_fiat: 100_00, max_fiat: 10_000_000_00 });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
 
-    const support = await adminClient(server, ['support']);
-    assert.equal((await support.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' })).status, 403);
-    const tooMuch = await admin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '1.5', mode: 'test', reason: 'Checking a report' });
+    const afrippaSupport = await afrippaAdminClient(server, ['support']);
+    assert.equal((await afrippaSupport.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' })).status, 403);
+    const tooMuch = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '1.5', mode: 'test', reason: 'Checking a report' });
     assert.deepEqual([tooMuch.status, tooMuch.json.error.code], [402, 'insufficient_funds'], 'only available crypto, never what an ad locks');
-    const freeze = await admin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' });
+    const freeze = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' });
     assert.equal(freeze.status, 201, JSON.stringify(freeze.json));
     assert.deepEqual([(await balance(trader, 'ETH')).available, (await balance(trader, 'ETH')).frozen], ['0.50000000', '0.50000000']);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: trader.id, type: 'customer.crypto.frozen' } }));
 
     const [first, second] = await Promise.all([
-      admin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),
-      admin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),
+      afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),
+      afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),
     ]);
     assert.deepEqual([first.status, second.status].sort(), [200, 409], 'released once');
     assert.equal((await balance(trader, 'ETH')).available, '1.00000000');
 
-    const again = await admin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
-    assert.equal((await admin.post(`/v1/afrippa/admin/crypto/freezes/${again.json.id}/seize`, { note: 'Order 123' })).status, 200, 'super admins pass every role');
-    const operations = await adminClient(server, ['operations']);
-    const third = await admin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
-    assert.equal((await operations.post(`/v1/afrippa/admin/crypto/freezes/${third.json.id}/seize`, { note: 'Order 124' })).status, 403, 'only finance seizes');
+    const again = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
+    assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${again.json.id}/seize`, { note: 'Order 123' })).status, 200, 'super admins pass every role');
+    const afrippaOperations = await afrippaAdminClient(server, ['operations']);
+    const third = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
+    assert.equal((await afrippaOperations.post(`/v1/afrippa/admin/crypto/freezes/${third.json.id}/seize`, { note: 'Order 124' })).status, 403, 'only finance seizes');
     assert.equal((await balance(trader, 'ETH')).frozen, '0.25000000');
 
-    const frozen = await admin.put(`/v1/afrippa/admin/crypto/customers/${trader.id}/account-freeze`, { frozen: true, reason: 'Fraud report' });
+    const frozen = await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${trader.id}/account-freeze`, { frozen: true, reason: 'Fraud report' });
     assert.deepEqual([frozen.status, frozen.json.frozen], [200, true]);
     assert.equal((await trader.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'ETH', price: 500_000_000, amount: '0.1', min_fiat: 100_00, max_fiat: 100_000_00 })).json.error.code, 'crypto_account_frozen');
     assert.equal((await buyer.get('/v1/afrippa/p2p/market?asset=ETH&side=buy')).json.data.some(item => item.id === ad.json.id), false, 'their ads leave the market');
     await fund(buyer, 10_000_00);
     assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 500_000_000, fiat: 5_000_00 })).json.error.code, 'ad_unavailable');
-    assert.equal((await admin.put(`/v1/afrippa/admin/crypto/customers/${trader.id}/account-freeze`, { frozen: false, reason: 'Cleared' })).json.frozen, false);
+    assert.equal((await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${trader.id}/account-freeze`, { frozen: false, reason: 'Cleared' })).json.frozen, false);
     assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 500_000_000, fiat: 5_000_00 })).status, 201);
 
-    const view = await support.get(`/v1/afrippa/admin/crypto/customers/${trader.id}`);
+    const view = await afrippaSupport.get(`/v1/afrippa/admin/crypto/customers/${trader.id}`);
     assert.deepEqual(view.json.freezes.map(item => item.status).sort(), ['frozen', 'released', 'seized']);
-    assert.ok((await support.get(`/v1/afrippa/admin/p2p/trades?customer_id=${trader.id}`)).json.data.length === 1);
+    assert.ok((await afrippaSupport.get(`/v1/afrippa/admin/p2p/trades?customer_id=${trader.id}`)).json.data.length === 1);
     const audit = await prisma.auditLog.findMany({ where: { targetId: trader.id, action: { startsWith: 'crypto.' } } });
     assert.deepEqual([...new Set(audit.map(item => item.action))].sort(), ['crypto.account_frozen', 'crypto.account_unfrozen', 'crypto.frozen', 'crypto.seized', 'crypto.unfrozen']);
     await cryptoConserved();
@@ -348,7 +350,7 @@ describe('admin freezes', () => {
 
   test('live crypto needs the identity check; test credits are sandbox only', async () => {
     const shopper = await customer();
-    const credited = await admin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset: 'USDC', amount: '5', reason: 'Trying the market' });
+    const credited = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset: 'USDC', amount: '5', reason: 'Trying the market' });
     assert.equal(credited.status, 201, JSON.stringify(credited.json));
     assert.equal(credited.json.balances.test.find(item => item.asset === 'USDC').available, '5.000000');
     const off = await admin.put('/v1/admin/integrations/checkout', { values: { CHECKOUT_SANDBOX: false }, code: await adminCode(server, admin) });
@@ -469,10 +471,10 @@ describe('paying P2P money out to a bank', () => {
   test('a frozen account pays nothing out; money can still be paid out after crypto is switched off', async () => {
     const seller = await sellerWithProceeds();
     const account = (await seller.post('/v1/store/cash/bank-accounts', { bank_code: 'SBX002', account_number: '1234567890' })).json;
-    await admin.put(`/v1/afrippa/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: true, reason: 'checking a report' });
+    await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: true, reason: 'checking a report' });
     const frozen = await seller.post('/v1/store/cash/payouts', { amount: 15_000_00, bank_account_id: account.id });
     assert.deepEqual([frozen.status, frozen.json.error.code], [403, 'crypto_account_frozen']);
-    await admin.put(`/v1/afrippa/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: false, reason: 'cleared' });
+    await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: false, reason: 'cleared' });
     await switches(false);
     try {
       const cash = await seller.get('/v1/store/cash');
@@ -528,7 +530,7 @@ describe('taking all of an ad', () => {
     assert.equal(trade.status, 201, JSON.stringify(trade.json));
     assert.deepEqual([trade.json.amount, trade.json.fiat], ['1.000001', 165000]);
     assert.equal((await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.json.id } })).status, 'completed');
-    const listed = (await admin.get(`/v1/afrippa/admin/p2p/trades?customer_id=${buyer.id}`)).json.data[0];
+    const listed = (await afrippaAdmin.get(`/v1/afrippa/admin/p2p/trades?customer_id=${buyer.id}`)).json.data[0];
     assert.deepEqual([listed.role, listed.taker], [null, 'buyer'], 'admins see who took the ad, not a viewer role');
     await ledgerOk();
     await cryptoConserved();
@@ -538,7 +540,7 @@ describe('taking all of an ad', () => {
 describe('markets: the global market and trading across borders', () => {
   /** Sets a switch at one scope (`country` or global), or clears it with null. */
   const set = async (key, enabled, country) => assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, ...(country ? { country_code: country } : {}) })).status, 200);
-  const credit = async (shopper, asset, amount) => assert.equal((await admin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing markets' })).status, 201);
+  const credit = async (shopper, asset, amount) => assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing markets' })).status, 201);
   const holding = async (shopper, kind, currency) => (await prisma.ledgerAccount.findFirst({ where: { customerId: shopper.id, mode: 'test', kind, currency } }))?.balanceMinor ?? 0n;
   const keys = ['crypto_wallets', 'p2p_trading', 'crypto_global', 'crypto_cross_border', 'crypto_app'];
 
@@ -745,8 +747,8 @@ describe('markets: the global market and trading across borders', () => {
 
 describe('market limits, the cross-border hold and the public pages', () => {
   const set = async (key, enabled, country) => assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, ...(country ? { country_code: country } : {}) })).status, 200);
-  const credit = async (shopper, asset, amount) => assert.equal((await admin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing limits' })).status, 201);
-  const limits = body => admin.put('/v1/afrippa/admin/crypto/market-limits', { mode: 'test', ...body });
+  const credit = async (shopper, asset, amount) => assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing limits' })).status, 201);
+  const limits = body => afrippaAdmin.put('/v1/afrippa/admin/crypto/market-limits', { mode: 'test', ...body });
   const publicGet = async path => {
     const res = await fetch(`${server.base}${path}`);
     return { status: res.status, cache: res.headers.get('cache-control'), json: await res.json() };
@@ -772,7 +774,7 @@ describe('market limits, the cross-border hold and the public pages', () => {
     const saved = await limits({ market: 'NG', currency: 'NGN', per_trade: 60_00, per_day: 100_00 });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
     assert.deepEqual([saved.json.per_trade, saved.json.per_day, saved.json.cross_border_per_trade], [60_00, 100_00, null]);
-    assert.equal((await admin.get('/v1/afrippa/admin/crypto/market-limits?mode=test')).json.data.some(row => row.market === 'NG' && row.currency === 'NGN'), true);
+    assert.equal((await afrippaAdmin.get('/v1/afrippa/admin/crypto/market-limits?mode=test')).json.data.some(row => row.market === 'NG' && row.currency === 'NGN'), true);
 
     const seller = await customer('NG');
     const buyer = await customer('NG');

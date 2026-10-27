@@ -3,7 +3,7 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { AdminRoles, RealmOnly } from '../auth/caller.js';
-import type { LedgerMode } from '../generated/prisma/client.js';
+import type { LedgerMode, Platform } from '../generated/prisma/client.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { FxModule } from '../fx/fx.module.js';
 import { AdminOverviewService } from './overview.service.js';
@@ -34,25 +34,17 @@ class ActivityQueryDto {
   @IsOptional() @IsUUID() starting_after?: string;
 }
 
-/** Every admin change across the platform (the audit trail), newest first. */
-@ApiExcludeController()
-@RealmOnly('admin')
-@Controller('admin/activity')
-export class AdminActivityController {
-  constructor(private readonly prisma: PrismaService) {}
-
-  @AdminRoles('operations', 'support', 'finance')
-  @Get()
-  async list(@Query() query: ActivityQueryDto) {
+/** A product's audit trail, newest first: BitoCard's admins read BitoCard's, Afrippa's admins Afrippa's. */
+async function auditTrail(prisma: PrismaService, platform: Platform, query: ActivityQueryDto) {
     const limit = query.limit ?? 50;
-    const entries = await this.prisma.auditLog.findMany({
-      where: { targetType: query.target_type, actorId: query.actor_id },
+    const entries = await prisma.auditLog.findMany({
+      where: { platform, targetType: query.target_type, actorId: query.actor_id },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(query.starting_after ? { cursor: { id: query.starting_after }, skip: 1 } : {}),
     });
     const actorIds = [...new Set(entries.map(entry => entry.actorId).filter((id): id is string => id !== null))];
-    const actors = new Map((await this.prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true, email: true } })).map(user => [user.id, user]));
+    const actors = new Map((await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true, email: true } })).map(user => [user.id, user]));
     return {
       object: 'list' as const,
       data: entries.slice(0, limit).map(entry => ({
@@ -68,8 +60,35 @@ export class AdminActivityController {
       })),
       has_more: entries.length > limit,
     };
+}
+
+/** Every BitoCard admin change (the audit trail), newest first. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@Controller('admin/activity')
+export class AdminActivityController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get()
+  list(@Query() query: ActivityQueryDto) {
+    return auditTrail(this.prisma, 'bitocard', query);
   }
 }
 
-@Module({ imports: [FxModule], controllers: [AdminOverviewController, AdminActivityController], providers: [AdminOverviewService] })
+/** Every Afrippa admin change, newest first: Afrippa's own audit trail (docs/CRYPTO_SPINOFF_PLAN.md). */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin/activity')
+export class AfrippaAdminActivityController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get()
+  list(@Query() query: ActivityQueryDto) {
+    return auditTrail(this.prisma, 'afrippa', query);
+  }
+}
+
+@Module({ imports: [FxModule], controllers: [AdminOverviewController, AdminActivityController, AfrippaAdminActivityController], providers: [AdminOverviewService] })
 export class AdminModule {}

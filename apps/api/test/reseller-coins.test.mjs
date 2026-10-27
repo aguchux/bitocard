@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import { pbkdf2Sync } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { HDKey } from '@scure/bip32';
-import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
+let afrippaAdmin;
 let prisma;
 let chain;
 
@@ -34,12 +35,13 @@ before(async () => {
   server = await startApp({ env: { CRON_SECRET: 'cron-secret' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
+  afrippaAdmin = await afrippaAdminClient(server);
   const update = async (id, values) => assert.equal((await admin.put(`/v1/admin/integrations/${id}`, { values, code: await adminCode(server, admin) })).status, 200);
   await update('crypto_keys', { CRYPTO_TEST_XPUB_EVM: testnet.derive("m/44'/60'/0'").publicExtendedKey });
   await update('getblock', { GETBLOCK_ETHEREUM_URL: `${chain.url}/evm`, GETBLOCK_SANDBOX: true });
   const usdt = await prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: 'USDT', chain: 'ETHEREUM' } } });
-  assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { deposits_enabled: true, withdrawals_enabled: true, test_contract: usdtContract, withdrawal_fee: '1.5', min_withdrawal: '5' })).status, 200);
-  assert.equal((await admin.patch('/v1/afrippa/admin/crypto/assets/USDT', { withdrawal_daily_limit: '500', withdrawal_review_from: '300' })).status, 200);
+  assert.equal((await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { deposits_enabled: true, withdrawals_enabled: true, test_contract: usdtContract, withdrawal_fee: '1.5', min_withdrawal: '5' })).status, 200);
+  assert.equal((await afrippaAdmin.patch('/v1/afrippa/admin/crypto/assets/USDT', { withdrawal_daily_limit: '500', withdrawal_review_from: '300' })).status, 200);
 });
 
 after(async () => {
@@ -91,7 +93,7 @@ describe('a reseller’s own coins on chain', () => {
     const held = asset => browser.get('/v1/crypto', headers).then(res => res.json.assets.find(item => item.asset === asset));
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['100.000000', '0.000000']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'crypto.deposit_credited', resellerId } }), 'the reseller is told');
-    const adminDeposit = (await admin.get(`/v1/afrippa/admin/crypto/deposits?reseller_id=${resellerId}`)).json.data;
+    const adminDeposit = (await afrippaAdmin.get(`/v1/afrippa/admin/crypto/deposits?reseller_id=${resellerId}`)).json.data;
     assert.deepEqual(adminDeposit.map(item => [item.customer, item.reseller?.id]), [[null, resellerId]]);
 
     const added = await browser.post('/v1/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Treasury' }, headers);
@@ -133,7 +135,7 @@ describe('a reseller’s own coins on chain', () => {
     assert.equal(done.status, 'completed', JSON.stringify(done));
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['78.500000', '0.000000']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'crypto.withdrawal_sent', resellerId } }));
-    const listed = (await admin.get(`/v1/afrippa/admin/crypto/withdrawals?reseller_id=${resellerId}`)).json.data;
+    const listed = (await afrippaAdmin.get(`/v1/afrippa/admin/crypto/withdrawals?reseller_id=${resellerId}`)).json.data;
     assert.deepEqual(listed.map(item => [item.status, item.customer, item.reseller?.id]), [['completed', null, resellerId]]);
     const entries = await prisma.journalEntry.findMany({ where: { reference: { startsWith: `crypto_withdrawal:${asked.json.id}` } }, select: { resellerId: true } });
     assert.ok(entries.length === 2 && entries.every(entry => entry.resellerId === resellerId), 'the entries carry the reseller');

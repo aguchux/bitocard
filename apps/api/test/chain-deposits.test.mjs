@@ -5,10 +5,12 @@ import assert from 'node:assert/strict';
 import { createHmac, pbkdf2Sync } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { HDKey } from '@scure/bip32';
-import { adminClient, adminCode, fakeService, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, adminCode, fakeService, lastEmailCode, startApp } from './helpers.mjs';
 
 let server;
 let admin;
+/** Afrippa's admin (its own realm): Afrippa's admin routes refuse BitoCard's admins. */
+let afrippaAdmin;
 let prisma;
 let chain;
 let derive;
@@ -93,6 +95,7 @@ before(async () => {
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   derive = await import('../dist/crypto/derive.js');
   admin = await adminClient(server);
+  afrippaAdmin = await afrippaAdminClient(server);
   for (const key of ['crypto_wallets', 'p2p_trading']) await admin.put(`/v1/admin/switches/${key}`, { enabled: true });
 });
 
@@ -163,7 +166,7 @@ describe('deposits', () => {
     await update('mempool', { MEMPOOL_ENABLED: true, MEMPOOL_API_URL: `${chain.url}/btc`, MEMPOOL_SANDBOX: true });
     for (const [asset, chainName, testContract] of [['USDT', 'ETHEREUM', usdtContract], ['USDT', 'BSC', bscUsdt], ['USDT', 'TRON', 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'], ['BTC', 'BITCOIN', null]]) {
       const found = await network(asset, chainName);
-      const changed = await admin.patch(`/v1/afrippa/admin/crypto/networks/${found.id}`, { deposits_enabled: true, ...(testContract ? { test_contract: testContract } : {}) });
+      const changed = await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${found.id}`, { deposits_enabled: true, ...(testContract ? { test_contract: testContract } : {}) });
       assert.equal(changed.status, 200, JSON.stringify(changed.json));
     }
   });
@@ -190,7 +193,7 @@ describe('deposits', () => {
   test('Polygon, Arbitrum, Base and Optimism give the customer the same EVM address as Ethereum', async () => {
     await update('getblock', { GETBLOCK_POLYGON_URL: `${chain.url}/evm2` });
     const usdc = await network('USDC', 'POLYGON');
-    assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdc.id}`, { deposits_enabled: true })).status, 200);
+    assert.equal((await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${usdc.id}`, { deposits_enabled: true })).status, 200);
     try {
       const shopper = await customer();
       const networks = (await shopper.get('/v1/afrippa/crypto/deposit-networks?asset=USDC')).json.data;
@@ -202,7 +205,7 @@ describe('deposits', () => {
       // Arbitrum is switched off: not offered.
       assert.equal((await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDC', chain: 'ARBITRUM' })).json.error.code, 'deposits_unavailable');
     } finally {
-      await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdc.id}`, { deposits_enabled: false });
+      await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${usdc.id}`, { deposits_enabled: false });
     }
   });
 
@@ -240,7 +243,7 @@ describe('deposits', () => {
       await cron('crypto');
       await cron('crypto');
       assert.equal(await balance(shopper, 'USDT'), '1.500000', 'BEP-20 USDT has 18 places on chain, 6 in the wallet');
-      const chains = (await admin.get('/v1/afrippa/admin/crypto/chains')).json.data;
+      const chains = (await afrippaAdmin.get('/v1/afrippa/admin/crypto/chains')).json.data;
       const ethereum = chains.find(item => item.chain === 'ETHEREUM');
       assert.match(ethereum.routes.find(item => item.provider === 'quicknode').last_error, /HTTP 503/);
       assert.deepEqual(ethereum.keys, { live: false, test: true });
@@ -253,9 +256,9 @@ describe('deposits', () => {
     const shopper = await customer();
     const address = (await shopper.post('/v1/afrippa/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
     const usdt = await network('USDT', 'ETHEREUM');
-    assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { double_check_from: '1000' })).status, 200);
+    assert.equal((await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${usdt.id}`, { double_check_from: '1000' })).status, 200);
     // Only GetBlock serves Ethereum for now.
-    assert.equal((await admin.put('/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock'], disabled: ['quicknode'] })).status, 200);
+    assert.equal((await afrippaAdmin.put('/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock'], disabled: ['quicknode'] })).status, 200);
     evmTransfer(chain.state, { hash: txHash(4), to: address, raw: 1_200_000_000n, block: 345n });
     chain.state.latest = 360n;
     await cron('crypto');
@@ -266,7 +269,7 @@ describe('deposits', () => {
     assert.ok(told.length, 'operations are told a large deposit has no second provider');
     await cron('crypto');
     assert.equal(await prisma.notification.count({ where: { dedupeKey: `admin.crypto.deposit_stuck:double_check:${waiting.id}` } }), told.length, 'once');
-    assert.equal((await admin.put('/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock', 'quicknode'], disabled: [] })).status, 200);
+    assert.equal((await afrippaAdmin.put('/v1/afrippa/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock', 'quicknode'], disabled: [] })).status, 200);
     await cron('crypto');
     const done = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
     assert.deepEqual([done.status, done.confirmedBy.sort()], ['credited', ['getblock', 'quicknode']]);
@@ -315,7 +318,7 @@ describe('deposits', () => {
     assert.equal(await balance(shopper, 'BTC'), '0.00123456');
     const row = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
     assert.equal(row.outputIndex, 1);
-    const listed = (await admin.get(`/v1/afrippa/admin/crypto/deposits?customer_id=${shopper.id}`)).json.data;
+    const listed = (await afrippaAdmin.get(`/v1/afrippa/admin/crypto/deposits?customer_id=${shopper.id}`)).json.data;
     assert.deepEqual(listed.map(item => [item.status, item.amount, item.confirmed_by]), [['credited', '0.00123456', ['mempool']]]);
     await ledgerOk();
   });
@@ -323,7 +326,7 @@ describe('deposits', () => {
   test('the health job records each provider’s latest block', async () => {
     const result = await cron('chain-health');
     assert.ok(result.result.results.some(item => item.provider === 'getblock' && item.ok));
-    const bitcoin = (await admin.get('/v1/afrippa/admin/crypto/chains')).json.data.find(item => item.chain === 'BITCOIN');
+    const bitcoin = (await afrippaAdmin.get('/v1/afrippa/admin/crypto/chains')).json.data.find(item => item.chain === 'BITCOIN');
     const mempool = bitcoin.routes.find(item => item.provider === 'mempool');
     assert.deepEqual([mempool.configured, mempool.environment, mempool.last_block, mempool.lists_deposits], [true, 'sandbox', '801', true]);
   });
@@ -332,13 +335,13 @@ describe('deposits', () => {
 describe('deposits are never silently missed', () => {
   test('a chain whose providers cannot list a kind of deposit says so instead of reporting nothing', async () => {
     const eth = await network('ETH', 'ETHEREUM');
-    assert.equal((await admin.patch(`/v1/afrippa/admin/crypto/networks/${eth.id}`, { deposits_enabled: true })).status, 200);
+    assert.equal((await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${eth.id}`, { deposits_enabled: true })).status, 200);
     try {
       const run = await cron('crypto');
       assert.deepEqual(run.result.deposits['test:ETHEREUM'].notes, ['coin deposits: webhooks only (no provider here lists them)'], 'only Alchemy lists plain ETH deposits');
       assert.equal(run.result.deposits['test:TRON'].skipped, 'no provider lists token deposits (webhooks only)', 'only TronGrid lists TRON token deposits');
     } finally {
-      await admin.patch(`/v1/afrippa/admin/crypto/networks/${eth.id}`, { deposits_enabled: false });
+      await afrippaAdmin.patch(`/v1/afrippa/admin/crypto/networks/${eth.id}`, { deposits_enabled: false });
     }
   });
 
@@ -366,7 +369,7 @@ describe('deposits are never silently missed', () => {
     assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'failed');
     chain.state.txs.set(txHash(7), saved);
     chain.state.latest += 20n;
-    const rechecked = await admin.post(`/v1/afrippa/admin/crypto/deposits/${row.id}/recheck`);
+    const rechecked = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/deposits/${row.id}/recheck`);
     assert.deepEqual([rechecked.status, rechecked.json.status], [200, 'credited']);
     assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).missingSince, null, 'seen again: no longer missing');
     assert.equal(await balance(shopper, 'USDT'), '3.000000');
@@ -556,7 +559,7 @@ describe('providers on the wrong network', () => {
     const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
     const deposits = server.app.get(CryptoDepositsService);
     assert.deepEqual((await deposits.routes('ETHEREUM', 'live')).map(route => route.provider.id), [], 'never routed for live deposits');
-    const route = (await admin.get('/v1/afrippa/admin/crypto/chains')).json.data.find(item => item.chain === 'ETHEREUM').routes.find(item => item.provider === 'chainstack');
+    const route = (await afrippaAdmin.get('/v1/afrippa/admin/crypto/chains')).json.data.find(item => item.chain === 'ETHEREUM').routes.find(item => item.provider === 'chainstack');
     assert.match(route.last_error, /test network/);
 
     // On the main network it serves live stores.

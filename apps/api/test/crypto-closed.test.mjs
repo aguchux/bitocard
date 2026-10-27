@@ -4,7 +4,7 @@
 // /v1/store/cash, and production refuses to open them.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 const { loadConfig } = await import('../dist/config/config.js');
 const { closedCryptoRoutes } = await import('../dist/afrippa/gate.guard.js');
@@ -87,9 +87,10 @@ describe('crypto is closed to BitoCard', () => {
     const open = await startApp({ env: { CRYPTO_ROUTES: 'open', CHECKOUT_SANDBOX: 'on' } });
     try {
       const admin = await adminClient(open);
+      const afrippaAdmin = await afrippaAdminClient(open);
       for (const path of ['/v1/admin/crypto/assets', '/v1/admin/p2p/ads']) assert.equal((await admin.get(path)).status, 404, path);
-      assert.equal((await admin.get('/v1/afrippa/admin/crypto/assets')).status, 200);
-      assert.equal((await admin.get('/v1/afrippa/admin/p2p/ads')).status, 200);
+      assert.equal((await afrippaAdmin.get('/v1/afrippa/admin/crypto/assets')).status, 200);
+      assert.equal((await afrippaAdmin.get('/v1/afrippa/admin/p2p/ads')).status, 200);
       assert.equal((await fetch(`${open.base}/v1/afrippa/markets`)).status, 200);
       assert.equal((await fetch(`${open.base}/v1/crypto/markets`)).status, 404);
       // Customers are told apart on Afrippa's routes as on the stores': the same Idempotency-Key from two customers is

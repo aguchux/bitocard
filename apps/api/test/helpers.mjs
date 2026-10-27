@@ -19,6 +19,8 @@ import { Public, Scopes } from '../dist/auth/caller.js';
 export const dockerUrl = process.env.TEST_DATABASE_URL;
 export const useRedis = Boolean(process.env.TEST_REDIS_REST_URL);
 export const appOrigin = 'http://localhost:3004';
+/** Afrippa's admin app in tests (its admins' changes are accepted only from it). */
+export const afrippaAdminOrigin = 'http://localhost:3010';
 
 /** Settings every test app starts with; tests can override any of them. */
 const baseEnv = {
@@ -33,6 +35,7 @@ const baseEnv = {
   // Crypto's routes are closed for BitoCard (afrippa/gate.guard.ts: Afrippa's need its server's signature); the crypto code's tests run them unsigned.
   CRYPTO_ROUTES: 'open',
   ALLOWED_ORIGINS: `${appOrigin},https://*.bitocard.com`,
+  AFRIPPA_ADMIN_APP_URL: afrippaAdminOrigin,
   COOKIE_SECURE: 'off',
   RESEND_API_KEY: '',
   MAILERSEND_API_KEY: '',
@@ -181,20 +184,30 @@ export async function lastEmailCode(app, to) {
 
 let adminCounter = 0;
 
-/** A signed-in admin (password plus authenticator) with the given roles, as a browser-like client. */
-export async function adminClient(server, roles = ['super_admin'], { stepUp = true } = {}) {
+/** Each admin realm's address domain, sign-in routes, authenticator name and app. */
+const adminRealmTest = {
+  admin: { domain: 'bitocard.com', auth: '/v1/admin/auth', issuer: 'BitoCard Admin', origin: appOrigin },
+  afrippa_admin: { domain: 'afrippa.com', auth: '/v1/afrippa/admin/auth', issuer: 'Afrippa Admin', origin: afrippaAdminOrigin },
+};
+
+/**
+ * A signed-in admin (password plus authenticator) with the given roles, as a browser-like client: BitoCard's by
+ * default, or Afrippa's (`realm: 'afrippa_admin'`, see `afrippaAdminClient`).
+ */
+export async function adminClient(server, roles = ['super_admin'], { stepUp = true, realm = 'admin' } = {}) {
   const { AdminAuthService } = await import('../dist/auth/admin-auth.service.js');
-  const email = `admin${(adminCounter += 1)}-${Date.now()}@bitocard.com`;
+  const settings = adminRealmTest[realm];
+  const email = `admin${(adminCounter += 1)}-${Date.now()}@${settings.domain}`;
   const password = 'admin passphrase long';
-  await server.app.get(AdminAuthService).createAdmin({ email, name: 'Test Admin', password, roles });
+  await server.app.get(AdminAuthService).createAdmin({ email, name: 'Test Admin', password, roles, realm });
   // Like the admin app, sends an Idempotency-Key with every POST.
-  const browser = client(server.base, { autoIdempotency: true });
-  const { json: challenge } = await browser.post('/v1/admin/auth/signin', { email, password });
-  const { json: setup } = await browser.post('/v1/admin/auth/mfa/setup', { challenge_token: challenge.challenge_token });
-  const code = new TOTP({ issuer: 'BitoCard Admin', label: email, secret: Secret.fromBase32(setup.secret) }).generate();
-  const verified = await browser.post('/v1/admin/auth/mfa/verify', { challenge_token: challenge.challenge_token, code });
+  const browser = client(server.base, { autoIdempotency: true, origin: settings.origin });
+  const { json: challenge } = await browser.post(`${settings.auth}/signin`, { email, password });
+  const { json: setup } = await browser.post(`${settings.auth}/mfa/setup`, { challenge_token: challenge.challenge_token });
+  const code = new TOTP({ issuer: settings.issuer, label: email, secret: Secret.fromBase32(setup.secret) }).generate();
+  const verified = await browser.post(`${settings.auth}/mfa/verify`, { challenge_token: challenge.challenge_token, code });
   if (verified.status !== 200) throw new Error(`Admin sign-in failed: ${JSON.stringify(verified.json)}`);
-  browser.admin = { email, secret: setup.secret };
+  browser.admin = { email, secret: setup.secret, realm };
   if (!stepUp) return browser;
   // Like the admin app: a sensitive action outside the step-up window answers step_up_required, so the admin enters
   // their authenticator code (opening 5 minutes) and the action is tried again once.
@@ -203,12 +216,17 @@ export async function adminClient(server, roles = ['super_admin'], { stepUp = tr
     browser[method] = async (...args) => {
       const first = await send(...args);
       if (first.status !== 403 || first.json?.error?.code !== 'step_up_required') return first;
-      const opened = await browser.post('/v1/admin/auth/step-up', { code: await adminCode(server, browser) });
+      const opened = await browser.post(`${settings.auth}/step-up`, { code: await adminCode(server, browser) });
       if (opened.status !== 200) throw new Error(`Admin step-up failed: ${JSON.stringify(opened.json)}`);
       return send(...args);
     };
   }
   return browser;
+}
+
+/** A signed-in Afrippa admin (admin.afrippa.com's realm), for Afrippa's admin routes (`/v1/afrippa/admin/…`). */
+export function afrippaAdminClient(server, roles = ['super_admin'], options = {}) {
+  return adminClient(server, roles, { ...options, realm: 'afrippa_admin' });
 }
 
 /**
@@ -218,9 +236,10 @@ export async function adminClient(server, roles = ['super_admin'], { stepUp = tr
 export async function adminCode(server, browser) {
   const { PrismaService } = await import('../dist/database/prisma.service.js');
   const prisma = server.app.get(PrismaService);
-  const user = await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email: browser.admin.email } });
+  const realm = browser.admin.realm ?? 'admin';
+  const user = await prisma.user.findFirstOrThrow({ where: { realm, email: browser.admin.email } });
   await prisma.totpCredential.update({ where: { userId: user.id }, data: { lastUsedStep: null } });
-  return new TOTP({ issuer: 'BitoCard Admin', label: browser.admin.email, secret: Secret.fromBase32(browser.admin.secret) }).generate();
+  return new TOTP({ issuer: adminRealmTest[realm].issuer, label: browser.admin.email, secret: Secret.fromBase32(browser.admin.secret) }).generate();
 }
 
 /** A newly signed-up reseller owner. */

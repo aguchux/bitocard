@@ -121,6 +121,14 @@ export const configSchema = z.object({
   ADMIN_SETUP_EMAILS: list.transform(items => items.map(item => item.toLowerCase())).prefault(''),
   /** The admin app (admin.bitocard.com): set-password links point here. Environment only, like the line above. */
   ADMIN_APP_URL: z.string().url().default('https://admin.bitocard.com'),
+  /**
+   * Afrippa's admins (admin.afrippa.com, their own realm): the email domains they may sign in with, the addresses its
+   * sign-in page may set up or reset (as ADMIN_SETUP_EMAILS for BitoCard's), and the app's address (links point there,
+   * and their session's changes are accepted only from its origin). Environment only, like BitoCard's.
+   */
+  AFRIPPA_ADMIN_EMAIL_DOMAINS: list.prefault('afrippa.com'),
+  AFRIPPA_ADMIN_SETUP_EMAILS: list.transform(items => items.map(item => item.toLowerCase())).prefault(''),
+  AFRIPPA_ADMIN_APP_URL: z.string().url().default('https://admin.afrippa.com'),
 
   /** Where links in emails point (the reseller dashboard). */
   DASHBOARD_URL: z.string().url().default('https://shq.bitocard.com'),

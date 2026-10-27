@@ -2,16 +2,21 @@ import type { EmailMessage } from './email.service.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
-function layout(heading: string, paragraphs: string[], code?: string) {
+/** Whose email it is: BitoCard's, or Afrippa's (its admins' sign-in emails). */
+export type EmailProduct = 'BitoCard' | 'Afrippa';
+const footers: Record<EmailProduct, string> = { BitoCard: 'BitoCard, a Golojan Ltd venture.', Afrippa: 'Afrippa.' };
+
+function layout(heading: string, paragraphs: string[], code?: string, product: EmailProduct = 'BitoCard') {
+  const footer = footers[product];
   const html = [
     '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
     `<h1 style="font-size:20px">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
     code ? `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(code)}</p>` : '',
-    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    `<p style="font-size:13px;color:#5b6488">${escape(footer)}</p>`,
     '</div>',
   ].join('');
-  const text = [heading, '', ...paragraphs, ...(code ? ['', code] : []), '', 'BitoCard, a Golojan Ltd venture.'].join('\n');
+  const text = [heading, '', ...paragraphs, ...(code ? ['', code] : []), '', footer].join('\n');
   return { html, text };
 }
 
@@ -83,14 +88,19 @@ export function emailChangedEmail(to: string, newEmail: string): EmailMessage {
   };
 }
 
-export function passwordChangedEmail(to: string): EmailMessage {
+export function passwordChangedEmail(to: string, product: EmailProduct = 'BitoCard'): EmailMessage {
   return {
     to,
-    subject: 'Your BitoCard password was changed',
-    ...layout('Your password was changed', [
-      'Your BitoCard password was just changed and your other sessions were signed out.',
-      'If you did not make this change, reset your password and contact support@bitocard.com.',
-    ]),
+    subject: `Your ${product} password was changed`,
+    ...layout(
+      'Your password was changed',
+      [
+        `Your ${product} password was just changed and your other sessions were signed out.`,
+        product === 'BitoCard' ? 'If you did not make this change, reset your password and contact support@bitocard.com.' : 'If you did not make this change, reset your password and tell the Afrippa team at once.',
+      ],
+      undefined,
+      product,
+    ),
   };
 }
 
@@ -128,19 +138,26 @@ export function twoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 
 }
 
 /** A set-password link for an admin (from the admin sign-in page: a first visit, or Forgot password). */
-export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number }): EmailMessage {
+export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number; product?: EmailProduct }): EmailMessage {
   const created = input.kind === 'create';
-  const message = layout(created ? 'Set up your BitoCard admin account' : 'Reset your BitoCard admin password', [
-    `Hello ${input.name},`,
-    created
-      ? 'Your BitoCard admin account is ready. Choose your password with this link, then sign in and set up your authenticator app.'
-      : 'Someone asked to reset the password of your BitoCard admin account. Choose a new password with this link. You can also reset your authenticator app there if you no longer have it.',
-    `The link works once, for ${input.hours} hours: ${input.link}`,
-    'If you were not expecting this, do not use the link and tell the BitoCard team at once.',
-  ]);
+  const product = input.product ?? 'BitoCard';
+  const subject = created ? `Set up your ${product} admin account` : `Reset your ${product} admin password`;
+  const message = layout(
+    subject,
+    [
+      `Hello ${input.name},`,
+      created
+        ? `Your ${product} admin account is ready. Choose your password with this link, then sign in and set up your authenticator app.`
+        : `Someone asked to reset the password of your ${product} admin account. Choose a new password with this link. You can also reset your authenticator app there if you no longer have it.`,
+      `The link works once, for ${input.hours} hours: ${input.link}`,
+      `If you were not expecting this, do not use the link and tell the ${product} team at once.`,
+    ],
+    undefined,
+    product,
+  );
   return {
     to,
-    subject: created ? 'Set up your BitoCard admin account' : 'Reset your BitoCard admin password',
+    subject,
     text: message.text,
     html: message.html.replace(escape(input.link), `<a href="${escape(input.link)}">${escape(input.link)}</a>`),
   };

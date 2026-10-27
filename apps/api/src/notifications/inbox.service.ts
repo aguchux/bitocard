@@ -84,7 +84,8 @@ export class InboxService {
   async person(userId: string, type: PersonalNotificationType, content: NotificationContent) {
     await this.safely(type, async () => {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { realm: true } });
-      return user ? this.create([{ audience: user.realm, userId, resellerId: null }], type, content) : 0;
+      // Afrippa's admins have no inbox here yet (plan step 2, item 2).
+      return user && user.realm !== 'afrippa_admin' ? this.create([{ audience: user.realm, userId, resellerId: null }], type, content) : 0;
     });
   }
 

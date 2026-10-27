@@ -54,6 +54,11 @@ export const ROUTE_TWO_STEP_PENDING = 'auth:two-step-pending';
 /** How long an admin's authenticator code opens sensitive actions for, on that session. */
 export const stepUpWindowMs = 5 * 60_000;
 
+/** The admins' realms: BitoCard's (admin.bitocard.com) and Afrippa's (admin.afrippa.com), each refusing the other. */
+export const adminRealms = ['admin', 'afrippa_admin'] as const satisfies readonly Realm[];
+export type AdminRealm = (typeof adminRealms)[number];
+export const isAdminRealm = (realm: Realm): realm is AdminRealm => (adminRealms as readonly Realm[]).includes(realm);
+
 /**
  * The same rules, written into the OpenAPI document for the docs: `x-bitocard-auth` (`public`, `session` or, by default,
  * `api_key` for routes that also accept keys), `x-bitocard-scopes` and `x-bitocard-roles`. A route's own value wins over its
@@ -70,7 +75,7 @@ export const Public = () => applyDecorators(SetMetadata(PUBLIC_ROUTE, true), Api
  */
 export const CronOnly = () => SetMetadata(ROUTE_CRON, true);
 
-/** Which realm may call the route. Defaults to `reseller`; admin routes must say `admin`. */
+/** Which realm may call the route. Defaults to `reseller`; BitoCard's admin routes say `admin`, Afrippa's `afrippa_admin`. */
 export const RealmOnly = (realm: Realm) => SetMetadata(ROUTE_REALM, realm);
 
 /** Reseller staff roles allowed to call the route (sessions). Owners are always allowed. */
@@ -88,7 +93,7 @@ export const StepUp = () => SetMetadata(ROUTE_STEP_UP, true);
 
 /** The same rule inside a handler, for actions sensitive only in some cases (a money decision, activating a reseller). */
 export function requireStepUp(caller: Caller) {
-  if (caller.kind === 'session' && caller.realm === 'admin' && caller.stepUpUntil && caller.stepUpUntil > new Date()) return;
+  if (caller.kind === 'session' && isAdminRealm(caller.realm) && caller.stepUpUntil && caller.stepUpUntil > new Date()) return;
   throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'step_up_required', 'Enter the code from your authenticator app to continue.');
 }
 
