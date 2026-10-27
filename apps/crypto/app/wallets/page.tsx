@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreP2pProfile } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "@bitocard/crypto-ui/coins";
 import { NicknameForm } from "@bitocard/crypto-ui/forms";
@@ -14,7 +15,8 @@ const button = "inline-flex min-h-11 items-center justify-center rounded-xl px-4
 
 /**
  * The customer's wallets for trading: each coin (available, in ads, frozen), their P2P money in every currency they
- * hold, and their nickname. Adding money, deposits, withdrawals and cash out open their account app (`/go/<place>`).
+ * hold, and their nickname. Deposits, withdrawals and cash out are on this site; adding money opens their account app
+ * (`/go/wallet`).
  */
 export default async function WalletsPage() {
   await requireCustomer("/wallets");
@@ -48,15 +50,15 @@ export default async function WalletsPage() {
         <AccountLink place="wallet" className={button}>
           Add money
         </AccountLink>
-        <AccountLink place="deposit" className={button}>
+        <Link href="/deposit" className={button}>
           Deposit coins
-        </AccountLink>
-        <AccountLink place="withdraw" className={button}>
+        </Link>
+        <Link href="/withdraw" className={button}>
           Withdraw coins
-        </AccountLink>
-        <AccountLink place="cash-out" className={button}>
+        </Link>
+        <Link href="/cash-out" className={button}>
           Cash out
-        </AccountLink>
+        </Link>
       </div>
       <section className={cardClass} aria-labelledby="coins">
         <h2 id="coins" className="font-semibold">

@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import type { MoneyLinks } from "@bitocard/crypto-ui/money-views";
 import { type Customer, currentCustomer, signInPath } from "@/lib/customer";
 
 /** The signed-in customer, their email confirmed; else signing in (or confirming the email) first, back to `next`. */
@@ -11,16 +12,23 @@ export async function requireCustomer(next: string): Promise<Customer> {
 }
 
 /**
- * Money in and out of BitoCard wallets stays on the customer's account app for now (their country store): adding money,
- * depositing and withdrawing coins, cashing out, and the identity check. `/go/<place>` takes them there, signed in.
+ * What stays on the customer's account app (their country store) for now: adding money to their wallets and the
+ * identity check. `/go/<place>` takes them there, signed in. Deposits, withdrawals and cash out are on this site.
  */
 export const accountPlaces = {
   wallet: "/account/wallet",
-  deposit: "/account/crypto/deposit",
-  withdraw: "/account/crypto/withdraw",
-  "cash-out": "/account/crypto/cash-out",
   verification: "/account/verification",
 } as const;
+
+const chosen = (asset: string, chain?: string) => `?${new URLSearchParams({ asset, ...(chain ? { chain } : {}) })}`;
+
+/** This site's money pages, for the shared deposit, withdrawal and cash-out views (`@bitocard/crypto-ui`). */
+export const moneyLinks: MoneyLinks = {
+  deposit: (asset, chain) => `/deposit${chosen(asset, chain)}`,
+  withdraw: (asset, chain) => `/withdraw${chosen(asset, chain)}`,
+  withdrawal: id => `/withdrawals/${id}`,
+  verification: "/go/verification",
+};
 
 export type AccountPlace = keyof typeof accountPlaces;
 

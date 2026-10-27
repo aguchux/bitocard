@@ -6,7 +6,21 @@ import { colors } from "@bitocard/ui/tokens";
 import { InstallSupport } from "@bitocard/ui/install-ui";
 import { installCaptureScript } from "@bitocard/ui/install";
 import { CryptoActionsProvider } from "@bitocard/crypto-ui/forms";
+import { MoneyActionsProvider } from "@bitocard/crypto-ui/money-forms";
 import { changeAd, chooseNickname, confirmTrade, postAd, repriceAd, takeAd } from "@/lib/trade";
+import {
+  addCashOutAccount,
+  addWithdrawalAddress,
+  cancelWithdrawal,
+  cashOut,
+  confirmWithdrawal,
+  createWithdrawal,
+  removeCashOutAccount,
+  removeWithdrawalAddress,
+  resendWithdrawalCode,
+  reviewWithdrawal,
+  simulateCashOut,
+} from "@/lib/money";
 import "./globals.css";
 
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
@@ -61,9 +75,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
           Skip to content
         </a>
-        {/* The shared trading forms act through this site's own server actions and pages. */}
+        {/* The shared trading and money forms act through this site's own server actions and pages. */}
         <CryptoActionsProvider actions={{ takeAd, confirmTrade, postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post", wallet: "/go/wallet" }}>
-          {children}
+          <MoneyActionsProvider
+            actions={{ addWithdrawalAddress, removeWithdrawalAddress, reviewWithdrawal, createWithdrawal, confirmWithdrawal, resendWithdrawalCode, cancelWithdrawal, addCashOutAccount, removeCashOutAccount, cashOut, simulateCashOut }}
+          >{children}</MoneyActionsProvider>
         </CryptoActionsProvider>
         <Footer />
         <InstallSupport />

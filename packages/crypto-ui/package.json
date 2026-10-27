@@ -10,7 +10,13 @@
     "./market-switcher": "./src/market-switcher.tsx",
     "./forms": "./src/forms.tsx",
     "./trade-actions": "./src/trade-actions.ts",
-    "./trade-views": "./src/trade-views.tsx"
+    "./trade-views": "./src/trade-views.tsx",
+    "./wallets": "./src/wallets.ts",
+    "./qr": "./src/qr.ts",
+    "./money-forms": "./src/money-forms.tsx",
+    "./money-actions": "./src/money-actions.ts",
+    "./money-views": "./src/money-views.tsx",
+    "./wallet-views": "./src/wallet-views.tsx"
   },
   "scripts": {
     "lint": "eslint .",
@@ -24,12 +30,14 @@
   "dependencies": {
     "@bitocard/api-client": "*",
     "@bitocard/ui": "*",
-    "lucide-react": "^1.52.0"
+    "lucide-react": "^1.52.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@bitocard/eslint-config": "*",
     "@bitocard/typescript-config": "*",
     "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

@@ -1,12 +1,12 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreP2pAd, StoreP2pQuote, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
+import type { StoreP2pAd, StoreP2pQuote } from "@bitocard/api-client/storefront";
 import type { FormState } from "@/lib/account-actions";
 import { customerApi } from "@/lib/customer";
 import { exchangeHref } from "@/lib/exchange";
+import { moneyActions } from "@bitocard/crypto-ui/money-actions";
 import { tradeActions } from "@bitocard/crypto-ui/trade-actions";
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
@@ -29,8 +29,6 @@ function cryptoAmount(value: string) {
  * a key, so trying again after fixing something must be a new request.
  */
 export type NonceFormState = FormState & { nonce?: string };
-const nonceOf = (form: FormData) => text(form, "nonce") || undefined;
-const fresh = (state: FormState): NonceFormState => ({ ...state, nonce: randomUUID() });
 
 function signInFirst(status: number, path: string) {
   if (status === 401) redirect(`/signin?next=${encodeURIComponent(path)}`);
@@ -117,141 +115,56 @@ export async function chooseNickname(_state: FormState, form: FormData): Promise
   return trade.chooseNickname(form);
 }
 
-// -- Withdrawals ----------------------------------------------------------------------------------------------------
+// -- Withdrawals and cashing out (`@bitocard/crypto-ui`, shared with BitoCard Crypto) -----------------------------------
 
-/** Saves an address to withdraw to (usable 24 hours later; the customer is emailed). */
+const money = moneyActions({
+  api: customerApi,
+  paths: {
+    withdraw: "/account/crypto/withdraw",
+    withdrawConfirm: "/account/crypto/withdraw/confirm",
+    withdrawal: id => `/account/crypto/withdrawals/${id}`,
+    cashOut: "/account/crypto/cash-out",
+    signIn: next => `/signin?next=${encodeURIComponent(next)}`,
+    refresh: ["/account/crypto"],
+    // The same accounts are BitoCard Shop's payout accounts for Safe pay sales (the Shop tab's Safe pay page adds them too).
+    bankAccountsAlso: ["/shop/safe-pay"],
+  },
+  redirect,
+  revalidate: revalidatePath,
+});
+
 export async function addWithdrawalAddress(_state: FormState, form: FormData): Promise<FormState> {
-  const address = text(form, "address");
-  const label = text(form, "label");
-  if (!address) return { error: "Paste the address.", field: "address" };
-  if (!label) return { error: "Give the address a name you will recognise.", field: "label" };
-  const result = await customerApi<StoreWithdrawalAddress>("POST", "/v1/store/crypto/withdrawal-addresses", { chain: text(form, "chain"), address, label });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/withdraw");
-    return { error: result.message, field: result.param === "address" || result.param === "label" ? result.param : null };
-  }
-  revalidatePath("/account/crypto/withdraw");
-  return { notice: `Saved. You can send to "${result.data.label}" from ${new Date(result.data.usable_from).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}.` };
+  return money.addWithdrawalAddress(form);
 }
-
 export async function removeWithdrawalAddress(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi("DELETE", `/v1/store/crypto/withdrawal-addresses/${encodeURIComponent(text(form, "id"))}`);
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/withdraw");
-    return { error: result.message };
-  }
-  revalidatePath("/account/crypto/withdraw");
-  return {};
+  return money.removeWithdrawalAddress(form);
 }
-
-/** Checks the amount and goes to the confirmation, where the customer sees the fee and total before anything moves. */
 export async function reviewWithdrawal(_state: FormState, form: FormData): Promise<FormState> {
-  const amount = cryptoAmount(text(form, "amount"));
-  const addressId = text(form, "address_id");
-  if (!addressId) return { error: "Choose where to send it.", field: "address_id" };
-  if (!amount) return { error: "Enter how much to send.", field: "amount" };
-  const body = { asset: text(form, "asset"), chain: text(form, "chain"), address_id: addressId, amount, preview: true };
-  const result = await customerApi("POST", "/v1/store/crypto/withdrawals", body);
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/withdraw");
-    return { error: result.message, field: result.param === "amount" ? "amount" : null };
-  }
-  redirect(`/account/crypto/withdraw/confirm?${new URLSearchParams({ asset: body.asset, chain: body.chain, address: addressId, amount }).toString()}`);
+  return money.reviewWithdrawal(form);
 }
-
-/** Asks for the withdrawal: its amount and fee leave the wallet, and a code is emailed to confirm it. */
 export async function createWithdrawal(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
-  const body = { asset: text(form, "asset"), chain: text(form, "chain"), address_id: text(form, "address_id"), amount: text(form, "amount") };
-  const result = await customerApi<StoreCryptoWithdrawal>("POST", "/v1/store/crypto/withdrawals", body, { idempotencyKey: nonceOf(form) });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/withdraw");
-    return fresh({ error: result.message });
-  }
-  revalidatePath("/account/crypto", "layout");
-  redirect(`/account/crypto/withdrawals/${result.data.id}`);
+  return money.createWithdrawal(form);
 }
-
-/** The emailed code confirms the withdrawal. */
 export async function confirmWithdrawal(_state: FormState, form: FormData): Promise<FormState> {
-  const id = text(form, "id");
-  const code = text(form, "code").replace(/\s/g, "");
-  if (!/^\d{6}$/.test(code)) return { error: "Enter the 6-digit code we emailed you.", field: "code" };
-  const result = await customerApi<StoreCryptoWithdrawal>("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/confirm`, { code });
-  if (!result.ok) return { error: result.message, field: "code" };
-  revalidatePath(`/account/crypto/withdrawals/${id}`);
-  return { notice: result.data.status === "review" ? "Confirmed. BitoCard checks this withdrawal before it is sent." : "Confirmed. Your withdrawal is on its way." };
+  return money.confirmWithdrawal(form);
 }
-
 export async function resendWithdrawalCode(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(text(form, "id"))}/resend-code`);
-  if (!result.ok) return { error: result.message };
-  return { notice: "A new code is on its way to your email." };
+  return money.resendWithdrawalCode(form);
 }
-
 export async function cancelWithdrawal(_state: FormState, form: FormData): Promise<FormState> {
-  const id = text(form, "id");
-  const result = await customerApi("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/cancel`);
-  if (!result.ok) {
-    signInFirst(result.status, `/account/crypto/withdrawals/${id}`);
-    return { error: result.message };
-  }
-  revalidatePath(`/account/crypto/withdrawals/${id}`);
-  revalidatePath("/account/crypto", "layout");
-  return {};
+  return money.cancelWithdrawal(form);
 }
-
-// -- Paying P2P money out to a bank ---------------------------------------------------------------------------------
-
-/** Adds a bank account for P2P money (in the customer's verified name; usable after 24 hours on live stores). */
 export async function addCashOutAccount(_state: FormState, form: FormData): Promise<FormState> {
-  const bankCode = text(form, "bank_code");
-  const accountNumber = text(form, "account_number").replace(/\s/g, "");
-  if (!bankCode) return { error: "Choose your bank.", field: "bank_code" };
-  if (!/^\d{6,20}$/.test(accountNumber)) return { error: "Enter your account number, digits only.", field: "account_number" };
-  const result = await customerApi<StoreCustomerBankAccount>("POST", "/v1/store/crypto/cash/bank-accounts", { bank_code: bankCode, account_number: accountNumber });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/cash-out");
-    return { error: result.message, field: result.param === "account_number" || result.param === "bank_code" ? result.param : null };
-  }
-  revalidatePath("/account/crypto/cash-out");
-  // The same accounts are BitoCard Shop's payout accounts for Safe pay sales (the Shop tab's Safe pay page adds them too).
-  revalidatePath("/shop/safe-pay");
-  return { notice: `Added ${result.data.bank_name} ending ${result.data.account_number_last4} (${result.data.account_name}).` };
+  return money.addCashOutAccount(form);
 }
-
 export async function removeCashOutAccount(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi("DELETE", `/v1/store/crypto/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/cash-out");
-    return { error: result.message };
-  }
-  revalidatePath("/account/crypto/cash-out");
-  return {};
+  return money.removeCashOutAccount(form);
 }
-
-/** Pays P2P money out to one of the customer's bank accounts (the amount typed in their currency). */
 export async function cashOut(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
-  const amount = toMinor(text(form, "amount"));
-  const account = text(form, "bank_account_id");
-  if (!account) return { error: "Choose the account to pay into.", field: "bank_account_id" };
-  if (!amount) return { error: "Enter how much to pay out.", field: "amount" };
-  const result = await customerApi<StoreCustomerPayout>("POST", "/v1/store/crypto/cash/payouts", { amount, bank_account_id: account }, { idempotencyKey: nonceOf(form) });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/cash-out");
-    return fresh({ error: result.message, field: result.param === "amount" ? "amount" : null });
-  }
-  revalidatePath("/account/crypto/cash-out");
-  revalidatePath("/account/crypto", "layout");
-  // A fresh nonce: another payout from the same form is a new request.
-  return fresh({ notice: result.data.status === "failed" ? `The bank refused it: ${result.data.failure_reason ?? "try another account"}. The money is back in your balance.` : "On its way to your bank." });
+  return money.cashOut(form);
 }
-
-/** Sandbox stores only: settles a test payout as paid or failed. */
 export async function simulateCashOut(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi("POST", `/v1/store/crypto/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
-  if (!result.ok) return { error: result.message };
-  revalidatePath("/account/crypto/cash-out");
-  return {};
+  return money.simulateCashOut(form);
 }
 
 /** The best price on the P2P market for a coin and side right now (fiat minor units per whole coin), or null with no ad. */

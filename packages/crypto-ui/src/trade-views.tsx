@@ -4,6 +4,9 @@ import { ShieldCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreP2pAd, type StoreP2pQuote, type StoreP2pTrade } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "./coins";
 
+/** A card on the crypto pages. */
+export const cardClass = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
+
 /**
  * The declaration every account makes before trading: not a citizen or resident of the United States or the United
  * Kingdom. `action` is the app's server action recording it (`POST /v1/store/crypto/declaration { version }`).
@@ -26,9 +29,6 @@ export function CryptoDeclaration({ version, action }: { version: string; action
     </form>
   );
 }
-
-/** A card on the crypto pages. */
-export const cardClass = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
 export const tradeDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 

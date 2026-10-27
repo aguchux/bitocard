@@ -168,15 +168,16 @@ describe("the small parts of a market page", () => {
     for (const href of ["/wallets", "/ads", "/trades"]) expect(signedIn).toContain(`href="${href}"`);
   });
 
-  test("money in and out opens the customer's account app, signed in there; signed out, signing in here first", async () => {
+  test("adding money and the identity check open the customer's account app, signed in there; deposits are on this site", async () => {
     const go = (place: string) => goPlace(new NextRequest(`https://crypto.bitocard.com/go/${place}`), { params: Promise.resolve({ place }) });
-    expect((await go("deposit")).headers.get("location")).toBe("https://crypto.bitocard.com/signin?next=%2Fgo%2Fdeposit");
+    expect((await go("wallet")).headers.get("location")).toBe("https://crypto.bitocard.com/signin?next=%2Fgo%2Fwallet");
     expect((await go("nowhere")).headers.get("location")).toBe("https://crypto.bitocard.com/");
+    expect((await go("deposit")).headers.get("location")).toBe("https://crypto.bitocard.com/");
     setRequest({}, { bc_customer: "bcc_token" });
     answer();
-    const sent = new URL((await go("deposit")).headers.get("location")!);
+    const sent = new URL((await go("verification")).headers.get("location")!);
     expect(sent.origin + sent.pathname).toBe("https://crypto.bitocard.com/handoff/go");
-    expect([sent.searchParams.get("to"), sent.searchParams.get("next")]).toEqual(["https://ng.bitocard.com", "/account/crypto/deposit"]);
+    expect([sent.searchParams.get("to"), sent.searchParams.get("next")]).toEqual(["https://ng.bitocard.com", "/account/verification"]);
   });
 
   test("the account pages ask to sign in first; signed in, the wallets show every currency of P2P money", async () => {
@@ -186,7 +187,7 @@ describe("the small parts of a market page", () => {
     const html = render(await WalletsPage());
     expect(html).toContain("You trade as TraderA");
     expect(html).toContain("GHS");
-    expect(html).toContain('href="/go/cash-out"');
+    for (const href of ["/deposit", "/withdraw", "/cash-out", "/go/wallet"]) expect(html).toContain(`href="${href}"`);
     expect(html).toContain("One question before you trade");
   });
 
