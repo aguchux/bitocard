@@ -330,17 +330,17 @@ export class StoresService {
       const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { status: true } });
       return reseller?.status === 'active' ? { available: true, reason: null } : { available: false, reason: 'Finish your identity check to open a Resale shop.' };
     }
-    if (!template.crypto) return { available: true, reason: null };
-    const on = (await this.settings.isOn('crypto_exchange', resellerId)) || (await this.settings.isOn('p2p_trading', resellerId));
-    return on ? { available: true, reason: null } : { available: false, reason: 'Crypto trading is not switched on for your stores yet.' };
+    // Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): the crypto desk is never offered again.
+    if (template.crypto) return { available: false, reason: 'The crypto desk is no longer offered.' };
+    return { available: true, reason: null };
   }
 
-  /** Every template, its variants and themes, and whether each is open to the reseller. */
+  /** Every template, its variants and themes, and whether each is open to the reseller (the crypto desk left with crypto). */
   async templates(resellerId: string) {
     return {
       object: 'list' as const,
       data: await Promise.all(
-        storeTemplates.map(async template => ({
+        storeTemplates.filter(template => !template.crypto).map(async template => ({
           object: 'store_template' as const,
           key: template.key,
           name: template.name,

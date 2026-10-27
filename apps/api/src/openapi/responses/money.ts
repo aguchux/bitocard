@@ -1,5 +1,5 @@
 import { planLimitCatalogue, planLimits } from '../../plans/features.js';
-import { planFeatureCatalogue, planFeatureGroups, planFeatures } from '../../plans/plans.service.js';
+import { bitocardPlanFeatures, planFeatureCatalogue, planFeatureGroups } from '../../plans/plans.service.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, num, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
@@ -359,10 +359,10 @@ const Plan = objectSchema(
       },
       'The price.',
     ),
-    features: array(oneOf('A plan feature.', planFeatures), 'What the plan includes, by code: `feature_details` names and describes each. An API call needing a feature the plan does not include is refused (403 `plan_feature_required`, `param` the feature).'),
+    features: array(oneOf('A plan feature.', bitocardPlanFeatures), 'What the plan includes, by code: `feature_details` names and describes each. An API call needing a feature the plan does not include is refused (403 `plan_feature_required`, `param` the feature).'),
     description: nullable(str('What the plan is for.')),
     feature_details: array(
-      shape({ code: oneOf('The feature.', planFeatures), scope: oneOf('Where it applies: to each store (`store`) or to your whole account (`account`).', ['store', 'account']), group: oneOf('Where it is listed: running independently, selling, crypto, support and protection, or team.', Object.keys(planFeatureGroups)), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
+      shape({ code: oneOf('The feature.', bitocardPlanFeatures), scope: oneOf('Where it applies: to each store (`store`) or to your whole account (`account`).', ['store', 'account']), group: oneOf('Where it is listed: running independently, selling, support and protection, or team.', Object.keys(planFeatureGroups).filter(group => group !== 'crypto')), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
       'The features in words, in the order they are shown.',
     ),
     limits: shape(

@@ -7,13 +7,13 @@ import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
 import { FxService } from '../fx/fx.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureCatalogue, planFeatureGroups, planFeatures, planLimitCatalogue, planLimits } from './features.js';
+import { bitocardPlanFeatures, freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureCatalogue, planFeatureGroups, planFeatures, planLimitCatalogue, planLimits } from './features.js';
 import { PlanAccessService } from './plan-access.js';
 
-export { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures, type PlanFeature } from './features.js';
+export { bitocardPlanFeatures, freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures, type PlanFeature } from './features.js';
 
 export function presentPlan(plan: Plan) {
-  return { object: 'plan' as const, code: plan.code, name: plan.name, price: { amount: plan.priceCents, currency: 'USD', interval: 'month' }, features: plan.features };
+  return { object: 'plan' as const, code: plan.code, name: plan.name, price: { amount: plan.priceCents, currency: 'USD', interval: 'month' }, features: plan.features.filter(code => (bitocardPlanFeatures as readonly string[]).includes(code)) };
 }
 
 /** What a reseller pays for a plan a month in one currency: the admin's fixed price, else the dollar price converted. */
@@ -30,7 +30,7 @@ export function presentPlanDetail(plan: Plan, local: LocalPrice | null, limits: 
   return {
     ...presentPlan(plan),
     description: plan.description,
-    feature_details: planFeatures.filter(code => plan.features.includes(code)).map(code => ({ code, ...planFeatureCatalogue[code] })),
+    feature_details: bitocardPlanFeatures.filter(code => plan.features.includes(code)).map(code => ({ code, ...planFeatureCatalogue[code] })),
     limits,
     local_price: local ? { amount: Number(local.amount), currency: local.currency, fixed: local.fixed } : null,
   };
@@ -134,8 +134,8 @@ export class PlansService {
           ),
         })),
       ),
-      groups: Object.entries(planFeatureGroups).map(([code, name]) => ({ code, name })),
-      features: planFeatures.map(code => ({ code, ...planFeatureCatalogue[code] })),
+      groups: Object.entries(planFeatureGroups).filter(([code]) => code !== 'crypto').map(([code, name]) => ({ code, name })),
+      features: bitocardPlanFeatures.map(code => ({ code, ...planFeatureCatalogue[code] })),
       limits: planLimits.map(code => {
         const { scope, group, name, unit, description, max } = planLimitCatalogue[code];
         return { code, scope, group, name, unit, description, max, default: this.access.limitOf({ limits: {} }, code) };

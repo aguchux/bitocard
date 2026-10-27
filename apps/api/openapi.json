@@ -46316,8 +46316,6 @@
                     "international_selling",
                     "white_label",
                     "store_traffic",
-                    "onchain_crypto",
-                    "reseller_desks",
                     "chargeback_protection",
                     "priority_support",
                     "ai_assistant",
@@ -50066,8 +50064,6 @@
                 "international_selling",
                 "white_label",
                 "store_traffic",
-                "onchain_crypto",
-                "reseller_desks",
                 "chargeback_protection",
                 "priority_support",
                 "ai_assistant",
@@ -50112,8 +50108,6 @@
                     "international_selling",
                     "white_label",
                     "store_traffic",
-                    "onchain_crypto",
-                    "reseller_desks",
                     "chargeback_protection",
                     "priority_support",
                     "ai_assistant",
@@ -50130,11 +50124,10 @@
                 },
                 "group": {
                   "type": "string",
-                  "description": "Where it is listed: running independently, selling, crypto, support and protection, or team.",
+                  "description": "Where it is listed: running independently, selling, support and protection, or team.",
                   "enum": [
                     "independence",
                     "selling",
-                    "crypto",
                     "support",
                     "team"
                   ]

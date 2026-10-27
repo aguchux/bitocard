@@ -92,25 +92,19 @@ describe('the templates', () => {
     assert.equal(templateSells({ template: 'rdp_shop', focus: null }, { key: 'vpn:WW:bitocard:vpn-access-30d', category: 'vpn' }), false);
   });
 
-  test('the list, with the crypto desk open only once the reseller’s exchange or P2P is switched on, and the Resale shop once reselling is', async () => {
+  test('the list without the crypto desk (it left with crypto), and the Resale shop once reselling is', async () => {
     const reseller = await seller();
     const listed = await reseller.browser.get('/v1/store-templates');
     assert.equal(listed.status, 200, JSON.stringify(listed.json));
     check('GET /v1/store-templates', 200, listed.json);
-    const crypto = () => listed.json.data.find(item => item.key === 'crypto_desk');
-    assert.deepEqual([crypto().available, crypto().reason], [false, 'Crypto trading is not switched on for your stores yet.']);
+    assert.equal(listed.json.data.some(item => item.key === 'crypto_desk'), false);
     const resale = listed.json.data.find(item => item.key === 'resale_shop');
     assert.deepEqual([resale.available, resale.reason], [false, 'Reselling BitoCard Shop listings is not open to your account yet.']);
-    assert.ok(listed.json.data.filter(item => !['crypto_desk', 'resale_shop'].includes(item.key)).every(item => item.available));
-    const refused = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk' });
-    assert.deepEqual([refused.status, refused.json.error.code], [403, 'template_unavailable']);
-
+    assert.ok(listed.json.data.filter(item => item.key !== 'resale_shop').every(item => item.available));
+    // Not even with crypto's switches on for them.
     assert.equal((await admin.put('/v1/admin/switches/p2p_trading', { reseller_id: reseller.resellerId, enabled: true })).status, 200);
-    const again = await reseller.browser.get('/v1/store-templates');
-    assert.equal(again.json.data.find(item => item.key === 'crypto_desk').available, true);
-    const desk = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk', variant: 'terminal', theme: 'gold_rush' });
-    assert.equal(desk.status, 201, JSON.stringify(desk.json));
-    assert.deepEqual([desk.json.template, desk.json.variant, desk.json.theme, desk.json.branding.primary_color], ['crypto_desk', 'terminal', 'gold_rush', '#eab308']);
+    const refused = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk' });
+    assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.message], [403, 'template_unavailable', 'The crypto desk is no longer offered.']);
   });
 });
 

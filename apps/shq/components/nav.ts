@@ -7,12 +7,6 @@ import {
   Building,
   Code2,
   CreditCard,
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ArrowUpFromLine,
-  Bitcoin,
-  History,
-  Scale,
   FileClock,
   House,
   KeyRound,
@@ -49,7 +43,7 @@ import {
   Webhook,
 } from "lucide-react";
 
-export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "exchange" | "store" | "resale" | "reports" | "support" | "integrations" | "developers" | "team" | "settings";
+export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "store" | "resale" | "reports" | "support" | "integrations" | "developers" | "team" | "settings";
 export type ShqNavItem = { key: ShqSection; label: string; href: string; icon: LucideIcon };
 export type ShqSubNavItem = { label: string; href: string; icon?: LucideIcon };
 
@@ -59,7 +53,6 @@ export const sections: ShqNavItem[] = [
   { key: "orders", label: "Orders", href: "/orders", icon: ReceiptText },
   { key: "catalogue", label: "Catalogue", href: "/catalogue", icon: Package },
   { key: "wallet", label: "Wallet", href: "/wallet", icon: Wallet },
-  { key: "exchange", label: "Exchange", href: "/exchange", icon: ArrowLeftRight },
   { key: "store", label: "Store", href: "/store", icon: Store },
   { key: "resale", label: "Resale", href: "/resale", icon: Repeat },
   { key: "reports", label: "Reports", href: "/reports", icon: PieChart },
@@ -107,17 +100,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "BitoCard fees", href: "/wallet/fees", icon: Percent },
     ],
   },
-  exchange: {
-    title: "Exchange",
-    items: [
-      { label: "Trade with BitoCard", href: "/exchange", icon: ArrowLeftRight },
-      { label: "Coins", href: "/exchange/coins", icon: Bitcoin },
-      { label: "Deposit", href: "/exchange/deposit", icon: ArrowDownToLine },
-      { label: "Withdraw", href: "/exchange/withdraw", icon: ArrowUpFromLine },
-      { label: "Your desk", href: "/exchange/desk", icon: Scale },
-      { label: "Trades", href: "/exchange/trades", icon: History },
-    ],
-  },
+
   store: {
     title: "Store",
     items: [
