@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseEnumPi
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsOptional, IsString, Length, Matches } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, SessionOnly } from '../../auth/caller.js';
+import { afrippaOperatorId } from '../../afrippa/ids.js';
 import { adminId } from '../../countries/countries.controller.js';
 import { AiService } from './ai.service.js';
 import { type AiProviderName, aiProviders } from './providers.js';
@@ -68,5 +69,24 @@ export class AdminAiController {
   usage(@CurrentCaller() caller: Caller, @Query() query: MonthDto) {
     adminId(caller);
     return this.ai.usage({ month: query.month });
+  }
+}
+
+/** Afrippa's admins: the models on Afrippa's own AI (for its assistant) and its AI use, never BitoCard's. */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('operations', 'finance', 'support')
+@Controller('afrippa/admin/support/ai')
+export class AfrippaAiController {
+  constructor(private readonly ai: AiService) {}
+
+  @Get()
+  overview() {
+    return { object: 'support_ai_admin' as const, bitocard_models: this.ai.afrippaModels(), replies_per_store: null };
+  }
+
+  @Get('usage')
+  usage(@Query() query: MonthDto) {
+    return this.ai.usage({ resellerId: afrippaOperatorId, month: query.month });
   }
 }

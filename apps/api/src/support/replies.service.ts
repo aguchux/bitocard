@@ -3,6 +3,7 @@ import { waitUntil } from '@vercel/functions';
 import { PrismaService } from '../database/prisma.service.js';
 import type { SupportBot, SupportConversation, SupportTicket } from '../generated/prisma/client.js';
 import { formatMoney } from '../notifications/templates.js';
+import { AfrippaAssistantRegistry, isAfrippaBot } from './afrippa-assistant.js';
 import { AiService } from './ai/ai.service.js';
 import type { AiProviderName, AiTool, AiToolCall, AiTurn } from './ai/providers.js';
 import { ChatsService } from './chats.service.js';
@@ -38,6 +39,7 @@ export class RepliesService {
     private readonly ai: AiService,
     private readonly chats: ChatsService,
     private readonly tickets: TicketsService,
+    private readonly afrippa: AfrippaAssistantRegistry,
   ) {
     chats.onRequesterMessage(chat => this.later(this.answerChat(chat.id)));
     chats.assistantFor(chat => this.chatAssistant(chat));
@@ -122,7 +124,8 @@ export class RepliesService {
       const bot = await this.ticketAssistant(ticket);
       if (!bot) return 'no_assistant';
       const visible = ticket.messages.filter(message => !message.draft && message.visibility === 'all');
-      if (visible.some(message => message.author === 'reseller' || message.author === 'bitocard') && ticket.requester === 'customer') return 'person_answering';
+      // A person on the store's, BitoCard's or Afrippa's team has written: the assistant stops.
+      if (visible.some(message => message.author === 'reseller' || message.author === 'bitocard' || message.author === 'afrippa') && ticket.requester === 'customer') return 'person_answering';
       if (ticket.requester === 'reseller' && visible.some(message => message.author === 'bitocard')) return 'person_answering';
       const last = visible.at(-1);
       if (!last || last.author !== ticket.requester) return 'nothing';
@@ -150,6 +153,12 @@ export class RepliesService {
   // -- The conversation with the model -----------------------------------------------------------------------------
 
   private tools(scope: Scope, place: { chatId?: string }): AiTool[] {
+    const handoff = tool('handoff', 'Hand the conversation to a person: when unsure, when money must move, for identity or legal questions, complaints, or whenever the user asks for a person.', { reason: { type: 'string', description: 'Why, in a few words, for the staff.' } }, ['reason']);
+    if (isAfrippaBot(scope.bot)) {
+      // Afrippa's tools (the market's ads, the trader's own orders, fees, the safety checks); a visitor cannot follow a ticket.
+      const ticket = place.chatId && scope.customerId ? [tool('create_ticket', 'Open a support ticket from this chat for something that needs following up over time.', { subject: { type: 'string' }, category: { type: 'string', enum: [...ticketCategories] } }, ['subject', 'category'])] : [];
+      return [handoff, ...this.afrippa.get().tools({ customerId: scope.customerId, chatId: place.chatId }), ...ticket];
+    }
     const list: AiTool[] = [
       tool('handoff', 'Hand the conversation to a person: when unsure, when money must move, for identity or legal questions, complaints, or whenever the user asks for a person.', { reason: { type: 'string', description: 'Why, in a few words, for the staff.' } }, ['reason']),
     ];
@@ -166,6 +175,10 @@ export class RepliesService {
   private async runTool(scope: Scope, call: AiToolCall, place: { chatId?: string }): Promise<{ result: string; handover?: string; ticket?: string }> {
     const args = call.arguments;
     if (call.name === 'handoff') return { result: 'Handed over.', handover: String(args.reason ?? 'The assistant asked for a person.').slice(0, 300) };
+    if (isAfrippaBot(scope.bot) && call.name !== 'create_ticket') {
+      const result = await this.afrippa.get().run({ customerId: scope.customerId, chatId: place.chatId }, call);
+      return { result: result ?? 'That tool is not available here.' };
+    }
     if (call.name === 'search_products' && scope.storeId) {
       const query = String(args.query ?? '').trim().slice(0, 80);
       const store = await this.prisma.store.findUnique({ where: { id: scope.storeId }, select: { resellerId: true, reseller: { select: { house: true } } } });
@@ -208,7 +221,7 @@ export class RepliesService {
   private async converse(scope: Scope, turns: AiTurn[], place: { chatId?: string; ticketId?: string; kind: 'chat' | 'ticket' }) {
     const knowledge = scope.bot.knowledgeId ? await this.prisma.supportBotKnowledge.findUnique({ where: { id: scope.bot.knowledgeId }, select: { content: true } }) : null;
     const audience = scope.requester === 'reseller' ? ({ kind: 'reseller' } as const) : ({ kind: 'customer', store: scope.storeName } as const);
-    const system = systemPrompt(scope.bot, audience, { tools: true });
+    const system = isAfrippaBot(scope.bot) ? this.afrippa.get().prompt(scope.bot, { customerId: scope.customerId, chatId: place.chatId }) : systemPrompt(scope.bot, audience, { tools: true });
     const tools = this.tools(scope, place);
     const messages = [...turns];
     for (let round = 0; round < maxRounds; round += 1) {

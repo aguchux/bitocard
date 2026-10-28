@@ -6,7 +6,9 @@ import { ApiError } from '../../common/errors/api-error.js';
 import { Encryption } from '../../common/encryption.js';
 import { APP_CONFIG, type AppConfig } from '../../config/config.js';
 import { PrismaService } from '../../database/prisma.service.js';
-import type { LedgerMode } from '../../generated/prisma/client.js';
+import type { LedgerMode, Platform } from '../../generated/prisma/client.js';
+import { afrippaOperatorId } from '../../afrippa/ids.js';
+import { isAfrippaAccount } from '../afrippa-assistant.js';
 import { IntegrationsService } from '../../integrations/integrations.service.js';
 import { ProviderError } from '../../payments/provider-error.js';
 import { aiCostMicros, aiProvider, type AiProvider, type AiProviderName, aiProviderLabels, aiProviders, type AiReply, type AiRequest, parseAiPrices, parseModelList } from './providers.js';
@@ -24,6 +26,9 @@ const keys: Record<AiProviderName, { key: keyof AppConfig; url: keyof AppConfig;
 
 const unavailable = (message: string) => new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'ai_unavailable', message);
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
+
+/** Afrippa's operator account, whose AI usage is Afrippa's. */
+const afrippaAccountId = () => afrippaOperatorId;
 
 /** The start of this UTC month, which the allowance counts from. */
 export const monthStart = (at = new Date()) => new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1));
@@ -51,8 +56,24 @@ export class AiService {
     return new Encryption(this.config.ENCRYPTION_KEY);
   }
 
-  private setting(name: keyof AppConfig) {
-    return this.integrations.config[name] as string | undefined;
+  private setting(name: keyof AppConfig, platform: Platform = 'bitocard') {
+    return this.integrations.configFor(platform)[name] as string | undefined;
+  }
+
+  /**
+   * Afrippa's assistant runs on Afrippa's own AI (its Anthropic and OpenAI settings, never BitoCard's): the models with a
+   * price in its settings and a key set. DeepSeek is not offered (processing in China, as for BitoCard Shop's).
+   */
+  afrippaModels() {
+    return (['anthropic', 'openai'] as const).flatMap(provider =>
+      this.setting(keys[provider].key, 'afrippa')?.trim() ? [...parseAiPrices(this.setting(keys[provider].prices, 'afrippa')).keys()].map(model => ({ provider: provider as AiProviderName, model })) : [],
+    );
+  }
+
+  /** Afrippa's AI spend this month, in millionths of a dollar. */
+  async afrippaSpentThisMonth() {
+    const sum = await this.prisma.aiUsage.aggregate({ where: { resellerId: afrippaAccountId(), createdAt: { gte: monthStart() } }, _sum: { costMicros: true } });
+    return sum._sum.costMicros ?? 0n;
   }
 
   /** The models stores may choose on BitoCard's keys, for providers whose key is set. */
@@ -70,9 +91,9 @@ export class AiService {
     return (await this.planAccess.limit(resellerId, 'ai_replies')).value;
   }
 
-  private bitocardProvider(provider: AiProviderName): AiProvider | null {
-    const apiKey = this.setting(keys[provider].key)?.trim();
-    return apiKey ? aiProvider(provider, { apiKey, baseUrl: this.setting(keys[provider].url) ?? '' }) : null;
+  private bitocardProvider(provider: AiProviderName, platform: Platform = 'bitocard'): AiProvider | null {
+    const apiKey = this.setting(keys[provider].key, platform)?.trim();
+    return apiKey ? aiProvider(provider, { apiKey, baseUrl: this.setting(keys[provider].url, platform) ?? '' }) : null;
   }
 
   /** Test connection for BitoCard's own key. */
@@ -155,7 +176,18 @@ export class AiService {
     let client: AiProvider | null;
     // Beyond the month's allowance a store may pay as it goes (`stores.ai_overage`): each reply billed at cost plus margin.
     let overage = false;
-    if (call.funding === 'bitocard') {
+    const afrippa = isAfrippaAccount(call.resellerId);
+    if (afrippa) {
+      // Afrippa's own AI and its own monthly budget (the assistant's limits): no BitoCard plan, allowance or invoice.
+      if (call.funding !== 'bitocard' || !this.afrippaModels().some(item => item.provider === call.provider && item.model === call.model)) throw invalid('ai_model_unavailable', 'This model is not set up on Afrippa’s AI. Choose another.', 'model');
+      const bot = call.botId ? await this.prisma.supportBot.findUnique({ where: { id: call.botId }, select: { limits: true } }) : null;
+      const budget = (bot?.limits as { monthly_budget_usd?: number | null } | null)?.monthly_budget_usd ?? null;
+      if (budget !== null && call.kind !== 'test' && (await this.afrippaSpentThisMonth()) >= BigInt(Math.round(budget * 1_000_000))) {
+        throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'assistant_budget_reached', 'Afrippa’s assistant has used this month’s budget. People answer until next month.');
+      }
+      client = this.bitocardProvider(call.provider, 'afrippa');
+      if (!client) throw unavailable(`${aiProviderLabels[call.provider]} is not set up on Afrippa’s AI.`);
+    } else if (call.funding === 'bitocard') {
       if (!(await this.premium(call.resellerId, call.storeId))) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'ai_plan_required', 'Assistants on BitoCard’s AI need the Premium plan. Use your own AI key instead, or change plan.');
       if (!this.bitocardModels().some(item => item.provider === call.provider && item.model === call.model)) throw invalid('ai_model_unavailable', 'This model is not offered on BitoCard’s AI. Choose another.', 'model');
       if (call.storeId && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
@@ -181,7 +213,7 @@ export class AiService {
       }
       throw error;
     }
-    const price = parseAiPrices(this.setting(keys[call.provider].prices)).get(call.model);
+    const price = parseAiPrices(this.setting(keys[call.provider].prices, afrippa ? 'afrippa' : 'bitocard')).get(call.model);
     const costMicros = call.funding === 'bitocard' ? aiCostMicros(reply.usage, price) : 0n;
     const usage = await this.prisma.aiUsage.create({
       data: {
@@ -235,7 +267,8 @@ export class AiService {
     const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
     const rows = await this.prisma.aiUsage.groupBy({
       by: ['resellerId', 'storeId', 'funding', 'provider', 'model'],
-      where: { resellerId: filter.resellerId, createdAt: { gte: start, lt: end } },
+      // BitoCard's report never includes Afrippa's spend (its own admin reads it).
+      where: { resellerId: filter.resellerId ?? { not: afrippaOperatorId }, createdAt: { gte: start, lt: end } },
       _count: { _all: true },
       _sum: { inputTokens: true, cachedTokens: true, outputTokens: true, costMicros: true },
     });

@@ -5,6 +5,7 @@ import { CustomerGuard } from '../customers/customer-session.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { TraderVerificationController } from './verification.controller.js';
 import { TraderDevicesService } from './devices.service.js';
+import { AfrippaAssistantService } from './assistant.service.js';
 import { AfrippaAccountController, AfrippaTraderAdminController } from './accounts.controller.js';
 import { AfrippaBooksController } from './books.controller.js';
 import { AfrippaBooksService } from './books.service.js';
@@ -33,7 +34,7 @@ import { TraderTwoStepService } from './two-step.service.js';
 @Module({
   imports: [CheckoutModule, CryptoModule, IdentityModule, SupportModule],
   controllers: [AfrippaAccountController, TraderNotificationsController, AfrippaAdminNotificationsController, TraderTicketsController, AfrippaTicketsAdminController, TraderChatController, AfrippaVisitorChatController, AfrippaChatsAdminController, AfrippaTraderAdminController, AfrippaBooksController, PaymentMethodsController, P2pOrdersController, AfrippaOrdersAdminController, AfrippaFeeRatesAdminController, P2pStandingController, AfrippaStandingAdminController, P2pTrustController, AfrippaReportsAdminController, AfrippaRefusedWordsAdminController, TraderVerificationController],
-  providers: [TraderDevicesService, TraderTwoStepService, TraderGoogleService, AfrippaBooksService, PaymentMethodsService, P2pOrdersService, OrderRoomService, KycStorage, CustomerGuard],
+  providers: [AfrippaAssistantService, TraderDevicesService, TraderTwoStepService, TraderGoogleService, AfrippaBooksService, PaymentMethodsService, P2pOrdersService, OrderRoomService, KycStorage, CustomerGuard],
   exports: [TraderTwoStepService, PaymentMethodsService, P2pOrdersService],
 })
 export class AfrippaModule {}

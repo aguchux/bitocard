@@ -149,6 +149,7 @@ class SuspendDto {
 
 const resellerOwner = (caller: Caller): BotOwner => ({ kind: 'reseller', resellerId: resellerOf(caller), userId: caller.kind === 'session' ? caller.userId : null });
 const adminOwner = (caller: Caller): BotOwner => ({ kind: 'admin', userId: adminId(caller) });
+const afrippaOwner = (caller: Caller): BotOwner => ({ kind: 'afrippa', userId: adminId(caller) });
 
 /** The routes both sides share: SHQ (a reseller's own stores) and admin (bitocard.com and BitoCard's assistant for resellers). */
 function botRoutes(owner: (caller: Caller) => BotOwner) {
@@ -283,3 +284,22 @@ export class AdminBotsController extends botRoutes(adminOwner) {
 @RealmOnly('admin')
 @Controller('admin/support/knowledge-template')
 export class AdminKnowledgeTemplateController extends KnowledgeTemplateController {}
+
+/**
+ * Afrippa's admins (admin.afrippa.com): Afrippa's one assistant, on its own AI, answering its traders' and visitors'
+ * chats and tickets. The same routes as BitoCard's admin; neither side reaches the other's assistants.
+ */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('operations', 'support')
+@Controller('afrippa/admin/support/bots')
+export class AfrippaBotsController extends botRoutes(afrippaOwner) {
+  constructor(bots: BotsService) {
+    super(bots);
+  }
+}
+
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin/support/knowledge-template')
+export class AfrippaKnowledgeTemplateController extends KnowledgeTemplateController {}

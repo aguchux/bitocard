@@ -1,10 +1,12 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { afrippaOperatorId, afrippaStoreId } from '../afrippa/ids.js';
 import { AuditService } from '../audit/audit.service.js';
 import { houseRootId } from '../checkout/house.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, SupportBot, SupportBotKnowledge } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { AfrippaAssistantRegistry, isAfrippaBot } from './afrippa-assistant.js';
 import { AiService } from './ai/ai.service.js';
 import { type AiProviderName, aiProviders, type AiTurn, visionProviders } from './ai/providers.js';
 import { csvToMarkdown, managedKeys, type ManagedKey, managedSections, managedTitles, maxKnowledgeChars, mergeSections, sectionHashes, StoreKnowledgeService } from './knowledge.js';
@@ -40,7 +42,7 @@ export const botFundings = ['bitocard', 'own'] as const;
 export type BotFunding = (typeof botFundings)[number];
 
 /** Who manages a bot: a reseller for their own stores, or BitoCard for bitocard.com and its assistant for resellers. */
-export type BotOwner = { kind: 'reseller'; resellerId: string; userId: string | null } | { kind: 'admin'; userId: string | null };
+export type BotOwner = { kind: 'reseller'; resellerId: string; userId: string | null } | { kind: 'admin'; userId: string | null } | { kind: 'afrippa'; userId: string | null };
 
 export type BotInput = {
   name?: string;
@@ -92,6 +94,8 @@ export function presentBot(bot: BotWithKnowledge, audience: 'reseller' | 'admin'
     created_at: bot.createdAt.toISOString(),
     updated_at: bot.updatedAt.toISOString(),
     ...(audience === 'admin' ? { reseller_id: bot.resellerId } : {}),
+    /** Afrippa's assistant: its monthly budget on Afrippa's AI (US dollars, null for none). */
+    ...(isAfrippaBot(bot) ? { limits: { monthly_budget_usd: ((bot.limits ?? {}) as { monthly_budget_usd?: number | null }).monthly_budget_usd ?? null } } : {}),
     /** Shop assistants only: the default, languages and greetings, limits, countries, and this month's use. */
     shop: bot.scope === 'shop' ? (bot.shop ?? null) : null,
   };
@@ -117,6 +121,7 @@ export class BotsService {
     private readonly knowledge: StoreKnowledgeService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly afrippa: AfrippaAssistantRegistry,
   ) {}
 
   /** The shop assistant module registers what only it knows. */
@@ -139,13 +144,16 @@ export class BotsService {
   }
 
   private audience(owner: BotOwner) {
-    return owner.kind === 'admin' ? ('admin' as const) : ('reseller' as const);
+    return owner.kind === 'reseller' ? ('reseller' as const) : ('admin' as const);
   }
 
   /** A bot the owner may manage: a reseller's own stores' bots; BitoCard's bitocard.com and platform bots. */
   private async owned(owner: BotOwner, id: string) {
     const bot = await this.prisma.supportBot.findUnique({ where: { id } });
     if (!bot) throw notFound();
+    // Afrippa's admins manage only Afrippa's assistant, and nobody else ever reaches it.
+    if ((owner.kind === 'afrippa') !== isAfrippaBot(bot)) throw notFound();
+    if (owner.kind === 'afrippa') return bot;
     if (owner.kind === 'reseller' && bot.resellerId !== owner.resellerId) throw notFound();
     if (owner.kind === 'reseller' && bot.scope === 'shop') throw notFound();
     if (owner.kind === 'admin' && bot.scope !== 'platform' && bot.resellerId !== houseRootId) {
@@ -157,12 +165,15 @@ export class BotsService {
   }
 
   async list(owner: BotOwner) {
-    const rows = await this.prisma.supportBot.findMany({ where: owner.kind === 'reseller' ? { resellerId: owner.resellerId, scope: { not: 'shop' } } : {}, orderBy: [{ shopDefault: 'desc' }, { createdAt: 'asc' }] });
+    const where: Prisma.SupportBotWhereInput =
+      owner.kind === 'reseller' ? { resellerId: owner.resellerId, scope: { not: 'shop' } } : owner.kind === 'afrippa' ? { storeId: afrippaStoreId } : { OR: [{ storeId: null }, { storeId: { not: afrippaStoreId } }] };
+    const rows = await this.prisma.supportBot.findMany({ where, orderBy: [{ shopDefault: 'desc' }, { createdAt: 'asc' }] });
     return { object: 'list' as const, data: await Promise.all(rows.map(async row => presentBot(await this.withKnowledge(row), this.audience(owner)))), has_more: false };
   }
 
   async get(owner: BotOwner, id: string) {
-    const bot = owner.kind === 'admin' ? await this.prisma.supportBot.findUnique({ where: { id } }) : await this.owned(owner, id);
+    const found = owner.kind === 'admin' ? await this.prisma.supportBot.findUnique({ where: { id } }) : await this.owned(owner, id);
+    const bot = found && owner.kind === 'admin' && isAfrippaBot(found) ? null : found;
     if (!bot) throw notFound();
     return presentBot(await this.withKnowledge(bot), this.audience(owner));
   }
@@ -170,13 +181,20 @@ export class BotsService {
   /** Validates a store the owner may give a bot. */
   private async checkStore(owner: BotOwner, storeId: string) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId }, include: { reseller: { select: { house: true } } } });
-    const allowed = store && (owner.kind === 'reseller' ? store.resellerId === owner.resellerId : store.reseller.house);
+    const allowed = store && (owner.kind === 'reseller' ? store.resellerId === owner.resellerId : owner.kind === 'afrippa' ? store.id === afrippaStoreId : store.reseller.house);
     if (!allowed) throw invalid('parameter_invalid', 'Choose one of your stores.', 'store_id');
     return store;
   }
 
-  private checkModel(input: { provider: AiProviderName; model: string; funding: BotFunding }, scope: BotScope = 'store', roles: string[] = []) {
+  private checkModel(input: { provider: AiProviderName; model: string; funding: BotFunding }, scope: BotScope = 'store', roles: string[] = [], afrippa = false) {
     if (!(aiProviders as readonly string[]).includes(input.provider)) throw invalid('parameter_invalid', 'Choose Anthropic, OpenAI or DeepSeek.', 'provider');
+    if (afrippa) {
+      // Afrippa's assistant runs on Afrippa's own AI only.
+      if (input.funding !== 'bitocard' || !this.ai.afrippaModels().some(item => item.provider === input.provider && item.model === input.model)) {
+        throw invalid('ai_model_unavailable', 'Choose a model set up on Afrippa’s AI (Settings > Integrations: its key and price).', 'model');
+      }
+      return;
+    }
     if (scope === 'shop') {
       // DeepSeek processes data in China: not offered for shop assistants until lawyers clear it.
       if (input.provider === 'deepseek') throw invalid('ai_model_unavailable', 'Shop assistants run on Anthropic or OpenAI.', 'provider');
@@ -211,6 +229,7 @@ export class BotsService {
   }
 
   async create(owner: BotOwner, input: Required<Pick<BotInput, 'name' | 'roles' | 'provider' | 'model' | 'funding'>> & BotInput) {
+    if (owner.kind === 'afrippa') return this.createAfrippa(owner, input);
     const platform = owner.kind === 'admin' && input.scope === 'platform';
     const shop = input.scope === 'shop';
     if ((input.scope === 'platform' || shop) && owner.kind !== 'admin') throw invalid('parameter_invalid', shop ? 'Only BitoCard runs shop assistants.' : 'Only BitoCard runs the assistant for resellers.', 'scope');
@@ -248,14 +267,47 @@ export class BotsService {
     }
   }
 
+  /** Afrippa's one assistant, on its own store, on its own AI (its limits: the monthly budget). */
+  private async createAfrippa(owner: BotOwner, input: Required<Pick<BotInput, 'name' | 'roles' | 'provider' | 'model' | 'funding'>> & BotInput) {
+    if (input.scope && input.scope !== 'store') throw invalid('parameter_invalid', 'Afrippa has one assistant, for its traders and visitors.', 'scope');
+    this.checkRoles('store', input.roles);
+    this.checkModel(input, 'store', input.roles, true);
+    try {
+      const bot = await this.prisma.supportBot.create({
+        data: {
+          resellerId: afrippaOperatorId,
+          scope: 'store',
+          storeId: afrippaStoreId,
+          roles: [...new Set(input.roles)],
+          ticketReplyMode: input.ticket_reply_mode ?? 'draft',
+          provider: input.provider,
+          model: input.model,
+          funding: 'bitocard',
+          name: input.name.trim(),
+          avatarUrl: input.avatar_url ?? null,
+          greeting: input.greeting?.trim() || null,
+          tone: input.tone ?? 'friendly',
+          instructions: input.instructions?.trim() || null,
+          limits: { monthly_budget_usd: input.limits?.monthly_budget_usd ?? null },
+          createdById: owner.userId,
+        },
+      });
+      await this.audit.record({ actorId: owner.userId, action: 'support_bot.created', targetType: 'support_bot', targetId: bot.id, before: null, after: { name: bot.name, provider: bot.provider, model: bot.model }, platform: 'afrippa' });
+      return presentBot(await this.withKnowledge(bot), 'admin');
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') throw conflict('store_has_assistant', 'Afrippa already has an assistant: one only.', 'store_id');
+      throw error;
+    }
+  }
+
   async update(owner: BotOwner, id: string, input: BotInput) {
     const bot = await this.owned(owner, id);
     const scope = bot.scope as BotScope;
     const next = { provider: input.provider ?? (bot.provider as AiProviderName), model: input.model ?? bot.model, funding: input.funding ?? (bot.funding as BotFunding) };
     if (input.roles) this.checkRoles(scope, input.roles);
-    if (input.provider || input.model || input.funding || (scope === 'shop' && input.roles)) this.checkModel(next, scope, input.roles ?? bot.roles);
+    if (input.provider || input.model || input.funding || (scope === 'shop' && input.roles)) this.checkModel(next, scope, input.roles ?? bot.roles, isAfrippaBot(bot));
     const store = input.store_id && scope === 'store' ? await this.checkStore(owner, input.store_id) : null;
-    const profile = scope === 'shop' ? this.shopProfile(input, bot) : {};
+    const profile = scope === 'shop' ? this.shopProfile(input, bot) : isAfrippaBot(bot) && input.limits ? { limits: { monthly_budget_usd: input.limits.monthly_budget_usd ?? null } } : {};
     try {
       const updated = await this.prisma.supportBot.update({
         where: { id },
@@ -306,6 +358,11 @@ export class BotsService {
     const missing: string[] = [];
     if (!bot.roles.length) missing.push('Choose what it answers: chats, tickets or both.');
     if (bot.scope === 'store' && !bot.storeId) missing.push('Assign it to a store.');
+    if (isAfrippaBot(bot)) {
+      if (!bot.knowledgeId) missing.push('Add its knowledge: generate it from Afrippa’s settings, or upload a document.');
+      if (!this.ai.afrippaModels().some(item => item.provider === bot.provider && item.model === bot.model)) missing.push('Its model is not set up on Afrippa’s AI: add its key and price in Settings > Integrations, or choose another.');
+      return missing;
+    }
     if (!bot.knowledgeId) missing.push('Add its knowledge: upload a document or generate one from BitoCard.');
     if (bot.funding === 'bitocard') {
       if (!(await this.ai.premium(bot.resellerId, bot.storeId))) missing.push('BitoCard’s AI needs the Premium plan: change plan, or use your own AI key.');
@@ -347,7 +404,7 @@ export class BotsService {
   /** BitoCard suspends any bot (for example one saying things it must not), with a reason its owner sees. */
   async suspend(actorId: string | null, id: string, reason: string) {
     const bot = await this.prisma.supportBot.findUnique({ where: { id } });
-    if (!bot) throw notFound();
+    if (!bot || isAfrippaBot(bot)) throw notFound();
     const updated = await this.prisma.supportBot.update({ where: { id }, data: { status: 'suspended', suspendedReason: reason.trim() } });
     if (bot.scope === 'shop') await this.shop().deactivated(id);
     await this.audit.record({ actorId, action: 'support_bot.suspended', targetType: 'support_bot', targetId: id, before: { status: bot.status }, after: { status: 'suspended', reason } });
@@ -357,7 +414,7 @@ export class BotsService {
 
   async unsuspend(actorId: string | null, id: string) {
     const bot = await this.prisma.supportBot.findUnique({ where: { id } });
-    if (!bot) throw notFound();
+    if (!bot || isAfrippaBot(bot)) throw notFound();
     if (bot.status !== 'suspended') throw conflict('assistant_not_suspended', 'This assistant is not suspended.');
     const updated = await this.prisma.supportBot.update({ where: { id }, data: { status: 'paused', suspendedReason: null } });
     await this.audit.record({ actorId, action: 'support_bot.unsuspended', targetType: 'support_bot', targetId: id, before: { status: 'suspended' }, after: { status: 'paused' } });
@@ -395,7 +452,7 @@ export class BotsService {
     const hashes = sectionHashes(content);
     let managed: Partial<Record<ManagedKey, string>>;
     let dataHash: string | null;
-    if (source === 'generated' && bot.storeId) {
+    if (source === 'generated' && bot.storeId && !isAfrippaBot(bot)) {
       // As BitoCard wrote it: every section's hash is the generated one, and the data is the store's now.
       managed = hashes;
       dataHash = this.knowledge.hash(await this.knowledge.gather(bot.storeId));
@@ -426,6 +483,7 @@ export class BotsService {
     const bot = await this.owned(owner, id);
     // A shop assistant's shared document is the admin's own sections; BitoCard's are generated per country.
     if (bot.scope === 'shop') return { object: 'support_bot_knowledge_draft' as const, content: (await this.shop().generate(bot)).content, data_hash: null };
+    if (isAfrippaBot(bot)) return { object: 'support_bot_knowledge_draft' as const, content: await this.afrippa.get().generate(), data_hash: null };
     if (!bot.storeId) throw conflict('assistant_without_store', 'Assign the assistant to a store first: BitoCard generates the document from the store.');
     const data = await this.knowledge.gather(bot.storeId);
     return { object: 'support_bot_knowledge_draft' as const, content: this.knowledge.render(data), data_hash: this.knowledge.hash(data) };
@@ -433,6 +491,7 @@ export class BotsService {
 
   /** BitoCard's sections now against the knowledge in use, section by section. */
   private async changes(bot: SupportBot) {
+    if (isAfrippaBot(bot)) throw conflict('refresh_unavailable', 'Generate the document again from Afrippa’s settings to update it.');
     if (!bot.storeId) throw conflict('assistant_without_store', 'Assign the assistant to a store first.');
     const current = bot.knowledgeId ? await this.prisma.supportBotKnowledge.findUnique({ where: { id: bot.knowledgeId } }) : null;
     if (!current) throw conflict('assistant_without_knowledge', 'Generate or upload a document first.');
@@ -495,13 +554,14 @@ export class BotsService {
   async test(owner: BotOwner, id: string, messages: Array<{ role: 'user' | 'assistant'; content: string }>, options: { country?: string; surface?: ShopRole } = {}) {
     const bot = await this.owned(owner, id);
     if (bot.scope === 'shop') return { object: 'support_bot_test' as const, ...(await this.shop().test(bot, messages, options)) };
+    const afrippa = isAfrippaBot(bot);
     const current = bot.knowledgeId ? await this.prisma.supportBotKnowledge.findUnique({ where: { id: bot.knowledgeId } }) : null;
     const store = bot.storeId ? await this.prisma.store.findUnique({ where: { id: bot.storeId }, select: { name: true } }) : null;
     const audience = bot.scope === 'platform' ? ({ kind: 'reseller' } as const) : ({ kind: 'customer', store: store?.name ?? 'the store' } as const);
     const turns: AiTurn[] = messages.slice(-20).map(message => (message.role === 'user' ? { role: 'user', content: message.content } : { role: 'assistant', content: message.content }));
     const reply = await this.ai.reply(
       { funding: bot.funding as BotFunding, provider: bot.provider as AiProviderName, model: bot.model, resellerId: bot.resellerId, storeId: bot.storeId, botId: bot.id, mode: 'live', kind: 'test' },
-      { system: systemPrompt(bot, audience), context: knowledgeContext(current?.content), messages: turns, maxTokens: 600 },
+      { system: afrippa ? this.afrippa.get().prompt(bot, { customerId: null }) : systemPrompt(bot, audience), context: knowledgeContext(current?.content), messages: turns, maxTokens: 600 },
     );
     return { object: 'support_bot_test' as const, reply: reply.text ?? '', usage: reply.usage };
   }
@@ -513,7 +573,7 @@ export class BotsService {
    * once (and tell the owner), or with automatic updates apply BitoCard's sections the owner has not edited.
    */
   async checkStale(limit = 100) {
-    const bots = await this.prisma.supportBot.findMany({ where: { storeId: { not: null }, scope: 'store', knowledgeId: { not: null }, status: { not: 'suspended' } }, orderBy: { updatedAt: 'asc' }, take: limit });
+    const bots = await this.prisma.supportBot.findMany({ where: { storeId: { not: null, notIn: [afrippaStoreId] }, scope: 'store', knowledgeId: { not: null }, status: { not: 'suspended' } }, orderBy: { updatedAt: 'asc' }, take: limit });
     let flagged = 0;
     let refreshed = 0;
     for (const bot of bots) {

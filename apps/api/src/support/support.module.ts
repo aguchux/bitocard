@@ -4,12 +4,13 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { KycStorage } from '../kyc/storage.js';
 import { AdminChatsController, BitocardChatController, ChatsController, CustomerChatController, VisitorChatController } from './chats.controller.js';
 import { ChatsService } from './chats.service.js';
-import { AdminAiController, AiController } from './ai/ai.controller.js';
+import { AdminAiController, AfrippaAiController, AiController } from './ai/ai.controller.js';
 import { AiService } from './ai/ai.service.js';
-import { AdminBotsController, AdminKnowledgeTemplateController, BotsController, KnowledgeTemplateController } from './bots.controller.js';
+import { AdminBotsController, AdminKnowledgeTemplateController, AfrippaBotsController, AfrippaKnowledgeTemplateController, BotsController, KnowledgeTemplateController } from './bots.controller.js';
 import { BotsService } from './bots.service.js';
 import { StoreKnowledgeService } from './knowledge.js';
 import { RepliesService } from './replies.service.js';
+import { AfrippaAssistantRegistry } from './afrippa-assistant.js';
 import { EngineeringService } from './engineering.service.js';
 import { GithubWebhookController } from './github.controller.js';
 import { AdminTicketsController, CustomerTicketsController, TicketsController } from './tickets.controller.js';
@@ -18,8 +19,8 @@ import { TicketsService } from './tickets.service.js';
 /** Support: tickets now; chat and support bots come next (docs/BITOCARD_SUPPORT_ASSISTANT_PLAN.md). */
 @Module({
   imports: [CheckoutModule, SettingsModule],
-  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, VisitorChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, GithubWebhookController],
-  providers: [KycStorage, TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService],
-  exports: [TicketsService, ChatsService, AiService, BotsService, RepliesService],
+  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, VisitorChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, AfrippaBotsController, AfrippaKnowledgeTemplateController, AfrippaAiController, GithubWebhookController],
+  providers: [AfrippaAssistantRegistry, KycStorage, TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService],
+  exports: [AfrippaAssistantRegistry, TicketsService, ChatsService, AiService, BotsService, RepliesService],
 })
 export class SupportModule {}

@@ -15,6 +15,7 @@ const { TraderStanding } = await import("@/components/trader-standing");
 const { TraderDevices } = await import("@/components/trader-devices");
 const { default: NotificationsPage } = await import("@/app/(console)/notifications/page");
 const { default: ChecksPage } = await import("@/app/(console)/verifications/page");
+const { default: AssistantPage } = await import("@/app/(console)/support/assistant/page");
 
 const admin = { id: "a1", name: "Ada Okafor", email: "ada@afrippa.com", roles: ["operations", "finance"] };
 const traderId = "5b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
@@ -85,6 +86,42 @@ beforeEach(() => {
       return ok({ object: "list", data: [{ object: "trader_device", id: "d1", first_seen_at: "2026-10-01T00:00:00.000Z", last_seen_at: "2026-10-28T00:00:00.000Z", shared_with: [{ id: "c9", email: "other@example.com" }] }] });
     if (path === `/v1/afrippa/admin/traders/${traderId}/standing/clear`) return ok({ ...standing, strikes: 0, restriction: null, cleared_at: "2026-10-28T00:00:00.000Z" });
     if (path === `/v1/afrippa/admin/traders/${traderId}/two-step/reset`) return ok({ object: "trader_two_step_reset" });
+    if (path === "/v1/afrippa/admin/support/ai") return ok({ object: "support_ai_admin", bitocard_models: [{ provider: "anthropic", model: "claude-haiku-5-5" }], replies_per_store: null });
+    if (path === "/v1/afrippa/admin/support/bots")
+      return ok({
+        object: "list",
+        has_more: false,
+        data: [
+          {
+            object: "support_bot",
+            id: "b1",
+            scope: "store",
+            store_id: "00000000-0000-4000-8000-0000000000a2",
+            store_name: "Afrippa",
+            roles: ["chat"],
+            ticket_reply_mode: "draft",
+            provider: "anthropic",
+            model: "claude-haiku-5-5",
+            funding: "bitocard",
+            name: "Ami",
+            avatar_url: null,
+            greeting: null,
+            tone: "friendly",
+            instructions: null,
+            status: "draft",
+            suspended_reason: null,
+            auto_refresh: false,
+            knowledge: null,
+            knowledge_stale_at: null,
+            created_at: "2026-10-28T00:00:00.000Z",
+            updated_at: "2026-10-28T00:00:00.000Z",
+            reseller_id: "00000000-0000-4000-8000-0000000000a1",
+            shop: null,
+            limits: { monthly_budget_usd: 50 },
+          },
+        ],
+      });
+    if (path === "/v1/afrippa/admin/support/bots/b1/knowledge") return ok({ object: "support_bot_knowledge", current: null, versions: [], stale_since: null, max_chars: 60000 });
     if (path === "/v1/afrippa/admin/kyc/cases")
       return ok({
         object: "list",
@@ -222,6 +259,15 @@ describe("admin.afrippa.com books, standing and help", () => {
     page(<TraderDevices id={traderId} />);
     expect((await screen.findAllByText("other@example.com", {}, slow)).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Shared").length).toBeGreaterThan(0);
+    neverBitoCard();
+  });
+
+  test("the assistant: Afrippa's AI, generated from Afrippa, its budget, and no store-by-store updates", async () => {
+    page(<AssistantPage />);
+    expect(await screen.findByText(/Afrippa’s AI/, {}, slow)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate from Afrippa" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Update knowledge base" })).toBeNull();
+    expect((screen.getByLabelText("US dollars a month") as HTMLInputElement).value).toBe("50");
     neverBitoCard();
   });
 
