@@ -1,5 +1,6 @@
 import { type CanActivate, createParamDecorator, type ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { afrippaSignedRoutes } from '../afrippa/gate.guard.js';
 import { ROUTE_TWO_STEP_PENDING } from '../auth/caller.js';
 import type { Request } from 'express';
 import { ApiError } from '../common/errors/api-error.js';
@@ -23,6 +24,9 @@ export const customerSignInRequired = () => new ApiError(HttpStatus.UNAUTHORIZED
  * account's session is also good on every published BitoCard country store (ng.bitocard.com…), which share its
  * accounts: there the customer shops in that store (`customer.store`, so it is the seller and its settings apply), while
  * the account itself (`customer.storeId`) stays bitocard.com's. Anything else is a 401.
+ *
+ * Afrippa's traders' sessions count only on Afrippa's own routes (`afrippaSignedRoutes`, reached through its signed
+ * server), never on BitoCard's, whatever store a request names.
  *
  * Afrippa's traders must finish two-step sign-in on a session before using it: until then only routes marked
  * `@AllowTwoStepPending()` (the two-step steps, reading the account, confirming the email or phone, signing out) take
@@ -57,6 +61,7 @@ export async function customerFor(customers: CustomersService, req: Request, opt
   const token = req.get(customerSessionHeader);
   const session = token ? await customers.resolve(token) : null;
   if (!session) return null;
+  if (session.customer.store.platform === 'afrippa' && !afrippaSignedRoutes.test(req.path)) return null;
   const requested = storeKey(req) ?? houseSubdomain;
   if (session.customer.store.subdomain !== requested) {
     const country = session.customer.store.subdomain === houseSubdomain ? await customers.countryStore(requested) : null;
