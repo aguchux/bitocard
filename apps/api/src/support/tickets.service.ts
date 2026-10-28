@@ -28,7 +28,13 @@ export type TicketSource = (typeof ticketSources)[number];
 type Audience = 'customer' | 'reseller' | 'admin';
 type TicketWithMessages = SupportTicket & { messages: SupportTicketMessage[] };
 type TicketEvent = Extract<EventType, `support_ticket.${string}`>;
-export type TicketAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; id: string | null; name: string | null; avatar?: string | null };
+export type TicketAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'afrippa' | 'bot' | 'system'; id: string | null; name: string | null; avatar?: string | null };
+/** Whose admins answer: BitoCard's (its queues) or Afrippa's (`afrippa`, its traders' tickets alone). */
+export type TicketPlatform = 'bitocard' | 'afrippa';
+/** Afrippa's traders' tickets: answered by Afrippa's admins only, never seen by BitoCard's or any reseller. */
+export const afrippaQueue = 'afrippa';
+/** Which tickets each product's admins reach. */
+const adminScope = (platform: TicketPlatform): Prisma.SupportTicketWhereInput => (platform === 'afrippa' ? { queue: afrippaQueue } : { queue: { not: afrippaQueue } });
 
 /** At most this many unresolved tickets per customer, so a store's queue cannot be flooded. */
 export const maxOpenCustomerTickets = 10;
@@ -167,14 +173,16 @@ export class TicketsService {
     const open = await this.prisma.supportTicket.count({ where: { customerId: customer.id, status: { not: 'resolved' } } });
     if (open >= maxOpenCustomerTickets) throw conflict('too_many_tickets', `You have ${open} tickets still open. Reply on one of them, or wait for an answer, before opening another.`);
     const house = customer.store.reseller.house;
+    // An Afrippa trader asks Afrippa: its own queue, under its operator's account.
+    const afrippa = customer.store.platform === 'afrippa';
     const resellerId = checkout?.resellerId ?? (house ? (customer.country ? (await this.house.resellerFor(customer.country)).id : houseRootId) : customer.store.resellerId);
     const ticket = await this.create(
       {
         resellerId,
         mode: checkout?.mode ?? this.sellers.mode(customer.store),
         requester: 'customer',
-        // At BitoCard's own store, BitoCard is the store.
-        queue: house ? 'bitocard' : 'reseller',
+        // At BitoCard's own store, BitoCard is the store; at Afrippa's, Afrippa.
+        queue: afrippa ? afrippaQueue : house ? 'bitocard' : 'reseller',
         category: input.category,
         subject: input.subject,
         storeId: customer.storeId,
@@ -186,7 +194,8 @@ export class TicketsService {
       author ?? { kind: 'customer', id: customer.id, name: customer.name },
       input.message,
     );
-    if (house) await this.tellAdmins(ticket, 'admin.support.ticket_created', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    if (afrippa) await this.tellAfrippa(ticket, 'admin.afrippa.ticket_created', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    else if (house) await this.tellAdmins(ticket, 'admin.support.ticket_created', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     else await this.tellReseller(ticket, 'support.ticket_created', 'A customer opened a support ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     this.requesterListener?.(ticket);
     return presentTicket(ticket, 'customer');
@@ -349,34 +358,37 @@ export class TicketsService {
 
   // -- BitoCard ----------------------------------------------------------------------------------------------------
 
-  async listForAdmin(filter: Page & { status?: TicketStatus; queue?: TicketQueue; reseller_id?: string; requester?: 'customer' | 'reseller' }) {
-    return this.page({ status: filter.status, queue: filter.queue ?? 'bitocard', resellerId: filter.reseller_id, requester: filter.requester }, filter, 'admin', [{ lastMessageAt: 'asc' }, { id: 'asc' }]);
+  /** A product's admins' queue: BitoCard's (its `bitocard` queue by default, or the stores'), or Afrippa's own. */
+  async listForAdmin(filter: Page & { status?: TicketStatus; queue?: TicketQueue; reseller_id?: string; requester?: 'customer' | 'reseller' }, platform: TicketPlatform = 'bitocard') {
+    const queue = platform === 'afrippa' ? afrippaQueue : (filter.queue ?? 'bitocard');
+    return this.page({ status: filter.status, queue, resellerId: platform === 'afrippa' ? undefined : filter.reseller_id, requester: filter.requester }, filter, 'admin', [{ lastMessageAt: 'asc' }, { id: 'asc' }]);
   }
 
-  async getForAdmin(id: string) {
-    const ticket = await this.load({ id });
+  async getForAdmin(id: string, platform: TicketPlatform = 'bitocard') {
+    const ticket = await this.load({ id, ...adminScope(platform) });
     if (!ticket) throw notFound();
     return presentTicket(ticket, 'admin');
   }
 
   /** BitoCard answers (`all`: the requester's turn next on its own queue) or adds a note only BitoCard and, on customers' tickets, the store see. */
-  async replyAsAdmin(id: string, author: TicketAuthor, input: { body: string; visibility?: TicketVisibility }) {
-    const ticket = await this.load({ id });
+  async replyAsAdmin(id: string, author: TicketAuthor, input: { body: string; visibility?: TicketVisibility }, platform: TicketPlatform = 'bitocard') {
+    const ticket = await this.load({ id, ...adminScope(platform) });
     if (!ticket) throw notFound();
     if (ticket.status === 'resolved') throw conflict('ticket_resolved', 'This ticket is resolved. It reopens when the requester replies.');
     const visibility = input.visibility ?? 'all';
-    await this.staffReplied(ticket, author, input.body, visibility, ticket.queue === 'bitocard', true);
+    const afrippa = ticket.queue === afrippaQueue;
+    await this.staffReplied(ticket, author, input.body, visibility, ticket.queue === 'bitocard' || afrippa, !afrippa);
     if (visibility === 'all') {
       if (ticket.requester === 'customer') await this.tellCustomer(ticket, 'customer.support.ticket_replied', 'Your ticket has a reply');
       else await this.tellReseller(ticket, 'support.ticket_replied', 'BitoCard replied to your ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     }
-    if (ticket.requester === 'customer') await this.tellReseller(ticket, 'support.ticket_replied', 'BitoCard wrote on a customer’s ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    if (ticket.requester === 'customer' && !afrippa) await this.tellReseller(ticket, 'support.ticket_replied', 'BitoCard wrote on a customer’s ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     return presentTicket((await this.load({ id }))!, 'admin');
   }
 
   /** BitoCard sends a customer's ticket back to the store to answer, with a note on why. */
   async returnToReseller(actorId: string | null, id: string, author: TicketAuthor, note: string) {
-    const before = await this.load({ id });
+    const before = await this.load({ id, ...adminScope('bitocard') });
     if (!before) throw notFound();
     const seller = await this.prisma.reseller.findUnique({ where: { id: before.resellerId }, select: { house: true } });
     if (before.requester !== 'customer' || before.queue !== 'bitocard' || seller?.house) throw conflict('ticket_not_returnable', 'Only a customer’s ticket a store passed to BitoCard can be sent back.');
@@ -388,27 +400,28 @@ export class TicketsService {
     return presentTicket(after, 'admin');
   }
 
-  async resolveAsAdmin(actorId: string | null, id: string, author: TicketAuthor, input: { note?: string }) {
-    const before = await this.load({ id });
+  async resolveAsAdmin(actorId: string | null, id: string, author: TicketAuthor, input: { note?: string }, platform: TicketPlatform = 'bitocard') {
+    const before = await this.load({ id, ...adminScope(platform) });
     if (!before) throw notFound();
     const message = input.note?.trim() ? { author, body: input.note, visibility: 'all' as const } : undefined;
     const claimed = await this.transition(id, { status: { not: 'resolved' } }, { status: 'resolved', resolvedAt: new Date() }, ['support_ticket.updated'], message);
     if (!claimed) throw conflict('ticket_resolved', 'This ticket is already resolved.');
     const after = (await this.load({ id }))!;
-    await this.audit.record({ actorId, action: 'support_ticket.resolved', targetType: 'support_ticket', targetId: id, before: presentTicketSummary(before, 'admin'), after: presentTicketSummary(after, 'admin') });
+    await this.audit.record({ actorId, action: 'support_ticket.resolved', targetType: 'support_ticket', targetId: id, before: presentTicketSummary(before, 'admin'), after: presentTicketSummary(after, 'admin'), platform });
     if (after.requester === 'customer') await this.tellCustomer(after, 'customer.support.ticket_resolved', 'Your support ticket is resolved');
-    await this.tellReseller(after, 'support.ticket_updated', `BitoCard resolved ${ticketReference(after.number)}`, after.subject);
+    if (platform === 'bitocard') await this.tellReseller(after, 'support.ticket_updated', `BitoCard resolved ${ticketReference(after.number)}`, after.subject);
     return presentTicket(after, 'admin');
   }
 
   /** Priority and the admin it is assigned to (tickets on BitoCard's queue). */
-  async updateAsAdmin(id: string, input: { priority?: TicketPriority; assignee_id?: string | null }) {
-    const ticket = await this.load({ id });
+  async updateAsAdmin(id: string, input: { priority?: TicketPriority; assignee_id?: string | null }, platform: TicketPlatform = 'bitocard') {
+    const ticket = await this.load({ id, ...adminScope(platform) });
     if (!ticket) throw notFound();
     if (input.assignee_id) {
-      const admin = await this.prisma.user.findFirst({ where: { id: input.assignee_id, realm: 'admin' } });
+      // Assigned to one of that product's own admins.
+      const admin = await this.prisma.user.findFirst({ where: { id: input.assignee_id, realm: platform === 'afrippa' ? 'afrippa_admin' : 'admin' } });
       if (!admin) throw invalid('parameter_invalid', 'Assign it to an admin.', 'assignee_id');
-      if (ticket.queue !== 'bitocard') throw conflict('ticket_not_yours', 'Only tickets with BitoCard are assigned to admins.');
+      if (ticket.queue !== 'bitocard' && ticket.queue !== afrippaQueue) throw conflict('ticket_not_yours', 'Only tickets with BitoCard are assigned to admins.');
     }
     await this.prisma.supportTicket.update({ where: { id }, data: { priority: input.priority, assigneeId: input.assignee_id } });
     return presentTicket((await this.load({ id }))!, 'admin');
@@ -458,7 +471,8 @@ export class TicketsService {
     if (ticket.requester === 'customer') types.push('support_ticket.message_received');
     if (reopen) types.push('support_ticket.updated');
     await this.transition(ticket.id, {}, reopen ? { status: 'open', resolvedAt: null } : {}, types, { author, body, visibility: 'all' });
-    if (ticket.queue === 'bitocard') await this.tellAdmins(ticket, 'admin.support.ticket_replied', `${ticketReference(ticket.number)} has a reply`);
+    if (ticket.queue === afrippaQueue) await this.tellAfrippa(ticket, 'admin.afrippa.ticket_replied', `${ticketReference(ticket.number)} has a reply`);
+    else if (ticket.queue === 'bitocard') await this.tellAdmins(ticket, 'admin.support.ticket_replied', `${ticketReference(ticket.number)} has a reply`);
     else await this.tellReseller(ticket, 'support.ticket_replied', 'A customer replied to a ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     this.requesterListener?.({ ...ticket, status: 'open' });
   }
@@ -556,6 +570,8 @@ export class TicketsService {
 
   private async recordEvent(tx: Tx, id: string, type: TicketEvent) {
     const ticket = await tx.supportTicket.findUniqueOrThrow({ where: { id } });
+    // Afrippa's tickets are no reseller's business: no webhook events for its operator's account.
+    if (ticket.queue === afrippaQueue) return;
     await this.events.record(tx, { resellerId: ticket.resellerId, storeId: ticket.storeId, mode: ticket.mode, type, object: presentTicketSummary(ticket, 'reseller') });
   }
 
@@ -585,7 +601,18 @@ export class TicketsService {
       subject: `${ticket.id}:${Date.now()}`,
       title,
       body: `${ticketReference(ticket.number)}: ${ticket.subject}`,
-      link: `/account/support/${ticket.id}`,
+      // Afrippa's site keeps help at /help; stores at the account's Help & support.
+      link: ticket.queue === afrippaQueue ? `/help/${ticket.id}` : `/account/support/${ticket.id}`,
+    });
+  }
+
+  private tellAfrippa(ticket: SupportTicket, type: 'admin.afrippa.ticket_created' | 'admin.afrippa.ticket_replied', body: string) {
+    return this.inbox.afrippaAdmins(type, {
+      subject: `${ticket.id}:${Date.now()}`,
+      title: type === 'admin.afrippa.ticket_created' ? 'A trader needs help' : 'A trader replied to a ticket',
+      body,
+      link: `/support/tickets/${ticket.id}`,
+      mode: ticket.mode,
     });
   }
 }

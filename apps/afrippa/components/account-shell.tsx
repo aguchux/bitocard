@@ -11,6 +11,7 @@ const places = [
   { href: "/payment-methods", label: "Payment methods" },
   { href: "/security", label: "Security" },
   { href: "/trust", label: "Trust and safety" },
+  { href: "/help", label: "Help" },
 ];
 
 /** A signed-in page: the header, its title (and an action beside it), the account's tabs, then the page. */

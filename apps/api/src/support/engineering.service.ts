@@ -40,7 +40,8 @@ export class EngineeringService {
   /** A draft issue for the admin to edit: written by BitoCard's AI from the ticket, or a template when no AI is set up. */
   async draft(ticketId: string) {
     const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId }, include: { messages: { where: { draft: false }, orderBy: { createdAt: 'asc' } } } });
-    if (!ticket) throw notFound();
+    // BitoCard's engineering escalations: never an Afrippa ticket.
+    if (!ticket || ticket.queue === 'afrippa') throw notFound();
     const conversation = ticket.messages.map(message => `${message.author}: ${withoutPersonalData(message.body)}`).join('\n').slice(0, 8000);
     const fallback = {
       title: withoutPersonalData(ticket.subject).slice(0, 120),
@@ -71,7 +72,7 @@ export class EngineeringService {
   /** Opens the issue (redacted again on the way out) and links it to the ticket. */
   async escalate(actorId: string | null, ticketId: string, input: { title: string; body: string; kind: 'bug' | 'feature' }) {
     const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } });
-    if (!ticket) throw notFound();
+    if (!ticket || ticket.queue === 'afrippa') throw notFound();
     if (ticket.githubIssueNumber) throw conflict('ticket_has_issue', `This ticket is already issue #${ticket.githubIssueNumber}.`);
     const github = this.github();
     if (!github.configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'github_not_configured', 'Set up Engineering (GitHub) in Settings > Integrations first.');

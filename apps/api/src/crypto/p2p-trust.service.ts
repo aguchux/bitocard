@@ -177,7 +177,15 @@ export class P2pTrustService {
     }
     try {
       const report = await this.prisma.p2pReport.create({ data: { mode, reporterId: customer.id, reportedId, orderId: input.order_id ?? null, reason: input.reason, details: input.details.trim() } });
-      return this.presentReport(report, 'reporter');
+      const presented = await this.presentReport(report, 'reporter');
+      await this.inbox.afrippaAdmins('admin.p2p.report_opened', {
+        subject: `report:${report.id}`,
+        title: `${presented.number}: ${presented.reported} reported`,
+        body: `Reason: ${input.reason.replace(/_/g, ' ')}.`,
+        link: `/reports/${report.id}`,
+        mode,
+      });
+      return presented;
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') throw conflict('report_open', 'You already have an open report about this trader.');
       throw error;

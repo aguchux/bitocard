@@ -308,6 +308,14 @@ export class P2pOrdersService {
     const other = customer.id === order.buyerId ? order.sellerId : order.buyerId;
     await this.room.system(this.prisma, id, `The ${customer.id === order.buyerId ? 'buyer' : 'seller'} appealed: ${reason.trim()} Afrippa's team will decide. Add your evidence here.`);
     await this.tell(order, other, 'customer.p2p.order_appealed', 'An order was appealed', `${orderNumber(order.number)} was appealed. Afrippa's team will decide; add your evidence to the order.`);
+    // Afrippa's operations decide it (admin.afrippa.com's order page).
+    await this.inbox.afrippaAdmins('admin.p2p.order_appealed', {
+      subject: `order:${order.id}`,
+      title: `${orderNumber(order.number)} appealed`,
+      body: `The ${customer.id === order.buyerId ? 'buyer' : 'seller'} appealed: ${reason.trim().slice(0, 300)}`,
+      link: `/orders/${order.id}`,
+      mode: order.mode,
+    });
     return this.present(await this.prisma.p2pOrder.findUniqueOrThrow({ where: { id } }), await this.assetOf(order), customer.id === order.buyerId ? 'buyer' : 'seller');
   }
 

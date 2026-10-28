@@ -5,6 +5,7 @@ import type { LedgerMode, Notification, NotificationAudience, Prisma } from '../
 import { PushService } from './push.service.js';
 import {
   type AdminNotificationType,
+  type AfrippaAdminNotificationType,
   type CustomerNotificationType,
   notificationTypes,
   type NotificationType,
@@ -80,12 +81,28 @@ export class InboxService {
     });
   }
 
+  /**
+   * To Afrippa's own admins (admin.afrippa.com): its super admins plus the listed roles, in their own realm; BitoCard's
+   * admins never receive them, and Afrippa's never receive BitoCard's.
+   */
+  async afrippaAdmins(type: AfrippaAdminNotificationType, content: NotificationContent) {
+    await this.safely(type, async () => {
+      const roles = ['super_admin', ...notificationTypes[type].roles];
+      const admins = await this.prisma.user.findMany({ where: { realm: 'afrippa_admin', status: 'active', adminRoles: { hasSome: roles } }, select: { id: true } });
+      return this.create(
+        admins.map(admin => ({ audience: 'admin', userId: admin.id, resellerId: null })),
+        type,
+        content,
+      );
+    });
+  }
+
   /** To one person only (security notices), shown whichever reseller account they are using. */
   async person(userId: string, type: PersonalNotificationType, content: NotificationContent) {
     await this.safely(type, async () => {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { realm: true } });
-      // Afrippa's admins have no inbox here yet (plan step 2, item 2).
-      return user && user.realm !== 'afrippa_admin' ? this.create([{ audience: user.realm, userId, resellerId: null }], type, content) : 0;
+      // Afrippa's admins are admins too (their own inbox, on admin.afrippa.com).
+      return user ? this.create([{ audience: user.realm === 'afrippa_admin' ? 'admin' : user.realm, userId, resellerId: null }], type, content) : 0;
     });
   }
 

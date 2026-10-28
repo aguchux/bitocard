@@ -2,7 +2,7 @@ import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Quer
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { Public } from '../auth/caller.js';
+import { type Caller, CurrentCaller, personOf, Public, RealmOnly } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { InboxService } from '../notifications/inbox.service.js';
 
@@ -51,5 +51,38 @@ export class TraderNotificationsController {
   @HttpCode(HttpStatus.OK)
   read(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.inbox.markRead({ customerId: caller.customer.id }, id);
+  }
+}
+
+/**
+ * Afrippa's admins' own inbox (admin.afrippa.com): appeals, reports and the crypto alerts, by their roles. BitoCard's
+ * admins never see these, nor Afrippa's admins BitoCard's.
+ */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin/notifications')
+export class AfrippaAdminNotificationsController {
+  constructor(private readonly inbox: InboxService) {}
+
+  @Get()
+  list(@CurrentCaller() caller: Caller, @Query() filter: TraderNotificationsDto) {
+    return this.inbox.list({ userId: personOf(caller) }, filter);
+  }
+
+  @Get('unread-count')
+  async unread(@CurrentCaller() caller: Caller) {
+    return { object: 'unread_count' as const, count: await this.inbox.unreadCount({ userId: personOf(caller) }) };
+  }
+
+  @Post('read-all')
+  @HttpCode(HttpStatus.OK)
+  readAll(@CurrentCaller() caller: Caller) {
+    return this.inbox.markAllRead({ userId: personOf(caller) });
+  }
+
+  @Post(':id/read')
+  @HttpCode(HttpStatus.OK)
+  read(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.inbox.markRead({ userId: personOf(caller) }, id);
   }
 }

@@ -16,6 +16,15 @@ type AdminType = {
   label: string;
 };
 
+type AfrippaAdminType = {
+  /** Afrippa's own admins (admin.afrippa.com), never BitoCard's: its crypto, orders and traders. */
+  realm: 'afrippa_admin';
+  /** Afrippa admin roles who see it, besides its super admins. */
+  roles: string[];
+  severity: NotificationSeverity;
+  label: string;
+};
+
 type PersonalType = {
   /** Only the person it is about, in their own realm, whatever their role. */
   realm: 'personal';
@@ -41,7 +50,7 @@ type CustomerType = {
 /**
  * Every in-app notification, who sees it and how serious it is. Recipients are worked out when it is created: reseller
  * notifications go to the owner plus the members whose role is listed; admin ones to super admins plus the listed admin
- * roles; personal ones to the one person; customer ones to the one storefront customer. A new notification needs its
+ * roles (BitoCard's admins, or Afrippa's for `afrippa_admin` ones); personal ones to the one person; customer ones to the one storefront customer. A new notification needs its
  * entry here (and in AGENTS.md).
  */
 export const notificationTypes = {
@@ -147,12 +156,16 @@ export const notificationTypes = {
   'admin.vpn.attention': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'VPN account needs attention' },
   'admin.vpn.credit_low': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'VPN supplier credit low' },
   'admin.esim.top_up_unclear': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'eSIM top-up unconfirmed' },
-  'admin.crypto.withdrawal_review': { realm: 'admin', roles: ['operations', 'finance'], severity: 'warning', label: 'Crypto withdrawal to approve' },
-  'admin.crypto.withdrawal_stuck': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Crypto withdrawal unconfirmed' },
-  'admin.crypto.address_flagged': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Withdrawal address on a sanctions list' },
+  'admin.crypto.withdrawal_review': { realm: 'afrippa_admin', roles: ['operations', 'finance'], severity: 'warning', label: 'Crypto withdrawal to approve' },
+  'admin.crypto.withdrawal_stuck': { realm: 'afrippa_admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Crypto withdrawal unconfirmed' },
+  'admin.crypto.address_flagged': { realm: 'afrippa_admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Withdrawal address on a sanctions list' },
   'admin.customer_payout.unclear': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Customer bank payout outcome unclear' },
-  'admin.crypto.custody_shortfall': { realm: 'admin', roles: ['finance', 'operations'], severity: 'critical', label: 'Crypto custody shortfall' },
-  'admin.crypto.deposit_stuck': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Crypto deposit cannot be settled' },
+  'admin.crypto.custody_shortfall': { realm: 'afrippa_admin', roles: ['finance', 'operations'], severity: 'critical', label: 'Crypto custody shortfall' },
+  'admin.crypto.deposit_stuck': { realm: 'afrippa_admin', roles: ['operations'], severity: 'warning', label: 'Crypto deposit cannot be settled' },
+  'admin.p2p.order_appealed': { realm: 'afrippa_admin', roles: ['operations', 'support'], severity: 'warning', label: 'An order was appealed' },
+  'admin.p2p.report_opened': { realm: 'afrippa_admin', roles: ['operations', 'support'], severity: 'info', label: 'A trader was reported' },
+  'admin.afrippa.ticket_created': { realm: 'afrippa_admin', roles: ['support', 'operations'], severity: 'info', label: 'New support ticket from a trader' },
+  'admin.afrippa.ticket_replied': { realm: 'afrippa_admin', roles: ['support', 'operations'], severity: 'info', label: 'A trader replied to a ticket' },
   'admin.wallet.manual_top_up': { realm: 'admin', roles: ['finance'], severity: 'info', label: 'Wallet topped up by hand' },
   'admin.supplier.funded': { realm: 'admin', roles: ['finance', 'operations'], severity: 'info', label: 'Supplier funded by hand' },
 
@@ -222,10 +235,11 @@ export const notificationTypes = {
   'customer.security.two_step_changed': { realm: 'customer', severity: 'warning', label: 'Two-step sign-in changed', push: true, locked: true },
   'customer.security.payment_method_added': { realm: 'customer', severity: 'warning', label: 'Payment method added', push: true, locked: true },
   'customer.security.email_changed': { realm: 'customer', severity: 'warning', label: 'Sign-in email changed', push: true, locked: true },
-} satisfies Record<string, ResellerType | AdminType | PersonalType | CustomerType>;
+} satisfies Record<string, ResellerType | AdminType | AfrippaAdminType | PersonalType | CustomerType>;
 
 export type NotificationType = keyof typeof notificationTypes;
 export type ResellerNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'reseller' ? K : never }[NotificationType];
 export type AdminNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'admin' ? K : never }[NotificationType];
+export type AfrippaAdminNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'afrippa_admin' ? K : never }[NotificationType];
 export type PersonalNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'personal' ? K : never }[NotificationType];
 export type CustomerNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'customer' ? K : never }[NotificationType];

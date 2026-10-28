@@ -115,7 +115,7 @@ export class CryptoReconciliationService {
       const row = await this.prisma.cryptoReconciliation.create({ data: { mode, asset: asset.code, expected, held, difference, status, detail: detail as Prisma.InputJsonValue } });
       rows.push(row);
       if (status === 'shortfall') {
-        await this.inbox.admins('admin.crypto.custody_shortfall', {
+        await this.inbox.afrippaAdmins('admin.crypto.custody_shortfall', {
           title: `${asset.code} custody short by ${fromUnits(-difference, asset.decimals)}`,
           body: `The signer's wallets hold ${fromUnits(held, asset.decimals)} ${asset.code}; the ledger expects ${fromUnits(expected, asset.decimals)}. Check the wallets, sweeps and gas spending now.`,
           link: '/crypto/assets',

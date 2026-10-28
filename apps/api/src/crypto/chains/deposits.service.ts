@@ -567,7 +567,7 @@ export class CryptoDepositsService {
     const chain = deposit.chain as Chain;
     const routes = await this.routes(chain, deposit.mode);
     if (!routes.length) {
-      await this.inbox.admins('admin.crypto.deposit_stuck', {
+      await this.inbox.afrippaAdmins('admin.crypto.deposit_stuck', {
         subject: `no_route:${deposit.mode}:${chain}:${new Date().toISOString().slice(0, 10)}`,
         title: `${chainNames[chain]} deposits cannot be checked (${deposit.mode})`,
         body: `No blockchain provider serves ${chainNames[chain]} for ${deposit.mode === 'live' ? 'live' : 'sandbox'} stores, so pending deposits there wait. Set one up, switched ${deposit.mode === 'live' ? 'off' : 'on'} Sandbox, under Crypto > Chains.`,
@@ -627,7 +627,7 @@ export class CryptoDepositsService {
     await this.prisma.cryptoDeposit.update({ where: { id: deposit.id }, data: { confirmations, blockNumber: block, confirmedBy: [...confirmedBy], checkedAt: new Date(), missingSince: null } });
     if (large && confirmedBy.size < 2 && !others.length && confirmations >= network.confirmations) {
       // Confirmed, but no second provider serves this chain and mode to agree on it: it waits for operations.
-      await this.inbox.admins('admin.crypto.deposit_stuck', {
+      await this.inbox.afrippaAdmins('admin.crypto.deposit_stuck', {
         subject: `double_check:${deposit.id}`,
         title: `A large ${deposit.asset} deposit needs a second provider`,
         body: `A ${fromUnits(deposit.amount, asset.decimals)} ${deposit.asset} deposit on ${chainNames[chain]} is confirmed, but only one blockchain provider serves ${chainNames[chain]} here, and deposits from ${network.doubleCheckFrom} ${deposit.asset} need two to agree. Set up a second provider under Crypto > Chains.`,
@@ -732,7 +732,7 @@ export class CryptoDepositsService {
     if (notice.provider === 'scan' && updated.attempts >= maxNoticeAttempts) {
       // A transfer a scan listed that no provider has shown since: operations look at it (a webhook's other hashes,
       // block hashes for one, are never transactions, so only scans' are raised).
-      await this.inbox.admins('admin.crypto.deposit_stuck', {
+      await this.inbox.afrippaAdmins('admin.crypto.deposit_stuck', {
         subject: `unread:${id}`,
         title: `A ${chainNames[chain]} transfer could not be read`,
         body: `A scan listed transaction ${unresolved.join(', ')} to a customer's address, but no provider has shown it since. Check it on a block explorer and recheck the providers under Crypto > Chains.`,

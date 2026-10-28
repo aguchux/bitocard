@@ -2,7 +2,7 @@
 // notices Afrippa leaves a trader, their own only, through Afrippa's signed server, past two-step.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, startApp } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { afrippaStoreId } = await import('../dist/afrippa/ids.js');
@@ -97,5 +97,31 @@ describe("a trader's inbox", () => {
     const refused = await pending.get('/v1/afrippa/account/notifications');
     assert.equal(refused.status, 401);
     assert.equal(refused.json.error.code, 'mfa_required');
+  });
+});
+
+describe("Afrippa's admins' inbox", () => {
+  test('Afrippa notices reach only its own admins, by role; BitoCard notices only BitoCard admins', async () => {
+    const inbox = server.app.get(InboxService);
+    const operations = await afrippaAdminClient(server, ['operations']);
+    const finance = await afrippaAdminClient(server, ['finance']);
+    const bitocard = await adminClient(server, ['super_admin']);
+    await inbox.afrippaAdmins('admin.p2p.order_appealed', { subject: 'order:test', title: 'ORD-000001 appealed', body: 'The buyer appealed.', link: '/orders/x', mode: 'test' });
+    await inbox.afrippaAdmins('admin.crypto.custody_shortfall', { subject: 'shortfall:test', title: 'USDT short', body: 'Custody is short.', link: '/crypto' });
+    await inbox.admins('admin.reseller.signed_up', { subject: 'reseller:test', title: 'New reseller', body: 'A reseller signed up.' });
+
+    const titles = async client => (await client.get('/v1/afrippa/admin/notifications')).json.data.map(item => item.title).sort();
+    assert.deepEqual(await titles(operations), ['ORD-000001 appealed', 'USDT short']);
+    assert.deepEqual(await titles(finance), ['USDT short'], 'appeals are for operations and support');
+    const theirs = (await bitocard.get('/v1/admin/notifications')).json.data.map(item => item.title);
+    assert.ok(theirs.includes('New reseller'));
+    assert.ok(!theirs.includes('USDT short') && !theirs.includes('ORD-000001 appealed'), "BitoCard's admins never see Afrippa's");
+
+    assert.equal((await operations.get('/v1/afrippa/admin/notifications/unread-count')).json.count, 2);
+    assert.equal((await operations.post('/v1/afrippa/admin/notifications/read-all', {})).status, 200);
+    assert.equal((await operations.get('/v1/afrippa/admin/notifications/unread-count')).json.count, 0);
+    // Neither realm reaches the other's inbox.
+    assert.ok([401, 403].includes((await operations.get('/v1/admin/notifications')).status));
+    assert.ok([401, 403].includes((await bitocard.get('/v1/afrippa/admin/notifications')).status));
   });
 });

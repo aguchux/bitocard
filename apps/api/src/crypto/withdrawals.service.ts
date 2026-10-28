@@ -232,7 +232,7 @@ export class CryptoWithdrawalsService {
   /** Admins are told about a sanctioned address, and it is refused. */
   private async refuseFlagged(holder: Holder, chain: Chain, address: string, screening: { provider: string | null; detail?: string | null }, param: string): Promise<never> {
     const id = holder.owner.customerId;
-    await this.inbox.admins('admin.crypto.address_flagged', {
+    await this.inbox.afrippaAdmins('admin.crypto.address_flagged', {
       title: 'Withdrawal address on a sanctions list',
       body: `${holder.who} tried to use ${address} (${chainNames[chain]}), which ${screening.provider} reports: ${screening.detail ?? 'sanctioned'}. It was refused.`,
       link: `/crypto/customers/${id}`,
@@ -483,7 +483,7 @@ export class CryptoWithdrawalsService {
     if (!claimed.count) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: row.asset } });
     if (next === 'review') {
-      await this.inbox.admins('admin.crypto.withdrawal_review', {
+      await this.inbox.afrippaAdmins('admin.crypto.withdrawal_review', {
         title: `Approve a ${row.asset} withdrawal`,
         body: `CW-${String(row.number).padStart(6, '0')}: ${fromUnits(row.amount, asset.decimals)} ${row.asset} on ${chainNames[row.chain as Chain]} for ${holder.who} (${reviewReasons[row.reviewReason!] ?? row.reviewReason}).`,
         link: '/crypto/withdrawals',
@@ -689,7 +689,7 @@ export class CryptoWithdrawalsService {
     if (row.needsReviewAt || Date.now() - (row.reviewedAt ?? row.createdAt).getTime() < stuckAfterMs) return;
     const flagged = await this.prisma.cryptoWithdrawal.updateMany({ where: { id: row.id, needsReviewAt: null }, data: { needsReviewAt: new Date() } });
     if (!flagged.count) return;
-    await this.inbox.admins('admin.crypto.withdrawal_stuck', {
+    await this.inbox.afrippaAdmins('admin.crypto.withdrawal_stuck', {
       title: `${row.asset} withdrawal unconfirmed`,
       body: `CW-${String(row.number).padStart(6, '0')} (${chainNames[row.chain as Chain]}) is still ${row.status} after ${Math.round((Date.now() - row.createdAt.getTime()) / hour)} hours. Check it with the signer and the chain.`,
       link: '/crypto/withdrawals',

@@ -19,16 +19,18 @@ import {
 import { KycStorage } from '../kyc/storage.js';
 import { OrderRoomService } from './order-room.service.js';
 import { P2pOrdersService } from './orders.service.js';
-import { TraderNotificationsController } from './notifications.controller.js';
+import { AfrippaAdminNotificationsController, TraderNotificationsController } from './notifications.controller.js';
 import { PaymentMethodsController } from './payment-methods.controller.js';
+import { AfrippaTicketsAdminController, TraderTicketsController } from './support.controller.js';
+import { SupportModule } from '../support/support.module.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
 import { TraderGoogleService } from './google.service.js';
 import { TraderTwoStepService } from './two-step.service.js';
 
 /** Afrippa's own surface in the API (docs/CRYPTO_SPINOFF_PLAN.md, step 2): its traders' accounts and their two-step sign-in, their payment methods and P2P orders, and its own books. */
 @Module({
-  imports: [CheckoutModule, CryptoModule, IdentityModule],
-  controllers: [AfrippaAccountController, TraderNotificationsController, AfrippaTraderAdminController, AfrippaBooksController, PaymentMethodsController, P2pOrdersController, AfrippaOrdersAdminController, AfrippaFeeRatesAdminController, P2pStandingController, AfrippaStandingAdminController, P2pTrustController, AfrippaReportsAdminController, AfrippaRefusedWordsAdminController],
+  imports: [CheckoutModule, CryptoModule, IdentityModule, SupportModule],
+  controllers: [AfrippaAccountController, TraderNotificationsController, AfrippaAdminNotificationsController, TraderTicketsController, AfrippaTicketsAdminController, AfrippaTraderAdminController, AfrippaBooksController, PaymentMethodsController, P2pOrdersController, AfrippaOrdersAdminController, AfrippaFeeRatesAdminController, P2pStandingController, AfrippaStandingAdminController, P2pTrustController, AfrippaReportsAdminController, AfrippaRefusedWordsAdminController],
   providers: [TraderTwoStepService, TraderGoogleService, AfrippaBooksService, PaymentMethodsService, P2pOrdersService, OrderRoomService, KycStorage, CustomerGuard],
   exports: [TraderTwoStepService, PaymentMethodsService, P2pOrdersService],
 })
