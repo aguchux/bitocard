@@ -214,6 +214,7 @@ export const notificationTypes = {
   'customer.p2p.order_decided': { realm: 'customer', severity: 'info', label: 'Appeal decided', push: true },
   'customer.p2p.order_message': { realm: 'customer', severity: 'info', label: 'Message in an order', push: true },
   'customer.p2p.order_reminder': { realm: 'customer', severity: 'warning', label: 'Order waiting on you', push: true },
+  'customer.p2p.standing_changed': { realm: 'customer', severity: 'warning', label: 'Trading paused or restored', push: true, locked: true },
   'customer.exchange.completed': { realm: 'customer', severity: 'success', label: 'Exchange completed', push: true },
   'customer.crypto.deposit_credited': { realm: 'customer', severity: 'success', label: 'Crypto deposit arrived', push: true },
   'customer.crypto.frozen': { realm: 'customer', severity: 'warning', label: 'Crypto frozen', push: true, locked: true },

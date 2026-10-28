@@ -4,6 +4,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { feeFor, fromUnits } from '../crypto/amounts.js';
 import { CryptoWalletsService, cryptoFeesRef, isTrader } from '../crypto/crypto-wallets.service.js';
 import { P2pFeesService } from '../crypto/p2p-fees.service.js';
+import { P2pStandingService } from '../crypto/p2p-standing.service.js';
 import { P2pService } from '../crypto/p2p.service.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -63,6 +64,7 @@ export class P2pOrdersService {
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
     private readonly room: OrderRoomService,
+    private readonly standing: P2pStandingService,
   ) {}
 
   private requireTrader(customer: CustomerWithStore) {
@@ -96,6 +98,8 @@ export class P2pOrdersService {
     if (buyerFee >= terms.amount) throw invalid('amount_too_small', 'This amount is too small to trade.', 'amount');
     const sellerId = found.side === 'sell' ? found.customerId : customer.id;
     const buyerId = found.side === 'sell' ? customer.id : found.customerId;
+    // A trader paused or cooling off opens nothing; one buying, nothing either after too many cancellations.
+    await this.standing.require(customer.id, context.mode, { buying: buyerId === customer.id });
     const method = await this.payInto(found, customer, input.payment_method_id);
     const unpaid = await this.prisma.p2pOrder.count({ where: { buyerId, mode: context.mode, status: 'pending_payment' } });
     if (unpaid >= maxUnpaidOrders) throw conflict('too_many_orders', `A buyer can have ${maxUnpaidOrders} orders waiting for payment at once. Pay or cancel one first.`);
@@ -250,6 +254,7 @@ export class P2pOrdersService {
     const decision = { decidedBy: adminId, decisionFault: input.fault, decisionNote: input.note.trim() };
     const done = await this.settle(order, input.outcome === 'release' ? 'released' : 'returned', { from: ['appealed'], decision });
     if (!done) throw conflict('order_not_appealed', 'Only an appealed, open order can be decided.');
+    if (input.fault !== 'none') await this.standing.afterStrike(input.fault === 'buyer' ? done.buyerId : done.sellerId, done.mode);
     await this.audit.record({ actorId: adminId, action: `p2p_order.${done.status}`, targetType: 'p2p_order', targetId: id, before: { status: order.status }, after: { status: done.status, fault: input.fault, note: input.note.trim() }, platform: 'afrippa' });
     const asset = await this.assetOf(done);
     for (const party of [done.buyerId, done.sellerId]) {

@@ -7,6 +7,8 @@ import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } fro
 import { adminId } from '../countries/countries.controller.js';
 import { cryptoAmount } from '../crypto/crypto.controller.js';
 import { maxFeeBps, P2pFeesService } from '../crypto/p2p-fees.service.js';
+import { P2pStandingService } from '../crypto/p2p-standing.service.js';
+import { CryptoWalletsService } from '../crypto/crypto-wallets.service.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode, P2pOrderStatus } from '../generated/prisma/client.js';
 import { sendFile } from '../support/chats.controller.js';
@@ -62,6 +64,15 @@ class FeeRateDto {
   @ValidateIf((_, value) => value !== null) @IsString() @Matches(/^[A-Za-z]{2}$/) market: string | null;
   @IsInt() @Min(0) @Max(maxFeeBps) buyer_bps: number;
   @IsInt() @Min(0) @Max(maxFeeBps) seller_bps: number;
+}
+
+class ClearStandingDto {
+  @IsIn(['test', 'live']) mode: LedgerMode;
+  @IsString() @Length(5, 500) reason: string;
+}
+
+class StandingQueryDto {
+  @IsOptional() @IsIn(['test', 'live']) mode?: LedgerMode;
 }
 
 class DecideDto {
@@ -215,5 +226,45 @@ export class AfrippaFeeRatesAdminController {
   @Delete(':asset/:market')
   remove(@CurrentCaller() caller: Caller, @Param('asset') asset: string, @Param('market') market: string) {
     return this.fees.remove(adminId(caller), asset, market);
+  }
+}
+
+/** A trader's own standing (strikes, cancellations, what stops them now), through Afrippa's signed server. */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('afrippa/p2p/standing')
+export class P2pStandingController {
+  constructor(
+    private readonly standing: P2pStandingService,
+    private readonly wallets: CryptoWalletsService,
+  ) {}
+
+  @Get()
+  async get(@CurrentCustomer() caller: CustomerCaller) {
+    const context = await this.wallets.context(caller.customer);
+    return this.standing.standing(caller.customer.id, context.mode);
+  }
+}
+
+/** Afrippa's admins: a trader's standing, and clearing their strikes (operations, step-up, audited). */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('operations', 'support', 'finance')
+@Controller('afrippa/admin/traders')
+export class AfrippaStandingAdminController {
+  constructor(private readonly standing: P2pStandingService) {}
+
+  @Get(':id/standing')
+  get(@Param('id', ParseUUIDPipe) id: string, @Query() query: StandingQueryDto) {
+    return this.standing.standing(id, query.mode ?? 'live');
+  }
+
+  @AdminRoles('operations')
+  @StepUp()
+  @Post(':id/standing/clear')
+  @HttpCode(HttpStatus.OK)
+  clear(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ClearStandingDto) {
+    return this.standing.clear(adminId(caller), id, body.mode, body.reason);
   }
 }

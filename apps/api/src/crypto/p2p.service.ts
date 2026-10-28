@@ -14,6 +14,7 @@ import { feeFor, fiatFor, fromUnits, toUnits, unitsFor } from './amounts.js';
 import { type CryptoContext, CryptoWalletsService, cryptoFeesRef, isTrader, notFound } from './crypto-wallets.service.js';
 import { CryptoMarketLimitsService, crossBorder } from './market-limits.service.js';
 import { P2pFeesService } from './p2p-fees.service.js';
+import { P2pStandingService } from './p2p-standing.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
@@ -67,6 +68,7 @@ export class P2pService {
     private readonly limits: CryptoMarketLimitsService,
     private readonly house: HouseService,
     private readonly fees: P2pFeesService,
+    private readonly standing: P2pStandingService,
   ) {}
 
   /** Whether other countries' residents may trade in `country`'s local book: its market open, and cross-border on there. */
@@ -319,7 +321,9 @@ export class P2pService {
           const owner = await this.prisma.customer.findUnique({ where: { id: customerId }, include: { store: { include: { reseller: { select: { house: true } } } }, market: true } });
           if (!owner || owner.status !== 'active') return false;
           try {
-            await this.access(owner, book);
+            const { context } = await this.access(owner, book);
+            // An Afrippa trader paused or cooling off after a lost appeal keeps their ads off the market.
+            if (isTrader(owner) && (await this.standing.restriction(owner.id, context.mode))) return false;
             return true;
           } catch {
             return false;
@@ -526,6 +530,7 @@ export class P2pService {
     const { context, book } = await this.access(customer, input);
     // Afrippa's traders post escrow ads: paid directly to the seller through the payment methods listed.
     const escrow = isTrader(customer);
+    if (escrow) await this.standing.require(customer.id, context.mode);
     const methods = escrow ? await this.adMethods(customer.id, context.mode, book.currency, input.payment_method_ids) : [];
     const window = escrow ? this.paymentWindow(input.payment_window ?? 15) : null;
     const rates = escrow ? await this.fees.rates(await this.wallets.asset(input.asset), book.market, context.mode) : null;

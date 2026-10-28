@@ -2596,6 +2596,7 @@ model Customer {
   p2pPaymentMethods         P2pPaymentMethod[]
   p2pOrdersSold             P2pOrder[]                @relation("p2pOrderSeller")
   p2pOrdersBought           P2pOrder[]                @relation("p2pOrderBuyer")
+  p2pStandings              P2pStanding[]
   /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
   /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
   /// secret, encrypted) until its first code.
@@ -5511,6 +5512,8 @@ model P2pOrder {
 
   @@index([sellerId, status])
   @@index([buyerId, status])
+  @@index([buyerId, closedAt])
+  @@index([sellerId, closedAt])
   @@index([status, payBy])
   @@index([adId])
   @@map("p2p_orders")
@@ -5550,4 +5553,20 @@ model P2pOrderMessage {
 
   @@index([orderId, createdAt])
   @@map("p2p_order_messages")
+}
+
+/// An Afrippa trader's standing per mode (docs/CRYPTO_SPINOFF_PLAN.md, step 3): when operations last cleared their
+/// strikes (strikes before then no longer count) and when they were last told they were paused.
+model P2pStanding {
+  customerId  String     @map("customer_id") @db.Uuid
+  mode        LedgerMode
+  clearedAt   DateTime?  @map("cleared_at")
+  clearedBy   String?    @map("cleared_by") @db.Uuid
+  clearReason String?    @map("clear_reason")
+  notifiedAt  DateTime?  @map("notified_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, mode])
+  @@map("p2p_standings")
 }
