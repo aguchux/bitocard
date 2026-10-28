@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { IdentityVerification } from '../generated/prisma/client.js';
+import { afrippaOperatorId } from '../afrippa/ids.js';
+import type { IdentityVerification, Platform } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 
 /** A link into BitoCard Verify works once, for this long. */
@@ -10,6 +11,12 @@ export const handoffMs = 30 * 60_000;
 /** The app session it becomes lasts this long without use. */
 export const sessionIdleMs = 2 * 3600_000;
 export const providerName = 'bitocard';
+
+/**
+ * Whose a case (or check) is: Afrippa's when it is under Afrippa's operator account (its traders' checks, on
+ * verify.afrippa.com, reviewed only by Afrippa's admins, documents in Afrippa's own bucket), else BitoCard's.
+ */
+export const kycPlatform = (resellerId: string): Platform => (resellerId === afrippaOperatorId ? 'afrippa' : 'bitocard');
 
 /**
  * Opening BitoCard Verify cases and the links into them, for the identity checks (`IdentityService`) of Verify
@@ -47,13 +54,14 @@ export class VerifyLinks {
         resubmitItems: [],
       },
     });
-    return this.link(verification.providerReference);
+    return this.link(verification.providerReference, kycPlatform(verification.resellerId));
   }
 
-  /** A fresh single-use link into the case. */
-  async link(caseId: string) {
+  /** A fresh single-use link into the case, on its product's Verify (verify.bitocard.com or verify.afrippa.com). */
+  async link(caseId: string, platform: Platform = 'bitocard') {
     const token = `bkh_${randomToken(32)}`;
     await this.prisma.kycSession.create({ data: { caseId, kind: 'handoff', tokenHash: sha256(token), expiresAt: new Date(Date.now() + handoffMs) } });
-    return `${this.integrations.config.VERIFY_URL.replace(/\/+$/, '')}/s#t=${token}`;
+    const base = platform === 'afrippa' ? this.integrations.config.AFRIPPA_VERIFY_URL : this.integrations.config.VERIFY_URL;
+    return `${base.replace(/\/+$/, '')}/s#t=${token}`;
   }
 }

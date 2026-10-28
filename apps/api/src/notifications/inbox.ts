@@ -167,6 +167,7 @@ export const notificationTypes = {
   'admin.afrippa.ticket_created': { realm: 'afrippa_admin', roles: ['support', 'operations'], severity: 'info', label: 'New support ticket from a trader' },
   'admin.afrippa.ticket_replied': { realm: 'afrippa_admin', roles: ['support', 'operations'], severity: 'info', label: 'A trader replied to a ticket' },
   'admin.afrippa.chat_waiting': { realm: 'afrippa_admin', roles: ['support', 'operations'], severity: 'warning', label: 'A trader is waiting in chat' },
+  'admin.afrippa.kyc_submitted': { realm: 'afrippa_admin', roles: ['operations', 'support'], severity: 'info', label: 'A trader identity check to review' },
   'admin.wallet.manual_top_up': { realm: 'admin', roles: ['finance'], severity: 'info', label: 'Wallet topped up by hand' },
   'admin.supplier.funded': { realm: 'admin', roles: ['finance', 'operations'], severity: 'info', label: 'Supplier funded by hand' },
 

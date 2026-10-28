@@ -5,7 +5,8 @@ import { randomToken, sha256 } from '../common/crypto.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { type KycCase, type KycDocument, Prisma } from '../generated/prisma/client.js';
+import { type KycCase, type KycDocument, type Platform, Prisma } from '../generated/prisma/client.js';
+import { afrippaOperatorId } from '../afrippa/ids.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { EmailService } from '../notifications/email.service.js';
@@ -15,7 +16,7 @@ import { EventsService } from '../webhooks/events.service.js';
 import { presentCustomerVerification } from '../identity/identity.service.js';
 import { businessDocuments, type DeclineReason, declineReasons, framesPerStep, idTypeFor, idTypesFor, type LivenessStep, livenessStepCount, livenessSteps } from './catalogue.js';
 import { checkDocument } from './files.js';
-import { sessionIdleMs } from './links.js';
+import { kycPlatform, sessionIdleMs } from './links.js';
 import { KycStorage } from './storage.js';
 
 /** Documents of declined cases are deleted after this; approved cases keep theirs for record keeping (to confirm with lawyers). */
@@ -25,7 +26,12 @@ const approvedRetentionMs = 5 * 365 * 24 * 3600_000;
 const abandonedMs = 7 * 24 * 3600_000;
 
 /** A reseller reviewer acts for one account; `*` (document links, which cannot name it) means the case's own, if the person belongs to it. */
-export type Reviewer = { realm: 'admin'; userId: string | null } | { realm: 'reseller'; userId: string; resellerId: string };
+export type Reviewer = { realm: 'admin'; userId: string | null; platform?: Platform } | { realm: 'reseller'; userId: string; resellerId: string };
+
+/** Which product's cases a reviewer sees: BitoCard's admins and resellers BitoCard's, Afrippa's admins Afrippa's. */
+const reviewerPlatform = (reviewer: Reviewer): Platform => (reviewer.realm === 'admin' ? (reviewer.platform ?? 'bitocard') : 'bitocard');
+/** The cases of a product, by their account: Afrippa's are under its operator account. */
+const platformWhere = (platform: Platform): Prisma.KycCaseWhereInput => (platform === 'afrippa' ? { resellerId: afrippaOperatorId } : { resellerId: { not: afrippaOperatorId } });
 type CaseWithDocs = KycCase & { documents: KycDocument[] };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such identity check.');
@@ -75,6 +81,11 @@ export class KycService {
     return new Encryption(key);
   }
 
+  /** A case's documents live in its product's own private bucket. */
+  private storageFor(c: KycCase) {
+    return this.storage.forPlatform(kycPlatform(c.resellerId));
+  }
+
   /** The same ID on any case: an HMAC of the country, ID type and number (letters and digits only, upper case). */
   fingerprint(country: string, type: string, number: string) {
     const key = this.integrations.env.ENCRYPTION_KEY ?? '';
@@ -84,9 +95,11 @@ export class KycService {
   // -- Sessions --------------------------------------------------------------------------------------------------
 
   /** A link's token for an app session (once): the case it opens and a new session token for the app's cookie. */
-  async exchange(token: string) {
+  async exchange(token: string, platform: Platform = 'bitocard') {
     const now = new Date();
-    const link = await this.prisma.kycSession.findUnique({ where: { tokenHash: sha256(token) } });
+    const found = await this.prisma.kycSession.findUnique({ where: { tokenHash: sha256(token) }, include: { case: { select: { resellerId: true } } } });
+    // A link opens only on its own product's Verify.
+    const link = found && kycPlatform(found.case.resellerId) === platform ? found : null;
     const claimed = link?.kind === 'handoff' ? await this.prisma.kycSession.updateMany({ where: { id: link.id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } }) : null;
     if (!link || !claimed?.count) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'kyc_link_invalid', 'This link has expired or was already used. Start your check again from where you came from.');
     const session = `bks_${randomToken(32)}`;
@@ -96,10 +109,10 @@ export class KycService {
   }
 
   /** The case and session behind an app session token, its idle time renewed; null when unknown or expired. */
-  async resolve(token: string) {
+  async resolve(token: string, platform: Platform = 'bitocard') {
     const now = new Date();
-    const session = await this.prisma.kycSession.findUnique({ where: { tokenHash: sha256(token) } });
-    if (!session || session.kind !== 'session' || session.expiresAt <= now) return null;
+    const session = await this.prisma.kycSession.findUnique({ where: { tokenHash: sha256(token) }, include: { case: { select: { resellerId: true } } } });
+    if (!session || session.kind !== 'session' || session.expiresAt <= now || kycPlatform(session.case.resellerId) !== platform) return null;
     // Renewed at most once a minute, not on every request.
     if (session.expiresAt.getTime() - now.getTime() < sessionIdleMs - 60_000) {
       await this.prisma.kycSession.update({ where: { id: session.id }, data: { expiresAt: new Date(now.getTime() + sessionIdleMs) } });
@@ -140,6 +153,7 @@ export class KycService {
 
   /** Who the applicant is checking for: the store (its customers), else the reseller (API customers), else BitoCard. */
   private async brand(c: KycCase) {
+    if (kycPlatform(c.resellerId) === 'afrippa') return { name: 'Afrippa', logo_url: null };
     if (c.subject === 'customer' && c.storeId) {
       const store = await this.prisma.store.findUnique({ where: { id: c.storeId }, select: { name: true, logoUrl: true, reseller: { select: { house: true } } } });
       if (store && !store.reseller.house) return { name: store.name, logo_url: store.logoUrl };
@@ -288,15 +302,16 @@ export class KycService {
     if ('problem' in checked) throw invalid(checked.problem.includes('4 MB') ? 'file_too_large' : 'file_type_invalid', checked.problem, 'file');
     // Liveness frames and the selfie come from the camera as JPEG; a PNG there is a file someone picked.
     if ((frame || kind === 'selfie') && checked.contentType !== 'image/jpeg') throw invalid('file_type_invalid', 'Take this photo with your camera.', 'file');
-    const key = this.storage.key(c.id, randomUUID());
-    await this.storage.put(key, checked.bytes);
+    const storage = this.storageFor(c);
+    const key = storage.key(c.id, randomUUID());
+    await storage.put(key, checked.bytes);
     const previous = c.documents.find(document => document.kind === kind);
     await this.prisma.kycDocument.upsert({
       where: { caseId_kind: { caseId: c.id, kind } },
       create: { caseId: c.id, kind, objectKey: key, contentType: checked.contentType, size: checked.bytes.length, sha256: sha256Bytes(checked.bytes) },
       update: { objectKey: key, contentType: checked.contentType, size: checked.bytes.length, sha256: sha256Bytes(checked.bytes), createdAt: new Date() },
     });
-    if (previous) await this.storage.remove(previous.objectKey).catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not delete a replaced document'));
+    if (previous) await storage.remove(previous.objectKey).catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not delete a replaced document'));
     await this.prisma.kycCase.update({ where: { id: c.id }, data: { updatedAt: new Date() } });
     return this.applicantCase(caseId);
   }
@@ -304,12 +319,13 @@ export class KycService {
   private async removeDocuments(c: KycCase, documents: KycDocument[]) {
     if (!documents.length) return;
     await this.prisma.kycDocument.deleteMany({ where: { id: { in: documents.map(document => document.id) } } });
-    for (const document of documents) await this.storage.remove(document.objectKey).catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not delete a document'));
+    const storage = this.storageFor(c);
+    for (const document of documents) await storage.remove(document.objectKey).catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not delete a document'));
   }
 
   /** Who reviews a case: a registered, KYB-verified, active reseller for its own customers; BitoCard otherwise. */
   private async reviewerFor(c: KycCase): Promise<'admin' | 'reseller'> {
-    if (c.subject !== 'customer') return 'admin';
+    if (c.subject !== 'customer' || kycPlatform(c.resellerId) === 'afrippa') return 'admin';
     const seller = await this.prisma.reseller.findUnique({ where: { id: c.resellerId }, select: { businessType: true, kybVerifiedAt: true, status: true, house: true } });
     return seller && !seller.house && seller.businessType === 'registered' && seller.kybVerifiedAt && seller.status === 'active' ? 'reseller' : 'admin';
   }
@@ -330,6 +346,14 @@ export class KycService {
         title: 'A customer’s identity check to review',
         body: 'Review their documents on BitoCard Verify.',
         link: '/store/customers',
+        mode: c.mode,
+      });
+    } else if (kycPlatform(c.resellerId) === 'afrippa') {
+      await this.inbox.afrippaAdmins('admin.afrippa.kyc_submitted', {
+        subject: `${c.id}:${Date.now()}`,
+        title: 'A trader’s identity check to review',
+        body: `${this.countryName(c.country)}. Review the documents and decide.`,
+        link: `/verifications/${c.id}`,
         mode: c.mode,
       });
     } else {
@@ -379,6 +403,8 @@ export class KycService {
   private async reviewable(id: string, reviewer: Reviewer) {
     const c = await this.prisma.kycCase.findUnique({ where: { id }, include: { documents: { orderBy: { kind: 'asc' } } } });
     if (!c) throw notFound();
+    // Each product's reviewers see only its own cases.
+    if (kycPlatform(c.resellerId) !== reviewerPlatform(reviewer)) throw notFound();
     if (reviewer.realm === 'reseller') {
       const member = await this.prisma.resellerMember.findFirst({ where: { resellerId: c.resellerId, userId: reviewer.userId } });
       if (!member || c.subject !== 'customer' || c.reviewer !== 'reseller' || (reviewer.resellerId !== '*' && c.resellerId !== reviewer.resellerId)) throw notFound();
@@ -388,12 +414,13 @@ export class KycService {
   }
 
   private async presentReview(c: CaseWithDocs, reviewer: Reviewer) {
-    const base = reviewer.realm === 'admin' ? `/v1/admin/kyc/cases/${c.id}` : `/v1/kyc/reviews/${c.id}`;
+    const platform = kycPlatform(c.resellerId);
+    const base = reviewer.realm === 'reseller' ? `/v1/kyc/reviews/${c.id}` : platform === 'afrippa' ? `/v1/afrippa/admin/kyc/cases/${c.id}` : `/v1/admin/kyc/cases/${c.id}`;
     const [reseller, store, customer, duplicates, decider] = await Promise.all([
       this.prisma.reseller.findUniqueOrThrow({ where: { id: c.resellerId }, select: { id: true, name: true, house: true } }),
       c.storeId ? this.prisma.store.findUnique({ where: { id: c.storeId }, select: { id: true, name: true, subdomain: true } }) : null,
       c.subject === 'customer' && c.storeId && c.customerReference ? this.prisma.customer.findUnique({ where: { id: c.customerReference }, select: { id: true, name: true, email: true } }).catch(() => null) : null,
-      c.idFingerprint ? this.prisma.kycCase.findMany({ where: { idFingerprint: c.idFingerprint, id: { not: c.id } }, select: { id: true, status: true, createdAt: true, resellerId: true }, take: 10 }) : [],
+      c.idFingerprint ? this.prisma.kycCase.findMany({ where: { idFingerprint: c.idFingerprint, id: { not: c.id }, ...platformWhere(platform) }, select: { id: true, status: true, createdAt: true, resellerId: true }, take: 10 }) : [],
       c.decidedById ? this.prisma.user.findUnique({ where: { id: c.decidedById }, select: { name: true } }) : null,
     ]);
     const owner = c.subject === 'reseller' ? await this.prisma.resellerMember.findFirst({ where: { resellerId: c.resellerId, role: 'owner' }, include: { user: { select: { name: true, email: true } } } }) : null;
@@ -413,8 +440,8 @@ export class KycService {
         c.subject === 'reseller'
           ? { type: 'reseller' as const, id: reseller.id, name: owner?.user.name ?? reseller.name, email: owner?.user.email ?? null, business_name: reseller.name }
           : { type: 'customer' as const, id: customer?.id ?? c.customerReference, name: customer?.name ?? verification?.expectedName ?? null, email: customer?.email ?? null, business_name: null },
-      store: store && !reseller.house ? store : store ? { ...store, name: 'bitocard.com' } : null,
-      reseller: { id: reseller.id, name: reseller.house ? 'BitoCard' : reseller.name },
+      store: platform === 'afrippa' ? null : store && !reseller.house ? store : store ? { ...store, name: 'bitocard.com' } : null,
+      reseller: { id: reseller.id, name: platform === 'afrippa' ? 'Afrippa' : reseller.house ? 'BitoCard' : reseller.name },
       business_type: c.businessType,
       business: c.businessType === 'registered' ? { registered_name: c.registeredName, registration_number: c.registrationNumber, business_address: c.businessAddress } : null,
       identity: c.idType ? { id_type: c.idType, id_type_label: type?.label ?? c.idType, id_number: this.idNumber(c), full_name: c.fullName, date_of_birth: c.dateOfBirth } : null,
@@ -432,7 +459,7 @@ export class KycService {
       verified_name: c.verifiedName,
       submitted_at: c.submittedAt?.toISOString() ?? null,
       decided_at: c.decidedAt?.toISOString() ?? null,
-      decided_by: c.decidedRealm ? { realm: c.decidedRealm, name: c.decidedRealm === 'admin' ? 'BitoCard' : (decider?.name ?? null) } : null,
+      decided_by: c.decidedRealm ? { realm: c.decidedRealm, name: c.decidedRealm === 'admin' ? (platform === 'afrippa' ? 'Afrippa' : 'BitoCard') : (decider?.name ?? null) } : null,
       purged: c.purgedAt !== null,
     };
   }
@@ -456,7 +483,8 @@ export class KycService {
           };
     const status = filter.status ?? 'submitted';
     const rows = await this.prisma.kycCase.findMany({
-      where: { ...where, ...(status === 'all' ? { status: { not: 'draft' } } : { status: status as KycCase['status'] }) },
+      // Each product's admins list only its own cases (a reseller's filter cannot reach the other's).
+      where: { AND: [where, platformWhere(reviewerPlatform(reviewer))], ...(status === 'all' ? { status: { not: 'draft' } } : { status: status as KycCase['status'] }) },
       include: { documents: { orderBy: { kind: 'asc' } } },
       orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
       take: limit + 1,
@@ -474,7 +502,7 @@ export class KycService {
     const c = await this.reviewable(id, reviewer);
     const document = c.documents.find(item => item.id === documentId);
     if (!document) throw notFound();
-    const bytes = await this.storage.get(document.objectKey);
+    const bytes = await this.storageFor(c).get(document.objectKey);
     if (!bytes) throw new ApiError(HttpStatus.GONE, 'not_found_error', 'document_deleted', 'This document was deleted under the retention rules.');
     await this.audit.record({
       actorId: reviewer.userId,
@@ -483,6 +511,7 @@ export class KycService {
       targetId: c.id,
       before: null,
       after: { document: document.kind, realm: reviewer.realm },
+      platform: kycPlatform(c.resellerId),
     });
     return { contentType: document.contentType, bytes, name: `${document.kind}.${document.contentType === 'application/pdf' ? 'pdf' : document.contentType === 'image/png' ? 'png' : 'jpg'}` };
   }
@@ -506,6 +535,12 @@ export class KycService {
     const to = await this.applicantEmail(c);
     if (!to) return;
     const brand = (await this.brand(c)).name;
+    if (kycPlatform(c.resellerId) === 'afrippa') {
+      // From Afrippa's own email account, never BitoCard's.
+      const message = verifyOutcomeEmail(to, { brand, outcome, reason: reason ? (declineReasons[reason as DeclineReason] ?? null) : null, note, link: this.continueUrl(c) });
+      await this.email.sendFor('afrippa', message).catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not email the outcome'));
+      return;
+    }
     await this.email
       .send(verifyOutcomeEmail(to, { brand, outcome, reason: reason ? (declineReasons[reason as DeclineReason] ?? null) : null, note, link: this.continueUrl(c) }), c.storeId ? { resellerId: c.resellerId, name: brand } : undefined)
       .catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not email the outcome'));
@@ -534,7 +569,7 @@ export class KycService {
     const [firstName, ...rest] = name.split(/\s+/);
     const verification = await this.prisma.identityVerification.findUniqueOrThrow({ where: { id: c.verificationId } });
     await this.identity.apply(verification, { status: 'approved', firstName, lastName: rest.join(' '), documentCountry: c.country }, reviewer.userId, { trusted: true });
-    await this.audit.record({ actorId: reviewer.userId, action: 'kyc.approved', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'approved', realm: reviewer.realm } });
+    await this.audit.record({ actorId: reviewer.userId, action: 'kyc.approved', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'approved', realm: reviewer.realm }, platform: kycPlatform(c.resellerId) });
     await this.tell(c, 'approved', null, null);
     return this.detail(id, reviewer);
   }
@@ -558,7 +593,7 @@ export class KycService {
     } else {
       await this.identity.apply(verification, { status: 'declined', reason: input.reason }, reviewer.userId, { trusted: true });
     }
-    await this.audit.record({ actorId: reviewer.userId, action: revoking ? 'kyc.revoked' : 'kyc.declined', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'declined', reason: input.reason, realm: reviewer.realm } });
+    await this.audit.record({ actorId: reviewer.userId, action: revoking ? 'kyc.revoked' : 'kyc.declined', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'declined', reason: input.reason, realm: reviewer.realm }, platform: kycPlatform(c.resellerId) });
     await this.tell(c, 'declined', input.reason, input.note ?? null);
     return this.detail(id, reviewer);
   }
@@ -581,7 +616,7 @@ export class KycService {
     });
     // The check is open again for the applicant.
     await this.prisma.identityVerification.updateMany({ where: { id: c.verificationId, status: 'in_review' }, data: { status: 'in_progress', createdAt: new Date() } });
-    await this.audit.record({ actorId: reviewer.userId, action: 'kyc.resubmit_requested', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'resubmit', items, realm: reviewer.realm } });
+    await this.audit.record({ actorId: reviewer.userId, action: 'kyc.resubmit_requested', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'resubmit', items, realm: reviewer.realm }, platform: kycPlatform(c.resellerId) });
     await this.tell(c, 'resubmit', null, input.note);
     return this.detail(id, reviewer);
   }

@@ -24,6 +24,7 @@ import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Is
 import { Type } from 'class-transformer';
 import type { Request, Response } from 'express';
 import { PrismaService } from '../database/prisma.service.js';
+import type { Platform } from '../generated/prisma/client.js';
 import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, SessionOnly, requireStepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
@@ -36,21 +37,32 @@ type KycRequest = Request & { kyc?: { caseId: string; sessionId: string }; kycSe
 
 const signInAgain = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'kyc_session_expired', 'Your session has ended. Open your verification link again.');
 
-/** BitoCard Verify's applicant routes: the app's server sends the session from its cookie as `BitoCard-Kyc-Session`. */
+/**
+ * BitoCard Verify's applicant routes: the app's server sends the session from its cookie as `BitoCard-Kyc-Session`. A
+ * session works only on its own product's routes (BitoCard's here, Afrippa's on `/v1/afrippa/kyc`).
+ */
 @Injectable()
 export class KycSessionGuard implements CanActivate {
+  protected readonly platform: Platform = 'bitocard';
+
   constructor(private readonly kyc: KycService) {}
 
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<KycRequest>();
     const token = req.get(kycSessionHeader);
-    const session = token ? await this.kyc.resolve(token) : null;
+    const session = token ? await this.kyc.resolve(token, this.platform) : null;
     if (!session) throw signInAgain();
     req.kyc = session;
     // Idempotency keys are scoped to this session.
     req.kycSessionId = session.sessionId;
     return true;
   }
+}
+
+/** Afrippa's applicants (verify.afrippa.com): only sessions of Afrippa's cases. */
+@Injectable()
+export class AfrippaKycSessionGuard extends KycSessionGuard {
+  protected readonly platform: Platform = 'afrippa';
 }
 
 const CurrentCase = createParamDecorator((_data: unknown, context: ExecutionContext): string => {
@@ -300,6 +312,124 @@ export class AdminKycController {
 
   private reviewer(caller: Caller): Reviewer {
     return { realm: 'admin', userId: adminId(caller) || null };
+  }
+
+  @AdminRoles('operations', 'support')
+  @Get()
+  list(@CurrentCaller() caller: Caller, @Query() query: ReviewListDto) {
+    return this.kyc.list(this.reviewer(caller), query);
+  }
+
+  @AdminRoles('operations', 'support')
+  @Get(':id')
+  get(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.kyc.detail(id, this.reviewer(caller));
+  }
+
+  @AdminRoles('operations', 'support')
+  @Get(':id/documents/:document')
+  async document(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('document', ParseUUIDPipe) document: string, @Res() res: Response) {
+    sendDocument(res, await this.kyc.document(id, document, this.reviewer(caller)));
+  }
+
+  @AdminRoles('operations')
+  @Post(':id/approve')
+  @HttpCode(HttpStatus.OK)
+  approve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ApproveDto) {
+    return this.kyc.approve(id, this.reviewer(caller), body);
+  }
+
+  @AdminRoles('operations')
+  @Post(':id/decline')
+  @HttpCode(HttpStatus.OK)
+  async decline(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DeclineDto) {
+    // Overturning an approved check needs the step-up window.
+    const current = await this.prisma.kycCase.findUnique({ where: { id }, select: { status: true } });
+    if (current?.status === 'approved') requireStepUp(caller);
+    return this.kyc.decline(id, this.reviewer(caller), body);
+  }
+
+  @AdminRoles('operations')
+  @Post(':id/resubmit')
+  @HttpCode(HttpStatus.OK)
+  resubmit(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResubmitDto) {
+    return this.kyc.resubmit(id, this.reviewer(caller), body);
+  }
+}
+
+/** Verify in Afrippa's name (verify.afrippa.com): exchanging a link of an Afrippa case for a session (once). */
+@ApiExcludeController()
+@Public()
+@SkipIdempotency()
+@Controller('afrippa/kyc/session')
+export class AfrippaKycSessionController {
+  constructor(private readonly kyc: KycService) {}
+
+  @Post()
+  @HttpCode(HttpStatus.OK)
+  exchange(@Body() body: ExchangeDto) {
+    return this.kyc.exchange(body.token, 'afrippa');
+  }
+}
+
+/** An Afrippa trader's case on verify.afrippa.com: the same steps as BitoCard Verify, its session only. */
+@ApiExcludeController()
+@Public()
+@UseGuards(AfrippaKycSessionGuard)
+@Controller('afrippa/kyc/case')
+export class AfrippaKycCaseController {
+  constructor(private readonly kyc: KycService) {}
+
+  @Get()
+  get(@CurrentCase() caseId: string) {
+    return this.kyc.applicantCase(caseId);
+  }
+
+  @Put('consent')
+  consent(@CurrentCase() caseId: string, @Body() body: ConsentDto) {
+    return this.kyc.consent(caseId, body.consent);
+  }
+
+  @Put('identity')
+  identity(@CurrentCase() caseId: string, @Body() body: IdentityDto) {
+    return this.kyc.identityDetails(caseId, body);
+  }
+
+  @Post('documents')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(upload)
+  document(@CurrentCase() caseId: string, @Body() body: DocumentDto, @UploadedFile() file?: { buffer: Buffer; mimetype: string; size: number }) {
+    return this.kyc.upload(caseId, body.kind, file);
+  }
+
+  @Post('liveness')
+  @HttpCode(HttpStatus.OK)
+  liveness(@CurrentCase() caseId: string) {
+    return this.kyc.liveness(caseId);
+  }
+
+  @Post('submit')
+  @HttpCode(HttpStatus.OK)
+  submit(@CurrentCase() caseId: string) {
+    return this.kyc.submit(caseId);
+  }
+}
+
+/**
+ * Afrippa's admins (admin.afrippa.com): its traders' identity checks, with their documents, the only place they are
+ * reviewed. BitoCard's admins never see them, nor Afrippa's BitoCard's.
+ */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin/kyc/cases')
+export class AfrippaAdminKycController {
+  constructor(
+    private readonly kyc: KycService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private reviewer(caller: Caller): Reviewer {
+    return { realm: 'admin', userId: adminId(caller) || null, platform: 'afrippa' };
   }
 
   @AdminRoles('operations', 'support')

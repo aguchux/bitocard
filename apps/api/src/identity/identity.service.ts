@@ -18,7 +18,8 @@ import { DiditProvider } from './didit.provider.js';
 import { type CheckResult, namesMatch } from './providers.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { africanCountries } from '../kyc/catalogue.js';
-import { providerName as verifyProvider, VerifyLinks } from '../kyc/links.js';
+import { afrippaOperatorId } from '../afrippa/ids.js';
+import { kycPlatform, providerName as verifyProvider, VerifyLinks } from '../kyc/links.js';
 
 /** Statuses a provider (or an admin, for in_review) can still change. */
 const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];
@@ -161,7 +162,7 @@ export class IdentityService {
   /** An open BitoCard Verify check gets a fresh single-use link (the last one may have been used or expired). */
   private async freshLink(record: IdentityVerification) {
     if (record.provider !== verifyProvider || record.status !== 'in_progress') return record;
-    const url = await this.verify.link(record.providerReference);
+    const url = await this.verify.link(record.providerReference, kycPlatform(record.resellerId));
     return this.prisma.identityVerification.update({ where: { id: record.id }, data: { url } });
   }
 
@@ -342,7 +343,8 @@ export class IdentityService {
   ) {
     if (!input.consent) throw consentRequired();
     const country = input.country.toUpperCase();
-    const viaVerify = (await this.providerFor(country)) === 'bitocard';
+    // Afrippa's traders are always checked by Verify in Afrippa's name; BitoCard's customers by their market's provider.
+    const viaVerify = kycPlatform(resellerId) === 'afrippa' || (await this.providerFor(country)) === 'bitocard';
     // BitoCard Verify checks everyone in its countries with an ID document and liveness; the BVN is only for reserved accounts.
     const method = !viaVerify && country === 'NG' ? 'bvn' : 'document';
     if (method === 'bvn' && !/^\d{11}$/.test(input.bvn ?? '')) {
@@ -487,7 +489,8 @@ export class IdentityService {
         await tx.reseller.update({ where: { id: record.resellerId }, data: { verifiedAt: now, verifiedName } });
         if (autoApprove) await tx.reseller.updateMany({ where: { id: record.resellerId, status: 'pending' }, data: { status: 'active' } });
       }
-      if (record.subject === 'customer' && (status === 'approved' || status === 'declined')) {
+      // Afrippa's traders' checks are Afrippa's: no reseller webhook event is written for them.
+      if (record.subject === 'customer' && (status === 'approved' || status === 'declined') && kycPlatform(record.resellerId) === 'bitocard') {
         const updated = await tx.identityVerification.findUniqueOrThrow({ where: { id: record.id } });
         await this.events.record(tx, {
           resellerId: record.resellerId,
@@ -609,7 +612,8 @@ export class IdentityService {
   async adminList(filter: { status?: VerificationStatus; subject?: 'reseller' | 'customer'; reseller_id?: string; limit?: number; starting_after?: string }) {
     const limit = filter.limit ?? 50;
     const records = await this.prisma.identityVerification.findMany({
-      where: { status: filter.status, subject: filter.subject, resellerId: filter.reseller_id },
+      // Afrippa's traders' checks are reviewed in Afrippa's admin only.
+      where: { status: filter.status, subject: filter.subject, AND: [{ resellerId: filter.reseller_id }, { resellerId: { not: afrippaOperatorId } }] },
       include: { reseller: { select: { name: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -620,14 +624,14 @@ export class IdentityService {
 
   async adminGet(id: string) {
     const record = await this.prisma.identityVerification.findUnique({ where: { id }, include: { reseller: { select: { name: true } } } });
-    if (!record) throw notFound();
+    if (!record || record.resellerId === afrippaOperatorId) throw notFound();
     return this.presentAdmin(record);
   }
 
   /** An admin's decision on a check the provider sent for review, after looking at it in the provider's console. */
   async decide(actorId: string | null, id: string, input: { decision: 'approved' | 'declined'; reason: string; verified_name?: string }) {
     const record = await this.prisma.identityVerification.findUnique({ where: { id } });
-    if (!record) throw notFound();
+    if (!record || record.resellerId === afrippaOperatorId) throw notFound();
     if (record.status !== 'in_review') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_not_in_review', 'Only checks waiting for review can be decided.');
     if (record.provider === verifyProvider) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'use_verify_review', 'Decide BitoCard Verify checks from their case, with its documents.');

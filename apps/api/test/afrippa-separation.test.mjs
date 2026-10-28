@@ -21,8 +21,12 @@ const secret = 'afrippa-separation-secret-afrippa-separation';
 const requestMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'ALL', 'OPTIONS', 'HEAD'];
 const unversioned = new Set(['', 'health', 'robots.txt']);
 const anyId = '00000000-0000-4000-8000-000000000999';
-/** Afrippa's own routes that are public by design, with credentials of their own: admin sign-in and chain providers' signed notifications. */
-const afrippaOwnCredentials = /^\/v1\/afrippa\/(?:admin\/auth|webhooks\/chain)(?:\/|$)/;
+/**
+ * Afrippa's own routes that are public by design, with credentials of their own: admin sign-in, chain providers' signed
+ * notifications, and Verify in Afrippa's name (a single-use link, then a session of an Afrippa case only; tested in
+ * afrippa-verify.test.mjs).
+ */
+const afrippaOwnCredentials = /^\/v1\/afrippa\/(?:admin\/auth|webhooks\/chain|kyc)(?:\/|$)/;
 
 let server;
 let prisma;

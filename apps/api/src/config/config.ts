@@ -139,6 +139,8 @@ export const configSchema = z.object({
   SHOP_URL: z.string().url().default('https://shop.bitocard.com'),
   /** Afrippa's site (docs/CRYPTO_SPINOFF_PLAN.md): where its emails and links point. */
   AFRIPPA_URL: z.string().url().default('https://afrippa.com'),
+  /** Verify in Afrippa's name, where its traders complete identity checks. */
+  AFRIPPA_VERIFY_URL: z.string().url().default('https://verify.afrippa.com'),
 
   // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),
