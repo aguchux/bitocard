@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import type { Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBase64, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { Equals, IsBase64, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { cryptoAmount } from '../crypto/crypto.controller.js';
@@ -42,6 +42,16 @@ class AttachmentDto {
 
 class AfterDto {
   @IsOptional() @IsUUID() after?: string;
+}
+
+class PaidDto {
+  /** The account you paid from: one of your own saved payment methods. */
+  @IsUUID() payment_method_id: string;
+}
+
+class ReleaseDto {
+  /** You checked the money arrived in your account from the buyer's own name. */
+  @Equals(true, { message: 'Confirm the money arrived from the buyer before releasing.' }) payer_checked: boolean;
 }
 
 class AppealDto {
@@ -171,14 +181,14 @@ export class P2pOrdersController {
 
   @Post(':id/paid')
   @HttpCode(HttpStatus.OK)
-  paid(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    return this.orders.markPaid(caller.customer, id);
+  paid(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: PaidDto) {
+    return this.orders.markPaid(caller.customer, id, body.payment_method_id);
   }
 
   @Post(':id/release')
   @HttpCode(HttpStatus.OK)
-  release(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    return this.orders.release(caller.customer, id);
+  release(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReleaseDto) {
+    return this.orders.release(caller.customer, id, body.payer_checked);
   }
 
   @Post(':id/cancel')

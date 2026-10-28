@@ -659,6 +659,13 @@ class MarketLimitDto {
   @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
   cross_border_per_trade?: number | null;
 
+  /** Afrippa: tighter limits for new traders (fewer than five completed orders), per order and per 24 hours. */
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  new_trader_per_trade?: number | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  new_trader_per_day?: number | null;
+
   @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
   cross_border_per_day?: number | null;
 

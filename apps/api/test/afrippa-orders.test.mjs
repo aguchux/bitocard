@@ -130,22 +130,22 @@ describe("Afrippa's P2P orders", () => {
     // Nobody else sees it; only the seller releases, only the buyer marks paid.
     const cara = await trader('Cara Other');
     assert.equal((await cara.client.get(`/v1/afrippa/p2p/orders/${order.id}`)).status, 404);
-    assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`)).json.error.code, 'seller_only');
-    assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`)).json.error.code, 'buyer_only');
+    assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true })).json.error.code, 'seller_only');
+    assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: ada.bank })).json.error.code, 'buyer_only');
 
-    const paid = await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`);
+    const paid = await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: bola.bank });
     assert.deepEqual([paid.status, paid.json.status], [200, 'paid']);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: ada.id, type: 'customer.p2p.order_paid' } }));
     const sellerView = (await ada.client.get(`/v1/afrippa/p2p/orders/${order.id}`)).json;
     assert.deepEqual([sellerView.side, sellerView.payer_name], ['sell', 'Bola Buyer'], 'the seller checks the money came from the buyer');
 
-    const released = await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`);
+    const released = await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true });
     assert.deepEqual([released.status, released.json.status, released.json.payment_method.details], [200, 'released', null], 'details are gone once closed');
     assert.deepEqual(await balances(ada), { wallet: 50, locked: 40, escrow: 0 });
     assert.deepEqual(await balances(bola), { wallet: 9.9, locked: 0, escrow: 0 });
     const fees = await prisma.ledgerAccount.aggregate({ where: { kind: 'crypto_fees', currency: 'USDT', mode: 'test' }, _sum: { balanceMinor: true } });
     assert.equal(fees._sum.balanceMinor, 100_000n);
-    assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`)).json.error.code, 'order_closed', 'released once');
+    assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true })).json.error.code, 'order_closed', 'released once');
     assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/cancel`)).json.error.code, 'order_closed', 'released coins are never taken back');
     assert.deepEqual((await bola.client.get('/v1/afrippa/p2p/orders?status=closed')).json.data.map(item => item.id), [order.id]);
     await ledgerOk();
@@ -184,7 +184,7 @@ describe("Afrippa's P2P orders", () => {
     const ad = await sellAd(ada);
     const order = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
     await prisma.p2pOrder.update({ where: { id: order.id }, data: { payBy: new Date(Date.now() - 1000) } });
-    assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`)).json.error.code, 'order_expired');
+    assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: bola.bank })).json.error.code, 'order_expired');
     const job = await fetch(`${server.base}/v1/cron/p2p-orders`, { headers: { authorization: 'Bearer cron-secret' } }).then(res => res.json());
     assert.ok(job.result.expired >= 1, JSON.stringify(job));
     const closed = await prisma.p2pOrder.findUniqueOrThrow({ where: { id: order.id } });
@@ -192,7 +192,7 @@ describe("Afrippa's P2P orders", () => {
     assert.deepEqual(await balances(ada), { wallet: 0, locked: 50, escrow: 0 }, 'back on the still-open sell ad');
     // A paid order never expires.
     const second = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
-    await bola.client.post(`/v1/afrippa/p2p/orders/${second.id}/paid`);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${second.id}/paid`, { payment_method_id: bola.bank });
     await prisma.p2pOrder.update({ where: { id: second.id }, data: { payBy: new Date(Date.now() - 1000) } });
     await fetch(`${server.base}/v1/cron/p2p-orders`, { headers: { authorization: 'Bearer cron-secret' } });
     assert.equal((await prisma.p2pOrder.findUniqueOrThrow({ where: { id: second.id } })).status, 'paid');
@@ -206,7 +206,7 @@ describe("Afrippa's P2P orders", () => {
     const ad = await sellAd(ada);
     const order = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
     assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/appeal`, { reason: 'Nothing has arrived in my account yet.' })).json.error.code, 'order_not_appealable', 'not before it is marked paid');
-    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: bola.bank });
     const appealed = await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/appeal`, { reason: 'Nothing has arrived in my account yet.' });
     assert.deepEqual([appealed.status, appealed.json.status, appealed.json.appealed_by], [200, 'appealed', 'seller']);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: bola.id, type: 'customer.p2p.order_appealed' } }));
@@ -234,8 +234,8 @@ describe("Afrippa's P2P orders", () => {
     await fund(ada, '20');
     const ad = await sellAd(ada, '10');
     const order = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
-    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`);
-    const [release, cancel] = await Promise.all([ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`), bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/cancel`)]);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: bola.bank });
+    const [release, cancel] = await Promise.all([ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true }), bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/cancel`)]);
     assert.equal([release.status, cancel.status].filter(status => status === 200).length, 1, `${release.status} ${cancel.status}`);
     const closed = await prisma.p2pOrder.findUniqueOrThrow({ where: { id: order.id } });
     assert.equal(await prisma.journalEntry.count({ where: { reference: { startsWith: `p2p_order:${order.id}:` } } }), 2, 'escrow, then one release or one return');

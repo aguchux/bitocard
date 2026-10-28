@@ -83,8 +83,8 @@ const open = (buyer, ad) => buyer.client.post('/v1/afrippa/p2p/orders', { ad_id:
 async function completed(seller, buyer, ad) {
   const order = await open(buyer, ad);
   assert.equal(order.status, 201, JSON.stringify(order.json));
-  await buyer.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/paid`);
-  assert.equal((await seller.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/release`)).status, 200);
+  await buyer.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/paid`, { payment_method_id: buyer.bank });
+  assert.equal((await seller.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/release`, { payer_checked: true })).status, 200);
   return order.json.id;
 }
 

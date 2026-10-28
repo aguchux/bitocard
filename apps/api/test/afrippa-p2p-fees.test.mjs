@@ -128,8 +128,8 @@ describe("Afrippa's P2P fees", () => {
     const first = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.json.id, price: 165000, fiat: 1650000, payment_method_id: payInto })).json;
     assert.deepEqual([first.amount, first.buyer_fee, first.seller_fee, first.received, first.escrow], ['10.000000', '0.050000', '0.100000', '9.950000', '10.100000']);
     assert.deepEqual(await balances(ada), { wallet: 49.5, locked: 40.4, escrow: 10.1 }, 'the seller fee came from the reserve');
-    await bola.client.post(`/v1/afrippa/p2p/orders/${first.id}/paid`);
-    assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${first.id}/release`)).status, 200);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${first.id}/paid`, { payment_method_id: bola.bank });
+    assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${first.id}/release`, { payer_checked: true })).status, 200);
     assert.deepEqual(await balances(bola), { wallet: 9.95, locked: 0, escrow: 0 });
     assert.equal(await feesHeld(), 0.15, 'both fees to Afrippa');
 
@@ -154,8 +154,8 @@ describe("Afrippa's P2P fees", () => {
     const order = await ada.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.json.id, price: 165000, fiat: 1650000, payment_method_id: ada.bank });
     assert.equal(order.status, 201, JSON.stringify(order.json));
     assert.deepEqual(await balances(ada), { wallet: 9.9, locked: 0, escrow: 10.1 });
-    await bola.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/paid`);
-    await ada.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/release`);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/paid`, { payment_method_id: bola.bank });
+    await ada.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/release`, { payer_checked: true });
     assert.deepEqual(await balances(bola), { wallet: 9.95, locked: 0, escrow: 0 });
     assert.equal((await server.app.get(LedgerService).check('afrippa')).ok, true);
   });

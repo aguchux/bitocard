@@ -125,7 +125,7 @@ describe("An Afrippa order's room", () => {
     assert.equal(said.status, 201, JSON.stringify(said.json));
     assert.equal(said.json.from, 'you');
     assert.ok(await prisma.notification.findFirst({ where: { customerId: ada.id, type: 'customer.p2p.order_message' } }));
-    await bola.client.post(`/v1/afrippa/p2p/orders/${opened.id}/paid`);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${opened.id}/paid`, { payment_method_id: bola.bank });
     const seen = (await ada.client.get(`/v1/afrippa/p2p/orders/${opened.id}/messages`)).json.data;
     assert.deepEqual(seen.map(message => message.from), ['system', 'buyer', 'system']);
     assert.match(seen[2].body, /marked the order paid/);
@@ -138,7 +138,7 @@ describe("An Afrippa order's room", () => {
     assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${opened.id}/messages`, { body: '   ' })).status, 400);
 
     // Once closed, the room is kept but takes no more messages.
-    await ada.client.post(`/v1/afrippa/p2p/orders/${opened.id}/release`);
+    await ada.client.post(`/v1/afrippa/p2p/orders/${opened.id}/release`, { payer_checked: true });
     const closed = (await bola.client.get(`/v1/afrippa/p2p/orders/${opened.id}/messages`)).json;
     assert.equal(closed.open, false);
     assert.match(closed.data.at(-1).body, /released the coins/);
@@ -183,7 +183,7 @@ describe("An Afrippa order's room", () => {
 
   test("during an appeal Afrippa's team reads the room and writes as Afrippa; BitoCard's admins cannot", async () => {
     const { ada, bola, order: opened } = await order();
-    await bola.client.post(`/v1/afrippa/p2p/orders/${opened.id}/paid`);
+    await bola.client.post(`/v1/afrippa/p2p/orders/${opened.id}/paid`, { payment_method_id: bola.bank });
     await ada.client.post(`/v1/afrippa/p2p/orders/${opened.id}/appeal`, { reason: 'Nothing arrived in my account.' });
     const team = await afrippaAdminClient(server, ['support']);
     const room = await team.get(`/v1/afrippa/admin/p2p/orders/${opened.id}/messages`);
@@ -202,7 +202,7 @@ describe("An Afrippa order's room", () => {
     const first = await order();
     await prisma.p2pOrder.update({ where: { id: first.order.id }, data: { payBy: new Date(Date.now() + 3 * 60_000) } });
     const second = await order();
-    await second.bola.client.post(`/v1/afrippa/p2p/orders/${second.order.id}/paid`);
+    await second.bola.client.post(`/v1/afrippa/p2p/orders/${second.order.id}/paid`, { payment_method_id: second.bola.bank });
     await prisma.p2pOrder.update({ where: { id: second.order.id }, data: { paidAt: new Date(Date.now() - 20 * 60_000) } });
     const cron = () => fetch(`${server.base}/v1/cron/p2p-orders`, { headers: { authorization: 'Bearer cron-secret' } }).then(res => res.json());
     assert.ok((await cron()).result.reminded >= 2);

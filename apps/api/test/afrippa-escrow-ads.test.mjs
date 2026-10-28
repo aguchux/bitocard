@@ -95,7 +95,7 @@ describe("Afrippa's escrow ads", () => {
     const ad = await ada.client.post('/v1/afrippa/p2p/ads', sellAd([ada.bank]));
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
     assert.deepEqual([ad.json.escrow, ad.json.payment_window, ad.json.market, ad.json.currency], [true, 30, 'NG', 'NGN']);
-    assert.deepEqual(ad.json.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN', id: ada.bank, hint: ad.json.payment_methods[0].hint }]);
+    assert.deepEqual(ad.json.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN', reversible: false, id: ada.bank, hint: ad.json.payment_methods[0].hint }]);
     const wallet = (await ada.client.get('/v1/afrippa/crypto')).json;
     const usdt = wallet.assets.find(balance => balance.asset === 'USDT');
     assert.deepEqual([usdt.available, usdt.locked], ['50.000000', '50.000000']);
@@ -104,7 +104,7 @@ describe("Afrippa's escrow ads", () => {
     const market = await bola.client.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
     assert.equal(market.status, 200, JSON.stringify(market.json));
     const listed = market.json.data.find(item => item.id === ad.json.id);
-    assert.deepEqual(listed.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN' }], 'no id or hint for anyone but the owner');
+    assert.deepEqual(listed.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN', reversible: false }], 'no id or hint for anyone but the owner');
     assert.equal(listed.mine, false);
 
     // Instant trades are BitoCard's: an escrow ad is taken through an order.

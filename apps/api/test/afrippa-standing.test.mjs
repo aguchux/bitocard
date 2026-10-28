@@ -83,7 +83,7 @@ const open = (buyer, ad) => buyer.client.post('/v1/afrippa/p2p/orders', { ad_id:
 async function lostAppeal(seller, buyer, ad, fault) {
   const order = await open(buyer, ad);
   assert.equal(order.status, 201, JSON.stringify(order.json));
-  await buyer.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/paid`);
+  await buyer.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/paid`, { payment_method_id: buyer.bank });
   await seller.client.post(`/v1/afrippa/p2p/orders/${order.json.id}/appeal`, { reason: 'The payment did not arrive in my account.' });
   const decided = await operations.post(`/v1/afrippa/admin/p2p/orders/${order.json.id}/decide`, { outcome: fault === 'buyer' ? 'return' : 'release', fault, note: 'Decided on the evidence given.' });
   assert.equal(decided.status, 200, JSON.stringify(decided.json));

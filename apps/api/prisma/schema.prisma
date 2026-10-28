@@ -4833,6 +4833,9 @@ model CryptoMarketLimit {
   crossBorderPerTradeMinor BigInt?    @map("cross_border_per_trade_minor")
   crossBorderPerDayMinor   BigInt?    @map("cross_border_per_day_minor")
   crossBorderHoldDays      Int?       @map("cross_border_hold_days")
+  /// Afrippa: tighter limits for new traders (fewer than five completed orders); null for the market's own.
+  newTraderPerTradeMinor   BigInt?    @map("new_trader_per_trade_minor")
+  newTraderPerDayMinor     BigInt?    @map("new_trader_per_day_minor")
   updatedById              String?    @map("updated_by_id") @db.Uuid
   createdAt                DateTime   @default(now()) @map("created_at")
   updatedAt                DateTime   @updatedAt @map("updated_at")
@@ -5431,7 +5434,8 @@ model P2pPaymentMethod {
   createdAt        DateTime             @default(now()) @map("created_at")
   customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
   ads              P2pAdPaymentMethod[]
-  orders           P2pOrder[]
+  orders           P2pOrder[]           @relation("p2pOrderPaidInto")
+  paidFromOrders   P2pOrder[]           @relation("p2pOrderPaidFrom")
 
   @@index([customerId, mode])
   @@map("p2p_payment_methods")
@@ -5491,6 +5495,8 @@ model P2pOrder {
   paymentMethodId      String           @map("payment_method_id") @db.Uuid
   /// The name the payment must come from: the buyer's verified name (live) or account name.
   buyerName            String           @map("buyer_name")
+  /// The buyer's own account they paid from, named when they marked it paid.
+  paidFromMethodId     String?          @map("paid_from_method_id") @db.Uuid
   paymentWindowMinutes Int              @map("payment_window_minutes")
   payBy                DateTime         @map("pay_by")
   status               P2pOrderStatus   @default(pending_payment)
@@ -5513,7 +5519,8 @@ model P2pOrder {
   ad                   P2pAd            @relation(fields: [adId], references: [id], onDelete: Restrict)
   seller               Customer         @relation("p2pOrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
   buyer                Customer         @relation("p2pOrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  paymentMethod        P2pPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  paymentMethod        P2pPaymentMethod @relation("p2pOrderPaidInto", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  paidFrom             P2pPaymentMethod? @relation("p2pOrderPaidFrom", fields: [paidFromMethodId], references: [id], onDelete: Restrict)
   messages             P2pOrderMessage[]
   feedback             P2pFeedback[]
   reports              P2pReport[]

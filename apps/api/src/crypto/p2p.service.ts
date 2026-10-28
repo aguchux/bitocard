@@ -17,6 +17,7 @@ import { P2pFeesService } from './p2p-fees.service.js';
 import { P2pStandingService } from './p2p-standing.service.js';
 import { P2pTrustService, type Trust } from './p2p-trust.service.js';
 import { P2pWordsService } from './p2p-words.service.js';
+import { isReversible } from '../afrippa/payment-methods.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
@@ -249,7 +250,7 @@ export class P2pService {
       escrow: ad.escrow,
       payment_window: ad.paymentWindowMinutes,
       /** Where the buyer pays (sell ads) or pays from (buy ads): never the details, which show only inside an order. */
-      payment_methods: methods.map(method => ({ kind: method.kind, label: method.label, currency: method.currency, ...(mine ? { id: method.id, hint: method.hint } : {}) })),
+      payment_methods: methods.map(method => ({ kind: method.kind, label: method.label, currency: method.currency, reversible: isReversible(method), ...(mine ? { id: method.id, hint: method.hint } : {}) })),
       /** The owner's sell ad: the seller's fee it keeps locked on top of the coins it offers. */
       fee_locked: mine && ad.escrow ? fromUnits(ad.feeLocked, asset.decimals) : null,
       mine,

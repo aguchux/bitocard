@@ -25,6 +25,9 @@ export const namedProviders = {
   grey: 'Grey',
 } as const;
 export type NamedProvider = keyof typeof namedProviders;
+/** Services whose payments the payer can reverse after the coins are released: sellers are warned. */
+export const reversibleProviders = new Set<string>([namedProviders.paypal]);
+export const isReversible = (method: { kind: string; label: string }) => method.kind === 'named' && reversibleProviders.has(method.label);
 
 /** At most this many saved at once; a new one is usable this long after it is added. */
 export const maxPaymentMethods = 10;
@@ -153,6 +156,8 @@ export class PaymentMethodsService {
       label: row.label,
       hint: row.hint,
       holder_name: row.holderName,
+      /** Payments through it can be reversed by the payer after release (PayPal). */
+      reversible: isReversible(row),
       usable: row.usableFrom <= new Date(),
       usable_from: row.usableFrom.toISOString(),
       created_at: row.createdAt.toISOString(),

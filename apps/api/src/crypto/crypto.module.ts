@@ -61,6 +61,6 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     ChainWebhooksController,
   ],
   providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
-  exports: [CryptoWalletsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
+  exports: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}

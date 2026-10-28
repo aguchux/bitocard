@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { feeFor, fromUnits } from '../crypto/amounts.js';
 import { CryptoWalletsService, cryptoFeesRef, isTrader } from '../crypto/crypto-wallets.service.js';
+import { CryptoMarketLimitsService } from '../crypto/market-limits.service.js';
 import { P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { P2pStandingService } from '../crypto/p2p-standing.service.js';
 import { P2pTrustService } from '../crypto/p2p-trust.service.js';
@@ -17,12 +18,15 @@ import { InboxService } from '../notifications/inbox.service.js';
 import type { CustomerNotificationType } from '../notifications/inbox.js';
 import { afrippaOperatorId } from './ids.js';
 import { OrderRoomService } from './order-room.service.js';
-import { PaymentMethodsService } from './payment-methods.service.js';
+import { isReversible, PaymentMethodsService } from './payment-methods.service.js';
 
 /** Orders still running: the coins in escrow. */
 export const openOrderStatuses: P2pOrderStatus[] = ['pending_payment', 'paid', 'appealed'];
-/** Orders a buyer may have waiting for their payment at once. */
+/** Orders a buyer may have waiting for their payment at once, and open in an hour. */
 export const maxUnpaidOrders = 5;
+export const maxOrdersPerHour = 10;
+/** A trader with fewer completed orders than this has the market's new-trader limits. */
+export const newTraderOrders = 5;
 export const orderNumber = (n: number) => `ORD-${String(n).padStart(6, '0')}`;
 
 const conflict = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
@@ -67,6 +71,7 @@ export class P2pOrdersService {
     private readonly room: OrderRoomService,
     private readonly standing: P2pStandingService,
     private readonly trust: P2pTrustService,
+    private readonly limits: CryptoMarketLimitsService,
   ) {}
 
   private requireTrader(customer: CustomerWithStore) {
@@ -107,7 +112,13 @@ export class P2pOrdersService {
     const method = await this.payInto(found, customer, input.payment_method_id);
     const unpaid = await this.prisma.p2pOrder.count({ where: { buyerId, mode: context.mode, status: 'pending_payment' } });
     if (unpaid >= maxUnpaidOrders) throw conflict('too_many_orders', `A buyer can have ${maxUnpaidOrders} orders waiting for payment at once. Pay or cancel one first.`);
+    if (buyerId === customer.id) {
+      const lastHour = await this.prisma.p2pOrder.count({ where: { takerId: customer.id, buyerId: customer.id, mode: context.mode, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
+      if (lastHour >= maxOrdersPerHour) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'order_rate_limited', 'You are opening orders too quickly. Try again in a while.');
+    }
     const buyerName = await this.payerName(buyerId, context.mode);
+    await this.notSamePerson(buyerId, sellerId, buyerName, context.mode);
+    const [takerNew, makerNew, makerHome] = await Promise.all([this.isNew(customer.id, context.mode), this.isNew(found.customerId, context.mode), this.homeOf(found.customerId)]);
     const shown = {
       object: 'p2p_order_preview' as const,
       asset: asset.code,
@@ -130,6 +141,18 @@ export class P2pOrdersService {
       const ad = await tx.p2pAd.findUniqueOrThrow({ where: { id: found.id } });
       if (ad.status !== 'active' || ad.priceMinor !== found.priceMinor) throw adUnavailable();
       if (ad.remainingAmount < terms.amount) throw conflict('amount_unavailable', `This ad has only ${fromUnits(ad.remainingAmount, asset.decimals)} ${asset.code} left.`, 'amount');
+      // The market's limits for both parties (a new trader's tighter), with both locked: parallel orders cannot pass them.
+      await tx.$queryRaw`SELECT id FROM customers WHERE id IN (${customer.id}::uuid, ${ad.customerId}::uuid) ORDER BY id FOR UPDATE`;
+      await this.limits.check(tx, {
+        mode: context.mode,
+        market: ad.country,
+        currency: ad.currency,
+        fiat: terms.fiat,
+        parties: [
+          { customerId: customer.id, home: context.country, taker: true, newTrader: takerNew },
+          { customerId: ad.customerId, home: makerHome, taker: false, newTrader: makerNew },
+        ],
+      });
       // A sell ad pays its seller's fee from the reserve it keeps for it, then the seller's wallet.
       const feeFromLock = ad.side === 'sell' ? (ad.feeLocked < sellerFee ? ad.feeLocked : sellerFee) : 0n;
       const created = await tx.p2pOrder.create({
@@ -196,6 +219,30 @@ export class P2pOrdersService {
     return own;
   }
 
+  /** Whether a trader is new: fewer than `newTraderOrders` completed orders. */
+  private async isNew(customerId: string, mode: LedgerMode) {
+    return (await this.prisma.p2pOrder.count({ where: { mode, status: 'released', OR: [{ buyerId: customerId }, { sellerId: customerId }] } })) < newTraderOrders;
+  }
+
+  private async homeOf(customerId: string) {
+    return (await this.prisma.customer.findUniqueOrThrow({ where: { id: customerId }, select: { country: true } })).country ?? '';
+  }
+
+  /**
+   * The same person on both sides is refused: the same verified name (live), or one payment account saved by both
+   * (the same details, by their fingerprint). Trading with oneself only moves coins to fake a history.
+   */
+  private async notSamePerson(buyerId: string, sellerId: string, buyerName: string, mode: LedgerMode) {
+    const refused = () => conflict('same_person', 'You cannot trade with this trader.');
+    if (mode === 'live') {
+      const sellerName = await this.identity.customerVerifiedName(afrippaOperatorId, 'live', sellerId);
+      if (sellerName && sellerName.trim().toLowerCase() === buyerName.trim().toLowerCase()) throw refused();
+    }
+    const fingerprints = await this.prisma.p2pPaymentMethod.findMany({ where: { customerId: { in: [buyerId, sellerId] }, mode }, select: { customerId: true, fingerprint: true } });
+    const buyers = new Set(fingerprints.filter(item => item.customerId === buyerId).map(item => item.fingerprint));
+    if (fingerprints.some(item => item.customerId === sellerId && buyers.has(item.fingerprint))) throw refused();
+  }
+
   /** The name a payment must come from: the buyer's verified name live, their account name in the sandbox. */
   private async payerName(buyerId: string, mode: LedgerMode) {
     if (mode === 'live') {
@@ -207,24 +254,37 @@ export class P2pOrdersService {
 
   // -- The steps -------------------------------------------------------------------------------------------------
 
-  /** The buyer says they paid, within the window. */
-  async markPaid(customer: CustomerWithStore, id: string) {
+  /**
+   * The buyer says they paid, within the window, naming the account they paid from: one of their own saved methods (in
+   * their verified name) in the order's currency, of the same kind as the seller's. Third-party payments are refused.
+   */
+  async markPaid(customer: CustomerWithStore, id: string, paidFrom: string) {
     const order = await this.mine(customer, id, 'buyer');
-    const claimed = await this.prisma.p2pOrder.updateMany({ where: { id, status: 'pending_payment', payBy: { gt: new Date() } }, data: { status: 'paid', paidAt: new Date() } });
+    const from = await this.prisma.p2pPaymentMethod.findFirst({ where: { id: paidFrom, customerId: customer.id, mode: order.mode, removedAt: null } });
+    if (!from) throw invalid('parameter_invalid', 'Choose the account you paid from: one of your own saved payment methods.', 'payment_method_id');
+    if (from.currency !== order.currency) throw invalid('payment_method_currency', `Choose an account in ${order.currency}, the order's currency.`, 'payment_method_id');
+    if (from.usableFrom > new Date()) throw conflict('payment_method_not_ready', 'A new payment method can be used 24 hours after it was added.', 'payment_method_id');
+    const into = await this.prisma.p2pPaymentMethod.findUniqueOrThrow({ where: { id: order.paymentMethodId } });
+    if (rail(from) !== rail(into)) throw invalid('payment_method_mismatch', 'This account cannot pay into the seller’s. Choose one of the same kind.', 'payment_method_id');
+    const claimed = await this.prisma.p2pOrder.updateMany({ where: { id, status: 'pending_payment', payBy: { gt: new Date() } }, data: { status: 'paid', paidAt: new Date(), paidFromMethodId: from.id } });
     if (claimed.count === 0) {
       const fresh = await this.prisma.p2pOrder.findUniqueOrThrow({ where: { id } });
       if (fresh.status === 'pending_payment') throw conflict('order_expired', 'The time to pay this order is over.');
       throw conflict('order_not_pending', 'This order is no longer waiting for payment.');
     }
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: order.asset } });
-    await this.room.system(this.prisma, id, `The buyer marked the order paid. Seller: check ${minor(order.fiatMinor) / 100} ${order.currency} arrived from ${order.buyerName}, then release the coins. Release only for a payment from that name.`);
+    await this.room.system(this.prisma, id, `The buyer marked the order paid from ${from.label} ${from.hint} (${from.holderName}). Seller: check ${minor(order.fiatMinor) / 100} ${order.currency} arrived from ${order.buyerName}, then release the coins. Release only for a payment from that name.`);
     await this.tell(order, order.sellerId, 'customer.p2p.order_paid', 'The buyer says they paid', `${orderNumber(order.number)}: check you received ${minor(order.fiatMinor) / 100} ${order.currency} from ${order.buyerName}, then release the coins.`);
     return this.present(await this.prisma.p2pOrder.findUniqueOrThrow({ where: { id } }), asset, 'buyer');
   }
 
-  /** The seller confirms the money arrived: the coins go to the buyer. */
-  async release(customer: CustomerWithStore, id: string) {
+  /**
+   * The seller confirms the money arrived from the buyer's own account (`payer_checked`): the coins go to the buyer.
+   * They are told to release only for a payment from the buyer's name; a release cannot be taken back.
+   */
+  async release(customer: CustomerWithStore, id: string, payerChecked: boolean) {
     const order = await this.mine(customer, id, 'seller');
+    if (!payerChecked) throw invalid('payer_check_required', `Confirm the money arrived in your account from ${order.buyerName}, the buyer, before releasing.`, 'payer_checked');
     const done = await this.settle(order, 'released', { from: openOrderStatuses });
     if (!done) throw conflict('order_closed', 'This order is already closed.');
     await this.tell(done, done.buyerId, 'customer.p2p.order_released', 'Your coins were released', `${orderNumber(done.number)}: the seller released your coins.`);
@@ -439,7 +499,9 @@ export class P2pOrdersService {
     const units = (value: bigint) => fromUnits(value, asset.decimals);
     const names = await this.p2p.nicknames([order.buyerId, order.sellerId]);
     const method = await this.prisma.p2pPaymentMethod.findUniqueOrThrow({ where: { id: order.paymentMethodId } });
+    const paidFrom = order.paidFromMethodId ? await this.prisma.p2pPaymentMethod.findUnique({ where: { id: order.paidFromMethodId } }) : null;
     const details = open && options.details !== false ? await this.methods.reveal(method.id) : null;
+    const warnings = isReversible(method) || (paidFrom && isReversible(paidFrom)) ? ['reversible_payment'] : [];
     return {
       object: 'p2p_order' as const,
       id: order.id,
@@ -470,6 +532,10 @@ export class P2pOrdersService {
       payment_method: { kind: method.kind, label: method.label, currency: method.currency, hint: method.hint, holder_name: method.holderName, details: details ? stripped(details) : null },
       /** The payment must come from an account in this name (the buyer's own): third-party payments are refused. */
       payer_name: order.buyerName,
+      /** The buyer's own account they say they paid from (once marked paid). */
+      paid_from: paidFrom ? { kind: paidFrom.kind, label: paidFrom.label, hint: paidFrom.hint, holder_name: paidFrom.holderName } : null,
+      /** reversible_payment: the payment can be taken back by the payer after release (PayPal): release only once sure. */
+      warnings,
       paid_at: order.paidAt?.toISOString() ?? null,
       appealed_at: order.appealedAt?.toISOString() ?? null,
       appealed_by: order.appealedBy ? (order.appealedBy === order.buyerId ? 'buyer' : 'seller') : null,

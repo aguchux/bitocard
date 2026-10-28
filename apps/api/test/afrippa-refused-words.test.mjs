@@ -106,8 +106,8 @@ describe("Afrippa's refused words", () => {
     assert.equal((await bola.client.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '20' })).status, 201);
     const sell = (await bola.client.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', currency: 'NGN', price: 165000, amount: '10', min_fiat: 100000, max_fiat: 5000000, payment_method_ids: [bola.bank] })).json;
     const order = (await ada.client.post('/v1/afrippa/p2p/orders', { ad_id: sell.id, price: 165000, fiat: 1650000, payment_method_id: sell.payment_methods[0].id })).json;
-    await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`);
-    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`);
+    await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: ada.bank });
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true });
     assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/feedback`, { rating: 'negative', comment: 'Total scammer' })).json.error.code, 'comment_refused');
 
     // The lists are each product's own: BitoCard's admins neither see nor remove Afrippa's, and the other way round.

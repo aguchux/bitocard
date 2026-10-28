@@ -11,8 +11,11 @@ import { formatMoney } from '../notifications/templates.js';
 const global = 'WW';
 const dayMs = 86_400_000;
 
-/** One party to a trade: their own country decides whether they trade across borders in this market. */
-export type TradeParty = { customerId: string; home: string; taker: boolean };
+/**
+ * One party to a trade: their own country decides whether they trade across borders in this market; a new Afrippa
+ * trader (`newTrader`: fewer than five completed orders) has the market's tighter new-trader limits.
+ */
+export type TradeParty = { customerId: string; home: string; taker: boolean; newTrader?: boolean };
 
 export type MarketLimitInput = {
   mode: LedgerMode;
@@ -23,6 +26,8 @@ export type MarketLimitInput = {
   cross_border_per_trade?: number | null;
   cross_border_per_day?: number | null;
   cross_border_hold_days?: number | null;
+  new_trader_per_trade?: number | null;
+  new_trader_per_day?: number | null;
 };
 
 export function presentMarketLimit(row: CryptoMarketLimit) {
@@ -37,9 +42,14 @@ export function presentMarketLimit(row: CryptoMarketLimit) {
     cross_border_per_trade: amount(row.crossBorderPerTradeMinor),
     cross_border_per_day: amount(row.crossBorderPerDayMinor),
     cross_border_hold_days: row.crossBorderHoldDays,
+    new_trader_per_trade: amount(row.newTraderPerTradeMinor),
+    new_trader_per_day: amount(row.newTraderPerDayMinor),
     updated_at: row.updatedAt.toISOString(),
   };
 }
+
+/** The tighter of two limits (null: none). */
+const tighter = (a: bigint | null, b: bigint | null) => (a === null ? b : b === null ? a : a < b ? a : b);
 
 /** Whether a party trades across borders in a market: always on the global market; in a country's book, when from elsewhere. */
 export const crossBorder = (market: string, home: string) => market === global || home !== market;
@@ -82,6 +92,8 @@ export class CryptoMarketLimitsService {
       crossBorderPerTradeMinor: amount(input.cross_border_per_trade),
       crossBorderPerDayMinor: amount(input.cross_border_per_day),
       crossBorderHoldDays: input.cross_border_hold_days ?? null,
+      newTraderPerTradeMinor: amount(input.new_trader_per_trade),
+      newTraderPerDayMinor: amount(input.new_trader_per_day),
       updatedById: adminId,
     };
     const key = { mode: input.mode, market, currency };
@@ -114,8 +126,13 @@ export class CryptoMarketLimitsService {
       // In a country's book, people from elsewhere have the tighter cross-border limits (each falls back to the
       // market's own); on the global market everyone has the market's own.
       const cross = input.market !== global && party.home !== input.market;
-      const perTrade = cross ? (row.crossBorderPerTradeMinor ?? row.perTradeMinor) : row.perTradeMinor;
-      const perDay = cross ? (row.crossBorderPerDayMinor ?? row.perDayMinor) : row.perDayMinor;
+      let perTrade = cross ? (row.crossBorderPerTradeMinor ?? row.perTradeMinor) : row.perTradeMinor;
+      let perDay = cross ? (row.crossBorderPerDayMinor ?? row.perDayMinor) : row.perDayMinor;
+      // A new trader: the tighter of their limit and the new-trader one.
+      if (party.newTrader) {
+        perTrade = tighter(perTrade, row.newTraderPerTradeMinor);
+        perDay = tighter(perDay, row.newTraderPerDayMinor);
+      }
       const refuse = (left: bigint) =>
         party.taker
           ? new ApiError(
@@ -132,7 +149,12 @@ export class CryptoMarketLimitsService {
           where: { mode: input.mode, country: input.market, currency: input.currency, createdAt: { gt: since }, OR: [{ buyerId: party.customerId }, { sellerId: party.customerId }] },
           _sum: { fiatMinor: true },
         });
-        const used = traded._sum.fiatMinor ?? 0n;
+        // Afrippa's orders count while running or once released (never a cancelled or returned one).
+        const ordered = await tx.p2pOrder.aggregate({
+          where: { mode: input.mode, market: input.market, currency: input.currency, createdAt: { gt: since }, status: { in: ['pending_payment', 'paid', 'appealed', 'released'] }, OR: [{ buyerId: party.customerId }, { sellerId: party.customerId }] },
+          _sum: { fiatMinor: true },
+        });
+        const used = (traded._sum.fiatMinor ?? 0n) + (ordered._sum.fiatMinor ?? 0n);
         if (used + input.fiat > perDay) throw refuse(perDay > used ? perDay - used : 0n);
       }
     }
