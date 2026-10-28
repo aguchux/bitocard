@@ -1,0 +1,50 @@
+{
+  "name": "@afrippa/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./market": "./src/market.ts",
+    "./coins": "./src/coins.tsx",
+    "./market-view": "./src/market-view.tsx",
+    "./market-switcher": "./src/market-switcher.tsx",
+    "./forms": "./src/forms.tsx",
+    "./trade-actions": "./src/trade-actions.ts",
+    "./trade-views": "./src/trade-views.tsx",
+    "./wallets": "./src/wallets.ts",
+    "./qr": "./src/qr.ts",
+    "./money-forms": "./src/money-forms.tsx",
+    "./money-actions": "./src/money-actions.ts",
+    "./money-views": "./src/money-views.tsx",
+    "./wallet-views": "./src/wallet-views.tsx"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "next": "16.3.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "dependencies": {
+    "@bitocard/api-client": "*",
+    "@bitocard/ui": "*",
+    "lucide-react": "^1.52.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@bitocard/eslint-config": "*",
+    "@bitocard/typescript-config": "*",
+    "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "next": "16.3.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "typescript": "^5"
+  },
+  "sideEffects": false
+}

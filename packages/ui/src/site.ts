@@ -25,12 +25,12 @@ const apps = {
   legals: { env: "LEGALS_URL", production: "https://legals.bitocard.com", localPort: 3005 },
   shq: { env: "SHQ_URL", production: "https://shq.bitocard.com", localPort: 3004 },
   shop: { env: "SHOP_URL", production: "https://shop.bitocard.com", localPort: 3007 },
-  crypto: { env: "CRYPTO_URL", production: "https://crypto.bitocard.com", localPort: 3008 },
+  afrippa: { env: "AFRIPPA_URL", production: "https://afrippa.com", localPort: 3008 },
 } as const;
 
 /**
- * Origin of another BitoCard app, for cross-app links (server-side only).
- * Priority: its env override (STOREFRONT_URL, LEGALS_URL, SHQ_URL, SHOP_URL, CRYPTO_URL), then the production domain on any Vercel build, then localhost.
+ * Origin of another app, for cross-app links (server-side only).
+ * Priority: its env override (STOREFRONT_URL, LEGALS_URL, SHQ_URL, SHOP_URL, AFRIPPA_URL), then the production domain on any Vercel build, then localhost.
  */
 export function appUrl(app: keyof typeof apps, path = "/"): string {
   const { env, production, localPort } = apps[app];

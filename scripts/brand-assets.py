@@ -1,12 +1,14 @@
-"""Generates every BitoCard logo file from the master artwork, assets/logo.png (the lowercase "b" mark).
+"""Generates every logo file from each brand's master artwork: BitoCard's assets/logo.png (the lowercase "b" mark) for
+BitoCard's apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
+master arrives) for apps/afrippa.
 
 Run from the repository root after the logo changes: python scripts/brand-assets.py (needs Pillow and NumPy).
 
-Writes to each Next.js app's public/ folder:
-  bitocard-mark.png         the "b" mark, tightly cropped, navy and pink: beside the name on light backgrounds
-  bitocard-mark-light.png   the same with the navy in white (the pink kept), for navy and dark backgrounds
-  bitocard-logo.png         the "b" centred in a square with room around it: favicons, app icons, push notifications
-  bitocard-logo-light.png   the square logo in white and pink, for navy and dark backgrounds
+Writes to each Next.js app's public/ folder (`<brand>` is bitocard or afrippa):
+  <brand>-mark.png          the mark, tightly cropped, navy and pink: beside the name on light backgrounds
+  <brand>-mark-light.png    the same with the navy in white (the pink kept), for navy and dark backgrounds
+  <brand>-logo.png          the mark centred in a square with room around it: favicons, app icons, push notifications
+  <brand>-logo-light.png    the square logo in white and pink, for navy and dark backgrounds
   icon-192.png, icon-512.png    web app manifest icons (transparent, room around the mark)
   icon-maskable-512.png         the manifest's maskable icon: white background, the mark inside the safe zone
 
@@ -25,8 +27,11 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "assets" / "logo.png"
-APPS = ["storefront", "docs", "legals", "admin", "shq", "verify", "shop", "crypto"]
+# Each brand: its master artwork and the apps that wear it.
+BRANDS = [
+    ("bitocard", ROOT / "assets" / "logo.png", ["storefront", "docs", "legals", "admin", "shq", "verify", "shop"]),
+    ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa"]),
+]
 
 WHITE = np.array([255, 255, 255])
 
@@ -45,9 +50,9 @@ SQUARE = 1024
 SQUARE_FILL = 0.78
 
 
-def load_clean():
+def load_clean(source):
     """The artwork with stray near-transparent pixels removed, each pixel set to the pure navy or pink it belongs to."""
-    rgba = np.asarray(Image.open(SOURCE).convert("RGBA")).astype(np.float64)
+    rgba = np.asarray(Image.open(source).convert("RGBA")).astype(np.float64)
     rgb, alpha = rgba[..., :3], rgba[..., 3]
     alpha[alpha < 4] = 0
     navy_colour, pink_colour = palette(rgb, alpha)
@@ -103,8 +108,8 @@ def adaptive_svg(dark: Image.Image, white: Image.Image, size=128):
     )
 
 
-def write_icons(dark: Image.Image, white: Image.Image):
-    """Favicons, app icons and manifest icons for every app."""
+def write_icons(dark: Image.Image, white: Image.Image, apps):
+    """Favicons, app icons and manifest icons for each of the brand's apps."""
     public_files = {
         "icon-192.png": fitted(dark, 192, 0.84),
         "icon-512.png": fitted(dark, 512, 0.84),
@@ -114,7 +119,7 @@ def write_icons(dark: Image.Image, white: Image.Image):
     favicon = fitted(dark, 48, 0.96)
     app_files = {"icon1.png": fitted(dark, 96, 0.9), "apple-icon.png": fitted(dark, 180, 0.66, (255, 255, 255, 255)).convert("RGB")}
     svg = adaptive_svg(dark, white)
-    for app in APPS:
+    for app in apps:
         public, app_dir = ROOT / "apps" / app / "public", ROOT / "apps" / app / "app"
         for file, picture in public_files.items():
             picture.save(public / file, optimize=True)
@@ -122,26 +127,31 @@ def write_icons(dark: Image.Image, white: Image.Image):
             picture.save(app_dir / file, optimize=True)
         favicon.save(app_dir / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
         (app_dir / "icon.svg").write_text(svg, encoding="utf-8")
-    print(f"Wrote favicon.ico, icon.svg, icon1.png, apple-icon.png and the manifest icons to {len(APPS)} apps")
+    print(f"Wrote favicon.ico, icon.svg, icon1.png, apple-icon.png and the manifest icons to {len(apps)} apps")
 
 
 def main():
-    colour, alpha, pink, pink_colour = load_clean()
+    for brand, source, apps in BRANDS:
+        write_brand(brand, source, apps)
+
+
+def write_brand(brand, source, apps):
+    colour, alpha, pink, pink_colour = load_clean(source)
     dark = image(colour, alpha)
     white = image(light(pink, pink_colour), alpha)
     outputs = {}
     for name, mark in (("", dark), ("-light", white)):
         tight = mark.resize((round(mark.width * MARK_HEIGHT / mark.height), MARK_HEIGHT), Image.LANCZOS)
-        outputs[f"bitocard-mark{name}.png"] = tight
-        outputs[f"bitocard-logo{name}.png"] = square(mark)
-    for app in APPS:
+        outputs[f"{brand}-mark{name}.png"] = tight
+        outputs[f"{brand}-logo{name}.png"] = square(mark)
+    for app in apps:
         public = ROOT / "apps" / app / "public"
         public.mkdir(parents=True, exist_ok=True)
         for file, picture in outputs.items():
             picture.save(public / file, optimize=True)
     sizes = {file: picture.size for file, picture in outputs.items()}
-    print(f"Wrote {', '.join(f'{file} {w}x{h}' for file, (w, h) in sizes.items())} to {len(APPS)} apps")
-    write_icons(dark, white)
+    print(f"Wrote {', '.join(f'{file} {w}x{h}' for file, (w, h) in sizes.items())} to {len(apps)} apps")
+    write_icons(dark, white, apps)
 
 
 if __name__ == "__main__":

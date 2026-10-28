@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "@bitocard/ui/styles/tokens.css";
+@import "@bitocard/ui/styles/interactive.css";
+/* Shared components styled with Tailwind utilities. */
+@source "../../../packages/ui/src/underline-tabs.tsx";
+@source "../../../packages/ui/src/install-ui.tsx";
+@source "../../../packages/afrippa-ui/src";
+@theme inline { --color-background: var(--color-page); --color-foreground: var(--color-navy-900); }
+/* In the base layer, so a field's own focus style (a utility) wins. Text fields never get the outline: they show focus
+   with their own border or ring, so no pink box is drawn inside a control. */
+@layer base {
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--color-page); color: var(--color-navy-900); }
+  :focus-visible { outline: 3px solid var(--color-brand-700); outline-offset: 3px; }
+  :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
+}

@@ -1,4 +1,4 @@
-// Every app has the complete, generated icon set (scripts/brand-assets.py): favicon.ico, the adaptive SVG icon, a
+// Every app has the complete, generated icon set of its brand (scripts/brand-assets.py): favicon.ico, the adaptive SVG icon, a
 // PNG icon, the Apple touch icon, and the manifest icons its manifest lists, at the sizes they claim.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 const root = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify', 'shop', 'crypto'];
+const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify', 'shop', 'afrippa'];
+/** Afrippa wears its own mark; every other app BitoCard's. */
+const brandOf = app => (app === 'afrippa' ? 'afrippa' : 'bitocard');
 
 /** Width, height and colour type from a PNG's header. */
 function png(path) {
@@ -43,7 +45,10 @@ describe('icons', () => {
         const icon = png(join(dir, 'public', file));
         assert.deepEqual([icon.width, icon.height], [size, size], file);
       }
-      for (const file of ['bitocard-mark.png', 'bitocard-mark-light.png', 'bitocard-logo.png', 'bitocard-logo-light.png']) assert.ok(existsSync(join(dir, 'public', file)), file);
+      const brand = brandOf(app);
+      for (const file of [`${brand}-mark.png`, `${brand}-mark-light.png`, `${brand}-logo.png`, `${brand}-logo-light.png`]) assert.ok(existsSync(join(dir, 'public', file)), file);
+      const other = brand === 'afrippa' ? 'bitocard' : 'afrippa';
+      assert.ok(!existsSync(join(dir, 'public', `${other}-mark.png`)), `no ${other} mark in ${app}`);
       // Icons are files, never generated routes; layouts set no icons metadata of their own.
       for (const stale of ['app/icon.tsx', 'app/apple-icon.tsx']) assert.ok(!existsSync(join(dir, stale)), `${stale} is gone`);
       assert.doesNotMatch(readFileSync(join(dir, 'app/layout.tsx'), 'utf8'), /\bicons:/);
