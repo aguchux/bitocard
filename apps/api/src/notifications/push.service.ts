@@ -4,7 +4,7 @@ import webpush from 'web-push';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Device, Notification, NotificationAudience, Prisma } from '../generated/prisma/client.js';
+import type { Device, Notification, NotificationAudience, Platform, Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { notificationTypes, type NotificationType } from './inbox.js';
 
@@ -70,7 +70,10 @@ export type PushOwner = { userId: string } | { customerId: string };
  * The signed-in recipient registering or managing devices: who they are, their audience, their session, and (admins)
  * their roles or (customers) their store.
  */
-export type PushCaller = { owner: PushOwner; audience: NotificationAudience; sessionId: string; adminRoles?: string[]; storeId?: string };
+export type PushCaller = { owner: PushOwner; audience: NotificationAudience; sessionId: string; adminRoles?: string[]; storeId?: string; platform?: Platform };
+
+/** Whose product a device's pushes are signed for: an Afrippa admin's are Afrippa's, everyone else's BitoCard's. */
+const platformOf = (device: { user?: { realm: string } | null }): Platform => (device.user?.realm === 'afrippa_admin' ? 'afrippa' : 'bitocard');
 
 const ownerWhere = (owner: PushOwner) => ('userId' in owner ? { userId: owner.userId } : { customerId: owner.customerId });
 const ownerKey = (row: { userId: string | null; customerId: string | null }) => row.userId ?? `customer:${row.customerId}`;
@@ -92,11 +95,16 @@ export class PushService {
     private readonly integrations: IntegrationsService,
   ) {}
 
-  /** The VAPID keys, or null while push is switched off. */
-  private vapid() {
-    const config = this.integrations.config;
+  /**
+   * A product's VAPID keys, or null while its push is switched off. Each product has its own (Browser push is a shared
+   * integration with a value per product), so Afrippa's admins' browsers subscribe to Afrippa's key, never BitoCard's.
+   */
+  private vapid(platform: Platform = 'bitocard') {
+    const config = this.integrations.configFor(platform);
+    // The contact push services may write to: BitoCard's default never stands in for Afrippa's.
+    const subject = platform === 'afrippa' && /@bitocard\.com$/i.test(config.WEB_PUSH_SUBJECT) ? 'mailto:support@afrippa.com' : config.WEB_PUSH_SUBJECT;
     return config.WEB_PUSH_PUBLIC_KEY && config.WEB_PUSH_PRIVATE_KEY
-      ? { subject: config.WEB_PUSH_SUBJECT, publicKey: config.WEB_PUSH_PUBLIC_KEY, privateKey: config.WEB_PUSH_PRIVATE_KEY }
+      ? { subject, publicKey: config.WEB_PUSH_PUBLIC_KEY, privateKey: config.WEB_PUSH_PRIVATE_KEY }
       : null;
   }
 
@@ -106,9 +114,9 @@ export class PushService {
     return new Encryption(key);
   }
 
-  /** What a browser needs to subscribe. */
-  settings() {
-    const vapid = this.vapid();
+  /** What a browser needs to subscribe, for the product whose app asks. */
+  settings(platform: Platform = 'bitocard') {
+    const vapid = this.vapid(platform);
     return { object: 'push_settings' as const, enabled: vapid !== null, public_key: vapid?.publicKey ?? null };
   }
 
@@ -116,7 +124,7 @@ export class PushService {
 
   /** Registers this browser for the signed-in person (or moves it to them, if someone else used it before). */
   async register(caller: PushCaller, input: { endpoint: string; keys: { p256dh: string; auth: string }; label?: string }, userAgent?: string | null) {
-    if (!this.vapid()) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'push_not_configured', 'Push notifications are not switched on yet.');
+    if (!this.vapid(caller.platform)) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'push_not_configured', 'Push notifications are not switched on yet.');
     if (!pushEndpointAllowed(input.endpoint, this.integrations.env.WEBHOOK_ALLOW_PRIVATE_URLS)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'push_endpoint_invalid', 'This browser’s push service is not supported.', 'endpoint');
     }
@@ -155,7 +163,7 @@ export class PushService {
   async test(caller: PushCaller, id: string) {
     const device = /^[0-9a-f-]{36}$/i.test(id) ? await this.prisma.device.findFirst({ where: { id, ...ownerWhere(caller.owner) } }) : null;
     if (!device) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such device.');
-    const result = await this.send(device, {
+    const result = await this.send(device, caller.platform ?? 'bitocard', {
       id: `test-${Date.now()}`,
       type: 'test',
       title: 'Push notifications are on',
@@ -225,9 +233,11 @@ export class PushService {
     if (caller.audience === 'admin') {
       const adminRoles = caller.adminRoles ?? [];
       const superAdmin = adminRoles.includes('super_admin');
+      // Afrippa's admins get only Afrippa's admin notices, BitoCard's only BitoCard's.
+      const realm = caller.platform === 'afrippa' ? 'afrippa_admin' : 'admin';
       return all.filter(type => {
         const definition = notificationTypes[type];
-        return definition.realm === 'admin' && (superAdmin || (definition.roles as string[]).some(role => adminRoles.includes(role)));
+        return definition.realm === realm && (superAdmin || (definition.roles as string[]).some(role => adminRoles.includes(role)));
       });
     }
     const roles = new Set((await this.prisma.resellerMember.findMany({ where: { userId: caller.owner.userId }, select: { role: true } })).map(row => row.role as string));
@@ -246,7 +256,7 @@ export class PushService {
    */
   async enqueue(notifications: Notification[]) {
     try {
-      if (!this.vapid() || notifications.length === 0) return;
+      if ((!this.vapid('bitocard') && !this.vapid('afrippa')) || notifications.length === 0) return;
       const userIds = [...new Set(notifications.flatMap(row => (row.userId ? [row.userId] : [])))];
       const customerIds = [...new Set(notifications.flatMap(row => (row.customerId ? [row.customerId] : [])))];
       const owners = { OR: [{ userId: { in: userIds } }, { customerId: { in: customerIds } }] };
@@ -296,8 +306,9 @@ export class PushService {
       data: { attempts: { increment: 1 }, nextAttemptAt: new Date(now.getTime() + leaseMs) },
     });
     if (claimed.count === 0) return null;
-    const delivery = await this.prisma.pushDelivery.findUniqueOrThrow({ where: { id }, include: { notification: true, device: true } });
+    const delivery = await this.prisma.pushDelivery.findUniqueOrThrow({ where: { id }, include: { notification: true, device: { include: { user: { select: { realm: true } } } } } });
     const { device, notification } = delivery;
+    const platform = platformOf(device);
     const finish = (data: { status: 'sent' | 'pending' | 'failed'; lastError?: string | null; nextAttemptAt?: Date; sentAt?: Date }) =>
       this.prisma.pushDelivery.updateMany({ where: { id, attempts: delivery.attempts }, data }).then(() => data.status);
 
@@ -306,9 +317,9 @@ export class PushService {
       await this.prisma.device.deleteMany({ where: { id: device.id } });
       return 'failed';
     }
-    if (!this.vapid()) return finish({ status: 'failed', lastError: 'Push is switched off' });
+    if (!this.vapid(platform)) return finish({ status: 'failed', lastError: 'Push is switched off' });
 
-    const result = await this.send(device, {
+    const result = await this.send(device, platform, {
       id: notification.id,
       type: notification.type,
       title: notification.title,
@@ -355,8 +366,8 @@ export class PushService {
   }
 
   /** Encrypts and sends one push (RFC 8291 aes128gcm, VAPID). Never throws. */
-  private async send(device: Device, payload: Record<string, unknown> & { severity: string; body: string }): Promise<SendResult> {
-    const vapid = this.vapid();
+  private async send(device: Device, platform: Platform, payload: Record<string, unknown> & { severity: string; body: string }): Promise<SendResult> {
+    const vapid = this.vapid(platform);
     if (!vapid) return { ok: false, gone: false, retry: false, error: 'Push is switched off' };
     // Checked again before every send, in case the rules tightened since it was registered.
     if (!pushEndpointAllowed(device.endpoint, this.integrations.env.WEBHOOK_ALLOW_PRIVATE_URLS)) return { ok: false, gone: true, retry: false, error: 'Push service not allowed' };

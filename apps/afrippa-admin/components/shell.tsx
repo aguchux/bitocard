@@ -68,6 +68,11 @@ export const menus: Record<AfrippaSection, { title: string; items: SubNavItem[] 
   },
 };
 
+/** The inbox bell; given the admin's ID, it keeps this browser registered for push after they sign in again. */
+function InboxBell() {
+  return <NotificationBell realm="admin" userId={useAdmin().id} />;
+}
+
 function AccountArea() {
   const admin = useAdmin();
   const [signOut, { isLoading }] = useAdminSignOutMutation();
@@ -89,11 +94,11 @@ function AccountArea() {
 
 /**
  * The layout of every page on admin.afrippa.com: the shared console (rail, section menu, breadcrumbs, account menu) in
- * Afrippa's name and mark, its inbox bell (no push yet: Afrippa's admins have no devices), and step-up prompts.
+ * Afrippa's name and mark, its inbox bell with push to the admin's browsers (Afrippa's own push key), and step-up prompts.
  */
 export function AfrippaShell({ section, current, crumbs, actions, children }: { section: AfrippaSection; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   return (
-    <ConsoleShell brand="Afrippa" logo="/afrippa-mark-light.png" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<NotificationBell realm="admin" />} account={<AccountArea />}>
+    <ConsoleShell brand="Afrippa" logo="/afrippa-mark-light.png" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<InboxBell />} account={<AccountArea />}>
       {children}
       <StepUpPrompt />
     </ConsoleShell>

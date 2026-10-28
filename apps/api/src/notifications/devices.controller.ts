@@ -46,9 +46,9 @@ class PreferenceDto {
 /** The signed-in person (sessions only: API keys never register devices). */
 function pushCaller(caller: Caller): PushCaller {
   if (caller.kind !== 'session') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'session_required', 'Sign in to do this; API keys cannot.');
-  // Afrippa's admins get their own notifications with the shared tools made product-aware (plan step 2, item 2).
-  if (caller.realm === 'afrippa_admin') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'This account cannot use this endpoint.');
-  return { owner: { userId: caller.userId }, audience: caller.realm, sessionId: caller.sessionId, adminRoles: caller.adminRoles };
+  // Afrippa's admins are admins of Afrippa: its notices, its push keys (admin.afrippa.com).
+  if (caller.realm === 'afrippa_admin') return { owner: { userId: caller.userId }, audience: 'admin', sessionId: caller.sessionId, adminRoles: caller.adminRoles, platform: 'afrippa' };
+  return { owner: { userId: caller.userId }, audience: caller.realm, sessionId: caller.sessionId, adminRoles: caller.adminRoles, platform: 'bitocard' };
 }
 
 /**
@@ -117,6 +117,54 @@ export class AdminDevicesController {
   @Get('devices/push-settings')
   settings() {
     return this.push.settings();
+  }
+
+  @Get('devices')
+  list(@CurrentCaller() caller: Caller) {
+    return this.push.list(pushCaller(caller));
+  }
+
+  @Post('devices')
+  register(@CurrentCaller() caller: Caller, @Body() body: RegisterDeviceDto, @Req() req: Request) {
+    return this.push.register(pushCaller(caller), body, req.get('user-agent'));
+  }
+
+  @Post('devices/:id/test')
+  @HttpCode(HttpStatus.OK)
+  test(@CurrentCaller() caller: Caller, @Param('id') id: string) {
+    return this.push.test(pushCaller(caller), id);
+  }
+
+  @Delete('devices/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@CurrentCaller() caller: Caller, @Param('id') id: string) {
+    return this.push.remove(pushCaller(caller), id);
+  }
+
+  @Get('notification-preferences')
+  preferences(@CurrentCaller() caller: Caller) {
+    return this.push.preferences(pushCaller(caller));
+  }
+
+  @Put('notification-preferences/:type')
+  setPreference(@CurrentCaller() caller: Caller, @Param('type') type: string, @Body() body: PreferenceDto) {
+    return this.push.setPreference(pushCaller(caller), type, body.push);
+  }
+}
+
+/**
+ * The same for Afrippa's admins, on admin.afrippa.com: their browsers subscribe to Afrippa's own push key and get only
+ * Afrippa's notices. BitoCard's admins never reach these routes, nor Afrippa's BitoCard's.
+ */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin')
+export class AfrippaAdminDevicesController {
+  constructor(private readonly push: PushService) {}
+
+  @Get('devices/push-settings')
+  settings() {
+    return this.push.settings('afrippa');
   }
 
   @Get('devices')

@@ -12,6 +12,7 @@ const { default: RefusedWordsPage } = await import("@/app/(console)/settings/wor
 const { default: BooksPage } = await import("@/app/(console)/books/page");
 const { default: TicketsPage } = await import("@/app/(console)/support/page");
 const { TraderStanding } = await import("@/components/trader-standing");
+const { default: NotificationsPage } = await import("@/app/(console)/notifications/page");
 
 const admin = { id: "a1", name: "Ada Okafor", email: "ada@afrippa.com", roles: ["operations", "finance"] };
 const traderId = "5b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
@@ -52,6 +53,11 @@ beforeEach(() => {
     const ok = (value: unknown) => Response.json(value);
     if (path === "/v1/afrippa/admin/auth/session") return ok({ object: "admin_session", admin });
     if (path === "/v1/afrippa/admin/notifications/unread-count") return ok({ object: "unread_count", count: 0 });
+    if (path === "/v1/afrippa/admin/notifications") return ok({ object: "list", data: [], has_more: false });
+    if (path === "/v1/afrippa/admin/devices/push-settings") return ok({ object: "push_settings", enabled: true, public_key: "BAfrippaKey" });
+    if (path === "/v1/afrippa/admin/devices") return ok({ object: "list", data: [{ object: "device", id: "d1", channel: "web_push", label: "Chrome on Windows", current: false, last_pushed_at: null, last_seen_at: "2026-10-28T00:00:00.000Z", created_at: "2026-10-28T00:00:00.000Z" }] });
+    if (path === "/v1/afrippa/admin/notification-preferences")
+      return ok({ object: "list", data: [{ object: "notification_preference", type: "admin.p2p.order_appealed", label: "An order was appealed", severity: "warning", push: true, default: true, locked: false }] });
     if (path === "/v1/afrippa/admin/crypto/assets") return ok({ object: "list", data: [{ code: "USDT" }, { code: "BTC" }] });
     if (path === "/v1/afrippa/admin/p2p/fee-rates" && input.method === "GET") return ok({ object: "list", max_bps: 1000, data: [{ object: "p2p_fee_rate", asset: "USDT", market: null, buyer_bps: 30, seller_bps: 20 }] });
     if (path === "/v1/afrippa/admin/p2p/fee-rates") return ok({ object: "p2p_fee_rate", asset: "BTC", market: "NG", buyer_bps: 25, seller_bps: 50 });
@@ -183,6 +189,16 @@ describe("admin.afrippa.com books, standing and help", () => {
     fireEvent.change(screen.getAllByRole("textbox", { name: /reason/i }).at(-1)!, { target: { value: "Proved who they are on a call." } });
     fireEvent.click(screen.getAllByRole("button", { name: "Reset two-step" }).at(-1)!);
     await waitFor(() => expect(sent.find(call => call.path.endsWith("/two-step/reset"))?.body).toEqual({ reason: "Proved who they are on a call." }), slow);
+  });
+
+  test("notifications: push to this browser on Afrippa's own devices and notices", async () => {
+    page(<NotificationsPage />);
+    expect(await screen.findByText("An order was appealed", {}, slow)).toBeTruthy();
+    expect(screen.getAllByText("Chrome on Windows").length).toBeGreaterThan(0);
+    for (const path of ["/v1/afrippa/admin/devices/push-settings", "/v1/afrippa/admin/devices", "/v1/afrippa/admin/notification-preferences"]) {
+      expect(sent.some(call => call.path === path), path).toBe(true);
+    }
+    neverBitoCard();
   });
 
   test("help: traders' tickets from Afrippa's own queue", async () => {
