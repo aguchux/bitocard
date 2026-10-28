@@ -21,7 +21,7 @@ import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 const assetCode = () => Matches(/^[A-Z0-9]{2,10}$/, { message: 'asset must be an asset code such as USDT' });
 /** A crypto amount as a decimal string ("12.5"). */
-const cryptoAmount = () => Matches(/^\d{1,20}(\.\d{1,8})?$/, { message: 'amount must be a decimal number such as 12.5' });
+export const cryptoAmount = () => Matches(/^\d{1,20}(\.\d{1,8})?$/, { message: 'amount must be a decimal number such as 12.5' });
 
 class AssetQueryDto {
   @IsOptional() @Transform(upper) @assetCode()

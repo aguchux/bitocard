@@ -30,7 +30,7 @@ describe('schedules', () => {
     const jobs = loadJobs();
     const source = readFileSync(new URL('../src/cron/cron.controller.ts', import.meta.url), 'utf8');
     const table = source.slice(source.indexOf('this.jobs = {'), source.indexOf('@Get('));
-    const defined = [...table.matchAll(/^\s{6}'?([a-z-]+)'?: (?:async )?\(\) =>/gm)].map(match => match[1]).sort();
+    const defined = [...table.matchAll(/^\s{6}'?([a-z0-9-]+)'?: (?:async )?\(\) =>/gm)].map(match => match[1]).sort();
     assert.ok(defined.length >= 20, 'the job table was read');
     assert.deepEqual(jobs.map(job => job.job).sort(), defined);
   });

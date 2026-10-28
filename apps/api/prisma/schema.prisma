@@ -1005,6 +1005,9 @@ enum AccountKind {
   /// A store customer's wallet money locked by a resale order until the supplier accepts it (then it goes to
   /// `classified_escrow`) or it ends (back to `customer_wallet`). Still the customer's; never below zero.
   customer_wallet_locked
+  /// Afrippa: a seller's coins held for an open P2P order (the amount and the seller's fee), released to the buyer or
+  /// returned to the seller. Never below zero.
+  crypto_escrow
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -2591,6 +2594,8 @@ model Customer {
   payments                  Payment[]
   reservedAccounts          ReservedAccount[]
   p2pPaymentMethods         P2pPaymentMethod[]
+  p2pOrdersSold             P2pOrder[]                @relation("p2pOrderSeller")
+  p2pOrdersBought           P2pOrder[]                @relation("p2pOrderBuyer")
   /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
   /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
   /// secret, encrypted) until its first code.
@@ -3021,6 +3026,7 @@ model P2pAd {
   customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
   trades           P2pTrade[]
   paymentMethods   P2pAdPaymentMethod[]
+  orders           P2pOrder[]
 
   @@index([mode, country, asset, side, status, priceMinor])
   @@index([customerId, status])
@@ -5415,6 +5421,7 @@ model P2pPaymentMethod {
   createdAt        DateTime             @default(now()) @map("created_at")
   customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
   ads              P2pAdPaymentMethod[]
+  orders           P2pOrder[]
 
   @@index([customerId, mode])
   @@map("p2p_payment_methods")
@@ -5430,4 +5437,72 @@ model P2pAdPaymentMethod {
   @@id([adId, paymentMethodId])
   @@index([paymentMethodId])
   @@map("p2p_ad_payment_methods")
+}
+
+enum P2pOrderStatus {
+  /// Opened: the coins in escrow, waiting for the buyer to pay within the window.
+  pending_payment
+  /// The buyer says they paid: waiting for the seller to release.
+  paid
+  /// Either side appealed: Afrippa's operations decide.
+  appealed
+  /// The coins went to the buyer (the seller released, or operations decided so).
+  released
+  /// Cancelled by the buyer, or expired unpaid (`cancel_reason`): the coins went back.
+  cancelled
+  /// Operations decided an appeal for the seller: the coins went back.
+  returned
+}
+
+/// An Afrippa P2P order on an escrow ad (docs/CRYPTO_SPINOFF_PLAN.md, step 3): see the migration for its steps.
+model P2pOrder {
+  id                   String           @id @default(uuid()) @db.Uuid
+  number               Int              @unique @default(autoincrement())
+  mode                 LedgerMode
+  adId                 String           @map("ad_id") @db.Uuid
+  market               String           @db.Char(2)
+  currency             String           @db.Char(3)
+  asset                String           @db.VarChar(10)
+  makerId              String           @map("maker_id") @db.Uuid
+  takerId              String           @map("taker_id") @db.Uuid
+  sellerId             String           @map("seller_id") @db.Uuid
+  buyerId              String           @map("buyer_id") @db.Uuid
+  priceMinor           BigInt           @map("price_minor")
+  /// The coins traded, in base units: the buyer receives this less `buyer_fee`; escrow holds this plus `seller_fee`.
+  amount               BigInt
+  fiatMinor            BigInt           @map("fiat_minor")
+  sellerFee            BigInt           @map("seller_fee")
+  buyerFee             BigInt           @map("buyer_fee")
+  sellerFeeBps         Int              @map("seller_fee_bps")
+  buyerFeeBps          Int              @map("buyer_fee_bps")
+  /// The seller's payment method the buyer pays into.
+  paymentMethodId      String           @map("payment_method_id") @db.Uuid
+  /// The name the payment must come from: the buyer's verified name (live) or account name.
+  buyerName            String           @map("buyer_name")
+  paymentWindowMinutes Int              @map("payment_window_minutes")
+  payBy                DateTime         @map("pay_by")
+  status               P2pOrderStatus   @default(pending_payment)
+  paidAt               DateTime?        @map("paid_at")
+  appealedAt           DateTime?        @map("appealed_at")
+  appealedBy           String?          @map("appealed_by") @db.Uuid
+  appealReason         String?          @map("appeal_reason")
+  closedAt             DateTime?        @map("closed_at")
+  /// buyer or expired.
+  cancelReason         String?          @map("cancel_reason")
+  /// The Afrippa admin who decided an appeal, whose fault it was (buyer, seller or none) and why.
+  decidedBy            String?          @map("decided_by") @db.Uuid
+  decisionFault        String?          @map("decision_fault")
+  decisionNote         String?          @map("decision_note")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  ad                   P2pAd            @relation(fields: [adId], references: [id], onDelete: Restrict)
+  seller               Customer         @relation("p2pOrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  buyer                Customer         @relation("p2pOrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  paymentMethod        P2pPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, status])
+  @@index([buyerId, status])
+  @@index([status, payBy])
+  @@index([adId])
+  @@map("p2p_orders")
 }

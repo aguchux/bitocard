@@ -104,6 +104,10 @@
     {
       "job": "classifieds",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "job": "p2p-orders",
+      "schedule": "* * * * *"
     }
   ]
 }

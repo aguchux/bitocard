@@ -1,3 +1,4 @@
+import { P2pOrdersService } from '../afrippa/orders.service.js';
 import { ListingsService } from '../classifieds/listings.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
@@ -57,6 +58,7 @@ export class CronController {
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    p2pOrders: P2pOrdersService,
     fx: FxService,
     payments: PaymentsService,
     payouts: PayoutsService,
@@ -172,6 +174,8 @@ export class CronController {
         const sent = await withdrawals.job();
         return { deposits: await deposits.job({ deadline }), withdrawals: sent };
       },
+      /** Every minute: Afrippa's P2P orders left unpaid past their window expire, their coins going back to the seller. */
+      'p2p-orders': () => p2pOrders.expireDue(),
       /** Every 15 minutes: every blockchain provider's latest block (Crypto > Chains health). */
       'chain-health': () => deposits.checkAll(),
       /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */

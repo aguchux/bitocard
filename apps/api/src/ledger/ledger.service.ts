@@ -48,7 +48,7 @@ const resellerKinds = new Set<AccountKind>([
   'reseller_crypto_withdrawing',
 ]);
 /** A store customer's own money and crypto: their wallets, P2P proceeds and what they have locked or an admin froze, never below zero. */
-const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_wallet_locked', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards', 'spin_rewards']);
+const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_wallet_locked', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards', 'spin_rewards', 'crypto_escrow']);
 /**
  * Accounts in Afrippa's books whoever owns them (docs/CRYPTO_SPINOFF_PLAN.md, step 2 item 7): BitoCard keeps no
  * crypto, and P2P is Afrippa's. Any account in a coin is Afrippa's too, and so is every account of Afrippa's traders
@@ -67,6 +67,7 @@ export const afrippaKinds = new Set<AccountKind>([
   'reseller_crypto',
   'reseller_crypto_withdrawing',
   'p2p_fiat_locked',
+  'crypto_escrow',
 ]);
 
 export const insufficientFunds = () =>

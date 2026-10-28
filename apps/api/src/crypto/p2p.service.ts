@@ -297,7 +297,7 @@ export class P2pService {
    * open to them, their identity check, their store open, not frozen). An owner who lost any of them has their ads
    * kept off the market, and taking one is refused.
    */
-  private async ownerCanTrade(customerId: string, book: MarketBook, known = new Map<string, Promise<boolean>>()) {
+  async ownerCanTrade(customerId: string, book: MarketBook, known = new Map<string, Promise<boolean>>()) {
     if (!known.has(customerId)) {
       known.set(
         customerId,
@@ -356,7 +356,7 @@ export class P2pService {
    * owner's favour (a buy ad's last fill takes all it still locks), and BitoCard's fee. Checked against the ad's
    * limits; throws a clear refusal otherwise.
    */
-  private terms(ad: P2pAd, asset: CryptoAsset, input: { fiat?: number; amount?: string }) {
+  terms(ad: P2pAd, asset: CryptoAsset, input: { fiat?: number; amount?: string }) {
     let amount = input.amount !== undefined ? toUnits(input.amount, asset.decimals) : unitsFor(BigInt(input.fiat!), ad.priceMinor, asset.decimals);
     // The ad's shown maximum is its rest rounded in the owner's favour, which may buy a part of a unit more than is left:
     // asking for all of it takes the whole rest.
@@ -860,7 +860,7 @@ export class P2pService {
     });
   }
 
-  private async nicknames(ids: string[]) {
+  async nicknames(ids: string[]) {
     const profiles = await this.prisma.p2pProfile.findMany({ where: { customerId: { in: ids } } });
     return new Map(profiles.map(profile => [profile.customerId, profile.nickname]));
   }
