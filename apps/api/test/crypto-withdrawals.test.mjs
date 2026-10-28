@@ -30,7 +30,7 @@ const signerSecret = 'signer-shared-secret-at-least-32-chars';
 async function fakeWorld() {
   const state = { flagged: new Set([flagged.toLowerCase()]), mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0, holdings: [], tracked: [] };
   const verified = call => {
-    const header = call.headers['bitocard-signer-signature'] ?? '';
+    const header = call.headers['afrippa-signer-signature'] ?? '';
     const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header) ?? [];
     const body = call.method === 'GET' ? new URL(call.url, 'http://x').pathname : call.raw.toString('utf8');
     const ok = t && v1 === createHmac('sha256', signerSecret).update(`${t}.${body}`).digest('hex');
@@ -40,11 +40,11 @@ async function fakeWorld() {
   // The signer signs every reply over the request's own signature (docs/crypto-signer.md), unless told to forge one.
   const signed = (call, reply) => {
     const body = JSON.stringify(reply.body ?? {});
-    const v1 = /v1=([0-9a-f]{64})/.exec(call.headers['bitocard-signer-signature'] ?? '')?.[1] ?? '';
+    const v1 = /v1=([0-9a-f]{64})/.exec(call.headers['afrippa-signer-signature'] ?? '')?.[1] ?? '';
     const t = Math.floor(Date.now() / 1000);
     const secret = state.replySecret ?? signerSecret;
     const signature = `t=${t},v1=${createHmac('sha256', secret).update(`reply.${t}.${v1}.${reply.status ?? 200}.${body}`).digest('hex')}`;
-    return { ...reply, body, headers: { 'content-type': 'application/json', ...(state.unsignedReplies ? {} : { 'bitocard-signer-signature': signature }) } };
+    return { ...reply, body, headers: { 'content-type': 'application/json', ...(state.unsignedReplies ? {} : { 'afrippa-signer-signature': signature }) } };
   };
   const service = await fakeService(call => {
     const path = new URL(call.url, 'http://x').pathname;

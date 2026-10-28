@@ -8,7 +8,7 @@ import { base58check, bech32 } from '@scure/base';
 /**
  * Chains, key families and addresses, kept identical to the API's `apps/api/src/crypto/derive.ts`: customer `i`'s
  * deposit address is the account key's child `0/i`, so the API (holding only xpubs) and the signer (asking the vault)
- * always agree. BitoCard's own hot wallet is the internal chain's first child, `1/0`, which no customer ever gets.
+ * always agree. Afrippa's own hot wallet is the internal chain's first child, `1/0`, which no customer ever gets.
  */
 export const chains = ['ETHEREUM', 'BSC', 'POLYGON', 'ARBITRUM', 'BASE', 'OPTIMISM', 'TRON', 'BITCOIN', 'LITECOIN', 'DOGECOIN'] as const;
 export type Chain = (typeof chains)[number];
@@ -59,7 +59,7 @@ export const defaultAccountPaths: Record<Family, Record<Network, string>> = {
   dogecoin: { mainnet: "m/44'/3'/0'", testnet: "m/44'/1'/0'" },
 };
 
-/** Who owns a key: customer `index`'s deposit address, or BitoCard's hot wallet. */
+/** Who owns a key: customer `index`'s deposit address, or Afrippa's hot wallet. */
 export type KeyOwner = { kind: 'customer'; index: number } | { kind: 'hot' };
 
 export function keyPath(account: string, owner: KeyOwner) {

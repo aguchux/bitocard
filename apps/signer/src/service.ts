@@ -39,7 +39,7 @@ class Locks {
 const leaseMs = 3 * 60_000;
 
 /**
- * BitoCard's signer: records each transfer the API asks for under its reference before anything else (so a second
+ * Afrippa's signer: records each transfer the API asks for under its reference before anything else (so a second
  * request is the same transfer, never another), signs it through the vault, keeps the signed bytes before
  * broadcasting (so a retry sends exactly those bytes), and follows it on chain. Only a clear refusal before signing,
  * or a transaction the chain shows can never send (reverted, expired), is `failed`.

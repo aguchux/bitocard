@@ -38,7 +38,7 @@ export async function fetchHandler(request: Request): Promise<Response> {
   const reply = await handleRequest(
     service,
     config.secret,
-    { method: request.method, path: new URL(request.url).pathname, signature: request.headers.get('bitocard-signer-signature'), body },
+    { method: request.method, path: new URL(request.url).pathname, signature: request.headers.get('afrippa-signer-signature'), body },
     log,
     work => void keepAlive(work),
   );

@@ -5,12 +5,13 @@ import type { IntegrationLink } from '../../integrations/links.js';
 import type { Chain } from '../chains/client.js';
 
 /**
- * BitoCard's signer: the only thing that can spend customers' crypto. It runs off Vercel, in front of the key vault
+ * Afrippa's signer (`apps/signer`, `@afrippa/signer`): the only thing that can spend traders' crypto, asked only for
+ * Afrippa (its settings are Afrippa's alone). It runs off Vercel, in front of the key vault
  * (Turnkey, Dfns or an HSM, holding the keys from the offline key ceremony), and applies its own limits. The API never
  * holds a private key: it asks the signer to send a transfer, identified by a reference that is the same on every
  * request, so a repeat after a timeout never sends twice. The protocol is in `docs/crypto-signer.md`.
  *
- * Requests are signed like BitoCard's webhooks: `BitoCard-Signer-Signature: t=<unix>,v1=<hex HMAC-SHA256 of "t.body">`
+ * Requests are signed like the API's webhooks: `Afrippa-Signer-Signature: t=<unix>,v1=<hex HMAC-SHA256 of "t.body">`
  * keyed with the shared secret (for GETs the body is the path). The signer must refuse anything older than 5 minutes.
  *
  * Sandbox stores use the signer whose Sandbox switch is on (test networks); without one their withdrawals are
@@ -105,7 +106,7 @@ export class RemoteSigner implements CryptoSigner {
     try {
       res = await fetch(url, {
         method,
-        headers: { accept: 'application/json', 'bitocard-signer-signature': signature, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+        headers: { accept: 'application/json', 'afrippa-signer-signature': signature, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
         body: body === undefined ? undefined : text,
         signal: AbortSignal.timeout(timeoutMs),
         redirect: 'error',
@@ -116,7 +117,7 @@ export class RemoteSigner implements CryptoSigner {
     const reply = await res.text();
     // Only a reply the signer signed counts, refusals and 404s included (a 404 lets a frozen withdrawal be returned):
     // anything else (a proxy's error page, a forged answer) is unclear and asked again.
-    if (!signerReplyValid(this.secret, res.headers.get('bitocard-signer-signature'), requestV1, res.status, reply)) {
+    if (!signerReplyValid(this.secret, res.headers.get('afrippa-signer-signature'), requestV1, res.status, reply)) {
       throw new SignerError(`an unsigned or wrongly signed reply (HTTP ${res.status})`);
     }
     const json = (() => {

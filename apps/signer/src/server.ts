@@ -5,7 +5,7 @@ import { HttpError, type Signer } from './service.js';
 const maxAgeSeconds = 300;
 export const maxBody = 64 * 1024;
 
-/** The request's `v1` when its `BitoCard-Signer-Signature` is valid for the signed text within five minutes, else null. */
+/** The request's `v1` when its `Afrippa-Signer-Signature` is valid for the signed text within five minutes, else null. */
 export function requestValid(secret: string, header: string | undefined | null, text: string, now = Math.floor(Date.now() / 1000)) {
   const at = /(?:^|,)t=(\d+)(?:,|$)/.exec(header ?? '')?.[1];
   if (!header || !at || Math.abs(now - Number(at)) > maxAgeSeconds) return null;
@@ -36,7 +36,7 @@ export async function handleRequest(signer: Signer, secret: string, request: Sig
     const body = JSON.stringify(payload);
     // An unsigned request gets an unsigned refusal: there is nothing to bind a signature to.
     const headers: Record<string, string> = { 'content-type': 'application/json', 'cache-control': 'no-store' };
-    if (requestV1) headers['BitoCard-Signer-Signature'] = replySignature(secret, requestV1, status, body);
+    if (requestV1) headers['Afrippa-Signer-Signature'] = replySignature(secret, requestV1, status, body);
     return { status, headers, body };
   };
   try {
@@ -103,7 +103,7 @@ export function signerServer(signer: Signer, secret: string, log: Log = () => un
         return;
       }
       const path = new URL(req.url ?? '/', 'http://signer').pathname;
-      const reply = await handleRequest(signer, secret, { method: req.method ?? 'GET', path, signature: req.headers['bitocard-signer-signature'] as string | undefined, body }, log, work => {
+      const reply = await handleRequest(signer, secret, { method: req.method ?? 'GET', path, signature: req.headers['afrippa-signer-signature'] as string | undefined, body }, log, work => {
         void work.catch(error => log('transfer.error', { error: String(error) }));
       });
       res.statusCode = reply.status;

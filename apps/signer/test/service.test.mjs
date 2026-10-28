@@ -264,20 +264,20 @@ describe('the HTTP interface', () => {
   test('signed requests get signed replies bound to the request', async () => {
     const body = JSON.stringify({ reference: 'bc_cw_http', chain: 'TRON', network: 'mainnet', asset: 'USDT', contract: usdt, to: customer, amount: '1000', decimals: 6 });
     const header = sign(body);
-    const res = await fetch(`${base}/v1/transfers`, { method: 'POST', headers: { 'bitocard-signer-signature': header }, body });
+    const res = await fetch(`${base}/v1/transfers`, { method: 'POST', headers: { 'afrippa-signer-signature': header }, body });
     const text = await res.text();
     assert.equal(res.status, 200);
     assert.equal(JSON.parse(text).status, 'pending');
-    assert.ok(replyValid(res.headers.get('bitocard-signer-signature'), header.split('v1=')[1], 200, text));
+    assert.ok(replyValid(res.headers.get('afrippa-signer-signature'), header.split('v1=')[1], 200, text));
 
     const path = '/v1/transfers/nope';
     // Signed once: signing again could fall in the next second and differ.
     const pathHeader = sign(path);
-    const missing = await fetch(`${base}${path}`, { headers: { 'bitocard-signer-signature': pathHeader } });
+    const missing = await fetch(`${base}${path}`, { headers: { 'afrippa-signer-signature': pathHeader } });
     assert.equal(missing.status, 404);
-    assert.ok(replyValid(missing.headers.get('bitocard-signer-signature'), pathHeader.split('v1=')[1], 404, await missing.text()));
+    assert.ok(replyValid(missing.headers.get('afrippa-signer-signature'), pathHeader.split('v1=')[1], 404, await missing.text()));
 
-    const health = await fetch(`${base}/signer/v1/health`, { headers: { 'bitocard-signer-signature': sign('/signer/v1/health') } });
+    const health = await fetch(`${base}/signer/v1/health`, { headers: { 'afrippa-signer-signature': sign('/signer/v1/health') } });
     const json = await health.json();
     assert.equal(json.network, 'mainnet');
     assert.equal(json.hot_wallets.TRON, addressOf('TRON', 'mainnet', await vault.publicKey("m/44'/195'/0'/1/0")));
@@ -285,12 +285,12 @@ describe('the HTTP interface', () => {
 
   test('missing, wrong or stale signatures are refused, unsigned', async () => {
     for (const header of [undefined, sign('/v1/health', undefined, 'w'.repeat(40)), sign('/v1/health', Math.floor(Date.now() / 1000) - 600)]) {
-      const res = await fetch(`${base}/v1/health`, { headers: header ? { 'bitocard-signer-signature': header } : {} });
+      const res = await fetch(`${base}/v1/health`, { headers: header ? { 'afrippa-signer-signature': header } : {} });
       assert.equal(res.status, 401);
-      assert.equal(res.headers.get('bitocard-signer-signature'), null);
+      assert.equal(res.headers.get('afrippa-signer-signature'), null);
     }
     // A body signed for one request cannot be replayed with another body.
-    const res = await fetch(`${base}/v1/transfers`, { method: 'POST', headers: { 'bitocard-signer-signature': sign('{}') }, body: '{"reference":"x"}' });
+    const res = await fetch(`${base}/v1/transfers`, { method: 'POST', headers: { 'afrippa-signer-signature': sign('{}') }, body: '{"reference":"x"}' });
     assert.equal(res.status, 401);
     assert.equal(requestValid(secret, sign('abc'), 'abc') !== null, true);
   });

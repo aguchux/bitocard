@@ -1,11 +1,19 @@
-# BitoCard crypto signer protocol
+# Afrippa crypto signer protocol
 
-The signer is the only part of BitoCard that can spend customers' crypto. It runs **off Vercel**, in front of the key
+The signer is the only part of Afrippa that can spend customers' crypto. It runs **off Vercel**, in front of the key
 vault (Turnkey, Dfns or an HSM holding the keys from the offline key ceremony), and enforces its own limits. The API
 holds no private keys: it asks the signer to send each on-chain withdrawal, then checks the result on chain through the
 chain providers before it settles anything.
 
-The API side is `apps/api/src/crypto/custody/signer.ts` (`RemoteSigner`). It is set up in the admin app at Settings >
+**Afrippa's alone** (`docs/CRYPTO_SPINOFF_PLAN.md`, step 4 part 4; 28 October 2026): BitoCard keeps no crypto, no
+signing keys and no signer. The package is `@afrippa/signer`; the API asks it only for Afrippa (its settings are in
+Afrippa's integrations, never BitoCard's); the signature header is `Afrippa-Signer-Signature` (was
+`BitoCard-Signer-Signature`). **Moving it** is an operations task: rename or move its Vercel project and team to
+Afrippa, give it `signer.afrippa.com`, name its Turnkey organisation and wallet for Afrippa, and **rotate its secrets**
+(a new `CRYPTO_SIGNER_SECRET`, set in the signer's environment and in Afrippa's admin at the same time, and a new
+Turnkey API key). Deploy the signer and the API together: each refuses the other's old header.
+
+The API side is `apps/api/src/crypto/custody/signer.ts` (`RemoteSigner`). It is set up in Afrippa's admin app (admin.afrippa.com) at Settings >
 Integrations > Blockchain > Crypto signer: the address (`CRYPTO_SIGNER_URL`), the shared secret
 (`CRYPTO_SIGNER_SECRET`, at least 32 characters) and the Sandbox switch (`CRYPTO_SIGNER_SANDBOX`). With Sandbox on, the
 signer serves sandbox stores on test networks, and live withdrawals are not offered. With it off, it serves live
@@ -16,7 +24,7 @@ stores on main networks. Sandbox stores without a test signer get a simulated on
 Every request carries a signature header:
 
 ```
-BitoCard-Signer-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<signed text>", keyed with the shared secret>
+Afrippa-Signer-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<signed text>", keyed with the shared secret>
 ```
 
 - For a POST, the signed text is the raw JSON body.
@@ -33,7 +41,7 @@ The signer must:
 Every reply, errors and `404`s included, carries a signature header too:
 
 ```
-BitoCard-Signer-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "reply.<t>.<the request's v1>.<HTTP status>.<raw reply body>", keyed with the shared secret>
+Afrippa-Signer-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "reply.<t>.<the request's v1>.<HTTP status>.<raw reply body>", keyed with the shared secret>
 ```
 
 - `<the request's v1>` is the hex `v1` value from the request's own signature header, so a reply belongs to exactly one
@@ -46,10 +54,10 @@ never returns a withdrawal's money, or takes a refusal as final, on an unsigned 
 error page in front of the signer is therefore harmless. Example (Node.js):
 
 ```js
-const v1 = /v1=([0-9a-f]{64})/.exec(req.headers['bitocard-signer-signature'])[1];
+const v1 = /v1=([0-9a-f]{64})/.exec(req.headers['afrippa-signer-signature'])[1];
 const t = Math.floor(Date.now() / 1000);
 const body = JSON.stringify(reply);
-res.setHeader('BitoCard-Signer-Signature', `t=${t},v1=${createHmac('sha256', secret).update(`reply.${t}.${v1}.${status}.${body}`).digest('hex')}`);
+res.setHeader('Afrippa-Signer-Signature', `t=${t},v1=${createHmac('sha256', secret).update(`reply.${t}.${v1}.${status}.${body}`).digest('hex')}`);
 res.status(status).end(body);
 ```
 
@@ -145,7 +153,7 @@ symbol). It compares the total per asset with what the ledger expects: `crypto_c
 not settled, plus deposits seen but not credited.
 
 - **Shortfall:** urgent; finance and operations are told at once.
-- **Surplus:** BitoCard's own money, such as a gas float or fees not swept.
+- **Surplus:** Afrippa's own money, such as a gas float or fees not swept.
 - **Unknown tokens:** listed and never counted.
 
 ### `POST /v1/addresses` (Solana, planned)
@@ -153,7 +161,7 @@ not settled, plus deposits seen but not credited.
 Takes `{ "chain": "SOLANA", "network": "mainnet" | "testnet", "index": 12 }` and answers `{ "address": "…" }`. Solana
 keys are hardened only, so only the signer can make customers' Solana deposit addresses.
 
-## BitoCard's signer (`apps/signer`)
+## Afrippa's signer (`apps/signer`)
 
 A plain Node service (no framework) with its own Postgres database. Run **one per network**: a `mainnet` signer for
 live stores and a `testnet` one for sandbox stores. Settings are environment variables, listed in
@@ -223,11 +231,11 @@ live stores and a `testnet` one for sandbox stores. Settings are environment var
    characters; Vercel Cron sends it). The team needs a plan whose cron jobs may run every minute (Pro): Hobby allows
    one a day. The signer has no static files, and Vercel refuses a missing or empty output folder, so `public` holds only a
    `robots.txt` refusing crawlers (`vercel.json`). Give the
-   project its own address on a custom domain, for example `signer.bitocard.com` (Cloudflare: a DNS-only CNAME to
-   `cname.vercel-dns.com`, plus the TXT record Vercel asks for to verify `bitocard.com` in this team): Vercel
+   project its own address on a custom domain, for example `signer.afrippa.com` (Cloudflare: a DNS-only CNAME to
+   `cname.vercel-dns.com`, plus the TXT record Vercel asks for to verify `afrippa.com` in this team): Vercel
    Authentication covers its `*.vercel.app` addresses, so the API reaches only the custom domain. Every request and
    reply is signed, so the address being public is safe.
-6. **The admin app.** Settings > Integrations > Blockchain > Crypto signer: the address and the same secret, the
+6. **Afrippa's admin app** (admin.afrippa.com). Settings > Integrations > Blockchain > Crypto signer: the address and the same secret, the
    Sandbox switch on for the `testnet` signer. Test connection shows its hot wallets: fund them, starting small.
 7. **Test networks first.** Run a `testnet` signer (`SIGNER_VAULT=local` is fine there) against Sepolia, Nile and the
    Bitcoin and Litecoin testnets, with a sandbox store, before any live withdrawal.
@@ -242,7 +250,7 @@ transaction takes one per input, and a token sweep needs a gas transfer too.
 - **Wallet tiers and limits.** A hot wallet holds 5 to 10% of custody, warm wallets are 2-of-3, and cold storage holds
   the rest (warm and cold are moved by hand, outside the signer, for now). Per-transfer and daily limits are reported
   as `failed` with the reason.
-- **Fees.** It pays network fees from the hot wallet. BitoCard's withdrawal fee, charged to the customer, is booked
+- **Fees.** It pays network fees from the hot wallet. Afrippa's withdrawal fee, charged to the customer, is booked
   separately by the API.
 - **Sweeps.** It moves funds from customers' deposit addresses to the hot wallet. Address `m/…/0/i` belongs to
   customer index `i` (see `apps/api/src/crypto/derive.ts`).

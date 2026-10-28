@@ -71,4 +71,4 @@ jobs:
         run: npm run test:docker -w @bitocard/api
 
       - name: Signer tests against Postgres (several instances at once)
-        run: npm run test:docker -w @bitocard/signer
+        run: npm run test:docker -w @afrippa/signer

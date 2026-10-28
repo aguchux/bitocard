@@ -34,15 +34,15 @@ describe('Vercel functions', () => {
   test('signed requests on their original path, signed replies', { skip: !database && 'set SIGNER_TEST_DATABASE_URL' }, async () => {
     const path = '/v1/health';
     const header = sign(path);
-    const res = await vercel.fetchHandler(new Request(`https://signer.example${path}`, { headers: { 'bitocard-signer-signature': header } }));
+    const res = await vercel.fetchHandler(new Request(`https://signer.example${path}`, { headers: { 'afrippa-signer-signature': header } }));
     const text = await res.text();
     assert.equal(res.status, 200, text);
     assert.equal(JSON.parse(text).network, 'testnet');
-    const at = /t=(\d+)/.exec(res.headers.get('bitocard-signer-signature'))[1];
+    const at = /t=(\d+)/.exec(res.headers.get('afrippa-signer-signature'))[1];
     const expected = createHmac('sha256', secret).update(`reply.${at}.${header.split('v1=')[1]}.200.${text}`).digest('hex');
-    assert.equal(res.headers.get('bitocard-signer-signature'), `t=${at},v1=${expected}`);
+    assert.equal(res.headers.get('afrippa-signer-signature'), `t=${at},v1=${expected}`);
     // Signed for one path, sent to another: refused.
-    const other = await vercel.fetchHandler(new Request('https://signer.example/v1/balances/testnet', { headers: { 'bitocard-signer-signature': header } }));
+    const other = await vercel.fetchHandler(new Request('https://signer.example/v1/balances/testnet', { headers: { 'afrippa-signer-signature': header } }));
     assert.equal(other.status, 401);
     const worker = await vercel.workerHandler(new Request('https://signer.example/api/worker', { headers: { authorization: `Bearer ${'c'.repeat(32)}` } }));
     assert.equal(worker.status, 200);
@@ -108,7 +108,7 @@ describe('vercel.json', () => {
     assert.equal(config.outputDirectory, 'public');
     const robots = await readFile(new URL('../public/robots.txt', import.meta.url), 'utf8');
     assert.equal(robots.replace(/\r\n/g, '\n'), 'User-agent: *\nDisallow: /\n');
-    assert.equal(config.buildCommand, 'cd ../.. && npx turbo run build --filter=@bitocard/signer');
+    assert.equal(config.buildCommand, 'cd ../.. && npx turbo run build --filter=@afrippa/signer');
     assert.deepEqual(Object.keys(config.functions).sort(), ['api/index.mjs', 'api/worker.mjs']);
     assert.deepEqual(config.rewrites, [{ source: '/((?!api/worker).*)', destination: '/api/index' }]);
     assert.deepEqual(config.crons, [{ path: '/api/worker', schedule: '* * * * *' }]);

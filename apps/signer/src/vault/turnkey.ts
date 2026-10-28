@@ -12,12 +12,12 @@ export type TurnkeyConfig = {
   /** The API key pair (P-256) created for this signer in Turnkey, hex. */
   apiPublicKey: string;
   apiPrivateKey: string;
-  /** Account paths and their xpubs, the same ones saved in BitoCard's admin app. */
+  /** Account paths and their xpubs, the same ones saved in Afrippa's admin app. */
   accounts: { path: string; xpub: string }[];
 };
 
 /**
- * Keys in Turnkey: BitoCard's recovery phrase is imported into one Turnkey wallet and never leaves it. Turnkey has no
+ * Keys in Turnkey: Afrippa's recovery phrase is imported into one Turnkey wallet and never leaves it. Turnkey has no
  * xpub export, so the signer is given the account xpubs (the same ones the admin app holds) and works out public keys
  * itself; every signature Turnkey returns is checked against that key, so a wallet that is not the one behind the
  * xpubs can never sign anything.
