@@ -30,7 +30,12 @@ export function TimeLeft({ until }: { until: string }) {
   const left = Math.max(0, new Date(until).getTime() - now);
   const minutes = Math.floor(left / 60_000);
   const seconds = Math.floor((left % 60_000) / 1000);
-  return <span className="font-mono tabular-nums">{left ? `${minutes}:${String(seconds).padStart(2, "0")}` : "time is up"}</span>;
+  // The server's clock and the browser's differ by a moment: the first second may not match, and that is expected.
+  return (
+    <span className="font-mono tabular-nums" suppressHydrationWarning>
+      {left ? `${minutes}:${String(seconds).padStart(2, "0")}` : "time is up"}
+    </span>
+  );
 }
 
 const quiet = "inline-flex min-h-12 items-center justify-center rounded-xl px-4 font-semibold ring-1 ring-slate-300 hover:ring-slate-400 disabled:opacity-60";
