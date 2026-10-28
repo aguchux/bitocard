@@ -194,7 +194,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 9. Tests on PGlite and Docker: no BitoCard caller can reach any Afrippa route, and no Afrippa caller any BitoCard route. **Built (28 October 2026):** `test/afrippa-separation.test.mjs` tries every route the app serves with every caller of the other product, refused before any handler runs, and checks every Afrippa route is behind the gate, its admin realm or credentials of its own. It found one gap, now closed: a trader's session naming Afrippa's store was accepted on BitoCard's customer routes (`/v1/store/…`); a trader's session now counts only on Afrippa's own routes.
 
 ### 3. The escrow engine
-1. Payment methods (saved, encrypted, name-checked).
+1. Payment methods (saved, encrypted, name-checked). **Built (28 October 2026):** bank accounts, mobile money wallets and named services (labels only) per currency, encrypted and shown as hints, the holder the trader's verified name (never typed), usable after 24 hours, at most 10, each addition emailed and noticed. **Next:** checking the account name with a provider (Afrippa's own bank-name lookup) once Afrippa has one; and `CryptoWalletsService.context` takes the market from the store's reseller, which Afrippa's operator account has none of, so the trader-facing crypto code must read the trader's own country before ads and orders (item 2) can run for Afrippa's traders.
 2. Ads with payment methods and windows; buy ads lock nothing.
 3. Orders: open with escrow, mark paid, release, cancel, expire (a job), appeal and decide; every step once, under row locks, tested with parallel requests.
 4. Fees in crypto.

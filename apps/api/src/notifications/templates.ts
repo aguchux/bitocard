@@ -168,6 +168,23 @@ export function traderTwoStepChangedEmail(to: string, change: 'enabled' | 'chang
   };
 }
 
+/** An Afrippa trader added a payment method: told every time, as a stolen session could add its own. */
+export function paymentMethodAddedEmail(to: string, what: string, usableFrom: Date): EmailMessage {
+  return {
+    to,
+    subject: 'A payment method was added to your Afrippa account',
+    ...layout(
+      'Payment method added',
+      [
+        `${what} was added to your Afrippa account. Buyers can be shown it from ${usableFrom.toUTCString()}.`,
+        'If this was not you, remove it, change your password and tell the Afrippa team at once.',
+      ],
+      undefined,
+      'Afrippa',
+    ),
+  };
+}
+
 /** A set-password link for an admin (from the admin sign-in page: a first visit, or Forgot password). */
 export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number; product?: EmailProduct }): EmailMessage {
   const created = input.kind === 'create';

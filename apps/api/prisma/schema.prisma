@@ -2590,6 +2590,7 @@ model Customer {
   ledgerAccounts            LedgerAccount[]
   payments                  Payment[]
   reservedAccounts          ReservedAccount[]
+  p2pPaymentMethods         P2pPaymentMethod[]
   /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
   /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
   /// secret, encrypted) until its first code.
@@ -5378,4 +5379,37 @@ model ResaleStoreReport {
   @@index([status, createdAt])
   @@index([resellerId, status])
   @@map("resale_store_reports")
+}
+
+enum P2pPaymentMethodKind {
+  bank
+  mobile_money
+  /// A named service (Wise, Payoneer, PayPal...): a label for where to pay, never an integration.
+  named
+}
+
+/// An Afrippa trader's payment method (docs/CRYPTO_SPINOFF_PLAN.md, step 3): where a buyer pays them directly, shown
+/// to the counterparty only inside an open order. `detailsEncrypted` holds the account details (JSON, encrypted with
+/// ENCRYPTION_KEY); `hint` is what lists show. The holder is the trader's verified name live, never typed. Usable from
+/// `usableFrom` (24 hours after it was added); removed ones are kept for the orders that used them.
+model P2pPaymentMethod {
+  id               String               @id @default(uuid()) @db.Uuid
+  customerId       String               @map("customer_id") @db.Uuid
+  mode             LedgerMode
+  kind             P2pPaymentMethodKind
+  currency         String               @db.VarChar(3)
+  /// The bank, the mobile money network or the named service.
+  label            String
+  hint             String
+  holderName       String               @map("holder_name")
+  detailsEncrypted String               @map("details_encrypted")
+  /// An HMAC of the kind, currency and details, so the same method is not saved twice.
+  fingerprint      String
+  usableFrom       DateTime             @map("usable_from")
+  removedAt        DateTime?            @map("removed_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, mode])
+  @@map("p2p_payment_methods")
 }
