@@ -7,7 +7,7 @@ import { InstallSupport } from "@bitocard/ui/install-ui";
 import { installCaptureScript } from "@bitocard/ui/install";
 import { CryptoActionsProvider } from "@bitocard/crypto-ui/forms";
 import { MoneyActionsProvider } from "@bitocard/crypto-ui/money-forms";
-import { changeAd, chooseNickname, confirmTrade, postAd, repriceAd, takeAd } from "@/lib/trade";
+import { changeAd, chooseNickname, postAd, repriceAd } from "@/lib/trade";
 import {
   addCashOutAccount,
   addWithdrawalAddress,
@@ -76,7 +76,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
         {/* The shared trading and money forms act through this site's own server actions and pages. */}
-        <CryptoActionsProvider actions={{ takeAd, confirmTrade, postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post", wallet: "/add-money" }}>
+        <CryptoActionsProvider actions={{ postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post" }}>
           <MoneyActionsProvider
             actions={{ addWithdrawalAddress, removeWithdrawalAddress, reviewWithdrawal, createWithdrawal, confirmWithdrawal, resendWithdrawalCode, cancelWithdrawal, addCashOutAccount, removeCashOutAccount, cashOut, simulateCashOut }}
           >{children}</MoneyActionsProvider>

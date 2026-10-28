@@ -67,11 +67,6 @@ export const switchDefinitions = {
     scopes: ['country'],
     description: "Residents of other allowed countries may trade in this country's local-currency P2P market (a Nigerian selling USDT for cedis in Ghana's), within its cross-border limits.",
   },
-  crypto_trade_abroad: {
-    scopes: ['reseller'],
-    default: true,
-    description: "Customers of this reseller's stores may trade in other countries' local P2P markets, where those take cross-border trades. On unless switched off.",
-  },
   crypto_install_prompt: {
     scopes: ['global', 'country'],
     description: 'BitoCard Crypto offers to install itself as an app, at most three times per visitor.',
@@ -186,7 +181,6 @@ export const afrippaSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'crypto_app',
   'crypto_global',
   'crypto_cross_border',
-  'crypto_trade_abroad',
   'crypto_install_prompt',
   'store_template_crypto_desk',
 ]);

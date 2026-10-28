@@ -1,17 +1,29 @@
-// Crypto wallets and the P2P market: instant trades paid from BitoCard wallets, settled in one transaction, with
-// admin freezes. Races from other P2P systems (two buyers on one ad, cancel against a trade) must never move money twice.
+// Afrippa's P2P market: traders post escrow ads and take them through orders (test/afrippa-orders.test.mjs covers the
+// orders themselves). BitoCard's instant trades and the fiat buy ads locked are retired: old ads can only be closed, and
+// closing gives back what they lock. Also admin freezes, the markets a trader may use, market limits, the public pages,
+// and paying old P2P money out to a bank.
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, afrippaAdminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, adminCode, lastEmailCode, startApp } from './helpers.mjs';
 
+const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
+const { afrippaStoreId } = await import('../dist/afrippa/ids.js');
+const { PrismaService } = await import('../dist/database/prisma.service.js');
+const { EmailService } = await import('../dist/notifications/email.service.js');
+const { LedgerService } = await import('../dist/ledger/ledger.service.js');
+
+const secret = 'afrippa-p2p-suite-secret-afrippa-p2p-suite';
 let server;
 let admin;
 let afrippaAdmin;
 let prisma;
+let ledger;
 
 before(async () => {
-  server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
-  prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  server = await startApp({ env: { CRYPTO_ROUTES: 'closed', AFRIPPA_SERVER_SECRET: secret, CHECKOUT_SANDBOX: 'on' } });
+  prisma = server.app.get(PrismaService);
+  ledger = server.app.get(LedgerService);
   admin = await adminClient(server);
   afrippaAdmin = await afrippaAdminClient(server);
 });
@@ -20,69 +32,89 @@ after(async () => {
   await server?.close();
 });
 
-const returnUrl = 'https://shop.example/account/wallet';
 const ledgerOk = async () => assert.equal((await admin.get('/v1/admin/ledger/check')).json.ok, true);
+
+/** Sets a switch at one scope (a country, or global), or clears it with null. */
+async function setSwitch(key, enabled, country = null) {
+  await prisma.featureSwitch.deleteMany({ where: { key, countryCode: country, resellerId: null } });
+  if (enabled !== null) await prisma.featureSwitch.create({ data: { key, countryCode: country, enabled } });
+}
 const switches = async enabled => {
   for (const key of ['crypto_wallets', 'p2p_trading']) {
-    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+    await setSwitch(key, enabled);
     // Crypto trading is open only in countries switched on by themselves (the global level never allows a country).
-    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, country_code: 'NG' })).status, 200);
+    await setSwitch(key, enabled, 'NG');
   }
 };
 
-function storeServer(subdomain = null) {
+/** Afrippa's server: every request signed, so it acts for Afrippa's store. */
+function afrippaServer() {
   let token = null;
   const request = async (method, path, body) => {
+    const raw = body === undefined ? undefined : JSON.stringify(body);
     const res = await fetch(`${server.base}${path}`, {
       method,
       headers: {
-        ...(subdomain ? { 'bitocard-store': subdomain } : {}),
-        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        'afrippa-signature': signAfrippaRequest(secret, { method, url: path, body: raw }),
+        ...(raw !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(token ? { 'bitocard-customer-session': token } : {}),
-        ...(method === 'POST' ? { 'idempotency-key': `store-${Date.now()}-${Math.random()}` } : {}),
+        ...(method === 'POST' ? { 'idempotency-key': `p2p-${Date.now()}-${Math.random()}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: raw,
     });
     const text = await res.text();
     const json = text ? JSON.parse(text) : null;
     if (json?.session?.token) token = json.session.token;
-    return { status: res.status, json };
+    return { status: res.status, cache: res.headers.get('cache-control'), json };
   };
   return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), put: (path, body) => request('PUT', path, body), patch: (path, body) => request('PATCH', path, body) };
 }
 
+const lastCodeTo = email => /\b(\d{6})\b/.exec(server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1).subject)[1];
+const currencies = { NG: 'NGN', GH: 'GHS', KE: 'KES' };
+
 let counter = 0;
-async function customer(country = 'NG', subdomain = null, declare = true) {
-  const shopper = storeServer(subdomain);
-  const email = `p2p${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada Trader', email, password: 'correct horse battery', country });
+
+/** A saved payment method, past its 24-hour wait. */
+async function method(client, body) {
+  const added = await client.post('/v1/afrippa/p2p/payment-methods', body);
+  assert.equal(added.status, 201, JSON.stringify(added.json));
+  await prisma.p2pPaymentMethod.update({ where: { id: added.json.id }, data: { usableFrom: new Date(Date.now() - 1000) } });
+  return added.json.id;
+}
+
+const bank = (client, currency) => method(client, { kind: 'bank', currency, bank_name: 'Example Bank', account_number: `55${String((counter += 1)).padStart(8, '0')}` });
+const wise = (client, currency) => method(client, { kind: 'named', currency, provider: 'wise', handle: `trader${(counter += 1)}@example.com` });
+
+/** An Afrippa trader past two-step, with the declaration made and a bank account in their own currency. */
+async function trader(name = 'Ada Trader', country = 'NG', { declare = true } = {}) {
+  const client = afrippaServer();
+  const email = `p2p-trader${(counter += 1)}-${Date.now()}@example.com`;
+  const signup = await client.post('/v1/afrippa/account/signup', { name, email, password: 'correct horse battery', country });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
-  assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-  shopper.id = signup.json.customer.id;
-  shopper.email = email;
-  if (declare) assert.equal((await shopper.post('/v1/afrippa/crypto/declaration', { version: (await shopper.get('/v1/afrippa/crypto/declaration')).json.version })).status, 200);
-  return shopper;
+  await prisma.customer.update({ where: { id: signup.json.customer.id }, data: { emailVerifiedAt: new Date() } });
+  await prisma.customerCode.updateMany({ where: { customer: { email } }, data: { createdAt: new Date(Date.now() - 120_000) } });
+  assert.equal((await client.post('/v1/afrippa/account/two-step/setup', { method: 'email' })).status, 200);
+  assert.equal((await client.post('/v1/afrippa/account/two-step/setup/confirm', { code: lastCodeTo(email) })).status, 200);
+  if (declare) assert.equal((await client.post('/v1/afrippa/crypto/declaration', { version: (await client.get('/v1/afrippa/crypto/declaration')).json.version })).status, 200);
+  client.id = signup.json.customer.id;
+  client.email = email;
+  client.bank = await bank(client, currencies[country]);
+  return client;
 }
 
-/** A sandbox top-up of the customer's NGN wallet, paid. */
-async function fund(shopper, amount, currency) {
-  const started = await shopper.post('/v1/store/wallet/top-ups', { amount, return_url: returnUrl, ...(currency ? { currency } : {}) });
-  assert.equal(started.status, 201, JSON.stringify(started.json));
-  assert.equal((await shopper.post(`/v1/store/wallet/top-ups/${started.json.id}/simulate`, { outcome: 'succeeded' })).status, 200);
-}
-
-async function deposit(shopper, asset, amount) {
-  const res = await shopper.post('/v1/afrippa/crypto/test-deposits', { asset, amount });
+async function deposit(client, asset, amount) {
+  const res = await client.post('/v1/afrippa/crypto/test-deposits', { asset, amount });
   assert.equal(res.status, 201, JSON.stringify(res.json));
   return res.json;
 }
 
-const balance = async (shopper, asset) => (await shopper.get('/v1/afrippa/crypto')).json.assets.find(item => item.asset === asset);
-const cash = async shopper => (await shopper.get('/v1/afrippa/crypto')).json.cash;
+const balance = async (client, asset) => (await client.get('/v1/afrippa/crypto')).json.assets.find(item => item.asset === asset);
+const credit = async (client, asset, amount) => assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${client.id}/test-credits`, { asset, amount, reason: 'Testing the market' })).status, 201);
 
-/** Every asset's customer balances plus fees and adjustments equal what BitoCard holds in custody: crypto is never made or lost. */
+/** Every asset's customer balances plus fees and adjustments equal what custody holds: crypto is never made or lost. */
 async function cryptoConserved() {
-  const accounts = await prisma.ledgerAccount.findMany({ where: { kind: { in: ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'crypto_fees', 'crypto_custody', 'adjustments'] } } });
+  const accounts = await prisma.ledgerAccount.findMany({ where: { kind: { in: ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'crypto_escrow', 'crypto_fees', 'crypto_custody', 'adjustments'] } } });
   const sums = new Map();
   for (const account of accounts) {
     if (account.kind === 'adjustments' && !['USDT', 'USDC', 'BTC', 'ETH', 'BNB'].includes(account.currency)) continue;
@@ -93,206 +125,194 @@ async function cryptoConserved() {
   for (const [key, sum] of sums) assert.equal(sum, 0n, `${key} is off by ${sum}`);
 }
 
-const sellAd = (shopper, overrides = {}) =>
-  shopper.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '100', min_fiat: 100_00, max_fiat: 500_000_00, ...overrides });
+const sellAd = (client, overrides = {}) =>
+  client.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '100', min_fiat: 100_00, max_fiat: 500_000_00, payment_method_ids: [client.bank], ...overrides });
+
+/** Opens an order on `ad` for `amount` (or `fiat`), paying into the ad's first payment method. */
+const order = (client, ad, size) => client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: ad.price, payment_method_id: ad.payment_methods[0].id, ...size });
 
 describe('switched off', () => {
   test('crypto is off until an admin switches it on', async () => {
-    const shopper = await customer();
-    const overview = await shopper.get('/v1/afrippa/crypto');
+    const ada = await trader();
+    const overview = await ada.get('/v1/afrippa/crypto');
     assert.deepEqual([overview.status, overview.json.enabled, overview.json.p2p_enabled, overview.json.mode], [200, false, false, 'test']);
     assert.deepEqual(overview.json.assets.map(item => item.asset), ['USDT', 'USDC', 'BTC', 'ETH', 'BNB', 'POL', 'TRX', 'LTC', 'DOGE']);
-    const market = await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
+    const market = await ada.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
     assert.deepEqual([market.status, market.json.error.code], [409, 'crypto_not_enabled']);
-    assert.equal((await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' })).json.error.code, 'crypto_not_enabled');
+    assert.equal((await ada.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' })).json.error.code, 'crypto_not_enabled');
   });
 });
 
-describe('instant P2P trades', () => {
+describe('escrow ads', () => {
   before(() => switches(true));
   after(() => switches(null));
 
-  test('USD ads use USD wallets for locking, matching, settlement and release', async () => {
-    const buyer = await customer();
-    const seller = await customer();
-    await fund(buyer, 100_00, 'USD');
-    await deposit(seller, 'USDT', '20');
-    const ad = await buyer.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'USD', price: 100, amount: '10', min_fiat: 100, max_fiat: 1000 });
-    assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.equal(ad.json.currency, 'USD');
-    assert.equal((await seller.get('/v1/afrippa/p2p/market?asset=USDT&side=sell&currency=USD')).json.data.some(item => item.id === ad.json.id), true);
-    assert.equal((await seller.get('/v1/afrippa/p2p/market?asset=USDT&side=sell&currency=NGN')).json.data.some(item => item.id === ad.json.id), false);
-    assert.equal((await seller.get(`/v1/afrippa/p2p/market?asset=USDT&side=sell&currency=USD&q=${ad.json.trader.nickname.slice(0, 6).toLowerCase()}`)).json.data.some(item => item.id === ad.json.id), true);
-    assert.equal((await seller.get('/v1/afrippa/p2p/market?asset=USDT&side=sell&currency=USD&q=no-such-trader')).json.data.length, 0);
-    assert.equal((await buyer.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'GBP', price: 100, amount: '1', min_fiat: 100, max_fiat: 100 })).json.error.code, 'currency_unsupported');
-    const trade = await seller.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 100, amount: '4' });
-    assert.equal(trade.status, 201, JSON.stringify(trade.json));
-    assert.deepEqual([trade.json.currency, trade.json.fiat], ['USD', 400]);
-    // USD sale money is P2P money (withdrawable), like local sales: never the spend-only wallet.
-    const sellerWallet = await seller.get('/v1/store/wallet?currency=USD');
-    assert.equal(sellerWallet.json.currency, 'USD');
-    assert.equal(sellerWallet.json.balance, 0);
-    const sellerProceeds = await prisma.ledgerAccount.findFirst({ where: { customerId: seller.id, mode: 'test', kind: 'customer_withdrawable', currency: 'USD' } });
-    assert.equal(sellerProceeds?.balanceMinor, 400n);
-    assert.equal((await buyer.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`)).status, 200);
-    const accounts = await prisma.ledgerAccount.findMany({ where: { customerId: buyer.id, mode: 'test', kind: { in: ['customer_wallet', 'p2p_fiat_locked'] } } });
-    assert.equal(accounts.find(row => row.currency === 'USD' && row.kind === 'p2p_fiat_locked')?.balanceMinor, 0n);
-    assert.equal(accounts.find(row => row.currency === 'USD' && row.kind === 'customer_wallet')?.balanceMinor, 96_00n);
-    const sell = await sellAd(seller, { currency: 'USD', price: 100, amount: '5', min_fiat: 100, max_fiat: 500 });
-    assert.equal(sell.status, 201, JSON.stringify(sell.json));
-    const bought = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: sell.json.id, price: 100, amount: '2' });
-    assert.equal(bought.status, 201, JSON.stringify(bought.json));
-    assert.deepEqual([bought.json.currency, bought.json.side, bought.json.fiat], ['USD', 'buy', 200]);
-    const afterBuy = await prisma.ledgerAccount.findFirst({ where: { customerId: buyer.id, mode: 'test', kind: 'customer_wallet', currency: 'USD' } });
-    assert.equal(afterBuy?.balanceMinor, 94_00n);
-    await ledgerOk();
-  });
-
-  test('a sell ad locks its crypto; a buyer pays from their wallet and gets it at once, less the fee', async () => {
-    const seller = await customer();
-    const buyer = await customer();
+  test('a sell ad locks its coins and is listed by nickname; taken through an order, its trades count on the profile', async () => {
+    const seller = await trader('Ada Seller');
+    const buyer = await trader('Bola Buyer');
     await deposit(seller, 'USDT', '250.5');
     const ad = await sellAd(seller, { amount: '200' });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.deepEqual([ad.json.side, ad.json.available, ad.json.price, ad.json.status], ['sell', '200.000000', 165000, 'active']);
+    assert.deepEqual([ad.json.side, ad.json.available, ad.json.price, ad.json.status, ad.json.escrow], ['sell', '200.000000', 165000, 'active', true]);
     const locked = await balance(seller, 'USDT');
     assert.deepEqual([locked.available, locked.locked, locked.total], ['50.500000', '200.000000', '250.500000']);
 
-    // Not enough cash: refused, nothing moves.
-    const poor = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, amount: '10' });
-    assert.deepEqual([poor.status, poor.json.error.code], [402, 'insufficient_funds']);
-    assert.equal(await prisma.p2pTrade.count({ where: { adId: ad.json.id } }), 0);
-
-    await fund(buyer, 200_000_00);
     const market = await buyer.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
     assert.ok(market.json.data.some(item => item.id === ad.json.id && item.trader.nickname.startsWith('Trader')), 'listed with the seller nickname only');
     assert.equal(JSON.stringify(market.json).includes(seller.email), false, 'never the seller email');
     assert.equal((await seller.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.data.some(item => item.id === ad.json.id), false, 'never your own ad');
 
-    const quote = await buyer.get('/v1/afrippa/p2p/quote?asset=USDT&side=buy&fiat=8250000');
-    assert.equal(quote.status, 200, JSON.stringify(quote.json));
-    assert.deepEqual([quote.json.ad.id, quote.json.amount, quote.json.fiat, quote.json.fee, quote.json.received], [ad.json.id, '50.000000', 82_500_00, '0.100000', '49.900000']);
-
-    const changed = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 160000, amount: '50' });
-    assert.deepEqual([changed.status, changed.json.error.code], [409, 'price_changed']);
-    const own = await seller.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, amount: '50' });
-    assert.equal(own.json.error.code, 'own_ad');
-    const preview = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, fiat: 82_500_00, preview: true });
-    assert.deepEqual([preview.json.object, preview.json.side, preview.json.amount], ['p2p_quote', 'buy', '50.000000']);
-
-    const trade = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, fiat: 82_500_00 });
-    assert.equal(trade.status, 201, JSON.stringify(trade.json));
-    assert.match(trade.json.number, /^P2P-\d{6}$/);
-    assert.deepEqual([trade.json.side, trade.json.role, trade.json.status, trade.json.received, trade.json.fiat], ['buy', 'taker', 'completed', '49.900000', 82_500_00]);
-    assert.equal((await balance(buyer, 'USDT')).available, '49.900000');
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 117_500_00, locked: 0, paying_out: 0 });
-    assert.equal((await balance(seller, 'USDT')).locked, '150.000000');
-    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 82_500_00, wallet: 0, locked: 0, paying_out: 0 });
-    const sellerView = await seller.get(`/v1/afrippa/p2p/trades/${trade.json.id}`);
-    assert.deepEqual([sellerView.json.side, sellerView.json.role], ['sell', 'maker']);
-    assert.ok(await prisma.notification.findFirst({ where: { customerId: seller.id, type: 'customer.p2p.trade_completed' } }), 'the seller is told');
+    // Taken, paid, released: the trade shows on the seller's profile.
+    const opened = await order(buyer, ad.json, { fiat: 82_500_00 });
+    assert.equal(opened.status, 201, JSON.stringify(opened.json));
+    assert.equal(opened.json.amount, '50.000000');
+    assert.equal((await buyer.post(`/v1/afrippa/p2p/orders/${opened.json.id}/paid`, { payment_method_id: buyer.bank })).status, 200);
+    assert.equal((await seller.post(`/v1/afrippa/p2p/orders/${opened.json.id}/release`, { payer_checked: true })).status, 200);
     assert.equal((await seller.get('/v1/afrippa/p2p/profile')).json.trades_total, 1);
-
-    // BitoCard's fees are spread over several accounts: their sum.
-    const fees = (await prisma.ledgerAccount.aggregate({ where: { kind: 'crypto_fees', currency: 'USDT', mode: 'test' }, _sum: { balanceMinor: true } }))._sum.balanceMinor;
-    assert.ok(fees >= 100_000n, 'BitoCard took its fee');
+    assert.equal((await balance(seller, 'USDT')).locked, '150.000000');
     await cryptoConserved();
     await ledgerOk();
   });
 
-  test('two buyers racing for the last of an ad: exactly one wins, nothing is paid twice', async () => {
-    const seller = await customer();
-    await deposit(seller, 'USDT', '10');
-    const ad = await sellAd(seller, { amount: '10', min_fiat: 100_00 });
-    const buyers = await Promise.all([customer(), customer(), customer()]);
-    await Promise.all(buyers.map(buyer => fund(buyer, 50_000_00)));
-    const results = await Promise.all(buyers.map(buyer => buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, amount: '10' })));
-    assert.deepEqual(results.map(res => res.status).sort(), [201, 409, 409], JSON.stringify(results.map(res => res.json)));
-    assert.equal(await prisma.p2pTrade.count({ where: { adId: ad.json.id } }), 1);
-    const row = await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.json.id } });
-    assert.deepEqual([row.status, row.remainingAmount], ['completed', 0n]);
-    assert.equal((await balance(seller, 'USDT')).locked, '0.000000');
-    await cryptoConserved();
-    await ledgerOk();
-  });
-
-  test('closing an ad while it is being taken: either the trade or the refund, never both', async () => {
-    const seller = await customer();
-    const buyer = await customer();
+  test('ads in US dollars sit in their own book, and the book can be searched by nickname', async () => {
+    const buyer = await trader('Ada Dollars');
+    const seller = await trader('Bola Dollars');
+    const buyerUsd = await wise(buyer, 'USD');
+    const sellerUsd = await wise(seller, 'USD');
     await deposit(seller, 'USDT', '20');
-    await fund(buyer, 50_000_00);
-    const ad = await sellAd(seller, { amount: '20' });
-    const [cancel, trade] = await Promise.all([seller.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`), buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, amount: '20' })]);
-    assert.ok([cancel.status, trade.status].includes(200) || [cancel.status, trade.status].includes(201));
-    const usdt = await balance(seller, 'USDT');
-    if (trade.status === 201) assert.deepEqual([usdt.available, usdt.locked, cancel.json.error.code], ['0.000000', '0.000000', 'ad_closed']);
-    else assert.deepEqual([usdt.available, usdt.locked, trade.json.error.code], ['20.000000', '0.000000', 'ad_unavailable']);
-    await cryptoConserved();
-    await ledgerOk();
-  });
-
-  test('a buy ad locks the fiat it needs, proceeds first; sellers fill it in parts; closing gives the rest back', async () => {
-    const buyer = await customer();
-    const seller = await customer();
-    await fund(buyer, 100_000_00);
-    await deposit(seller, 'BTC', '0.01');
-    // Not enough cash for the ad: refused.
-    const tooBig = await buyer.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'BTC', price: 150_000_000_00, amount: '1', min_fiat: 1000_00, max_fiat: 10_000_000_00 });
-    assert.deepEqual([tooBig.status, tooBig.json.error.code], [402, 'insufficient_funds']);
-    const ad = await buyer.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'BTC', price: 150_000_000_00, amount: '0.0005', min_fiat: 1000_00, max_fiat: 100_000_00 });
+    const ad = await buyer.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'USD', price: 100, amount: '10', min_fiat: 100, max_fiat: 1000, payment_method_ids: [buyerUsd] });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 25_000_00, locked: 75_000_00, paying_out: 0 });
-
-    const sold = await seller.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 150_000_000_00, amount: '0.0002' });
+    assert.equal(ad.json.currency, 'USD');
+    const book = async query => (await seller.get(`/v1/afrippa/p2p/market?asset=USDT&side=sell&${query}`)).json.data.some(item => item.id === ad.json.id);
+    assert.equal(await book('currency=USD'), true);
+    assert.equal(await book('currency=NGN'), false);
+    assert.equal(await book(`currency=USD&q=${ad.json.trader.nickname.slice(0, 6).toLowerCase()}`), true);
+    assert.equal(await book('currency=USD&q=no-such-trader'), false);
+    assert.equal((await buyer.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'GBP', price: 100, amount: '1', min_fiat: 100, max_fiat: 100, payment_method_ids: [buyerUsd] })).json.error.code, 'currency_unsupported');
+    // The seller sells into it, paid into their own US dollar account.
+    const sold = await seller.post('/v1/afrippa/p2p/orders', { ad_id: ad.json.id, price: 100, amount: '4', payment_method_id: sellerUsd });
     assert.equal(sold.status, 201, JSON.stringify(sold.json));
-    assert.deepEqual([sold.json.side, sold.json.fiat, sold.json.fee], ['sell', 30_000_00, '0.00000040']);
-    assert.equal((await balance(seller, 'BTC')).available, '0.00980000');
-    assert.equal((await balance(buyer, 'BTC')).available, '0.00019960');
-    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 30_000_00, wallet: 0, locked: 0, paying_out: 0 });
-    assert.equal((await cash(buyer)).locked, 45_000_00);
-
-    // A new price locks more (or gives back) in the same step.
-    const repriced = await buyer.patch(`/v1/afrippa/p2p/ads/${ad.json.id}`, { price: 140_000_000_00 });
-    assert.equal(repriced.status, 200, JSON.stringify(repriced.json));
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 28_000_00, locked: 42_000_00, paying_out: 0 });
-    const stale = await seller.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 150_000_000_00, amount: '0.0001' });
-    assert.equal(stale.json.error.code, 'price_changed');
-
-    const closed = await buyer.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`);
-    assert.deepEqual([closed.status, closed.json.status], [200, 'cancelled']);
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 70_000_00, locked: 0, paying_out: 0 });
-    assert.equal((await buyer.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`)).json.error.code, 'ad_closed', 'closed once');
-
-    // The seller spends their P2P proceeds before their wallet.
-    await deposit(buyer, 'USDT', '10');
-    const usdtAd = await sellAd(buyer, { amount: '10' });
-    const spent = await seller.post('/v1/afrippa/p2p/trades', { ad_id: usdtAd.json.id, price: 165000, amount: '10' });
-    assert.equal(spent.status, 201, JSON.stringify(spent.json));
-    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 13_500_00, wallet: 0, locked: 0, paying_out: 0 });
-    await cryptoConserved();
-    await ledgerOk();
+    assert.deepEqual([sold.json.currency, sold.json.fiat], ['USD', 400]);
   });
 
-  test('ads check their limits and amounts', async () => {
-    const seller = await customer();
-    const buyer = await customer();
+  test('ads check their limits and amounts; paused ads cannot be taken; a nickname is chosen once and unique', async () => {
+    const seller = await trader('Ada Limits');
+    const buyer = await trader('Bola Limits');
     await deposit(seller, 'USDT', '100');
     assert.equal((await sellAd(seller, { amount: '101' })).json.error.code, 'insufficient_funds');
     assert.equal((await sellAd(seller, { amount: '1.1234567' })).json.error.code, 'parameter_invalid', 'USDT keeps 6 places');
     assert.equal((await sellAd(seller, { min_fiat: 1000_00, max_fiat: 100_00 })).json.error.param, 'max_fiat');
-    const ad = await sellAd(seller, { amount: '100', min_fiat: 10_000_00, max_fiat: 20_000_00 });
-    await fund(buyer, 100_000_00);
-    assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, fiat: 5_000_00 })).json.error.code, 'below_ad_limit');
-    assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, fiat: 30_000_00 })).json.error.code, 'above_ad_limit');
-    assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, amount: '101' })).json.error.code, 'amount_unavailable');
-    // Paused ads leave the market and cannot be taken.
-    assert.equal((await seller.patch(`/v1/afrippa/p2p/ads/${ad.json.id}`, { status: 'paused' })).json.status, 'paused');
-    assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, fiat: 15_000_00 })).json.error.code, 'ad_unavailable');
+    const ad = (await sellAd(seller, { amount: '100', min_fiat: 10_000_00, max_fiat: 20_000_00 })).json;
+    assert.equal((await order(buyer, ad, { fiat: 5_000_00 })).json.error.code, 'below_ad_limit');
+    assert.equal((await order(buyer, ad, { fiat: 30_000_00 })).json.error.code, 'above_ad_limit');
+    assert.equal((await order(buyer, ad, { amount: '101' })).json.error.code, 'amount_unavailable');
+    assert.equal((await seller.patch(`/v1/afrippa/p2p/ads/${ad.id}`, { status: 'paused' })).json.status, 'paused');
+    assert.equal((await order(buyer, ad, { fiat: 15_000_00 })).json.error.code, 'ad_unavailable');
     assert.equal((await seller.get('/v1/afrippa/p2p/ads')).json.data.length, 1);
-    // A nickname is chosen once, and unique.
     assert.equal((await seller.put('/v1/afrippa/p2p/profile', { nickname: `Ada_${counter}` })).json.nickname_chosen, true);
     assert.equal((await seller.put('/v1/afrippa/p2p/profile', { nickname: 'Another' })).json.error.code, 'nickname_locked');
     assert.equal((await buyer.put('/v1/afrippa/p2p/profile', { nickname: `ada_${counter}` })).json.error.code, 'nickname_taken');
+  });
+
+  test("the ad's shown maximum takes its whole rest, though that fiat would buy a part of a unit more", async () => {
+    const seller = await trader('Ada Rest');
+    const buyer = await trader('Bola Rest');
+    await deposit(seller, 'USDT', '2');
+    const ad = await sellAd(seller, { amount: '1.000001', price: 164999, min_fiat: 1_00 });
+    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    assert.equal(ad.json.max_fiat, 165000, 'the rest, rounded up for the seller');
+    assert.ok((await buyer.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&fiat=165000')).json.data.some(item => item.id === ad.json.id));
+    const taken = await order(buyer, ad.json, { fiat: 165000 });
+    assert.equal(taken.status, 201, JSON.stringify(taken.json));
+    assert.deepEqual([taken.json.amount, taken.json.fiat], ['1.000001', 165000]);
+    assert.equal((await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.json.id } })).remainingAmount, 0n);
+    await cryptoConserved();
+  });
+});
+
+describe('instant trades are retired', () => {
+  before(() => switches(true));
+  after(() => switches(null));
+
+  test('there are no instant trades or quotes, and the market is for Afrippa’s traders only', async () => {
+    const ada = await trader();
+    for (const [verb, path] of [
+      ['get', '/v1/afrippa/p2p/quote?asset=USDT&side=buy&fiat=100000'],
+      ['get', '/v1/afrippa/p2p/trades'],
+      ['post', '/v1/afrippa/p2p/trades'],
+    ]) {
+      assert.equal((await ada[verb](path, verb === 'post' ? { ad_id: randomUUID(), price: 1, amount: '1' } : undefined)).status, 404, path);
+    }
+    assert.equal((await afrippaAdmin.get('/v1/afrippa/admin/p2p/trades')).status, 404);
+
+    // A bitocard.com customer never reaches the market (the gate keeps them off its routes; the service refuses too).
+    const shopper = await fetch(`${server.base}/v1/store/account/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': `p2p-${Date.now()}` },
+      body: JSON.stringify({ name: 'Ada Shopper', email: `p2p-shopper-${Date.now()}@example.com`, password: 'correct horse battery', country: 'NG' }),
+    }).then(res => res.json());
+    const row = await prisma.customer.findUniqueOrThrow({ where: { id: shopper.customer.id }, include: { store: { include: { reseller: { select: { house: true } } } }, market: true } });
+    const { P2pService } = await import('../dist/crypto/p2p.service.js');
+    const p2p = server.app.get(P2pService);
+    for (const call of [() => p2p.market(row, { asset: 'USDT', side: 'buy' }), () => p2p.markets(row), () => p2p.createAd(row, { side: 'sell', asset: 'USDT', price: 1, amount: '1', min_fiat: 1, max_fiat: 1 })]) {
+      await assert.rejects(call(), error => error.code === 'market_unavailable');
+    }
+  });
+
+  test('an old instant ad is never shown or taken and cannot be changed; closing it gives back its coins or money', async () => {
+    const ada = await trader('Ada Old');
+    const bola = await trader('Bola Old');
+    await deposit(ada, 'USDT', '30');
+    const oldAd = (side, extra = {}) =>
+      prisma.p2pAd.create({
+        data: { id: randomUUID(), mode: 'test', customerId: ada.id, country: 'NG', currency: 'NGN', asset: 'USDT', side, priceMinor: 165000n, totalAmount: 20_000_000n, remainingAmount: 20_000_000n, minFiatMinor: 100n, maxFiatMinor: 10_000_000_00n, ...extra },
+      });
+    // An old sell ad, its coins locked.
+    const sell = await oldAd('sell');
+    await ledger.post({
+      mode: 'test',
+      type: 'p2p_ad_lock',
+      reference: `p2p_ad:${sell.id}:lock`,
+      description: 'USDT locked for your sell ad',
+      lines: [
+        { account: { kind: 'crypto_wallet', currency: 'USDT', customerId: ada.id }, debit: 20_000_000n },
+        { account: { kind: 'crypto_locked', currency: 'USDT', customerId: ada.id }, credit: 20_000_000n },
+      ],
+    });
+    // An old buy ad, NGN 30,000 locked: NGN 10,000 of it from P2P money.
+    const buy = await oldAd('buy', { fiatLockedMinor: 30_000_00n, fiatFromProceeds: 10_000_00n });
+    await ledger.post({
+      mode: 'test',
+      type: 'p2p_ad_lock',
+      reference: `p2p_ad:${buy.id}:lock`,
+      description: 'NGN locked for your buy ad',
+      lines: [
+        { account: { kind: 'adjustments', currency: 'NGN' }, debit: 30_000_00n },
+        { account: { kind: 'p2p_fiat_locked', currency: 'NGN', customerId: ada.id }, credit: 30_000_00n },
+      ],
+    });
+
+    for (const side of ['buy', 'sell']) assert.equal((await bola.get(`/v1/afrippa/p2p/market?asset=USDT&side=${side}`)).json.data.some(item => [sell.id, buy.id].includes(item.id)), false, side);
+    await setSwitch('crypto_app', true, 'NG');
+    try {
+      const book = (await afrippaServer().get('/v1/afrippa/markets/NG/ads?asset=USDT&side=buy')).json.data;
+      assert.equal(book.some(item => item.id === sell.id), false, 'not on the public book');
+    } finally {
+      await setSwitch('crypto_app', null, 'NG');
+    }
+    const taken = await bola.post('/v1/afrippa/p2p/orders', { ad_id: sell.id, price: 165000, amount: '1', payment_method_id: bola.bank });
+    assert.deepEqual([taken.status, taken.json.error.code], [409, 'ad_unavailable']);
+    const changed = await ada.patch(`/v1/afrippa/p2p/ads/${buy.id}`, { price: 170000 });
+    assert.deepEqual([changed.status, changed.json.error.code], [409, 'ad_retired']);
+
+    assert.equal((await ada.post(`/v1/afrippa/p2p/ads/${sell.id}/cancel`)).status, 200);
+    assert.deepEqual([(await balance(ada, 'USDT')).available, (await balance(ada, 'USDT')).locked], ['30.000000', '0.000000']);
+    const closed = await ada.post(`/v1/afrippa/p2p/ads/${buy.id}/cancel`);
+    assert.deepEqual([closed.status, closed.json.status], [200, 'cancelled']);
+    const held = async kind => (await prisma.ledgerAccount.findFirst({ where: { customerId: ada.id, mode: 'test', kind, currency: 'NGN' } }))?.balanceMinor ?? 0n;
+    assert.deepEqual([await held('p2p_fiat_locked'), await held('customer_withdrawable'), await held('customer_wallet')], [0n, 10_000_00n, 20_000_00n], 'P2P money back as P2P money, the rest to the wallet');
+    assert.equal((await ada.post(`/v1/afrippa/p2p/ads/${buy.id}/cancel`)).json.error.code, 'ad_closed', 'closed once');
+    await cryptoConserved();
   });
 });
 
@@ -301,20 +321,20 @@ describe('admin freezes', () => {
   after(() => switches(null));
 
   test('an amount freeze holds crypto until released once; finance seizes; an account freeze stops trading and hides ads', async () => {
-    const trader = await customer();
-    const buyer = await customer();
-    await deposit(trader, 'ETH', '2');
-    const ad = await trader.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'ETH', price: 500_000_000, amount: '1', min_fiat: 100_00, max_fiat: 10_000_000_00 });
+    const ada = await trader('Ada Frozen');
+    const buyer = await trader('Bola Frozen');
+    await deposit(ada, 'ETH', '2');
+    const ad = await ada.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'ETH', price: 500_000_000, amount: '1', min_fiat: 100_00, max_fiat: 10_000_000_00, payment_method_ids: [ada.bank] });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
 
     const afrippaSupport = await afrippaAdminClient(server, ['support']);
-    assert.equal((await afrippaSupport.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' })).status, 403);
-    const tooMuch = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '1.5', mode: 'test', reason: 'Checking a report' });
+    assert.equal((await afrippaSupport.post(`/v1/afrippa/admin/crypto/customers/${ada.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' })).status, 403);
+    const tooMuch = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${ada.id}/freezes`, { asset: 'ETH', amount: '1.5', mode: 'test', reason: 'Checking a report' });
     assert.deepEqual([tooMuch.status, tooMuch.json.error.code], [402, 'insufficient_funds'], 'only available crypto, never what an ad locks');
-    const freeze = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' });
+    const freeze = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${ada.id}/freezes`, { asset: 'ETH', amount: '0.5', mode: 'test', reason: 'Checking a report' });
     assert.equal(freeze.status, 201, JSON.stringify(freeze.json));
-    assert.deepEqual([(await balance(trader, 'ETH')).available, (await balance(trader, 'ETH')).frozen], ['0.50000000', '0.50000000']);
-    assert.ok(await prisma.notification.findFirst({ where: { customerId: trader.id, type: 'customer.crypto.frozen' } }));
+    assert.deepEqual([(await balance(ada, 'ETH')).available, (await balance(ada, 'ETH')).frozen], ['0.50000000', '0.50000000']);
+    assert.ok(await prisma.notification.findFirst({ where: { customerId: ada.id, type: 'customer.crypto.frozen' } }));
 
     // The step-up window opened first, so the two releases race on the freeze, not on one authenticator code.
     assert.equal((await afrippaAdmin.post('/v1/afrippa/admin/auth/step-up', { code: await adminCode(server, afrippaAdmin) })).status, 200);
@@ -323,115 +343,127 @@ describe('admin freezes', () => {
       afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),
     ]);
     assert.deepEqual([first.status, second.status].sort(), [200, 409], 'released once');
-    assert.equal((await balance(trader, 'ETH')).available, '1.00000000');
+    assert.equal((await balance(ada, 'ETH')).available, '1.00000000');
 
-    const again = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
+    const again = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${ada.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
     assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${again.json.id}/seize`, { note: 'Order 123' })).status, 200, 'super admins pass every role');
     const afrippaOperations = await afrippaAdminClient(server, ['operations']);
-    const third = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${trader.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
+    const third = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${ada.id}/freezes`, { asset: 'ETH', amount: '0.25', mode: 'test', reason: 'Court order' });
     assert.equal((await afrippaOperations.post(`/v1/afrippa/admin/crypto/freezes/${third.json.id}/seize`, { note: 'Order 124' })).status, 403, 'only finance seizes');
-    assert.equal((await balance(trader, 'ETH')).frozen, '0.25000000');
+    assert.equal((await balance(ada, 'ETH')).frozen, '0.25000000');
 
-    const frozen = await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${trader.id}/account-freeze`, { frozen: true, reason: 'Fraud report' });
+    const frozen = await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${ada.id}/account-freeze`, { frozen: true, reason: 'Fraud report' });
     assert.deepEqual([frozen.status, frozen.json.frozen], [200, true]);
-    assert.equal((await trader.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'ETH', price: 500_000_000, amount: '0.1', min_fiat: 100_00, max_fiat: 100_000_00 })).json.error.code, 'crypto_account_frozen');
+    assert.equal((await ada.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'ETH', price: 500_000_000, amount: '0.1', min_fiat: 100_00, max_fiat: 100_000_00, payment_method_ids: [ada.bank] })).json.error.code, 'crypto_account_frozen');
     assert.equal((await buyer.get('/v1/afrippa/p2p/market?asset=ETH&side=buy')).json.data.some(item => item.id === ad.json.id), false, 'their ads leave the market');
-    await fund(buyer, 10_000_00);
-    assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 500_000_000, fiat: 5_000_00 })).json.error.code, 'ad_unavailable');
-    assert.equal((await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${trader.id}/account-freeze`, { frozen: false, reason: 'Cleared' })).json.frozen, false);
-    assert.equal((await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 500_000_000, fiat: 5_000_00 })).status, 201);
+    assert.equal((await order(buyer, ad.json, { fiat: 5_000_00 })).json.error.code, 'ad_unavailable');
+    assert.equal((await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${ada.id}/account-freeze`, { frozen: false, reason: 'Cleared' })).json.frozen, false);
+    assert.equal((await order(buyer, ad.json, { fiat: 5_000_00 })).status, 201);
 
-    const view = await afrippaSupport.get(`/v1/afrippa/admin/crypto/customers/${trader.id}`);
+    const view = await afrippaSupport.get(`/v1/afrippa/admin/crypto/customers/${ada.id}`);
     assert.deepEqual(view.json.freezes.map(item => item.status).sort(), ['frozen', 'released', 'seized']);
-    assert.ok((await afrippaSupport.get(`/v1/afrippa/admin/p2p/trades?customer_id=${trader.id}`)).json.data.length === 1);
-    const audit = await prisma.auditLog.findMany({ where: { targetId: trader.id, action: { startsWith: 'crypto.' } } });
+    const audit = await prisma.auditLog.findMany({ where: { targetId: ada.id, action: { startsWith: 'crypto.' } } });
     assert.deepEqual([...new Set(audit.map(item => item.action))].sort(), ['crypto.account_frozen', 'crypto.account_unfrozen', 'crypto.frozen', 'crypto.seized', 'crypto.unfrozen']);
     await cryptoConserved();
-    await ledgerOk();
   });
 
   test('live crypto needs the identity check; test credits are sandbox only', async () => {
-    const shopper = await customer();
-    const credited = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset: 'USDC', amount: '5', reason: 'Trying the market' });
+    const ada = await trader('Ada Live');
+    const credited = await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${ada.id}/test-credits`, { asset: 'USDC', amount: '5', reason: 'Trying the market' });
     assert.equal(credited.status, 201, JSON.stringify(credited.json));
     assert.equal(credited.json.balances.test.find(item => item.asset === 'USDC').available, '5.000000');
-    const off = await admin.put('/v1/admin/integrations/checkout', { values: { CHECKOUT_SANDBOX: false }, code: await adminCode(server, admin) });
-    assert.equal(off.status, 200, JSON.stringify(off.json));
+    // Afrippa's store switched live: its traders trade live.
+    await prisma.store.update({ where: { id: afrippaStoreId }, data: { checkoutMode: 'live' } });
     try {
-      const overview = await shopper.get('/v1/afrippa/crypto');
+      const overview = await ada.get('/v1/afrippa/crypto');
       assert.deepEqual([overview.json.mode, overview.json.verified], ['live', false]);
-      assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.error.code, 'customer_verification_required');
-      assert.equal((await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' })).json.error.code, 'customer_verification_required');
+      assert.equal((await ada.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.error.code, 'customer_verification_required');
+      assert.equal((await ada.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' })).json.error.code, 'customer_verification_required');
     } finally {
-      await admin.put('/v1/admin/integrations/checkout', { values: { CHECKOUT_SANDBOX: true }, code: await adminCode(server, admin) });
+      await prisma.store.update({ where: { id: afrippaStoreId }, data: { checkoutMode: 'test' } });
     }
   });
 });
 
-describe('owners who can no longer trade, changed fees and huge amounts', () => {
+describe('owners who can no longer trade, and huge amounts', () => {
   before(() => switches(true));
   after(() => switches(null));
 
   test('an ad leaves the market when its owner can no longer trade, and cannot be taken', async () => {
-    const seller = await customer();
-    const buyer = await customer();
+    const seller = await trader('Ada Away');
+    const buyer = await trader('Bola Away');
     await deposit(seller, 'USDT', '50');
-    await fund(buyer, 1_000_000_00);
     const ad = (await sellAd(seller, { amount: '50', price: 170000 })).json;
     const listed = async () => (await buyer.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&limit=100')).json.data.some(item => item.id === ad.id);
     assert.equal(await listed(), true);
     await prisma.customer.update({ where: { id: seller.id }, data: { status: 'disabled' } });
     assert.equal(await listed(), false, 'a disabled account’s ads are off the market');
-    const taken = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.id, price: 170000, fiat: 10_000_00 });
+    const taken = await order(buyer, ad, { fiat: 10_000_00 });
     assert.deepEqual([taken.status, taken.json.error.code], [409, 'ad_unavailable']);
     await prisma.customer.update({ where: { id: seller.id }, data: { status: 'active' } });
     assert.equal(await listed(), true);
-    await ledgerOk();
-  });
-
-  test('a fee changed after the customer saw it is refused, never charged', async () => {
-    const seller = await customer();
-    const buyer = await customer();
-    await deposit(seller, 'USDT', '20');
-    await fund(buyer, 1_000_000_00);
-    const ad = (await sellAd(seller, { amount: '20', price: 171000 })).json;
-    const preview = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.id, price: 171000, fiat: 10_000_00, preview: true });
-    assert.equal(typeof preview.json.fee_bps, 'number');
-    const changed = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.id, price: 171000, fee_bps: preview.json.fee_bps + 1, fiat: 10_000_00 });
-    assert.deepEqual([changed.status, changed.json.error.code], [409, 'fee_changed']);
-    const done = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.id, price: 171000, fee_bps: preview.json.fee_bps, fiat: 10_000_00 });
-    assert.equal(done.status, 201, JSON.stringify(done.json));
   });
 
   test('amounts too large for the ledger are refused, never a server error', async () => {
-    const shopper = await customer();
-    const huge = await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '99999999999999999999.5' });
+    const ada = await trader('Ada Huge');
+    const huge = await ada.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '99999999999999999999.5' });
     assert.deepEqual([huge.status, huge.json.error.code], [400, 'parameter_invalid']);
-    const ad = await sellAd(shopper, { amount: '99999999999999999999' });
+    const ad = await sellAd(ada, { amount: '99999999999999999999' });
     assert.deepEqual([ad.status, ad.json.error.code], [400, 'parameter_invalid']);
   });
 });
 
-describe('paying P2P money out to a bank', () => {
+describe('paying old P2P money out to a bank', () => {
   before(() => switches(true));
   after(() => switches(null));
 
-  /** A seller with P2P money from selling 20 USDT at 1,650 NGN (33,000 NGN; Nigeria's smallest payout is 15,000). */
+  /** A bitocard.com customer through its store's server (no Afrippa signature). */
+  function storeServer() {
+    let token = null;
+    const request = async (method, path, body) => {
+      const res = await fetch(`${server.base}${path}`, {
+        method,
+        headers: {
+          ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+          ...(token ? { 'bitocard-customer-session': token } : {}),
+          ...(method === 'POST' ? { 'idempotency-key': `store-${Date.now()}-${Math.random()}` } : {}),
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : null;
+      if (json?.session?.token) token = json.session.token;
+      return { status: res.status, json };
+    };
+    return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
+  }
+
+  /** A customer holding NGN 33,000 of P2P money from an old instant sale (Nigeria's smallest payout is NGN 15,000). */
   async function sellerWithProceeds() {
-    const seller = await customer();
-    const buyer = await customer();
-    await deposit(seller, 'USDT', '20');
-    await fund(buyer, 1_000_000_00);
-    const ad = (await sellAd(seller, { amount: '20', price: 165000 })).json;
-    const trade = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.id, price: 165000, amount: '20' });
-    assert.equal(trade.status, 201, JSON.stringify(trade.json));
-    return seller;
+    const shopper = storeServer();
+    const email = `p2p-money${(counter += 1)}-${Date.now()}@example.com`;
+    const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada Proceeds', email, password: 'correct horse battery', country: 'NG' });
+    assert.equal(signup.status, 201, JSON.stringify(signup.json));
+    assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+    shopper.id = signup.json.customer.id;
+    await ledger.post({
+      mode: 'test',
+      type: 'p2p_trade',
+      reference: `p2p_trade:${randomUUID()}`,
+      description: 'An old P2P sale',
+      lines: [
+        { account: { kind: 'adjustments', currency: 'NGN' }, debit: 33_000_00n },
+        { account: { kind: 'customer_withdrawable', currency: 'NGN', customerId: shopper.id }, credit: 33_000_00n },
+      ],
+    });
+    return shopper;
   }
 
   test('sale money waits for the payout hold, then goes to the customer’s bank account once', async () => {
     const seller = await sellerWithProceeds();
     const held = await seller.get('/v1/store/cash');
     assert.deepEqual([held.json.balance, held.json.available, held.json.held, held.json.hold_days], [33_000_00, 0, 33_000_00, 15]);
+    assert.equal('cross_border_hold_days' in held.json, false, 'the cross-border hold went with instant trades');
 
     const unknown = await seller.post('/v1/store/cash/bank-accounts', { bank_code: 'SBX001', account_number: '0000000000' });
     assert.deepEqual([unknown.status, unknown.json.error.code], [400, 'bank_account_invalid']);
@@ -473,10 +505,10 @@ describe('paying P2P money out to a bank', () => {
   test('a frozen account pays nothing out; money can still be paid out after crypto is switched off', async () => {
     const seller = await sellerWithProceeds();
     const account = (await seller.post('/v1/store/cash/bank-accounts', { bank_code: 'SBX002', account_number: '1234567890' })).json;
-    await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: true, reason: 'checking a report' });
+    await prisma.customer.update({ where: { id: seller.id }, data: { cryptoFrozenAt: new Date() } });
     const frozen = await seller.post('/v1/store/cash/payouts', { amount: 15_000_00, bank_account_id: account.id });
     assert.deepEqual([frozen.status, frozen.json.error.code], [403, 'crypto_account_frozen']);
-    await afrippaAdmin.put(`/v1/afrippa/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: false, reason: 'cleared' });
+    await prisma.customer.update({ where: { id: seller.id }, data: { cryptoFrozenAt: null } });
     await switches(false);
     try {
       const cash = await seller.get('/v1/store/cash');
@@ -511,60 +543,29 @@ describe('paying P2P money out to a bank', () => {
     assert.ok((await prisma.notification.count({ where: { type: 'admin.customer_payout.unclear', dedupeKey: `admin.customer_payout.unclear:${payout.id}` } })) > 0, 'finance is told');
   });
 });
-describe('taking all of an ad', () => {
-  before(() => switches(true));
-  after(() => switches(null));
-
-  test("the ad's shown maximum takes its whole rest, though that fiat would buy a part of a unit more", async () => {
-    const seller = await customer();
-    const buyer = await customer();
-    await deposit(seller, 'USDT', '2');
-    const ad = await sellAd(seller, { amount: '1.000001', price: 164999, min_fiat: 1_00 });
-    assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.equal(ad.json.max_fiat, 165000, 'the rest, rounded up for the seller');
-    await fund(buyer, 2_000_00);
-    const market = await buyer.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&fiat=165000');
-    assert.ok(market.json.data.some(item => item.id === ad.json.id));
-    const quote = await buyer.get('/v1/afrippa/p2p/quote?asset=USDT&side=buy&fiat=165000');
-    assert.equal(quote.status, 200, JSON.stringify(quote.json));
-    assert.deepEqual([quote.json.ad.id, quote.json.amount, quote.json.fiat], [ad.json.id, '1.000001', 165000]);
-    const trade = await buyer.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 164999, fiat: 165000 });
-    assert.equal(trade.status, 201, JSON.stringify(trade.json));
-    assert.deepEqual([trade.json.amount, trade.json.fiat], ['1.000001', 165000]);
-    assert.equal((await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.json.id } })).status, 'completed');
-    const listed = (await afrippaAdmin.get(`/v1/afrippa/admin/p2p/trades?customer_id=${buyer.id}`)).json.data[0];
-    assert.deepEqual([listed.role, listed.taker], [null, 'buyer'], 'admins see who took the ad, not a viewer role');
-    await ledgerOk();
-    await cryptoConserved();
-  });
-});
 
 describe('markets: the global market and trading across borders', () => {
-  /** Sets a switch at one scope (`country` or global), or clears it with null. */
-  const set = async (key, enabled, country) => assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, ...(country ? { country_code: country } : {}) })).status, 200);
-  const credit = async (shopper, asset, amount) => assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing markets' })).status, 201);
-  const holding = async (shopper, kind, currency) => (await prisma.ledgerAccount.findFirst({ where: { customerId: shopper.id, mode: 'test', kind, currency } }))?.balanceMinor ?? 0n;
   const keys = ['crypto_wallets', 'p2p_trading', 'crypto_global', 'crypto_cross_border', 'crypto_app'];
 
   after(async () => {
     for (const key of keys) {
-      if (key !== 'crypto_cross_border') await set(key, null);
-      for (const country of ['NG', 'GH', 'KE']) await set(key, null, country);
+      await setSwitch(key, null);
+      for (const country of ['NG', 'GH', 'KE']) await setSwitch(key, null, country);
     }
   });
 
   test('the global market: US dollars across countries, open to residents of a country whose own market is off', async () => {
     // Nigeria's own market is open; Ghana's is off, but Ghanaians may trade on the global market.
-    await set('crypto_wallets', true, 'NG');
-    await set('p2p_trading', true, 'NG');
-    await set('crypto_wallets', false, 'GH');
-    await set('p2p_trading', false, 'GH');
+    await setSwitch('crypto_wallets', true, 'NG');
+    await setSwitch('p2p_trading', true, 'NG');
+    await setSwitch('crypto_wallets', false, 'GH');
+    await setSwitch('p2p_trading', false, 'GH');
     // The global market itself, and each country whose residents may trade there, set for it by itself.
-    await set('crypto_global', true);
-    await set('crypto_global', true, 'NG');
-    await set('crypto_global', true, 'GH');
-    const nigerian = await customer('NG');
-    const ghanaian = await customer('GH');
+    await setSwitch('crypto_global', true);
+    await setSwitch('crypto_global', true, 'NG');
+    await setSwitch('crypto_global', true, 'GH');
+    const nigerian = await trader('Ada Lagos', 'NG');
+    const ghanaian = await trader('Kofi Accra', 'GH');
 
     assert.deepEqual((await ghanaian.get('/v1/afrippa/p2p/markets')).json.data.map(item => [item.market, item.currencies, item.home]), [['WW', ['USD'], false]]);
     assert.deepEqual((await nigerian.get('/v1/afrippa/p2p/markets')).json.data.map(item => [item.market, item.currencies, item.home]), [['NG', ['NGN', 'USD'], true], ['WW', ['USD'], false]]);
@@ -576,7 +577,8 @@ describe('markets: the global market and trading across borders', () => {
     assert.deepEqual([overview.enabled, overview.p2p_enabled, overview.global_enabled], [true, false, true]);
     assert.equal((await ghanaian.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '5' })).status, 201);
     await credit(ghanaian, 'USDT', '25');
-    const ad = await sellAd(ghanaian, { market: 'WW', price: 100, amount: '10', min_fiat: 100, max_fiat: 1000 });
+    const usd = await wise(ghanaian, 'USD');
+    const ad = await sellAd(ghanaian, { market: 'WW', price: 100, amount: '10', min_fiat: 100, max_fiat: 1000, payment_method_ids: [usd] });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
     assert.deepEqual([ad.json.market, ad.json.currency], ['WW', 'USD']);
     assert.equal((await sellAd(ghanaian, { market: 'WW', currency: 'GHS', price: 100, amount: '1', min_fiat: 100, max_fiat: 100 })).json.error.code, 'currency_unsupported');
@@ -586,41 +588,37 @@ describe('markets: the global market and trading across borders', () => {
     assert.equal(book.json.market, 'WW');
     assert.equal(book.json.data.some(item => item.id === ad.json.id), true);
 
-    await fund(nigerian, 50_00, 'USD');
-    const trade = await nigerian.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 100, amount: '4' });
-    assert.equal(trade.status, 201, JSON.stringify(trade.json));
-    assert.deepEqual([trade.json.market, trade.json.currency, trade.json.fiat], ['WW', 'USD', 400]);
-    // The Ghanaian's sale money is P2P money in US dollars.
-    assert.equal(await holding(ghanaian, 'customer_withdrawable', 'USD'), 400n);
-    assert.equal(await holding(nigerian, 'customer_wallet', 'USD'), 46_00n);
+    const taken = await order(nigerian, ad.json, { amount: '4' });
+    assert.equal(taken.status, 201, JSON.stringify(taken.json));
+    assert.deepEqual([taken.json.market, taken.json.currency, taken.json.fiat], ['WW', 'USD', 400]);
 
     // Global trading switched off for Ghana: their ad leaves the book, and they cannot trade there.
-    await set('crypto_global', false, 'GH');
+    await setSwitch('crypto_global', false, 'GH');
     assert.equal((await nigerian.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=WW')).json.data.some(item => item.id === ad.json.id), false);
-    assert.equal((await nigerian.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 100, amount: '1' })).json.error.code, 'ad_unavailable');
+    assert.equal((await order(nigerian, ad.json, { amount: '1' })).json.error.code, 'ad_unavailable');
     assert.equal((await ghanaian.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
     // What they hold is still theirs: closing the ad gives the rest back.
     assert.equal((await ghanaian.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`)).status, 200);
     // The global market itself off: nobody trades there.
-    await set('crypto_global', true, 'GH');
-    await set('crypto_global', false);
+    await setSwitch('crypto_global', true, 'GH');
+    await setSwitch('crypto_global', false);
     assert.equal((await nigerian.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
-    await ledgerOk();
     await cryptoConserved();
   });
 
   test("another country's local book: in its currency only, where it takes cross-border trades", async () => {
     for (const country of ['NG', 'GH', 'KE']) {
-      await set('crypto_wallets', true, country);
-      await set('p2p_trading', true, country);
+      await setSwitch('crypto_wallets', true, country);
+      await setSwitch('p2p_trading', true, country);
     }
-    const nigerian = await customer('NG');
-    const ghanaian = await customer('GH');
+    const nigerian = await trader('Ada Border', 'NG');
+    const ghanaian = await trader('Kofi Border', 'GH');
     await credit(nigerian, 'USDT', '20');
+    const cedis = await bank(nigerian, 'GHS');
 
     // Ghana takes no cross-border trades yet.
-    assert.equal((await sellAd(nigerian, { market: 'GH', price: 1_500_00, amount: '5', min_fiat: 100, max_fiat: 100_000_00 })).json.error.code, 'market_unavailable');
-    await set('crypto_cross_border', true, 'GH');
+    assert.equal((await sellAd(nigerian, { market: 'GH', price: 1_500_00, amount: '5', min_fiat: 100, max_fiat: 100_000_00, payment_method_ids: [cedis] })).json.error.code, 'market_unavailable');
+    await setSwitch('crypto_cross_border', true, 'GH');
     assert.deepEqual(
       (await nigerian.get('/v1/afrippa/p2p/markets')).json.data.map(item => [item.market, item.currencies, item.cross_border]),
       [['NG', ['NGN', 'USD'], false], ['GH', ['GHS'], true]],
@@ -628,102 +626,47 @@ describe('markets: the global market and trading across borders', () => {
     assert.equal((await sellAd(nigerian, { market: 'GH', currency: 'USD', price: 100, amount: '1', min_fiat: 100, max_fiat: 100 })).json.error.code, 'currency_unsupported', "another country's USD book is its residents'");
     assert.equal((await sellAd(nigerian, { market: 'KE', price: 100, amount: '1', min_fiat: 100, max_fiat: 100 })).json.error.code, 'market_unavailable', 'Kenya takes no cross-border trades');
 
-    // A Nigerian sells USDT to a Ghanaian for cedis.
-    const ad = await sellAd(nigerian, { market: 'GH', price: 15_00, amount: '10', min_fiat: 100, max_fiat: 100_000_00 });
+    // A Nigerian sells USDT to a Ghanaian for cedis, paid into their Ghanaian account.
+    const ad = await sellAd(nigerian, { market: 'GH', price: 15_00, amount: '10', min_fiat: 100, max_fiat: 100_000_00, payment_method_ids: [cedis] });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
     assert.deepEqual([ad.json.market, ad.json.currency], ['GH', 'GHS']);
     assert.equal((await ghanaian.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.data.some(item => item.id === ad.json.id), true, "in Ghana's own book");
-    await fund(ghanaian, 200_00);
-    const trade = await ghanaian.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 15_00, amount: '6' });
-    assert.equal(trade.status, 201, JSON.stringify(trade.json));
-    assert.deepEqual([trade.json.market, trade.json.currency, trade.json.fiat], ['GH', 'GHS', 90_00]);
-    assert.equal(await holding(nigerian, 'customer_withdrawable', 'GHS'), 90_00n);
-
-    // The Nigerian spends the cedis in Ghana's market: buying USDT back from a Ghanaian.
-    await credit(ghanaian, 'USDT', '10');
-    const back = await sellAd(ghanaian, { price: 15_00, amount: '5', min_fiat: 100, max_fiat: 100_000_00 });
-    assert.equal(back.status, 201, JSON.stringify(back.json));
-    const bought = await nigerian.post('/v1/afrippa/p2p/trades', { ad_id: back.json.id, price: 15_00, amount: '2' });
-    assert.equal(bought.status, 201, JSON.stringify(bought.json));
-    assert.equal(await holding(nigerian, 'customer_withdrawable', 'GHS'), 60_00n);
-    // The cedis are listed as P2P money in another country's currency: spent in Ghana's market.
-    assert.deepEqual((await nigerian.get('/v1/afrippa/crypto')).json.other_cash, [{ currency: 'GHS', proceeds: 60_00, locked: 0 }]);
+    const taken = await order(ghanaian, ad.json, { amount: '6' });
+    assert.equal(taken.status, 201, JSON.stringify(taken.json));
+    assert.deepEqual([taken.json.market, taken.json.currency, taken.json.fiat], ['GH', 'GHS', 90_00]);
 
     // Cross-border trades closed again: the Nigerian's ad leaves Ghana's book; closing it still works.
-    await set('crypto_cross_border', null, 'GH');
+    await setSwitch('crypto_cross_border', null, 'GH');
     assert.equal((await ghanaian.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.data.some(item => item.id === ad.json.id), false);
     assert.equal((await nigerian.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=GH')).json.error.code, 'market_unavailable');
     assert.equal((await nigerian.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`)).status, 200);
-    await ledgerOk();
     await cryptoConserved();
   });
 
-  test("a reseller's store is its customers' door into every market, as far as the reseller allows", async () => {
-    for (const country of ['NG', 'GH']) {
-      await set('crypto_wallets', true, country);
-      await set('p2p_trading', true, country);
-    }
-    await set('crypto_global', true);
-    await set('crypto_global', true, 'NG');
-    await set('crypto_cross_border', true, 'GH');
-    const reseller = await resellerClient(server);
-    await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
-    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active' } });
-    const store = await reseller.browser.post('/v1/stores', { name: 'Ada Coins', subdomain: `coin${Date.now().toString(36)}` });
-    assert.equal(store.status, 201, JSON.stringify(store.json));
-    assert.equal((await reseller.browser.post(`/v1/stores/${store.json.id}/publish`)).status, 200);
-    const shopper = await customer('NG', store.json.subdomain);
-    const markets = async who => (await who.get('/v1/afrippa/p2p/markets')).json.data.map(item => item.market);
-
-    // By default the store's customers trade wherever the country allows, from the store: never crypto.bitocard.com.
-    assert.deepEqual(await markets(shopper), ['NG', 'WW', 'GH']);
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=WW')).status, 200);
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=GH')).status, 200);
-
-    // The reseller keeps their customers to their own market: global off, then trading abroad off.
-    await admin.put('/v1/admin/switches/crypto_global', { enabled: false, reseller_id: reseller.resellerId });
-    assert.deepEqual(await markets(shopper), ['NG', 'GH']);
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
-    await admin.put('/v1/admin/switches/crypto_trade_abroad', { enabled: false, reseller_id: reseller.resellerId });
-    assert.deepEqual(await markets(shopper), ['NG']);
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=GH')).json.error.code, 'market_unavailable');
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).status, 200, 'their own market stays open');
-
-    // bitocard.com's customers in the same country are not touched by a reseller's choice.
-    assert.deepEqual(await markets(await customer('NG')), ['NG', 'WW', 'GH']);
-    // With the store's own market closed, its customers trade nowhere, whatever the country allows.
-    await admin.put('/v1/admin/switches/crypto_global', { enabled: null, reseller_id: reseller.resellerId });
-    await admin.put('/v1/admin/switches/crypto_trade_abroad', { enabled: null, reseller_id: reseller.resellerId });
-    await admin.put('/v1/admin/switches/p2p_trading', { enabled: false, reseller_id: reseller.resellerId });
-    assert.deepEqual(await markets(shopper), []);
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
-    await admin.put('/v1/admin/switches/p2p_trading', { enabled: null, reseller_id: reseller.resellerId });
-  });
-
   test('trading needs the declaration (not a US or UK citizen or resident) and, live, an ID from an allowed country', async () => {
-    await set('crypto_wallets', true, 'NG');
-    await set('p2p_trading', true, 'NG');
-    const shopper = await customer('NG', null, false);
-    const declaration = (await shopper.get('/v1/afrippa/crypto/declaration')).json;
+    await setSwitch('crypto_wallets', true, 'NG');
+    await setSwitch('p2p_trading', true, 'NG');
+    const ada = await trader('Ada Declares', 'NG', { declare: false });
+    const declaration = (await ada.get('/v1/afrippa/crypto/declaration')).json;
     assert.deepEqual([declaration.declared, declaration.text], [false, 'I am not a citizen or a resident of the United States or the United Kingdom.']);
-    const refused = await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
+    const refused = await ada.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
     assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.param], [409, 'declaration_required', 'declaration']);
-    assert.equal((await shopper.post('/v1/afrippa/crypto/declaration', { version: '2020-01-01' })).json.error.code, 'declaration_changed');
-    const made = await shopper.post('/v1/afrippa/crypto/declaration', { version: declaration.version });
+    assert.equal((await ada.post('/v1/afrippa/crypto/declaration', { version: '2020-01-01' })).json.error.code, 'declaration_changed');
+    const made = await ada.post('/v1/afrippa/crypto/declaration', { version: declaration.version });
     assert.deepEqual([made.status, made.json.declared], [200, true]);
-    assert.equal((await shopper.post('/v1/afrippa/crypto/declaration', { version: declaration.version })).status, 200, 'declaring again changes nothing');
-    assert.equal((await shopper.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).status, 200);
+    assert.equal((await ada.post('/v1/afrippa/crypto/declaration', { version: declaration.version })).status, 200, 'declaring again changes nothing');
+    assert.equal((await ada.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).status, 200);
 
     // Live, the ID document's country must be an allowed market: a US passport is refused whatever was declared.
     const { CryptoWalletsService } = await import('../dist/crypto/crypto-wallets.service.js');
     const wallets = server.app.get(CryptoWalletsService);
-    const row = await prisma.customer.findUniqueOrThrow({ where: { id: shopper.id }, include: { store: { include: { reseller: { select: { house: true } } } }, market: true } });
+    const row = await prisma.customer.findUniqueOrThrow({ where: { id: ada.id }, include: { store: { include: { reseller: { select: { house: true } } } }, market: true } });
     const context = { ...(await wallets.context(row)), mode: 'live' };
     const check = async documentCountry => {
-      await prisma.identityVerification.deleteMany({ where: { customerReference: shopper.id } });
+      await prisma.identityVerification.deleteMany({ where: { customerReference: ada.id } });
       if (documentCountry) {
         await prisma.identityVerification.create({
-          data: { subject: 'customer', resellerId: context.seller.id, mode: 'live', customerReference: shopper.id, method: 'document', provider: 'sandbox', providerReference: `doc-${Date.now()}-${Math.random()}`, status: 'approved', country: 'NG', consentAt: new Date(), documentCountry },
+          data: { subject: 'customer', resellerId: context.seller.id, mode: 'live', customerReference: ada.id, method: 'document', provider: 'sandbox', providerReference: `doc-${Date.now()}-${Math.random()}`, status: 'approved', country: 'NG', consentAt: new Date(), documentCountry },
         });
       }
       try {
@@ -736,57 +679,50 @@ describe('markets: the global market and trading across borders', () => {
     assert.equal(await check('NG'), 'ok');
     assert.equal(await check('US'), 'country_not_allowed');
     assert.equal(await check('GB'), 'country_not_allowed');
-    await set('crypto_wallets', false, 'GH');
-    await set('crypto_global', false, 'GH');
+    await setSwitch('crypto_wallets', false, 'GH');
+    await setSwitch('crypto_global', false, 'GH');
     assert.equal(await check('GH'), 'country_not_allowed', 'Ghana is not allowed until an admin opens it');
-    await set('crypto_app', true, 'GH');
+    await setSwitch('crypto_app', true, 'GH');
     assert.equal(await check('GH'), 'ok');
     assert.equal(await check(null), 'country_not_allowed', 'no approved check, no live trading');
-    await set('crypto_app', null, 'GH');
-    await prisma.identityVerification.deleteMany({ where: { customerReference: shopper.id } });
+    await setSwitch('crypto_app', null, 'GH');
+    await prisma.identityVerification.deleteMany({ where: { customerReference: ada.id } });
   });
 });
 
-describe('market limits, the cross-border hold and the public pages', () => {
-  const set = async (key, enabled, country) => assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, ...(country ? { country_code: country } : {}) })).status, 200);
-  const credit = async (shopper, asset, amount) => assert.equal((await afrippaAdmin.post(`/v1/afrippa/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing limits' })).status, 201);
+describe('market limits and the public pages', () => {
   const limits = body => afrippaAdmin.put('/v1/afrippa/admin/crypto/market-limits', { mode: 'test', ...body });
-  const publicGet = async path => {
-    const res = await fetch(`${server.base}${path}`);
-    return { status: res.status, cache: res.headers.get('cache-control'), json: await res.json() };
-  };
 
   before(async () => {
     for (const country of ['NG', 'GH']) {
-      await set('crypto_wallets', true, country);
-      await set('p2p_trading', true, country);
+      await setSwitch('crypto_wallets', true, country);
+      await setSwitch('p2p_trading', true, country);
     }
   });
   after(async () => {
     await prisma.cryptoMarketLimit.deleteMany({});
-    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_app', 'crypto_global', 'crypto_cross_border']) {
-      if (key !== 'crypto_cross_border') await set(key, null);
-      for (const country of ['NG', 'GH']) await set(key, null, country);
+    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_app', 'crypto_global', 'crypto_cross_border', 'crypto_install_prompt']) {
+      await setSwitch(key, null);
+      for (const country of ['NG', 'GH']) await setSwitch(key, null, country);
     }
   });
 
-  test('per trade and per 24 hours, for the taker and the ad owner alike', async () => {
+  test('per order and per 24 hours, for the taker and the ad owner alike', async () => {
     assert.equal((await limits({ market: 'WW', currency: 'NGN', per_trade: 1 })).json.error.code, 'parameter_invalid', 'the global market is USD only');
     assert.equal((await limits({ market: 'ZZ', currency: 'USD', per_trade: 1 })).json.error.code, 'parameter_invalid');
+    assert.equal((await limits({ market: 'NG', currency: 'NGN', cross_border_hold_days: 30 })).status, 400, 'the cross-border hold is retired');
     const saved = await limits({ market: 'NG', currency: 'NGN', per_trade: 60_00, per_day: 100_00 });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
     assert.deepEqual([saved.json.per_trade, saved.json.per_day, saved.json.cross_border_per_trade], [60_00, 100_00, null]);
+    assert.equal('cross_border_hold_days' in saved.json, false);
     assert.equal((await afrippaAdmin.get('/v1/afrippa/admin/crypto/market-limits?mode=test')).json.data.some(row => row.market === 'NG' && row.currency === 'NGN'), true);
 
-    const seller = await customer('NG');
-    const buyer = await customer('NG');
-    const other = await customer('NG');
+    const seller = await trader('Ada Capped');
+    const buyer = await trader('Bola Capped');
+    const other = await trader('Cara Capped');
     await credit(seller, 'USDT', '10');
-    await fund(buyer, 500_00);
-    await fund(other, 500_00);
-    const ad = await sellAd(seller, { price: 100_00, amount: '5', min_fiat: 100, max_fiat: 500_00 });
-    assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    const take = (who, amount) => who.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 100_00, amount });
+    const ad = (await sellAd(seller, { price: 100_00, amount: '5', min_fiat: 100, max_fiat: 500_00 })).json;
+    const take = (who, amount) => order(who, ad, { amount });
 
     const tooBig = await take(buyer, '0.7');
     assert.deepEqual([tooBig.status, tooBig.json.error.code], [409, 'trade_limit']);
@@ -794,86 +730,64 @@ describe('market limits, the cross-border hold and the public pages', () => {
     assert.equal((await take(buyer, '0.5')).status, 201);
     const overDay = await take(buyer, '0.6');
     assert.equal(overDay.json.error.code, 'trade_limit');
-    assert.match(overDay.json.error.message, /NGN 50\.00/, 'what is left today');
+    assert.match(overDay.json.error.message, /NGN 50\.00/, 'what is left today, open orders counted');
     assert.equal((await take(buyer, '0.5')).status, 201);
-    // The seller has now traded NGN 100.00 today: their ad takes no more, whoever asks.
+    // The seller now has NGN 100.00 of orders today: their ad takes no more, whoever asks.
     assert.equal((await take(other, '0.1')).json.error.code, 'ad_limit');
-    await ledgerOk();
   });
 
-  test("people from other countries have the tighter cross-border limits in a country's book, and its longer hold", async () => {
-    await set('crypto_cross_border', true, 'GH');
-    const hold = (await prisma.country.findUniqueOrThrow({ where: { code: 'GH' } })).payoutHoldDays;
-    assert.equal((await limits({ market: 'GH', currency: 'GHS', per_trade: 100_00, cross_border_per_trade: 20_00, cross_border_hold_days: hold + 10 })).status, 200);
-    const nigerian = await customer('NG');
-    const ghanaian = await customer('GH');
+  test("people from other countries have the tighter cross-border limits in a country's book; live, a market needs its limits", async () => {
+    await setSwitch('crypto_cross_border', true, 'GH');
+    assert.equal((await limits({ market: 'GH', currency: 'GHS', per_trade: 100_00, cross_border_per_trade: 20_00 })).status, 200);
+    const nigerian = await trader('Ada Visitor', 'NG');
+    const ghanaian = await trader('Kofi Host', 'GH');
     await credit(nigerian, 'USDT', '10');
-    await fund(ghanaian, 200_00);
-    const ad = await sellAd(nigerian, { market: 'GH', price: 10_00, amount: '5', min_fiat: 100, max_fiat: 100_00 });
-    assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    // The Ghanaian is in their own market (GHS 100.00 a trade); the Nigerian owner is from elsewhere (GHS 20.00).
-    assert.equal((await ghanaian.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 10_00, amount: '3' })).json.error.code, 'ad_limit');
-    const sold = await ghanaian.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 10_00, amount: '1.5' });
-    assert.equal(sold.status, 201, JSON.stringify(sold.json));
-    assert.equal((await prisma.p2pTrade.findUniqueOrThrow({ where: { id: sold.json.id } })).crossBorder, true);
+    const cedis = await bank(nigerian, 'GHS');
+    const ad = (await sellAd(nigerian, { market: 'GH', price: 10_00, amount: '5', min_fiat: 100, max_fiat: 100_00, payment_method_ids: [cedis] })).json;
+    // The Ghanaian is in their own market (GHS 100.00 an order); the Nigerian owner is from elsewhere (GHS 20.00).
+    assert.equal((await order(ghanaian, ad, { amount: '3' })).json.error.code, 'ad_limit');
+    assert.equal((await order(ghanaian, ad, { amount: '1.5' })).status, 201);
 
-    // The Nigerian spends the cedis buying from another Ghanaian: that Ghanaian's sale is cross-border, so its money
-    // waits for the longer hold, even once it is older than Ghana's own.
-    const seller = await customer('GH');
-    await credit(seller, 'USDT', '5');
-    const back = await sellAd(seller, { price: 10_00, amount: '2', min_fiat: 100, max_fiat: 100_00 });
-    const bought = await nigerian.post('/v1/afrippa/p2p/trades', { ad_id: back.json.id, price: 10_00, amount: '1' });
-    assert.equal(bought.status, 201, JSON.stringify(bought.json));
-    const old = new Date(Date.now() - (hold + 5) * 86_400_000);
-    await prisma.p2pTrade.update({ where: { id: bought.json.id }, data: { createdAt: old } });
-    await prisma.journalEntry.updateMany({ where: { reference: `p2p_trade:${bought.json.id}` }, data: { createdAt: old } });
-    const cash = (await seller.get('/v1/store/cash')).json;
-    assert.deepEqual([cash.balance, cash.held, cash.available, cash.cross_border_hold_days], [10_00, 10_00, 0, hold + 10]);
-    await prisma.cryptoMarketLimit.update({ where: { mode_market_currency: { mode: 'test', market: 'GH', currency: 'GHS' } }, data: { crossBorderHoldDays: null } });
-    assert.equal((await seller.get('/v1/store/cash')).json.available, 10_00, "without the longer hold, Ghana's own applies");
-
-    // Live, a market without limits set takes no trades.
     const { CryptoMarketLimitsService } = await import('../dist/crypto/market-limits.service.js');
     const service = server.app.get(CryptoMarketLimitsService);
     await assert.rejects(
       prisma.$transaction(tx => service.check(tx, { mode: 'live', market: 'KE', currency: 'KES', fiat: 1n, parties: [] })),
       error => error.code === 'market_limits_unset',
     );
-    await ledgerOk();
-    await cryptoConserved();
   });
 
   test('the public pages: markets shown, their ads and traders, with nicknames only and no sign-in', async () => {
-    assert.deepEqual((await publicGet('/v1/afrippa/markets')).json.data, []);
-    await set('crypto_app', true, 'NG');
-    await set('crypto_global', true);
-    const markets = await publicGet('/v1/afrippa/markets');
+    const visitor = afrippaServer();
+    assert.deepEqual((await visitor.get('/v1/afrippa/markets')).json.data, []);
+    await setSwitch('crypto_app', true, 'NG');
+    await setSwitch('crypto_global', true);
+    const markets = await visitor.get('/v1/afrippa/markets');
     assert.equal(markets.cache, 'public, max-age=60');
     assert.deepEqual(markets.json.assets.slice(0, 2), ['USDT', 'USDC'], 'the coins on sale, in order');
     assert.deepEqual(markets.json.data.map(item => [item.market, item.currencies, item.install_prompt]), [['WW', ['USD'], false], ['NG', ['NGN', 'USD'], false]]);
-    await set('crypto_install_prompt', true, 'NG');
-    assert.deepEqual((await publicGet('/v1/afrippa/markets')).json.data.map(item => item.install_prompt), [false, true], "each market's own install prompt");
-    await set('crypto_install_prompt', null, 'NG');
+    await setSwitch('crypto_install_prompt', true, 'NG');
+    assert.deepEqual((await visitor.get('/v1/afrippa/markets')).json.data.map(item => item.install_prompt), [false, true], "each market's own install prompt");
+    await setSwitch('crypto_install_prompt', null, 'NG');
 
-    const seller = await customer('NG');
+    const seller = await trader('Ada Public');
     await credit(seller, 'USDT', '5');
     const ad = await sellAd(seller, { price: 100_00, amount: '2', min_fiat: 100, max_fiat: 50_00 });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
     const nickname = ad.json.trader.nickname;
-    const book = await publicGet('/v1/afrippa/markets/ng/ads?asset=USDT&side=buy');
+    const book = await visitor.get('/v1/afrippa/markets/ng/ads?asset=USDT&side=buy');
     assert.equal(book.status, 200, JSON.stringify(book.json));
     const listed = book.json.data.find(item => item.id === ad.json.id);
     assert.deepEqual([listed.market, listed.trader.nickname, listed.mine], ['NG', nickname, false]);
     assert.equal(JSON.stringify(book.json).includes(seller.id), false, 'never a customer id');
     assert.equal(JSON.stringify(book.json).includes(seller.email), false);
-    assert.ok((await publicGet('/v1/afrippa/markets')).json.data.find(item => item.market === 'NG').ads.NGN >= 1);
-    assert.equal((await publicGet('/v1/afrippa/markets/NG/ads?asset=USDT&side=buy&currency=GHS')).json.error.code, 'currency_unsupported');
-    assert.equal((await publicGet('/v1/afrippa/markets/GH/ads?asset=USDT&side=buy')).json.error.code, 'market_unavailable', 'Ghana is not shown on BitoCard Crypto');
+    assert.ok((await visitor.get('/v1/afrippa/markets')).json.data.find(item => item.market === 'NG').ads.NGN >= 1);
+    assert.equal((await visitor.get('/v1/afrippa/markets/NG/ads?asset=USDT&side=buy&currency=GHS')).json.error.code, 'currency_unsupported');
+    assert.equal((await visitor.get('/v1/afrippa/markets/GH/ads?asset=USDT&side=buy')).json.error.code, 'market_unavailable', 'Ghana is not shown');
 
-    const trader = await publicGet(`/v1/afrippa/traders/${nickname.toLowerCase()}`);
-    assert.equal(trader.status, 200, JSON.stringify(trader.json));
-    assert.deepEqual([trader.json.nickname, trader.json.open_ads, trader.json.markets], [nickname, 1, ['NG']]);
-    assert.equal(JSON.stringify(trader.json).includes(seller.id), false);
-    assert.equal((await publicGet('/v1/afrippa/traders/NoSuchTrader')).status, 404);
+    const card = await visitor.get(`/v1/afrippa/traders/${nickname.toLowerCase()}`);
+    assert.equal(card.status, 200, JSON.stringify(card.json));
+    assert.deepEqual([card.json.nickname, card.json.open_ads, card.json.markets, card.json.trades_total], [nickname, 1, ['NG'], 0]);
+    assert.equal(JSON.stringify(card.json).includes(seller.id), false);
+    assert.equal((await visitor.get('/v1/afrippa/traders/NoSuchTrader')).status, 404);
   });
 });

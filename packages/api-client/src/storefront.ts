@@ -563,7 +563,6 @@ export type StoreP2pAd = {
   filled: string;
   min_fiat: number;
   max_fiat: number;
-  fee_bps: number;
   terms: string | null;
   status: 'active' | 'paused' | 'completed' | 'cancelled';
   mine: boolean;
@@ -577,29 +576,6 @@ export type StoreP2pAd = {
  * dollars), the global market (`WW`, US dollars) and other countries taking cross-border trades (their currency only).
  */
 export type StoreP2pMarket = { object: 'p2p_market'; market: string; name: string; currencies: string[]; home: boolean; cross_border: boolean };
-
-/** What a trade would be: the crypto, BitoCard's fee, what the buyer receives and the fiat (minor units). */
-export type StoreP2pTerms = { asset: string; currency: string; price: number; amount: string; fee: string; received: string; fiat: number };
-/** `side`: what the viewer does (buy from a sell ad, sell to a buy ad). */
-export type StoreP2pQuote = StoreP2pTerms & { object: 'p2p_quote'; side: 'buy' | 'sell'; ad?: StoreP2pAd; fee_bps: number };
-
-export type StoreP2pTrade = StoreP2pTerms & {
-  object: 'p2p_trade';
-  id: string;
-  /** P2P-000123. */
-  number: string;
-  mode: 'live' | 'test';
-  side: 'buy' | 'sell';
-  role: 'maker' | 'taker';
-  ad_id: string;
-  /** The market traded in: a country code, or `WW` for the global market. */
-  market: string;
-  counterparty: { nickname: string };
-  settlement: 'instant' | 'classic';
-  status: string;
-  created_at: string;
-  completed_at: string | null;
-};
 
 /** A network an asset can be deposited on now (`token`: ERC-20, BEP-20, TRC-20; null for the chain's own coin). */
 export type StoreCryptoNetwork = { object: 'crypto_network'; asset: string; chain: string; name: string; token: string | null; confirmations: number };
@@ -687,81 +663,6 @@ export type StoreCustomerPayout = {
 };
 
 export type StoreP2pProfile = { object: 'p2p_profile'; nickname: string; nickname_chosen: boolean; trades_30d: number; trades_total: number };
-
-// -- Instant exchange -------------------------------------------------------------------------------------------------
-
-/** One side of a coin on the exchange: BitoCard's price (fiat minor units per whole coin), limits and what its reserve allows. */
-export type StoreExchangeSide = { price: number; markup_bps: number; min_fiat: number; max_fiat: number | null; available_amount: string; available_fiat: number };
-
-/** A coin on the exchange: its live market price, BitoCard's buy and sell sides, or why it is closed. */
-export type StoreExchangeAsset = {
-  desk: { id: string; name: string };
-  asset: string;
-  name: string;
-  decimals: number;
-  /** The customer's available balance of the coin. */
-  holding: string;
-  market: { usd: string; change_24h: number | null; updated_at: string | null; price: number | null } | null;
-  closed: 'not_offered' | 'price_unavailable' | 'conversion_unavailable' | null;
-  buy: StoreExchangeSide | null;
-  sell: StoreExchangeSide | null;
-};
-
-/** `GET /v1/store/exchange`: what the customer can trade with BitoCard now. */
-export type StoreExchange = {
-  object: 'exchange';
-  mode: 'live' | 'test';
-  currency: string;
-  desk: { id: string; name: string };
-  enabled: boolean;
-  reason: string | null;
-  message: string | null;
-  quote_seconds: number;
-  balances: { proceeds: number; wallet: number };
-  assets: StoreExchangeAsset[];
-};
-
-/** A price held for `quote_seconds`: exactly what the trade moves. */
-export type StoreExchangeQuote = {
-  object: 'exchange_quote';
-  id: string;
-  mode: 'live' | 'test';
-  side: 'buy' | 'sell';
-  asset: string;
-  currency: string;
-  amount: string;
-  fiat: number;
-  price: number;
-  markup_bps: number;
-  market_usd: string;
-  market_updated_at: string | null;
-  fx_rate: string;
-  expires_at: string;
-  created_at: string;
-  /** The most the desk's reserve allows on this side right now, in coins and money (fiat minor units). */
-  available: { amount: string; fiat: number };
-  /** True when the quote is exactly that most: the trade takes everything the reserve has available. */
-  capped: boolean;
-};
-
-export type StoreExchangeTrade = {
-  object: 'exchange_trade';
-  id: string;
-  /** EX-000123. */
-  number: string;
-  mode: 'live' | 'test';
-  desk: { id: string; name: string };
-  side: 'buy' | 'sell';
-  asset: string;
-  currency: string;
-  amount: string;
-  fiat: number;
-  price: number;
-  markup_bps: number;
-  from_proceeds: number;
-  from_wallet: number;
-  created_at: string;
-};
 
 /** A crypto amount for people: trailing zeros dropped, at least two places for stablecoins ("49.9", "0.0002"). */
 export function formatCrypto(amount: string, asset?: string) {

@@ -107,8 +107,6 @@ export class CustomerPayoutsService {
       held: minor(account.balanceMinor - available),
       available: minor(available),
       hold_days: country.payoutHoldDays,
-      /** Money from cross-border P2P sales waits this many days instead, where the market sets a longer hold. */
-      cross_border_hold_days: await this.crossBorderHoldDays(context.mode, context.country, context.currency, country.payoutHoldDays),
       minimum: minor(country.minWithdrawalMinor),
     };
   }
@@ -117,17 +115,11 @@ export class CustomerPayoutsService {
    * Money not withdrawable yet: from P2P sales (and BitoCard Shop Safe pay sales) credited inside the hold, and Safe
    * pay money finance has not approved (the buyer paid from a recent card or mobile money top-up), whenever released.
    */
-  /** The market's hold on money from cross-border P2P sales, where it is longer than the country's own. */
-  private async crossBorderHoldDays(mode: LedgerMode, country: string, currency: string, holdDays: number, db: Pick<Prisma.TransactionClient, 'cryptoMarketLimit'> = this.prisma) {
-    const row = await db.cryptoMarketLimit.findUnique({ where: { mode_market_currency: { mode, market: country, currency } }, select: { crossBorderHoldDays: true } });
-    return row?.crossBorderHoldDays && row.crossBorderHoldDays > holdDays ? row.crossBorderHoldDays : holdDays;
-  }
-
   private async held(
     accountId: string,
     holdDays: number,
     owner: { customerId: string; mode: LedgerMode; currency: string; country: string },
-    db: Pick<Prisma.TransactionClient, 'ledgerPosting' | 'classifiedOrder' | 'p2pTrade' | 'cryptoMarketLimit'> = this.prisma,
+    db: Pick<Prisma.TransactionClient, 'ledgerPosting' | 'classifiedOrder'> = this.prisma,
   ) {
     const holdStart = new Date(Date.now() - Math.max(holdDays, 0) * dayMs);
     const recent =
@@ -142,17 +134,7 @@ export class CustomerPayoutsService {
       where: { sellerId: owner.customerId, mode: owner.mode, currency: owner.currency, payoutReview: { in: ['pending', 'rejected'] }, releasedAt: { lte: holdStart } },
       _sum: { sellerPayoutMinor: true },
     });
-    // Money from cross-border P2P sales (a buyer from another country) waits for the market's longer hold: the part
-    // older than the country's own hold is counted here (the newer part is already counted above).
-    const crossDays = await this.crossBorderHoldDays(owner.mode, owner.country, owner.currency, holdDays, db);
-    const crossHeld =
-      crossDays > holdDays
-        ? await db.p2pTrade.aggregate({
-            where: { sellerId: owner.customerId, mode: owner.mode, currency: owner.currency, crossBorder: true, createdAt: { gt: new Date(Date.now() - crossDays * dayMs), lte: holdStart } },
-            _sum: { fiatMinor: true },
-          })
-        : { _sum: { fiatMinor: 0n } };
-    return -(recent._sum.amountMinor ?? 0n) + (reviewing._sum.sellerPayoutMinor ?? 0n) + (crossHeld._sum.fiatMinor ?? 0n);
+    return -(recent._sum.amountMinor ?? 0n) + (reviewing._sum.sellerPayoutMinor ?? 0n);
   }
 
   // -- Banks and accounts ---------------------------------------------------------------------------------------

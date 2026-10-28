@@ -107,9 +107,9 @@ describe("Afrippa's escrow ads", () => {
     assert.deepEqual(listed.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN', reversible: false }], 'no id or hint for anyone but the owner');
     assert.equal(listed.mine, false);
 
-    // Instant trades are BitoCard's: an escrow ad is taken through an order.
+    // Instant trades are retired: an ad is taken only through an order.
     const instant = await bola.client.post('/v1/afrippa/p2p/trades', { ad_id: ad.json.id, price: 165000, amount: '1' });
-    assert.deepEqual([instant.status, instant.json.error.code], [409, 'order_required']);
+    assert.equal(instant.status, 404);
 
     // Closing it gives the coins back.
     assert.equal((await ada.client.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`)).status, 200);
@@ -160,7 +160,7 @@ describe("Afrippa's escrow ads", () => {
   test("a trader's book holds escrow ads only", async () => {
     const ada = await trader();
     const bola = await trader('Bola Viewer');
-    // An instant ad in the same book (BitoCard's kind, made directly here: no trader can post one).
+    // An old instant ad in the same book (made directly here: none can be posted now).
     const instant = await prisma.p2pAd.create({
       data: { mode: 'test', customerId: ada.id, country: 'NG', currency: 'NGN', asset: 'USDT', side: 'sell', priceMinor: 150000n, totalAmount: 5_000_000n, remainingAmount: 5_000_000n, minFiatMinor: 100n, maxFiatMinor: 10_000_000n },
     });

@@ -8,6 +8,7 @@ let server;
 let admin;
 let afrippaAdmin;
 let prisma;
+const { LedgerService } = await import('../dist/ledger/ledger.service.js');
 
 before(async () => {
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
@@ -83,8 +84,18 @@ describe('a closed store', () => {
     const store = await resellerStore();
     const shopper = await customer(store.subdomain);
     assert.equal((await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '100' })).status, 201);
-    const ad = await shopper.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '40', min_fiat: 100_00, max_fiat: 500_000_00 });
-    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    // An old instant sell ad of theirs, 40 USDT locked (none can be posted now: the market is Afrippa's traders').
+    const ad = { json: await prisma.p2pAd.create({ data: { mode: 'test', customerId: shopper.id, country: 'NG', currency: 'NGN', asset: 'USDT', side: 'sell', priceMinor: 165000n, totalAmount: 40_000_000n, remainingAmount: 40_000_000n, minFiatMinor: 100_00n, maxFiatMinor: 500_000_00n } }) };
+    await server.app.get(LedgerService).post({
+      mode: 'test',
+      type: 'p2p_ad_lock',
+      reference: `p2p_ad:${ad.json.id}:lock`,
+      description: 'USDT locked for your sell ad',
+      lines: [
+        { account: { kind: 'crypto_wallet', currency: 'USDT', customerId: shopper.id }, debit: 40_000_000n },
+        { account: { kind: 'crypto_locked', currency: 'USDT', customerId: shopper.id }, credit: 40_000_000n },
+      ],
+    });
 
     await prisma.store.update({ where: { id: store.id }, data: { status: 'suspended' } });
     const overview = await shopper.get('/v1/afrippa/crypto');
@@ -95,8 +106,6 @@ describe('a closed store', () => {
     assert.equal(closed.status, 200, JSON.stringify(closed.json));
     assert.equal((await usdt(shopper)).available, '100.000000', 'the locked crypto is back');
 
-    const again = await shopper.post('/v1/afrippa/p2p/ads', { side: 'sell', asset: 'USDT', price: 165000, amount: '10', min_fiat: 100_00, max_fiat: 500_000_00 });
-    assert.deepEqual([again.status, again.json.error.code], [404, 'store_unavailable'], 'no new ads');
     const deposit = await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '1' });
     assert.deepEqual([deposit.status, deposit.json.error.code], [404, 'store_unavailable'], 'no new deposits');
 

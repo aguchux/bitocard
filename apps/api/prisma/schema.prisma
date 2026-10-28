@@ -4824,7 +4824,6 @@ model CryptoMarketLimit {
   perDayMinor              BigInt?    @map("per_day_minor")
   crossBorderPerTradeMinor BigInt?    @map("cross_border_per_trade_minor")
   crossBorderPerDayMinor   BigInt?    @map("cross_border_per_day_minor")
-  crossBorderHoldDays      Int?       @map("cross_border_hold_days")
   /// Afrippa: tighter limits for new traders (fewer than five completed orders); null for the market's own.
   newTraderPerTradeMinor   BigInt?    @map("new_trader_per_trade_minor")
   newTraderPerDayMinor     BigInt?    @map("new_trader_per_day_minor")

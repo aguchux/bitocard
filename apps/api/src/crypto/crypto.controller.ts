@@ -99,27 +99,6 @@ class PublicMarketQueryDto {
   limit?: number;
 }
 
-class QuoteQueryDto {
-  /** The market: a country code, or WW for the global market. Default: the customer's own country. */
-  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'market must be a country code such as NG, or WW' })
-  market?: string;
-
-  @Transform(upper) @assetCode()
-  asset: string;
-
-  @IsIn(['buy', 'sell'])
-  side: AdSide;
-
-  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
-  currency?: string;
-
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
-  fiat?: number;
-
-  @IsOptional() @cryptoAmount()
-  amount?: string;
-}
-
 class CreateAdDto {
   /** The market: a country code, or WW for the global market. Default: the customer's own country. */
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'market must be a country code such as NG, or WW' })
@@ -188,30 +167,6 @@ class UpdateAdDto {
 class MyAdsQueryDto {
   @IsOptional() @IsIn(['open', 'closed'])
   status?: 'open' | 'closed';
-}
-
-class TradeDto {
-  @IsUUID()
-  ad_id: string;
-
-  /** The ad's price as you saw it: a changed price is refused, never charged. */
-  @IsInt() @Min(1)
-  price: number;
-
-  /** BitoCard's fee as you saw it (basis points): a changed fee is refused, like a changed price. */
-  @IsOptional() @IsInt() @Min(0) @Max(1000)
-  fee_bps?: number;
-
-  /** How much crypto, or (instead) how much fiat to spend or receive, in minor units. */
-  @IsOptional() @cryptoAmount()
-  amount?: string;
-
-  @IsOptional() @IsInt() @Min(1)
-  fiat?: number;
-
-  /** Only show the trade it would make. */
-  @IsOptional() @IsBoolean()
-  preview?: boolean;
 }
 
 export class DepositNetworksDto {
@@ -534,11 +489,6 @@ export class CustomerP2pController {
     return this.p2p.market(caller.customer, query);
   }
 
-  @Get('quote')
-  quote(@CurrentCustomer() caller: CustomerCaller, @Query() query: QuoteQueryDto) {
-    return this.p2p.quote(caller.customer, query);
-  }
-
   @Get('ads')
   myAds(@CurrentCustomer() caller: CustomerCaller, @Query() query: MyAdsQueryDto) {
     return this.p2p.myAds(caller.customer, query);
@@ -558,21 +508,6 @@ export class CustomerP2pController {
   @HttpCode(HttpStatus.OK)
   cancelAd(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.p2p.cancelAd(caller.customer, id);
-  }
-
-  @Post('trades')
-  trade(@CurrentCustomer() caller: CustomerCaller, @Body() body: TradeDto) {
-    return this.p2p.trade(caller.customer, body);
-  }
-
-  @Get('trades')
-  trades(@CurrentCustomer() caller: CustomerCaller, @Query() query: AssetQueryDto) {
-    return this.p2p.trades(caller.customer, query);
-  }
-
-  @Get('trades/:id')
-  getTrade(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    return this.p2p.getTrade(caller.customer, id);
   }
 }
 
@@ -660,9 +595,6 @@ class MarketLimitDto {
 
   @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
   cross_border_per_day?: number | null;
-
-  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(0) @Max(365)
-  cross_border_hold_days?: number | null;
 }
 
 class AdminListDto {
@@ -777,11 +709,6 @@ export class AdminP2pController {
   @Get('ads')
   ads(@Query() query: AdminListDto) {
     return this.p2p.adminAds(query);
-  }
-
-  @Get('trades')
-  trades(@Query() query: AdminListDto) {
-    return this.p2p.adminTrades(query);
   }
 
   @AdminRoles('operations')

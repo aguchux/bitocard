@@ -25,7 +25,6 @@ export type MarketLimitInput = {
   per_day?: number | null;
   cross_border_per_trade?: number | null;
   cross_border_per_day?: number | null;
-  cross_border_hold_days?: number | null;
   new_trader_per_trade?: number | null;
   new_trader_per_day?: number | null;
 };
@@ -41,7 +40,6 @@ export function presentMarketLimit(row: CryptoMarketLimit) {
     per_day: amount(row.perDayMinor),
     cross_border_per_trade: amount(row.crossBorderPerTradeMinor),
     cross_border_per_day: amount(row.crossBorderPerDayMinor),
-    cross_border_hold_days: row.crossBorderHoldDays,
     new_trader_per_trade: amount(row.newTraderPerTradeMinor),
     new_trader_per_day: amount(row.newTraderPerDayMinor),
     updated_at: row.updatedAt.toISOString(),
@@ -91,7 +89,6 @@ export class CryptoMarketLimitsService {
       perDayMinor: amount(input.per_day),
       crossBorderPerTradeMinor: amount(input.cross_border_per_trade),
       crossBorderPerDayMinor: amount(input.cross_border_per_day),
-      crossBorderHoldDays: input.cross_border_hold_days ?? null,
       newTraderPerTradeMinor: amount(input.new_trader_per_trade),
       newTraderPerDayMinor: amount(input.new_trader_per_day),
       updatedById: adminId,
@@ -145,16 +142,12 @@ export class CryptoMarketLimitsService {
           : new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'ad_limit', 'This ad cannot take this trade today. Choose another.', 'ad_id');
       if (perTrade !== null && input.fiat > perTrade) throw refuse(perTrade);
       if (perDay !== null) {
-        const traded = await tx.p2pTrade.aggregate({
-          where: { mode: input.mode, country: input.market, currency: input.currency, createdAt: { gt: since }, OR: [{ buyerId: party.customerId }, { sellerId: party.customerId }] },
-          _sum: { fiatMinor: true },
-        });
-        // Afrippa's orders count while running or once released (never a cancelled or returned one).
+        // Orders count while running or once released (never a cancelled or returned one).
         const ordered = await tx.p2pOrder.aggregate({
           where: { mode: input.mode, market: input.market, currency: input.currency, createdAt: { gt: since }, status: { in: ['pending_payment', 'paid', 'appealed', 'released'] }, OR: [{ buyerId: party.customerId }, { sellerId: party.customerId }] },
           _sum: { fiatMinor: true },
         });
-        const used = (traded._sum.fiatMinor ?? 0n) + (ordered._sum.fiatMinor ?? 0n);
+        const used = ordered._sum.fiatMinor ?? 0n;
         if (used + input.fiat > perDay) throw refuse(perDay > used ? perDay - used : 0n);
       }
     }

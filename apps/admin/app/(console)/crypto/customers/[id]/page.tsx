@@ -202,8 +202,7 @@ export default function CryptoCustomerPage({ params }: { params: Promise<{ id: s
                 <DataTable columns={freezeColumns} rows={customer.freezes} rowKey={row => row.id} empty="Nothing has been frozen." />
               </Card>
               <p className="text-sm text-muted">
-                Their activity: <AppLink href={`/crypto/trades?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P trades</AppLink> ·{" "}
-                <AppLink href={`/crypto/ads?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P ads</AppLink> ·{" "}
+                Their activity: <AppLink href={`/crypto/ads?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P ads</AppLink> ·{" "}
                 <AppLink href={`/crypto/deposits?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Deposits</AppLink> ·{" "}
                 <AppLink href={`/crypto/withdrawals?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Withdrawals</AppLink> ·{" "}
                 <AppLink href={`/crypto/payouts?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P payouts</AppLink> ·{" "}

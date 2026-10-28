@@ -202,7 +202,6 @@ export const notificationTypes = {
   'customer.esim.expiring': { realm: 'customer', severity: 'warning', label: 'eSIM about to expire', push: true },
   'customer.gift_card_sale.accepted': { realm: 'customer', severity: 'success', label: 'Gift card sale accepted', push: true },
   'customer.gift_card_sale.declined': { realm: 'customer', severity: 'warning', label: 'Gift card sale declined', push: true },
-  'customer.p2p.trade_completed': { realm: 'customer', severity: 'success', label: 'P2P trade completed', push: true },
   'customer.p2p.order_opened': { realm: 'customer', severity: 'info', label: 'New order on your ad', push: true },
   'customer.p2p.order_paid': { realm: 'customer', severity: 'warning', label: 'Buyer says they paid', push: true },
   'customer.p2p.order_released': { realm: 'customer', severity: 'success', label: 'Coins released', push: true },

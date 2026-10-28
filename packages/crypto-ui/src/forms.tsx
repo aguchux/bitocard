@@ -2,7 +2,7 @@
 
 import { createContext, type InputHTMLAttributes, type ReactNode, useActionState, useContext, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, CheckCircle2, LoaderCircle, Plus } from "lucide-react";
+import { AlertCircle, CheckCircle2, LoaderCircle, Plus } from "lucide-react";
 
 /** What a form's server action answers: an error (naming the field the API named), or a notice. */
 export type FormState = { error?: string; field?: string | null; notice?: string };
@@ -16,8 +16,6 @@ type Action<S> = (state: S, form: FormData) => Promise<S>;
  * Crypto tab and BitoCard Crypto each give theirs, so the same forms serve both.
  */
 export type TradeActions = {
-  takeAd: Action<FormState>;
-  confirmTrade: Action<NonceFormState>;
   postAd: Action<FormState>;
   repriceAd: Action<FormState>;
   /** Pauses, resumes or closes an ad (`op`: pause, resume, cancel). */
@@ -25,8 +23,8 @@ export type TradeActions = {
   chooseNickname: Action<FormState>;
 };
 
-/** Where the forms send people in that app: posting an ad (with `?side&asset&market`), and topping up the wallet. */
-export type TradeLinks = { postAd: string; wallet: string };
+/** Where the forms send people in that app: posting an ad (with `?side&asset&market`). */
+export type TradeLinks = { postAd: string };
 
 const Context = createContext<{ actions: TradeActions; links: TradeLinks } | null>(null);
 
@@ -92,54 +90,7 @@ export function Submit({ pending, children, className = "" }: { pending: boolean
   );
 }
 
-/** Taking an ad: the amount, then the confirmation page, where the customer sees exactly what they get. */
-export function TakeAdForm({ adId, price, currency, side, min, max }: { adId: string; price: number; currency: string; side: "buy" | "sell"; min: string; max: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(useTrade().actions.takeAd, {});
-  return (
-    <form action={action} className="flex flex-col gap-2 sm:flex-row sm:items-end" aria-label={side === "buy" ? "Buy from this ad" : "Sell to this ad"}>
-      <input type="hidden" name="ad_id" value={adId} />
-      <input type="hidden" name="price" value={price} />
-      <div className="min-w-0 flex-1">
-        <Field label={`Amount (${currency})`} name="fiat" inputMode="decimal" placeholder={`${min} – ${max}`} required state={state} />
-      </div>
-      <Submit pending={pending} className={side === "buy" ? "bg-emerald-600 hover:bg-emerald-700" : ""}>
-        {side === "buy" ? "Buy" : "Sell"}
-      </Submit>
-      {state.error ? (
-        <p className="text-sm text-red-700" role="alert">
-          {state.error}
-        </p>
-      ) : null}
-    </form>
-  );
-}
-
-/** The final step: confirms exactly the trade shown. */
-export function ConfirmTradeForm({ adId, price, feeBps, fiat, label, nonce }: { adId: string; price: number; feeBps: number; fiat: number; label: string; nonce: string }) {
-  const { actions, links } = useTrade();
-  const [state, action, pending] = useActionState<NonceFormState, FormData>(actions.confirmTrade, {});
-  return (
-    <form action={action} className="space-y-3">
-      {/* Sent as the Idempotency-Key, so a double tap trades once. */}
-      <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
-      <input type="hidden" name="ad_id" value={adId} />
-      <input type="hidden" name="price" value={price} />
-      <input type="hidden" name="fee_bps" value={feeBps} />
-      <input type="hidden" name="fiat" value={fiat} />
-      <FormMessage state={state} />
-      {state.field === "funds" ? (
-        <a href={links.wallet} className="inline-flex min-h-11 items-center font-semibold text-brand-500 hover:underline">
-          Add money to your wallet
-        </a>
-      ) : null}
-      <Submit pending={pending} className="w-full">
-        <Check className="size-4" aria-hidden="true" /> {label}
-      </Submit>
-    </form>
-  );
-}
-
-/** Posting an ad: sell (your crypto is locked for the market) or buy (the money it needs is locked). */
+/** Posting an ad: sell (your crypto is locked for the market) or buy (nothing is locked: the seller's coins go to escrow when an order opens). */
 export function PostAdForm({
   asset,
   currency,
@@ -185,7 +136,7 @@ export function PostAdForm({
           placeholder="Amount"
           required
           state={state}
-          hint={side === "sell" ? "Locked from your coin wallet while the ad is open." : `Calculated from your ${currency} balance at the suggested price; the final amount is locked when you post.`}
+          hint={side === "sell" ? "Locked from your coin wallet while the ad is open." : "How much you want to buy. Nothing is locked: the seller's coins are held when an order opens."}
         />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Min per trade" name="min_fiat" inputMode="decimal" placeholder="Minimum" required state={state} />
@@ -346,32 +297,6 @@ export function PostAdLauncher({
             Continue
           </button>
         </form>
-      </dialog>
-    </>
-  );
-}
-
-/** Market cards show one action; the amount is asked only for the ad chosen. */
-export function TakeAdDialog(props: { adId: string; price: number; currency: string; side: "buy" | "sell"; min: string; max: string; asset: string }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  return (
-    <>
-      <button type="button" className={button} onClick={() => dialog.current?.showModal()}>
-        {props.side === "buy" ? "Buy" : "Sell"} {props.asset}
-      </button>
-      <dialog ref={dialog} className={dialogClass} aria-labelledby={`take-${props.adId}`}>
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <h2 id={`take-${props.adId}`} className="font-display text-xl font-extrabold">
-              {props.side === "buy" ? "Buy" : "Sell"} {props.asset}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">Enter an amount to review the trade.</p>
-          </div>
-          <button type="button" className="min-h-10 px-2 text-sm font-semibold text-slate-600" onClick={() => dialog.current?.close()}>
-            Close
-          </button>
-        </div>
-        <TakeAdForm {...props} />
       </dialog>
     </>
   );

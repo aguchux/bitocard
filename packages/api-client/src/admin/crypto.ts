@@ -66,38 +66,12 @@ export type P2pAd = {
   filled: string;
   min_fiat: number;
   max_fiat: number;
-  fee_bps: number;
   terms: string | null;
   status: 'active' | 'paused' | 'completed' | 'cancelled';
   trader: { nickname: string; trades_30d: number; trades_total: number };
   customer: { id: string; email: string | null };
   created_at: string;
   updated_at: string;
-};
-
-export type P2pTrade = {
-  object: 'p2p_trade';
-  id: string;
-  number: string;
-  mode: Mode;
-  ad_id: string;
-  asset: string;
-  currency: string;
-  price: number;
-  amount: string;
-  fee: string;
-  received: string;
-  fiat: number;
-  settlement: 'instant' | 'classic';
-  status: string;
-  buyer: { id: string; email: string; nickname: string | null };
-  seller: { id: string; email: string; nickname: string | null };
-  /** Admins see both sides, so there is no viewer's role. */
-  role: null;
-  /** Which side took the ad (the other posted it). */
-  taker: 'buyer' | 'seller';
-  created_at: string;
-  completed_at: string | null;
 };
 
 export type ChainRoute = {
@@ -299,7 +273,6 @@ const cryptoApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Crypto'],
     }),
     p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/afrippa/admin/p2p/ads', params }), providesTags: ['P2p'] }),
-    p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/afrippa/admin/p2p/trades', params }), providesTags: ['P2p'] }),
     cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/v1/afrippa/admin/p2p/ads/${id}/cancel`, method: 'POST', body: { reason } }),
       invalidatesTags: ['P2p', 'Crypto'],
@@ -317,7 +290,6 @@ export const {
   useResolveCryptoFreezeMutation,
   useSetCryptoAccountFrozenMutation,
   useP2pAdsQuery,
-  useP2pTradesQuery,
   useCancelP2pAdMutation,
   useChainsQuery,
   useSetChainRoutesMutation,

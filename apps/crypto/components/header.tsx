@@ -59,9 +59,6 @@ export async function AccountArea() {
       <Link href="/ads" className={link}>
         My ads
       </Link>
-      <Link href="/trades" className={link}>
-        Trades
-      </Link>
       <form action={signOut} className="hidden lg:block">
         <button type="submit" className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-slate-600 hover:text-navy-900">
           Sign out ({customer.name.split(/\s+/)[0]})

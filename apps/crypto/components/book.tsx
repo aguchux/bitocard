@@ -1,36 +1,20 @@
 import Link from "next/link";
 import { amountMinor, marketHref, shownAds, type MarketState } from "@bitocard/crypto-ui/market";
-import { TakeAdDialog } from "@bitocard/crypto-ui/forms";
 import { MarketAds, type AdAction } from "@bitocard/crypto-ui/market-view";
 import { book, bookQuery } from "@/lib/api";
-import { currentCustomer, signInPath } from "@/lib/customer";
 
-const major = (minor: number) => (minor / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 });
-
-/** Signed in, an ad is taken right here: the amount in a dialog, then the confirmation (the shared trading forms). */
-export const takeHere: AdAction = (ad, side) => (
-  <TakeAdDialog adId={ad.id} price={ad.price} currency={ad.currency} side={side} min={major(ad.min_fiat)} max={major(ad.max_fiat)} asset={ad.asset} />
-);
-
-/** Signed out, taking an ad signs in here first and comes back to the very view (`next`). */
-export function signInToTake(next: string): AdAction {
-  return function SignInToTake(ad, side) {
-    return (
-      <a href={signInPath(next, "trade")} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white hover:bg-navy-800">
-        {side === "buy" ? `Buy ${ad.asset}` : `Sell ${ad.asset}`}
-      </a>
-    );
-  };
-}
+/**
+ * Ads are taken through escrow orders, which open with Afrippa's own site (docs/CRYPTO_SPINOFF_PLAN.md, step 4):
+ * BitoCard's instant trades are retired, so the book is for looking until then.
+ */
+export const ordersSoon: AdAction = () => <span className="inline-flex min-h-11 items-center text-sm font-semibold text-slate-500">Orders open soon</span>;
 
 /**
  * A market's book for the filters chosen: its own small part, reading the cached book (one per market, coin, side,
  * currency and amount) and streaming in under the filters. An unreachable API says so here alone.
  */
 export async function MarketBook({ market, name, state }: { market: string; name: string; state: MarketState }) {
-  const [result, customer] = await Promise.all([book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount) })), currentCustomer()]);
-  // Signed in: taken right here. Signed out: sign in here first, then back to this very view.
-  const action = customer ? takeHere : signInToTake(marketHref(state));
+  const result = await book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount) }));
   if (!result.ok) return <p className="rounded-3xl bg-white p-5 text-sm text-slate-600 ring-1 ring-slate-200/70">This market cannot be shown right now. Try again shortly.</p>;
   const ads = shownAds(result.data.data, state);
   const filtered = Boolean(state.q || state.amount || state.experienced);
@@ -40,7 +24,7 @@ export async function MarketBook({ market, name, state }: { market: string; name
         {ads.length} {ads.length === 1 ? "ad" : "ads"} {state.side === "buy" ? `selling ${state.asset}` : `buying ${state.asset}`} for {state.currency} in {name}
       </p>
       {ads.length ? (
-        <MarketAds ads={ads} state={state} action={action} />
+        <MarketAds ads={ads} state={state} action={ordersSoon} />
       ) : (
         <div className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
           <p className="font-semibold">{filtered ? "No ads match your filters" : `Nobody is ${state.side === "buy" ? "selling" : "buying"} ${state.asset} for ${state.currency} here right now`}</p>

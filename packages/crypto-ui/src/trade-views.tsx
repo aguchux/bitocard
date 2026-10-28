@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { formatCrypto, formatFace, type StoreP2pAd, type StoreP2pQuote, type StoreP2pTrade } from "@bitocard/api-client/storefront";
+import { formatCrypto, formatFace, type StoreP2pAd } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "./coins";
 
 /** A card on the crypto pages. */
@@ -31,103 +30,6 @@ export function CryptoDeclaration({ version, action }: { version: string; action
 }
 
 export const tradeDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
-
-/**
- * The trade the customer is about to make, exactly: price, what they pay or receive, BitoCard's fee and the coins that
- * arrive. `children` is the confirm form; nothing moves until they confirm, and a changed price is refused, never charged.
- */
-export function QuoteDetails({ quote, children }: { quote: StoreP2pQuote; children?: ReactNode }) {
-  const buying = quote.side !== "sell";
-  const rows: Array<[string, string, boolean?]> = [
-    ["Price", `${formatFace(quote.price, quote.currency)} / ${quote.asset}`],
-    [buying ? "You pay" : "You receive", formatFace(quote.fiat, quote.currency)],
-    ["BitoCard fee", formatCrypto(quote.fee, quote.asset)],
-    [buying ? "Coins you receive" : "The buyer receives", formatCrypto(quote.received, quote.asset), true],
-  ];
-  return (
-    <section className={cardClass} aria-label="Trade details">
-      <div className="flex items-center gap-3">
-        <CoinBadge asset={quote.asset} size="size-12" />
-        <div>
-          <p className="text-sm text-slate-500">{buying ? "You buy" : "You sell"}</p>
-          <p className="font-display text-2xl font-extrabold">{formatCrypto(quote.amount, quote.asset)}</p>
-        </div>
-      </div>
-      <dl className="mt-4 divide-y divide-slate-100 text-sm">
-        {rows.map(([label, value, strong]) => (
-          <div key={label} className="flex justify-between gap-4 py-2.5">
-            <dt className="text-slate-500">{label}</dt>
-            <dd className={strong ? "font-bold text-emerald-700" : "font-semibold"}>{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-3 flex items-start gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
-        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" />
-        {buying ? "Paid from your balance in this currency. " : "The money goes to your fiat balance at once. "}
-        Settled instantly by BitoCard: the coins and the money move together in one step, or not at all.
-      </p>
-      {children ? <div className="mt-4">{children}</div> : null}
-    </section>
-  );
-}
-
-/** A completed trade's receipt, from the viewer's side. */
-export function TradeReceipt({ trade }: { trade: StoreP2pTrade }) {
-  const bought = trade.side === "buy";
-  const rows: Array<[string, string]> = [
-    ["Trade", trade.number],
-    ["Price", `${formatFace(trade.price, trade.currency)} / ${trade.asset}`],
-    [bought ? "You paid" : "You received", formatFace(trade.fiat, trade.currency)],
-    [bought ? "Coins bought" : "Coins sold", formatCrypto(trade.amount, trade.asset)],
-    ["BitoCard fee", formatCrypto(trade.fee, trade.asset)],
-    [bought ? "Coins you received" : "The buyer received", formatCrypto(trade.received, trade.asset)],
-    [bought ? "Seller" : "Buyer", trade.counterparty.nickname],
-    ["When", tradeDate(trade.completed_at ?? trade.created_at)],
-  ];
-  return (
-    <section className={cardClass} aria-label="Trade receipt">
-      <div className="flex items-center gap-3">
-        <CoinBadge asset={trade.asset} size="size-12" />
-        <div>
-          <h1 className="font-display text-xl font-extrabold text-navy-900">
-            {bought ? "Bought" : "Sold"} {formatCrypto(bought ? trade.received : trade.amount, trade.asset)}
-          </h1>
-          <p className="text-sm text-slate-500">{trade.status === "completed" ? "Completed instantly" : trade.status}</p>
-        </div>
-      </div>
-      <dl className="mt-4 divide-y divide-slate-100 text-sm">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-4 py-2.5">
-            <dt className="text-slate-500">{label}</dt>
-            <dd className="text-right font-semibold break-all">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-/** A trade as a list row: what moved, with whom, and when (`href` its receipt). */
-export function TradeRow({ trade, href }: { trade: StoreP2pTrade; href: string }) {
-  const bought = trade.side === "buy";
-  return (
-    <Link href={href} className="flex items-center gap-3 py-3 hover:bg-slate-50">
-      <CoinBadge asset={trade.asset} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold">
-          {bought ? "Bought" : "Sold"} {formatCrypto(bought ? trade.received : trade.amount, trade.asset)}
-        </span>
-        <span className="block truncate text-sm text-slate-500">
-          {trade.number} · {bought ? "from" : "to"} {trade.counterparty.nickname} · {tradeDate(trade.created_at)}
-        </span>
-      </span>
-      <span className={`shrink-0 font-semibold ${bought ? "text-navy-900" : "text-emerald-700"}`}>
-        {bought ? "−" : "+"}
-        {formatFace(trade.fiat, trade.currency)}
-      </span>
-    </Link>
-  );
-}
 
 const adStatus: Record<StoreP2pAd["status"], [string, string]> = {
   active: ["On the market", "bg-emerald-50 text-emerald-800"],

@@ -8,7 +8,6 @@ import type { AccountPlace } from "@/lib/account";
 const places = [
   { href: "/wallets", label: "Wallets" },
   { href: "/ads", label: "My ads" },
-  { href: "/trades", label: "Trades" },
 ];
 
 /** A signed-in page: the header, its title (and an action beside it), the account's tabs, then the page. */

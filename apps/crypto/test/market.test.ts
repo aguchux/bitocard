@@ -17,7 +17,7 @@ const { CryptoActionsProvider } = await import("@bitocard/crypto-ui/forms");
 /** Renders as the root layout does: the shared trading forms get this site's actions (stubbed here). */
 const stub = async () => ({});
 const render = (element: ReactElement) =>
-  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, changeAd: stub, chooseNickname: stub }, links: { postAd: "/ads/post", wallet: "/add-money" } }, element));
+  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { postAd: stub, repriceAd: stub, changeAd: stub, chooseNickname: stub }, links: { postAd: "/ads/post" } }, element));
 const { MarketsList } = await import("@/components/markets-list");
 const { TraderCard } = await import("@/components/trader-card");
 const { marketMetadata, pageState } = await import("@/components/market-page");
@@ -48,7 +48,6 @@ const ad = (id: string, extra: Partial<StoreP2pAd> = {}): StoreP2pAd => ({
   filled: "0.000000",
   min_fiat: 1000_00,
   max_fiat: 50_000_00,
-  fee_bps: 20,
   terms: null,
   status: "active",
   mine: false,
@@ -136,28 +135,19 @@ describe("reading the public data, cached", () => {
 describe("the small parts of a market page", () => {
   const nigeria = shown.data[1];
 
-  test("the book: its ads; signed out, taking one signs in here first and comes back to this very view", async () => {
+  test("the book: its ads, to look at until orders open (instant trades are retired)", async () => {
     answer([ad("a"), ad("b", { trader: { nickname: "Traderb", trades_30d: 0, trades_total: 1 } })]);
     const state = pageState(nigeria, shown.assets, {});
     const html = renderToStaticMarkup(await MarketBook({ market: "NG", name: "Nigeria", state }));
     expect(html).toContain("2 ads selling USDT for NGN in Nigeria");
     expect(html).toContain("Tradera");
-    expect(html).toContain('href="/signin?next=%2Fng%3Fside%3Dbuy%26asset%3DUSDT%26currency%3DNGN&amp;for=trade"');
-    expect(html).toContain("Buy USDT");
+    expect(html).toContain("Orders open soon");
+    expect(html).not.toContain("Buy USDT");
+    expect(html).not.toContain("/signin");
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/v1/store/account")), "no session, no account asked").toBe(false);
   });
 
-  test("signed in, an ad is taken right here: a dialog asking the amount, through this site's own actions", async () => {
-    setRequest({}, { bc_customer: "bcc_token" });
-    answer();
-    const html = render(await MarketBook({ market: "WW", name: "the global market", state: pageState(shown.data[0], shown.assets, {}) }));
-    expect(html).toContain("Buy USDT");
-    expect(html).toContain('aria-label="Buy from this ad"');
-    expect(html).toContain('name="ad_id" value="a"');
-    expect(html).not.toContain("/handoff/go");
-  });
-
-  test("the account area: Sign in and Trade now signed out; their wallets, ads, trades and Sign out signed in", async () => {
+  test("the account area: Sign in and Trade now signed out; their wallets, ads and Sign out signed in", async () => {
     answer();
     const out = renderToStaticMarkup(await AccountArea());
     expect(out).toContain('href="/signin?next=%2F"');
@@ -165,7 +155,8 @@ describe("the small parts of a market page", () => {
     setRequest({}, { bc_customer: "bcc_token" });
     const signedIn = renderToStaticMarkup(await AccountArea());
     expect(signedIn).toContain("Sign out (Ada)");
-    for (const href of ["/wallets", "/ads", "/trades"]) expect(signedIn).toContain(`href="${href}"`);
+    for (const href of ["/wallets", "/ads"]) expect(signedIn).toContain(`href="${href}"`);
+    expect(signedIn).not.toContain('href="/trades"');
   });
 
   test("the identity check opens the customer's account app, signed in there; money in and out is on this site", async () => {
