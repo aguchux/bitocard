@@ -316,6 +316,8 @@ describe('admin freezes', () => {
     assert.deepEqual([(await balance(trader, 'ETH')).available, (await balance(trader, 'ETH')).frozen], ['0.50000000', '0.50000000']);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: trader.id, type: 'customer.crypto.frozen' } }));
 
+    // The step-up window opened first, so the two releases race on the freeze, not on one authenticator code.
+    assert.equal((await afrippaAdmin.post('/v1/afrippa/admin/auth/step-up', { code: await adminCode(server, afrippaAdmin) })).status, 200);
     const [first, second] = await Promise.all([
       afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),
       afrippaAdmin.post(`/v1/afrippa/admin/crypto/freezes/${freeze.json.id}/release`, { note: 'All clear' }),

@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { cryptoAmount } from '../crypto/crypto.controller.js';
+import { maxFeeBps, P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode, P2pOrderStatus } from '../generated/prisma/client.js';
 import { P2pOrdersService } from './orders.service.js';
@@ -34,6 +35,14 @@ class AdminOrdersQueryDto {
   @IsOptional() @IsIn(['pending_payment', 'paid', 'appealed', 'released', 'cancelled', 'returned']) status?: P2pOrderStatus;
   @IsOptional() @IsUUID() customer_id?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number;
+}
+
+class FeeRateDto {
+  @IsString() @Matches(/^[A-Za-z0-9]{2,10}$/) asset: string;
+  /** A country, WW for the global market, or null for every market (a market's own rate wins). */
+  @ValidateIf((_, value) => value !== null) @IsString() @Matches(/^[A-Za-z]{2}$/) market: string | null;
+  @IsInt() @Min(0) @Max(maxFeeBps) buyer_bps: number;
+  @IsInt() @Min(0) @Max(maxFeeBps) seller_bps: number;
 }
 
 class DecideDto {
@@ -114,5 +123,34 @@ export class AfrippaOrdersAdminController {
   @HttpCode(HttpStatus.OK)
   decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideDto) {
     return this.orders.decide(adminId(caller), id, body);
+  }
+}
+
+/** Afrippa's P2P fee rates, per coin and market (step 3 item 4): finance sets them, with step-up; audited. */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('operations', 'support', 'finance')
+@Controller('afrippa/admin/p2p/fee-rates')
+export class AfrippaFeeRatesAdminController {
+  constructor(private readonly fees: P2pFeesService) {}
+
+  @Get()
+  list() {
+    return this.fees.list();
+  }
+
+  @AdminRoles('finance')
+  @StepUp()
+  @Put()
+  set(@CurrentCaller() caller: Caller, @Body() body: FeeRateDto) {
+    return this.fees.set(adminId(caller), body);
+  }
+
+  /** `market` is a country, WW, or `all` for the every-market rate. */
+  @AdminRoles('finance')
+  @StepUp()
+  @Delete(':asset/:market')
+  remove(@CurrentCaller() caller: Caller, @Param('asset') asset: string, @Param('market') market: string) {
+    return this.fees.remove(adminId(caller), asset, market);
   }
 }

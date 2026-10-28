@@ -2951,6 +2951,7 @@ model CryptoAsset {
   /// Admins are told when BitoCard's coin reserve falls below this (coin units, as text); null: never.
   exchangeReserveAlert String?  @map("exchange_reserve_alert")
   updatedAt            DateTime @updatedAt @map("updated_at")
+  p2pFeeRates               P2pFeeRate[]
 
   @@map("crypto_assets")
 }
@@ -3021,6 +3022,8 @@ model P2pAd {
   escrow           Boolean    @default(false)
   /// Escrow ads: how long a buyer has to pay once an order opens (15, 30 or 60).
   paymentWindowMinutes Int?   @map("payment_window_minutes")
+  /// Escrow sell ads: the seller's fee reserved (locked) on top of the coins offered.
+  feeLocked        BigInt     @default(0) @map("fee_locked")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -5474,6 +5477,8 @@ model P2pOrder {
   sellerFee            BigInt           @map("seller_fee")
   buyerFee             BigInt           @map("buyer_fee")
   sellerFeeBps         Int              @map("seller_fee_bps")
+  /// How much of the seller's fee came from their sell ad's fee reserve (the rest from their wallet).
+  sellerFeeFromLock    BigInt           @default(0) @map("seller_fee_from_lock")
   buyerFeeBps          Int              @map("buyer_fee_bps")
   /// The seller's payment method the buyer pays into.
   paymentMethodId      String           @map("payment_method_id") @db.Uuid
@@ -5505,4 +5510,19 @@ model P2pOrder {
   @@index([status, payBy])
   @@index([adId])
   @@map("p2p_orders")
+}
+
+/// Afrippa's P2P fee rates (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 4): per coin, for one market or every market
+/// (`*`), in basis points (0 to 1000), the seller's normally higher. Set by Afrippa's admins.
+model P2pFeeRate {
+  id        String   @id @default(uuid()) @db.Uuid
+  asset     String   @db.VarChar(10)
+  market    String   @db.VarChar(2)
+  buyerBps  Int      @map("buyer_bps")
+  sellerBps Int      @map("seller_bps")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  coin      CryptoAsset @relation(fields: [asset], references: [code], onDelete: Cascade)
+
+  @@unique([asset, market])
+  @@map("p2p_fee_rates")
 }

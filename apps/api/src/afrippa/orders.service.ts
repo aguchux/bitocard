@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { feeFor, fromUnits } from '../crypto/amounts.js';
 import { CryptoWalletsService, cryptoFeesRef, isTrader } from '../crypto/crypto-wallets.service.js';
+import { P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { P2pService } from '../crypto/p2p.service.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -55,16 +56,12 @@ export class P2pOrdersService {
     private readonly ledger: LedgerService,
     private readonly wallets: CryptoWalletsService,
     private readonly p2p: P2pService,
+    private readonly feeRates: P2pFeesService,
     private readonly methods: PaymentMethodsService,
     private readonly identity: IdentityService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
   ) {}
-
-  /** The fees an order pays: the buyer's at the coin's P2P rate; the seller's (higher) comes with per-market rates (step 3 item 4). */
-  private fees(asset: CryptoAsset) {
-    return { buyerBps: asset.p2pFeeBps, sellerBps: 0 };
-  }
 
   private requireTrader(customer: CustomerWithStore) {
     if (!isTrader(customer)) throw notFound();
@@ -91,7 +88,7 @@ export class P2pOrdersService {
     const asset = await this.wallets.asset(found.asset);
     if (BigInt(input.price) !== found.priceMinor) throw conflict('price_changed', 'The price of this ad changed. Check the new price and try again.', 'price');
     const terms = this.p2p.terms(found, asset, { fiat: input.fiat, amount: input.amount });
-    const { buyerBps, sellerBps } = this.fees(asset);
+    const { buyerBps, sellerBps } = await this.feeRates.rates(asset, found.country, context.mode);
     const buyerFee = feeFor(terms.amount, buyerBps);
     const sellerFee = feeFor(terms.amount, sellerBps);
     if (buyerFee >= terms.amount) throw invalid('amount_too_small', 'This amount is too small to trade.', 'amount');
@@ -123,6 +120,8 @@ export class P2pOrdersService {
       const ad = await tx.p2pAd.findUniqueOrThrow({ where: { id: found.id } });
       if (ad.status !== 'active' || ad.priceMinor !== found.priceMinor) throw adUnavailable();
       if (ad.remainingAmount < terms.amount) throw conflict('amount_unavailable', `This ad has only ${fromUnits(ad.remainingAmount, asset.decimals)} ${asset.code} left.`, 'amount');
+      // A sell ad pays its seller's fee from the reserve it keeps for it, then the seller's wallet.
+      const feeFromLock = ad.side === 'sell' ? (ad.feeLocked < sellerFee ? ad.feeLocked : sellerFee) : 0n;
       const created = await tx.p2pOrder.create({
         data: {
           mode: context.mode,
@@ -140,6 +139,7 @@ export class P2pOrdersService {
           sellerFee,
           buyerFee,
           sellerFeeBps: sellerBps,
+          sellerFeeFromLock: feeFromLock,
           buyerFeeBps: buyerBps,
           paymentMethodId: method.id,
           buyerName,
@@ -148,9 +148,9 @@ export class P2pOrdersService {
         },
       });
       // The ad's taken part counts as filled while the order runs; a cancelled or returned order gives it back.
-      await tx.p2pAd.update({ where: { id: ad.id }, data: { remainingAmount: { decrement: terms.amount }, filledAmount: { increment: terms.amount } } });
-      // A sell ad's coins come from its lock; a buy ad's seller (the taker) pays from their wallet. The seller's fee is always from the wallet.
-      const fromLock = ad.side === 'sell' ? terms.amount : 0n;
+      await tx.p2pAd.update({ where: { id: ad.id }, data: { remainingAmount: { decrement: terms.amount }, filledAmount: { increment: terms.amount }, feeLocked: { decrement: feeFromLock } } });
+      // A sell ad's coins (and its fee, as far as its reserve goes) come from its lock; a buy ad's seller (the taker) pays from their wallet.
+      const fromLock = ad.side === 'sell' ? terms.amount + feeFromLock : 0n;
       const fromWallet = held - fromLock;
       await this.write(tx, context.mode, `p2p_order:${created.id}:escrow`, 'p2p_order_escrow', `${asset.code} held in escrow for order ${orderNumber(created.number)}`, created, [
         ...(fromLock > 0n ? [{ accountId: lockedId, kind: 'crypto_locked' as const, amount: fromLock }] : []),
@@ -306,8 +306,12 @@ export class P2pOrdersService {
         await tx.$queryRaw`SELECT id FROM p2p_ads WHERE id = ${order.adId}::uuid FOR UPDATE`;
         const ad = await tx.p2pAd.findUniqueOrThrow({ where: { id: order.adId } });
         const backToAd = ad.side === 'sell' && ad.customerId === order.sellerId && ['active', 'paused'].includes(ad.status);
-        await tx.p2pAd.update({ where: { id: ad.id }, data: { remainingAmount: { increment: order.amount }, filledAmount: { decrement: order.amount } } });
-        const toLock = backToAd ? order.amount : 0n;
+        // Back to a still-open sell ad: its coins and the fee its reserve paid; the rest to the seller's wallet.
+        await tx.p2pAd.update({
+          where: { id: ad.id },
+          data: { remainingAmount: { increment: order.amount }, filledAmount: { decrement: order.amount }, ...(backToAd ? { feeLocked: { increment: order.sellerFeeFromLock } } : {}) },
+        });
+        const toLock = backToAd ? order.amount + order.sellerFeeFromLock : 0n;
         await this.write(tx, order.mode, `p2p_order:${order.id}:return`, 'p2p_order_return', `${asset.code} back from order ${number}`, order, [
           { accountId: escrowId, kind: 'crypto_escrow', amount: held },
           ...(toLock > 0n ? [{ accountId: sellerLockedId, kind: 'crypto_locked' as const, amount: -toLock }] : []),

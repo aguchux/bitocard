@@ -31,6 +31,8 @@ const protectedRoutes = [
   ['put', '/v1/afrippa/admin/two-step-methods/WW', { methods: ['email'] }],
   ['delete', '/v1/afrippa/admin/two-step-methods/NG'],
   ['post', `/v1/afrippa/admin/p2p/orders/${randomId}/decide`, { outcome: 'return', fault: 'none', note: 'Decided after review' }],
+  ['put', '/v1/afrippa/admin/p2p/fee-rates', { asset: 'USDT', market: null, buyer_bps: 50, seller_bps: 100 }],
+  ['delete', '/v1/afrippa/admin/p2p/fee-rates/USDT/all'],
   ['post', `/v1/afrippa/admin/traders/${randomId}/two-step/reset`, { reason: 'lost phone' }],
   ['post', `/v1/admin/orders/${randomId}/refund`, { reason: 'x' }],
   ['post', `/v1/admin/classifieds/orders/${randomId}/dispute/decide`, { decision: 'release', note: 'ok' }],
