@@ -1081,6 +1081,8 @@ model LedgerAccount {
   balanceMinor BigInt          @default(0) @map("balance_minor")
   /// Reseller money can never go below zero; a posting that would do so fails.
   nonNegative  Boolean         @map("non_negative")
+  /// Whose books: Afrippa's for coins, P2P fiat locks and Afrippa's traders and operator account; BitoCard's otherwise.
+  platform     Platform        @default(bitocard)
   createdAt    DateTime        @default(now()) @map("created_at")
   postings     LedgerPosting[]
   reseller     Reseller?       @relation(fields: [resellerId], references: [id])
@@ -1089,6 +1091,7 @@ model LedgerAccount {
   @@unique([kind, mode, currency, ownerKey])
   @@index([resellerId])
   @@index([customerId])
+  @@index([platform, mode, kind])
   @@map("ledger_accounts")
 }
 
@@ -1103,10 +1106,13 @@ model JournalEntry {
   resellerId  String?         @map("reseller_id") @db.Uuid
   description String
   metadata    Json?
+  /// Whose books: Afrippa's when any of its accounts is Afrippa's.
+  platform    Platform        @default(bitocard)
   createdAt   DateTime        @default(now()) @map("created_at")
   postings    LedgerPosting[]
 
   @@index([resellerId, createdAt])
+  @@index([platform, createdAt])
   @@map("journal_entries")
 }
 

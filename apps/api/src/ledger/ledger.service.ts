@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { type AccountKind, type LedgerMode, Prisma } from '../generated/prisma/client.js';
+import { type AccountKind, type LedgerMode, type Platform, Prisma } from '../generated/prisma/client.js';
 
 export type Tx = Prisma.TransactionClient;
 
@@ -23,8 +23,11 @@ export type EntryInput = {
   lines: Line[];
 };
 
-/** An entry whose accounts exist, ready to write inside a transaction. */
-export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ accountId: string; kind: AccountKind; amount: bigint }> };
+/**
+ * An entry whose accounts exist, ready to write inside a transaction. `platform` is whose books it is in, worked out
+ * from its accounts by `prepare`; an entry built by hand from account ids leaves it out and `write` reads it.
+ */
+export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ accountId: string; kind: AccountKind; amount: bigint }>; platform?: Platform };
 
 /** Assets and expenses grow with debits; every other account (what BitoCard owes, revenue, tax) grows with credits. */
 const debitNormal = new Set<AccountKind>(['reseller_owed', 'provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales', 'promotions', 'crypto_custody', 'crypto_promotions']);
@@ -46,6 +49,25 @@ const resellerKinds = new Set<AccountKind>([
 ]);
 /** A store customer's own money and crypto: their wallets, P2P proceeds and what they have locked or an admin froze, never below zero. */
 const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_wallet_locked', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards', 'spin_rewards']);
+/**
+ * Accounts in Afrippa's books whoever owns them (docs/CRYPTO_SPINOFF_PLAN.md, step 2 item 7): BitoCard keeps no
+ * crypto, and P2P is Afrippa's. Any account in a coin is Afrippa's too, and so is every account of Afrippa's traders
+ * (customers of an Afrippa store) or of an Afrippa reseller (its operator account).
+ */
+export const afrippaKinds = new Set<AccountKind>([
+  'crypto_wallet',
+  'crypto_locked',
+  'crypto_frozen',
+  'crypto_custody',
+  'crypto_fees',
+  'crypto_withdrawing',
+  'crypto_spin_rewards',
+  'crypto_promotions',
+  'reserve_crypto',
+  'reseller_crypto',
+  'reseller_crypto_withdrawing',
+  'p2p_fiat_locked',
+]);
 
 export const insufficientFunds = () =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'insufficient_funds', 'The wallet balance is too low for this.');
@@ -66,6 +88,9 @@ function ownerKey(ref: AccountRef) {
 /** Change to an account's natural balance from a posting (positive amount = debit). */
 const balanceDelta = (kind: AccountKind, amount: bigint) => (debitNormal.has(kind) ? amount : -amount);
 
+/** Assets and expenses (what is held or spent) grow with debits; the rest (what is owed or earned) with credits. */
+export const isDebitNormal = (kind: AccountKind) => debitNormal.has(kind);
+
 /**
  * The double-entry ledger. Every money movement is a balanced journal entry; account balances change only together
  * with their postings, in the same transaction, and reseller accounts can never go below zero.
@@ -76,24 +101,45 @@ export class LedgerService {
 
   /** Finds or creates an account. Runs outside money transactions; a creation race just reads the winner. */
   async accountId(mode: LedgerMode, ref: AccountRef) {
+    return (await this.account(mode, ref)).id;
+  }
+
+  /** The account and whose books it is in, created on first use. */
+  private async account(mode: LedgerMode, ref: AccountRef): Promise<{ id: string; platform: Platform }> {
     const key = { kind: ref.kind, mode, currency: ref.currency, ownerKey: ownerKey(ref) };
-    const existing = await this.prisma.ledgerAccount.findUnique({ where: { kind_mode_currency_ownerKey: key }, select: { id: true } });
-    if (existing) return existing.id;
+    const select = { id: true, platform: true } as const;
+    const existing = await this.prisma.ledgerAccount.findUnique({ where: { kind_mode_currency_ownerKey: key }, select });
+    if (existing) return existing;
     try {
-      const created = await this.prisma.ledgerAccount.create({
+      return await this.prisma.ledgerAccount.create({
         data: {
           ...key,
           resellerId: resellerKinds.has(ref.kind) ? ref.resellerId : null,
           customerId: customerKinds.has(ref.kind) ? ref.customerId : null,
           nonNegative: resellerKinds.has(ref.kind) || customerKinds.has(ref.kind),
+          platform: await this.platformOf(ref),
         },
-        select: { id: true },
+        select,
       });
-      return created.id;
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
-      return (await this.prisma.ledgerAccount.findUniqueOrThrow({ where: { kind_mode_currency_ownerKey: key }, select: { id: true } })).id;
+      return this.prisma.ledgerAccount.findUniqueOrThrow({ where: { kind_mode_currency_ownerKey: key }, select });
     }
+  }
+
+  /** Whose books a new account is in (see `afrippaKinds`). */
+  private async platformOf(ref: AccountRef): Promise<Platform> {
+    if (afrippaKinds.has(ref.kind)) return 'afrippa';
+    if (customerKinds.has(ref.kind) && ref.customerId) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: ref.customerId }, select: { store: { select: { platform: true } } } });
+      if (customer?.store.platform === 'afrippa') return 'afrippa';
+    }
+    if (resellerKinds.has(ref.kind) && ref.resellerId) {
+      const reseller = await this.prisma.reseller.findUnique({ where: { id: ref.resellerId }, select: { platform: true } });
+      if (reseller?.platform === 'afrippa') return 'afrippa';
+    }
+    if (await this.prisma.cryptoAsset.findUnique({ where: { code: ref.currency }, select: { code: true } })) return 'afrippa';
+    return 'bitocard';
   }
 
   /** Checks the entry balances in each currency and makes sure its accounts exist. */
@@ -110,16 +156,24 @@ export class LedgerService {
       if (sum !== 0n) throw new Error(`Unbalanced entry ${input.reference}: ${currency} is off by ${sum}`);
     }
     const postings = [];
+    let platform: Platform = 'bitocard';
     for (const line of input.lines) {
-      postings.push({ accountId: await this.accountId(input.mode, line.account), kind: line.account.kind, amount: line.debit ?? -(line.credit ?? 0n) });
+      const account = await this.account(input.mode, line.account);
+      if (account.platform === 'afrippa') platform = 'afrippa';
+      postings.push({ accountId: account.id, kind: line.account.kind, amount: line.debit ?? -(line.credit ?? 0n) });
     }
-    return { mode: input.mode, type: input.type, reference: input.reference, resellerId: input.resellerId, description: input.description, metadata: input.metadata, postings };
+    return { mode: input.mode, type: input.type, reference: input.reference, resellerId: input.resellerId, description: input.description, metadata: input.metadata, postings, platform };
   }
 
   /** Writes a prepared entry inside `tx`. Throws insufficient_funds (and so rolls back `tx`) if a reseller or customer account would go negative. */
   async write(tx: Tx, entry: PreparedEntry) {
+    // Afrippa's when any of its accounts is.
+    const platform: Platform =
+      entry.platform ??
+      ((await tx.ledgerAccount.count({ where: { id: { in: entry.postings.map(p => p.accountId) }, platform: 'afrippa' } })) > 0 ? 'afrippa' : 'bitocard');
     const created = await tx.journalEntry.create({
       data: {
+        platform,
         mode: entry.mode,
         type: entry.type,
         reference: entry.reference,
@@ -155,22 +209,24 @@ export class LedgerService {
   }
 
   /**
-   * Integrity check: every account balance equals the sum of its postings, and every entry balances.
-   * Returns the problems found (none means the ledger is consistent).
+   * Integrity check of one product's books: every account balance equals the sum of its postings, and every entry
+   * balances. Returns the problems found (none means the books are consistent).
    */
-  async check() {
+  async check(platform: Platform = 'bitocard') {
     const accounts = await this.prisma.$queryRaw<Array<{ id: string; kind: AccountKind; balance_minor: bigint; posted: bigint | null }>>`
       SELECT a.id, a.kind, a.balance_minor, (SELECT SUM(p.amount_minor) FROM ledger_postings p WHERE p.account_id = a.id) AS posted
-      FROM ledger_accounts a`;
+      FROM ledger_accounts a WHERE a.platform = ${platform}::"Platform"`;
     const accountProblems = accounts
       .filter(a => BigInt(a.balance_minor) !== balanceDelta(a.kind, BigInt(a.posted ?? 0)))
       .map(a => ({ account_id: a.id, balance: String(a.balance_minor), from_postings: String(balanceDelta(a.kind, BigInt(a.posted ?? 0))) }));
     const entries = await this.prisma.$queryRaw<Array<{ entry_id: string; currency: string; total: bigint }>>`
       SELECT p.entry_id, a.currency, SUM(p.amount_minor) AS total
-      FROM ledger_postings p JOIN ledger_accounts a ON a.id = p.account_id
+      FROM ledger_postings p JOIN ledger_accounts a ON a.id = p.account_id JOIN journal_entries e ON e.id = p.entry_id
+      WHERE e.platform = ${platform}::"Platform"
       GROUP BY p.entry_id, a.currency HAVING SUM(p.amount_minor) <> 0`;
     return {
       object: 'ledger_check' as const,
+      platform,
       ok: accountProblems.length === 0 && entries.length === 0,
       accounts_checked: accounts.length,
       account_mismatches: accountProblems,

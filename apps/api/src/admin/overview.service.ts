@@ -57,7 +57,7 @@ export class AdminOverviewService {
     }
     const dates = Array.from({ length: days }, (_, index) => dateKey(new Date(from.getTime() + (index + 1) * day)));
 
-    const float = await this.prisma.ledgerAccount.groupBy({ by: ['currency'], where: { mode, kind: { in: [...floatAccounts] } }, _sum: { balanceMinor: true } });
+    const float = await this.prisma.ledgerAccount.groupBy({ by: ['currency'], where: { mode, platform: 'bitocard', kind: { in: [...floatAccounts] } }, _sum: { balanceMinor: true } });
     const [active, pending, joined, previouslyJoined] = await Promise.all([
       this.prisma.reseller.count({ where: { status: 'active', house: false, platform: 'bitocard' } }),
       this.prisma.reseller.count({ where: { status: 'pending', house: false, platform: 'bitocard' } }),

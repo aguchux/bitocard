@@ -184,14 +184,15 @@ export class ReportsService {
 
   /**
    * The postings a P&L counts: BitoCard's own revenue and expense accounts, and the house accounts' earnings (the
-   * retail margin), in money only.
+   * retail margin), in money only and in BitoCard's books only (never Afrippa's).
    */
   private reportedPostings() {
     return Prisma.sql`(
         (a.kind::text IN (${kindList(ledgerKinds)}))
         OR (r.house AND a.kind::text IN (${kindList(houseEarningKinds)}) AND e.type IN (${kindList(houseEarningTypes)}))
       )
-      AND a.currency NOT IN (SELECT code FROM crypto_assets)`;
+      AND a.currency NOT IN (SELECT code FROM crypto_assets)
+      AND a.platform = 'bitocard'`;
   }
 
   private async byLineAndCurrency(mode: LedgerMode, from: Date, to: Date) {
