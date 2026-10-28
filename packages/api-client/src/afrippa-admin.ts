@@ -131,6 +131,9 @@ export type TraderStanding = {
   cleared_at: string | null;
 };
 
+/** A trader's device (never its ID): when it was used, and any other trader who used it. */
+export type TraderDevice = { object: 'trader_device'; id: string; first_seen_at: string; last_seen_at: string; shared_with: Array<{ id: string; email: string }> };
+
 export const afrippaAdminApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     p2pOrders: build.query<List<AdminP2pOrder>, { mode?: Mode; status?: P2pOrderStatus; customer_id?: string; limit?: number }>({
@@ -200,6 +203,7 @@ export const afrippaAdminApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/traders/${id}/standing/clear`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'P2p', id: `STANDING-${id}` }],
     }),
+    traderDevices: build.query<List<TraderDevice>, string>({ query: id => `/v1/afrippa/admin/traders/${id}/devices` }),
     resetTraderTwoStep: build.mutation<unknown, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/v1/afrippa/admin/traders/${id}/two-step/reset`, method: 'POST', body: { reason } }),
     }),
@@ -230,4 +234,5 @@ export const {
   useTraderStandingQuery,
   useClearTraderStrikesMutation,
   useResetTraderTwoStepMutation,
+  useTraderDevicesQuery,
 } = afrippaAdminApi;

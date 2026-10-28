@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { ArrayMinSize, ArrayUnique, IsArray, IsEmail, IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
@@ -15,6 +16,7 @@ import type { MfaMethod } from '../generated/prisma/client.js';
 import { afrippaStoreId } from './ids.js';
 import { TraderGoogleService } from './google.service.js';
 import { everywhere, type TraderSession, TraderTwoStepService } from './two-step.service.js';
+import { TraderDevicesService } from './devices.service.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -143,6 +145,7 @@ export class AfrippaAccountController {
     private readonly customers: CustomersService,
     private readonly twoStep: TraderTwoStepService,
     private readonly google: TraderGoogleService,
+    private readonly devices: TraderDevicesService,
   ) {}
 
   /** Google sign-in, step 1: Google's consent address and the one-time state Afrippa's server keeps. */
@@ -157,8 +160,9 @@ export class AfrippaAccountController {
   @Post('google/finish')
   @HttpCode(HttpStatus.OK)
   @SkipIdempotency()
-  async googleFinish(@Body() body: GoogleFinishDto) {
+  async googleFinish(@Body() body: GoogleFinishDto, @Req() req: Request) {
     const result = await this.google.finish(body);
+    await this.devices.seen(result.customer.id, this.devices.hashOf(req), { alert: true });
     const customer = await this.prisma.customer.findUniqueOrThrow({ where: { id: result.customer.id }, include: { store: { include: { reseller: { select: { house: true } } } } } });
     return { ...result, two_step: await this.twoStep.state({ customer, sessionId: '', mfaVerifiedAt: null, mfaReconfirmedAt: null }) };
   }
@@ -166,8 +170,11 @@ export class AfrippaAccountController {
   /** A new trader: their account and a session waiting for two-step set-up; a code to confirm the email is sent. */
   @Post('signup')
   @SkipIdempotency()
-  async signup(@Body() body: TraderSignUpDto) {
+  async signup(@Body() body: TraderSignUpDto, @Req() req: Request) {
+    const device = this.devices.hashOf(req);
+    await this.devices.requireRoomForSignup(device);
     const result = await this.customers.signup(await afrippaStore(this.prisma), body);
+    await this.devices.seen(result.customer.id, device);
     return { ...result, two_step: { object: 'two_step_state' as const, pending: true, setup_required: true, method: null, method_not_allowed: false } };
   }
 
@@ -175,8 +182,9 @@ export class AfrippaAccountController {
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   @SkipIdempotency()
-  async signin(@Body() body: TraderSignInDto) {
+  async signin(@Body() body: TraderSignInDto, @Req() req: Request) {
     const result = await this.customers.signin(await afrippaStore(this.prisma), body);
+    await this.devices.seen(result.customer.id, this.devices.hashOf(req), { alert: true });
     const customer = await this.prisma.customer.findUniqueOrThrow({ where: { id: result.customer.id }, include: { store: { include: { reseller: { select: { house: true } } } } } });
     const state = await this.twoStep.state({ customer, sessionId: '', mfaVerifiedAt: null, mfaReconfirmedAt: null });
     return { ...result, two_step: state };
@@ -319,6 +327,7 @@ export class AfrippaTraderAdminController {
     private readonly prisma: PrismaService,
     private readonly twoStep: TraderTwoStepService,
     private readonly audit: AuditService,
+    private readonly devices: TraderDevicesService,
   ) {}
 
   @Get('two-step-methods')
@@ -350,6 +359,12 @@ export class AfrippaTraderAdminController {
     const removed = await this.prisma.afrippaTwoStepPolicy.deleteMany({ where: { market } });
     if (removed.count) await this.audit.record({ actorId: caller.kind === 'session' ? caller.userId : null, action: 'trader.two_step_methods_changed', targetType: 'two_step_policy', targetId: market, before: null, after: { methods: 'follows WW' }, platform: 'afrippa' });
     return { object: 'two_step_policy' as const, market, deleted: true };
+  }
+
+  /** A trader's devices (never their IDs): when each was used, and any other trader who used it. */
+  @Get('traders/:id/devices')
+  traderDevices(@Param('id', ParseUUIDPipe) id: string) {
+    return this.devices.forAdmin(id);
   }
 
   /** A trader who lost every method, after they proved who they are: cleared, signed out, withdrawals held 24 hours. */

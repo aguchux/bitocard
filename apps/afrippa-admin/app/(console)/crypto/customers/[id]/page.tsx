@@ -5,6 +5,7 @@ import { Lock, Plus, Snowflake, Unlock } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, Field, formatDateTime, Input, PageHeader, QueryView, Select, Skeleton, Tabs, type Column } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { AfrippaShell as AdminShell } from "@/components/shell";
+import { TraderDevices } from "@/components/trader-devices";
 import { TraderStanding } from "@/components/trader-standing";
 import {
   type CryptoBalance,
@@ -196,6 +197,7 @@ export default function CryptoCustomerPage({ params }: { params: Promise<{ id: s
                 <DataTable columns={freezeColumns} rows={customer.freezes} rowKey={row => row.id} empty="Nothing has been frozen." />
               </Card>
               <TraderStanding id={customer.id} mode={mode} />
+              <TraderDevices id={customer.id} />
               <p className="text-sm text-muted">
                 Their activity: <AppLink href={`/crypto/ads?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P ads</AppLink> ·{" "}
                 <AppLink href={`/crypto/deposits?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Deposits</AppLink> ·{" "}

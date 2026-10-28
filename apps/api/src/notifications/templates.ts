@@ -168,6 +168,15 @@ export function traderTwoStepChangedEmail(to: string, change: 'enabled' | 'chang
   };
 }
 
+/** An Afrippa trader signed in on a device they never used before: told at once, in case it was not them. */
+export function traderNewDeviceEmail(to: string, at: Date): EmailMessage {
+  return {
+    to,
+    subject: 'A new device signed in to your Afrippa account',
+    ...layout('New sign-in', [`Your Afrippa account was signed in on a device you have not used before, at ${at.toUTCString()}.`, 'If this was you, there is nothing to do. If not, change your password and tell the Afrippa team at once.'], undefined, 'Afrippa'),
+  };
+}
+
 /** An Afrippa trader added a payment method: told every time, as a stolen session could add its own. */
 export function paymentMethodAddedEmail(to: string, what: string, usableFrom: Date): EmailMessage {
   return {

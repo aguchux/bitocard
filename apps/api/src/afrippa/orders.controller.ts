@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { Equals, IsBase64, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
@@ -16,6 +16,7 @@ import type { LedgerMode, P2pOrderStatus } from '../generated/prisma/client.js';
 import { sendFile } from '../support/chats.controller.js';
 import { maxMessageLength, OrderRoomService } from './order-room.service.js';
 import { P2pOrdersService } from './orders.service.js';
+import { TraderDevicesService } from './devices.service.js';
 
 class OpenOrderDto {
   @IsUUID() ad_id: string;
@@ -132,6 +133,7 @@ class DecideDto {
 @Controller('afrippa/p2p/orders')
 export class P2pOrdersController {
   constructor(
+    private readonly devices: TraderDevicesService,
     private readonly orders: P2pOrdersService,
     private readonly room: OrderRoomService,
     private readonly trust: P2pTrustService,
@@ -164,8 +166,10 @@ export class P2pOrdersController {
     sendFile(res, await this.room.file(caller.customer, id, message));
   }
 
+  /** Opening an order records the device it was opened from first, so the same device on both sides is caught. */
   @Post()
-  open(@CurrentCustomer() caller: CustomerCaller, @Body() body: OpenOrderDto) {
+  async open(@CurrentCustomer() caller: CustomerCaller, @Body() body: OpenOrderDto, @Req() req: Request) {
+    await this.devices.seen(caller.customer.id, this.devices.hashOf(req));
     return this.orders.open(caller.customer, body);
   }
 

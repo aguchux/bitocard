@@ -2586,6 +2586,7 @@ model Customer {
   payments                  Payment[]
   reservedAccounts          ReservedAccount[]
   p2pPaymentMethods         P2pPaymentMethod[]
+  traderDevices             TraderDevice[]
   p2pOrdersSold             P2pOrder[]                @relation("p2pOrderSeller")
   p2pOrdersBought           P2pOrder[]                @relation("p2pOrderBuyer")
   p2pStandings              P2pStanding[]
@@ -5388,4 +5389,21 @@ model P2pReport {
   @@index([status, createdAt])
   @@index([reportedId, status])
   @@map("p2p_reports")
+}
+
+/// The devices an Afrippa trader used (step 4, device checks): a keyed hash of the random ID afrippa.com keeps in its
+/// own cookie, never the ID itself. A new one at sign-in tells the trader; one shared by both sides of an order is the
+/// same person; too many accounts from one device are refused.
+model TraderDevice {
+  id          String   @id @default(uuid()) @db.Uuid
+  customerId  String   @map("customer_id") @db.Uuid
+  /// HMAC-SHA256 of the device's ID, keyed from ENCRYPTION_KEY.
+  deviceHash  String   @map("device_hash") @db.VarChar(64)
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, deviceHash])
+  @@index([deviceHash])
+  @@map("trader_devices")
 }

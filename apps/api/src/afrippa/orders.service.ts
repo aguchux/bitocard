@@ -19,6 +19,7 @@ import type { CustomerNotificationType } from '../notifications/inbox.js';
 import { afrippaOperatorId } from './ids.js';
 import { OrderRoomService } from './order-room.service.js';
 import { isReversible, PaymentMethodsService } from './payment-methods.service.js';
+import { TraderDevicesService } from './devices.service.js';
 
 /** Orders still running: the coins in escrow. */
 export const openOrderStatuses: P2pOrderStatus[] = ['pending_payment', 'paid', 'appealed'];
@@ -71,6 +72,7 @@ export class P2pOrdersService {
     private readonly room: OrderRoomService,
     private readonly standing: P2pStandingService,
     private readonly trust: P2pTrustService,
+    private readonly devices: TraderDevicesService,
     private readonly limits: CryptoMarketLimitsService,
   ) {}
 
@@ -229,8 +231,9 @@ export class P2pOrdersService {
   }
 
   /**
-   * The same person on both sides is refused: the same verified name (live), or one payment account saved by both
-   * (the same details, by their fingerprint). Trading with oneself only moves coins to fake a history.
+   * The same person on both sides is refused: the same verified name (live), one payment account saved by both (the
+   * same details, by their fingerprint), or one device used by both within 90 days (`TraderDevicesService`). Trading
+   * with oneself only moves coins to fake a history.
    */
   private async notSamePerson(buyerId: string, sellerId: string, buyerName: string, mode: LedgerMode) {
     const refused = () => conflict('same_person', 'You cannot trade with this trader.');
@@ -241,6 +244,7 @@ export class P2pOrdersService {
     const fingerprints = await this.prisma.p2pPaymentMethod.findMany({ where: { customerId: { in: [buyerId, sellerId] }, mode }, select: { customerId: true, fingerprint: true } });
     const buyers = new Set(fingerprints.filter(item => item.customerId === buyerId).map(item => item.fingerprint));
     if (fingerprints.some(item => item.customerId === sellerId && buyers.has(item.fingerprint))) throw refused();
+    if (await this.devices.shared(buyerId, sellerId)) throw refused();
   }
 
   /** The name a payment must come from: the buyer's verified name live, their account name in the sandbox. */

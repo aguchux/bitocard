@@ -236,6 +236,7 @@ export const notificationTypes = {
   'customer.security.password_changed': { realm: 'customer', severity: 'warning', label: 'Password changed', push: true, locked: true },
   'customer.security.two_step_changed': { realm: 'customer', severity: 'warning', label: 'Two-step sign-in changed', push: true, locked: true },
   'customer.security.payment_method_added': { realm: 'customer', severity: 'warning', label: 'Payment method added', push: true, locked: true },
+  'customer.security.new_device': { realm: 'customer', severity: 'warning', label: 'A new device signed in', push: true, locked: true },
   'customer.security.email_changed': { realm: 'customer', severity: 'warning', label: 'Sign-in email changed', push: true, locked: true },
 } satisfies Record<string, ResellerType | AdminType | AfrippaAdminType | PersonalType | CustomerType>;
 

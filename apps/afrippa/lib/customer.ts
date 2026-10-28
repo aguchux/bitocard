@@ -4,6 +4,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { appUrl } from "@bitocard/ui/site";
 import { apiUrl } from "./api";
+import { deviceCookie, deviceHeader, validDeviceId } from "./device";
 import { signatureFor, visitorHeader } from "./signing";
 
 /**
@@ -42,6 +43,12 @@ const idempotencyKeyPattern = /^[A-Za-z0-9_-]{8,128}$/;
  * Every POST carries a fresh Idempotency-Key unless `idempotencyKey` names one (a form's nonce, so a double submit acts
  * once).
  */
+/** This browser's device ID (from the proxy's cookie) for the API's device checks, or nothing. */
+async function deviceHeaders(): Promise<Record<string, string>> {
+  const id = (await cookies()).get(deviceCookie)?.value;
+  return validDeviceId(id) ? { [deviceHeader]: id } : {};
+}
+
 export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: unknown, options: { idempotencyKey?: string; headers?: Record<string, string> } = {}): Promise<CustomerResult<T>> {
   const token = (await cookies()).get(sessionCookie)?.value;
   const raw = body !== undefined ? JSON.stringify(body) : undefined;
@@ -55,6 +62,7 @@ export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | 
         ...(token ? { [sessionHeader]: token } : {}),
         ...signatureFor(method, path, raw),
         ...(await visitorHeader()),
+        ...(await deviceHeaders()),
         ...options.headers,
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
       },

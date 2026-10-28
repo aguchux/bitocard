@@ -12,6 +12,7 @@ const { default: RefusedWordsPage } = await import("@/app/(console)/settings/wor
 const { default: BooksPage } = await import("@/app/(console)/books/page");
 const { default: TicketsPage } = await import("@/app/(console)/support/page");
 const { TraderStanding } = await import("@/components/trader-standing");
+const { TraderDevices } = await import("@/components/trader-devices");
 const { default: NotificationsPage } = await import("@/app/(console)/notifications/page");
 const { default: ChecksPage } = await import("@/app/(console)/verifications/page");
 
@@ -80,6 +81,8 @@ beforeEach(() => {
       });
     if (path === "/v1/afrippa/admin/books/check") return ok({ object: "ledger_check", platform: "afrippa", ok: true, accounts_checked: 12, account_mismatches: [], unbalanced_entries: [] });
     if (path === `/v1/afrippa/admin/traders/${traderId}/standing`) return ok(standing);
+    if (path === `/v1/afrippa/admin/traders/${traderId}/devices`)
+      return ok({ object: "list", data: [{ object: "trader_device", id: "d1", first_seen_at: "2026-10-01T00:00:00.000Z", last_seen_at: "2026-10-28T00:00:00.000Z", shared_with: [{ id: "c9", email: "other@example.com" }] }] });
     if (path === `/v1/afrippa/admin/traders/${traderId}/standing/clear`) return ok({ ...standing, strikes: 0, restriction: null, cleared_at: "2026-10-28T00:00:00.000Z" });
     if (path === `/v1/afrippa/admin/traders/${traderId}/two-step/reset`) return ok({ object: "trader_two_step_reset" });
     if (path === "/v1/afrippa/admin/kyc/cases")
@@ -212,6 +215,13 @@ describe("admin.afrippa.com books, standing and help", () => {
     page(<ChecksPage />);
     expect((await screen.findAllByText("Ada Trader", {}, slow)).length).toBeGreaterThan(0);
     expect(sent.find(call => call.path.startsWith("/v1/afrippa/admin/kyc/cases"))?.path).toMatch(/^\/v1\/afrippa\/admin\/kyc\/cases\?/);
+    neverBitoCard();
+  });
+
+  test("a trader's devices, and who else used one", async () => {
+    page(<TraderDevices id={traderId} />);
+    expect((await screen.findAllByText("other@example.com", {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Shared").length).toBeGreaterThan(0);
     neverBitoCard();
   });
 
