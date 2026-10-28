@@ -29,6 +29,9 @@ export const cryptoDeclarationText = 'I am not a citizen or a resident of the Un
 /** Who a customer is in the crypto market: their store's mode, the seller behind it and their country's currency. */
 export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; seller: Reseller; country: string; currency: string };
 
+/** An Afrippa trader: a customer of an Afrippa store (docs/CRYPTO_SPINOFF_PLAN.md), whose market is their own country. */
+export const isTrader = (customer: Pick<CustomerWithStore, 'store'>) => customer.store.platform === 'afrippa';
+
 const cryptoKinds = ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing'] as const satisfies AccountKind[];
 const fiatKinds = ['customer_withdrawable', 'p2p_fiat_locked', 'customer_wallet', 'customer_payouts_pending'] as const satisfies AccountKind[];
 
@@ -96,6 +99,15 @@ export class CryptoWalletsService {
    * New business (`require`) also needs the store open.
    */
   async context(customer: CustomerWithStore): Promise<CryptoContext> {
+    if (isTrader(customer)) {
+      // Afrippa's traders: their market is the country fixed at sign-up, under Afrippa's operator account.
+      if (!customer.country) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'Choose your country first.', 'country');
+      const [seller, market] = await Promise.all([
+        this.prisma.reseller.findUniqueOrThrow({ where: { id: customer.store.resellerId } }),
+        this.prisma.country.findUniqueOrThrow({ where: { code: customer.country }, select: { code: true, currency: true } }),
+      ]);
+      return { customer, mode: this.stores.mode(customer.store), seller, country: market.code, currency: market.currency };
+    }
     const seller = this.stores.isHouse(customer.store)
       ? await this.stores.sellerFor(customer)
       : await this.prisma.reseller.findUniqueOrThrow({ where: { id: customer.store.resellerId } });
@@ -104,8 +116,14 @@ export class CryptoWalletsService {
     return { customer, mode: this.stores.mode(customer.store), seller, country: market.code, currency: market.currency };
   }
 
-  enabled(seller: Pick<Reseller, 'id'>) {
-    return this.settings.isOn('crypto_wallets', seller.id);
+  /** Whether crypto is on for the customer: their store's seller's switch, or for Afrippa's traders their country's. */
+  enabled(context: CryptoContext) {
+    return this.switchOn('crypto_wallets', context);
+  }
+
+  /** A crypto switch for a customer: Afrippa's traders follow their own country (then the global level), never a reseller. */
+  private switchOn(key: 'crypto_wallets' | 'p2p_trading', context: CryptoContext) {
+    return isTrader(context.customer) ? this.settings.isOnForCountry(key, context.country) : this.settings.isOn(key, context.seller.id);
   }
 
   /** Live crypto needs the customer's identity check (BVN in Nigeria, Didit elsewhere); the sandbox does not. */
@@ -116,7 +134,7 @@ export class CryptoWalletsService {
   /** The checks before any new crypto business (deposits, ads, trades): the store open and crypto on for it, then `requireHolder`'s. */
   async require(customer: CustomerWithStore) {
     const context = await this.requireOpen(customer);
-    if (!(await this.enabled(context.seller))) {
+    if (!(await this.enabled(context))) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'crypto_not_enabled', 'Crypto is not available in your country yet.');
     }
     return context;
@@ -126,7 +144,7 @@ export class CryptoWalletsService {
 
   /** Whether the customer's own market is open: crypto and P2P switched on for their store's seller. */
   async homeOpen(context: CryptoContext) {
-    return (await this.enabled(context.seller)) && (await this.settings.isOn('p2p_trading', context.seller.id));
+    return (await this.enabled(context)) && (await this.switchOn('p2p_trading', context));
   }
 
   /**
@@ -143,7 +161,7 @@ export class CryptoWalletsService {
    * reseller's switch (else their country), and only while their store's own market is open.
    */
   async globalAllowed(context: CryptoContext, home?: boolean) {
-    if (context.customer.store.reseller.house) return this.globalOpenFor(context.country);
+    if (context.customer.store.reseller.house || isTrader(context.customer)) return this.globalOpenFor(context.country);
     const open = home ?? (await this.homeOpen(context));
     if (!open || !(await this.settings.isOnGlobally('crypto_global'))) return false;
     // The reseller's own choice, else their country's, set for it by itself: never the global level alone.
@@ -200,7 +218,7 @@ export class CryptoWalletsService {
    */
   async requireUse(customer: CustomerWithStore) {
     const context = await this.requireOpen(customer);
-    if ((await this.enabled(context.seller)) || (await this.globalAllowed(context))) return context;
+    if ((await this.enabled(context)) || (await this.globalAllowed(context))) return context;
     throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'crypto_not_enabled', 'Crypto is not available in your country yet.');
   }
 
@@ -209,7 +227,8 @@ export class CryptoWalletsService {
    * switches depend on the market (the global market does not need the customer's own country's crypto on).
    */
   async requireOpen(customer: CustomerWithStore) {
-    if (!this.stores.isHouse(customer.store)) await this.stores.seller(customer.store, '');
+    // Afrippa's store is never a store on BitoCard: its traders are let in by Afrippa's signed server.
+    if (!this.stores.isHouse(customer.store) && !isTrader(customer)) await this.stores.seller(customer.store, '');
     return this.requireHolder(customer, 'using crypto');
   }
 
@@ -289,8 +308,8 @@ export class CryptoWalletsService {
   async overview(customer: CustomerWithStore) {
     const context = await this.context(customer);
     const [home, p2p, global, verified, fresh, all] = await Promise.all([
-      this.enabled(context.seller),
-      this.settings.isOn('p2p_trading', context.seller.id),
+      this.enabled(context),
+      this.switchOn('p2p_trading', context),
       this.globalAllowed(context),
       this.verified(context),
       this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { cryptoFrozenAt: true } }),

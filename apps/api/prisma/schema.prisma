@@ -3012,10 +3012,15 @@ model P2pAd {
   terms            String?
   /// active, paused, completed or cancelled.
   status           String     @default("active")
+  /// Afrippa's escrow ads (taken through orders, paid directly to the seller); false for BitoCard's instant ads.
+  escrow           Boolean    @default(false)
+  /// Escrow ads: how long a buyer has to pay once an order opens (15, 30 or 60).
+  paymentWindowMinutes Int?   @map("payment_window_minutes")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
   trades           P2pTrade[]
+  paymentMethods   P2pAdPaymentMethod[]
 
   @@index([mode, country, asset, side, status, priceMinor])
   @@index([customerId, status])
@@ -5409,7 +5414,20 @@ model P2pPaymentMethod {
   removedAt        DateTime?            @map("removed_at")
   createdAt        DateTime             @default(now()) @map("created_at")
   customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  ads              P2pAdPaymentMethod[]
 
   @@index([customerId, mode])
   @@map("p2p_payment_methods")
+}
+
+/// The payment methods an escrow ad is paid through: its owner's own, in the ad's currency.
+model P2pAdPaymentMethod {
+  adId            String           @map("ad_id") @db.Uuid
+  paymentMethodId String           @map("payment_method_id") @db.Uuid
+  ad              P2pAd            @relation(fields: [adId], references: [id], onDelete: Cascade)
+  paymentMethod   P2pPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+
+  @@id([adId, paymentMethodId])
+  @@index([paymentMethodId])
+  @@map("p2p_ad_payment_methods")
 }

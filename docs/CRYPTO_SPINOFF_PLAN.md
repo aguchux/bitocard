@@ -195,7 +195,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 
 ### 3. The escrow engine
 1. Payment methods (saved, encrypted, name-checked). **Built (28 October 2026):** bank accounts, mobile money wallets and named services (labels only) per currency, encrypted and shown as hints, the holder the trader's verified name (never typed), usable after 24 hours, at most 10, each addition emailed and noticed. **Next:** checking the account name with a provider (Afrippa's own bank-name lookup) once Afrippa has one; and `CryptoWalletsService.context` takes the market from the store's reseller, which Afrippa's operator account has none of, so the trader-facing crypto code must read the trader's own country before ads and orders (item 2) can run for Afrippa's traders.
-2. Ads with payment methods and windows; buy ads lock nothing.
+2. Ads with payment methods and windows; buy ads lock nothing. **Built (28 October 2026):** Afrippa's traders get their market from their own country (their switches that country's, Afrippa's store never published), and their ads are escrow ads listing one to five of their own payment methods (past the wait, in the ad's currency) and a 15, 30 or 60-minute window; sell ads lock their coins, buy ads lock nothing; instant trades refuse them and books never mix escrow and instant ads. Floating prices against a reference price come later.
 3. Orders: open with escrow, mark paid, release, cancel, expire (a job), appeal and decide; every step once, under row locks, tested with parallel requests.
 4. Fees in crypto.
 5. The order room on the lifted chat, appeals on the lifted disputes, trader standing and the deadline reminders.

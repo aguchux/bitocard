@@ -150,6 +150,14 @@ class CreateAdDto {
 
   @IsOptional() @IsString() @MaxLength(500)
   terms?: string;
+
+  /** Escrow ads (Afrippa): one to five of your saved payment methods, in the ad's currency. */
+  @IsOptional() @IsArray() @ArrayMaxSize(5) @IsUUID('all', { each: true })
+  payment_method_ids?: string[];
+
+  /** Escrow ads (Afrippa): minutes a buyer has to pay once an order opens: 15, 30 or 60 (default 15). */
+  @IsOptional() @IsInt() @IsIn([15, 30, 60])
+  payment_window?: number;
 }
 
 class UpdateAdDto {
@@ -167,6 +175,14 @@ class UpdateAdDto {
 
   @IsOptional() @IsIn(['active', 'paused'])
   status?: 'active' | 'paused';
+
+  /** Escrow ads (Afrippa): one to five of your saved payment methods, in the ad's currency. */
+  @IsOptional() @IsArray() @ArrayMaxSize(5) @IsUUID('all', { each: true })
+  payment_method_ids?: string[];
+
+  /** Escrow ads (Afrippa): minutes a buyer has to pay once an order opens: 15, 30 or 60 (default 15). */
+  @IsOptional() @IsInt() @IsIn([15, 30, 60])
+  payment_window?: number;
 }
 
 class MyAdsQueryDto {

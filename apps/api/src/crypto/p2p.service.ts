@@ -5,19 +5,22 @@ import { HouseService } from '../checkout/house.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { type AccountKind, type CryptoAsset, type LedgerMode, type P2pAd, type P2pTrade, Prisma } from '../generated/prisma/client.js';
+import { type AccountKind, type CryptoAsset, type LedgerMode, type P2pAd, type P2pPaymentMethod, type P2pTrade, Prisma } from '../generated/prisma/client.js';
 import { insufficientFunds, LedgerService, type PreparedEntry, type Tx } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { feeFor, fiatFor, fromUnits, toUnits, unitsFor } from './amounts.js';
-import { type CryptoContext, CryptoWalletsService, cryptoFeesRef, notFound } from './crypto-wallets.service.js';
+import { type CryptoContext, CryptoWalletsService, cryptoFeesRef, isTrader, notFound } from './crypto-wallets.service.js';
 import { CryptoMarketLimitsService, crossBorder } from './market-limits.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
 /** Ads a customer can have open (active or paused) at once, per mode. */
 export const maxOpenAds = 10;
+/** Escrow ads: how long a buyer may take to pay once an order opens, and how many payment methods an ad lists. */
+export const paymentWindows = [15, 30, 60] as const;
+export const maxAdPaymentMethods = 5;
 
 const conflict = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -33,6 +36,8 @@ export type MarketBook = { market: string; currency: string };
 
 type Stats = { trades_30d: number; trades_total: number };
 type Owner = { id: string; nickname: string };
+/** An escrow ad's payment methods: what anyone sees (where to pay, never the details), and for its owner which of theirs. */
+type AdMethod = Pick<P2pPaymentMethod, 'id' | 'kind' | 'label' | 'currency' | 'hint'>;
 
 export const tradeNumber = (n: number) => `P2P-${String(n).padStart(6, '0')}`;
 
@@ -74,7 +79,7 @@ export class P2pService {
 
   /** Whether this customer may trade in other countries' books: their own country allowed, and their reseller agreeing. */
   private async abroadAllowed(context: CryptoContext, home: boolean) {
-    if (context.customer.store.reseller.house) return home || (await this.wallets.globalOpenFor(context.country));
+    if (context.customer.store.reseller.house || isTrader(context.customer)) return home || (await this.wallets.globalOpenFor(context.country));
     return home && (await this.settings.isOn('crypto_trade_abroad', context.seller.id));
   }
 
@@ -95,7 +100,7 @@ export class P2pService {
     let currency: string;
     if (market === context.country) {
       if (!home) {
-        if (!(await this.wallets.enabled(context.seller))) throw conflict('crypto_not_enabled', 'Crypto is not available in your country yet.');
+        if (!(await this.wallets.enabled(context))) throw conflict('crypto_not_enabled', 'Crypto is not available in your country yet.');
         throw conflict('p2p_not_enabled', 'P2P trading is not available in your country yet.');
       }
       currency = this.tradeCurrency(context.currency, requested?.currency);
@@ -197,14 +202,16 @@ export class P2pService {
 
   /** Fiat an ad can still take, and its limits per order now (the last part of an ad may be below its minimum). */
   private capacity(ad: P2pAd, asset: CryptoAsset) {
-    const available = ad.side === 'sell' ? fiatFor(ad.remainingAmount, ad.priceMinor, asset.decimals, true) : ad.fiatLockedMinor;
+    const available =
+      ad.side === 'sell' ? fiatFor(ad.remainingAmount, ad.priceMinor, asset.decimals, true) : ad.escrow ? fiatFor(ad.remainingAmount, ad.priceMinor, asset.decimals, false) : ad.fiatLockedMinor;
     const max = available < ad.maxFiatMinor ? available : ad.maxFiatMinor;
     const min = available < ad.minFiatMinor ? available : ad.minFiatMinor;
     return { available, min, max };
   }
 
-  private presentAd(ad: P2pAd, asset: CryptoAsset, owner: Owner, stats: Stats | undefined, viewerId?: string) {
+  private presentAd(ad: P2pAd, asset: CryptoAsset, owner: Owner, stats: Stats | undefined, viewerId?: string, methods: AdMethod[] = []) {
     const capacity = this.capacity(ad, asset);
+    const mine = viewerId === ad.customerId;
     return {
       object: 'p2p_ad' as const,
       id: ad.id,
@@ -227,7 +234,12 @@ export class P2pService {
       fee_bps: asset.p2pFeeBps,
       terms: ad.terms,
       status: ad.status,
-      mine: viewerId === ad.customerId,
+      /** Afrippa's escrow ads: taken through an order and paid directly to the seller within `payment_window` minutes. */
+      escrow: ad.escrow,
+      payment_window: ad.paymentWindowMinutes,
+      /** Where the buyer pays (sell ads) or pays from (buy ads): never the details, which show only inside an order. */
+      payment_methods: methods.map(method => ({ kind: method.kind, label: method.label, currency: method.currency, ...(mine ? { id: method.id, hint: method.hint } : {}) })),
+      mine,
       trader: { nickname: owner.nickname, ...(stats ?? { trades_30d: 0, trades_total: 0 }) },
       created_at: ad.createdAt.toISOString(),
       updated_at: ad.updatedAt.toISOString(),
@@ -236,9 +248,15 @@ export class P2pService {
 
   private async owners(ads: P2pAd[], mode: LedgerMode) {
     const ids = [...new Set(ads.map(ad => ad.customerId))];
-    const [profiles, stats] = await Promise.all([this.prisma.p2pProfile.findMany({ where: { customerId: { in: ids } } }), this.stats(ids, mode)]);
+    const [profiles, stats, links] = await Promise.all([
+      this.prisma.p2pProfile.findMany({ where: { customerId: { in: ids } } }),
+      this.stats(ids, mode),
+      this.prisma.p2pAdPaymentMethod.findMany({ where: { adId: { in: ads.filter(ad => ad.escrow).map(ad => ad.id) } }, include: { paymentMethod: true } }),
+    ]);
     const names = new Map(profiles.map(profile => [profile.customerId, profile.nickname]));
-    return { owner: (id: string): Owner => ({ id, nickname: names.get(id) ?? 'Trader' }), stats };
+    const methods = new Map<string, AdMethod[]>();
+    for (const link of links) methods.set(link.adId, [...(methods.get(link.adId) ?? []), link.paymentMethod]);
+    return { owner: (id: string): Owner => ({ id, nickname: names.get(id) ?? 'Trader' }), stats, methods };
   }
 
   /**
@@ -249,7 +267,7 @@ export class P2pService {
     const { context, book } = await this.access(customer, query);
     const currency = book.currency;
     const asset = await this.wallets.asset(query.asset);
-    const ads = await this.book(context.mode, book, asset, query.side, customer.id, 200, query.q?.trim());
+    const ads = await this.book(context.mode, book, asset, query.side, customer.id, 200, query.q?.trim(), isTrader(customer));
     const fiat = query.fiat !== undefined ? BigInt(query.fiat) : null;
     const usable = ads.filter(ad => {
       const capacity = this.capacity(ad, asset);
@@ -257,8 +275,8 @@ export class P2pService {
       return fiat === null || (fiat >= capacity.min && fiat <= capacity.max);
     });
     const shown = usable.slice(0, query.limit ?? 50);
-    const { owner, stats } = await this.owners(shown, context.mode);
-    return { object: 'list' as const, market: book.market, asset: asset.code, currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id)) };
+    const { owner, stats, methods } = await this.owners(shown, context.mode);
+    return { object: 'list' as const, market: book.market, asset: asset.code, currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id, methods.get(ad.id))) };
   }
 
   private tradeCurrency(local: string, requested?: string) {
@@ -298,12 +316,16 @@ export class P2pService {
     return known.get(customerId)!;
   }
 
-  private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string | null, take: number, trader?: string) {
+  /**
+   * The ads of a book for one side. `escrow` keeps Afrippa's escrow ads and BitoCard's instant ads apart (a viewer only
+   * ever sees the kind they can take); the public book (no viewer) shows both, though only Afrippa's server reaches it.
+   */
+  private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string | null, take: number, trader?: string, escrow?: boolean) {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
     const known = new Map<string, Promise<boolean>>();
     const ads = await this.prisma.p2pAd.findMany({
-      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(viewerId ? { customerId: { not: viewerId } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
+      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(escrow === undefined ? {} : { escrow }), ...(viewerId ? { customerId: { not: viewerId } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });
@@ -316,12 +338,12 @@ export class P2pService {
     const { context, book } = await this.access(customer, query);
     const asset = await this.wallets.asset(query.asset);
     if ((query.fiat === undefined) === (query.amount === undefined)) throw invalid('parameter_missing', 'Send either fiat or amount.', 'fiat');
-    const ads = await this.book(context.mode, book, asset, query.side, customer.id, 200);
+    const ads = await this.book(context.mode, book, asset, query.side, customer.id, 200, undefined, isTrader(customer));
     for (const ad of ads) {
       try {
         const terms = this.terms(ad, asset, { fiat: query.fiat, amount: query.amount });
-        const { owner, stats } = await this.owners([ad], context.mode);
-        return { object: 'p2p_quote' as const, side: query.side, ad: this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id), ...this.presentTerms(terms, asset, ad) };
+        const { owner, stats, methods } = await this.owners([ad], context.mode);
+        return { object: 'p2p_quote' as const, side: query.side, ad: this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id, methods.get(ad.id)), ...this.presentTerms(terms, asset, ad) };
       } catch (error) {
         if (!(error instanceof ApiError)) throw error;
       }
@@ -342,7 +364,7 @@ export class P2pService {
     if (amount <= 0n) throw invalid('amount_too_small', 'This amount is too small to trade.', input.amount !== undefined ? 'amount' : 'fiat');
     if (amount > ad.remainingAmount) throw conflict('amount_unavailable', `This ad has only ${fromUnits(ad.remainingAmount, asset.decimals)} ${asset.code} left.`, 'amount');
     const whole = amount === ad.remainingAmount;
-    const fiat = ad.side === 'buy' && whole ? ad.fiatLockedMinor : fiatFor(amount, ad.priceMinor, asset.decimals, ad.side === 'sell');
+    const fiat = ad.side === 'buy' && whole && !ad.escrow ? ad.fiatLockedMinor : fiatFor(amount, ad.priceMinor, asset.decimals, ad.side === 'sell');
     if (fiat <= 0n) throw invalid('amount_too_small', 'This amount is too small to trade.', 'amount');
     if (fiat > ad.maxFiatMinor) throw invalid('above_ad_limit', `This ad takes at most ${minor(ad.maxFiatMinor) / 100} ${ad.currency} per trade.`, 'fiat');
     if (fiat < ad.minFiatMinor && !whole) throw invalid('below_ad_limit', `This ad takes at least ${minor(ad.minFiatMinor) / 100} ${ad.currency} per trade.`, 'fiat');
@@ -423,8 +445,8 @@ export class P2pService {
       return capacity.available > 0n && (fiat === null || (fiat >= capacity.min && fiat <= capacity.max));
     });
     const shown = usable.slice(0, query.limit ?? 50);
-    const { owner, stats } = await this.owners(shown, mode);
-    return { object: 'list' as const, market: code, asset: asset.code, currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId))) };
+    const { owner, stats, methods } = await this.owners(shown, mode);
+    return { object: 'list' as const, market: code, asset: asset.code, currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), undefined, methods.get(ad.id))) };
   }
 
   /** A trader's public card by nickname: completed trades, open ads and the markets they are in. Nothing else about them. */
@@ -458,8 +480,8 @@ export class P2pService {
 
   private async presentAds(ads: P2pAd[], mode: LedgerMode, viewerId?: string) {
     const assets = new Map((await this.wallets.assets(true)).map(asset => [asset.code, asset]));
-    const { owner, stats } = await this.owners(ads, mode);
-    return { object: 'list' as const, data: ads.map(ad => this.presentAd(ad, assets.get(ad.asset)!, owner(ad.customerId), stats.get(ad.customerId), viewerId)) };
+    const { owner, stats, methods } = await this.owners(ads, mode);
+    return { object: 'list' as const, data: ads.map(ad => this.presentAd(ad, assets.get(ad.asset)!, owner(ad.customerId), stats.get(ad.customerId), viewerId, methods.get(ad.id))) };
   }
 
   /** Accounts the customer's fiat leaves from, in the order spent: P2P proceeds, then the wallet. */
@@ -483,8 +505,15 @@ export class P2pService {
    * Posts an ad. A sell ad locks all its crypto from the wallet now; a buy ad locks the fiat it needs (rounded up)
    * from the customer's P2P proceeds, then their wallet. Nothing is posted if the balance is short.
    */
-  async createAd(customer: CustomerWithStore, input: { side: AdSide; asset: string; market?: string; currency?: string; price: number; amount: string; min_fiat: number; max_fiat: number; terms?: string }) {
+  async createAd(
+    customer: CustomerWithStore,
+    input: { side: AdSide; asset: string; market?: string; currency?: string; price: number; amount: string; min_fiat: number; max_fiat: number; terms?: string; payment_method_ids?: string[]; payment_window?: number },
+  ) {
     const { context, book } = await this.access(customer, input);
+    // Afrippa's traders post escrow ads: paid directly to the seller through the payment methods listed.
+    const escrow = isTrader(customer);
+    const methods = escrow ? await this.adMethods(customer.id, context.mode, book.currency, input.payment_method_ids) : [];
+    const window = escrow ? this.paymentWindow(input.payment_window ?? 15) : null;
     const currency = book.currency;
     const asset = await this.wallets.asset(input.asset);
     const amount = toUnits(input.amount, asset.decimals);
@@ -508,20 +537,27 @@ export class P2pService {
       minFiatMinor: BigInt(input.min_fiat),
       maxFiatMinor: BigInt(input.max_fiat),
       terms: input.terms?.trim() || null,
+      escrow,
+      paymentWindowMinutes: window,
     };
+    const listed = methods.map(method => ({ paymentMethodId: method.id }));
     let ad: P2pAd;
     if (input.side === 'sell') {
       const walletId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'crypto_wallet', asset.code));
       const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'crypto_locked', asset.code));
       ad = await this.prisma.$transaction(async tx => {
         await this.ledger.lockBalances(tx, [walletId, lockedId]);
-        const created = await tx.p2pAd.create({ data: base });
+        const created = await tx.p2pAd.create({ data: { ...base, paymentMethods: { create: listed } } });
         await this.write(tx, context.mode, `p2p_ad:${id}:lock`, 'p2p_ad_lock', `${asset.code} locked for your sell ad`, { ad_id: id }, [
           { accountId: walletId, kind: 'crypto_wallet', amount },
           { accountId: lockedId, kind: 'crypto_locked', amount: -amount },
         ]);
         return created;
       });
+    } else if (escrow) {
+      // A buy ad on Afrippa locks nothing: the seller's coins go to escrow when an order opens.
+      if (fiatFor(amount, price, asset.decimals, false) <= 0n) throw invalid('amount_too_small', 'This amount is too small to trade.', 'amount');
+      ad = await this.prisma.p2pAd.create({ data: { ...base, paymentMethods: { create: listed } } });
     } else {
       const needed = fiatFor(amount, price, asset.decimals, true);
       if (needed <= 0n) throw invalid('amount_too_small', 'This amount is too small to trade.', 'amount');
@@ -542,6 +578,26 @@ export class P2pService {
     return (await this.presentAds([ad], context.mode, customer.id)).data[0];
   }
 
+  /**
+   * The payment methods an escrow ad lists: one to five of the owner's own, not removed, past their 24-hour wait and in
+   * the ad's currency.
+   */
+  private async adMethods(customerId: string, mode: LedgerMode, currency: string, ids: string[] | undefined) {
+    const wanted = [...new Set(ids ?? [])];
+    if (wanted.length === 0) throw invalid('parameter_missing', 'Choose at least one of your payment methods for this ad.', 'payment_method_ids');
+    if (wanted.length > maxAdPaymentMethods) throw invalid('parameter_invalid', `An ad lists at most ${maxAdPaymentMethods} payment methods.`, 'payment_method_ids');
+    const found = await this.prisma.p2pPaymentMethod.findMany({ where: { id: { in: wanted }, customerId, mode, removedAt: null } });
+    if (found.length !== wanted.length) throw invalid('parameter_invalid', 'Choose your own saved payment methods.', 'payment_method_ids');
+    if (found.some(method => method.currency !== currency)) throw invalid('payment_method_currency', `Choose payment methods in ${currency}, the ad's currency.`, 'payment_method_ids');
+    if (found.some(method => method.usableFrom > new Date())) throw conflict('payment_method_not_ready', 'A new payment method can be used 24 hours after it was added.', 'payment_method_ids');
+    return found;
+  }
+
+  private paymentWindow(minutes: number) {
+    if (!(paymentWindows as readonly number[]).includes(minutes)) throw invalid('parameter_invalid', 'Choose a payment window of 15, 30 or 60 minutes.', 'payment_window');
+    return minutes;
+  }
+
   /** Writes a balanced entry inside `tx`, locking every account it touches first (in one order, so trades never deadlock). */
   private async write(tx: Tx, mode: LedgerMode, reference: string, type: string, description: string, metadata: Record<string, unknown>, postings: PreparedEntry['postings']) {
     await this.ledger.lockBalances(tx, [...new Set(postings.map(posting => posting.accountId))]);
@@ -558,7 +614,11 @@ export class P2pService {
    * Changes an ad: its price, limits, terms, or pauses and resumes it. A buy ad's new price locks more fiat or gives
    * back what it no longer needs, in the same transaction.
    */
-  async updateAd(customer: CustomerWithStore, id: string, input: { price?: number; min_fiat?: number; max_fiat?: number; terms?: string | null; status?: 'active' | 'paused' }) {
+  async updateAd(
+    customer: CustomerWithStore,
+    id: string,
+    input: { price?: number; min_fiat?: number; max_fiat?: number; terms?: string | null; status?: 'active' | 'paused'; payment_method_ids?: string[]; payment_window?: number },
+  ) {
     const owned = await this.wallets.context(customer);
     const found = await this.prisma.p2pAd.findFirst({ where: { id, customerId: customer.id, mode: owned.mode } });
     if (!found) throw notFound('ad');
@@ -567,6 +627,8 @@ export class P2pService {
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: found.asset } });
     const sources = await this.fiatSources(customer.id, context.mode, found.currency);
     const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'p2p_fiat_locked', found.currency));
+    const methods = found.escrow && input.payment_method_ids !== undefined ? await this.adMethods(customer.id, context.mode, found.currency, input.payment_method_ids) : null;
+    const window = found.escrow && input.payment_window !== undefined ? this.paymentWindow(input.payment_window) : null;
     const ad = await this.prisma.$transaction(async tx => {
       const ad = await this.lockAd(tx, id);
       if (!ad || !openStatuses.includes(ad.status)) throw conflict('ad_closed', 'This ad is closed.');
@@ -577,7 +639,12 @@ export class P2pService {
       const data: Prisma.P2pAdUpdateInput = { priceMinor: price, minFiatMinor: min, maxFiatMinor: max };
       if (input.terms !== undefined) data.terms = input.terms?.trim() || null;
       if (input.status) data.status = input.status;
-      if (ad.side === 'buy' && price !== ad.priceMinor) {
+      if (window !== null) data.paymentWindowMinutes = window;
+      if (methods) {
+        await tx.p2pAdPaymentMethod.deleteMany({ where: { adId: id } });
+        await tx.p2pAdPaymentMethod.createMany({ data: methods.map(method => ({ adId: id, paymentMethodId: method.id })) });
+      }
+      if (ad.side === 'buy' && !ad.escrow && price !== ad.priceMinor) {
         const needed = fiatFor(ad.remainingAmount, price, asset.decimals, true);
         const delta = needed - ad.fiatLockedMinor;
         const reference = `p2p_ad:${id}:relock:${randomUUID()}`;
@@ -660,6 +727,7 @@ export class P2pService {
     const owned = await this.wallets.context(customer);
     const found = await this.prisma.p2pAd.findFirst({ where: { id: input.ad_id, mode: owned.mode } });
     if (!found || found.status !== 'active') throw adUnavailable();
+    if (found.escrow) throw conflict('order_required', 'Open an order on this ad: you pay the seller directly, and the coins are held until they confirm.', 'ad_id');
     // The ad's market decides: the taker must be allowed to trade there, in its currency.
     const { context } = await this.access(customer, { market: found.country, currency: found.currency });
     if (found.customerId === customer.id) throw conflict('own_ad', 'This is your own ad.', 'ad_id');
