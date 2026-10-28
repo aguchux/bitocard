@@ -20,7 +20,10 @@ export type ChatStatus = (typeof chatStatuses)[number];
 type Audience = 'customer' | 'reseller' | 'admin';
 type MessageWithFiles = SupportChatMessage & { attachments?: SupportChatAttachment[] };
 type ChatWithMessages = SupportConversation & { messages: MessageWithFiles[] };
-export type ChatAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; id: string | null; name: string | null };
+export type ChatAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'afrippa' | 'bot' | 'system'; id: string | null; name: string | null };
+/** Whose admins answer: BitoCard's (its `bitocard` queue) or Afrippa's (`afrippa`, its traders' chats alone). */
+export type ChatPlatform = 'bitocard' | 'afrippa';
+const adminQueue = (platform: ChatPlatform) => (platform === 'afrippa' ? 'afrippa' : 'bitocard');
 /** A file as it arrives (multipart). */
 export type ChatUpload = { buffer: Buffer; mimetype: string; size: number; originalname?: string };
 type CheckedUpload = { file: ChatUpload; checked: CheckedFile };
@@ -60,12 +63,13 @@ function presentAttachment(file: SupportChatAttachment) {
   return { id: file.id, name: file.name, content_type: file.contentType, size: file.size, width: file.width, height: file.height };
 }
 
-function presentMessage(message: MessageWithFiles) {
+function presentMessage(message: MessageWithFiles, audience: Audience = 'admin') {
   return {
     id: message.id,
     author: message.author,
-    // Everyone sees who answered: the person's name, or the assistant's (with its picture).
-    author_name: message.authorName,
+    // Everyone sees who answered: the person's name, or the assistant's (with its picture); Afrippa's team writes to
+    // traders as "Afrippa", its people's names kept for its own admins.
+    author_name: audience === 'customer' && message.author === 'afrippa' ? null : message.authorName,
     author_avatar_url: message.author === 'bot' ? message.authorAvatarUrl : null,
     body: message.body,
     attachments: (message.attachments ?? []).map(presentAttachment),
@@ -77,7 +81,7 @@ type Extras = { requester_name?: string | null; ticket_reference?: string | null
 
 /** A chat as each side sees it. The requester sees whether someone is answering; staff see everything. */
 export function presentChat(chat: ChatWithMessages, audience: Audience, extra: Extras = {}) {
-  const messages = chat.messages.map(presentMessage);
+  const messages = chat.messages.map(message => presentMessage(message, audience));
   if (audience === 'customer') {
     return { object: 'support_chat' as const, id: chat.id, status: chat.status as ChatStatus, ticket_reference: extra.ticket_reference ?? null, created_at: chat.createdAt.toISOString(), closed_at: chat.closedAt?.toISOString() ?? null, messages };
   }
@@ -91,7 +95,7 @@ export function presentChat(chat: ChatWithMessages, audience: Audience, extra: E
     visitor: extra.visitor ?? null,
     /** Who they are, from their account (a visitor: as they typed it): name, email, confirmed mobile, country and currency. */
     requester_profile: extra.profile ?? null,
-    queue: chat.queue as 'reseller' | 'bitocard',
+    queue: chat.queue as 'reseller' | 'bitocard' | 'afrippa',
     status: chat.status as ChatStatus,
     store_id: chat.storeId,
     customer_id: chat.customerId,
@@ -207,12 +211,14 @@ export class ChatsService {
   private async storeChat(requester: StoreRequester) {
     const store = ChatsService.storeOf(requester);
     const house = store.reseller.house;
+    // Afrippa's traders chat with Afrippa: its own queue, under its operator's account.
+    const afrippa = store.platform === 'afrippa';
     const country = requester.kind === 'customer' ? requester.customer.country : null;
     return this.openOrCreate({ ...ChatsService.whereFor(requester), status: { not: 'closed' } }, async () => ({
       resellerId: house ? (country ? (await this.house.resellerFor(country)).id : houseRootId) : store.resellerId,
       mode: this.sellers.mode(store),
       requester: 'customer',
-      queue: house ? 'bitocard' : 'reseller',
+      queue: afrippa ? 'afrippa' : house ? 'bitocard' : 'reseller',
       storeId: store.id,
       ...ChatsService.whereFor(requester),
     }));
@@ -227,7 +233,7 @@ export class ChatsService {
 
   /** The requester sends a file (with an optional caption): to their open chat, or starting one. */
   async attachAs(requester: StoreRequester, file: ChatUpload | undefined, caption: string | undefined) {
-    const checked = this.checkFile(file);
+    const checked = this.checkFile(file, ChatsService.storeOf(requester).platform);
     const open = await this.storeChat(requester);
     await this.requesterWrote(open, ChatsService.authorOf(requester), caption ?? '', { file: file!, checked });
     return this.present((await this.load({ id: open.id }))!, 'customer');
@@ -235,7 +241,7 @@ export class ChatsService {
 
   /** New messages since `after` (a message ID), for polling. */
   async messagesFor(requester: StoreRequester, id: string, after?: string) {
-    return this.since(await this.ownChat(requester, id), after);
+    return this.since(await this.ownChat(requester, id), after, 'customer');
   }
 
   async closeAs(requester: StoreRequester, id: string) {
@@ -245,7 +251,7 @@ export class ChatsService {
   }
 
   async fileFor(requester: StoreRequester, id: string, file: string) {
-    return this.readFile((await this.ownChat(requester, id)).id, file);
+    return this.readFile(await this.ownChat(requester, id), file);
   }
 
   // Signed-in customers (the requester helpers above, by customer).
@@ -322,8 +328,8 @@ export class ChatsService {
     return this.page({ resellerId, mode, requester: 'customer', queue: 'reseller', status: filter.status ?? { not: 'closed' } }, filter, 'reseller');
   }
 
-  async listForAdmin(filter: { status?: ChatStatus; limit?: number; starting_after?: string }) {
-    return this.page({ queue: 'bitocard', status: filter.status ?? { not: 'closed' } }, filter, 'admin');
+  async listForAdmin(filter: { status?: ChatStatus; limit?: number; starting_after?: string }, platform: ChatPlatform = 'bitocard') {
+    return this.page({ queue: adminQueue(platform), status: filter.status ?? { not: 'closed' } }, filter, 'admin');
   }
 
   /** A chat the reseller can see: their customers' (to answer) and their own with BitoCard. */
@@ -333,8 +339,9 @@ export class ChatsService {
     return chat;
   }
 
-  private async adminOwned(id: string) {
-    const chat = await this.load({ id, queue: 'bitocard' });
+  /** A chat on a product's own admin queue: BitoCard's admins never reach Afrippa's, nor Afrippa's BitoCard's. */
+  private async adminOwned(id: string, platform: ChatPlatform = 'bitocard') {
+    const chat = await this.load({ id, queue: adminQueue(platform) });
     if (!chat) throw notFound();
     return chat;
   }
@@ -343,24 +350,24 @@ export class ChatsService {
     return this.present(await this.owned(resellerId, mode, id), 'reseller');
   }
 
-  async getForAdmin(id: string) {
-    return this.present(await this.adminOwned(id), 'admin');
+  async getForAdmin(id: string, platform: ChatPlatform = 'bitocard') {
+    return this.present(await this.adminOwned(id, platform), 'admin');
   }
 
   async messagesForReseller(resellerId: string, mode: LedgerMode, id: string, after?: string) {
     return this.since(await this.owned(resellerId, mode, id), after);
   }
 
-  async messagesForAdmin(id: string, after?: string) {
-    return this.since(await this.adminOwned(id), after);
+  async messagesForAdmin(id: string, after?: string, platform: ChatPlatform = 'bitocard') {
+    return this.since(await this.adminOwned(id, platform), after);
   }
 
   async fileForReseller(resellerId: string, mode: LedgerMode, id: string, file: string) {
-    return this.readFile((await this.owned(resellerId, mode, id)).id, file);
+    return this.readFile(await this.owned(resellerId, mode, id), file);
   }
 
-  async fileForAdmin(id: string, file: string) {
-    return this.readFile((await this.adminOwned(id)).id, file);
+  async fileForAdmin(id: string, file: string, platform: ChatPlatform = 'bitocard') {
+    return this.readFile(await this.adminOwned(id, platform), file);
   }
 
   private storeAnswers(chat: SupportConversation) {
@@ -383,15 +390,15 @@ export class ChatsService {
     return this.present((await this.load({ id }))!, 'reseller');
   }
 
-  async replyAsAdmin(id: string, author: ChatAuthor, body: string) {
-    const chat = await this.adminOwned(id);
+  async replyAsAdmin(id: string, author: ChatAuthor, body: string, platform: ChatPlatform = 'bitocard') {
+    const chat = await this.adminOwned(id, platform);
     await this.staffWrote(chat, author, body);
     return this.present((await this.load({ id }))!, 'admin');
   }
 
-  async attachAsAdmin(id: string, author: ChatAuthor, file: ChatUpload | undefined, caption: string | undefined) {
-    const checked = this.checkFile(file);
-    const chat = await this.adminOwned(id);
+  async attachAsAdmin(id: string, author: ChatAuthor, file: ChatUpload | undefined, caption: string | undefined, platform: ChatPlatform = 'bitocard') {
+    const checked = this.checkFile(file, platform);
+    const chat = await this.adminOwned(id, platform);
     await this.staffWrote(chat, author, caption ?? '', { file: file!, checked });
     return this.present((await this.load({ id }))!, 'admin');
   }
@@ -404,8 +411,8 @@ export class ChatsService {
     return this.present((await this.load({ id }))!, 'reseller');
   }
 
-  async takeAsAdmin(id: string, author: ChatAuthor) {
-    const chat = await this.adminOwned(id);
+  async takeAsAdmin(id: string, author: ChatAuthor, platform: ChatPlatform = 'bitocard') {
+    const chat = await this.adminOwned(id, platform);
     await this.take(chat, author);
     return this.present((await this.load({ id }))!, 'admin');
   }
@@ -418,9 +425,9 @@ export class ChatsService {
     return this.present((await this.load({ id }))!, 'reseller');
   }
 
-  async closeAsAdmin(id: string) {
-    const chat = await this.adminOwned(id);
-    await this.close(chat, system, 'BitoCard ended the chat.');
+  async closeAsAdmin(id: string, platform: ChatPlatform = 'bitocard') {
+    const chat = await this.adminOwned(id, platform);
+    await this.close(chat, system, platform === 'afrippa' ? 'Afrippa ended the chat.' : 'BitoCard ended the chat.');
     return this.present((await this.load({ id }))!, 'admin');
   }
 
@@ -432,8 +439,8 @@ export class ChatsService {
     return this.present((await this.load({ id }))!, 'reseller');
   }
 
-  async ticketAsAdmin(id: string, input: { subject: string; category: TicketCategory }) {
-    const chat = await this.adminOwned(id);
+  async ticketAsAdmin(id: string, input: { subject: string; category: TicketCategory }, platform: ChatPlatform = 'bitocard') {
+    const chat = await this.adminOwned(id, platform);
     await this.toTicket(chat, input, 'chat');
     return this.present((await this.load({ id }))!, 'admin');
   }
@@ -445,11 +452,11 @@ export class ChatsService {
    */
   async purgeOld(now = new Date()) {
     const before = new Date(now.getTime() - 365 * 24 * 3600_000);
-    const old = await this.prisma.supportConversation.findMany({ where: { status: 'closed', closedAt: { lt: before } }, select: { id: true, attachments: { select: { objectKey: true } } }, take: 500 });
+    const old = await this.prisma.supportConversation.findMany({ where: { status: 'closed', closedAt: { lt: before } }, select: { id: true, queue: true, attachments: { select: { objectKey: true } } }, take: 500 });
     const removable: string[] = [];
     for (const chat of old) {
       try {
-        for (const file of chat.attachments) await this.storage.remove(file.objectKey);
+        for (const file of chat.attachments) await this.storageFor(chat).remove(file.objectKey);
         removable.push(chat.id);
       } catch (error) {
         this.logger.warn({ chat: chat.id, error: (error as Error).message }, 'Chat files could not be removed; kept for the next run');
@@ -477,10 +484,15 @@ export class ChatsService {
     }
   }
 
+  /** Where a chat's files live: its product's own private bucket (Afrippa's chats in Afrippa's, never BitoCard's). */
+  private storageFor(chat: Pick<SupportConversation, 'queue'>) {
+    return this.storage.forPlatform(chat.queue === 'afrippa' ? 'afrippa' : 'bitocard');
+  }
+
   /** A file people may send: a photo (JPEG or PNG, its metadata removed) or a PDF without scripts, at most 4 MB. */
-  private checkFile(file: ChatUpload | undefined) {
+  private checkFile(file: ChatUpload | undefined, platform: ChatPlatform = 'bitocard') {
     if (!file) throw invalid('parameter_missing', 'Choose a file to send.', 'file');
-    if (!this.storage.configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'storage_not_configured', 'Files cannot be sent in chat yet. Write a message instead.');
+    if (!this.storage.forPlatform(platform).configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'storage_not_configured', 'Files cannot be sent in chat yet. Write a message instead.');
     const checked = checkDocument(file.buffer, file.mimetype, true);
     if ('problem' in checked) throw invalid('file_invalid', checked.problem.replace('Upload a JPEG, PNG or PDF file.', 'Send a photo (JPEG or PNG) or a PDF.'), 'file');
     return checked;
@@ -490,8 +502,9 @@ export class ChatsService {
   private async storeFile(chat: SupportConversation, upload: CheckedUpload) {
     if ((await this.prisma.supportChatAttachment.count({ where: { conversationId: chat.id } })) >= maxChatFiles) throw conflict('too_many_files', `A chat can hold ${maxChatFiles} files. Start a new chat to send more.`);
     const id = randomUUID();
-    const objectKey = this.storage.chatKey(chat.id, id);
-    await this.storage.put(objectKey, upload.checked.bytes);
+    const storage = this.storageFor(chat);
+    const objectKey = storage.chatKey(chat.id, id);
+    await storage.put(objectKey, upload.checked.bytes);
     return (messageId: string): Prisma.SupportChatAttachmentUncheckedCreateInput => ({
       id,
       conversationId: chat.id,
@@ -505,10 +518,10 @@ export class ChatsService {
     });
   }
 
-  private async readFile(chatId: string, fileId: string) {
-    const file = await this.prisma.supportChatAttachment.findFirst({ where: { id: fileId, conversationId: chatId } });
+  private async readFile(chat: Pick<SupportConversation, 'id' | 'queue'>, fileId: string) {
+    const file = await this.prisma.supportChatAttachment.findFirst({ where: { id: fileId, conversationId: chat.id } });
     if (!file) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such file.');
-    const bytes = await this.storage.get(file.objectKey);
+    const bytes = await this.storageFor(chat).get(file.objectKey);
     if (!bytes) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'file_gone', 'This file is no longer kept.');
     return { contentType: file.contentType, bytes, name: file.name };
   }
@@ -590,7 +603,8 @@ export class ChatsService {
     if (chat.status === 'closed') throw conflict('chat_closed', 'This chat has ended.');
     const now = new Date();
     await this.prisma.$transaction([
-      this.prisma.supportChatMessage.create({ data: { conversationId: chat.id, author: 'system', body: `${author.name ?? 'A person'} joined the chat.`, createdAt: now } }),
+      // Traders read "Afrippa's team"; elsewhere the person's name.
+      this.prisma.supportChatMessage.create({ data: { conversationId: chat.id, author: 'system', body: author.kind === 'afrippa' ? "Afrippa's team joined the chat." : `${author.name ?? 'A person'} joined the chat.`, createdAt: now } }),
       this.prisma.supportConversation.update({ where: { id: chat.id }, data: { status: 'with_staff', assigneeId: author.id, lastMessageAt: now } }),
     ]);
   }
@@ -607,7 +621,7 @@ export class ChatsService {
   private async toTicket(chat: ChatWithMessages, input: { subject: string; category: TicketCategory }, source: 'chat' | 'bot') {
     if (chat.ticketId) throw conflict('chat_has_ticket', 'This chat is already a ticket.');
     if (chat.visitorId) throw conflict('visitor_chat', 'A visitor has no account to follow a ticket: answer them here, or by email.');
-    const roles: Record<string, string> = { customer: 'Customer', reseller: chat.requester === 'reseller' ? 'Reseller' : 'Store', bitocard: 'BitoCard', bot: 'Assistant', system: 'Update' };
+    const roles: Record<string, string> = { customer: chat.queue === 'afrippa' ? 'Trader' : 'Customer', reseller: chat.requester === 'reseller' ? 'Reseller' : 'Store', bitocard: 'BitoCard', afrippa: 'Afrippa', bot: 'Assistant', system: 'Update' };
     const transcript = [
       'From a live chat:',
       ...chat.messages.map(message => {
@@ -621,7 +635,7 @@ export class ChatsService {
     return ticketReference(ticket.number);
   }
 
-  private async since(chat: SupportConversation, after: string | undefined) {
+  private async since(chat: SupportConversation, after: string | undefined, audience: Audience = 'admin') {
     const from = after ? await this.prisma.supportChatMessage.findFirst({ where: { id: after, conversationId: chat.id }, select: { createdAt: true } }) : null;
     const messages = await this.prisma.supportChatMessage.findMany({
       where: { conversationId: chat.id, ...(from ? { createdAt: { gt: from.createdAt } } : {}) },
@@ -629,7 +643,7 @@ export class ChatsService {
       take: messagesShown,
       include: withFiles,
     });
-    return { object: 'list' as const, status: chat.status as ChatStatus, data: messages.map(presentMessage) };
+    return { object: 'list' as const, status: chat.status as ChatStatus, data: messages.map(message => presentMessage(message, audience)) };
   }
 
   private async page(where: Prisma.SupportConversationWhereInput, page: { limit?: number; starting_after?: string }, audience: Exclude<Audience, 'customer'>) {
@@ -651,7 +665,8 @@ export class ChatsService {
     if (!claimed.count) return;
     const who = chat.requester === 'reseller' ? 'A reseller' : chat.visitorId ? 'A visitor' : 'A customer';
     const content = { subject: `${chat.id}:${now.getTime()}`, title: `${who} is waiting in chat`, body: reason ? `The assistant handed over: ${reason}` : 'Open the chat to answer.', mode: chat.mode };
-    if (chat.queue === 'bitocard') await this.inbox.admins('admin.support.chat_waiting', { ...content, link: `/support/chats/${chat.id}` });
+    if (chat.queue === 'afrippa') await this.inbox.afrippaAdmins('admin.afrippa.chat_waiting', { ...content, title: reason ? content.title : 'A trader is waiting in chat', link: `/support/chats/${chat.id}` });
+    else if (chat.queue === 'bitocard') await this.inbox.admins('admin.support.chat_waiting', { ...content, link: `/support/chats/${chat.id}` });
     else await this.inbox.reseller(chat.resellerId, 'support.chat_waiting', { ...content, link: `/support/chats/${chat.id}` });
   }
 
@@ -667,7 +682,13 @@ export class ChatsService {
   private async tellRequester(chat: SupportConversation) {
     const bucket = Math.floor(Date.now() / alertEveryMs);
     if (chat.customerId && chat.storeId) {
-      await this.inbox.customer({ customerId: chat.customerId, storeId: chat.storeId }, 'customer.support.chat_replied', { subject: `${chat.id}:${bucket}`, title: 'The store replied in chat', body: 'Open the chat to read it.', link: '/account/support?chat=1' });
+      const afrippa = chat.queue === 'afrippa';
+      await this.inbox.customer({ customerId: chat.customerId, storeId: chat.storeId }, 'customer.support.chat_replied', {
+        subject: `${chat.id}:${bucket}`,
+        title: afrippa ? 'Afrippa replied in chat' : 'The store replied in chat',
+        body: 'Open the chat to read it.',
+        link: afrippa ? '/help?chat=1' : '/account/support?chat=1',
+      });
     } else if (chat.visitorId && chat.storeId) {
       const now = new Date();
       const claimed = await this.prisma.supportConversation.updateMany({ where: { id: chat.id, OR: [{ requesterAlertedAt: null }, { requesterAlertedAt: { lt: new Date(now.getTime() - alertEveryMs) } }] }, data: { requesterAlertedAt: now } });

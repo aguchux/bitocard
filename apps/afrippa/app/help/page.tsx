@@ -3,8 +3,10 @@ import Link from "next/link";
 import { cardClass, tradeDate } from "@afrippa/ui/trade-views";
 import { AccountShell } from "@/components/account-shell";
 import { NewTicketForm } from "@/components/help";
+import { HelpChat } from "@/components/help-chat";
 import { requireCustomer } from "@/lib/account";
 import { customerApi } from "@/lib/customer";
+import type { Chat } from "@/lib/help";
 
 export const metadata: Metadata = { title: "Help", robots: { index: false, follow: false } };
 
@@ -16,13 +18,14 @@ const ticketStatus: Record<Ticket["status"], [string, string]> = {
   resolved: ["Resolved", "bg-slate-100 text-slate-700"],
 };
 
-/** The trader's questions to Afrippa's team, and a new one. */
+/** Live chat with Afrippa's team, then the trader's questions (tickets) and a new one. */
 export default async function HelpPage() {
   await requireCustomer("/help");
-  const result = await customerApi<{ data: Ticket[] }>("GET", "/v1/afrippa/account/support/tickets");
+  const [result, chat] = await Promise.all([customerApi<{ data: Ticket[] }>("GET", "/v1/afrippa/account/support/tickets"), customerApi<Chat | null>("GET", "/v1/afrippa/account/support/chat")]);
   const tickets = result.ok ? result.data.data : [];
   return (
     <AccountShell title="Help" current="/help">
+      <HelpChat initial={chat.ok ? chat.data : null} />
       {tickets.length ? (
         <ul className="space-y-2" aria-label="Your questions">
           {tickets.map(ticket => {

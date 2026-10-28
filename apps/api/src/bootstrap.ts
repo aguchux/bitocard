@@ -17,10 +17,11 @@ import { addWebhooks } from './webhooks/openapi.js';
 const unversioned = ['/', 'health', 'robots.txt'];
 
 /**
- * Files sent in an Afrippa order's room: a JSON body (so Afrippa's server signs the file with the request) up to 6 MB,
- * read before Nest's 100 KB parser, its raw bytes kept for the signature check.
+ * Files sent from Afrippa's site (an order's room, a trader's chat with Afrippa): a JSON body (so Afrippa's server signs
+ * the file with the request) up to 6 MB, read before Nest's 100 KB parser, its raw bytes kept for the signature check.
  */
-export const isOrderRoomUpload = (url: string | undefined) => /^\/v1\/afrippa\/p2p\/orders\/[^/?#]+\/attachments(?:[?#]|$)/.test(url ?? '');
+export const isOrderRoomUpload = (url: string | undefined) =>
+  /^\/v1\/afrippa\/(?:p2p\/orders\/[^/?#]+\/attachments|account\/support\/chat\/attachments)(?:[?#]|$)/.test(url ?? '');
 const orderRoomJson = json({
   limit: '6mb',
   verify: (req, _res, bytes) => {

@@ -451,7 +451,8 @@ export class TicketsService {
       system,
       input.transcript,
     );
-    if (ticket.queue === 'bitocard') await this.tellAdmins(ticket, 'admin.support.ticket_created', `From a chat: ${ticketReference(ticket.number)}: ${ticket.subject}`);
+    if (ticket.queue === afrippaQueue) await this.tellAfrippa(ticket, 'admin.afrippa.ticket_created', `From a chat: ${ticketReference(ticket.number)}: ${ticket.subject}`);
+    else if (ticket.queue === 'bitocard') await this.tellAdmins(ticket, 'admin.support.ticket_created', `From a chat: ${ticketReference(ticket.number)}: ${ticket.subject}`);
     else await this.tellReseller(ticket, 'support.ticket_created', 'A chat became a support ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     return ticket;
   }

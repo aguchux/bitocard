@@ -12,6 +12,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined, unstable_cache: 
 const help = await import("@/lib/help");
 const { default: HelpPage } = await import("@/app/help/page");
 const { default: TicketPage } = await import("@/app/help/[id]/page");
+const { GET: chatFile } = await import("@/app/help/chat/files/[chat]/[file]/route");
 
 async function render(element: ReactElement) {
   const stream = await renderToReadableStream(element);
@@ -98,5 +99,45 @@ describe("help", () => {
     expect(calls().map(call => call[0])).toEqual([`http://api.test/v1/afrippa/account/support/tickets/${ticketId}/messages`, `http://api.test/v1/afrippa/account/support/tickets/${ticketId}/close`]);
     answer({ [`POST /v1/afrippa/account/support/tickets/${ticketId}/messages`]: json({ error: { code: "authentication_required", message: "Sign in." } }, 401) });
     await expect(help.replyToTicket({}, form({ id: ticketId, body: "Thanks" }))).rejects.toThrow(`redirect:/signin?next=%2Fhelp%2F${ticketId}`);
+  });
+
+  test("chatting: text or a file (base64) to Afrippa, the thread shown with Afrippa's replies, new messages polled", async () => {
+    const chatId = "6b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
+    const chat = { id: chatId, status: "with_staff", ticket_reference: null, messages: [
+      { id: "7b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a", author: "customer", body: "Is my deposit coming?", attachments: [], created_at: "2026-10-28T09:00:00.000Z" },
+      { id: "8b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a", author: "afrippa", body: "Two more confirmations.", attachments: [{ id: "9b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a", name: "chain.png", content_type: "image/png" }], created_at: "2026-10-28T09:01:00.000Z" },
+    ] };
+    answer({
+      "POST /v1/afrippa/account/support/chat/messages": chat,
+      "POST /v1/afrippa/account/support/chat/attachments": chat,
+      [`/v1/afrippa/account/support/chat/${chatId}/messages?after=8b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a`]: { object: "list", status: "with_staff", data: [] },
+      "/v1/afrippa/account": customer,
+      "/v1/afrippa/account/support/tickets": { object: "list", data: [] },
+      "/v1/afrippa/account/support/chat": chat,
+    });
+    expect((await help.sendChat({}, form({ body: "" }))).field).toBe("body");
+    expect((await help.sendChat({}, form({ body: "Is my deposit coming?" }))).chat?.id).toBe(chatId);
+    const data = new FormData();
+    data.set("file", new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "receipt.png", { type: "image/png" }));
+    await help.sendChat({}, data);
+    expect(JSON.parse(String(calls().at(-1)![1].body))).toEqual({ file_name: "receipt.png", content_type: "image/png", data: "iVBORw==" });
+    expect((await help.chatSince(chatId, "8b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a"))?.status).toBe("with_staff");
+    expect(await help.chatSince("nope", null)).toBeNull();
+
+    const page = await render(await HelpPage());
+    expect(page).toContain("Chat with Afrippa");
+    expect(page).toContain("Two more confirmations.");
+    expect(page).toContain(`href="/help/chat/files/${chatId}/9b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a"`);
+    expect(page).toContain("End chat");
+  });
+
+  test("a chat's file is passed on sandboxed and never cached", async () => {
+    const chatId = "6b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
+    const fileId = "9b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
+    answer({ [`/v1/afrippa/account/support/chat/${chatId}/files/${fileId}`]: new Response("PNG", { headers: { "content-type": "image/png" } }) });
+    const res = await chatFile(new Request("https://afrippa.com/x"), { params: Promise.resolve({ chat: chatId, file: fileId }) });
+    expect([res.status, res.headers.get("cache-control")]).toEqual([200, "no-store"]);
+    expect(res.headers.get("content-security-policy")).toContain("sandbox");
+    expect((await chatFile(new Request("https://afrippa.com/x"), { params: Promise.resolve({ chat: "x", file: fileId }) })).status).toBe(404);
   });
 });
