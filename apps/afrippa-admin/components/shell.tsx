@@ -1,19 +1,20 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, Ban, Bell, BookOpen, ChartNoAxesColumn, Coins, Flag, Gauge, Gavel, Headset, History, House, ListChecks, MessagesSquare, Percent, PlugZap, ReceiptText, Settings, ShieldCheck, Snowflake, Ticket, Wallet } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Ban, Bell, BookOpen, ChartNoAxesColumn, Coins, Flag, Gauge, Gavel, Headset, History, House, ListChecks, MessagesSquare, Percent, PlugZap, ReceiptText, ScanFace, Settings, ShieldCheck, Snowflake, Ticket, Wallet } from "lucide-react";
 import { humanise } from "@bitocard/admin-ui";
 import { AccountMenu, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
 
 export type { Crumb };
 
-export type AfrippaSection = "home" | "orders" | "crypto" | "support" | "settings";
+export type AfrippaSection = "home" | "orders" | "traders" | "crypto" | "support" | "settings";
 
 /** The left rail of admin.afrippa.com, in order. */
 export const sections: Array<NavItem<AfrippaSection>> = [
   { key: "home", label: "Home", href: "/", icon: House },
   { key: "orders", label: "Orders", href: "/orders", icon: ReceiptText },
+  { key: "traders", label: "Traders", href: "/verifications", icon: ScanFace },
   { key: "crypto", label: "Crypto", href: "/crypto", icon: Wallet },
   { key: "support", label: "Help", href: "/support", icon: Headset },
   { key: "settings", label: "Settings", href: "/settings", icon: Settings },
@@ -37,6 +38,10 @@ export const menus: Record<AfrippaSection, { title: string; items: SubNavItem[] 
       { label: "All orders", href: "/orders/all", icon: ReceiptText },
       { label: "Reports", href: "/reports", icon: Flag },
     ],
+  },
+  traders: {
+    title: "Traders",
+    items: [{ label: "Identity checks", href: "/verifications", icon: ScanFace }],
   },
   crypto: {
     title: "Crypto",

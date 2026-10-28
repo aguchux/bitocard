@@ -1,5 +1,6 @@
 import type { KycCase } from "@bitocard/api-client/kyc";
 import { uploadProblem } from "./documents";
+import { brand } from "./brand";
 
 /** Browser side of the wizard: calls this app's own route handlers, which add the applicant's session. */
 export type CaseResult = { ok: true; case: KycCase } | { ok: false; code: string | null; message: string; param: string | null; status: number };
@@ -10,7 +11,7 @@ async function read(res: Response): Promise<CaseResult> {
   return { ok: false, status: res.status, code: json?.error?.code ?? null, message: json?.error?.message ?? "Something went wrong. Try again.", param: json?.error?.param ?? null };
 }
 
-const offline = (): CaseResult => ({ ok: false, status: 0, code: null, message: "We could not reach BitoCard. Check your connection and try again.", param: null });
+const offline = (): CaseResult => ({ ok: false, status: 0, code: null, message: `We could not reach ${brand.name}. Check your connection and try again.`, param: null });
 
 export type CaseStep = "consent" | "business" | "identity" | "liveness" | "submit";
 

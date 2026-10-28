@@ -1,4 +1,5 @@
 import type { ApiResult } from "./api";
+import { brand } from "./brand";
 
 /**
  * Only this site's own pages may call its route handlers. The session cookie is SameSite=Strict already; browsers also
@@ -21,9 +22,9 @@ export function reply<T>(result: ApiResult<T>) {
 
 /** What the wizard may change through `/api/case/<step>`, and the API endpoint for each. Anything else is a 404. */
 export const caseSteps = {
-  consent: { method: "PUT", path: "/v1/kyc/case/consent" },
-  business: { method: "PUT", path: "/v1/kyc/case/business" },
-  identity: { method: "PUT", path: "/v1/kyc/case/identity" },
-  liveness: { method: "POST", path: "/v1/kyc/case/liveness" },
-  submit: { method: "POST", path: "/v1/kyc/case/submit" },
+  consent: { method: "PUT", path: `${brand.apiPrefix}/case/consent` },
+  business: { method: "PUT", path: `${brand.apiPrefix}/case/business` },
+  identity: { method: "PUT", path: `${brand.apiPrefix}/case/identity` },
+  liveness: { method: "POST", path: `${brand.apiPrefix}/case/liveness` },
+  submit: { method: "POST", path: `${brand.apiPrefix}/case/submit` },
 } as const;

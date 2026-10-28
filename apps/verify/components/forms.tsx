@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { Building2, ShieldCheck, User } from "lucide-react";
 import { Button, Field, Input, Notice, Select, Textarea } from "@bitocard/admin-ui";
 import type { KycBusinessType, KycCase } from "@bitocard/api-client/kyc";
+import { brand } from "@/lib/brand";
 import { type CaseResult, type CaseStep, saveStep } from "@/lib/client";
 
 /** Saves one step and hands the new case back; the API's message (and the field it names) stays on the form. */
@@ -22,7 +23,7 @@ function useSave(step: CaseStep, onSaved: (kase: KycCase) => void) {
 }
 
 /** Consent first: what is collected, why, who sees it, and the privacy notice. */
-export function ConsentStep({ kase, privacyUrl, onSaved }: { kase: KycCase; privacyUrl: string; onSaved: (kase: KycCase) => void }) {
+export function ConsentStep({ kase, privacyUrl, onSaved }: { kase: KycCase; privacyUrl: string | null; onSaved: (kase: KycCase) => void }) {
   const [agreed, setAgreed] = useState(kase.consented);
   const { error, saving, save } = useSave("consent", onSaved);
   const customer = kase.subject === "customer";
@@ -32,7 +33,7 @@ export function ConsentStep({ kase, privacyUrl, onSaved }: { kase: KycCase; priv
         <p>
           {customer
             ? `${kase.brand.name} needs to confirm who you are before you can buy some products. It takes about five minutes.`
-            : "BitoCard needs to confirm who runs your business before your account can take live orders. It takes about five minutes."}
+            : `${brand.name} needs to confirm who runs your business before your account can take live orders. It takes about five minutes.`}
         </p>
         <p className="font-semibold">You will need</p>
         <ul className="list-disc space-y-1 pl-5 text-muted">
@@ -42,19 +43,26 @@ export function ConsentStep({ kase, privacyUrl, onSaved }: { kase: KycCase; priv
         </ul>
         <p className="font-semibold">Who sees your documents</p>
         <ul className="list-disc space-y-1 pl-5 text-muted">
-          <li>BitoCard reviews them. A person checks your ID and compares your face with its photo; nothing is decided automatically.</li>
-          {customer ? <li>{`If ${kase.brand.name} is a registered business that BitoCard has verified, its team may review your check instead.`}</li> : null}
+          <li>{`${brand.name} reviews them. A person checks your ID and compares your face with its photo; nothing is decided automatically.`}</li>
+          {customer && brand.review ? <li>{`If ${kase.brand.name} is a registered business that BitoCard has verified, its team may review your check instead.`}</li> : null}
           <li>They are stored privately and encrypted, never made public, and kept only as long as the law requires.</li>
         </ul>
       </div>
       <label className="flex items-start gap-3 rounded-xl border border-line bg-white p-4 text-sm">
         <input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)} className="mt-0.5 size-5 shrink-0 accent-brand-500" />
         <span>
-          I agree to BitoCard processing my ID document and photos of my face, including a comparison of my face with my ID (biometric data), to check my identity, as the{" "}
-          <a href={privacyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 underline">
-            privacy notice
-          </a>{" "}
-          explains.
+          {`I agree to ${brand.name} processing my ID document and photos of my face, including a comparison of my face with my ID (biometric data), to check my identity`}
+          {privacyUrl ? (
+            <>
+              {", as the "}
+              <a href={privacyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 underline">
+                privacy notice
+              </a>
+              {" explains."}
+            </>
+          ) : (
+            "."
+          )}
         </span>
       </label>
       {error ? <Notice tone="red">{error.message}</Notice> : null}

@@ -4,6 +4,7 @@ import { LinkProblem } from "@/components/link-problem";
 import { VerifyFooter, VerifyHeader } from "@/components/header";
 import { Wizard } from "@/components/wizard";
 import { currentCase } from "@/lib/api";
+import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Identity check" };
 
@@ -15,7 +16,7 @@ export default async function VerifyPage() {
       <VerifyHeader brand={result.ok ? result.data.brand : null} />
       <main className="mx-auto w-full max-w-xl px-4 py-5">
         {result.ok ? (
-          <Wizard key={result.data.id} initial={result.data} privacyUrl={appUrl("legals", "/documents/privacy")} />
+          <Wizard key={result.data.id} initial={result.data} privacyUrl={brand.key === "bitocard" ? appUrl("legals", "/documents/privacy") : brand.privacyUrl} />
         ) : (
           <LinkProblem unreachable={result.status === 0 || result.status >= 500} />
         )}

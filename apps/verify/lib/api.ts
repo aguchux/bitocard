@@ -2,26 +2,27 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import type { KycCase, KycSession } from "@bitocard/api-client/kyc";
+import { brand } from "./brand";
 
 /**
- * The applicant's side of BitoCard Verify. The API gives a session for the case when the one-time link is exchanged;
+ * The applicant's side of Verify (BitoCard's or Afrippa's, `brand`). The API gives a session for the case when the one-time link is exchanged;
  * this server keeps it in its own host-only, httpOnly cookie and sends it to the API in a header. The browser never
  * sees the token, and never calls the API for the applicant.
  */
-export const kycCookie = "bc_kyc";
+export const kycCookie = brand.cookie;
 const sessionHeader = "bitocard-kyc-session";
 /** The session lasts two hours on the API; the cookie never outlives it. */
 export const kycCookieMaxAge = 2 * 60 * 60;
 
-/** The BitoCard API: `API_URL`, then the public address, then production on Vercel and the local API (3001) in development. */
+/** The API: `API_URL`, then the public address, then the brand's production address on Vercel and the local API (3001) in development. */
 export function apiUrl(path: string) {
-  const base = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? (process.env.VERCEL ? "https://api.bitocard.com" : "http://localhost:3001");
+  const base = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? (process.env.VERCEL ? brand.apiDefault : "http://localhost:3001");
   return `${base.replace(/\/+$/, "")}${path}`;
 }
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
 
-const unreachable = { ok: false, status: 0, code: null, message: "We could not reach BitoCard. Check your connection and try again.", param: null } as const;
+const unreachable = { ok: false, status: 0, code: null, message: `We could not reach ${brand.name}. Check your connection and try again.`, param: null } as const;
 
 /** The cookie's settings: host-only (no domain), httpOnly, Strict, two hours. Secure everywhere but local development. */
 export function kycCookieOptions() {
@@ -62,13 +63,13 @@ export async function kycApi<T>(method: "GET" | "POST" | "PUT", path: string, bo
 
 /** The applicant's case, or why it cannot be read (no session, an ended one, the API down). */
 export function currentCase() {
-  return kycApi<KycCase>("GET", "/v1/kyc/case");
+  return kycApi<KycCase>("GET", `${brand.apiPrefix}/case`);
 }
 
 /** The handoff token from the link exchanged for a session (public: no session header). Single use. */
 export async function exchangeToken(token: string): Promise<ApiResult<KycSession>> {
   try {
-    const res = await fetch(apiUrl("/v1/kyc/session"), {
+    const res = await fetch(apiUrl(`${brand.apiPrefix}/session`), {
       method: "POST",
       cache: "no-store",
       headers: { accept: "application/json", "content-type": "application/json", "idempotency-key": randomUUID() },

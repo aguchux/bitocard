@@ -60,6 +60,19 @@ describe('icons', () => {
     });
   }
 
+  test("Verify's Afrippa deployment has Afrippa's whole set in public/afrippa, served at the usual addresses", () => {
+    const dir = join(root, 'apps/verify/public/afrippa');
+    assert.deepEqual(ico(join(dir, 'favicon.ico')), [16, 32, 48]);
+    assert.equal(readFileSync(join(dir, 'icon.svg'), 'utf8').match(/<image /g)?.length, 2);
+    assert.deepEqual([png(join(dir, 'icon1.png')).width, png(join(dir, 'apple-icon.png')).colourType], [96, 2]);
+    for (const [file, size] of Object.entries(manifestIcons)) assert.equal(png(join(dir, file)).width, size, file);
+    for (const file of ['afrippa-mark.png', 'afrippa-mark-light.png', 'afrippa-logo.png', 'afrippa-logo-light.png']) assert.ok(existsSync(join(dir, file)), file);
+    // Every file the rewrites name is there.
+    const brand = readFileSync(join(root, 'apps/verify/lib/brand.ts'), 'utf8');
+    const listed = /afrippaIconFiles = \[([^\]]+)\]/.exec(brand)[1].match(/"([^"]+)"/g).map(item => item.slice(1, -1));
+    for (const file of listed) assert.ok(existsSync(join(dir, file)), file);
+  });
+
   test('the shared manifest icon list names files at their real sizes', () => {
     const site = readFileSync(join(root, 'packages/ui/src/site.ts'), 'utf8');
     const listed = [...site.matchAll(/\{ src: "\/([\w-]+\.png)", sizes: "(\d+)x(\d+)", type: "image\/png", purpose: "(any|maskable)" \}/g)];

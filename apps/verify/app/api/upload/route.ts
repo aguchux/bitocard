@@ -1,4 +1,5 @@
 import type { KycCase } from "@bitocard/api-client/kyc";
+import { brand } from "@/lib/brand";
 import { kycApi } from "@/lib/api";
 import { uploadProblem } from "@/lib/documents";
 import { crossSite, errorReply, reply } from "@/lib/requests";
@@ -20,5 +21,5 @@ export async function POST(request: Request) {
   const forward = new FormData();
   forward.set("kind", kind);
   forward.set("file", file, file instanceof File && file.name ? file.name : `${kind}.${file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : "jpg"}`);
-  return reply(await kycApi<KycCase>("POST", "/v1/kyc/case/documents", forward));
+  return reply(await kycApi<KycCase>("POST", `${brand.apiPrefix}/case/documents`, forward));
 }

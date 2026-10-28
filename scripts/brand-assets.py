@@ -33,6 +33,10 @@ BRANDS = [
     ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa", "afrippa-admin"]),
 ]
 
+# Apps deployed a second time in another brand: that brand's whole set (marks, favicons, app and manifest icons) goes in
+# one folder of the app's public/, served at the usual addresses by that deployment (apps/verify/next.config.ts).
+SECOND_BRAND = {"afrippa": [ROOT / "apps" / "verify" / "public" / "afrippa"]}
+
 WHITE = np.array([255, 255, 255])
 
 
@@ -130,6 +134,24 @@ def write_icons(dark: Image.Image, white: Image.Image, apps):
     print(f"Wrote favicon.ico, icon.svg, icon1.png, apple-icon.png and the manifest icons to {len(apps)} apps")
 
 
+def write_folder(folder, outputs, dark: Image.Image, white: Image.Image):
+    """A brand's whole set in one folder, for an app deployed a second time in that brand."""
+    folder.mkdir(parents=True, exist_ok=True)
+    for file, picture in outputs.items():
+        picture.save(folder / file, optimize=True)
+    for file, picture in {
+        "icon-192.png": fitted(dark, 192, 0.84),
+        "icon-512.png": fitted(dark, 512, 0.84),
+        "icon-maskable-512.png": fitted(dark, 512, 0.56, (255, 255, 255, 255)),
+        "icon1.png": fitted(dark, 96, 0.9),
+        "apple-icon.png": fitted(dark, 180, 0.66, (255, 255, 255, 255)).convert("RGB"),
+    }.items():
+        picture.save(folder / file, optimize=True)
+    fitted(dark, 48, 0.96).save(folder / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+    (folder / "icon.svg").write_text(adaptive_svg(dark, white), encoding="utf-8")
+    print(f"Wrote the whole set to {folder.relative_to(ROOT)}")
+
+
 def main():
     for brand, source, apps in BRANDS:
         write_brand(brand, source, apps)
@@ -149,6 +171,8 @@ def write_brand(brand, source, apps):
         public.mkdir(parents=True, exist_ok=True)
         for file, picture in outputs.items():
             picture.save(public / file, optimize=True)
+    for folder in SECOND_BRAND.get(brand, []):
+        write_folder(folder, outputs, dark, white)
     sizes = {file: picture.size for file, picture in outputs.items()}
     print(f"Wrote {', '.join(f'{file} {w}x{h}' for file, (w, h) in sizes.items())} to {len(apps)} apps")
     write_icons(dark, white, apps)

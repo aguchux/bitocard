@@ -9,6 +9,7 @@ import { LivenessStep } from "@/components/liveness-step";
 import { PhotoStep } from "@/components/photo-step";
 import { saveStep } from "@/lib/client";
 import { chosenIdType, currentStep, neighbours, pendingItems, planSteps, progress, type StepKey, stepTitles } from "@/lib/steps";
+import { brand } from "@/lib/brand";
 
 /** "Back to Ada Gifts", where the applicant came from. */
 function BackLink({ kase, primary }: { kase: KycCase; primary?: boolean }) {
@@ -44,7 +45,7 @@ function StatusView({ kase }: { kase: KycCase }) {
       {view.text ? <p className="text-muted">{view.text}</p> : null}
       {kase.status === "declined" ? (
         <Notice tone="red" title={kase.reason_text ?? (kase.reason ? (kycDeclineReasons[kase.reason as KycDeclineReason] ?? "Not approved") : "Not approved")}>
-          {kase.note ? <span className="whitespace-pre-line">{kase.note}</span> : "If you think this is a mistake, contact the store or BitoCard support."}
+          {kase.note ? <span className="whitespace-pre-line">{kase.note}</span> : brand.key === "bitocard" ? "If you think this is a mistake, contact the store or BitoCard support." : `If you think this is a mistake, contact ${brand.name} support.`}
         </Notice>
       ) : null}
       <BackLink kase={kase} primary />
@@ -103,7 +104,7 @@ const documentTips = ["Use the original document, not a photocopy or a screen.",
  * The applicant's wizard: one step per screen, resumed from what the case still needs (or only what the reviewer asked
  * to redo), then the status once sent.
  */
-export function Wizard({ initial, privacyUrl }: { initial: KycCase; privacyUrl: string }) {
+export function Wizard({ initial, privacyUrl }: { initial: KycCase; privacyUrl: string | null }) {
   const [kase, setKase] = useState(initial);
   // What the applicant saved again during this visit, for a resubmission's items without a document of their own.
   const [saved, setSaved] = useState<ReadonlySet<string>>(() => new Set());

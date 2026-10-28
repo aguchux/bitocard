@@ -1,16 +1,33 @@
 import { Brand } from "@bitocard/ui/brand";
+import { brand as verifyBrand } from "@/lib/brand";
+
+/** The product's logo: BitoCard's lockup, or Afrippa's mark with "Afri" in ink and "ppa" in the accent. */
+function Logo() {
+  if (verifyBrand.key === "bitocard") return <Brand />;
+  const [first, second] = verifyBrand.wordmark;
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a small static mark */}
+      <img src={verifyBrand.mark} alt="" className="h-[1.1em] w-auto" />
+      <span>
+        <span className="text-navy-900">{first}</span>
+        <span className="text-brand-500">{second}</span>
+      </span>
+    </>
+  );
+}
 
 /**
- * BitoCard Verify's header: the BitoCard logo, and for a store's customers the store they are verifying for (its
- * name and logo), so they know why they are here.
+ * Verify's header: the product's logo (BitoCard's or Afrippa's), and for a store's customers the store they are
+ * verifying for (its name and logo), so they know why they are here.
  */
 export function VerifyHeader({ brand }: { brand?: { name: string; logo_url: string | null } | null }) {
-  const store = brand && brand.name !== "BitoCard" ? brand : null;
+  const store = brand && brand.name !== verifyBrand.name ? brand : null;
   return (
     <header className="mx-auto flex w-full max-w-xl items-center justify-between gap-3 px-4 pt-5 sm:pt-8">
-      <span className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-ink" aria-label="BitoCard Verify">
+      <span className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-ink" aria-label={verifyBrand.product}>
         <span className="flex items-center gap-[0.3em]" aria-hidden="true">
-          <Brand />
+          <Logo />
         </span>
         <span className="rounded-full bg-navy-100 px-2 py-0.5 text-xs font-bold text-navy-900">Verify</span>
       </span>
@@ -31,5 +48,5 @@ export function VerifyHeader({ brand }: { brand?: { name: string; logo_url: stri
 }
 
 export function VerifyFooter() {
-  return <footer className="mx-auto max-w-xl px-4 pb-8 pt-6 text-center text-xs text-subtle">BitoCard Verify · A Golojan Ltd venture</footer>;
+  return <footer className="mx-auto max-w-xl px-4 pb-8 pt-6 text-center text-xs text-subtle">{`${verifyBrand.product} · A Golojan Ltd venture`}</footer>;
 }

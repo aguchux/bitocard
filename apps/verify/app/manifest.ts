@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
 import { manifestIcons } from "@bitocard/ui/site";
+import { brand } from "@/lib/brand";
 
-/** BitoCard Verify can be added to a Home Screen like the other apps. The icons are the "b" mark. */
+/** Verify can be added to a Home Screen like the other apps, with its brand's name and mark (Afrippa's icons are served at the same addresses on its deployment). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "BitoCard Verify",
-    short_name: "BitoCard Verify",
-    description: "Check your identity, or your business, for BitoCard and the stores it supplies.",
+    name: brand.product,
+    short_name: brand.product,
+    description: brand.description,
     start_url: "/",
     scope: "/",
     display: "standalone",

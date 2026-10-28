@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { siteUrl } from "@bitocard/ui/site";
+import { brand } from "@/lib/brand";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(3006),
-  title: { default: "BitoCard Verify", template: "%s | BitoCard Verify" },
-  description: "Check your identity, or your business, for BitoCard and the stores it supplies.",
+  title: { default: brand.product, template: `%s | ${brand.product}` },
+  description: brand.description,
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };

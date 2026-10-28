@@ -13,6 +13,7 @@ const { default: BooksPage } = await import("@/app/(console)/books/page");
 const { default: TicketsPage } = await import("@/app/(console)/support/page");
 const { TraderStanding } = await import("@/components/trader-standing");
 const { default: NotificationsPage } = await import("@/app/(console)/notifications/page");
+const { default: ChecksPage } = await import("@/app/(console)/verifications/page");
 
 const admin = { id: "a1", name: "Ada Okafor", email: "ada@afrippa.com", roles: ["operations", "finance"] };
 const traderId = "5b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
@@ -81,6 +82,12 @@ beforeEach(() => {
     if (path === `/v1/afrippa/admin/traders/${traderId}/standing`) return ok(standing);
     if (path === `/v1/afrippa/admin/traders/${traderId}/standing/clear`) return ok({ ...standing, strikes: 0, restriction: null, cleared_at: "2026-10-28T00:00:00.000Z" });
     if (path === `/v1/afrippa/admin/traders/${traderId}/two-step/reset`) return ok({ object: "trader_two_step_reset" });
+    if (path === "/v1/afrippa/admin/kyc/cases")
+      return ok({
+        object: "list",
+        has_more: false,
+        data: [{ object: "kyc_review", id: "k9", kind: "kyc", subject: "customer", mode: "live", country: "NG", status: "submitted", reviewer: "admin", applicant: { type: "customer", id: "c1", name: "Ada Trader", email: "ada@example.com", business_name: null }, store: null, reseller: { id: "r", name: "Afrippa" }, duplicates: [], submitted_at: "2026-10-28T00:00:00.000Z" }],
+      });
     if (path === "/v1/afrippa/admin/support/tickets")
       return ok({ object: "list", data: [{ object: "support_ticket", id: "k1", reference: "T-000003", subject: "Where are my coins?", category: "payment", priority: "normal", status: "open", last_message_at: "2026-10-28T00:00:00.000Z" }] });
     return Response.json({ error: { type: "not_found_error", code: "resource_missing", message: "Not found." } }, { status: 404 });
@@ -198,6 +205,13 @@ describe("admin.afrippa.com books, standing and help", () => {
     for (const path of ["/v1/afrippa/admin/devices/push-settings", "/v1/afrippa/admin/devices", "/v1/afrippa/admin/notification-preferences"]) {
       expect(sent.some(call => call.path === path), path).toBe(true);
     }
+    neverBitoCard();
+  });
+
+  test("identity checks: traders' cases from Afrippa's own Verify", async () => {
+    page(<ChecksPage />);
+    expect((await screen.findAllByText("Ada Trader", {}, slow)).length).toBeGreaterThan(0);
+    expect(sent.find(call => call.path.startsWith("/v1/afrippa/admin/kyc/cases"))?.path).toMatch(/^\/v1\/afrippa\/admin\/kyc\/cases\?/);
     neverBitoCard();
   });
 
