@@ -17,7 +17,7 @@ const railStep = 200;
  * wheels, trackpads and fingers scroll it directly, and keyboard focus brings a section into view). The current
  * section is brought into view when the rail appears.
  */
-function Rail({ brand, sections, active, onNavigate }: { brand: string; sections: NavItem<string>[]; active: string; onNavigate?: () => void }) {
+function Rail({ brand, logo, sections, active, onNavigate }: { brand: string; logo: string; sections: NavItem<string>[]; active: string; onNavigate?: () => void }) {
   const list = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState({ up: false, down: false });
   useEffect(() => {
@@ -42,8 +42,8 @@ function Rail({ brand, sections, active, onNavigate }: { brand: string; sections
   return (
     <nav aria-label="Main" className="flex h-full flex-col bg-navy-900 text-white">
       <AppLink href="/" className="flex shrink-0 flex-col items-center gap-1 px-3 pt-4 pb-3 text-center" onClick={onNavigate}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- the light "b" mark for the navy rail, from the app's public folder */}
-        <img src="/bitocard-mark-light.png" alt="" className="h-9 w-auto" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- the product's light mark for the navy rail, from the app's public folder */}
+        <img src={logo} alt="" className="h-9 w-auto" />
         <span className="text-sm font-extrabold tracking-tight">{brand}</span>
       </AppLink>
       <div className="relative min-h-0 flex-1">
@@ -191,6 +191,8 @@ export function AccountMenu({ name, email, detail, children, signingOut, onSignO
 export type ConsoleShellProps<K extends string> = {
   /** The name under the logo in the rail. */
   brand: string;
+  /** The light mark on the navy rail, from the app's public folder (BitoCard's by default; Afrippa's admin its own). */
+  logo?: string;
   sections: NavItem<K>[];
   menus: Record<K, { title: string; items: SubNavItem[] }>;
   section: K;
@@ -211,7 +213,7 @@ export type ConsoleShellProps<K extends string> = {
  * The layout of the admin app and SHQ: navy rail, section menu, breadcrumbs and account menu. On phones the rail and
  * section menu move into a drawer.
  */
-export function ConsoleShell<K extends string>({ brand, sections, menus, section, current, crumbs, actions, account, notifications, banner, children }: ConsoleShellProps<K>) {
+export function ConsoleShell<K extends string>({ brand, logo = '/bitocard-mark-light.png', sections, menus, section, current, crumbs, actions, account, notifications, banner, children }: ConsoleShellProps<K>) {
   const [drawer, setDrawer] = useState(false);
   const { title: sectionTitle, items: subnav } = menus[section];
   useEffect(() => {
@@ -227,7 +229,7 @@ export function ConsoleShell<K extends string>({ brand, sections, menus, section
         Skip to content
       </a>
       <div className="sticky top-0 hidden h-svh w-24 shrink-0 lg:block">
-        <Rail brand={brand} sections={sections} active={section} />
+        <Rail brand={brand} logo={logo} sections={sections} active={section} />
       </div>
       <aside className="sticky top-0 hidden h-svh w-60 shrink-0 overflow-y-auto border-r border-line bg-white xl:block">
         <SubNav title={sectionTitle} items={subnav} current={current} />
@@ -236,7 +238,7 @@ export function ConsoleShell<K extends string>({ brand, sections, menus, section
       {drawer ? (
         <div className="fixed inset-0 z-40 flex xl:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="h-dvh w-24 shrink-0">
-            <Rail brand={brand} sections={sections} active={section} onNavigate={() => setDrawer(false)} />
+            <Rail brand={brand} logo={logo} sections={sections} active={section} onNavigate={() => setDrawer(false)} />
           </div>
           <div className="w-64 max-w-[calc(100vw-6rem)] overflow-y-auto bg-white">
             <div className="flex justify-end p-2">

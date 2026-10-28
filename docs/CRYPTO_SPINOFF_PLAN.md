@@ -209,7 +209,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 3. SEO from day one (as built: market and trader pages indexed).
 4. **Market addresses:** the global market at `afrippa.com`, each country at `afrippa.com/ng` (as built), and `ng.afrippa.com`-style short addresses redirecting there for good (see Market addresses).
 5. **verify.afrippa.com:** the Verify app (`apps/verify`) made brand-configurable (name, colours, logo, domain, the review console's sign-in) and deployed a second time as its own Vercel project for Afrippa.
-6. **admin.afrippa.com:** `apps/afrippa-admin`, its own Vercel project, on the shared admin components, with the sections in Architecture 4.
+6. **admin.afrippa.com:** `apps/afrippa-admin`, its own Vercel project, on the shared admin components, with the sections in Architecture 4. **Started (28 October 2026):** the app, signing in against Afrippa's admin realm with BitoCard's own sign-in, gate, step-up and inbox code (`setAdminProduct('afrippa')`, the API at `api.afrippa.com`), appeals and orders with their rooms and decisions, reports, notifications, activity, and the Crypto pages moved from BitoCard's admin app. Still to do: the help desk, settings (fee rates, limits, two-step methods, refused words, integrations), standing, the books, devices and push, and its Vercel project, DNS and `api.afrippa.com`.
 7. **The signer rebranded:** `apps/signer` becomes Afrippa's (`@afrippa/signer`, its Vercel project and team renamed or moved to Afrippa, its address on afrippa.com), `docs/crypto-signer.md` rewritten as Afrippa's protocol, its Turnkey organisation and wallet named for Afrippa; the API asks it only for Afrippa. Its secrets are rotated in the move.
 
 ### 5. Hardening

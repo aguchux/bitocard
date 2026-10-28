@@ -3,7 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ActionDialog, Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatMoney, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import { type Mode, type P2pAd, useCancelP2pAdMutation, useP2pAdsQuery } from "@bitocard/api-client/admin";
 
 const statusTone: Record<P2pAd["status"], Tone> = { active: "green", paused: "amber", completed: "grey", cancelled: "grey" };

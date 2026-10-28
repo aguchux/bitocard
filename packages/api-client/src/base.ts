@@ -3,8 +3,12 @@ import { type BaseQueryFn, createApi, type FetchArgs, fetchBaseQuery } from '@re
 /** BitoCard's error shape: `{ error: { type, code, message, param?, request_id } }`. */
 export type ApiError = { status: number; type: string; code: string; message: string; param?: string; requestId?: string };
 
-/** Where the API lives: NEXT_PUBLIC_API_URL (for example http://localhost:3001 in development), else production. */
-export const apiBaseUrl = () => (process.env.NEXT_PUBLIC_API_URL ?? 'https://api.bitocard.com').replace(/\/$/, '');
+/**
+ * Where the API lives: NEXT_PUBLIC_API_URL (for example http://localhost:3001 in development), else production:
+ * api.bitocard.com, or api.afrippa.com for Afrippa's admin (its own host, so its admin cookie stays same-site).
+ */
+// eslint-disable-next-line @typescript-eslint/no-use-before-define -- read when called, long after it is set
+export const apiBaseUrl = () => (process.env.NEXT_PUBLIC_API_URL ?? (adminProduct === 'afrippa' ? 'https://api.afrippa.com' : 'https://api.bitocard.com')).replace(/\/$/, '');
 
 /**
  * Headers SHQ adds to every request: which of the person's reseller accounts it acts for (`BitoCard-Reseller`) and
@@ -16,6 +20,18 @@ export function setRequestContext(next: { reseller?: string | null; mode?: 'live
   if ('mode' in next) requestContext.mode = next.mode;
 }
 
+/**
+ * Which product's admin routes the admin hooks call. BitoCard's admin app leaves it at `bitocard` (`/v1/admin/...`);
+ * Afrippa's (admin.afrippa.com) sets `afrippa` once at start-up, so the same hooks and screens (signing in, the session
+ * gate, step-up, the inbox) call Afrippa's own admin realm (`/v1/afrippa/admin/...`). Nothing else is rewritten.
+ */
+let adminProduct: 'bitocard' | 'afrippa' = 'bitocard';
+export function setAdminProduct(product: 'bitocard' | 'afrippa') {
+  adminProduct = product;
+}
+/** A path as the current admin product calls it. */
+export const adminPath = (path: string) => (adminProduct === 'afrippa' && path.startsWith('/v1/admin/') ? `/v1/afrippa${path.slice(3)}` : path);
+
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 /**
@@ -24,7 +40,7 @@ const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 
  */
 export function apiFetch(path: string, init: RequestInit = {}) {
   const method = (init.method ?? 'GET').toUpperCase();
-  return fetch(`${apiBaseUrl()}${path}`, {
+  return fetch(`${apiBaseUrl()}${adminPath(path)}`, {
     ...init,
     credentials: 'include',
     headers: {
@@ -89,7 +105,8 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
     return raw;
   };
   return async (args, api, extra) => {
-    const original: FetchArgs = typeof args === 'string' ? { url: args } : { ...args };
+    const asked: FetchArgs = typeof args === 'string' ? { url: args } : { ...args };
+    const original: FetchArgs = { ...asked, url: adminPath(asked.url) };
     const method = (original.method ?? 'GET').toUpperCase();
     const send = () => {
       const request: FetchArgs = {

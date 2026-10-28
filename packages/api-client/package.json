@@ -10,7 +10,8 @@
     "./storefront": "./src/storefront.ts",
     "./classifieds": "./src/classifieds.ts",
     "./kyc": "./src/kyc.ts",
-    "./crypto": "./src/crypto.ts"
+    "./crypto": "./src/crypto.ts",
+    "./afrippa-admin": "./src/afrippa-admin.ts"
   },
   "scripts": {
     "lint": "eslint .",

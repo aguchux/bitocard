@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Badge, Button, Card, CardHeader, DataTable, errorMessage, FilterSelect, formatDateTime, Input, Notice, PageHeader, Toggle, type Column, type Tone } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import { type CryptoAsset, type CryptoReconciliation, type Mode, useCryptoAssetsQuery, useCryptoReconciliationsQuery, useRunCryptoReconciliationMutation, useUpdateCryptoAssetMutation } from "@bitocard/api-client/admin";
 
 /** The fee as a percentage, saved in basis points (0 to 10%). */
@@ -73,7 +74,7 @@ function CustodyCheck({ runs }: { runs: boolean }) {
     <Card>
       <CardHeader
         title="Custody check"
-        description="Daily: customers' crypto and BitoCard's fees in custody (less withdrawals on their way, plus deposits arriving) against what the signer's wallets hold. A shortfall is urgent."
+        description="Daily: customers' crypto and Afrippa's fees in custody (less withdrawals on their way, plus deposits arriving) against what the signer's wallets hold. A shortfall is urgent."
         actions={
           <span className="flex flex-wrap items-center gap-2">
             <FilterSelect id="custody-mode" label="Mode" value={mode} onChange={value => setMode(value as Mode)} options={[{ value: "live", label: "Live" }, { value: "test", label: "Test" }]} />
@@ -94,7 +95,7 @@ function CustodyCheck({ runs }: { runs: boolean }) {
   );
 }
 
-/** Crypto > Assets: which coins customers can hold and trade, BitoCard's P2P fee on each, and withdrawal limits. */
+/** Crypto > Assets: which coins customers can hold and trade, Afrippa's P2P fee on each, and withdrawal limits. */
 export default function CryptoAssetsPage() {
   const admin = useAdmin();
   const editable = can(admin, "operations");
@@ -138,15 +139,11 @@ export default function CryptoAssetsPage() {
     <AdminShell section="crypto" current="/crypto/assets" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Assets" }]}>
       <PageHeader
         title="Assets"
-        description="Coins customers can hold and trade. BitoCard's P2P fee is taken in the coin from what the buyer receives. Withdrawals from the approval amount wait for finance (0: none do)."
+        description="Coins customers can hold and trade. Afrippa's P2P fee is taken in the coin from what the buyer receives. Withdrawals from the approval amount wait for finance (0: none do)."
       />
       <div className="mt-6 space-y-4">
         <Notice tone="amber">
-          Crypto and P2P are off until switched on per market or store (
-          <AppLink href="/settings" className="font-semibold underline">
-            Feature switches
-          </AppLink>
-          : crypto_wallets and p2p_trading). Take legal advice for each market first.
+          Crypto and P2P are off in a market until switched on there (crypto_wallets and p2p_trading). Take legal advice for each market first.
         </Notice>
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
         <Card>

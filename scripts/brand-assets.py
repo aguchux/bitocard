@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Each brand: its master artwork and the apps that wear it.
 BRANDS = [
     ("bitocard", ROOT / "assets" / "logo.png", ["storefront", "docs", "legals", "admin", "shq", "verify", "shop"]),
-    ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa"]),
+    ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa", "afrippa-admin"]),
 ]
 
 WHITE = np.array([255, 255, 255])

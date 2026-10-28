@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, RefreshCw } from "lucide-react";
 import { Badge, Button, Card, CardHeader, errorMessage, formatRelative, Input, Notice, PageHeader, QueryView, Skeleton, Toggle } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import { type ChainView, type CryptoNetworkSetting, useChainsQuery, useCheckChainsMutation, useSetChainRoutesMutation, useUpdateCryptoNetworkMutation } from "@bitocard/api-client/admin";
 
 /** One network's settings: deposits on or off, confirmations, the test network token, the two-provider amount. */
@@ -89,7 +90,7 @@ function NetworkRow({ network, editable, ready }: { network: CryptoNetworkSettin
   );
 }
 
-/** One chain: its providers in the order BitoCard asks them (move up or down, switch off), their health, its networks. */
+/** One chain: its providers in the order Afrippa asks them (move up or down, switch off), their health, its networks. */
 function ChainCard({ chain, editable }: { chain: ChainView; editable: boolean }) {
   const [setRoutes, state] = useSetChainRoutesMutation();
   const order = chain.routes.map(route => route.provider);
@@ -153,7 +154,7 @@ function ChainCard({ chain, editable }: { chain: ChainView; editable: boolean })
 }
 
 /**
- * Crypto > Chains: for each chain, the blockchain providers BitoCard reads it through, in order (the first that
+ * Crypto > Chains: for each chain, the blockchain providers Afrippa reads it through, in order (the first that
  * answers is used; a failing one is passed over), their health, and the coins and tokens deposited on it.
  */
 export default function ChainsPage() {
@@ -165,7 +166,7 @@ export default function ChainsPage() {
     <AdminShell section="crypto" current="/crypto/chains" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Chains" }]}>
       <PageHeader
         title="Chains"
-        description="Providers per chain in the order BitoCard asks them; the next is used when one fails. Large deposits wait until a second provider agrees."
+        description="Providers per chain in the order Afrippa asks them; the next is used when one fails. Large deposits wait until a second provider agrees."
         actions={
           editable ? (
             <Button variant="secondary" icon={<RefreshCw className="size-4" aria-hidden="true" />} loading={checking.isLoading} onClick={() => void check()}>
@@ -176,7 +177,7 @@ export default function ChainsPage() {
       />
       <div className="mt-6 space-y-4">
         <Notice tone="blue">
-          Set provider keys and BitoCard&apos;s wallet keys in{" "}
+          Set provider keys and Afrippa&apos;s wallet keys in{" "}
           <AppLink href="/settings/integrations" className="font-semibold underline">
             Settings &gt; Integrations &gt; Blockchain
           </AppLink>

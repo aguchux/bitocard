@@ -1,4 +1,4 @@
-import { AlertTriangle, Repeat, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Store, Flag, HandCoins, SlidersHorizontal, Tags, MapPin, ArrowDownToLine, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Repeat, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Store, Flag, HandCoins, SlidersHorizontal, Tags, MapPin, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'classifieds' | 'reports' | 'support' | 'settings';
 
@@ -93,17 +93,10 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Settings', href: '/storefront/settings', icon: Settings },
     ],
   },
+  // Crypto's pages moved to Afrippa's own admin (apps/afrippa-admin); customers' payouts (Safe pay sellers) stay here.
   crypto: {
-    title: 'Crypto',
-    items: [
-      { label: 'Wallets & freezes', href: '/crypto', icon: Snowflake },
-      { label: 'P2P ads', href: '/crypto/ads', icon: ListChecks },
-      { label: 'Deposits', href: '/crypto/deposits', icon: ArrowDownToLine },
-      { label: 'Withdrawals', href: '/crypto/withdrawals', icon: ArrowUpFromLine },
-      { label: 'P2P payouts', href: '/crypto/payouts', icon: Building2 },
-      { label: 'Chains', href: '/crypto/chains', icon: PlugZap },
-      { label: 'Assets', href: '/crypto/assets', icon: Coins },
-    ],
+    title: 'Payouts',
+    items: [{ label: 'Customer payouts', href: '/crypto/payouts', icon: Building2 }],
   },
   classifieds: {
     title: 'BitoCard Shop',

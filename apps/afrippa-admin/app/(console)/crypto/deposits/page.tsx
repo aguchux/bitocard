@@ -4,7 +4,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
 import { CoinOwnerLink } from "@/components/coin-owner";
-import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import { type CryptoDeposit, type Mode, useCryptoDepositsQuery, useRecheckCryptoDepositMutation } from "@bitocard/api-client/admin";
 
 const tones: Record<CryptoDeposit["status"], Tone> = { pending: "amber", credited: "green", ignored: "grey", failed: "red" };

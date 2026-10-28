@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 const root = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify', 'shop', 'afrippa'];
+const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify', 'shop', 'afrippa', 'afrippa-admin'];
 /** Afrippa wears its own mark; every other app BitoCard's. */
-const brandOf = app => (app === 'afrippa' ? 'afrippa' : 'bitocard');
+const brandOf = app => (app.startsWith('afrippa') ? 'afrippa' : 'bitocard');
 
 /** Width, height and colour type from a PNG's header. */
 function png(path) {

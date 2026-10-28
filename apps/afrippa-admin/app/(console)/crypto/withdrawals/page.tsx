@@ -4,7 +4,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ActionDialog, Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
 import { CoinOwnerLink } from "@/components/coin-owner";
-import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import {
   type CryptoWithdrawal,
   type CryptoWithdrawalStatus,
@@ -156,7 +157,7 @@ function Withdrawals() {
     <AdminShell section="crypto" current="/crypto/withdrawals" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Withdrawals" }]}>
       <PageHeader
         title="Withdrawals"
-        description="Customers' on-chain withdrawals. BitoCard's signer sends each once; it counts as sent only when the chain shows it confirmed. Rejected or failed ones go back to the customer's wallet."
+        description="Customers' on-chain withdrawals. Afrippa's signer sends each once; it counts as sent only when the chain shows it confirmed. Rejected or failed ones go back to the customer's wallet."
       />
       <div className="mt-6 flex flex-wrap gap-3">
         <FilterSelect id="withdrawals-mode" label="Mode" value={mode} onChange={value => setMode(value as Mode)} options={[{ value: "live", label: "Live" }, { value: "test", label: "Test" }]} />

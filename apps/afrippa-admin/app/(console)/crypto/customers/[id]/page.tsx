@@ -3,7 +3,8 @@
 import { use, useState } from "react";
 import { Lock, Plus, Snowflake, Unlock } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, Field, formatDateTime, Input, PageHeader, QueryView, Select, Skeleton, Tabs, type Column } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import {
   type CryptoBalance,
   type CryptoCustomerDetail,
@@ -197,8 +198,7 @@ export default function CryptoCustomerPage({ params }: { params: Promise<{ id: s
                 Their activity: <AppLink href={`/crypto/ads?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P ads</AppLink> ·{" "}
                 <AppLink href={`/crypto/deposits?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Deposits</AppLink> ·{" "}
                 <AppLink href={`/crypto/withdrawals?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Withdrawals</AppLink> ·{" "}
-                <AppLink href={`/crypto/payouts?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P payouts</AppLink> ·{" "}
-                <AppLink href={`/storefront/spins?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Spin rewards</AppLink>
+                <AppLink href={`/orders/all?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Orders</AppLink>
               </p>
               {dialog === "freeze" ? <FreezeDialog customer={customer} open onClose={() => setDialog(null)} defaultMode={mode} /> : null}
               <CreditDialog customer={customer} open={dialog === "credit"} onClose={() => setDialog(null)} />
@@ -218,7 +218,7 @@ export default function CryptoCustomerPage({ params }: { params: Promise<{ id: s
                 description={
                   resolving
                     ? resolving.outcome === "seize"
-                      ? `${resolving.freeze.amount} ${resolving.freeze.asset} goes to BitoCard's adjustments for good (court orders, proven fraud). This cannot be undone.`
+                      ? `${resolving.freeze.amount} ${resolving.freeze.asset} goes to Afrippa's adjustments for good (court orders, proven fraud). This cannot be undone.`
                       : `${resolving.freeze.amount} ${resolving.freeze.asset} goes back to their available balance.`
                     : undefined
                 }

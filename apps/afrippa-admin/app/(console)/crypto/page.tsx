@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Card, DataTable, errorMessage, Input, PageHeader, useDebouncedValue, type Column } from "@bitocard/admin-ui";
-import { AdminShell } from "@bitocard/admin-ui/shell";
+import { AfrippaShell as AdminShell } from "@/components/shell";
 import { type CryptoCustomer, useCryptoCustomersQuery } from "@bitocard/api-client/admin";
 import { usePrefetchQuery } from "@bitocard/api-client";
 
@@ -25,7 +25,7 @@ const columns: Array<Column<CryptoCustomer>> = [
 ];
 
 /**
- * Crypto > Wallets & freezes: find any store's customer (by email or ID; with no search, those holding crypto) and
+ * Crypto > Wallets & freezes: find a trader (by email or ID; with no search, those holding crypto) and
  * open them to see their balances, freeze or release crypto, or freeze the whole crypto account.
  */
 export default function CryptoCustomersPage() {
@@ -37,7 +37,7 @@ export default function CryptoCustomersPage() {
   const customers = useCryptoCustomersQuery(q ? { q } : {});
   return (
     <AdminShell section="crypto" current="/crypto" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Wallets & freezes" }]}>
-      <PageHeader title="Wallets & freezes" description="Customers' crypto wallets across every store. Freeze an amount or a whole crypto account while you look into it; every change is audited." />
+      <PageHeader title="Wallets & freezes" description="Traders' crypto wallets. Freeze an amount or a whole crypto account while you look into it; every change is audited." />
       <Card className="mt-6">
         <div className="border-b border-line p-4">
           <label htmlFor="crypto-search" className="sr-only">
