@@ -9,6 +9,7 @@ import { cryptoAmount } from '../crypto/crypto.controller.js';
 import { maxFeeBps, P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { P2pStandingService } from '../crypto/p2p-standing.service.js';
 import { P2pTrustService, type ReportReason, reportReasons } from '../crypto/p2p-trust.service.js';
+import { P2pWordsService } from '../crypto/p2p-words.service.js';
 import { CryptoWalletsService } from '../crypto/crypto-wallets.service.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode, P2pOrderStatus } from '../generated/prisma/client.js';
@@ -91,6 +92,12 @@ class ReportsQueryDto {
 class DecideReportDto {
   @IsIn(['upheld', 'dismissed']) decision: 'upheld' | 'dismissed';
   @IsString() @Length(5, 1000) note: string;
+}
+
+class RefusedWordDto {
+  @IsString() @Length(2, 60) phrase: string;
+  /** A market, or null for every market. */
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsString() @Matches(/^[A-Za-z]{2}$/) market?: string | null;
 }
 
 class ClearStandingDto {
@@ -363,5 +370,31 @@ export class AfrippaReportsAdminController {
   @HttpCode(HttpStatus.OK)
   decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideReportDto) {
     return this.trust.decide(adminId(caller), id, body);
+  }
+}
+
+/** Afrippa's refused words (ad terms, nicknames, feedback): operations keep the list, audited; support reads it. */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('operations', 'support')
+@Controller('afrippa/admin/p2p/refused-words')
+export class AfrippaRefusedWordsAdminController {
+  constructor(private readonly words: P2pWordsService) {}
+
+  @Get()
+  list() {
+    return this.words.list();
+  }
+
+  @AdminRoles('operations')
+  @Post()
+  add(@CurrentCaller() caller: Caller, @Body() body: RefusedWordDto) {
+    return this.words.add(adminId(caller), body);
+  }
+
+  @AdminRoles('operations')
+  @Delete(':id')
+  remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.words.remove(adminId(caller), id);
   }
 }

@@ -16,6 +16,7 @@ import { CryptoMarketLimitsService, crossBorder } from './market-limits.service.
 import { P2pFeesService } from './p2p-fees.service.js';
 import { P2pStandingService } from './p2p-standing.service.js';
 import { P2pTrustService, type Trust } from './p2p-trust.service.js';
+import { P2pWordsService } from './p2p-words.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
@@ -72,6 +73,7 @@ export class P2pService {
     private readonly fees: P2pFeesService,
     private readonly standing: P2pStandingService,
     private readonly trustFigures: P2pTrustService,
+    private readonly words: P2pWordsService,
   ) {}
 
   /** Whether other countries' residents may trade in `country`'s local book: its market open, and cross-border on there. */
@@ -178,6 +180,8 @@ export class P2pService {
   async setNickname(customer: CustomerWithStore, nickname: string) {
     const profile = await this.profileFor(customer.id);
     if (profile.chosen) throw conflict('nickname_locked', 'Your nickname is already set.', 'nickname');
+    // Afrippa's traders: no contact details or refused words in a nickname.
+    if (isTrader(customer)) await this.words.check(nickname, customer.country, 'nickname');
     try {
       const claimed = await this.prisma.p2pProfile.updateMany({ where: { customerId: customer.id, chosen: false }, data: { nickname, nicknameKey: nickname.toLowerCase(), chosen: true } });
       if (claimed.count !== 1) throw conflict('nickname_locked', 'Your nickname is already set.', 'nickname');
@@ -538,7 +542,11 @@ export class P2pService {
     const { context, book } = await this.access(customer, input);
     // Afrippa's traders post escrow ads: paid directly to the seller through the payment methods listed.
     const escrow = isTrader(customer);
-    if (escrow) await this.standing.require(customer.id, context.mode);
+    if (escrow) {
+      await this.standing.require(customer.id, context.mode);
+      // An escrow ad's terms never carry contact that moves the trade off Afrippa, or refused words.
+      await this.words.check(input.terms, book.market, 'terms');
+    }
     const methods = escrow ? await this.adMethods(customer.id, context.mode, book.currency, input.payment_method_ids) : [];
     const window = escrow ? this.paymentWindow(input.payment_window ?? 15) : null;
     const rates = escrow ? await this.fees.rates(await this.wallets.asset(input.asset), book.market, context.mode) : null;
@@ -657,6 +665,7 @@ export class P2pService {
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: found.asset } });
     const sources = await this.fiatSources(customer.id, context.mode, found.currency);
     const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'p2p_fiat_locked', found.currency));
+    if (found.escrow) await this.words.check(input.terms, found.country, 'terms');
     const methods = found.escrow && input.payment_method_ids !== undefined ? await this.adMethods(customer.id, context.mode, found.currency, input.payment_method_ids) : null;
     const window = found.escrow && input.payment_window !== undefined ? this.paymentWindow(input.payment_window) : null;
     const ad = await this.prisma.$transaction(async tx => {

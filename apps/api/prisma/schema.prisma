@@ -4763,9 +4763,11 @@ model ClassifiedPriceHistory {
   @@map("classified_price_history")
 }
 
-/// Words and phrases BitoCard Shop refuses (`block`) or sends to a moderator (`review`), everywhere or in one country.
+/// Words and phrases a product refuses (`block`) or sends to a moderator (`review`), everywhere or in one country: BitoCard
+/// Shop's (`bitocard`), or Afrippa's (`afrippa`: ad terms, nicknames, feedback; block only). Neither reads the other's.
 model ClassifiedProhibitedWord {
   id          String   @id @default(uuid()) @db.Uuid
+  platform    Platform @default(bitocard)
   /// Null: every country.
   country     String?  @db.Char(2)
   phrase      String
@@ -4774,7 +4776,7 @@ model ClassifiedProhibitedWord {
   createdById String?  @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
 
-  @@index([country])
+  @@index([platform, country])
   @@map("classified_prohibited_words")
 }
 

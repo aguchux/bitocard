@@ -5,6 +5,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type LedgerMode } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { P2pWordsService } from './p2p-words.service.js';
 
 /** What traders may say about each other and what can be reported. */
 export const feedbackRatings = ['positive', 'negative'] as const;
@@ -31,11 +32,6 @@ const invalid = (code: string, message: string, param?: string) => new ApiError(
 const conflict = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
 const noTrader = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No trader by that nickname.', 'nickname');
 
-/** Words that move a trade off Afrippa: links, emails, handles and phone numbers. */
-function offPlatform(text: string) {
-  return /https?:\/\/|www\.|\b[\w.-]+\.(com|net|org|io|ng|gh|ke|co)\b|@\w|\b[\w.+-]+@[\w-]+\.\w+|(?:\d[\s-]?){10,}/i.test(text);
-}
-
 /**
  * Trust between Afrippa's traders (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 6): figures worked out from their orders
  * (orders completed, completion rate, how fast they pay and release) and feedback, shown on their ads and card;
@@ -48,6 +44,7 @@ export class P2pTrustService {
     private readonly prisma: PrismaService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly words: P2pWordsService,
   ) {}
 
   // -- Figures -------------------------------------------------------------------------------------------------
@@ -112,7 +109,7 @@ export class P2pTrustService {
     if (order.status !== 'released' || !order.closedAt) throw conflict('feedback_not_open', 'Feedback is given once an order is released.');
     if (order.closedAt.getTime() + feedbackDays * day < Date.now()) throw conflict('feedback_closed', `Feedback is given within ${feedbackDays} days of an order.`);
     const comment = input.comment?.trim() || null;
-    if (comment && offPlatform(comment)) throw invalid('comment_refused', 'Feedback cannot carry links, emails, handles or phone numbers.', 'comment');
+    await this.words.check(comment, order.market, 'comment', 'comment_refused');
     const toId = order.buyerId === customer.id ? order.sellerId : order.buyerId;
     try {
       const saved = await this.prisma.p2pFeedback.create({ data: { mode: order.mode, orderId, fromId: customer.id, toId, rating: input.rating, comment } });

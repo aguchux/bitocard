@@ -449,7 +449,7 @@ export class ShopAssistantService {
   /** Words the listing may carry: no link and no blocked phrase in the country. */
   private async allowedText(country: string, text: string) {
     if (linkPattern.test(text)) return false;
-    const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { action: 'block', OR: [{ country: null }, { country }] }, select: { phrase: true } });
+    const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { platform: 'bitocard', action: 'block', OR: [{ country: null }, { country }] }, select: { phrase: true } });
     const plain = ` ${text.toLowerCase().replace(/[^\p{L}\p{N}-]+/gu, ' ')} `;
     return !words.some(word => plain.includes(` ${word.phrase.toLowerCase().replace(/[^\p{L}\p{N}-]+/gu, ' ')} `));
   }

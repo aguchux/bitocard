@@ -537,7 +537,7 @@ export class ResaleStoresService {
       throw invalid('note_refused', 'A note cannot contain links, phone numbers, email addresses or social handles.', 'note');
     }
     const text = ` ${note.toLowerCase().replace(/[^\p{L}\p{N}-]+/gu, ' ')} `;
-    const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { OR: [{ country: null }, { country }] } });
+    const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { platform: 'bitocard', OR: [{ country: null }, { country }] } });
     if (words.some(word => text.includes(` ${word.phrase.replace(/[^\p{L}\p{N}-]+/gu, ' ')} `))) throw invalid('note_refused', 'This note uses words BitoCard Shop does not allow.', 'note');
     return note;
   }

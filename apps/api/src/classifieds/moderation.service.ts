@@ -55,7 +55,7 @@ export class ModerationService {
     const flags: ReviewFlag[] = [];
     const values = await this.prisma.classifiedListingFeature.findMany({ where: { listingId: listing.id, valueText: { not: null } }, select: { valueText: true } });
     const text = ` ${[listing.title, listing.description, ...values.map(value => value.valueText)].filter(Boolean).join(' ').toLowerCase().replace(/[^\p{L}\p{N}-]+/gu, ' ')} `;
-    const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { OR: [{ country: null }, { country: listing.country }] } });
+    const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { platform: 'bitocard', OR: [{ country: null }, { country: listing.country }] } });
     const found = words.filter(word => text.includes(` ${word.phrase.replace(/[^\p{L}\p{N}-]+/gu, ' ')} `));
     if (found.some(word => word.action === 'block')) {
       throw invalid('listing_prohibited', 'This listing mentions something that cannot be sold on BitoCard Shop. See the prohibited items in the marketplace terms.', 'title');
@@ -215,7 +215,7 @@ export class ModerationService {
   // ---- Refused words ----
 
   async words(country?: string) {
-    const rows = await this.prisma.classifiedProhibitedWord.findMany({ where: country ? { OR: [{ country: null }, { country }] } : {}, orderBy: [{ action: 'asc' }, { phrase: 'asc' }] });
+    const rows = await this.prisma.classifiedProhibitedWord.findMany({ where: { platform: 'bitocard', ...(country ? { OR: [{ country: null }, { country }] } : {}) }, orderBy: [{ action: 'asc' }, { phrase: 'asc' }] });
     return { object: 'list' as const, data: rows.map(row => ({ object: 'classified_prohibited_word' as const, id: row.id, country: row.country, phrase: row.phrase, action: row.action })) };
   }
 
@@ -234,7 +234,8 @@ export class ModerationService {
 
   async removeWord(actorId: string | null, id: string) {
     const row = await this.prisma.classifiedProhibitedWord.findUnique({ where: { id } });
-    if (!row) throw notFound('word');
+    // BitoCard's admins remove only BitoCard's words.
+    if (!row || row.platform !== 'bitocard') throw notFound('word');
     await this.prisma.classifiedProhibitedWord.delete({ where: { id } });
     await this.audit.record({ actorId, action: 'classifieds.word_removed', targetType: 'classified_prohibited_word', targetId: id, before: { phrase: row.phrase, action: row.action, country: row.country }, after: null });
   }

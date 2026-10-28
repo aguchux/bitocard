@@ -30,6 +30,7 @@ import { CryptoMarketLimitsService } from './market-limits.service.js';
 import { P2pFeesService } from './p2p-fees.service.js';
 import { P2pStandingService } from './p2p-standing.service.js';
 import { P2pTrustService } from './p2p-trust.service.js';
+import { P2pWordsService } from './p2p-words.service.js';
 import { P2pService } from './p2p.service.js';
 import { CryptoPricesService } from './prices.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
@@ -59,7 +60,7 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     AdminReconciliationsController,
     ChainWebhooksController,
   ],
-  providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
-  exports: [CryptoWalletsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
+  providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
+  exports: [CryptoWalletsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}
