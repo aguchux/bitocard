@@ -111,6 +111,13 @@ export async function sendCode(): Promise<FormState> {
   return { notice: result.data.sent ? `We have sent a code${result.data.sent_to ? ` to ${result.data.sent_to}` : ""}.` : "A code was sent less than a minute ago. Check for it, or try again shortly." };
 }
 
+/** Sends the emailed or texted code that confirms a money move (releasing coins, adding a payment method). */
+export async function sendConfirmCode(): Promise<FormState> {
+  const result = await customerApi<{ sent: boolean; sent_to: string | null }>("POST", "/v1/afrippa/account/two-step/challenge", { purpose: "confirm" });
+  if (!result.ok) return failed(result);
+  return { notice: result.data.sent ? `We have sent a code${result.data.sent_to ? ` to ${result.data.sent_to}` : ""}.` : "A code was sent less than a minute ago. Check for it, or try again shortly." };
+}
+
 /** The two-step code (or a recovery code): signed in, or on to set an allowed method up. */
 export async function verifyTwoStep(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<{ signed_in: boolean; setup_required: boolean }>("POST", "/v1/afrippa/account/two-step/verify", { code: text(form, "code") });

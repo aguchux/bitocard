@@ -138,16 +138,18 @@ export function twoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 
 }
 
 /** An Afrippa trader's two-step code (setting a method up, or signing in), in Afrippa's name. */
-export function traderTwoStepCodeEmail(to: string, code: string, purpose: 'sign_in' | 'setup'): EmailMessage {
+export function traderTwoStepCodeEmail(to: string, code: string, purpose: 'sign_in' | 'setup' | 'confirm'): EmailMessage {
+  const text = {
+    setup: { subject: 'two-step set-up', title: 'Set up two-step sign-in', line: 'Enter this code on Afrippa to use emailed codes for two-step sign-in. It expires in 10 minutes.', ifNot: 'If you did not just sign in, change your password.' },
+    sign_in: { subject: 'sign-in', title: 'Your sign-in code', line: 'Enter this code on Afrippa to finish signing in. It expires in 10 minutes.', ifNot: 'If you did not just sign in, change your password.' },
+    confirm: { subject: 'confirmation', title: 'Confirm on Afrippa', line: 'Enter this code on Afrippa to confirm releasing coins or adding a payment method. It expires in 10 minutes.', ifNot: 'If you did not just ask for it, change your password now: someone may be signed in to your account.' },
+  }[purpose];
   return {
     to,
-    subject: `${code} is your Afrippa ${purpose === 'setup' ? 'two-step set-up' : 'sign-in'} code`,
+    subject: `${code} is your Afrippa ${text.subject} code`,
     ...layout(
-      purpose === 'setup' ? 'Set up two-step sign-in' : 'Your sign-in code',
-      [
-        purpose === 'setup' ? 'Enter this code on Afrippa to use emailed codes for two-step sign-in. It expires in 10 minutes.' : 'Enter this code on Afrippa to finish signing in. It expires in 10 minutes.',
-        'Never share it. Afrippa will never ask you for it. If you did not just sign in, change your password.',
-      ],
+      text.title,
+      [text.line, `Never share it. Afrippa will never ask you for it. ${text.ifNot}`],
       code,
       'Afrippa',
     ),

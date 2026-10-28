@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { afrippaAdminClient, startApp } from './helpers.mjs';
+import { afrippaAdminClient, startApp, withTwoStepCode } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { PrismaService } = await import('../dist/database/prisma.service.js');
@@ -51,7 +51,7 @@ function afrippaServer(device, token = null) {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), token: () => token };
+  return { get: path => request('GET', path), post: (path, body = {}) => withTwoStepCode(request, 'POST', path, body), token: () => token };
 }
 
 const outbox = () => server.app.get(EmailService).outbox;

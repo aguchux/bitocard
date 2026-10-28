@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, afrippaAdminClient, adminCode, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, adminCode, afrippaAdminClient, lastEmailCode, startApp, withTwoStepCode } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { afrippaStoreId } = await import('../dist/afrippa/ids.js');
@@ -66,7 +66,7 @@ function afrippaServer() {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, cache: res.headers.get('cache-control'), json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), put: (path, body) => request('PUT', path, body), patch: (path, body) => request('PATCH', path, body) };
+  return { get: path => request('GET', path), post: (path, body = {}) => withTwoStepCode(request, 'POST', path, body), put: (path, body) => request('PUT', path, body), patch: (path, body) => request('PATCH', path, body) };
 }
 
 const lastCodeTo = email => /\b(\d{6})\b/.exec(server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1).subject)[1];

@@ -6,6 +6,7 @@ import { FileText, Paperclip, Send } from "lucide-react";
 import { FormMessage, type FormState, type NonceFormState, Submit } from "@afrippa/ui/forms";
 import { appealOrder, cancelOrder, markPaid, openOrder, releaseOrder, roomSince, type RoomState, sendToRoom } from "@/lib/orders";
 import type { OrderMessage } from "@/lib/orders-types";
+import { ConfirmCode, type TwoStepMethod } from "@/components/confirm-code";
 
 /** Refreshes an open order's page every 10 seconds while it is shown, so its steps follow the other side's. */
 export function AutoRefresh() {
@@ -79,7 +80,7 @@ export function MarkPaidForm({ id, methods }: { id: string; methods: Array<{ id:
 }
 
 /** The seller releases the coins, only once they checked the money arrived from the buyer's own name. */
-export function ReleaseForm({ id, payerName, warning }: { id: string; payerName: string; warning: boolean }) {
+export function ReleaseForm({ id, payerName, warning, method }: { id: string; payerName: string; warning: boolean; method: TwoStepMethod }) {
   const [state, action, pending] = useActionState<FormState, FormData>(releaseOrder, {});
   return (
     <form action={action} className="space-y-3" aria-label="Release the coins">
@@ -92,6 +93,7 @@ export function ReleaseForm({ id, payerName, warning }: { id: string; payerName:
           I checked my account: the money arrived, in full, from an account in the name <strong>{payerName}</strong>.
         </span>
       </label>
+      <ConfirmCode method={method} state={state} />
       <Submit pending={pending}>Release the coins</Submit>
     </form>
   );

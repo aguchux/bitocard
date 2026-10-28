@@ -33,6 +33,8 @@ export async function addPaymentMethod(_state: FormState, form: FormData): Promi
   const fields: Record<string, string[]> = { bank: ["bank_name", "bank_code", "account_number"], mobile_money: ["network", "phone"], named: ["provider", "handle"] };
   const body: Record<string, string> = { kind, currency: text(form, "currency").toUpperCase() };
   for (const name of fields[kind]) if (text(form, name)) body[name] = text(form, name);
+  if (!text(form, "code")) return { error: "Enter a code from your two-step method.", field: "code" };
+  body.code = text(form, "code").toLowerCase();
   const result = await customerApi<PaymentMethod>("POST", "/v1/afrippa/p2p/payment-methods", body, { idempotencyKey: text(form, "nonce") || undefined });
   if (!result.ok) return refused(result, "/payment-methods");
   revalidatePath("/payment-methods");
@@ -91,10 +93,11 @@ export async function markPaid(_state: FormState, form: FormData): Promise<FormS
   return step(form, "paid", { payment_method_id: from });
 }
 
-/** The seller releases the coins, once they checked the money arrived from the buyer's own name. */
+/** The seller releases the coins, once they checked the money arrived from the buyer's own name, with a fresh code. */
 export async function releaseOrder(_state: FormState, form: FormData): Promise<FormState> {
   if (form.get("payer_checked") !== "yes") return { error: "Confirm the money arrived from the buyer’s own account first.", field: "payer_checked" };
-  return step(form, "release", { payer_checked: true });
+  if (!text(form, "code")) return { error: "Enter a code from your two-step method.", field: "code" };
+  return step(form, "release", { payer_checked: true, code: text(form, "code").toLowerCase() });
 }
 
 /** The buyer cancels (before paying, or if they will not pay): the coins go back to the seller. */

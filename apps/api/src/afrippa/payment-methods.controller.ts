@@ -16,6 +16,8 @@ class PaymentMethodDto {
   @IsOptional() @IsString() @Length(1, 30) phone?: string;
   @IsOptional() @IsString() @Length(1, 40) provider?: string;
   @IsOptional() @IsString() @Length(1, 160) handle?: string;
+  /** A fresh code from your two-step method (or a recovery code). */
+  @IsOptional() @IsString() @Length(1, 20) code?: string;
 }
 
 /**

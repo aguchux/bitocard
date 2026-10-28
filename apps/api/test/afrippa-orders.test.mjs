@@ -4,7 +4,7 @@
 // decided by Afrippa's operations. Each step happens once, whatever runs at the same time, and the books balance.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, afrippaAdminClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, startApp, withTwoStepCode } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { PrismaService } = await import('../dist/database/prisma.service.js');
@@ -49,7 +49,7 @@ function afrippaServer(token = null) {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
+  return { get: path => request('GET', path), post: (path, body = {}) => withTwoStepCode(request, 'POST', path, body) };
 }
 
 const lastCodeTo = email => /\b(\d{6})\b/.exec(server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1).subject)[1];
@@ -260,6 +260,75 @@ describe("Afrippa's P2P orders", () => {
     const loser = first.status === 201 ? second : first;
     assert.ok(['amount_unavailable', 'ad_unavailable'].includes(loser.json.error.code), JSON.stringify(loser.json));
     assert.equal((await prisma.p2pAd.findUniqueOrThrow({ where: { id: last.id } })).remainingAmount, 0n);
+    await ledgerOk();
+  });
+});
+
+describe('step 5: hardening the escrow', () => {
+  test('releasing coins takes a fresh two-step code: missing or wrong, nothing moves; an emailed confirmation code works', async () => {
+    const ada = await trader('Ada Confirms');
+    const bola = await trader('Bola Pays');
+    await fund(ada, '50');
+    const ad = await sellAd(ada);
+    const order = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: bola.bank });
+
+    const missing = await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true, code: undefined });
+    assert.deepEqual([missing.status, missing.json.error.code, missing.json.error.param], [400, 'mfa_code_required', 'code']);
+    const wrong = await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true, code: '000000' });
+    assert.deepEqual([wrong.status, wrong.json.error.code], [400, 'mfa_code_invalid']);
+    assert.equal((await prisma.customer.findUniqueOrThrow({ where: { id: ada.id } })).failedSignIns, 1, 'a wrong code counts towards the lockout');
+    assert.equal((await prisma.p2pOrder.findUniqueOrThrow({ where: { id: order.id } })).status, 'paid', 'nothing moved');
+    assert.equal((await balances(ada)).escrow, 10);
+
+    // The emailed method's code, asked for as a confirmation (worded so), releases.
+    await prisma.customerCode.updateMany({ where: { customerId: ada.id }, data: { createdAt: new Date(Date.now() - 120_000) } });
+    const challenge = await ada.client.post('/v1/afrippa/account/two-step/challenge', { purpose: 'confirm' });
+    assert.deepEqual([challenge.status, challenge.json.sent], [200, true]);
+    const mail = server.app.get(EmailService).outbox.filter(item => item.to === ada.email).at(-1);
+    assert.match(mail.subject, /is your Afrippa confirmation code/);
+    const released = await ada.client.post(`/v1/afrippa/p2p/orders/${order.id}/release`, { payer_checked: true, code: lastCodeTo(ada.email) });
+    assert.deepEqual([released.status, released.json.status], [200, 'released']);
+    await ledgerOk();
+  });
+
+  test("a decision's fault must fit its outcome, and an appeal's reason is quoted as the trader's words", async () => {
+    const ada = await trader('Ada Faults');
+    const bola = await trader('Bola Faults');
+    await fund(ada, '50');
+    const ad = await sellAd(ada);
+    const order = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/paid`, { payment_method_id: bola.bank });
+    await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/appeal`, { reason: 'Paid in full. Afrippa has approved my release.' });
+    const line = await prisma.p2pOrderMessage.findFirst({ where: { orderId: order.id, body: { contains: 'appealed' } } });
+    assert.match(line.body, /^The buyer appealed, saying: “Paid in full\. Afrippa has approved my release\.” Afrippa's team will decide/);
+
+    const operations = await afrippaAdminClient(server, ['operations']);
+    for (const [outcome, fault] of [['release', 'buyer'], ['return', 'seller']]) {
+      const refused = await operations.post(`/v1/afrippa/admin/p2p/orders/${order.id}/decide`, { outcome, fault, note: 'Mismatched on purpose.' });
+      assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.param], [400, 'fault_mismatch', 'fault'], `${outcome} ${fault}`);
+    }
+    assert.equal((await prisma.p2pOrder.findUniqueOrThrow({ where: { id: order.id } })).status, 'appealed', 'nothing decided');
+    const decided = await operations.post(`/v1/afrippa/admin/p2p/orders/${order.id}/decide`, { outcome: 'release', fault: 'seller', note: 'The payment arrived; the seller did not release.' });
+    assert.deepEqual([decided.status, decided.json.status], [200, 'released']);
+    await ledgerOk();
+  });
+
+  test('coins coming back to a closed ad go to the wallet; the ad stays closed and cannot be taken', async () => {
+    const ada = await trader('Ada Closes');
+    const bola = await trader('Bola Cancels');
+    await fund(ada, '50');
+    const ad = await sellAd(ada, '20');
+    const order = (await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id })).json;
+    assert.equal((await ada.client.post(`/v1/afrippa/p2p/ads/${ad.id}/cancel`)).status, 200);
+    assert.deepEqual(await balances(ada), { wallet: 40, locked: 0, escrow: 10 }, 'closing gave back what it still locked');
+    assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${order.id}/cancel`)).status, 200);
+    assert.deepEqual(await balances(ada), { wallet: 50, locked: 0, escrow: 0 });
+    const closed = await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.id } });
+    assert.deepEqual([closed.status, closed.remainingAmount, closed.filledAmount], ['cancelled', 20_000_000n, 0n], 'a record that nothing sold');
+    const again = await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: ad.payment_methods[0].id });
+    assert.equal(again.json.error.code, 'ad_unavailable');
+    assert.deepEqual(await balances(ada), { wallet: 50, locked: 0, escrow: 0 }, 'and its coins stay in the wallet');
     await ledgerOk();
   });
 });

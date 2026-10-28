@@ -8,7 +8,7 @@ import { OrderBadge } from "@/components/order-badge";
 import { AppealForm, AutoRefresh, CancelForm, MarkPaidForm, OrderRoom, ReleaseForm, TimeLeft } from "@/components/orders";
 import { FeedbackForm, ReportForm } from "@/components/trust";
 import { requireCustomer } from "@/lib/account";
-import { customerApi } from "@/lib/customer";
+import { customerApi, type Trader } from "@/lib/customer";
 import { openStatuses, type Order, type OrderMessages, type PaymentMethod, shownDetails } from "@/lib/orders-types";
 
 export const metadata: Metadata = { title: "Order", robots: { index: false, follow: false } };
@@ -21,7 +21,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireCustomer(`/orders/${id}`);
+  const trader = await requireCustomer(`/orders/${id}`);
   const result = uuid.test(id) ? await customerApi<Order>("GET", `/v1/afrippa/p2p/orders/${id}`) : null;
   if (!result?.ok)
     return (
@@ -73,7 +73,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {order.mode === "test" ? <p className="text-xs font-semibold text-amber-700">Sandbox order: no real money or coins.</p> : null}
       </section>
 
-      <Step order={order} payFrom={payFrom} />
+      <Step order={order} payFrom={payFrom} method={trader.two_step.method} />
 
       {open && order.status !== "pending_payment" && order.status !== "appealed" ? (
         <AppealForm id={order.id} />
@@ -92,7 +92,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 }
 
 /** What the viewer does now, by side and status. */
-function Step({ order, payFrom }: { order: Order; payFrom: PaymentMethod[] }) {
+function Step({ order, payFrom, method }: { order: Order; payFrom: PaymentMethod[]; method: Trader["two_step"]["method"] }) {
   const buyer = order.side === "buy";
   const details = order.payment_method.details ? shownDetails(order.payment_method.details) : [];
   const account = (
@@ -134,7 +134,7 @@ function Step({ order, payFrom }: { order: Order; payFrom: PaymentMethod[] }) {
             {order.buyer.nickname} says they paid {formatFace(order.fiat, order.currency)}
             {order.paid_from ? ` from ${order.paid_from.label} ${order.paid_from.hint} in the name ${order.paid_from.holder_name}` : ""}. Open your own banking app: a screenshot or a message is not proof.
           </p>
-          <ReleaseForm id={order.id} payerName={order.payer_name} warning={order.warnings.includes("reversible_payment")} />
+          <ReleaseForm id={order.id} payerName={order.payer_name} warning={order.warnings.includes("reversible_payment")} method={method} />
         </Card>
       );
     case "appealed":

@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Field, FormMessage, type FormState, Submit } from "@afrippa/ui/forms";
 import { addPaymentMethod, removePaymentMethod } from "@/lib/orders";
 import { kindNames, namedServices, type PaymentMethodKind } from "@/lib/orders-types";
+import { ConfirmCode, type TwoStepMethod } from "@/components/confirm-code";
 
 const selectClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15";
 
@@ -11,7 +12,7 @@ const selectClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white
  * Adding where the trader is paid. The account must be in their own verified name (the API sets it, never typed here);
  * a new one can be used 24 hours after it is added, and every addition is emailed to them.
  */
-export function AddPaymentMethodForm({ currencies, nonce }: { currencies: string[]; nonce: string }) {
+export function AddPaymentMethodForm({ currencies, nonce, method }: { currencies: string[]; nonce: string; method: TwoStepMethod }) {
   const [kind, setKind] = useState<PaymentMethodKind>("bank");
   const [state, action, pending] = useActionState<FormState, FormData>(addPaymentMethod, {});
   return (
@@ -70,6 +71,7 @@ export function AddPaymentMethodForm({ currencies, nonce }: { currencies: string
         </div>
       )}
       <p className="text-xs text-slate-500">The account must be in your own name. Buyers see its details only inside an order with you. You can use it 24 hours after adding it.</p>
+      <ConfirmCode method={method} state={state} />
       <Submit pending={pending}>Save payment method</Submit>
     </form>
   );

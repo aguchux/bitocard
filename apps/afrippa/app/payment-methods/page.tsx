@@ -52,7 +52,7 @@ export default async function PaymentMethodsPage() {
         <h2 id="add-method" className="font-display text-lg font-extrabold">
           Add a payment method
         </h2>
-        <AddPaymentMethodForm currencies={currencies} nonce={crypto.randomUUID()} />
+        <AddPaymentMethodForm currencies={currencies} nonce={crypto.randomUUID()} method={trader.two_step.method} />
       </section>
     </AccountShell>
   );

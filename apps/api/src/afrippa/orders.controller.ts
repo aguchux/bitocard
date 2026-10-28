@@ -53,6 +53,8 @@ class PaidDto {
 class ReleaseDto {
   /** You checked the money arrived in your account from the buyer's own name. */
   @Equals(true, { message: 'Confirm the money arrived from the buyer before releasing.' }) payer_checked: boolean;
+  /** A fresh code from your two-step method (or a recovery code): releasing coins cannot be taken back. */
+  @IsOptional() @IsString() @Length(1, 20) code?: string;
 }
 
 class AppealDto {
@@ -192,7 +194,7 @@ export class P2pOrdersController {
   @Post(':id/release')
   @HttpCode(HttpStatus.OK)
   release(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReleaseDto) {
-    return this.orders.release(caller.customer, id, body.payer_checked);
+    return this.orders.release(caller.customer, id, body.payer_checked, body.code);
   }
 
   @Post(':id/cancel')

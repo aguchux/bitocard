@@ -20,6 +20,7 @@ import { afrippaOperatorId } from './ids.js';
 import { OrderRoomService } from './order-room.service.js';
 import { isReversible, PaymentMethodsService } from './payment-methods.service.js';
 import { TraderDevicesService } from './devices.service.js';
+import { TraderTwoStepService } from './two-step.service.js';
 
 /** Orders still running: the coins in escrow. */
 export const openOrderStatuses: P2pOrderStatus[] = ['pending_payment', 'paid', 'appealed'];
@@ -74,6 +75,7 @@ export class P2pOrdersService {
     private readonly trust: P2pTrustService,
     private readonly devices: TraderDevicesService,
     private readonly limits: CryptoMarketLimitsService,
+    private readonly twoStep: TraderTwoStepService,
   ) {}
 
   private requireTrader(customer: CustomerWithStore) {
@@ -283,12 +285,15 @@ export class P2pOrdersService {
   }
 
   /**
-   * The seller confirms the money arrived from the buyer's own account (`payer_checked`): the coins go to the buyer.
-   * They are told to release only for a payment from the buyer's name; a release cannot be taken back.
+   * The seller confirms the money arrived from the buyer's own account (`payer_checked`) and gives a fresh two-step code
+   * (`code`): the coins go to the buyer. They are told to release only for a payment from the buyer's name; a release
+   * cannot be taken back. The code is asked only of an open order, so a closed one never uses it up.
    */
-  async release(customer: CustomerWithStore, id: string, payerChecked: boolean) {
+  async release(customer: CustomerWithStore, id: string, payerChecked: boolean, code?: string) {
     const order = await this.mine(customer, id, 'seller');
     if (!payerChecked) throw invalid('payer_check_required', `Confirm the money arrived in your account from ${order.buyerName}, the buyer, before releasing.`, 'payer_checked');
+    if (!openOrderStatuses.includes(order.status)) throw conflict('order_closed', 'This order is already closed.');
+    await this.twoStep.confirm(customer, code);
     const done = await this.settle(order, 'released', { from: openOrderStatuses });
     if (!done) throw conflict('order_closed', 'This order is already closed.');
     await this.tell(done, done.buyerId, 'customer.p2p.order_released', 'Your coins were released', `${orderNumber(done.number)}: the seller released your coins.`);
@@ -310,7 +315,7 @@ export class P2pOrdersService {
     const claimed = await this.prisma.p2pOrder.updateMany({ where: { id, status: 'paid' }, data: { status: 'appealed', appealedAt: new Date(), appealedBy: customer.id, appealReason: reason.trim() } });
     if (claimed.count === 0) throw conflict('order_not_appealable', 'An order can be appealed once it is marked paid, while it is open.');
     const other = customer.id === order.buyerId ? order.sellerId : order.buyerId;
-    await this.room.system(this.prisma, id, `The ${customer.id === order.buyerId ? 'buyer' : 'seller'} appealed: ${reason.trim()} Afrippa's team will decide. Add your evidence here.`);
+    await this.room.system(this.prisma, id, `The ${customer.id === order.buyerId ? 'buyer' : 'seller'} appealed, saying: “${reason.trim().replace(/[“”]/g, '"')}” Afrippa's team will decide. Add your evidence here.`);
     await this.tell(order, other, 'customer.p2p.order_appealed', 'An order was appealed', `${orderNumber(order.number)} was appealed. Afrippa's team will decide; add your evidence to the order.`);
     // Afrippa's operations decide it (admin.afrippa.com's order page).
     await this.inbox.afrippaAdmins('admin.p2p.order_appealed', {
@@ -327,6 +332,9 @@ export class P2pOrdersService {
   async decide(adminId: string | null, id: string, input: { outcome: 'release' | 'return'; fault: 'buyer' | 'seller' | 'none'; note: string }) {
     const order = await this.prisma.p2pOrder.findUnique({ where: { id } });
     if (!order) throw notFound();
+    // Releasing to the buyer can only be the seller's fault (or nobody's); returning to the seller, the buyer's.
+    const fits = input.fault === 'none' || (input.outcome === 'release' ? input.fault === 'seller' : input.fault === 'buyer');
+    if (!fits) throw invalid('fault_mismatch', input.outcome === 'release' ? "Releasing the coins to the buyer can only be the seller's fault, or nobody's." : "Returning the coins to the seller can only be the buyer's fault, or nobody's.", 'fault');
     const decision = { decidedBy: adminId, decisionFault: input.fault, decisionNote: input.note.trim() };
     const done = await this.settle(order, input.outcome === 'release' ? 'released' : 'returned', { from: ['appealed'], decision });
     if (!done) throw conflict('order_not_appealed', 'Only an appealed, open order can be decided.');
@@ -427,7 +435,8 @@ export class P2pOrdersService {
         await tx.$queryRaw`SELECT id FROM p2p_ads WHERE id = ${order.adId}::uuid FOR UPDATE`;
         const ad = await tx.p2pAd.findUniqueOrThrow({ where: { id: order.adId } });
         const backToAd = ad.side === 'sell' && ad.customerId === order.sellerId && ['active', 'paused'].includes(ad.status);
-        // Back to a still-open sell ad: its coins and the fee its reserve paid; the rest to the seller's wallet.
+        // Back to a still-open sell ad: its coins and the fee its reserve paid; the rest to the seller's wallet. A closed
+        // ad (never reopened; closing already gave back what it locked) only records that it sold less.
         await tx.p2pAd.update({
           where: { id: ad.id },
           data: { remainingAmount: { increment: order.amount }, filledAmount: { decrement: order.amount }, ...(backToAd ? { feeLocked: { increment: order.sellerFeeFromLock } } : {}) },

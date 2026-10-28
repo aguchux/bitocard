@@ -3,7 +3,7 @@
 // orders, and reports Afrippa's operations decide (an upheld one is a strike).
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, afrippaAdminClient, startApp } from './helpers.mjs';
+import { adminClient, afrippaAdminClient, startApp, withTwoStepCode } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { PrismaService } = await import('../dist/database/prisma.service.js');
@@ -46,7 +46,7 @@ function afrippaServer(token = null) {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), delete: path => request('DELETE', path) };
+  return { get: path => request('GET', path), post: (path, body = {}) => withTwoStepCode(request, 'POST', path, body), delete: path => request('DELETE', path) };
 }
 
 const lastCodeTo = email => /\b(\d{6})\b/.exec(server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1).subject)[1];

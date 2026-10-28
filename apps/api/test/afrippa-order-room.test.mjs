@@ -4,7 +4,7 @@
 // reminders go out once each.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, afrippaAdminClient, fakeService, startApp } from './helpers.mjs';
+import { adminClient, adminCode, afrippaAdminClient, fakeService, startApp, withTwoStepCode } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { PrismaService } = await import('../dist/database/prisma.service.js');
@@ -73,7 +73,7 @@ function afrippaServer(token = null) {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json, bytes, type: res.headers.get('content-type'), headers: res.headers };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
+  return { get: path => request('GET', path), post: (path, body = {}) => withTwoStepCode(request, 'POST', path, body) };
 }
 
 const lastCodeTo = email => /\b(\d{6})\b/.exec(server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1).subject)[1];
@@ -188,7 +188,7 @@ describe("An Afrippa order's room", () => {
     const team = await afrippaAdminClient(server, ['support']);
     const room = await team.get(`/v1/afrippa/admin/p2p/orders/${opened.id}/messages`);
     assert.equal(room.status, 200);
-    assert.ok(room.json.data.some(message => message.from === 'system' && /appealed: Nothing arrived/.test(message.body)));
+    assert.ok(room.json.data.some(message => message.from === 'system' && /appealed, saying: “Nothing arrived/.test(message.body)));
     const wrote = await team.post(`/v1/afrippa/admin/p2p/orders/${opened.id}/messages`, { body: 'Please both send your bank statements for today.' });
     assert.equal(wrote.status, 201, JSON.stringify(wrote.json));
     const seen = (await bola.client.get(`/v1/afrippa/p2p/orders/${opened.id}/messages`)).json.data.at(-1);

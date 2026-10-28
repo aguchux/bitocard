@@ -13,6 +13,7 @@ import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { paymentMethodAddedEmail } from '../notifications/templates.js';
 import { afrippaOperatorId } from './ids.js';
+import { TraderTwoStepService } from './two-step.service.js';
 
 /** Named services a trader can say they are paid through: labels only, never integrations. */
 export const namedProviders = {
@@ -45,6 +46,8 @@ export type PaymentMethodInput = {
   phone?: string;
   provider?: string;
   handle?: string;
+  /** A fresh code from the trader's two-step method (or a recovery code). */
+  code?: string;
 };
 
 /** The details a payment method keeps (encrypted), by kind. */
@@ -75,6 +78,7 @@ export class PaymentMethodsService {
     private readonly email: EmailService,
     private readonly inbox: InboxService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly twoStep: TraderTwoStepService,
   ) {}
 
   private mode(customer: CustomerWithStore): LedgerMode {
@@ -111,6 +115,11 @@ export class PaymentMethodsService {
     if (count >= maxPaymentMethods) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'too_many_payment_methods', `You can keep up to ${maxPaymentMethods} payment methods. Remove one first.`);
     }
+    if (await this.prisma.p2pPaymentMethod.findFirst({ where: { customerId: customer.id, mode, fingerprint, removedAt: null }, select: { id: true } })) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'payment_method_exists', 'You have already saved this payment method.');
+    }
+    // Buyers pay into it: a fresh code, so a stolen session cannot add an account of its own.
+    await this.twoStep.confirm(customer, input.code);
     let row: P2pPaymentMethod;
     try {
       row = await this.prisma.p2pPaymentMethod.create({

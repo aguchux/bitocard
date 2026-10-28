@@ -103,7 +103,16 @@ function OrderView({ order }: { order: AdminP2pOrder }) {
       >
         <label className="block space-y-1 text-sm font-medium">
           The coins go
-          <select className={selectClass} value={outcome} onChange={event => setOutcome(event.target.value as "release" | "return")}>
+          <select
+            className={selectClass}
+            value={outcome}
+            onChange={event => {
+              const next = event.target.value as "release" | "return";
+              setOutcome(next);
+              // Releasing can only be the seller's fault, returning the buyer's (or nobody's either way).
+              setFault(next === "release" ? "seller" : "buyer");
+            }}
+          >
             <option value="release">To the buyer: they paid</option>
             <option value="return">Back to the seller: the buyer did not pay</option>
           </select>
@@ -111,8 +120,7 @@ function OrderView({ order }: { order: AdminP2pOrder }) {
         <label className="block space-y-1 text-sm font-medium">
           Whose fault
           <select className={selectClass} value={fault} onChange={event => setFault(event.target.value as "buyer" | "seller" | "none")}>
-            <option value="seller">The seller&apos;s (a strike for them)</option>
-            <option value="buyer">The buyer&apos;s (a strike for them)</option>
+            {outcome === "release" ? <option value="seller">The seller&apos;s (a strike for them)</option> : <option value="buyer">The buyer&apos;s (a strike for them)</option>}
             <option value="none">Nobody&apos;s</option>
           </select>
         </label>

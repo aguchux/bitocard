@@ -157,10 +157,10 @@ afterEach(() => {
 describe("payment methods", () => {
   test("adding one sends only its kind's fields, in the currency chosen; the list shows the hint and when it is usable", async () => {
     answer({ "POST /v1/afrippa/p2p/payment-methods": method(myBank, { usable: false, usable_from: "2026-10-29T10:00:00.000Z" }) });
-    const saved = await orders.addPaymentMethod({}, form({ kind: "bank", currency: "ngn", bank_name: "My Bank", account_number: "0123456789", network: "MTN", nonce: "nonce-12345678" }));
+    const saved = await orders.addPaymentMethod({}, form({ kind: "bank", currency: "ngn", bank_name: "My Bank", account_number: "0123456789", network: "MTN", nonce: "nonce-12345678", code: " ABCD-1234 " }));
     expect(saved.notice).toContain("My Bank •••• 6789 is saved");
     const [, init] = calls()[0];
-    expect(bodyOf(calls()[0])).toEqual({ kind: "bank", currency: "NGN", bank_name: "My Bank", account_number: "0123456789" });
+    expect(bodyOf(calls()[0])).toEqual({ kind: "bank", currency: "NGN", bank_name: "My Bank", account_number: "0123456789", code: "abcd-1234" });
     expect(init.headers["idempotency-key"]).toBe("nonce-12345678");
     expect(revalidatePath).toHaveBeenCalledWith("/payment-methods", undefined);
 
@@ -175,7 +175,8 @@ describe("payment methods", () => {
 
   test("a refusal names its field; a lost session signs in again", async () => {
     answer({ "POST /v1/afrippa/p2p/payment-methods": json({ error: { code: "parameter_invalid", message: "Enter the account number: 6 to 20 digits.", param: "account_number" } }, 400) });
-    expect(await orders.addPaymentMethod({}, form({ kind: "bank", currency: "NGN", bank_name: "B", account_number: "1" }))).toEqual({ error: "Enter the account number: 6 to 20 digits.", field: "account_number" });
+    expect(await orders.addPaymentMethod({}, form({ kind: "bank", currency: "NGN", bank_name: "B", account_number: "6789" }))).toEqual({ error: "Enter a code from your two-step method.", field: "code" });
+    expect(await orders.addPaymentMethod({}, form({ kind: "bank", currency: "NGN", bank_name: "B", account_number: "1", code: "123456" }))).toEqual({ error: "Enter the account number: 6 to 20 digits.", field: "account_number" });
     answer({ [`DELETE /v1/afrippa/p2p/payment-methods/${myBank}`]: json({ error: { code: "authentication_required", message: "Sign in." } }, 401) });
     await expect(orders.removePaymentMethod({}, form({ id: myBank }))).rejects.toThrow("redirect:/signin?next=%2Fpayment-methods");
   });
@@ -275,6 +276,8 @@ describe("an order", () => {
     expect(html).toContain("Ada Bank •••• 4321");
     expect(html).toContain("can be taken back by the payer");
     expect(html).toContain("Release the coins");
+    expect(html).toContain("Send me a code");
+    expect(html).toContain('name="code"');
     expect(html).toContain("Something is wrong? Appeal");
   });
 
@@ -291,17 +294,25 @@ describe("an order", () => {
     expect(html).not.toContain("Release the coins");
   });
 
-  test("the steps: paid names the account paid from, release needs the check, appeal needs a reason", async () => {
+  test("the steps: paid names the account paid from, release needs the check and a fresh code, appeal needs a reason", async () => {
     answer({ [`POST /v1/afrippa/p2p/orders/${orderId}/paid`]: order({ status: "paid" }), [`POST /v1/afrippa/p2p/orders/${orderId}/release`]: order({ status: "released" }), [`POST /v1/afrippa/p2p/orders/${orderId}/appeal`]: order({ status: "appealed" }) });
     expect((await orders.markPaid({}, form({ id: orderId }))).field).toBe("payment_method_id");
     expect(await orders.markPaid({}, form({ id: orderId, payment_method_id: myBank }))).toEqual({ notice: "Done." });
     expect(bodyOf(calls()[0])).toEqual({ payment_method_id: myBank });
     expect((await orders.releaseOrder({}, form({ id: orderId }))).field).toBe("payer_checked");
-    await orders.releaseOrder({}, form({ id: orderId, payer_checked: "yes" }));
-    expect(bodyOf(calls()[1])).toEqual({ payer_checked: true });
+    expect((await orders.releaseOrder({}, form({ id: orderId, payer_checked: "yes" }))).field).toBe("code");
+    await orders.releaseOrder({}, form({ id: orderId, payer_checked: "yes", code: "123456" }));
+    expect(bodyOf(calls()[1])).toEqual({ payer_checked: true, code: "123456" });
     expect((await orders.appealOrder({}, form({ id: orderId, reason: "short" }))).field).toBe("reason");
     await orders.appealOrder({}, form({ id: orderId, reason: "The seller has not released after I paid." }));
     expect(revalidatePath).toHaveBeenCalledWith(`/orders/${orderId}`, undefined);
+  });
+
+  test("Send me a code asks for a confirmation code, worded so, and says where it went", async () => {
+    const { sendConfirmCode } = await import("@/lib/account-actions");
+    answer({ "POST /v1/afrippa/account/two-step/challenge": { object: "two_step_challenge", method: "email", sent: true, sent_to: "a•••@example.com" } });
+    expect(await sendConfirmCode()).toEqual({ notice: "We have sent a code to a•••@example.com." });
+    expect(bodyOf(calls()[0])).toEqual({ purpose: "confirm" });
   });
 
   test("the room: text as a message, a file as a base64 attachment; polling asks only for what is new", async () => {

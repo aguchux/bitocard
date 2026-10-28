@@ -3,7 +3,7 @@
 // a new method is usable after 24 hours, and adding one emails the trader and leaves a security notice.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { startApp } from './helpers.mjs';
+import { startApp, withTwoStepCode } from './helpers.mjs';
 
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { afrippaOperatorId, afrippaStoreId } = await import('../dist/afrippa/ids.js');
@@ -46,7 +46,7 @@ function afrippaServer(token = null) {
   };
   return {
     get: (path, options) => request('GET', path, undefined, options),
-    post: (path, body = {}, options) => request('POST', path, body, options),
+    post: (path, body = {}, options) => withTwoStepCode(request, 'POST', path, body, options),
     delete: (path, options) => request('DELETE', path, undefined, options),
   };
 }
@@ -72,7 +72,35 @@ async function trader({ twoStep = true } = {}) {
 const bank = { kind: 'bank', currency: 'NGN', bank_name: 'Example Bank', account_number: '0123 456-789' };
 const path = '/v1/afrippa/p2p/payment-methods';
 
+/** A fresh emailed two-step code, asked for as a confirmation. */
+async function emailedCode(who) {
+  await prisma.customerCode.updateMany({ where: { customerId: who.id }, data: { createdAt: new Date(Date.now() - 120_000) } });
+  const sent = await who.client.post('/v1/afrippa/account/two-step/challenge', { purpose: 'confirm' });
+  assert.equal(sent.json.sent, true, JSON.stringify(sent.json));
+  return lastCodeTo(who.email);
+}
+
 describe("Afrippa traders' payment methods", () => {
+  test('adding one takes a fresh two-step code: missing or wrong, nothing is saved; a recovery code used is told', async () => {
+    const ada = await trader();
+    const missing = await ada.client.post(path, { ...bank, account_number: '3000000001', code: undefined });
+    assert.deepEqual([missing.status, missing.json.error.code, missing.json.error.param], [400, 'mfa_code_required', 'code']);
+    const wrong = await ada.client.post(path, { ...bank, account_number: '3000000001', code: '123456' });
+    assert.deepEqual([wrong.status, wrong.json.error.code], [400, 'mfa_code_invalid']);
+    assert.equal(await prisma.p2pPaymentMethod.count({ where: { customerId: ada.id } }), 0, 'nothing saved');
+
+    const emailed = await ada.client.post(path, { ...bank, account_number: '3000000001', code: await emailedCode(ada) });
+    assert.equal(emailed.status, 201, JSON.stringify(emailed.json));
+    // Already saved: refused before a code is asked for, so none is used up.
+    const again = await ada.client.post(path, { ...bank, account_number: '3000000001', code: '000000' });
+    assert.deepEqual([again.status, again.json.error.code], [409, 'payment_method_exists']);
+    assert.equal((await prisma.customer.findUniqueOrThrow({ where: { id: ada.id } })).failedSignIns, 1, 'only the wrong code counted');
+
+    const recovered = await ada.client.post(path, { ...bank, account_number: '3000000002' });
+    assert.equal(recovered.status, 201, JSON.stringify(recovered.json));
+    assert.ok(await prisma.notification.findFirst({ where: { customerId: ada.id, title: 'A recovery code was used' } }), 'a recovery code used is told');
+  });
+
   test('a bank account is saved encrypted, shown as a hint, usable after 24 hours, and the trader is told', async () => {
     const ada = await trader();
     const added = await ada.client.post(path, bank);
@@ -139,6 +167,8 @@ describe("Afrippa traders' payment methods", () => {
     const ada = await trader();
     const ids = [];
     for (let index = 0; index < 10; index += 1) {
+      // Each addition spends a recovery code: new ones half way, confirmed with an emailed code (the test client keeps them).
+      if (index === 5) assert.equal((await ada.client.post('/v1/afrippa/account/two-step/recovery-codes', { code: await emailedCode(ada) })).status, 200);
       const added = await ada.client.post(path, { ...bank, account_number: `100000000${index}` });
       assert.equal(added.status, 201, JSON.stringify(added.json));
       ids.push(added.json.id);

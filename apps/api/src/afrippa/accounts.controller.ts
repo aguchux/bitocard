@@ -59,6 +59,11 @@ class TwoStepCodeDto {
   code: string;
 }
 
+class ChallengeDto {
+  /** `confirm`: a code to confirm a money move (releasing coins, adding a payment method), worded so; else signing in. */
+  @IsOptional() @IsIn(['sign_in', 'confirm']) purpose?: 'sign_in' | 'confirm';
+}
+
 class TwoStepSetupDto {
   @IsIn(mfaMethods as MfaMethod[])
   method: MfaMethod;
@@ -292,8 +297,8 @@ export class AfrippaAccountController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(CustomerGuard)
   @AllowTwoStepPending()
-  challenge(@CurrentCustomer() caller: CustomerCaller) {
-    return this.twoStep.challenge(session(caller));
+  challenge(@CurrentCustomer() caller: CustomerCaller, @Body() body: ChallengeDto) {
+    return this.twoStep.challenge(session(caller), body?.purpose ?? 'sign_in');
   }
 
   @Post('two-step/verify')

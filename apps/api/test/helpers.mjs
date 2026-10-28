@@ -312,3 +312,16 @@ export async function listForTest(server, { resellerId, productIds } = {}) {
   if (resellerId) return prisma.resellerListing.createMany({ data: productIds.map(productId => ({ resellerId, productId })), skipDuplicates: true });
   return prisma.product.updateMany({ where: { listed: false }, data: { listed: true, listedAt: new Date() } });
 }
+
+/**
+ * Afrippa's money moves (releasing coins, adding a payment method) take a fresh two-step code. Test traders' clients
+ * keep the recovery codes their two-step set-up returned and spend one on each, unless the body names `code` itself.
+ */
+const recoveryCodes = new WeakMap();
+export async function withTwoStepCode(request, method, path, body, ...rest) {
+  const codes = recoveryCodes.get(request) ?? [];
+  if (method === 'POST' && /\/(payment-methods|release)$/.test(path) && body && !('code' in body) && codes.length > 0) body = { ...body, code: codes.shift() };
+  const result = await request(method, path, body, ...rest);
+  if (Array.isArray(result.json?.recovery_codes)) recoveryCodes.set(request, [...result.json.recovery_codes]);
+  return result;
+}

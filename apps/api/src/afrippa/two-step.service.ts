@@ -189,15 +189,18 @@ export class TraderTwoStepService {
     return { object: 'two_step_enabled' as const, method, recovery_codes: recoveryCodes };
   }
 
-  /** Sends the emailed or texted code to sign in (or to confirm a change): one a minute, `sent: false` sooner. */
-  async challenge(session: TraderSession) {
+  /**
+   * Sends the emailed or texted code to sign in, or (`purpose: 'confirm'`) to confirm a money move or a change: one a
+   * minute, `sent: false` sooner.
+   */
+  async challenge(session: TraderSession, purpose: 'sign_in' | 'confirm' = 'sign_in') {
     const customer = session.customer;
     const method = customer.mfaMethod;
     if (!method) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'two_step_setup_required', 'Set up two-step sign-in first.');
     if (method === 'authenticator') return { object: 'two_step_challenge' as const, method, sent: false, sent_to: null };
     const { to, hint } = this.target(customer, method);
     try {
-      await this.send(customer, method, 'mfa_sign_in', to);
+      await this.send(customer, method, 'mfa_sign_in', to, purpose);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'code_recently_sent') return { object: 'two_step_challenge' as const, method, sent: false, sent_to: hint };
       throw error;
@@ -222,6 +225,22 @@ export class TraderTwoStepService {
       await this.notice(customer, 'recovery', 'A recovery code was used to sign in', `${left} recovery ${left === 1 ? 'code is' : 'codes are'} left. If this was not you, change your password.`);
     }
     return { object: 'two_step_verified' as const, method: customer.mfaMethod, used, signed_in: allowed, setup_required: !allowed };
+  }
+
+  /**
+   * A fresh code before a money move (releasing coins, adding a payment method; docs/CRYPTO_SPINOFF_PLAN.md, step 5):
+   * the method's code (an emailed or texted one from `challenge` with `purpose: 'confirm'`) or a recovery code, used
+   * once. A signed-in session is not enough on its own: a stolen session cannot move coins or add an account to be
+   * paid into. Wrong codes count towards the sign-in lockout.
+   */
+  async confirm(customer: Customer, code: string | undefined, param = 'code') {
+    if (!customer.mfaMethod) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'two_step_setup_required', 'Set up two-step sign-in first.');
+    if (!code?.trim()) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'mfa_code_required', 'Enter a code from your two-step method to confirm this.', param);
+    const used = await this.check(customer, code, param);
+    if (used === 'recovery') {
+      const left = customer.mfaRecoveryCodeHashes.length - 1;
+      await this.notice(customer, 'recovery', 'A recovery code was used', `A recovery code confirmed a change on your account. ${left} recovery ${left === 1 ? 'code is' : 'codes are'} left. If this was not you, change your password.`);
+    }
   }
 
   /** New recovery codes (shown once) with a current code; the old ones stop working. */
@@ -307,12 +326,12 @@ export class TraderTwoStepService {
   }
 
   /** Emailed and texted codes go through Afrippa's own email and SMS accounts. */
-  private async send(customer: Customer, method: MfaMethod, purpose: 'mfa_setup' | 'mfa_sign_in', to: string) {
+  private async send(customer: Customer, method: MfaMethod, purpose: 'mfa_setup' | 'mfa_sign_in', to: string, use: 'sign_in' | 'confirm' = 'sign_in') {
     if (!to) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'two_step_method_unavailable', 'Confirm your mobile number first, or choose another method.', 'method');
     const code = await this.customers.issueCode(customer, purpose, to, codeLifetimeMs);
     try {
-      if (method === 'email') await this.email.sendFor('afrippa', traderTwoStepCodeEmail(to, code, purpose === 'mfa_setup' ? 'setup' : 'sign_in'));
-      else await this.sms.sendForCountry(parsePhoneNumberFromString(to)?.country ?? null, { to, text: `Your Afrippa sign-in code is ${code}. It expires in 10 minutes. Never share it.` }, 'afrippa');
+      if (method === 'email') await this.email.sendFor('afrippa', traderTwoStepCodeEmail(to, code, purpose === 'mfa_setup' ? 'setup' : use));
+      else await this.sms.sendForCountry(parsePhoneNumberFromString(to)?.country ?? null, { to, text: `Your Afrippa ${use === 'confirm' ? 'confirmation' : 'sign-in'} code is ${code}. It expires in 10 minutes. Never share it.` }, 'afrippa');
     } catch (error) {
       await this.customers.cancelCode(customer.id, purpose);
       if (error instanceof ApiError) throw error;

@@ -213,7 +213,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 7. **The signer rebranded:** `apps/signer` becomes Afrippa's (`@afrippa/signer`, its Vercel project and team renamed or moved to Afrippa, its address on afrippa.com), `docs/crypto-signer.md` rewritten as Afrippa's protocol, its Turnkey organisation and wallet named for Afrippa; the API asks it only for Afrippa. Its secrets are rotated in the move. **Built in the code (28 October 2026):** the package is `@afrippa/signer`, its signature header `Afrippa-Signer-Signature` on both sides, its words and `docs/crypto-signer.md` Afrippa's, and its settings Afrippa's alone (step 2 item 8). **Still operations':** moving its Vercel project and team, `signer.afrippa.com`, naming the Turnkey organisation and wallet for Afrippa, and rotating its secrets, with the signer and the API deployed together.
 
 ### 5. Hardening
-1. A security review of escrow, release and appeals.
+1. A security review of escrow, release and appeals. **Done (28 October 2026):** a fresh two-step code to release coins and to add a payment method (a stolen session cannot move coins or add an account to be paid into); a decision's fault must fit its outcome; an appeal's reason is quoted as the trader's words in the room. Reviewed and kept: each step claims the order's status in the same transaction that moves the coins (racing steps leave one winner), the ledger entries balance, and coins returning to a closed ad go to the seller's wallet.
 2. The legal documents on afrippa.com (terms, privacy, P2P rules, fees, risk warnings), reviewed by lawyers per market.
 3. Browser checks at phone width; the operations runbook for appeals.
 
