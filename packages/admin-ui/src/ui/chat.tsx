@@ -8,7 +8,7 @@ import { cn, formatDateTime } from '../format';
 export type ChatPanelAttachment = { id: string; name: string; content_type: string; size: number; width: number | null; height: number | null };
 export type ChatPanelMessage = { id: string; author: string; author_name: string | null; author_avatar_url?: string | null; body: string; attachments?: ChatPanelAttachment[]; created_at: string };
 
-const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', bot: 'Assistant', system: 'Update' };
+const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', afrippa: 'Afrippa', bot: 'Assistant', system: 'Update' };
 const time = (iso: string) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 /** A participant's face: the assistant's picture or icon, otherwise their initials on their side's colour. */
@@ -106,7 +106,8 @@ export function ChatPanel({
   className,
 }: {
   messages: ChatPanelMessage[];
-  side: 'reseller' | 'bitocard';
+  /** BitoCard's admins write as `bitocard`, Afrippa's as `afrippa`, a store's team as `reseller`. */
+  side: 'reseller' | 'bitocard' | 'afrippa';
   requesterLabel?: string;
   onSend?: (body: string) => Promise<boolean>;
   onAttach?: (file: File, body: string) => Promise<boolean>;
@@ -174,7 +175,7 @@ export function ChatPanel({
     setFile(ready.file);
   };
   const nameOf = (message: ChatPanelMessage) =>
-    message.author === 'customer' || (message.author === 'reseller' && side === 'bitocard') ? (requesterLabel ?? message.author_name ?? roles[message.author]) : (message.author_name ?? roles[message.author] ?? message.author);
+    message.author === 'customer' || (message.author === 'reseller' && side !== 'reseller') ? (requesterLabel ?? message.author_name ?? roles[message.author]) : (message.author_name ?? roles[message.author] ?? message.author);
   const canSend = !disabled && !busy && (Boolean(file) || Boolean(body.trim()));
 
   return (

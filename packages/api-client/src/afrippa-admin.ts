@@ -80,6 +80,57 @@ export type P2pReport = {
 
 export type P2pFeeRate = { object: 'p2p_fee_rate'; asset: string; market: string | null; buyer_bps: number; seller_bps: number; warnings?: string[] };
 
+export type MarketLimit = {
+  object: 'crypto_market_limit';
+  mode: Mode;
+  market: string;
+  currency: string;
+  per_trade: number | null;
+  per_day: number | null;
+  cross_border_per_trade: number | null;
+  cross_border_per_day: number | null;
+  new_trader_per_trade: number | null;
+  new_trader_per_day: number | null;
+  updated_at: string;
+};
+export type MarketLimitInput = Omit<MarketLimit, 'object' | 'updated_at'>;
+
+export type TwoStepMethod = 'authenticator' | 'email' | 'sms';
+export type TwoStepPolicy = { object: 'two_step_policy'; market: string; methods: TwoStepMethod[]; updated_at: string };
+export type RefusedWord = { object: 'refused_word'; id: string; phrase: string; market: string | null };
+
+type BooksLine = { kind: string; currency: string; accounts: number; balance: string | number; debits: string | number; credits: string | number };
+export type AfrippaBooks = {
+  object: 'afrippa_books';
+  mode: Mode;
+  from: string;
+  to: string;
+  coins: BooksLine[];
+  money: BooksLine[];
+  trial_balance: Array<{ currency: string; holds: string | number; owes: string | number; balanced: boolean }>;
+};
+export type BooksCheck = {
+  object: 'ledger_check';
+  ok: boolean;
+  accounts_checked: number;
+  account_mismatches: Array<{ account_id: string; balance: string; from_postings: string }>;
+  unbalanced_entries: Array<{ entry_id: string; currency: string; off_by: string }>;
+};
+
+export type TraderStanding = {
+  object: 'p2p_standing';
+  mode: Mode;
+  strikes: number;
+  strike_limit: number;
+  strike_window_days: number;
+  cancellations_today: number;
+  cancellation_limit: number;
+  restriction: { code: string; until: string | null; message: string } | null;
+  lost_appeals: Array<{ order_id: string; number: string; decided_at: string }>;
+  upheld_reports: Array<{ report_id: string; number: string; decided_at: string }>;
+  cleared_at: string | null;
+};
+
 export const afrippaAdminApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     p2pOrders: build.query<List<AdminP2pOrder>, { mode?: Mode; status?: P2pOrderStatus; customer_id?: string; limit?: number }>({
@@ -116,6 +167,42 @@ export const afrippaAdminApi = bitocardApi.injectEndpoints({
       query: ({ asset, market }) => ({ url: `/v1/afrippa/admin/p2p/fee-rates/${asset}/${market ?? 'all'}`, method: 'DELETE' }),
       invalidatesTags: [{ type: 'P2p', id: 'FEES' }],
     }),
+    marketLimits: build.query<List<MarketLimit>, Mode>({ query: mode => ({ url: '/v1/afrippa/admin/crypto/market-limits', params: { mode } }), providesTags: [{ type: 'P2p', id: 'LIMITS' }] }),
+    setMarketLimit: build.mutation<MarketLimit, MarketLimitInput>({
+      query: body => ({ url: '/v1/afrippa/admin/crypto/market-limits', method: 'PUT', body }),
+      invalidatesTags: [{ type: 'P2p', id: 'LIMITS' }],
+    }),
+    twoStepPolicies: build.query<List<TwoStepPolicy>, void>({ query: () => '/v1/afrippa/admin/two-step-methods', providesTags: [{ type: 'P2p', id: 'TWO_STEP' }] }),
+    setTwoStepPolicy: build.mutation<TwoStepPolicy, { market: string; methods: TwoStepMethod[] }>({
+      query: ({ market, methods }) => ({ url: `/v1/afrippa/admin/two-step-methods/${market}`, method: 'PUT', body: { methods } }),
+      invalidatesTags: [{ type: 'P2p', id: 'TWO_STEP' }],
+    }),
+    clearTwoStepPolicy: build.mutation<{ market: string; deleted: true }, string>({
+      query: market => ({ url: `/v1/afrippa/admin/two-step-methods/${market}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'P2p', id: 'TWO_STEP' }],
+    }),
+    refusedWords: build.query<List<RefusedWord>, void>({ query: () => '/v1/afrippa/admin/p2p/refused-words', providesTags: [{ type: 'P2p', id: 'WORDS' }] }),
+    addRefusedWord: build.mutation<RefusedWord, { phrase: string; market?: string | null }>({
+      query: body => ({ url: '/v1/afrippa/admin/p2p/refused-words', method: 'POST', body }),
+      invalidatesTags: [{ type: 'P2p', id: 'WORDS' }],
+    }),
+    removeRefusedWord: build.mutation<unknown, string>({
+      query: id => ({ url: `/v1/afrippa/admin/p2p/refused-words/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'P2p', id: 'WORDS' }],
+    }),
+    afrippaBooks: build.query<AfrippaBooks, { mode: Mode; from: string; to: string }>({ query: params => ({ url: '/v1/afrippa/admin/books', params }), providesTags: [{ type: 'P2p', id: 'BOOKS' }] }),
+    afrippaBooksCheck: build.query<BooksCheck, void>({ query: () => '/v1/afrippa/admin/books/check', providesTags: [{ type: 'P2p', id: 'BOOKS' }] }),
+    traderStanding: build.query<TraderStanding, { id: string; mode: Mode }>({
+      query: ({ id, mode }) => ({ url: `/v1/afrippa/admin/traders/${id}/standing`, params: { mode } }),
+      providesTags: (_result, _error, { id }) => [{ type: 'P2p', id: `STANDING-${id}` }],
+    }),
+    clearTraderStrikes: build.mutation<TraderStanding, { id: string; mode: Mode; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/traders/${id}/standing/clear`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'P2p', id: `STANDING-${id}` }],
+    }),
+    resetTraderTwoStep: build.mutation<unknown, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/afrippa/admin/traders/${id}/two-step/reset`, method: 'POST', body: { reason } }),
+    }),
   }),
 });
 
@@ -130,4 +217,17 @@ export const {
   useP2pFeeRatesQuery,
   useSetP2pFeeRateMutation,
   useRemoveP2pFeeRateMutation,
+  useMarketLimitsQuery,
+  useSetMarketLimitMutation,
+  useTwoStepPoliciesQuery,
+  useSetTwoStepPolicyMutation,
+  useClearTwoStepPolicyMutation,
+  useRefusedWordsQuery,
+  useAddRefusedWordMutation,
+  useRemoveRefusedWordMutation,
+  useAfrippaBooksQuery,
+  useAfrippaBooksCheckQuery,
+  useTraderStandingQuery,
+  useClearTraderStrikesMutation,
+  useResetTraderTwoStepMutation,
 } = afrippaAdminApi;

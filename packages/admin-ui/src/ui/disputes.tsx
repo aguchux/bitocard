@@ -8,7 +8,7 @@ import { Button, Field, Textarea, Toggle } from './primitives';
 /** One message on a dispute, as the API returns it. */
 export type DisputeThreadMessage = {
   id: string;
-  author: 'customer' | 'reseller' | 'bitocard' | 'system' | (string & {});
+  author: 'customer' | 'reseller' | 'bitocard' | 'afrippa' | 'system' | (string & {});
   author_name: string | null;
   /** A support assistant's picture (support tickets). */
   author_avatar_url?: string | null;
@@ -40,8 +40,9 @@ export const disputeTopicLabels: Record<string, string> = { order: 'Order', paym
 
 /** Who wrote a message, as the reader sees it: "You" for their own side. */
 function authorLabel(message: DisputeThreadMessage, viewer: 'reseller' | 'admin') {
-  const own = (viewer === 'reseller' && message.author === 'reseller') || (viewer === 'admin' && message.author === 'bitocard');
-  const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', bot: 'Assistant', system: 'BitoCard' };
+  // The admin's own side: BitoCard's team, or Afrippa's on admin.afrippa.com.
+  const own = (viewer === 'reseller' && message.author === 'reseller') || (viewer === 'admin' && (message.author === 'bitocard' || message.author === 'afrippa'));
+  const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', afrippa: 'Afrippa', bot: 'Assistant', system: 'BitoCard' };
   const role = roles[message.author] ?? message.author;
   if (message.author === 'system') return 'Update';
   return own ? `${message.author_name ?? role} (you)` : message.author_name ? `${message.author_name} · ${role}` : role;
@@ -56,7 +57,7 @@ export function DisputeThread({ messages, viewer, requester = 'customer' }: { me
   return (
     <ol className="space-y-3" aria-label="Messages">
       {messages.map(message => {
-        const ours = (viewer === 'reseller' && message.author === 'reseller') || (viewer === 'admin' && message.author === 'bitocard');
+        const ours = (viewer === 'reseller' && message.author === 'reseller') || (viewer === 'admin' && (message.author === 'bitocard' || message.author === 'afrippa'));
         return (
           <li
             key={message.id}

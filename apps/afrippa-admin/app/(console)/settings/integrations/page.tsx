@@ -1,0 +1,357 @@
+"use client";
+
+import { useId, useState } from "react";
+import { Check, Copy, FlaskConical, KeyRound, Pencil, PlugZap } from "lucide-react";
+import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, ExternalLinks, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, RefreshFailed, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
+import { can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AfrippaShell } from "@/components/shell";
+import {
+  type Integration,
+  type IntegrationField,
+  type IntegrationSource,
+  useIntegrationsQuery,
+  useTestIntegrationMutation,
+  useUpdateIntegrationMutation,
+} from "@bitocard/api-client/admin";
+
+const sourceLabels: Record<IntegrationSource, string> = { admin: "Set here", environment: "From .env", default: "Default", unset: "Not set" };
+const statusLabels: Record<Integration["status"], string> = { connected: "Connected", incomplete: "Incomplete", not_connected: "Not connected" };
+
+function displayValue(field: IntegrationField) {
+  if (field.secret) return field.hint ? `Set (${field.hint})` : "Not set";
+  if (field.kind === "flag") return field.value ? "On" : "Off";
+  return field.value === null ? "Not set" : String(field.value);
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-label={copied ? "Copied" : "Copy webhook address"}
+      icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* clipboard unavailable: the address is shown to copy by hand */
+        }
+      }}
+    />
+  );
+}
+
+/** The integration's Sandbox switch field (`RELOADLY_SANDBOX`), if it has one. */
+const sandboxField = (integration: Integration) => integration.fields.find(field => field.kind === "flag" && field.key.endsWith("_SANDBOX")) ?? null;
+
+/**
+ * Switching Sandbox on or off changes where Afrippa's credentials are used, so it needs an authenticator code. For
+ * blockchain providers and the Crypto signer it decides which stores they serve: sandbox stores on test networks, or
+ * live stores on main networks.
+ */
+function SandboxDialog({ integration, on, onClose }: { integration: Integration; on: boolean; onClose: () => void }) {
+  const [update] = useUpdateIntegrationMutation();
+  const [code, setCode] = useState("");
+  const field = sandboxField(integration);
+  return (
+    <ActionDialog
+      open
+      onClose={onClose}
+      title={on ? `Switch ${integration.name} to its sandbox?` : `Switch ${integration.name} to live?`}
+      description={
+        integration.section === "blockchain"
+          ? // Blockchain providers and the Crypto signer: the switch picks which stores they serve, not a test-only address.
+            on
+            ? `${integration.name} will serve sandbox stores on test networks only, with the credentials saved here. Live stores stop using it for deposits and withdrawals. Save credentials for its test networks, then use Test connection.`
+            : `${integration.name} will serve live stores on main networks, with real customers’ deposits and withdrawals, and stop serving sandbox stores. Save your live credentials first, then use Test connection.`
+          : on
+            ? `Afrippa will call ${integration.name}’s sandbox address with the credentials saved here, for Test connection only. While in sandbox it is never synced or used for live use. Save your sandbox credentials, then use Test connection.`
+            : `Afrippa will call ${integration.name}’s live address and use it live again. Save your live credentials first, then use Test connection.`
+      }
+      confirmLabel={on ? "Switch to sandbox" : "Switch to live"}
+      requireReason={false}
+      onConfirm={async () => {
+        if (!field) return;
+        if (!/^\d{6}$/.test(code)) throw new Error("Enter the 6-digit code from your authenticator app.");
+        await update({ id: integration.id, values: { [field.key]: on }, code }).unwrap();
+      }}
+    >
+      <div className="space-y-2 rounded-lg bg-canvas p-4">
+        <p className="text-sm font-semibold text-ink">Authenticator code</p>
+        <CodeInput label="Authenticator code" value={code} onChange={setCode} />
+      </div>
+    </ActionDialog>
+  );
+}
+
+/**
+ * The card's switches: Sandbox (the provider's sandbox or live address, picked automatically) and Test connection.
+ * Afrippa has no resellers, so no reseller access.
+ */
+function IntegrationControls({ integration, editable }: { integration: Integration; editable: boolean }) {
+  const [test, testState] = useTestIntegrationMutation();
+  const [sandboxTo, setSandboxTo] = useState<boolean | null>(null);
+  const result = testState.data?.integration === integration.id ? testState.data : null;
+  if (integration.sandbox === null && !integration.testable) return null;
+  return (
+    <div className="mx-5 mt-4 space-y-3 sm:mx-6">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        {integration.sandbox !== null ? (
+          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+            Sandbox
+            <Toggle label={`${integration.name} sandbox`} checked={integration.sandbox} disabled={!editable} onChange={checked => setSandboxTo(checked)} />
+          </span>
+        ) : null}
+        {integration.testable ? (
+          <Button size="sm" variant="secondary" icon={<PlugZap className="size-4" aria-hidden />} loading={testState.isLoading} disabled={!editable} onClick={() => test(integration.id)}>
+            {integration.sandbox ? "Test sandbox connection" : "Test connection"}
+          </Button>
+        ) : null}
+      </div>
+      {result ? (
+        <Notice tone={result.ok ? "green" : "red"}>
+          {result.ok ? `${result.environment === "sandbox" ? "Sandbox" : "Live"} credentials work (${formatRelative(result.tested_at)}).${result.message ? ` ${result.message}` : ""}` : result.message}
+        </Notice>
+      ) : null}
+      {testState.error ? <Notice tone="red">{errorMessage(testState.error)}</Notice> : null}
+      {integration.sandbox ? (
+        <Notice tone="amber">
+          <span className="inline-flex items-center gap-2">
+            <FlaskConical className="size-4 shrink-0" aria-hidden />
+            In sandbox: used only to test its credentials, never for live orders, syncs or payments.
+          </span>
+        </Notice>
+      ) : null}
+      {sandboxTo !== null ? <SandboxDialog integration={integration} on={sandboxTo} onClose={() => setSandboxTo(null)} /> : null}
+    </div>
+  );
+}
+
+function IntegrationCard({ integration, editable, onEdit }: { integration: Integration; editable: boolean; onEdit: () => void }) {
+  return (
+    <Card className="flex flex-col">
+      <CardHeader
+        title={integration.name}
+        description={integration.description}
+        actions={
+          <>
+            {integration.sandbox ? (
+              <Badge tone="amber" dot={false}>
+                Sandbox
+              </Badge>
+            ) : null}
+            <StatusBadge
+              status={integration.adapter_ready ? integration.status : integration.status === "connected" ? "pending" : integration.status}
+              label={integration.adapter_ready ? statusLabels[integration.status] : integration.status === "connected" ? "Saved for later" : statusLabels[integration.status]}
+            />
+            {editable ? (
+              <Button variant="secondary" size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={onEdit} aria-label={`Edit ${integration.name}`}>
+                Edit
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+      <ExternalLinks links={integration.links} className="mx-5 mt-3 sm:mx-6" />
+      <IntegrationControls integration={integration} editable={editable} />
+      {integration.adapter_ready ? null : (
+        <p className="mx-5 mt-4 rounded-lg bg-canvas px-3 py-2 text-xs text-muted sm:mx-6">
+          Not connected yet: the adapter for this service is still to be built. Keys saved now are kept encrypted and used once it is.
+        </p>
+      )}
+      <dl className="mt-4 divide-y divide-line border-t border-line">
+        {integration.fields.map(field => (
+          <div key={field.key} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 sm:px-6">
+            <dt className="min-w-0 text-sm">
+              <span className="font-medium text-ink">{field.label}</span>
+              {field.required ? <span className="text-muted"> · required</span> : null}
+            </dt>
+            <dd className="flex min-w-0 items-center gap-2 text-sm">
+              <span className={field.source === "unset" ? "text-subtle" : "break-all text-ink"}>{displayValue(field)}</span>
+              {field.source !== "unset" ? (
+                <Badge tone={field.source === "admin" ? "blue" : "grey"} dot={false}>
+                  {sourceLabels[field.source]}
+                </Badge>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {integration.webhook_url ? (
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm sm:px-6">
+          <span className="text-muted">Webhook address</span>
+          <span className="flex min-w-0 items-center gap-1">
+            <code className="break-all rounded-lg bg-canvas px-2 py-1 text-xs text-ink">{integration.webhook_url}</code>
+            <CopyButton text={integration.webhook_url} />
+          </span>
+        </div>
+      ) : null}
+      {integration.updated_at ? <p className="px-5 pb-4 text-xs text-subtle sm:px-6">{`Changed here ${formatRelative(integration.updated_at)}`}</p> : null}
+    </Card>
+  );
+}
+
+type Draft = Record<string, { value: string | boolean; clear: boolean }>;
+
+const initialDraft = (integration: Integration): Draft =>
+  Object.fromEntries(
+    integration.fields.map(field => [field.key, { value: field.kind === "flag" ? Boolean(field.value) : field.secret || field.value === null ? "" : String(field.value), clear: false }]),
+  );
+
+/** Only what the admin changed: new secrets, edited values, and admin values cleared back to the environment. */
+function changesOf(integration: Integration, draft: Draft) {
+  const values: Record<string, string | number | boolean | null> = {};
+  for (const field of integration.fields) {
+    const entry = draft[field.key];
+    if (entry.clear) {
+      values[field.key] = null;
+      continue;
+    }
+    if (field.kind === "flag") {
+      if (entry.value !== Boolean(field.value)) values[field.key] = entry.value;
+      continue;
+    }
+    const text = String(entry.value).trim();
+    if (field.secret ? text !== "" : text !== "" && text !== String(field.value ?? "")) values[field.key] = field.kind === "number" ? Number(text) : text;
+  }
+  return values;
+}
+
+function EditDialog({ integration, onClose }: { integration: Integration; onClose: () => void }) {
+  const id = useId();
+  const [update] = useUpdateIntegrationMutation();
+  const [draft, setDraft] = useState<Draft>(() => initialDraft(integration));
+  const [code, setCode] = useState("");
+  const set = (key: string, change: Partial<Draft[string]>) => setDraft(current => ({ ...current, [key]: { ...current[key], ...change } }));
+
+  return (
+    <ActionDialog
+      open
+      onClose={onClose}
+      title={`Edit ${integration.name}`}
+      description="Secrets are encrypted and never shown again; leave a secret blank to keep it. Changes apply within 30 seconds, without a restart."
+      confirmLabel="Save changes"
+      requireReason={false}
+      onConfirm={async () => {
+        const values = changesOf(integration, draft);
+        if (Object.keys(values).length === 0) throw new Error("Nothing has changed.");
+        if (!/^\d{6}$/.test(code)) throw new Error("Enter the 6-digit code from your authenticator app.");
+        await update({ id: integration.id, values, code }).unwrap();
+      }}
+    >
+      <ExternalLinks links={integration.links} className="mb-4" />
+      {integration.fields.map(field => {
+        const inputId = `${id}-${field.key}`;
+        const entry = draft[field.key];
+        const hint = [field.help, field.source === "environment" ? "Currently from the API’s environment; a value here replaces it." : null].filter(Boolean).join(" ");
+        return (
+          <div key={field.key} className="space-y-2">
+            {field.kind === "flag" ? (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-ink">{field.label}</p>
+                  {hint ? <p className="text-xs text-muted">{hint}</p> : null}
+                </div>
+                <Toggle label={field.label} checked={Boolean(entry.value)} disabled={entry.clear} onChange={checked => set(field.key, { value: checked })} />
+              </div>
+            ) : (
+              <Field label={field.label} htmlFor={inputId} hint={hint || undefined}>
+                <Input
+                  id={inputId}
+                  type={field.secret ? "password" : field.kind === "number" ? "number" : field.kind === "email" ? "email" : field.kind === "url" ? "url" : "text"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={entry.clear}
+                  placeholder={field.secret ? (field.hint ? `Leave blank to keep (${field.hint})` : "Paste the key") : undefined}
+                  value={String(entry.value)}
+                  onChange={event => set(field.key, { value: event.target.value })}
+                />
+              </Field>
+            )}
+            {field.source === "admin" ? (
+              <label className="flex items-center gap-2 text-xs text-muted">
+                <input type="checkbox" className="size-4 accent-brand-500" checked={entry.clear} onChange={event => set(field.key, { clear: event.target.checked })} />
+                Remove the value set here (the environment or default applies again)
+              </label>
+            ) : null}
+          </div>
+        );
+      })}
+      <div className="rounded-lg bg-canvas p-4">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-ink">Authenticator code</p>
+          <CodeInput label="Authenticator code" value={code} onChange={setCode} />
+          <p className="text-xs text-muted">Changing credentials needs a fresh code from your authenticator app.</p>
+        </div>
+      </div>
+    </ActionDialog>
+  );
+}
+
+/**
+ * Afrippa's own service credentials and settings (its email, SMS, Google, AI, files, push and the crypto services),
+ * never BitoCard's. Super admins only; every change needs a fresh authenticator code.
+ */
+export default function IntegrationsPage() {
+  const admin = useAdmin();
+  const allowed = can(admin);
+  const { data, error, isFetching, refetch } = useIntegrationsQuery(undefined, { skip: !allowed });
+  const [editing, setEditing] = useState<string | null>(null);
+  const [section, setSection] = useState<Integration["section"]>("platform");
+  const shown = data?.data.filter(item => item.section === section) ?? [];
+  const current = data?.data.find(item => item.id === editing) ?? null;
+  const connected = data?.data.filter(item => item.status === "connected" && item.adapter_ready).length ?? 0;
+  const live = data?.data.filter(item => item.adapter_ready).length ?? 0;
+
+  return (
+    <AfrippaShell section="settings" current="/settings/integrations" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Integrations" }]}>
+      <PageHeader
+        title="Integrations"
+        description="Keys and settings for the services Afrippa uses, kept apart from BitoCard's. They apply within 30 seconds, without a restart."
+      />
+      {!allowed ? (
+        <Notice tone="amber" title="Super admins only">
+          Service credentials can be viewed and changed only by a super admin.
+        </Notice>
+      ) : !data && error ? (
+        <Card>
+          <ErrorState message={errorMessage(error)} onRetry={refetch} />
+        </Card>
+      ) : !data ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[0, 1, 2, 3].map(index => (
+            <Skeleton key={index} className="h-56 w-full" />
+          ))}
+        </div>
+      ) : (
+        <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
+          <Notice tone="blue">
+            <span className="inline-flex items-center gap-2">
+              <KeyRound className="size-4 shrink-0" aria-hidden />
+              {`${connected} of ${live} connected. Secrets are encrypted at rest, never shown again, and every change is recorded in the activity log without its value.`}
+            </span>
+          </Notice>
+          <Tabs
+            label="Integrations"
+            value={section}
+            onChange={setSection}
+            items={[
+              { value: "platform", label: "Platform", count: data.data.filter(item => item.section === "platform").length },
+              { value: "blockchain", label: "Blockchain", count: data.data.filter(item => item.section === "blockchain").length },
+            ]}
+          />
+          <div className="grid gap-4 lg:grid-cols-2">
+            {shown.map(integration => (
+              <IntegrationCard key={integration.id} integration={integration} editable={allowed} onEdit={() => setEditing(integration.id)} />
+            ))}
+          </div>
+        </>
+      )}
+      {current ? <EditDialog key={current.id} integration={current} onClose={() => setEditing(null)} /> : null}
+    </AfrippaShell>
+  );
+}
