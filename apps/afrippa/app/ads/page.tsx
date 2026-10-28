@@ -23,7 +23,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
     <AccountShell title="My ads" current="/ads" action={assets.length ? <PostAdLauncher assets={assets} /> : null}>
       {posted ? (
         <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status">
-          Your ad is on the market. Trades against it settle at once and show in Trades.
+          Your ad is on the market. Orders on it show in Orders: the buyer pays you directly, and you release the coins once the money is in your account.
         </p>
       ) : null}
       {ads.length ? (
@@ -33,7 +33,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
           ))}
         </ul>
       ) : (
-        <p className={cardClass}>You have no ads yet. Sell ads lock your coins until traded or closed; buy ads lock the money they need.</p>
+        <p className={cardClass}>You have no ads yet. A sell ad locks your coins (and Afrippa’s fee) until they are traded or you close it; a buy ad locks nothing.</p>
       )}
     </AccountShell>
   );

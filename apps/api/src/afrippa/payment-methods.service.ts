@@ -209,7 +209,7 @@ export class PaymentMethodsService {
       subject: `payment_method:${row.id}`,
       title: 'Payment method added',
       body: `${what} was added to your account. It can be used from ${row.usableFrom.toUTCString()}. If this was not you, remove it and change your password.`,
-      link: '/account/payment-methods',
+      link: '/payment-methods',
       mode: row.mode,
     });
   }

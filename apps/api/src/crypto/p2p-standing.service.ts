@@ -139,7 +139,7 @@ export class P2pStandingService {
       subject: `p2p_suspended:${customerId}:${mode}:${Date.now()}`,
       title: 'Your trading is paused',
       body: restriction.message,
-      link: '/account/standing',
+      link: '/standing',
       mode,
     });
     await this.prisma.p2pStanding.upsert({ where: { customerId_mode: { customerId, mode } }, create: { customerId, mode, notifiedAt: new Date() }, update: { notifiedAt: new Date() } });
@@ -157,7 +157,7 @@ export class P2pStandingService {
     });
     await this.audit.record({ actorId: adminId, action: 'trader.strikes_cleared', targetType: 'customer', targetId: customerId, before: { strikes: before.strikes, restriction: before.restriction?.code ?? null }, after: { strikes: 0, reason: reason.trim() }, platform: 'afrippa' });
     if (before.restriction?.code === 'trading_suspended') {
-      await this.inbox.customer({ customerId, storeId: customer.storeId }, 'customer.p2p.standing_changed', { subject: `p2p_cleared:${customerId}:${mode}:${Date.now()}`, title: 'You can trade again', body: "Afrippa's team cleared your strikes.", link: '/account/standing', mode });
+      await this.inbox.customer({ customerId, storeId: customer.storeId }, 'customer.p2p.standing_changed', { subject: `p2p_cleared:${customerId}:${mode}:${Date.now()}`, title: 'You can trade again', body: "Afrippa's team cleared your strikes.", link: '/standing', mode });
     }
     return this.standing(customerId, mode);
   }

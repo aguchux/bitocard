@@ -346,7 +346,7 @@ export class TraderTwoStepService {
   }
 
   private notice(customer: Customer, subject: string, title: string, body: string) {
-    return this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.security.two_step_changed', { subject: `${subject}:${Date.now()}`, title, body, link: '/account/security' });
+    return this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.security.two_step_changed', { subject: `${subject}:${Date.now()}`, title, body, link: '/security' });
   }
 
   private encryption() {

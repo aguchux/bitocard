@@ -494,6 +494,12 @@ export class CustomerP2pController {
     return this.p2p.myAds(caller.customer, query);
   }
 
+  /** One ad, to take (or your own): unavailable once it is no longer on offer to you. */
+  @Get('ads/:id')
+  ad(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.p2p.ad(caller.customer, id);
+  }
+
   @Post('ads')
   createAd(@CurrentCustomer() caller: CustomerCaller, @Body() body: CreateAdDto) {
     return this.p2p.createAd(caller.customer, body);

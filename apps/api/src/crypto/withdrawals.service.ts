@@ -225,7 +225,7 @@ export class CryptoWithdrawalsService {
       subject: row.id,
     };
     const customer = await this.prisma.customer.findUnique({ where: { id: holder.owner.customerId }, select: { storeId: true } });
-    if (customer) await this.inbox.customer({ customerId: holder.owner.customerId, storeId: customer.storeId }, 'customer.crypto.address_added', { ...notice, link: '/account/crypto/withdraw' });
+    if (customer) await this.inbox.customer({ customerId: holder.owner.customerId, storeId: customer.storeId }, 'customer.crypto.address_added', { ...notice, link: '/withdraw' });
     return presentAddress(row);
   }
 
@@ -611,7 +611,7 @@ export class CryptoWithdrawalsService {
     if (!customer) return;
     await this.inbox.customer({ customerId: row.customerId, storeId: customer.storeId }, outcome === 'sent' ? 'customer.crypto.withdrawal_sent' : 'customer.crypto.withdrawal_failed', {
       ...content,
-      link: '/account/crypto/withdraw',
+      link: '/withdraw',
     });
   }
 

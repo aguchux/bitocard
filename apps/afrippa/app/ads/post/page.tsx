@@ -5,6 +5,7 @@ import { PostAdForm } from "@afrippa/ui/forms";
 import { CryptoDeclaration, cardClass } from "@afrippa/ui/trade-views";
 import { AccountShell } from "@/components/account-shell";
 import { requireCustomer, tradableAssets } from "@/lib/account";
+import type { PaymentMethod } from "@/lib/orders-types";
 import { customerApi } from "@/lib/customer";
 import { declareCrypto } from "@/lib/trade";
 
@@ -16,7 +17,11 @@ type Search = { side?: string; asset?: string; currency?: string; market?: strin
 export default async function PostAdPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
   await requireCustomer(`/ads/post?${new URLSearchParams(params as Record<string, string>)}`);
-  const [overview, open] = await Promise.all([customerApi<StoreCryptoWallets>("GET", "/v1/afrippa/crypto"), customerApi<StoreList<StoreP2pMarket>>("GET", "/v1/afrippa/p2p/markets")]);
+  const [overview, open, saved] = await Promise.all([
+    customerApi<StoreCryptoWallets>("GET", "/v1/afrippa/crypto"),
+    customerApi<StoreList<StoreP2pMarket>>("GET", "/v1/afrippa/p2p/markets"),
+    customerApi<StoreList<PaymentMethod>>("GET", "/v1/afrippa/p2p/payment-methods"),
+  ]);
   const wallets = overview.ok ? overview.data : null;
   const assets = tradableAssets(wallets);
   const markets = open.ok ? open.data.data : [];
@@ -27,6 +32,8 @@ export default async function PostAdPage({ searchParams }: { searchParams: Promi
   const asset = assets.includes((params.asset ?? "").toUpperCase()) ? params.asset!.toUpperCase() : (assets[0] ?? "USDT");
   const side = params.side === "sell" ? "sell" : "buy";
   const coin = wallets?.assets.find(item => item.asset === asset);
+  // Only the trader's own accounts in the ad's currency, past their 24-hour wait.
+  const methods = (saved.ok ? saved.data.data : []).filter(method => method.currency === currency && method.usable);
   const route = (next: Partial<Search>) => `/ads/post?${new URLSearchParams({ side, asset, currency, ...(market ? { market } : {}), ...next })}`;
 
   let body;
@@ -58,7 +65,17 @@ export default async function PostAdPage({ searchParams }: { searchParams: Promi
             ))}
           </div>
         ) : null}
-        <PostAdForm key={`${market}-${side}-${asset}-${currency}`} side={side} asset={asset} currency={currency} market={market} suggestedAmount={side === "sell" && Number(coin?.available) > 0 ? coin!.available : undefined} />
+        {methods.length ? (
+        <PostAdForm key={`${market}-${side}-${asset}-${currency}`} side={side} asset={asset} currency={currency} market={market} suggestedAmount={side === "sell" && Number(coin?.available) > 0 ? coin!.available : undefined} methods={methods} />
+        ) : (
+          <p className="text-sm text-slate-600">
+            {side === "sell" ? "Buyers pay you directly" : "You pay sellers directly"}: add an account in {currency} first, in{" "}
+            <Link href="/payment-methods" className="font-semibold text-brand-700 underline">
+              Payment methods
+            </Link>
+            . A new one can be used 24 hours after you add it.
+          </p>
+        )}
       </section>
     );
   return (

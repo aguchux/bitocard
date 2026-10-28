@@ -106,8 +106,16 @@ describe("Afrippa's P2P orders", () => {
     await fund(ada, '100');
     const ad = await sellAd(ada);
     const adSeen = (await bola.client.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.data.find(item => item.id === ad.id);
-    const payInto = ad.payment_methods[0].id;
-    assert.equal(adSeen.payment_methods[0].id, undefined, 'the buyer sees no ids on the ad');
+    const payInto = adSeen.payment_methods[0].id;
+    assert.equal(payInto, ad.payment_methods[0].id, 'the buyer names the method they pay into by its id');
+    assert.equal(adSeen.payment_methods[0].hint, undefined, 'but never sees its hint');
+
+    // The ad on its own, to take: the same as the book shows; another trader's closed ad is unavailable.
+    const one = await bola.client.get(`/v1/afrippa/p2p/ads/${ad.id}`);
+    assert.equal(one.status, 200, JSON.stringify(one.json));
+    assert.deepEqual([one.json.id, one.json.mine, one.json.payment_methods[0].id, one.json.payment_methods[0].hint], [ad.id, false, payInto, undefined]);
+    assert.equal((await ada.client.get(`/v1/afrippa/p2p/ads/${ad.id}`)).json.mine, true);
+    assert.equal((await bola.client.get('/v1/afrippa/p2p/ads/00000000-0000-4000-8000-000000000000')).json.error.code, 'ad_unavailable');
 
     const preview = await bola.client.post('/v1/afrippa/p2p/orders', { ad_id: ad.id, price: 165000, fiat: 1650000, payment_method_id: payInto, preview: true });
     assert.equal(preview.status, 201, JSON.stringify(preview.json));

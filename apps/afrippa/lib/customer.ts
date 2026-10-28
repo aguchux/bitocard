@@ -67,6 +67,20 @@ export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | 
   }
 }
 
+/**
+ * A signed GET as the signed-in trader whose answer is passed on as it is (a file from an order room), or null when the
+ * API cannot be reached. Never cached.
+ */
+export async function customerFile(path: string): Promise<Response | null> {
+  const token = (await cookies()).get(sessionCookie)?.value;
+  if (!token) return null;
+  try {
+    return await fetch(apiUrl(path), { cache: "no-store", headers: { [sessionHeader]: token, ...signatureFor("GET", path), ...(await visitorHeader()) } });
+  } catch {
+    return null;
+  }
+}
+
 /** The trader this browser has a session for, signed in or still finishing two-step, or null. Asked once per request. */
 export const currentSession = cache(async (): Promise<Trader | null> => {
   if (!(await cookies()).get(sessionCookie)?.value) return null;

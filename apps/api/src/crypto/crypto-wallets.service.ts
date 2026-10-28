@@ -495,7 +495,7 @@ export class CryptoWalletsService {
     await this.inbox.customer({ customerId, storeId: customer.storeId }, 'customer.crypto.frozen', {
       title: `${fromUnits(amount, asset.decimals)} ${asset.code} frozen`,
       body: 'BitoCard froze part of your crypto while it looks into your account. Contact support to find out more.',
-      link: '/account/crypto',
+      link: '/wallets',
       mode: input.mode,
       subject: freeze.id,
     });
@@ -550,7 +550,7 @@ export class CryptoWalletsService {
       await this.inbox.customer({ customerId, storeId: customer.storeId }, 'customer.crypto.frozen', {
         title: 'Crypto account frozen',
         body: 'BitoCard froze your crypto account while it looks into it. Contact support to find out more.',
-        link: '/account/crypto',
+        link: '/wallets',
         subject: `account:${Date.now()}`,
       });
     }

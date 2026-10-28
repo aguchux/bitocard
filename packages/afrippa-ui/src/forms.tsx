@@ -90,7 +90,7 @@ export function Submit({ pending, children, className = "" }: { pending: boolean
   );
 }
 
-/** Posting an ad: sell (your crypto is locked for the market) or buy (nothing is locked: the seller's coins go to escrow when an order opens). */
+/** Posting an escrow ad: sell (your coins and the fee are locked for the market) or buy (nothing is locked: the seller's coins go into escrow when an order opens), with its payment methods and window. */
 export function PostAdForm({
   asset,
   currency,
@@ -99,6 +99,7 @@ export function PostAdForm({
   suggestedPrice,
   suggestedAmount,
   suggestedMax,
+  methods,
 }: {
   asset: string;
   currency: string;
@@ -108,6 +109,8 @@ export function PostAdForm({
   suggestedPrice?: string;
   suggestedAmount?: string;
   suggestedMax?: string;
+  /** The trader's own usable payment methods in the ad's currency (buyers pay into them, or the trader pays from them). */
+  methods: Array<{ id: string; label: string; hint: string }>;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(useTrade().actions.postAd, {});
   return (
@@ -143,6 +146,27 @@ export function PostAdForm({
           <Field label="Max per trade" name="max_fiat" inputMode="decimal" defaultValue={suggestedMax} placeholder="Maximum" required state={state} />
         </div>
       </div>
+      <fieldset className="space-y-2" aria-invalid={state.field === "payment_method_ids" || undefined}>
+        <legend className="text-sm font-semibold text-navy-900">{side === "sell" ? "Buyers pay into" : "You pay from"}</legend>
+        {methods.map((method, index) => (
+          <label key={method.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+            <input type="checkbox" name="payment_method_ids" value={method.id} defaultChecked={index === 0} className="size-4" />
+            <span className="font-semibold">{method.label}</span>
+            <span className="text-slate-500">{method.hint}</span>
+          </label>
+        ))}
+        <p className="text-xs text-slate-500">Up to five. The account details show only inside an order.</p>
+      </fieldset>
+      <label className="block space-y-1.5 text-sm font-semibold text-navy-900">
+        Payment window
+        <select name="payment_window" defaultValue="15" className={inputClass}>
+          {[15, 30, 60].map(minutes => (
+            <option key={minutes} value={minutes}>
+              {minutes} minutes to pay
+            </option>
+          ))}
+        </select>
+      </label>
       <Field label="Terms (optional)" name="terms" maxLength={500} placeholder="Anything buyers should know" state={state} />
       <Submit pending={pending} className="w-full sm:w-auto">
         <Plus className="size-4" aria-hidden="true" /> Post ad

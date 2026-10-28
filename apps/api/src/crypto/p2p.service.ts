@@ -229,8 +229,8 @@ export class P2pService {
       status: ad.status,
       /** Taken through an order and paid directly to the seller within `payment_window` minutes. */
       payment_window: ad.paymentWindowMinutes,
-      /** Where the buyer pays (sell ads) or pays from (buy ads): never the details, which show only inside an order. */
-      payment_methods: methods.map(method => ({ kind: method.kind, label: method.label, currency: method.currency, reversible: isReversible(method), ...(mine ? { id: method.id, hint: method.hint } : {}) })),
+      /** Where the buyer pays (sell ads) or pays from (buy ads), by id (a taker names one): never the details, which show only inside an order, nor the owner's hint. */
+      payment_methods: methods.map(method => ({ id: method.id, kind: method.kind, label: method.label, currency: method.currency, reversible: isReversible(method), ...(mine ? { hint: method.hint } : {}) })),
       /** The owner's sell ad: the seller's fee it keeps locked on top of the coins it offers. */
       fee_locked: mine ? fromUnits(ad.feeLocked, asset.decimals) : null,
       mine,
@@ -436,6 +436,25 @@ export class P2pService {
   }
 
   // -- Ads ------------------------------------------------------------------------------------------------------
+
+  /**
+   * One ad as a trader about to take it sees it (an Afrippa order opens on it), or their own. Another trader's ad must
+   * still be on offer to them: active with coins left, in a market they may trade in, its owner able to trade and
+   * neither having blocked the other; otherwise it is unavailable, exactly as opening an order on it would be.
+   */
+  async ad(customer: CustomerWithStore, id: string) {
+    const context = await this.wallets.context(customer);
+    const unavailable = () => conflict('ad_unavailable', 'This ad is no longer available. Choose another.', 'ad_id');
+    const found = await this.prisma.p2pAd.findFirst({ where: { id, mode: context.mode } });
+    if (!found) throw unavailable();
+    if (found.customerId !== customer.id) {
+      if (found.status !== 'active' || found.remainingAmount <= 0n) throw unavailable();
+      const { book } = await this.access(customer, { market: found.country, currency: found.currency });
+      if ((await this.trustFigures.blockedWith(customer.id)).includes(found.customerId)) throw unavailable();
+      if (!(await this.ownerCanTrade(found.customerId, book))) throw unavailable();
+    }
+    return (await this.presentAds([found], context.mode, customer.id)).data[0];
+  }
 
   async myAds(customer: CustomerWithStore, query: { status?: 'open' | 'closed' }) {
     const context = await this.wallets.context(customer);

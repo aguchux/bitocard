@@ -668,7 +668,7 @@ export class CryptoDepositsService {
         subject: deposit.id,
         title: `${fromUnits(deposit.amount, decimals)} ${deposit.asset} arrived`,
         body: `Your ${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]} is in your crypto wallet.`,
-        link: '/account/crypto',
+        link: '/wallets',
         mode: deposit.mode,
       });
     }

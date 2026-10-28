@@ -5,8 +5,10 @@ import { Header } from "@/components/header";
 
 /** The signed-in places, as underlined tabs. */
 const places = [
+  { href: "/orders", label: "Orders" },
   { href: "/wallets", label: "Wallets" },
   { href: "/ads", label: "My ads" },
+  { href: "/payment-methods", label: "Payment methods" },
 ];
 
 /** A signed-in page: the header, its title (and an action beside it), the account's tabs, then the page. */

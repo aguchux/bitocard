@@ -44,7 +44,7 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
     if (status === 401) redirect(paths.signIn(next));
   };
   return {
-    /** Posts an ad: price and limits in the market's currency, the amount in the coin, in the market chosen. */
+    /** Posts an ad: price and limits in the market's currency, the amount in the coin, in the market chosen, with where buyers pay (or the seller is paid from) and the payment window. */
     async postAd(form: FormData): Promise<FormState> {
       const price = toMinor(text(form, "price"));
       const min = toMinor(text(form, "min_fiat"));
@@ -54,6 +54,9 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
       if (!amount) return { error: "Enter how much to trade.", field: "amount" };
       if (!min) return { error: "Enter the smallest trade you take.", field: "min_fiat" };
       if (!max) return { error: "Enter the largest trade you take.", field: "max_fiat" };
+      const methods = form.getAll("payment_method_ids").map(String).filter(Boolean);
+      if (!methods.length) return { error: "Choose at least one payment method for this ad.", field: "payment_method_ids" };
+      const paymentWindow = Number(text(form, "payment_window") || 15);
       const result = await api<StoreP2pAd>("POST", "/v1/afrippa/p2p/ads", {
         side: text(form, "side") === "buy" ? "buy" : "sell",
         asset: text(form, "asset"),
@@ -64,6 +67,8 @@ export function tradeActions(deps: { api: CustomerCall; paths: TradePaths; redir
         min_fiat: min,
         max_fiat: max,
         terms: text(form, "terms") || undefined,
+        payment_method_ids: methods,
+        payment_window: paymentWindow,
       });
       if (!result.ok) {
         signInFirst(result.status, paths.ads);

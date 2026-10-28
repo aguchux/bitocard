@@ -138,14 +138,15 @@ describe("reading the public data, cached", () => {
 describe("the small parts of a market page", () => {
   const nigeria = shown.data[1];
 
-  test("the book: its ads, to look at until orders open (instant trades are retired)", async () => {
+  test("the book: its ads, each taken on its own page (an escrow order, signed in), never a session asked here", async () => {
     answer([ad("a"), ad("b", { trader: { nickname: "Traderb", trades_30d: 0, trades_total: 1 } })]);
     const state = pageState(nigeria, shown.assets, {});
     const html = renderToStaticMarkup(await MarketBook({ market: "NG", name: "Nigeria", state }));
     expect(html).toContain("2 ads selling USDT for NGN in Nigeria");
     expect(html).toContain("Tradera");
-    expect(html).toContain("Orders open soon");
-    expect(html).not.toContain("Buy USDT");
+    expect(html).toContain('href="/take/a"');
+    expect(html).toContain("Buy USDT");
+    expect(html).not.toContain("Orders open soon");
     expect(html).not.toContain("/signin");
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/v1/afrippa/account")), "no session, no account asked").toBe(false);
   });

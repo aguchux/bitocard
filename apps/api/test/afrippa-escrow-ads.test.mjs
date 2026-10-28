@@ -103,7 +103,7 @@ describe("Afrippa's escrow ads", () => {
     const market = await bola.client.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
     assert.equal(market.status, 200, JSON.stringify(market.json));
     const listed = market.json.data.find(item => item.id === ad.json.id);
-    assert.deepEqual(listed.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN', reversible: false }], 'no id or hint for anyone but the owner');
+    assert.deepEqual(listed.payment_methods, [{ id: ada.bank, kind: 'bank', label: 'Example Bank', currency: 'NGN', reversible: false }], 'the id to take it by, never the hint, for anyone but the owner');
     assert.equal(listed.mine, false);
 
     // Instant trades are retired: an ad is taken only through an order.

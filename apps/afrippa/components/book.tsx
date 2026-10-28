@@ -4,10 +4,14 @@ import { MarketAds, type AdAction } from "@afrippa/ui/market-view";
 import { book, bookQuery } from "@/lib/api";
 
 /**
- * Ads are taken through escrow orders, which open with Afrippa's own site (docs/CRYPTO_SPINOFF_PLAN.md, step 4):
- * BitoCard's instant trades are retired, so the book is for looking until then.
+ * Taking an ad opens an escrow order on its own page (`/take/<ad>`): signed in, past two-step, with the amount and the
+ * account the money goes to. The book itself stays public and cached, so the button is a plain link.
  */
-export const ordersSoon: AdAction = () => <span className="inline-flex min-h-11 items-center text-sm font-semibold text-slate-500">Orders open soon</span>;
+export const takeAd: AdAction = (ad, side) => (
+  <Link href={`/take/${ad.id}`} prefetch={false} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600">
+    {side === "buy" ? "Buy" : "Sell"} {ad.asset}
+  </Link>
+);
 
 /**
  * A market's book for the filters chosen: its own small part, reading the cached book (one per market, coin, side,
@@ -24,7 +28,7 @@ export async function MarketBook({ market, name, state }: { market: string; name
         {ads.length} {ads.length === 1 ? "ad" : "ads"} {state.side === "buy" ? `selling ${state.asset}` : `buying ${state.asset}`} for {state.currency} in {name}
       </p>
       {ads.length ? (
-        <MarketAds ads={ads} state={state} action={ordersSoon} />
+        <MarketAds ads={ads} state={state} action={takeAd} />
       ) : (
         <div className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
           <p className="font-semibold">{filtered ? "No ads match your filters" : `Nobody is ${state.side === "buy" ? "selling" : "buying"} ${state.asset} for ${state.currency} here right now`}</p>
