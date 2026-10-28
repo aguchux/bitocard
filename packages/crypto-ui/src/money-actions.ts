@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
+import type { StoreCryptoWithdrawal, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
 import type { FormState, NonceFormState } from "./forms";
-import { cryptoAmount, toMinor, type CustomerCall } from "./trade-actions";
+import { cryptoAmount, type CustomerCall } from "./trade-actions";
 
 /** Where an app's money pages are, and what else to refresh when money moves. */
 export type MoneyPaths = {
@@ -9,13 +9,10 @@ export type MoneyPaths = {
   /** The withdrawal's review, before anything moves (`?asset&chain&address&amount`). */
   withdrawConfirm: string;
   withdrawal: (id: string) => string;
-  cashOut: string;
   /** Signing in first, coming back to `next`. */
   signIn: (next: string) => string;
   /** Layouts to refresh once money moves (balances shown elsewhere). */
   refresh: string[];
-  /** Other pages showing the same bank accounts (the storefront's Shop tab pays Safe pay sales into them). */
-  bankAccountsAlso?: string[];
 };
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
@@ -23,7 +20,7 @@ const fresh = (state: FormState): NonceFormState => ({ ...state, nonce: randomUU
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
 /**
- * The money actions' work (withdrawals, and cashing P2P money out to a bank), shared by the storefront's Crypto tab and
+ * The money actions' work (on-chain withdrawals), shared by the storefront's Crypto tab and
  * BitoCard Crypto: each app's own server actions call these with its customer API and its pages, and `redirect` and
  * `revalidatePath` passed in, as `tradeActions` does. A form that moves money sends its nonce as the Idempotency-Key,
  * and every refusal gives the form a fresh one (the API keeps a key's answer, so trying again must be a new request).
@@ -114,56 +111,6 @@ export function moneyActions(deps: { api: CustomerCall; paths: MoneyPaths; redir
       }
       page(paths.withdrawal(id));
       layouts();
-      return {};
-    },
-
-    /** Adds a bank account for P2P money (in the customer's verified name; usable after 24 hours on live stores). */
-    async addCashOutAccount(form: FormData): Promise<FormState> {
-      const bankCode = text(form, "bank_code");
-      const accountNumber = text(form, "account_number").replace(/\s/g, "");
-      if (!bankCode) return { error: "Choose your bank.", field: "bank_code" };
-      if (!/^\d{6,20}$/.test(accountNumber)) return { error: "Enter your account number, digits only.", field: "account_number" };
-      const result = await api<StoreCustomerBankAccount>("POST", "/v1/store/cash/bank-accounts", { bank_code: bankCode, account_number: accountNumber });
-      if (!result.ok) {
-        signInFirst(result.status, paths.cashOut);
-        return { error: result.message, field: result.param === "account_number" || result.param === "bank_code" ? result.param : null };
-      }
-      page(paths.cashOut, ...(paths.bankAccountsAlso ?? []));
-      return { notice: `Added ${result.data.bank_name} ending ${result.data.account_number_last4} (${result.data.account_name}).` };
-    },
-
-    async removeCashOutAccount(form: FormData): Promise<FormState> {
-      const result = await api("DELETE", `/v1/store/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
-      if (!result.ok) {
-        signInFirst(result.status, paths.cashOut);
-        return { error: result.message };
-      }
-      page(paths.cashOut);
-      return {};
-    },
-
-    /** Pays P2P money out to one of the customer's bank accounts (the amount typed in their currency). */
-    async cashOut(form: FormData): Promise<NonceFormState> {
-      const amount = toMinor(text(form, "amount"));
-      const account = text(form, "bank_account_id");
-      if (!account) return { error: "Choose the account to pay into.", field: "bank_account_id" };
-      if (!amount) return { error: "Enter how much to pay out.", field: "amount" };
-      const result = await api<StoreCustomerPayout>("POST", "/v1/store/cash/payouts", { amount, bank_account_id: account }, { idempotencyKey: text(form, "nonce") || undefined });
-      if (!result.ok) {
-        signInFirst(result.status, paths.cashOut);
-        return fresh({ error: result.message, field: result.param === "amount" ? "amount" : null });
-      }
-      page(paths.cashOut);
-      layouts();
-      // A fresh nonce: another payout from the same form is a new request.
-      return fresh({ notice: result.data.status === "failed" ? `The bank refused it: ${result.data.failure_reason ?? "try another account"}. The money is back in your balance.` : "On its way to your bank." });
-    },
-
-    /** Sandbox only: settles a test payout as paid or failed. */
-    async simulateCashOut(form: FormData): Promise<FormState> {
-      const result = await api("POST", `/v1/store/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
-      if (!result.ok) return { error: result.message };
-      page(paths.cashOut);
       return {};
     },
   };

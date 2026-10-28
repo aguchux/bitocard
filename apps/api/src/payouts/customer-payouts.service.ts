@@ -61,9 +61,9 @@ export function presentCustomerPayout(payout: CustomerPayout & { bankAccount?: C
 }
 
 /**
- * Store customers' P2P money (`customer_withdrawable`, from selling crypto) paid out to their own bank account through
- * BitoCard's transfer provider. Live accounts must be in the customer's verified name and wait 24 hours after they are
- * added; money from P2P sales becomes withdrawable after the country's payout hold (the same days as resellers'
+ * Store customers' withdrawable money (`customer_withdrawable`, from BitoCard Shop's Safe pay sales) paid out to their
+ * own bank account through BitoCard's transfer provider. Live accounts must be in the customer's verified name and wait
+ * 24 hours after they are added; money from sales becomes withdrawable after the country's payout hold (the same days as resellers'
  * earnings), so a sale paid with money that is later reversed can still be put right. The amount moves to
  * `customer_payouts_pending` before the transfer starts, and back only if the bank definitely refused it; an unclear
  * transfer stays pending (finance is told after an hour).
@@ -92,7 +92,7 @@ export class CustomerPayoutsService {
 
   // -- Money that can be paid out -------------------------------------------------------------------------------
 
-  /** P2P money now: the balance, what is still inside the payout hold, and what can be paid out. */
+  /** Withdrawable money now: the balance, what is still inside the payout hold, and what can be paid out. */
   async balance(context: PayoutContext) {
     const country = await this.prisma.country.findUniqueOrThrow({ where: { code: context.country } });
     const accountId = await this.ledger.accountId(context.mode, this.ref(context.customer.id, 'customer_withdrawable', context.currency));
@@ -112,7 +112,7 @@ export class CustomerPayoutsService {
   }
 
   /**
-   * Money not withdrawable yet: from P2P sales (and BitoCard Shop Safe pay sales) credited inside the hold, and Safe
+   * Money not withdrawable yet: from Safe pay sales credited inside the hold, and Safe
    * pay money finance has not approved (the buyer paid from a recent card or mobile money top-up), whenever released.
    */
   private async held(
@@ -125,7 +125,7 @@ export class CustomerPayoutsService {
     const recent =
       holdDays > 0
         ? await db.ledgerPosting.aggregate({
-            where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['p2p_trade', 'exchange_trade', 'classified_release', 'classified_partial'] }, createdAt: { gt: holdStart } } },
+            where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['classified_release', 'classified_partial'] }, createdAt: { gt: holdStart } } },
             _sum: { amountMinor: true },
           })
         : { _sum: { amountMinor: 0n } };
@@ -203,7 +203,7 @@ export class CustomerPayoutsService {
     await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.security.bank_account_added', {
       subject: account.id,
       title: 'Bank account added',
-      body: `${bank.name} ending ${account.accountNumberLast4} can receive your P2P money from ${when}. If this was not you, remove it and change your password.`,
+      body: `${bank.name} ending ${account.accountNumberLast4} can receive your payouts from ${when}. If this was not you, remove it and change your password.`,
       link: '/shop/payouts',
       mode,
     });
@@ -223,7 +223,7 @@ export class CustomerPayoutsService {
     return { object: 'list' as const, data: rows.map(presentCustomerPayout) };
   }
 
-  /** Pays P2P money out to one of the customer's bank accounts: set aside first, then the bank transfer. */
+  /** Pays withdrawable money out to one of the customer's bank accounts: set aside first, then the bank transfer. */
   async create(context: PayoutContext, input: { amount: number; bank_account_id: string }) {
     const { customer, mode, currency } = context;
     const account = await this.prisma.customerBankAccount.findFirst({ where: { id: input.bank_account_id, customerId: customer.id, mode, removedAt: null } });
@@ -293,7 +293,7 @@ export class CustomerPayoutsService {
     return presentCustomerPayout({ ...(await this.apply(payout, result)), bankAccount: account });
   }
 
-  /** Applies a transfer result once: paid takes the money out to the bank, failed returns it to the customer's P2P money. */
+  /** Applies a transfer result once: paid takes the money out to the bank, failed returns it to the customer's withdrawable money. */
   async apply(payout: CustomerPayout, result: TransferResult) {
     const transferId = result.providerTransferId || payout.providerTransferId;
     if (result.status === 'pending') {
@@ -320,7 +320,7 @@ export class CustomerPayoutsService {
             mode: payout.mode,
             type: 'customer_payout_reversal',
             reference: `customer_payout_failed:${payout.id}`,
-            description: 'Payout failed: returned to your P2P money',
+            description: 'Payout failed: returned to your balance',
             metadata: { payout_id: payout.id, reason: result.failureReason },
             lines: [
               { account: pending, debit: payout.amountMinor },
@@ -344,7 +344,7 @@ export class CustomerPayoutsService {
         subject: updated.id,
         title: paid ? `${amount} sent to your bank` : `${amount} payout failed`,
         body: paid
-          ? `Your P2P money was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
+          ? `Your money was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
           : `The payout to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your P2P balance.`,
         link: '/shop/payouts',
         mode: updated.mode,

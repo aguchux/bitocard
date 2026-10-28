@@ -1,5 +1,5 @@
 // What a customer already holds stays theirs: closing a reseller's store, switching crypto off or delisting a coin never
-// traps their crypto or P2P money. They can still see it, close their ads and withdraw; only new business is refused.
+// traps their crypto. They can still see it, close their ads and withdraw; only new business is refused.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, afrippaAdminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
@@ -84,8 +84,8 @@ describe('a closed store', () => {
     const store = await resellerStore();
     const shopper = await customer(store.subdomain);
     assert.equal((await shopper.post('/v1/afrippa/crypto/test-deposits', { asset: 'USDT', amount: '100' })).status, 201);
-    // An old instant sell ad of theirs, 40 USDT locked (none can be posted now: the market is Afrippa's traders').
-    const ad = { json: await prisma.p2pAd.create({ data: { mode: 'test', customerId: shopper.id, country: 'NG', currency: 'NGN', asset: 'USDT', side: 'sell', priceMinor: 165000n, totalAmount: 40_000_000n, remainingAmount: 40_000_000n, minFiatMinor: 100_00n, maxFiatMinor: 500_000_00n } }) };
+    // A sell ad of theirs, 40 USDT locked (made directly: only Afrippa's traders post ads).
+    const ad = { json: await prisma.p2pAd.create({ data: { mode: 'test', customerId: shopper.id, country: 'NG', currency: 'NGN', asset: 'USDT', side: 'sell', priceMinor: 165000n, totalAmount: 40_000_000n, remainingAmount: 40_000_000n, minFiatMinor: 100_00n, maxFiatMinor: 500_000_00n, paymentWindowMinutes: 15 } }) };
     await server.app.get(LedgerService).post({
       mode: 'test',
       type: 'p2p_ad_lock',
@@ -100,7 +100,8 @@ describe('a closed store', () => {
     await prisma.store.update({ where: { id: store.id }, data: { status: 'suspended' } });
     const overview = await shopper.get('/v1/afrippa/crypto');
     assert.equal(overview.status, 200, JSON.stringify(overview.json));
-    assert.deepEqual([overview.json.assets.find(item => item.asset === 'USDT').locked, overview.json.cash.paying_out], ['40.000000', 0]);
+    assert.equal(overview.json.assets.find(item => item.asset === 'USDT').locked, '40.000000');
+    assert.equal('cash' in overview.json, false, 'Afrippa holds no money');
     assert.equal((await shopper.get('/v1/afrippa/p2p/ads')).status, 200);
     const closed = await shopper.post(`/v1/afrippa/p2p/ads/${ad.json.id}/cancel`);
     assert.equal(closed.status, 200, JSON.stringify(closed.json));
@@ -112,7 +113,7 @@ describe('a closed store', () => {
     const address = await shopper.post('/v1/afrippa/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'My wallet' });
     assert.equal(address.status, 201, JSON.stringify(address.json));
     assert.equal((await shopper.get('/v1/afrippa/crypto/withdrawal-networks?asset=USDT')).status, 200);
-    assert.equal((await shopper.get('/v1/store/cash')).status, 200, 'P2P money can be paid out');
+    assert.equal((await shopper.get('/v1/store/cash')).status, 200, 'withdrawable money can be paid out');
   });
 });
 

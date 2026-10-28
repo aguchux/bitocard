@@ -185,7 +185,7 @@ export class CryptoDepositsService {
     return this.addressFor({ customerId: customer.id }, context.mode, input);
   }
 
-  /** An owner's deposit address (a customer's, or a Premium reseller's own): one per family and mode, for good. */
+  /** An owner's deposit address: one per family and mode, for good. */
   async addressFor(owner: CoinOwner, mode: LedgerMode, input: { asset: string; chain: string }) {
     const context = { mode };
     const asset = await this.wallets.asset(input.asset);
@@ -501,7 +501,6 @@ export class CryptoDepositsService {
       await this.prisma.cryptoDeposit.create({
         data: {
           customerId: address.customerId,
-          resellerId: address.resellerId,
           mode,
           chain,
           asset: network.asset,
@@ -640,7 +639,7 @@ export class CryptoDepositsService {
     return this.credit(deposit, asset.decimals);
   }
 
-  /** Credits a confirmed deposit to its owner's coin wallet (a customer's, or a reseller's own), once. */
+  /** Credits a confirmed deposit to its owner's coin wallet, once. */
   private async credit(deposit: CryptoDeposit, decimals: number) {
     const owner = ownerOf(deposit);
     const walletRef = coinWalletRef(owner, deposit.asset);
@@ -653,7 +652,6 @@ export class CryptoDepositsService {
         mode: deposit.mode,
         type: 'crypto_deposit',
         reference: `crypto_deposit:${deposit.chain}:${deposit.txHash}:${deposit.outputIndex}`,
-        resellerId: owner.resellerId ?? null,
         description: `${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]}`,
         metadata: { deposit_id: deposit.id, tx_hash: deposit.txHash },
         postings: [
@@ -664,19 +662,9 @@ export class CryptoDepositsService {
       return true;
     });
     if (!done) return false;
-    if (owner.resellerId) {
-      await this.inbox.reseller(owner.resellerId, 'crypto.deposit_credited', {
-        subject: deposit.id,
-        title: `${fromUnits(deposit.amount, decimals)} ${deposit.asset} arrived`,
-        body: `Your ${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]} is in your coin wallet.`,
-        link: '/exchange/coins',
-        mode: deposit.mode,
-      });
-      return true;
-    }
     const customer = await this.prisma.customer.findUnique({ where: { id: owner.customerId }, select: { storeId: true } });
     if (customer) {
-      await this.inbox.customer({ customerId: owner.customerId!, storeId: customer.storeId }, 'customer.crypto.deposit_credited', {
+      await this.inbox.customer({ customerId: owner.customerId, storeId: customer.storeId }, 'customer.crypto.deposit_credited', {
         subject: deposit.id,
         title: `${fromUnits(deposit.amount, decimals)} ${deposit.asset} arrived`,
         body: `Your ${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]} is in your crypto wallet.`,
@@ -883,15 +871,14 @@ export class CryptoDepositsService {
     return { object: 'chain_check' as const, results };
   }
 
-  async adminDeposits(query: { mode?: LedgerMode; status?: string; customer_id?: string; reseller_id?: string }) {
+  async adminDeposits(query: { mode?: LedgerMode; status?: string; customer_id?: string }) {
     const rows = await this.prisma.cryptoDeposit.findMany({
       where: {
         ...(query.mode ? { mode: query.mode } : {}),
         ...(query.status ? { status: query.status } : {}),
         ...(query.customer_id ? { customerId: query.customer_id } : {}),
-        ...(query.reseller_id ? { resellerId: query.reseller_id } : {}),
       },
-      include: { customer: { select: { email: true } }, reseller: { select: { name: true } } },
+      include: { customer: { select: { email: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -904,8 +891,7 @@ export class CryptoDepositsService {
           ...item,
           address: row.address,
           confirmed_by: row.confirmedBy,
-          customer: row.customerId && row.customer ? { id: row.customerId, email: row.customer.email } : null,
-          reseller: row.resellerId && row.reseller ? { id: row.resellerId, name: row.reseller.name } : null,
+          customer: { id: row.customerId, email: row.customer.email },
         };
       }),
     };

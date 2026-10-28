@@ -27,7 +27,7 @@ const baseColumns: Array<Column<CryptoDeposit>> = [
   {
     key: "customer",
     header: "Owner",
-    cell: deposit => <CoinOwnerLink customer={deposit.customer} reseller={deposit.reseller} />,
+    cell: deposit => <CoinOwnerLink customer={deposit.customer} />,
   },
   { key: "tx", header: "Transaction", hideOnMobile: true, cell: deposit => <span className="block max-w-56 truncate font-mono text-xs" title={deposit.tx_hash}>{deposit.tx_hash}</span> },
   { key: "confirmations", header: "Confirmations", hideOnMobile: true, cell: deposit => `${deposit.confirmations}${deposit.confirmations_needed ? ` / ${deposit.confirmations_needed}` : ""}` },

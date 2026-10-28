@@ -8,7 +8,6 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { AccountKind, CryptoAsset, CryptoFreeze, LedgerMode, Reseller } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { type AccountRef, LedgerService } from '../ledger/ledger.service.js';
-import { minor } from '../ledger/mode.js';
 import { testModeOnly } from '../payments/payments.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -33,7 +32,6 @@ export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; sel
 export const isTrader = (customer: Pick<CustomerWithStore, 'store'>) => customer.store.platform === 'afrippa';
 
 const cryptoKinds = ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing'] as const satisfies AccountKind[];
-const fiatKinds = ['customer_withdrawable', 'p2p_fiat_locked', 'customer_wallet', 'customer_payouts_pending'] as const satisfies AccountKind[];
 
 /** BitoCard's crypto fees per mode and asset are spread over this many accounts (`crypto_fees`; totals are their sum). */
 export const cryptoFeeShards = 16;
@@ -62,8 +60,8 @@ export function presentFreeze(freeze: CryptoFreeze, asset: Pick<CryptoAsset, 'de
 /**
  * Customers' crypto wallets: one ledger account per asset for what they can spend (`crypto_wallet`), what is locked
  * in the market (`crypto_locked`) and what an admin froze (`crypto_frozen`), all in the asset's base units and never
- * below zero. BitoCard's side is `crypto_custody` (what it holds for them). Their P2P sale money is
- * `customer_withdrawable` in their country's currency. Gated by the `crypto_wallets` switch (store's seller, then
+ * below zero. BitoCard's side is `crypto_custody` (what it holds for them). Afrippa holds no money: traders pay each
+ * other directly (P2P money and the instant exchange are retired). Gated by the `crypto_wallets` switch (store's seller, then
  * country, then global; off by default) and, live, by the customer's identity check.
  */
 @Injectable()
@@ -233,7 +231,7 @@ export class CryptoWalletsService {
   }
 
   /**
-   * The checks before moving out what a customer already holds (on-chain withdrawals, bank payouts of P2P money):
+   * The checks before moving out what a customer already holds (on-chain withdrawals, bank payouts):
    * email confirmed, not frozen, identity checked live. Not the crypto switches nor the store being open: switching
    * crypto off or closing a store never traps money.
    */
@@ -263,21 +261,10 @@ export class CryptoWalletsService {
     return { kind, currency, customerId };
   }
 
-  /** Every crypto and P2P cash balance the customer has in a mode, by kind and currency. */
+  /** Every crypto balance the customer has in a mode, by kind and asset. */
   private async accounts(customerId: string, mode: LedgerMode) {
-    const rows = await this.prisma.ledgerAccount.findMany({ where: { customerId, mode, kind: { in: [...cryptoKinds, ...fiatKinds] } }, select: { kind: true, currency: true, balanceMinor: true } });
+    const rows = await this.prisma.ledgerAccount.findMany({ where: { customerId, mode, kind: { in: [...cryptoKinds] } }, select: { kind: true, currency: true, balanceMinor: true } });
     return (kind: AccountKind, currency: string) => rows.find(row => row.kind === kind && row.currency === currency)?.balanceMinor ?? 0n;
-  }
-
-  /** Fiat currencies other than `known` in which the customer holds P2P money or has it locked in buy ads. */
-  private async otherCurrencies(customerId: string, mode: LedgerMode, known: string[]) {
-    const rows = await this.prisma.ledgerAccount.findMany({
-      where: { customerId, mode, kind: { in: ['customer_withdrawable', 'p2p_fiat_locked'] }, currency: { notIn: known }, balanceMinor: { gt: 0n } },
-      select: { currency: true },
-      distinct: ['currency'],
-      orderBy: { currency: 'asc' },
-    });
-    return rows.map(row => row.currency);
   }
 
   private async assetBalances(customerId: string, mode: LedgerMode, assets: CryptoAsset[]) {
@@ -304,7 +291,7 @@ export class CryptoWalletsService {
     });
   }
 
-  /** The customer's crypto wallets and P2P cash, with what they can do now. */
+  /** The customer's crypto wallets, with what they can do now. */
   async overview(customer: CustomerWithStore) {
     const context = await this.context(customer);
     const [home, p2p, global, verified, fresh, all] = await Promise.all([
@@ -335,25 +322,6 @@ export class CryptoWalletsService {
       declaration: { version: cryptoDeclarationVersion, declared: Boolean(await this.prisma.cryptoDeclaration.findUnique({ where: { customerId_version: { customerId: customer.id, version: cryptoDeclarationVersion } } })) },
       frozen: Boolean(fresh.cryptoFrozenAt),
       assets: await this.assetBalances(customer.id, context.mode, listed),
-      /** Money in the customer's country currency for P2P: sale proceeds (withdrawable), the wallet (top-ups) and what buy ads lock. */
-      cash: {
-        currency: context.currency,
-        proceeds: minor(balance('customer_withdrawable', context.currency)),
-        wallet: minor(balance('customer_wallet', context.currency)),
-        locked: minor(balance('p2p_fiat_locked', context.currency)),
-        /** P2P money on its way to the customer's bank, until the transfer is paid or returned. */
-        paying_out: minor(balance('customer_payouts_pending', context.currency)),
-      },
-      /**
-       * P2P money in other countries' currencies, from selling in their markets (a Nigerian's cedis): spent in those
-       * markets, never cashed out here (cash-out is through the customer's own country only). Only currencies held.
-       */
-      other_cash: (await this.otherCurrencies(customer.id, context.mode, [context.currency, 'USD'])).map(code => ({
-        currency: code,
-        proceeds: minor(balance('customer_withdrawable', code)),
-        locked: minor(balance('p2p_fiat_locked', code)),
-      })),
-      ...(context.currency !== 'USD' ? { usd_cash: { currency: 'USD', proceeds: minor(balance('customer_withdrawable', 'USD')), wallet: minor(balance('customer_wallet', 'USD')), locked: minor(balance('p2p_fiat_locked', 'USD')), paying_out: minor(balance('customer_payouts_pending', 'USD')) } } : {}),
     };
   }
 
@@ -463,21 +431,19 @@ export class CryptoWalletsService {
     };
   }
 
-  /** One customer's crypto: balances in both modes, cash, freezes. */
+  /** One customer's crypto: balances in both modes and freezes. */
   async adminCustomer(id: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id }, include: { store: { select: { name: true, subdomain: true } }, p2pProfile: true } });
     if (!customer) throw notFound('customer');
     const assets = await this.assets(true);
     const byCode = new Map(assets.map(asset => [asset.code, asset]));
     const freezes = await this.prisma.cryptoFreeze.findMany({ where: { customerId: id }, orderBy: { createdAt: 'desc' }, take: 50 });
-    const cash = await this.prisma.ledgerAccount.findMany({ where: { customerId: id, kind: { in: [...fiatKinds] } }, orderBy: [{ mode: 'desc' }, { currency: 'asc' }] });
     return {
       ...this.presentCustomer(customer),
       balances: {
         live: await this.assetBalances(id, 'live', assets),
         test: await this.assetBalances(id, 'test', assets),
       },
-      cash: cash.map(account => ({ mode: account.mode, kind: account.kind, currency: account.currency, balance: minor(account.balanceMinor) })),
       freezes: freezes.map(freeze => presentFreeze(freeze, byCode.get(freeze.asset) ?? { decimals: 8 })),
     };
   }

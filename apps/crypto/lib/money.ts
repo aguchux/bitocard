@@ -7,7 +7,7 @@ import { moneyActions } from "@bitocard/crypto-ui/money-actions";
 import { customerApi, signInPath } from "@/lib/customer";
 
 /**
- * BitoCard Crypto's money actions (withdrawals, cashing P2P money out): the work is `@bitocard/crypto-ui`'s
+ * BitoCard Crypto's money actions (on-chain withdrawals): the work is `@bitocard/crypto-ui`'s
  * (`moneyActions`, shared with the storefront's Crypto tab), over this site's own customer session and on its own pages.
  */
 const money = moneyActions({
@@ -16,7 +16,6 @@ const money = moneyActions({
     withdraw: "/withdraw",
     withdrawConfirm: "/withdraw/confirm",
     withdrawal: id => `/withdrawals/${id}`,
-    cashOut: "/cash-out",
     signIn: next => signInPath(next),
     refresh: ["/"],
   },
@@ -50,20 +49,4 @@ export async function resendWithdrawalCode(_state: FormState, form: FormData): P
 
 export async function cancelWithdrawal(_state: FormState, form: FormData): Promise<FormState> {
   return money.cancelWithdrawal(form);
-}
-
-export async function addCashOutAccount(_state: FormState, form: FormData): Promise<FormState> {
-  return money.addCashOutAccount(form);
-}
-
-export async function removeCashOutAccount(_state: FormState, form: FormData): Promise<FormState> {
-  return money.removeCashOutAccount(form);
-}
-
-export async function cashOut(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
-  return money.cashOut(form);
-}
-
-export async function simulateCashOut(_state: FormState, form: FormData): Promise<FormState> {
-  return money.simulateCashOut(form);
 }

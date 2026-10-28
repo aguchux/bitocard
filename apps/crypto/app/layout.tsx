@@ -8,26 +8,14 @@ import { installCaptureScript } from "@bitocard/ui/install";
 import { CryptoActionsProvider } from "@bitocard/crypto-ui/forms";
 import { MoneyActionsProvider } from "@bitocard/crypto-ui/money-forms";
 import { changeAd, chooseNickname, postAd, repriceAd } from "@/lib/trade";
-import {
-  addCashOutAccount,
-  addWithdrawalAddress,
-  cancelWithdrawal,
-  cashOut,
-  confirmWithdrawal,
-  createWithdrawal,
-  removeCashOutAccount,
-  removeWithdrawalAddress,
-  resendWithdrawalCode,
-  reviewWithdrawal,
-  simulateCashOut,
-} from "@/lib/money";
+import { addWithdrawalAddress, cancelWithdrawal, confirmWithdrawal, createWithdrawal, removeWithdrawalAddress, resendWithdrawalCode, reviewWithdrawal } from "@/lib/money";
 import "./globals.css";
 
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 const title = "BitoCard Crypto – Buy and sell crypto with people";
-const description = "Buy and sell USDT, BTC and more with other people, in your country's currency or US dollars. Instant trades paid from BitoCard wallets.";
+const description = "Buy and sell USDT, BTC and more with other people, in your country's currency or US dollars. Paid directly to each other, the coins held until the seller is paid.";
 
 export const metadata: Metadata = {
   // Canonical addresses and sitemaps always name crypto.bitocard.com (CRYPTO_URL), previews included.
@@ -78,7 +66,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* The shared trading and money forms act through this site's own server actions and pages. */}
         <CryptoActionsProvider actions={{ postAd, repriceAd, changeAd, chooseNickname }} links={{ postAd: "/ads/post" }}>
           <MoneyActionsProvider
-            actions={{ addWithdrawalAddress, removeWithdrawalAddress, reviewWithdrawal, createWithdrawal, confirmWithdrawal, resendWithdrawalCode, cancelWithdrawal, addCashOutAccount, removeCashOutAccount, cashOut, simulateCashOut }}
+            actions={{ addWithdrawalAddress, removeWithdrawalAddress, reviewWithdrawal, createWithdrawal, confirmWithdrawal, resendWithdrawalCode, cancelWithdrawal }}
           >{children}</MoneyActionsProvider>
         </CryptoActionsProvider>
         <Footer />

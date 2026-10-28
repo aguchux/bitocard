@@ -45,8 +45,6 @@ export type CryptoCustomer = {
 
 export type CryptoCustomerDetail = CryptoCustomer & {
   balances: { live: CryptoBalance[]; test: CryptoBalance[] };
-  /** P2P proceeds (customer_withdrawable), fiat locked in buy ads (p2p_fiat_locked), the wallet (customer_wallet) and P2P money paying out to a bank (customer_payouts_pending), minor units. */
-  cash: Array<{ mode: Mode; kind: string; currency: string; balance: number }>;
   freezes: CryptoFreeze[];
 };
 
@@ -127,9 +125,8 @@ export type CryptoDeposit = {
   confirmations_needed: number | null;
   address: string;
   confirmed_by: string[];
-  /** Whose coins: a store customer's, or a Premium reseller's own coin wallet (exactly one is set). */
-  customer: { id: string; email: string } | null;
-  reseller: { id: string; name: string } | null;
+  /** Whose coins. */
+  customer: { id: string; email: string };
   created_at: string;
   credited_at: string | null;
 };
@@ -156,9 +153,8 @@ export type CryptoWithdrawal = {
   confirmations: number;
   created_at: string;
   completed_at: string | null;
-  /** Whose coins: a store customer's, or a Premium reseller's own coin wallet (exactly one is set). */
-  customer: { id: string; email: string } | null;
-  reseller: { id: string; name: string } | null;
+  /** Whose coins. */
+  customer: { id: string; email: string };
   screening: 'clear' | 'flagged' | 'unscreened' | null;
   screened_by: string | null;
   signer_reference: string;

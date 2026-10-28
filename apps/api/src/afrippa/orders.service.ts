@@ -89,7 +89,7 @@ export class P2pOrdersService {
     this.requireTrader(customer);
     if ((input.fiat === undefined) === (input.amount === undefined)) throw invalid('parameter_missing', 'Send either fiat or amount.', 'fiat');
     const owned = await this.wallets.context(customer);
-    const found = await this.prisma.p2pAd.findFirst({ where: { id: input.ad_id, mode: owned.mode, escrow: true } });
+    const found = await this.prisma.p2pAd.findFirst({ where: { id: input.ad_id, mode: owned.mode } });
     // An ad another order emptied is no longer on offer (rather than an amount clipped to nothing).
     if (!found || found.status !== 'active' || found.remainingAmount <= 0n) throw adUnavailable();
     // The ad's market decides: the taker must be allowed to trade there.

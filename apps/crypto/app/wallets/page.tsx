@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreP2pProfile } from "@bitocard/api-client/storefront";
+import { formatCrypto, type StoreCryptoWallets, type StoreP2pProfile } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "@bitocard/crypto-ui/coins";
 import { NicknameForm } from "@bitocard/crypto-ui/forms";
 import { CryptoDeclaration, cardClass } from "@bitocard/crypto-ui/trade-views";
@@ -28,11 +28,6 @@ export default async function WalletsPage() {
     );
   }
   const wallets = overview.data;
-  const money = [
-    { currency: wallets.cash.currency, proceeds: wallets.cash.proceeds, locked: wallets.cash.locked },
-    ...(wallets.usd_cash ? [{ currency: "USD", proceeds: wallets.usd_cash.proceeds, locked: wallets.usd_cash.locked }] : []),
-    ...(wallets.other_cash ?? []),
-  ];
   return (
     <AccountShell title="Wallets" current="/wallets">
       {!wallets.verified ? (
@@ -46,17 +41,11 @@ export default async function WalletsPage() {
         <CryptoDeclaration version={wallets.declaration.version} action={declareCrypto} />
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <Link href="/add-money" className={button}>
-          Add money
-        </Link>
         <Link href="/deposit" className={button}>
           Deposit coins
         </Link>
         <Link href="/withdraw" className={button}>
           Withdraw coins
-        </Link>
-        <Link href="/cash-out" className={button}>
-          Cash out
         </Link>
       </div>
       <section className={cardClass} aria-labelledby="coins">
@@ -76,23 +65,6 @@ export default async function WalletsPage() {
             </li>
           ))}
         </ul>
-      </section>
-      <section className={cardClass} aria-labelledby="money">
-        <h2 id="money" className="font-semibold">
-          P2P money
-        </h2>
-        <dl className="mt-2 grid gap-3 sm:grid-cols-3">
-          {money.map(item => (
-            <div key={item.currency} className="rounded-2xl bg-slate-50 p-3">
-              <dt className="text-xs text-slate-500">{item.currency}</dt>
-              <dd className="font-bold">
-                {formatFace(item.proceeds, item.currency)}
-                {item.locked > 0 ? <span className="block text-xs font-normal text-slate-500">{formatFace(item.locked, item.currency)} in buy ads</span> : null}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-3 text-xs text-slate-500">Money from sales. Cash out is to an account in your own country; money in another country&apos;s currency is spent in that country&apos;s market.</p>
       </section>
       {profile.ok ? (
         <section className={cardClass} aria-labelledby="nickname">

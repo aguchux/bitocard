@@ -1,7 +1,6 @@
 // Afrippa's escrow ads (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 2): an Afrippa trader's ad lists the payment methods it
 // is paid through (their own, past the 24-hour wait, in the ad's currency) and a payment window; a sell ad locks its
-// coins, a buy ad locks nothing; instant trades refuse them (orders take them); and escrow and instant ads never share
-// a book. Afrippa's traders get their market from their own country, never a reseller's.
+// coins, a buy ad locks nothing; ads are taken only through orders. Afrippa's traders get their market from their own country, never a reseller's.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { startApp } from './helpers.mjs';
@@ -94,7 +93,7 @@ describe("Afrippa's escrow ads", () => {
     await fund(ada.client, '100');
     const ad = await ada.client.post('/v1/afrippa/p2p/ads', sellAd([ada.bank]));
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.deepEqual([ad.json.escrow, ad.json.payment_window, ad.json.market, ad.json.currency], [true, 30, 'NG', 'NGN']);
+    assert.deepEqual([ad.json.payment_window, ad.json.market, ad.json.currency], [30, 'NG', 'NGN']);
     assert.deepEqual(ad.json.payment_methods, [{ kind: 'bank', label: 'Example Bank', currency: 'NGN', reversible: false, id: ada.bank, hint: ad.json.payment_methods[0].hint }]);
     const wallet = (await ada.client.get('/v1/afrippa/crypto')).json;
     const usdt = wallet.assets.find(balance => balance.asset === 'USDT');
@@ -121,10 +120,8 @@ describe("Afrippa's escrow ads", () => {
     const ada = await trader();
     const ad = await ada.client.post('/v1/afrippa/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'NGN', price: 160000, amount: '10', min_fiat: 100000, max_fiat: 5000000, payment_method_ids: [ada.bank] });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.deepEqual([ad.json.escrow, ad.json.payment_window, ad.json.max_fiat], [true, 15, 1600000], 'the default window; 10 USDT at NGN 1,600.00');
+    assert.deepEqual([ad.json.payment_window, ad.json.max_fiat], [15, 1600000], 'the default window; 10 USDT at NGN 1,600.00');
     assert.equal(await prisma.journalEntry.count({ where: { reference: { startsWith: `p2p_ad:${ad.json.id}` } } }), 0, 'nothing locked');
-    const row = await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.json.id } });
-    assert.equal(row.fiatLockedMinor, 0n);
 
     // A new price changes nothing locked; the payment methods and window can change.
     const wise = await method(ada.client, { kind: 'named', currency: 'NGN', provider: 'wise', handle: 'ada@example.com' });
@@ -155,20 +152,5 @@ describe("Afrippa's escrow ads", () => {
       if (code) assert.equal(refused.json.error.code, code);
     }
     assert.equal(await prisma.p2pAd.count({ where: { customerId: ada.id } }), 0, 'nothing posted or locked');
-  });
-
-  test("a trader's book holds escrow ads only", async () => {
-    const ada = await trader();
-    const bola = await trader('Bola Viewer');
-    // An old instant ad in the same book (made directly here: none can be posted now).
-    const instant = await prisma.p2pAd.create({
-      data: { mode: 'test', customerId: ada.id, country: 'NG', currency: 'NGN', asset: 'USDT', side: 'sell', priceMinor: 150000n, totalAmount: 5_000_000n, remainingAmount: 5_000_000n, minFiatMinor: 100n, maxFiatMinor: 10_000_000n },
-    });
-    await fund(ada.client, '20');
-    const escrow = await ada.client.post('/v1/afrippa/p2p/ads', sellAd([ada.bank], { amount: '10' }));
-    assert.equal(escrow.status, 201, JSON.stringify(escrow.json));
-    const shown = (await bola.client.get('/v1/afrippa/p2p/market?asset=USDT&side=buy')).json.data.map(item => item.id);
-    assert.ok(shown.includes(escrow.json.id));
-    assert.equal(shown.includes(instant.id), false);
   });
 });

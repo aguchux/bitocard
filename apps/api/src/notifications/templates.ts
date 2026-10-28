@@ -585,11 +585,11 @@ export function cryptoAddressAddedEmail(to: string, input: { store: string; labe
   return { to, subject: `A withdrawal address was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
 }
 
-/** Tells a customer a bank account was added for their P2P money (payouts to it start after 24 hours). */
+/** Tells a customer a bank account was added for their payouts (payouts to it start after 24 hours). */
 export function customerBankAccountAddedEmail(to: string, input: { store: string; bank: string; last4: string; name: string; payoutsFrom: string }): EmailMessage {
   const heading = 'A bank account was added';
   const paragraphs = [
-    `${input.bank} account ending ${input.last4} (${input.name}) was added to your ${input.store} account for your P2P money.`,
+    `${input.bank} account ending ${input.last4} (${input.name}) was added to your ${input.store} account for your payouts.`,
     `Payouts to it can start from ${input.payoutsFrom}.`,
     `If this was not you, remove it, change your password and contact ${input.store} straight away.`,
   ];

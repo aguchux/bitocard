@@ -1,7 +1,6 @@
 // Afrippa's P2P market: traders post escrow ads and take them through orders (test/afrippa-orders.test.mjs covers the
-// orders themselves). BitoCard's instant trades and the fiat buy ads locked are retired: old ads can only be closed, and
-// closing gives back what they lock. Also admin freezes, the markets a trader may use, market limits, the public pages,
-// and paying old P2P money out to a bank.
+// orders themselves). BitoCard's instant trades are gone. Also admin freezes, the markets a trader may use, market
+// limits, the public pages, and paying customers' withdrawable money out to a bank.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
@@ -153,7 +152,7 @@ describe('escrow ads', () => {
     await deposit(seller, 'USDT', '250.5');
     const ad = await sellAd(seller, { amount: '200' });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.deepEqual([ad.json.side, ad.json.available, ad.json.price, ad.json.status, ad.json.escrow], ['sell', '200.000000', 165000, 'active', true]);
+    assert.deepEqual([ad.json.side, ad.json.available, ad.json.price, ad.json.status, ad.json.payment_window], ['sell', '200.000000', 165000, 'active', 15]);
     const locked = await balance(seller, 'USDT');
     assert.deepEqual([locked.available, locked.locked, locked.total], ['50.500000', '200.000000', '250.500000']);
 
@@ -259,61 +258,6 @@ describe('instant trades are retired', () => {
     }
   });
 
-  test('an old instant ad is never shown or taken and cannot be changed; closing it gives back its coins or money', async () => {
-    const ada = await trader('Ada Old');
-    const bola = await trader('Bola Old');
-    await deposit(ada, 'USDT', '30');
-    const oldAd = (side, extra = {}) =>
-      prisma.p2pAd.create({
-        data: { id: randomUUID(), mode: 'test', customerId: ada.id, country: 'NG', currency: 'NGN', asset: 'USDT', side, priceMinor: 165000n, totalAmount: 20_000_000n, remainingAmount: 20_000_000n, minFiatMinor: 100n, maxFiatMinor: 10_000_000_00n, ...extra },
-      });
-    // An old sell ad, its coins locked.
-    const sell = await oldAd('sell');
-    await ledger.post({
-      mode: 'test',
-      type: 'p2p_ad_lock',
-      reference: `p2p_ad:${sell.id}:lock`,
-      description: 'USDT locked for your sell ad',
-      lines: [
-        { account: { kind: 'crypto_wallet', currency: 'USDT', customerId: ada.id }, debit: 20_000_000n },
-        { account: { kind: 'crypto_locked', currency: 'USDT', customerId: ada.id }, credit: 20_000_000n },
-      ],
-    });
-    // An old buy ad, NGN 30,000 locked: NGN 10,000 of it from P2P money.
-    const buy = await oldAd('buy', { fiatLockedMinor: 30_000_00n, fiatFromProceeds: 10_000_00n });
-    await ledger.post({
-      mode: 'test',
-      type: 'p2p_ad_lock',
-      reference: `p2p_ad:${buy.id}:lock`,
-      description: 'NGN locked for your buy ad',
-      lines: [
-        { account: { kind: 'adjustments', currency: 'NGN' }, debit: 30_000_00n },
-        { account: { kind: 'p2p_fiat_locked', currency: 'NGN', customerId: ada.id }, credit: 30_000_00n },
-      ],
-    });
-
-    for (const side of ['buy', 'sell']) assert.equal((await bola.get(`/v1/afrippa/p2p/market?asset=USDT&side=${side}`)).json.data.some(item => [sell.id, buy.id].includes(item.id)), false, side);
-    await setSwitch('crypto_app', true, 'NG');
-    try {
-      const book = (await afrippaServer().get('/v1/afrippa/markets/NG/ads?asset=USDT&side=buy')).json.data;
-      assert.equal(book.some(item => item.id === sell.id), false, 'not on the public book');
-    } finally {
-      await setSwitch('crypto_app', null, 'NG');
-    }
-    const taken = await bola.post('/v1/afrippa/p2p/orders', { ad_id: sell.id, price: 165000, amount: '1', payment_method_id: bola.bank });
-    assert.deepEqual([taken.status, taken.json.error.code], [409, 'ad_unavailable']);
-    const changed = await ada.patch(`/v1/afrippa/p2p/ads/${buy.id}`, { price: 170000 });
-    assert.deepEqual([changed.status, changed.json.error.code], [409, 'ad_retired']);
-
-    assert.equal((await ada.post(`/v1/afrippa/p2p/ads/${sell.id}/cancel`)).status, 200);
-    assert.deepEqual([(await balance(ada, 'USDT')).available, (await balance(ada, 'USDT')).locked], ['30.000000', '0.000000']);
-    const closed = await ada.post(`/v1/afrippa/p2p/ads/${buy.id}/cancel`);
-    assert.deepEqual([closed.status, closed.json.status], [200, 'cancelled']);
-    const held = async kind => (await prisma.ledgerAccount.findFirst({ where: { customerId: ada.id, mode: 'test', kind, currency: 'NGN' } }))?.balanceMinor ?? 0n;
-    assert.deepEqual([await held('p2p_fiat_locked'), await held('customer_withdrawable'), await held('customer_wallet')], [0n, 10_000_00n, 20_000_00n], 'P2P money back as P2P money, the rest to the wallet');
-    assert.equal((await ada.post(`/v1/afrippa/p2p/ads/${buy.id}/cancel`)).json.error.code, 'ad_closed', 'closed once');
-    await cryptoConserved();
-  });
 });
 
 describe('admin freezes', () => {
@@ -413,7 +357,7 @@ describe('owners who can no longer trade, and huge amounts', () => {
   });
 });
 
-describe('paying old P2P money out to a bank', () => {
+describe('paying withdrawable money out to a bank', () => {
   before(() => switches(true));
   after(() => switches(null));
 
@@ -438,7 +382,7 @@ describe('paying old P2P money out to a bank', () => {
     return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
   }
 
-  /** A customer holding NGN 33,000 of P2P money from an old instant sale (Nigeria's smallest payout is NGN 15,000). */
+  /** A customer holding NGN 33,000 from a Safe pay sale (Nigeria's smallest payout is NGN 15,000). */
   async function sellerWithProceeds() {
     const shopper = storeServer();
     const email = `p2p-money${(counter += 1)}-${Date.now()}@example.com`;
@@ -448,9 +392,9 @@ describe('paying old P2P money out to a bank', () => {
     shopper.id = signup.json.customer.id;
     await ledger.post({
       mode: 'test',
-      type: 'p2p_trade',
-      reference: `p2p_trade:${randomUUID()}`,
-      description: 'An old P2P sale',
+      type: 'classified_release',
+      reference: `classified_order:${randomUUID()}:released`,
+      description: 'A Safe pay sale',
       lines: [
         { account: { kind: 'adjustments', currency: 'NGN' }, debit: 33_000_00n },
         { account: { kind: 'customer_withdrawable', currency: 'NGN', customerId: shopper.id }, credit: 33_000_00n },
@@ -463,7 +407,7 @@ describe('paying old P2P money out to a bank', () => {
     const seller = await sellerWithProceeds();
     const held = await seller.get('/v1/store/cash');
     assert.deepEqual([held.json.balance, held.json.available, held.json.held, held.json.hold_days], [33_000_00, 0, 33_000_00, 15]);
-    assert.equal('cross_border_hold_days' in held.json, false, 'the cross-border hold went with instant trades');
+    assert.equal('cross_border_hold_days' in held.json, false, 'the cross-border hold is gone');
 
     const unknown = await seller.post('/v1/store/cash/bank-accounts', { bank_code: 'SBX001', account_number: '0000000000' });
     assert.deepEqual([unknown.status, unknown.json.error.code], [400, 'bank_account_invalid']);

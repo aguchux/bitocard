@@ -4,7 +4,7 @@ import { Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { formatCrypto, type StoreCryptoWallets } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "./coins";
 import { cardClass } from "./trade-views";
-import { hasP2pMoney, heldAssets } from "./wallets";
+import { heldAssets } from "./wallets";
 
 /**
  * Choosing a coin: every coin as a tile (its badge, code, and its name or the balance), all in view at once, never
@@ -80,8 +80,8 @@ export function CryptoGate({ wallets, p2p = false, withdraw = false, verifyHref,
       <div className={cardClass}>
         <p className="font-semibold">Crypto is not available in your country yet</p>
         <p className="mt-1 text-sm text-slate-600">
-          {heldAssets(wallets).length || hasP2pMoney(wallets)
-            ? "Trading is closed here for now. You can still withdraw the coins you hold and cash out eligible local-currency P2P money."
+          {heldAssets(wallets).length
+            ? "Trading is closed here for now. You can still withdraw the coins you hold."
             : "We open it country by country. We will tell you when you can hold and trade crypto here."}
         </p>
       </div>

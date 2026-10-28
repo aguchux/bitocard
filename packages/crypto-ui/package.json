@@ -16,10 +16,7 @@
     "./money-forms": "./src/money-forms.tsx",
     "./money-actions": "./src/money-actions.ts",
     "./money-views": "./src/money-views.tsx",
-    "./wallet-views": "./src/wallet-views.tsx",
-    "./top-up-actions": "./src/top-up-actions.ts",
-    "./top-up-forms": "./src/top-up-forms.tsx",
-    "./top-up-views": "./src/top-up-views.tsx"
+    "./wallet-views": "./src/wallet-views.tsx"
   },
   "scripts": {
     "lint": "eslint .",

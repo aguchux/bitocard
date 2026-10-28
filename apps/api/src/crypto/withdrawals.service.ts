@@ -50,12 +50,8 @@ const open = ['awaiting_code', 'review', 'queued', 'submitting', 'broadcast', 'c
 
 const bitcoinCheck = base58check(sha256Bytes);
 
-/**
- * Who is withdrawing: the coins' owner (a store customer, or a Premium reseller's own coin wallet), the mode, where the
- * code and notices are emailed, the name the emails carry, how admins see them, and for a reseller the team member
- * asking (only they can confirm what they asked for).
- */
-export type Holder = { owner: CoinOwner; mode: LedgerMode; email: string; brand: string; who: string; userId?: string };
+/** Who is withdrawing: the coins' owner, the mode, where the code and notices are emailed, the name the emails carry and how admins see them. */
+export type Holder = { owner: CoinOwner; mode: LedgerMode; email: string; brand: string; who: string };
 
 /**
  * Each Bitcoin-style chain's address forms on its main and test networks: the SegWit prefix (none for Dogecoin, which
@@ -228,21 +224,18 @@ export class CryptoWithdrawalsService {
       mode: context.mode,
       subject: row.id,
     };
-    if (holder.owner.resellerId) await this.inbox.reseller(holder.owner.resellerId, 'crypto.address_added', { ...notice, link: '/exchange/withdraw' });
-    else {
-      const customer = await this.prisma.customer.findUnique({ where: { id: holder.owner.customerId }, select: { storeId: true } });
-      if (customer) await this.inbox.customer({ customerId: holder.owner.customerId!, storeId: customer.storeId }, 'customer.crypto.address_added', { ...notice, link: '/account/crypto/withdraw' });
-    }
+    const customer = await this.prisma.customer.findUnique({ where: { id: holder.owner.customerId }, select: { storeId: true } });
+    if (customer) await this.inbox.customer({ customerId: holder.owner.customerId, storeId: customer.storeId }, 'customer.crypto.address_added', { ...notice, link: '/account/crypto/withdraw' });
     return presentAddress(row);
   }
 
   /** Admins are told about a sanctioned address, and it is refused. */
   private async refuseFlagged(holder: Holder, chain: Chain, address: string, screening: { provider: string | null; detail?: string | null }, param: string): Promise<never> {
-    const id = holder.owner.resellerId ?? holder.owner.customerId;
+    const id = holder.owner.customerId;
     await this.inbox.admins('admin.crypto.address_flagged', {
       title: 'Withdrawal address on a sanctions list',
       body: `${holder.who} tried to use ${address} (${chainNames[chain]}), which ${screening.provider} reports: ${screening.detail ?? 'sanctioned'}. It was refused.`,
-      link: holder.owner.resellerId ? `/resellers/${id}` : `/crypto/customers/${id}`,
+      link: `/crypto/customers/${id}`,
       mode: holder.mode,
       subject: `${id}:${chain}:${address}`,
     });
@@ -324,7 +317,8 @@ export class CryptoWithdrawalsService {
     if (address.screening !== 'clear') return 'unscreened';
     const reversible = await this.prisma.payment.count({
       where: {
-        ...(owner.resellerId ? { resellerId: owner.resellerId, customerId: null, purpose: 'wallet_top_up' as const } : { customerId: owner.customerId, purpose: 'customer_top_up' as const }),
+        customerId: owner.customerId,
+        purpose: 'customer_top_up',
         mode,
         status: 'succeeded',
         reservedAccountId: null,
@@ -404,7 +398,6 @@ export class CryptoWithdrawalsService {
         data: {
           id,
           ...ownerWhere(owner),
-          requestedBy: holder.userId ?? null,
           mode: context.mode,
           asset: asset.code,
           chain,
@@ -424,7 +417,6 @@ export class CryptoWithdrawalsService {
         mode: context.mode,
         type: 'crypto_withdrawal',
         reference: `crypto_withdrawal:${id}`,
-        resellerId: owner.resellerId ?? null,
         description: `${asset.code} withdrawal on ${chainNames[chain]}`,
         metadata: { withdrawal_id: id },
         postings: [
@@ -450,20 +442,12 @@ export class CryptoWithdrawalsService {
     return row;
   }
 
-  /** A reseller's withdrawal is confirmed (and its code resent) only by the team member who asked: the code went to them. */
-  private ownAsked(holder: Holder, row: CryptoWithdrawal) {
-    if (holder.owner.resellerId && row.requestedBy !== holder.userId) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_requester', 'Only the person who asked for this withdrawal can confirm it.');
-    }
-  }
-
   async resendCode(customer: CustomerWithStore, id: string) {
     return this.resendFor(this.customerHolder(customer, (await this.wallets.context(customer)).mode), id);
   }
 
   async resendFor(holder: Holder, id: string) {
     const row = await this.own(holder.owner, id);
-    this.ownAsked(holder, row);
     if (row.status !== 'awaiting_code') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     if (row.codeSentAt && Date.now() - row.codeSentAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
@@ -488,7 +472,6 @@ export class CryptoWithdrawalsService {
   async confirmFor(holder: Holder, id: string, code: string) {
     const context = { mode: holder.mode };
     const row = await this.own(holder.owner, id);
-    this.ownAsked(holder, row);
     if (row.status !== 'awaiting_code' || !row.codeHash) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     if (!row.codeExpiresAt || row.codeExpiresAt <= new Date()) throw invalid('code_expired', 'That code has expired. Ask for a new one.', 'code');
     // Claim an attempt before comparing, in one statement, so parallel guesses never get past the limit.
@@ -570,7 +553,6 @@ export class CryptoWithdrawalsService {
         mode: row.mode,
         type: 'crypto_withdrawal_release',
         reference: `crypto_withdrawal:${row.id}:released`,
-        resellerId: owner.resellerId ?? null,
         description: `${row.asset} withdrawal ${status}: returned to the wallet`,
         metadata: { withdrawal_id: row.id },
         postings: [
@@ -598,7 +580,6 @@ export class CryptoWithdrawalsService {
         mode: row.mode,
         type: 'crypto_withdrawal_sent',
         reference: `crypto_withdrawal:${row.id}:sent`,
-        resellerId: owner.resellerId ?? null,
         description: `${row.asset} withdrawal on ${chainNames[row.chain as Chain]} confirmed`,
         metadata: { withdrawal_id: row.id, tx_hash: row.txHash },
         postings: [
@@ -623,16 +604,12 @@ export class CryptoWithdrawalsService {
       body:
         outcome === 'sent'
           ? `Your withdrawal on ${chainNames[row.chain as Chain]} is confirmed on chain.`
-          : `Your withdrawal was ${row.status === 'rejected' ? 'not approved' : 'not sent'}. The ${row.asset} is back in your ${row.resellerId ? 'coin ' : ''}wallet.`,
+          : `Your withdrawal was ${row.status === 'rejected' ? 'not approved' : 'not sent'}. The ${row.asset} is back in your wallet.`,
       mode: row.mode,
     };
-    if (row.resellerId) {
-      await this.inbox.reseller(row.resellerId, outcome === 'sent' ? 'crypto.withdrawal_sent' : 'crypto.withdrawal_failed', { ...content, link: '/exchange/withdraw' });
-      return;
-    }
-    const customer = row.customerId ? await this.prisma.customer.findUnique({ where: { id: row.customerId }, select: { storeId: true } }) : null;
+    const customer = await this.prisma.customer.findUnique({ where: { id: row.customerId }, select: { storeId: true } });
     if (!customer) return;
-    await this.inbox.customer({ customerId: row.customerId!, storeId: customer.storeId }, outcome === 'sent' ? 'customer.crypto.withdrawal_sent' : 'customer.crypto.withdrawal_failed', {
+    await this.inbox.customer({ customerId: row.customerId, storeId: customer.storeId }, outcome === 'sent' ? 'customer.crypto.withdrawal_sent' : 'customer.crypto.withdrawal_failed', {
       ...content,
       link: '/account/crypto/withdraw',
     });
@@ -659,10 +636,8 @@ export class CryptoWithdrawalsService {
     const signer = this.signer(row.mode);
     if (!signer) return this.unclear(row, 'No signer is set up for this mode.');
     const network = await this.prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: row.asset, chain: row.chain } } });
-    // A frozen customer account, or a suspended reseller, sends nothing more.
-    const frozen = row.resellerId
-      ? (await this.prisma.reseller.findUniqueOrThrow({ where: { id: row.resellerId }, select: { status: true } })).status === 'suspended'
-      : Boolean((await this.prisma.customer.findUniqueOrThrow({ where: { id: row.customerId! }, select: { cryptoFrozenAt: true } })).cryptoFrozenAt);
+    // A frozen account sends nothing more.
+    const frozen = Boolean((await this.prisma.customer.findUniqueOrThrow({ where: { id: row.customerId }, select: { cryptoFrozenAt: true } })).cryptoFrozenAt);
     if (frozen) {
       // A frozen account sends nothing more. Only one the signer never received can be returned; one it did is followed up.
       const known = row.attempts > 1 ? await signer.status(row.signerReference).catch(() => undefined) : null;
@@ -838,16 +813,15 @@ export class CryptoWithdrawalsService {
 
   // -- Admin ----------------------------------------------------------------------------------------------------
 
-  async adminList(query: { mode?: LedgerMode; status?: string; customer_id?: string; reseller_id?: string; id?: string }) {
+  async adminList(query: { mode?: LedgerMode; status?: string; customer_id?: string; id?: string }) {
     const rows = await this.prisma.cryptoWithdrawal.findMany({
       where: {
         ...(query.id ? { id: query.id } : {}),
         ...(query.mode ? { mode: query.mode } : {}),
         ...(query.status ? { status: query.status } : {}),
         ...(query.customer_id ? { customerId: query.customer_id } : {}),
-        ...(query.reseller_id ? { resellerId: query.reseller_id } : {}),
       },
-      include: { customer: { select: { email: true } }, reseller: { select: { name: true } }, savedAddress: { select: { screening: true, screenedBy: true, label: true } } },
+      include: { customer: { select: { email: true } }, savedAddress: { select: { screening: true, screenedBy: true, label: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -856,8 +830,7 @@ export class CryptoWithdrawalsService {
       object: 'list' as const,
       data: rows.map(row => ({
         ...this.present(row, assets.get(row.asset)!),
-        customer: row.customerId && row.customer ? { id: row.customerId, email: row.customer.email } : null,
-        reseller: row.resellerId && row.reseller ? { id: row.resellerId, name: row.reseller.name } : null,
+        customer: { id: row.customerId, email: row.customer.email },
         screening: row.savedAddress?.screening ?? null,
         screened_by: row.savedAddress?.screenedBy ?? null,
         signer_reference: row.signerReference,

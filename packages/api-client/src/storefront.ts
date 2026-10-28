@@ -509,7 +509,7 @@ export type StoreVpn = {
  */
 export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; enabled: boolean; available: string; locked: string; frozen: string; withdrawing: string; total: string };
 
-/** `GET /v1/afrippa/crypto`: the customer's crypto wallets, their P2P cash (minor units) and what they can do now. */
+/** `GET /v1/afrippa/crypto`: the customer's crypto wallets and what they can do now. */
 export type StoreCryptoWallets = {
   object: 'crypto_wallets';
   mode: 'live' | 'test';
@@ -524,12 +524,6 @@ export type StoreCryptoWallets = {
   verified: boolean;
   frozen: boolean;
   assets: StoreCryptoBalance[];
-  /** proceeds: P2P sales (withdrawable); wallet: top-ups; locked: behind buy ads; paying_out: on its way to a bank. */
-  cash: { currency: string; proceeds: number; wallet: number; locked: number; paying_out: number };
-  /** USD balances when the customer's home currency is not USD. */
-  usd_cash?: { currency: 'USD'; proceeds: number; wallet: number; locked: number; paying_out: number };
-  /** P2P money in other countries' currencies (from selling in their markets): spent in those markets, never cashed out by the customer. */
-  other_cash: Array<{ currency: string; proceeds: number; locked: number }>;
 };
 
 export type StoreCryptoTransaction = {
@@ -633,7 +627,7 @@ export type StoreCryptoWithdrawal = {
   completed_at: string | null;
 };
 
-/** `GET /v1/store/cash`: P2P money (minor units): what can be paid out now, and what waits for the payout hold. */
+/** `GET /v1/store/cash`: withdrawable money (minor units): what can be paid out now, and what waits for the payout hold. */
 export type StoreP2pCash = { object: 'p2p_cash'; mode: 'live' | 'test'; currency: string; balance: number; held: number; available: number; hold_days: number; minimum: number };
 
 export type StoreCustomerBankAccount = {

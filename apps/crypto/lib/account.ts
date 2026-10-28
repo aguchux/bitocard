@@ -22,7 +22,7 @@ export const accountPlaces = {
 
 const chosen = (asset: string, chain?: string) => `?${new URLSearchParams({ asset, ...(chain ? { chain } : {}) })}`;
 
-/** This site's money pages, for the shared deposit, withdrawal and cash-out views (`@bitocard/crypto-ui`). */
+/** This site's money pages, for the shared deposit and withdrawal views (`@bitocard/crypto-ui`). */
 export const moneyLinks: MoneyLinks = {
   deposit: (asset, chain) => `/deposit${chosen(asset, chain)}`,
   withdraw: (asset, chain) => `/withdraw${chosen(asset, chain)}`,

@@ -87,7 +87,7 @@ function Withdrawals() {
     {
       key: "customer",
       header: "Owner",
-      cell: item => <CoinOwnerLink customer={item.customer} reseller={item.reseller} />,
+      cell: item => <CoinOwnerLink customer={item.customer} />,
     },
     {
       key: "to",

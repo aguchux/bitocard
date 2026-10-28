@@ -9,8 +9,8 @@ import { Field, FormMessage, type FormState, type NonceFormState, Submit } from 
 type Action<S> = (state: S, form: FormData) => Promise<S>;
 
 /**
- * The money actions of the app the forms are in (its own server actions, over its own session): withdrawals and
- * cashing P2P money out. The storefront's Crypto tab and BitoCard Crypto each give theirs (`moneyActions`).
+ * The money actions of the app the forms are in (its own server actions, over its own session): on-chain withdrawals.
+ * The storefront's Crypto tab and BitoCard Crypto each give theirs (`moneyActions`).
  */
 export type MoneyActions = {
   addWithdrawalAddress: Action<FormState>;
@@ -20,10 +20,6 @@ export type MoneyActions = {
   confirmWithdrawal: Action<FormState>;
   resendWithdrawalCode: Action<FormState>;
   cancelWithdrawal: Action<FormState>;
-  addCashOutAccount: Action<FormState>;
-  removeCashOutAccount: Action<FormState>;
-  cashOut: Action<NonceFormState>;
-  simulateCashOut: Action<FormState>;
 };
 
 const Context = createContext<MoneyActions | null>(null);
@@ -39,7 +35,6 @@ function useMoney() {
   return value;
 }
 
-const selectClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400";
 const iconButton = "inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700";
 const focusRing = "focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700";
 
@@ -109,29 +104,6 @@ export function CancelWithdrawalButton({ id }: { id: string }) {
     <ActionButton action={useMoney().cancelWithdrawal} fields={{ id }} className="inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-slate-700 ring-1 ring-slate-300 hover:ring-slate-400">
       Cancel this withdrawal
     </ActionButton>
-  );
-}
-
-/** Removes a bank account for P2P money. */
-export function RemoveBankAccountButton({ id, label }: { id: string; label: string }) {
-  return (
-    <ActionButton action={useMoney().removeCashOutAccount} fields={{ id }} label={`Remove ${label}`} className={iconButton}>
-      <Trash2 className="size-4" aria-hidden="true" />
-    </ActionButton>
-  );
-}
-
-/** Sandbox only: settles a test payout as paid or failed. */
-export function SimulatePayoutButtons({ id }: { id: string }) {
-  const { simulateCashOut } = useMoney();
-  return (
-    <span className="flex w-full gap-2">
-      {(["paid", "failed"] as const).map(outcome => (
-        <ActionButton key={outcome} action={simulateCashOut} fields={{ id, outcome }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-semibold ring-1 ring-amber-300 hover:bg-amber-50">
-          Test: {outcome === "paid" ? "pay it" : "fail it"}
-        </ActionButton>
-      ))}
-    </span>
   );
 }
 
@@ -224,63 +196,6 @@ export function WithdrawalCodeForm({ id }: { id: string }) {
   );
 }
 
-/** Adds a bank account for P2P money: the bank names its holder, who must be the customer. */
-export function CashOutAccountForm({ banks }: { banks: Array<{ code: string; name: string }> }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(useMoney().addCashOutAccount, {});
-  return (
-    <form action={action} className="space-y-3" aria-label="Add a bank account">
-      <FormMessage state={state} />
-      <label className="block space-y-1.5">
-        <span className="block text-sm font-semibold text-navy-900">Bank</span>
-        <select name="bank_code" required defaultValue="" className={selectClass} aria-invalid={state.field === "bank_code" || undefined}>
-          <option value="" disabled>
-            Choose your bank
-          </option>
-          {banks.map(bank => (
-            <option key={bank.code} value={bank.code}>
-              {bank.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Field label="Account number" name="account_number" inputMode="numeric" autoComplete="off" required state={state} hint="It must be in your own name, as your identity check shows it." />
-      <Submit pending={pending} className="w-full sm:w-auto">
-        <Plus className="size-4" aria-hidden="true" /> Add bank account
-      </Submit>
-    </form>
-  );
-}
-
-/** Pays P2P money out to one of the customer's bank accounts. */
-export function CashOutForm({ accounts, currency, available, nonce }: { accounts: Array<{ id: string; label: string; ready: boolean; from: string }>; currency: string; available: string; nonce: string }) {
-  const [state, action, pending] = useActionState<NonceFormState, FormData>(useMoney().cashOut, {});
-  const usable = accounts.filter(item => item.ready);
-  return (
-    <form action={action} className="space-y-4" aria-label="Cash out">
-      {/* Sent as the Idempotency-Key, so a double tap pays out once. */}
-      <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
-      <FormMessage state={state} />
-      <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-semibold text-navy-900">Pay into</legend>
-        {accounts.map(item => (
-          <label key={item.id} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-brand-500 ${item.ready ? "cursor-pointer" : "opacity-60"}`}>
-            <input type="radio" name="bank_account_id" value={item.id} disabled={!item.ready} defaultChecked={item.id === usable[0]?.id} className="accent-brand-500" />
-            <span className="min-w-0">
-              <span className="block font-semibold">{item.label}</span>
-              {!item.ready ? <span className="block text-xs text-amber-700">Usable from {item.from}</span> : null}
-            </span>
-          </label>
-        ))}
-      </fieldset>
-      <Field label={`Amount (${currency})`} name="amount" inputMode="decimal" required state={state} hint={`You can pay out ${available} now.`} />
-      <Submit pending={pending} className="w-full">
-        <Send className="size-4" aria-hidden="true" /> Pay out to my bank
-      </Submit>
-    </form>
-  );
-}
-
-/** The address with its middle cut out, so the button's card shows it is ready without the whole string. */
 const shortAddress = (address: string) => (address.length > 22 ? `${address.slice(0, 10)}…${address.slice(-8)}` : address);
 
 /**

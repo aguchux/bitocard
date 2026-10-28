@@ -49,8 +49,8 @@ type AdMethod = Pick<P2pPaymentMethod, 'id' | 'kind' | 'label' | 'currency' | 'h
  * of other allowed countries in its local currency, where its `crypto_cross_border` switch is on) or the global market
  * (`WW`, US dollars only, for residents of every country where `crypto_global` is on, even where their own market is
  * off). A sell ad locks its coins (and its seller's fee) when posted; a buy ad locks nothing. BitoCard's instant trades,
- * paid from its fiat wallets, and the fiat buy ads locked are retired (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 8):
- * closing an old ad still gives back what it locks.
+ * paid from its fiat wallets, and the fiat buy ads locked are retired and dropped (docs/CRYPTO_SPINOFF_PLAN.md, step 3
+ * item 8).
  */
 @Injectable()
 export class P2pService {
@@ -227,13 +227,12 @@ export class P2pService {
       max_fiat: minor(capacity.max),
       terms: ad.terms,
       status: ad.status,
-      /** Afrippa's escrow ads: taken through an order and paid directly to the seller within `payment_window` minutes. */
-      escrow: ad.escrow,
+      /** Taken through an order and paid directly to the seller within `payment_window` minutes. */
       payment_window: ad.paymentWindowMinutes,
       /** Where the buyer pays (sell ads) or pays from (buy ads): never the details, which show only inside an order. */
       payment_methods: methods.map(method => ({ kind: method.kind, label: method.label, currency: method.currency, reversible: isReversible(method), ...(mine ? { id: method.id, hint: method.hint } : {}) })),
       /** The owner's sell ad: the seller's fee it keeps locked on top of the coins it offers. */
-      fee_locked: mine && ad.escrow ? fromUnits(ad.feeLocked, asset.decimals) : null,
+      fee_locked: mine ? fromUnits(ad.feeLocked, asset.decimals) : null,
       mine,
       trader: { nickname: owner.nickname, ...(stats ?? { trades_30d: 0, trades_total: 0 }) },
       created_at: ad.createdAt.toISOString(),
@@ -323,7 +322,7 @@ export class P2pService {
     return known.get(customerId)!;
   }
 
-  /** The escrow ads of a book for one side (old instant ads are never shown: they can only be closed). */
+  /** The ads of a book for one side. */
   private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string | null, take: number, trader?: string) {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
@@ -331,7 +330,7 @@ export class P2pService {
     // Never the viewer's own ads, nor those of traders they blocked or who blocked them.
     const hidden = viewerId ? [viewerId, ...(await this.trustFigures.blockedWith(viewerId))] : [];
     const ads = await this.prisma.p2pAd.findMany({
-      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', escrow: true, ...(viewerId ? { customerId: { notIn: hidden } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
+      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(viewerId ? { customerId: { notIn: hidden } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });
@@ -373,7 +372,7 @@ export class P2pService {
     const global = await this.settings.isOnGlobally('crypto_global');
     const counts = await this.prisma.p2pAd.groupBy({
       by: ['country', 'currency'],
-      where: { mode, status: 'active', escrow: true, remainingAmount: { gt: 0 }, country: { in: [...(global ? [globalMarket] : []), ...shown.map(country => country.code)] } },
+      where: { mode, status: 'active', remainingAmount: { gt: 0 }, country: { in: [...(global ? [globalMarket] : []), ...shown.map(country => country.code)] } },
       _count: { _all: true },
     });
     const ads = (market: string, currency: string) => counts.find(row => row.country === market && row.currency === currency)?._count._all ?? 0;
@@ -425,7 +424,7 @@ export class P2pService {
     const profile = await this.prisma.p2pProfile.findUnique({ where: { nicknameKey: nickname.toLowerCase() }, include: { customer: { select: { status: true, cryptoFrozenAt: true } } } });
     if (!profile || profile.customer.status !== 'active' || profile.customer.cryptoFrozenAt) throw notFound('trader');
     const stats = (await this.stats([profile.customerId], mode)).get(profile.customerId)!;
-    const ads = await this.prisma.p2pAd.findMany({ where: { customerId: profile.customerId, mode, status: 'active', escrow: true, remainingAmount: { gt: 0 } }, select: { country: true } });
+    const ads = await this.prisma.p2pAd.findMany({ where: { customerId: profile.customerId, mode, status: 'active', remainingAmount: { gt: 0 } }, select: { country: true } });
     return {
       object: 'p2p_trader' as const,
       nickname: profile.nickname,
@@ -452,14 +451,6 @@ export class P2pService {
     const assets = new Map((await this.wallets.assets(true)).map(asset => [asset.code, asset]));
     const { owner, stats, methods } = await this.owners(ads, mode);
     return { object: 'list' as const, data: ads.map(ad => this.presentAd(ad, assets.get(ad.asset)!, owner(ad.customerId), stats.get(ad.customerId), viewerId, methods.get(ad.id))) };
-  }
-
-  /** Where an old buy ad's locked fiat came from (P2P proceeds, then the wallet), to give it back when it closes. */
-  private async fiatSources(customerId: string, mode: LedgerMode, currency: string) {
-    return {
-      proceedsId: await this.ledger.accountId(mode, this.wallets.ref(customerId, 'customer_withdrawable', currency)),
-      walletId: await this.ledger.accountId(mode, this.wallets.ref(customerId, 'customer_wallet', currency)),
-    };
   }
 
   /**
@@ -500,7 +491,6 @@ export class P2pService {
       minFiatMinor: BigInt(input.min_fiat),
       maxFiatMinor: BigInt(input.max_fiat),
       terms: input.terms?.trim() || null,
-      escrow: true,
       paymentWindowMinutes: window,
     };
     const listed = methods.map(method => ({ paymentMethodId: method.id }));
@@ -570,8 +560,6 @@ export class P2pService {
     if (!found) throw notFound('ad');
     // Changing an ad is trading in its market: the market must still be open to the customer (closing it never needs this).
     const { context } = await this.access(customer, { market: found.country, currency: found.currency });
-    // An old instant ad can only be closed.
-    if (!found.escrow) throw conflict('ad_retired', 'This ad can no longer be changed. Close it and post a new one.');
     await this.words.check(input.terms, found.country, 'terms');
     const methods = input.payment_method_ids !== undefined ? await this.adMethods(customer.id, context.mode, found.currency, input.payment_method_ids) : null;
     const window = input.payment_window !== undefined ? this.paymentWindow(input.payment_window) : null;
@@ -595,22 +583,7 @@ export class P2pService {
     return (await this.presentAds([ad], context.mode, customer.id)).data[0];
   }
 
-  /** Fiat an old buy ad gives back, to the wallet part first, then proceeds (so proceeds never exceed what is locked). */
-  private giveBack(ad: P2pAd, amount: bigint) {
-    const walletPart = ad.fiatLockedMinor - ad.fiatFromProceeds;
-    const toWallet = walletPart < amount ? walletPart : amount;
-    return { toWallet, toProceeds: amount - toWallet, total: amount };
-  }
-
-  private releasePostings(sources: { proceedsId: string; walletId: string }, lockedId: string, back: { toWallet: bigint; toProceeds: bigint; total: bigint }): PreparedEntry['postings'] {
-    return [
-      { accountId: lockedId, kind: 'p2p_fiat_locked', amount: back.total },
-      ...(back.toProceeds > 0n ? [{ accountId: sources.proceedsId, kind: 'customer_withdrawable' as const, amount: -back.toProceeds }] : []),
-      ...(back.toWallet > 0n ? [{ accountId: sources.walletId, kind: 'customer_wallet' as const, amount: -back.toWallet }] : []),
-    ];
-  }
-
-  /** Closes an ad and gives back what it still locks: the crypto of a sell ad, the fiat of a buy ad. Once. */
+  /** Closes an ad and gives back what a sell ad still locks (its coins and seller's fee). Once. */
   async cancelAd(customer: CustomerWithStore, id: string) {
     const context = await this.wallets.context(customer);
     const found = await this.prisma.p2pAd.findFirst({ where: { id, customerId: customer.id, mode: context.mode } });
@@ -620,9 +593,8 @@ export class P2pService {
   }
 
   private async close(found: P2pAd) {
-    const lockedId = await this.ledger.accountId(found.mode, this.wallets.ref(found.customerId, found.side === 'sell' ? 'crypto_locked' : 'p2p_fiat_locked', found.side === 'sell' ? found.asset : found.currency));
+    const lockedId = await this.ledger.accountId(found.mode, this.wallets.ref(found.customerId, 'crypto_locked', found.asset));
     const walletId = await this.ledger.accountId(found.mode, this.wallets.ref(found.customerId, 'crypto_wallet', found.asset));
-    const sources = await this.fiatSources(found.customerId, found.mode, found.currency);
     return this.prisma.$transaction(async tx => {
       const ad = await this.lockAd(tx, found.id);
       if (!ad || !openStatuses.includes(ad.status)) throw conflict('ad_closed', 'This ad is already closed.');
@@ -633,10 +605,8 @@ export class P2pService {
           { accountId: lockedId, kind: 'crypto_locked', amount: back },
           { accountId: walletId, kind: 'crypto_wallet', amount: -back },
         ]);
-      } else if (ad.side === 'buy' && ad.fiatLockedMinor > 0n) {
-        await this.write(tx, ad.mode, reference, 'p2p_ad_release', `${ad.currency} back from your closed buy ad`, { ad_id: ad.id }, this.releasePostings(sources, lockedId, this.giveBack(ad, ad.fiatLockedMinor)));
       }
-      return tx.p2pAd.update({ where: { id: ad.id }, data: { status: 'cancelled', fiatLockedMinor: 0n, fiatFromProceeds: 0n, feeLocked: 0n } });
+      return tx.p2pAd.update({ where: { id: ad.id }, data: { status: 'cancelled', feeLocked: 0n } });
     });
   }
 

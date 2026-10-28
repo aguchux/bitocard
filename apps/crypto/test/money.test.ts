@@ -14,10 +14,7 @@ const { default: DepositPage } = await import("@/app/deposit/page");
 const { default: WithdrawPage } = await import("@/app/withdraw/page");
 const { default: ReviewPage } = await import("@/app/withdraw/confirm/page");
 const { default: WithdrawalPage } = await import("@/app/withdrawals/[id]/page");
-const { default: CashOutPage } = await import("@/app/cash-out/page");
 const money = await import("@/lib/money");
-const topUp = await import("@/lib/top-up");
-const { default: AddMoneyPage } = await import("@/app/add-money/page");
 const { MoneyActionsProvider } = await import("@bitocard/crypto-ui/money-forms");
 
 /**
@@ -45,7 +42,6 @@ const overview = (extra: Record<string, unknown> = {}) => ({
   declaration: { version: "2026-10-27", declared: true },
   frozen: false,
   assets: [coin],
-  cash: { currency: "NGN", proceeds: 50_000_00, wallet: 0, locked: 0, paying_out: 0 },
   ...extra,
 });
 const address = "0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
@@ -153,7 +149,6 @@ describe("money in and out, on this site", () => {
   test("signed out, every money page signs in here first and comes back", async () => {
     setRequest({});
     await expect(DepositPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/signin?next=%2Fdeposit&for=trade");
-    await expect(CashOutPage()).rejects.toThrow("redirect:/signin?next=%2Fcash-out&for=trade");
   });
 
   test("depositing: the coin, its network, then the customer's own address with its QR code, and recent deposits", async () => {
@@ -200,16 +195,6 @@ describe("money in and out, on this site", () => {
     await expect(WithdrawalPage({ params: Promise.resolve({ id: "nope" }) })).rejects.toThrow();
   });
 
-  test("cashing out: what can be paid now and what waits, the account in their name, and test payouts to settle", async () => {
-    answer();
-    const html = await render(await CashOutPage());
-    expect(html).toContain("Test network: nothing here is real money.");
-    expect(html).toContain("50,000");
-    expect(html).toContain("7 days after each sale");
-    expect(html).toContain("Sandbox Bank ••••6789");
-    expect(html).toContain("Test: pay it");
-  });
-
   test("the actions work on this site's pages: the review, the withdrawal, and signing in here", async () => {
     answer();
     await expect(money.reviewWithdrawal({}, form({ asset: "USDT", chain: "TRON", address_id: address, amount: "1,000.5" }))).rejects.toThrow(
@@ -220,35 +205,6 @@ describe("money in and out, on this site", () => {
     expect(calls().at(-1)![1].headers["idempotency-key"]).toBe(address);
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
     fetchMock.mockImplementationOnce(async () => json({ error: { code: "authentication_required", message: "Sign in." } }, 401));
-    await expect(money.addCashOutAccount({}, form({ bank_code: "SBX001", account_number: "0123456789" }))).rejects.toThrow("redirect:/signin?next=%2Fcash-out");
-  });
-
-  test("adding money: each wallet a tab, its balance, the top-up form, the customer's bank account number, and a top-up waiting", async () => {
-    answer();
-    const html = await render(await AddMoneyPage({ searchParams: Promise.resolve({ top_up: "t1" }) }));
-    expect(html).toContain('href="/add-money?wallet=USD"');
-    expect(html).toContain("20,000");
-    expect(html).toContain("Paystack");
-    expect(html).toContain("Add test money");
-    expect(html).toContain("0123456789");
-    expect(html).toContain("Simulate a transfer");
-    expect(html).toContain("Waiting for your payment of");
-    expect(html).toContain("Simulate paid");
-    const usd = await render(await AddMoneyPage({ searchParams: Promise.resolve({ wallet: "usd" }) }));
-    expect(usd).toContain('name="currency" value="USD"');
-    expect(usd).not.toContain("Bank transfer");
-  });
-
-  test("a top-up returns to this site's Add money page; the sandbox shows it there, live goes to the payment page", async () => {
-    answer();
-    await expect(topUp.topUpWallet({}, form({ amount: "1,000", currency: "USD", method: "paystack" }))).rejects.toThrow("redirect:/add-money?wallet=USD&top_up=t1");
-    const sent = JSON.parse(String(calls().at(-1)![1].body));
-    expect(sent).toEqual({ amount: 100000, method: "paystack", return_url: "https://crypto.bitocard.com/add-money?wallet=USD", currency: "USD" });
-    wallet.mode = "live";
-    await expect(topUp.topUpWallet({}, form({ amount: "50" }))).rejects.toThrow("redirect:https://pay.example/p/1");
-    wallet.mode = "test";
-    expect(await topUp.topUpWallet({}, form({ amount: "0.5" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
-    await topUp.simulateTopUp(form({ id: "t1", outcome: "succeeded" }));
-    expect(revalidatePath).toHaveBeenCalledWith("/add-money", undefined);
+    await expect(money.addWithdrawalAddress({}, form({ chain: "TRON", address, label: "Mine" }))).rejects.toThrow("redirect:/signin?next=%2Fwithdraw");
   });
 });

@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import { Lock, Plus, Snowflake, Unlock } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, Field, formatDateTime, formatMoney, Input, KeyValue, PageHeader, QueryView, Select, Skeleton, Tabs, type Column } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, Field, formatDateTime, Input, PageHeader, QueryView, Select, Skeleton, Tabs, type Column } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type CryptoBalance,
@@ -29,7 +29,6 @@ const balanceColumns: Array<Column<CryptoBalance>> = [
 const holding = (balances: CryptoBalance[]) => balances.some(row => Number(row.total) > 0);
 const firstMode = (customer: CryptoCustomerDetail): Mode => (holding(customer.balances.live) || !holding(customer.balances.test) ? "live" : "test");
 
-const cashLabels: Record<string, string> = { customer_withdrawable: "P2P money", p2p_fiat_locked: "In buy ads", customer_wallet: "Wallet", customer_payouts_pending: "Paying out" };
 
 /** Freezing an amount: which asset and mode, how much, and why (the customer is told). */
 function FreezeDialog({ customer, open, onClose, defaultMode }: { customer: CryptoCustomerDetail; open: boolean; onClose: () => void; defaultMode: Mode }) {
@@ -189,13 +188,6 @@ export default function CryptoCustomerPage({ params }: { params: Promise<{ id: s
                   />
                 </div>
                 <DataTable columns={balanceColumns} rows={customer.balances[mode]} rowKey={row => row.asset} />
-                <div className="border-t border-line p-4">
-                  <KeyValue
-                    items={customer.cash
-                      .filter(row => row.mode === mode)
-                      .map(row => ({ label: `${cashLabels[row.kind] ?? row.kind} (${row.currency})`, value: formatMoney(row.balance, row.currency) }))}
-                  />
-                </div>
               </Card>
               <Card>
                 <CardHeader title="Freezes" />

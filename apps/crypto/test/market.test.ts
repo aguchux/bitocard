@@ -69,9 +69,6 @@ const overview = {
   declaration: { version: "2026-10-27", declared: false },
   frozen: false,
   assets: [{ object: "crypto_balance", asset: "USDT", name: "Tether", decimals: 6, enabled: true, available: "12.500000", locked: "0.000000", frozen: "0.000000", withdrawing: "0.000000", total: "12.500000" }],
-  cash: { currency: "NGN", proceeds: 50_000_00, wallet: 0, locked: 0, paying_out: 0 },
-  usd_cash: { currency: "USD", proceeds: 40_00, wallet: 0, locked: 0, paying_out: 0 },
-  other_cash: [{ currency: "GHS", proceeds: 90_00, locked: 0 }],
 };
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -171,14 +168,15 @@ describe("the small parts of a market page", () => {
     expect([sent.searchParams.get("to"), sent.searchParams.get("next")]).toEqual(["https://ng.bitocard.com", "/account/verification"]);
   });
 
-  test("the account pages ask to sign in first; signed in, the wallets show every currency of P2P money", async () => {
+  test("the account pages ask to sign in first; signed in, the wallets show the coins, with no money pages", async () => {
     await expect(WalletsPage()).rejects.toThrow("NEXT_REDIRECT");
     setRequest({}, { bc_customer: "bcc_token" });
     answer();
     const html = render(await WalletsPage());
     expect(html).toContain("You trade as TraderA");
-    expect(html).toContain("GHS");
-    for (const href of ["/add-money", "/deposit", "/withdraw", "/cash-out"]) expect(html).toContain(`href="${href}"`);
+    for (const href of ["/deposit", "/withdraw"]) expect(html).toContain(`href="${href}"`);
+    for (const href of ["/add-money", "/cash-out"]) expect(html).not.toContain(`href="${href}"`);
+    expect(html).not.toContain("P2P money");
     expect(html).toContain("One question before you trade");
   });
 

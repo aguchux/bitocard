@@ -519,10 +519,6 @@ model Reseller {
   resaleStrikesClearedAt    DateTime?                 @map("resale_strikes_cleared_at")
   checkouts                 Checkout[]
   manualTopUps              ManualTopUp[]
-  cryptoAddresses           CryptoAddress[]
-  cryptoDeposits            CryptoDeposit[]
-  cryptoWithdrawals         CryptoWithdrawal[]
-  cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
   resaleListings            ResaleListing[]
   resaleRules               ResaleRule[]
   resaleRelationships       ResaleRelationship[]
@@ -2617,8 +2613,6 @@ model Customer {
   p2pProfile                P2pProfile?
   cryptoFreezes             CryptoFreeze[]
   p2pAds                    P2pAd[]
-  p2pBuys                   P2pTrade[]                @relation("p2p_buyer")
-  p2pSales                  P2pTrade[]                @relation("p2p_seller")
   cryptoAddresses           CryptoAddress[]
   cryptoDeposits            CryptoDeposit[]
   cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
@@ -2630,8 +2624,6 @@ model Customer {
   spinExchanges             SpinExchange[]
   publicSpinClaim           PublicSpinClaim?
   manualTopUps              ManualTopUp[]
-  exchangeQuotes            ExchangeQuote[]
-  exchangeTrades            ExchangeTrade[]
   classifiedListings        ClassifiedListing[]
   classifiedSeller          ClassifiedSeller?
   classifiedTermsAcceptances ClassifiedTermsAcceptance[]
@@ -3009,68 +3001,22 @@ model P2pAd {
   /// Fiat limits per order.
   minFiatMinor     BigInt     @map("min_fiat_minor")
   maxFiatMinor     BigInt     @map("max_fiat_minor")
-  /// Buy ads: fiat still locked, and how much of it came from P2P proceeds (spent first) rather than the wallet.
-  fiatLockedMinor  BigInt     @default(0) @map("fiat_locked_minor")
-  fiatFromProceeds BigInt     @default(0) @map("fiat_from_proceeds")
   terms            String?
   /// active, paused, completed or cancelled.
   status           String     @default("active")
-  /// Afrippa's escrow ads (taken through orders, paid directly to the seller); false for BitoCard's instant ads.
-  escrow           Boolean    @default(false)
-  /// Escrow ads: how long a buyer has to pay once an order opens (15, 30 or 60).
+  /// How long a buyer has to pay once an order opens (15, 30 or 60).
   paymentWindowMinutes Int?   @map("payment_window_minutes")
-  /// Escrow sell ads: the seller's fee reserved (locked) on top of the coins offered.
+  /// Sell ads: the seller's fee reserved (locked) on top of the coins offered.
   feeLocked        BigInt     @default(0) @map("fee_locked")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  trades           P2pTrade[]
   paymentMethods   P2pAdPaymentMethod[]
   orders           P2pOrder[]
 
   @@index([mode, country, asset, side, status, priceMinor])
   @@index([customerId, status])
   @@map("p2p_ads")
-}
-
-/// One trade against an ad. Instant trades settle both legs in the transaction that creates them.
-model P2pTrade {
-  id               String     @id @default(uuid()) @db.Uuid
-  /// Shown as P2P-000123.
-  number           Int        @unique @default(autoincrement())
-  mode             LedgerMode
-  adId             String     @map("ad_id") @db.Uuid
-  buyerId          String     @map("buyer_id") @db.Uuid
-  sellerId         String     @map("seller_id") @db.Uuid
-  /// The customer who took the ad (the other is the ad's owner).
-  takerId          String     @map("taker_id") @db.Uuid
-  country          String     @db.Char(2)
-  currency         String     @db.Char(3)
-  asset            String     @db.VarChar(10)
-  priceMinor       BigInt     @map("price_minor")
-  /// Crypto the seller gave, the fee BitoCard took from it and what the buyer received.
-  amount           BigInt
-  feeAmount        BigInt     @map("fee_amount")
-  fiatMinor        BigInt     @map("fiat_minor")
-  /// Where the buyer's fiat came from: P2P proceeds first, then the wallet (top-ups).
-  fiatFromProceeds BigInt     @default(0) @map("fiat_from_proceeds")
-  fiatFromWallet   BigInt     @default(0) @map("fiat_from_wallet")
-  /// instant (BitoCard wallet) for now; classic (paid off platform) later.
-  settlement       String     @default("instant")
-  /// A trade across borders: on the global market, or with a party from another country than the market's. Its sale
-  /// money waits for the market's cross-border payout hold.
-  crossBorder      Boolean    @default(false) @map("cross_border")
-  status           String     @default("completed")
-  createdAt        DateTime   @default(now()) @map("created_at")
-  completedAt      DateTime?  @map("completed_at")
-  ad               P2pAd      @relation(fields: [adId], references: [id], onDelete: Restrict)
-  buyer            Customer   @relation("p2p_buyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  seller           Customer   @relation("p2p_seller", fields: [sellerId], references: [id], onDelete: Restrict)
-
-  @@index([buyerId, createdAt])
-  @@index([sellerId, createdAt])
-  @@index([adId])
-  @@map("p2p_trades")
 }
 
 /// Where an asset moves on chain: USDT on TRON, BNB on BNB Chain. `decimals` is the token's own (USDT on BNB Chain has
@@ -3104,9 +3050,7 @@ model CryptoNetwork {
 /// An address a customer saved to withdraw crypto to: usable 24 hours after it is added, screened against sanctions lists.
 model CryptoWithdrawalAddress {
   id          String             @id @default(uuid()) @db.Uuid
-  /// A store customer's or a reseller's saved address (exactly one).
-  customerId  String?            @map("customer_id") @db.Uuid
-  resellerId  String?            @map("reseller_id") @db.Uuid
+  customerId  String             @map("customer_id") @db.Uuid
   mode        LedgerMode
   chain       String
   address     String
@@ -3118,12 +3062,10 @@ model CryptoWithdrawalAddress {
   screenedBy  String?            @map("screened_by")
   screenedAt  DateTime?          @map("screened_at")
   createdAt   DateTime           @default(now()) @map("created_at")
-  customer    Customer?          @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  reseller    Reseller?          @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  customer    Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
   withdrawals CryptoWithdrawal[]
 
   @@unique([customerId, mode, chain, address])
-  @@unique([resellerId, mode, chain, address])
   @@map("crypto_withdrawal_addresses")
 }
 
@@ -3242,177 +3184,6 @@ model ManualTopUp {
   @@map("manual_top_ups")
 }
 
-/// An exchange desk's markup on the live market price of one coin in one currency, per mode (`desk` is `bitocard`;
-/// resellers' desks later). Its price is the coin's US dollar market price x the currency's mid rate x (1 + buy markup)
-/// when the customer buys, x (1 - sell markup) when they sell. Off until enabled.
-model ExchangeMarkup {
-  id            String     @id @default(uuid()) @db.Uuid
-  desk          String     @default("bitocard")
-  mode          LedgerMode
-  asset         String     @db.VarChar(10)
-  currency      String     @db.Char(3)
-  buyMarkupBps  Int        @default(150) @map("buy_markup_bps")
-  sellMarkupBps Int        @default(150) @map("sell_markup_bps")
-  /// Per-trade limits in the currency's minor units (no maximum when null).
-  minFiatMinor  BigInt     @default(0) @map("min_fiat_minor")
-  maxFiatMinor  BigInt?    @map("max_fiat_minor")
-  enabled       Boolean    @default(false)
-  updatedAt     DateTime   @updatedAt @map("updated_at")
-
-  @@unique([desk, mode, asset, currency])
-  @@map("exchange_markups")
-}
-
-/// A price held for 30 seconds for one customer: used once, by the trade it quotes.
-model ExchangeQuote {
-  id          String     @id @default(uuid()) @db.Uuid
-  desk        String     @default("bitocard")
-  mode        LedgerMode
-  customerId  String     @map("customer_id") @db.Uuid
-  /// buy (the customer buys coins) or sell.
-  side        String
-  asset       String     @db.VarChar(10)
-  currency    String     @db.Char(3)
-  /// Base units of the coin, and fiat minor units.
-  amount      BigInt
-  fiatMinor   BigInt     @map("fiat_minor")
-  /// Fiat minor units per whole coin, after the markup.
-  priceMinor  BigInt     @map("price_minor")
-  /// The market price it was built on (US dollars x 1e8), when CoinGecko updated it, the mid rate and the markup.
-  marketUsdE8 BigInt     @map("market_usd_e8")
-  marketAt    DateTime?  @map("market_at")
-  fxMid       Decimal    @map("fx_mid") @db.Decimal(24, 10)
-  markupBps   Int        @map("markup_bps")
-  expiresAt   DateTime   @map("expires_at")
-  usedAt      DateTime?  @map("used_at")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId, createdAt])
-  @@map("exchange_quotes")
-}
-
-/// An instant trade with an exchange desk, settled in one ledger entry (`exchange_trade:<id>`). Shown as EX-000123.
-model ExchangeTrade {
-  id           String     @id @default(uuid()) @db.Uuid
-  number       Int        @unique @default(autoincrement())
-  quoteId      String     @unique @map("quote_id") @db.Uuid
-  desk         String     @default("bitocard")
-  mode         LedgerMode
-  customerId   String     @map("customer_id") @db.Uuid
-  side         String
-  asset        String     @db.VarChar(10)
-  currency     String     @db.Char(3)
-  amount       BigInt
-  fiatMinor    BigInt     @map("fiat_minor")
-  priceMinor   BigInt     @map("price_minor")
-  marketUsdE8  BigInt     @map("market_usd_e8")
-  fxMid        Decimal    @map("fx_mid") @db.Decimal(24, 10)
-  markupBps    Int        @map("markup_bps")
-  /// The desk's margin in fiat minor units: what the trade made over the market price (never negative).
-  markupMinor  BigInt     @map("markup_minor")
-  /// Buying: how much came from P2P money and from the store wallet.
-  fromProceeds BigInt     @default(0) @map("from_proceeds")
-  fromWallet   BigInt     @default(0) @map("from_wallet")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  customer     Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
-
-  @@index([customerId, createdAt])
-  @@index([mode, createdAt])
-  @@map("exchange_trades")
-}
-
-/// A reseller's held price to trade its own fiat and coin reserve directly with BitoCard.
-model ExchangeDesk {
-  resellerId         String   @id @map("reseller_id") @db.Uuid
-  fallbackToBitocard Boolean  @default(true) @map("fallback_to_bitocard")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  @@map("exchange_desks")
-}
-
-/// A reseller's held price to trade its own fiat and coin reserve directly with BitoCard.
-model ResellerDeskQuote {
-  id          String     @id @default(uuid()) @db.Uuid
-  resellerId  String     @map("reseller_id") @db.Uuid
-  mode        LedgerMode
-  side        String
-  asset       String     @db.VarChar(10)
-  currency    String     @db.Char(3)
-  amount      BigInt
-  fiatMinor   BigInt     @map("fiat_minor")
-  priceMinor  BigInt     @map("price_minor")
-  marketUsdE8 BigInt     @map("market_usd_e8")
-  fxMid       Decimal    @map("fx_mid") @db.Decimal(24, 10)
-  markupBps   Int        @map("markup_bps")
-  expiresAt   DateTime   @map("expires_at")
-  usedAt      DateTime?  @map("used_at")
-  createdAt   DateTime   @default(now()) @map("created_at")
-
-  @@index([resellerId, mode, createdAt])
-  @@map("reseller_desk_quotes")
-}
-
-/// The reseller-to-BitoCard trade: one quote, one balanced ledger entry, no customer account involved.
-model ResellerDeskTrade {
-  id          String     @id @default(uuid()) @db.Uuid
-  number      Int        @unique @default(autoincrement())
-  quoteId     String     @unique @map("quote_id") @db.Uuid
-  resellerId  String     @map("reseller_id") @db.Uuid
-  mode        LedgerMode
-  side        String
-  asset       String     @db.VarChar(10)
-  currency    String     @db.Char(3)
-  amount      BigInt
-  fiatMinor   BigInt     @map("fiat_minor")
-  priceMinor  BigInt     @map("price_minor")
-  markupMinor BigInt     @map("markup_minor")
-  createdAt   DateTime   @default(now()) @map("created_at")
-
-  @@index([resellerId, mode, createdAt])
-  @@map("reseller_desk_trades")
-}
-
-/// A finance admin funding or drawing down one of BitoCard's exchange reserves. Nothing moves until the admin who asked
-/// enters the code emailed to them (10 minutes, 5 attempts, a resend a minute). Fiat: from or to the provider balance
-/// (`manual`), into the market's house account; coins: from or to `crypto_custody` (coins BitoCard holds on chain),
-/// into the root house account.
-model ReserveMovement {
-  id                String     @id @default(uuid()) @db.Uuid
-  /// Shown as RM-000123.
-  number            Int        @unique @default(autoincrement())
-  mode              LedgerMode
-  /// fund or withdraw.
-  kind              String
-  /// fiat or crypto.
-  reserve           String
-  /// The asset code, or the fiat currency.
-  currency          String     @db.VarChar(10)
-  /// Fiat reserves: the market whose house account holds it.
-  country           String?    @db.Char(2)
-  amount            BigInt
-  externalReference String?    @map("external_reference")
-  reason            String
-  /// awaiting_code, completed or cancelled.
-  status            String     @default("awaiting_code")
-  requestedBy       String     @map("requested_by") @db.Uuid
-  cancelledBy       String?    @map("cancelled_by") @db.Uuid
-  codeHash          String?    @map("code_hash")
-  codeExpiresAt     DateTime?  @map("code_expires_at")
-  codeAttempts      Int        @default(0) @map("code_attempts")
-  codeSentAt        DateTime?  @map("code_sent_at")
-  /// Codes sent for this request (capped, so resends cannot give unlimited guesses).
-  codeSends         Int        @default(1) @map("code_sends")
-  entryId           String?    @map("entry_id") @db.Uuid
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
-  completedAt       DateTime?  @map("completed_at")
-
-  @@index([status, createdAt])
-  @@map("reserve_movements")
-}
-
 /// Money an admin recorded as sent to a supplier outside BitoCard (a bank transfer to its account): funds
 /// `supplier_float`, confirmed by a code emailed to the admin who asked, exactly like a reserve movement.
 model SupplierFundingMovement {
@@ -3451,11 +3222,7 @@ model CryptoWithdrawal {
   id              String                   @id @default(uuid()) @db.Uuid
   /// Shown as CW-000123.
   number          Int                      @unique @default(autoincrement())
-  /// Whose coins: a store customer or a reseller (exactly one).
-  customerId      String?                  @map("customer_id") @db.Uuid
-  resellerId      String?                  @map("reseller_id") @db.Uuid
-  /// For a reseller's withdrawal, the team member who asked: only they can confirm it with the emailed code.
-  requestedBy     String?                  @map("requested_by") @db.Uuid
+  customerId      String                   @map("customer_id") @db.Uuid
   mode            LedgerMode
   asset           String                   @db.VarChar(10)
   chain           String
@@ -3489,12 +3256,10 @@ model CryptoWithdrawal {
   createdAt       DateTime                 @default(now()) @map("created_at")
   updatedAt       DateTime                 @updatedAt @map("updated_at")
   completedAt     DateTime?                @map("completed_at")
-  customer        Customer?                @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reseller        Reseller?                @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  customer        Customer                 @relation(fields: [customerId], references: [id], onDelete: Restrict)
   savedAddress    CryptoWithdrawalAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   @@index([status, nextCheckAt])
-  @@index([resellerId, createdAt])
   @@index([customerId, createdAt])
   @@map("crypto_withdrawals")
 }
@@ -3502,9 +3267,7 @@ model CryptoWithdrawal {
 /// A customer's own deposit address in a family (bitcoin, evm, tron), derived from BitoCard's xpub at `index`.
 model CryptoAddress {
   id             String     @id @default(uuid()) @db.Uuid
-  /// Exactly one owner: a store customer or a reseller (Premium resellers' own coin wallets; a database check).
-  customerId     String?    @map("customer_id") @db.Uuid
-  resellerId     String?    @map("reseller_id") @db.Uuid
+  customerId     String     @map("customer_id") @db.Uuid
   mode           LedgerMode
   family         String
   index          Int
@@ -3516,11 +3279,9 @@ model CryptoAddress {
   /// Last read outside its watch window (TRON and Bitcoin list each address's history, so unwatched ones are swept in turn).
   sweptAt        DateTime?  @map("swept_at")
   createdAt      DateTime   @default(now()) @map("created_at")
-  customer       Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  reseller       Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([customerId, mode, family])
-  @@unique([resellerId, mode, family])
   @@unique([mode, family, index])
   @@unique([mode, family, address])
   @@index([mode, family, watchUntil])
@@ -3532,9 +3293,7 @@ model CryptoAddress {
 /// provider agrees), then credited once (`crypto_deposit:<chain>:<tx>:<index>`).
 model CryptoDeposit {
   id              String     @id @default(uuid()) @db.Uuid
-  /// The address's owner: a store customer or a reseller (exactly one).
-  customerId      String?    @map("customer_id") @db.Uuid
-  resellerId      String?    @map("reseller_id") @db.Uuid
+  customerId      String     @map("customer_id") @db.Uuid
   mode            LedgerMode
   chain           String
   asset           String     @db.VarChar(10)
@@ -3559,11 +3318,9 @@ model CryptoDeposit {
   /// When the signer was told about the deposit's address (so it sweeps it and counts it in its balances).
   signerTrackedAt DateTime?  @map("signer_tracked_at")
   createdAt       DateTime   @default(now()) @map("created_at")
-  customer        Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reseller        Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  customer        Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@unique([chain, txHash, outputIndex])
-  @@index([resellerId, createdAt])
   @@index([status, chain])
   @@index([status, mode, checkedAt])
   @@index([customerId, createdAt])

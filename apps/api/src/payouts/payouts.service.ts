@@ -468,7 +468,7 @@ export class PayoutsService implements OnModuleInit {
       where: { provider: providerName, OR: [{ providerTransferId: transferId }, ...(result.reference ? [{ reference: result.reference }] : [])] },
     });
     if (!payout) {
-      // Not a reseller's: perhaps a store customer's payout of their P2P money.
+      // Not a reseller's: perhaps a store customer's payout.
       const status = await this.customerPayouts.refreshByTransfer(providerName, transferId, result);
       if (status) return { handled: true, status };
       this.logger.warn({ providerName, transferId }, 'Transfer notification for an unknown payout');

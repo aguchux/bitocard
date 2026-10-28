@@ -369,7 +369,7 @@ class SimulatePayoutDto {
 }
 
 /**
- * A store customer's withdrawable money (BitoCard Shop's Safe pay sales; P2P money before crypto left) paid out to their
+ * A store customer's withdrawable money (BitoCard Shop's Safe pay sales) paid out to their
  * own bank account, at `/v1/store/cash`. BitoCard's, not Afrippa's: Afrippa never pays out fiat.
  */
 @ApiExcludeController()
@@ -764,9 +764,6 @@ class DepositListDto {
 
   @IsOptional() @IsUUID()
   customer_id?: string;
-
-  @IsOptional() @IsUUID()
-  reseller_id?: string;
 }
 
 /** Admin: chains (providers in order, their health, networks) and deposits. */
@@ -826,9 +823,6 @@ class WithdrawalListDto {
 
   @IsOptional() @IsUUID()
   customer_id?: string;
-
-  @IsOptional() @IsUUID()
-  reseller_id?: string;
 }
 
 /** Admin: on-chain withdrawals (approve or reject those waiting for review, recheck stuck ones). */
@@ -904,7 +898,7 @@ class CustomerPayoutListDto {
   customer_id?: string;
 }
 
-/** Admin: customers' payouts of their P2P money to their banks. */
+/** Admin: customers' payouts of their withdrawable money to their banks. */
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
