@@ -67,7 +67,7 @@ async function authorOf(prisma: PrismaService, caller: Caller, kind: 'reseller' 
 }
 
 /** A chat file, never cached, and a PDF opened from here can never run anything. */
-function sendFile(res: Response, file: { contentType: string; bytes: Buffer; name: string }) {
+export function sendFile(res: Response, file: { contentType: string; bytes: Buffer; name: string }) {
   const ascii = file.name.replace(/[^\w.\- ]/g, '_');
   res.set({
     'content-type': file.contentType,

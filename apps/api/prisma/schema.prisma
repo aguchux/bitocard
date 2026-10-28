@@ -5498,12 +5498,16 @@ model P2pOrder {
   decidedBy            String?          @map("decided_by") @db.Uuid
   decisionFault        String?          @map("decision_fault")
   decisionNote         String?          @map("decision_note")
+  /// Deadline reminders, each once: the buyer before the window ends, the seller once paid and not released.
+  payRemindedAt        DateTime?        @map("pay_reminded_at")
+  releaseRemindedAt    DateTime?        @map("release_reminded_at")
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
   ad                   P2pAd            @relation(fields: [adId], references: [id], onDelete: Restrict)
   seller               Customer         @relation("p2pOrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
   buyer                Customer         @relation("p2pOrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
   paymentMethod        P2pPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  messages             P2pOrderMessage[]
 
   @@index([sellerId, status])
   @@index([buyerId, status])
@@ -5525,4 +5529,25 @@ model P2pFeeRate {
 
   @@unique([asset, market])
   @@map("p2p_fee_rates")
+}
+
+/// A line in an Afrippa order's room (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 5): from the buyer, the seller, Afrippa's
+/// team (`afrippa`, never a person's name) or the system at each step; text, a file (sealed in Afrippa's private
+/// bucket under the order, named by this message's id), or both.
+model P2pOrderMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  author     String
+  authorId   String?  @map("author_id") @db.Uuid
+  body       String?
+  fileName   String?  @map("file_name")
+  fileType   String?  @map("file_type")
+  fileSize   Int?     @map("file_size")
+  fileWidth  Int?     @map("file_width")
+  fileHeight Int?     @map("file_height")
+  createdAt  DateTime @default(now()) @map("created_at")
+  order      P2pOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("p2p_order_messages")
 }

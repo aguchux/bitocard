@@ -14,6 +14,7 @@ import { minor } from '../ledger/mode.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import type { CustomerNotificationType } from '../notifications/inbox.js';
 import { afrippaOperatorId } from './ids.js';
+import { OrderRoomService } from './order-room.service.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
 
 /** Orders still running: the coins in escrow. */
@@ -61,6 +62,7 @@ export class P2pOrdersService {
     private readonly identity: IdentityService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly room: OrderRoomService,
   ) {}
 
   private requireTrader(customer: CustomerWithStore) {
@@ -157,6 +159,12 @@ export class P2pOrdersService {
         ...(fromWallet > 0n ? [{ accountId: walletId, kind: 'crypto_wallet' as const, amount: fromWallet }] : []),
         { accountId: escrowId, kind: 'crypto_escrow', amount: -held },
       ]);
+      await this.room.system(
+        tx,
+        created.id,
+        `Order ${orderNumber(created.number)} opened: ${fromUnits(created.amount, asset.decimals)} ${asset.code} for ${minor(created.fiatMinor) / 100} ${created.currency}, held in escrow. ` +
+          `The buyer pays within ${created.paymentWindowMinutes} minutes into the seller's account shown in the order, from an account in their own name (${buyerName}).`,
+      );
       return created;
     });
     await this.tell(order, found.customerId, 'customer.p2p.order_opened', 'New order on your ad', `${orderNumber(order.number)}: ${fromUnits(order.amount, asset.decimals)} ${asset.code} for ${minor(order.fiatMinor) / 100} ${order.currency}.`);
@@ -201,6 +209,7 @@ export class P2pOrdersService {
       throw conflict('order_not_pending', 'This order is no longer waiting for payment.');
     }
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: order.asset } });
+    await this.room.system(this.prisma, id, `The buyer marked the order paid. Seller: check ${minor(order.fiatMinor) / 100} ${order.currency} arrived from ${order.buyerName}, then release the coins. Release only for a payment from that name.`);
     await this.tell(order, order.sellerId, 'customer.p2p.order_paid', 'The buyer says they paid', `${orderNumber(order.number)}: check you received ${minor(order.fiatMinor) / 100} ${order.currency} from ${order.buyerName}, then release the coins.`);
     return this.present(await this.prisma.p2pOrder.findUniqueOrThrow({ where: { id } }), asset, 'buyer');
   }
@@ -229,6 +238,7 @@ export class P2pOrdersService {
     const claimed = await this.prisma.p2pOrder.updateMany({ where: { id, status: 'paid' }, data: { status: 'appealed', appealedAt: new Date(), appealedBy: customer.id, appealReason: reason.trim() } });
     if (claimed.count === 0) throw conflict('order_not_appealable', 'An order can be appealed once it is marked paid, while it is open.');
     const other = customer.id === order.buyerId ? order.sellerId : order.buyerId;
+    await this.room.system(this.prisma, id, `The ${customer.id === order.buyerId ? 'buyer' : 'seller'} appealed: ${reason.trim()} Afrippa's team will decide. Add your evidence here.`);
     await this.tell(order, other, 'customer.p2p.order_appealed', 'An order was appealed', `${orderNumber(order.number)} was appealed. Afrippa's team will decide; add your evidence to the order.`);
     return this.present(await this.prisma.p2pOrder.findUniqueOrThrow({ where: { id } }), await this.assetOf(order), customer.id === order.buyerId ? 'buyer' : 'seller');
   }
@@ -248,7 +258,36 @@ export class P2pOrdersService {
     return this.present(done, asset, 'admin');
   }
 
-  /** The `p2p-orders` job: unpaid orders past their window expire, their coins going back (100 a run). */
+  /** The `p2p-orders` job (every minute): expiries, then the deadline reminders. */
+  async job() {
+    return { ...(await this.expireDue()), reminded: await this.remind() };
+  }
+
+  /**
+   * Deadline reminders, each once (claimed on the order): the buyer when 5 minutes of the window are left (or a third
+   * of a shorter one), the seller once an order has been marked paid for 15 minutes and not released.
+   */
+  async remind() {
+    const now = Date.now();
+    let reminded = 0;
+    const unpaid = await this.prisma.p2pOrder.findMany({ where: { status: 'pending_payment', payRemindedAt: null, payBy: { gt: new Date(now), lte: new Date(now + 5 * 60_000) } }, take: 200 });
+    for (const order of unpaid) {
+      const claimed = await this.prisma.p2pOrder.updateMany({ where: { id: order.id, status: 'pending_payment', payRemindedAt: null }, data: { payRemindedAt: new Date() } });
+      if (claimed.count === 0) continue;
+      reminded += 1;
+      await this.tell(order, order.buyerId, 'customer.p2p.order_reminder', 'Pay or cancel your order', `${orderNumber(order.number)}: pay the seller before ${order.payBy.toUTCString()}, then mark it paid, or cancel it.`);
+    }
+    const waiting = await this.prisma.p2pOrder.findMany({ where: { status: 'paid', releaseRemindedAt: null, paidAt: { lte: new Date(now - 15 * 60_000) } }, take: 200 });
+    for (const order of waiting) {
+      const claimed = await this.prisma.p2pOrder.updateMany({ where: { id: order.id, status: 'paid', releaseRemindedAt: null }, data: { releaseRemindedAt: new Date() } });
+      if (claimed.count === 0) continue;
+      reminded += 1;
+      await this.tell(order, order.sellerId, 'customer.p2p.order_reminder', 'A buyer is waiting for your coins', `${orderNumber(order.number)} was marked paid. Check the money arrived from ${order.buyerName}, then release, or appeal if it did not.`);
+    }
+    return reminded;
+  }
+
+  /** Unpaid orders past their window expire, their coins going back (100 a run). */
   async expireDue() {
     const due = await this.prisma.p2pOrder.findMany({ where: { status: 'pending_payment', payBy: { lte: new Date() } }, orderBy: { payBy: 'asc' }, take: 100 });
     let expired = 0;
@@ -295,6 +334,7 @@ export class P2pOrdersService {
       });
       if (claimed.count === 0) return null;
       const number = orderNumber(order.number);
+      await this.room.system(tx, order.id, closingLine(status, options));
       if (status === 'released') {
         const fees = order.sellerFee + order.buyerFee;
         await this.write(tx, order.mode, `p2p_order:${order.id}:release`, 'p2p_order_release', `${asset.code} released for order ${number}`, order, [
@@ -438,6 +478,13 @@ export class P2pOrdersService {
     if (!customer) return;
     await this.inbox.customer({ customerId, storeId: customer.storeId }, type, { subject: `${type}:${order.id}:${Date.now()}`, title, body, link: `/orders/${order.id}`, mode: order.mode });
   }
+}
+
+/** The room's line when an order closes. */
+function closingLine(status: 'released' | 'cancelled' | 'returned', options: { reason?: string; decision?: unknown }) {
+  if (status === 'released') return options.decision ? "Afrippa's team decided the appeal: the coins were released to the buyer." : 'The seller released the coins to the buyer.';
+  if (status === 'returned') return "Afrippa's team decided the appeal: the coins were returned to the seller.";
+  return options.reason === 'expired' ? 'The order was not paid in time and expired. The coins went back to the seller.' : 'The buyer cancelled the order. The coins went back to the seller.';
 }
 
 /** The details shown in an order: the account itself (the holder and currency are shown beside it). */

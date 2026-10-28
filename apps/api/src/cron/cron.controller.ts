@@ -174,8 +174,8 @@ export class CronController {
         const sent = await withdrawals.job();
         return { deposits: await deposits.job({ deadline }), withdrawals: sent };
       },
-      /** Every minute: Afrippa's P2P orders left unpaid past their window expire, their coins going back to the seller. */
-      'p2p-orders': () => p2pOrders.expireDue(),
+      /** Every minute: Afrippa's P2P orders left unpaid past their window expire (their coins back to the seller), then the deadline reminders. */
+      'p2p-orders': () => p2pOrders.job(),
       /** Every 15 minutes: every blockchain provider's latest block (Crypto > Chains health). */
       'chain-health': () => deposits.checkAll(),
       /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */

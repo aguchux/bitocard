@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } f
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { AppConfig } from '../config/config.js';
+import type { Platform } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { type Credentials, encodeKey, signRequest } from '../media/sigv4.js';
 
@@ -36,6 +37,23 @@ export class KycStorage {
     this.bucket = integrations.derive(bucketFrom);
   }
 
+  private readonly scoped = new Map<Platform, KycStorage>();
+
+  /**
+   * The same private storage for a product: its own bucket (that product's Private files settings, never another's),
+   * sealed the same way. BitoCard's is this one.
+   */
+  forPlatform(platform: Platform): KycStorage {
+    if (platform === 'bitocard') return this;
+    let storage = this.scoped.get(platform);
+    if (!storage) {
+      storage = Object.create(KycStorage.prototype) as KycStorage;
+      Object.assign(storage, { integrations: this.integrations, bucket: this.integrations.deriveFor(platform, bucketFrom), scoped: this.scoped });
+      this.scoped.set(platform, storage);
+    }
+    return storage;
+  }
+
   configured() {
     return this.bucket() !== null;
   }
@@ -54,6 +72,11 @@ export class KycStorage {
   /** Where a file sent in a chat lives: under the chat, named by a random id (never the file's own name). */
   chatKey(chatId: string, file: string) {
     return `${this.require().root}/chat/${chatId}/${file}`;
+  }
+
+  /** Where a file sent in an Afrippa order's room lives: under the order, named by the message's id. */
+  orderRoomKey(orderId: string, messageId: string) {
+    return `${this.require().root}/p2p-orders/${orderId}/${messageId}`;
   }
 
   /** Where a photo sent in a BitoCard Shop chat lives: under the chat, named by a random id. */

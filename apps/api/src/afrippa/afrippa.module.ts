@@ -7,6 +7,8 @@ import { AfrippaAccountController, AfrippaTraderAdminController } from './accoun
 import { AfrippaBooksController } from './books.controller.js';
 import { AfrippaBooksService } from './books.service.js';
 import { AfrippaFeeRatesAdminController, AfrippaOrdersAdminController, P2pOrdersController } from './orders.controller.js';
+import { KycStorage } from '../kyc/storage.js';
+import { OrderRoomService } from './order-room.service.js';
 import { P2pOrdersService } from './orders.service.js';
 import { PaymentMethodsController } from './payment-methods.controller.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
@@ -17,7 +19,7 @@ import { TraderTwoStepService } from './two-step.service.js';
 @Module({
   imports: [CheckoutModule, CryptoModule, IdentityModule],
   controllers: [AfrippaAccountController, AfrippaTraderAdminController, AfrippaBooksController, PaymentMethodsController, P2pOrdersController, AfrippaOrdersAdminController, AfrippaFeeRatesAdminController],
-  providers: [TraderTwoStepService, TraderGoogleService, AfrippaBooksService, PaymentMethodsService, P2pOrdersService, CustomerGuard],
+  providers: [TraderTwoStepService, TraderGoogleService, AfrippaBooksService, PaymentMethodsService, P2pOrdersService, OrderRoomService, KycStorage, CustomerGuard],
   exports: [TraderTwoStepService, PaymentMethodsService, P2pOrdersService],
 })
 export class AfrippaModule {}

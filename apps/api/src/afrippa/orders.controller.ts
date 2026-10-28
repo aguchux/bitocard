@@ -1,13 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
+import { IsBase64, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { cryptoAmount } from '../crypto/crypto.controller.js';
 import { maxFeeBps, P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode, P2pOrderStatus } from '../generated/prisma/client.js';
+import { sendFile } from '../support/chats.controller.js';
+import { maxMessageLength, OrderRoomService } from './order-room.service.js';
 import { P2pOrdersService } from './orders.service.js';
 
 class OpenOrderDto {
@@ -19,6 +22,22 @@ class OpenOrderDto {
   /** Where the buyer pays: one of a sell ad's payment methods, or (taking a buy ad) one of your own the ad accepts. */
   @IsUUID() payment_method_id: string;
   @IsOptional() @IsBoolean() preview?: boolean;
+}
+
+class MessageDto {
+  @IsString() @Length(1, maxMessageLength) body: string;
+}
+
+class AttachmentDto {
+  @IsString() @Length(1, 200) file_name: string;
+  @IsIn(['image/jpeg', 'image/png', 'application/pdf']) content_type: string;
+  /** The file, base64 (4 MB at most once decoded). */
+  @IsBase64() @MaxLength(5_600_000) data: string;
+  @IsOptional() @IsString() @MaxLength(maxMessageLength) body?: string;
+}
+
+class AfterDto {
+  @IsOptional() @IsUUID() after?: string;
 }
 
 class AppealDto {
@@ -57,7 +76,31 @@ class DecideDto {
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p/orders')
 export class P2pOrdersController {
-  constructor(private readonly orders: P2pOrdersService) {}
+  constructor(
+    private readonly orders: P2pOrdersService,
+    private readonly room: OrderRoomService,
+  ) {}
+
+  /** The order's room, oldest first; with `after`, only what came since (polled while it is open). */
+  @Get(':id/messages')
+  messages(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Query() query: AfterDto) {
+    return this.room.list(caller.customer, id, query.after);
+  }
+
+  @Post(':id/messages')
+  send(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: MessageDto) {
+    return this.room.send(caller.customer, id, body.body);
+  }
+
+  @Post(':id/attachments')
+  attach(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: AttachmentDto) {
+    return this.room.attach(caller.customer, id, body);
+  }
+
+  @Get(':id/files/:message')
+  async file(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendFile(res, await this.room.file(caller.customer, id, message));
+  }
 
   @Post()
   open(@CurrentCustomer() caller: CustomerCaller, @Body() body: OpenOrderDto) {
@@ -105,7 +148,27 @@ export class P2pOrdersController {
 @AdminRoles('operations', 'support', 'finance')
 @Controller('afrippa/admin/p2p/orders')
 export class AfrippaOrdersAdminController {
-  constructor(private readonly orders: P2pOrdersService) {}
+  constructor(
+    private readonly orders: P2pOrdersService,
+    private readonly room: OrderRoomService,
+  ) {}
+
+  @Get(':id/messages')
+  messages(@Param('id', ParseUUIDPipe) id: string, @Query() query: AfterDto) {
+    return this.room.adminList(id, query.after);
+  }
+
+  /** Writes in an open order's room as "Afrippa" (operations and support). */
+  @AdminRoles('operations', 'support')
+  @Post(':id/messages')
+  send(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: MessageDto) {
+    return this.room.adminSend(adminId(caller), id, body.body);
+  }
+
+  @Get(':id/files/:message')
+  async file(@Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendFile(res, await this.room.adminFile(id, message));
+  }
 
   @Get()
   list(@Query() query: AdminOrdersQueryDto) {
