@@ -141,3 +141,38 @@ describe("help", () => {
     expect((await chatFile(new Request("https://afrippa.com/x"), { params: Promise.resolve({ chat: "x", file: fileId }) })).status).toBe(404);
   });
 });
+
+describe("signed-out visitors' chat", () => {
+  const visitorChat = () => import("@/lib/visitor-chat");
+  const chat = { object: "support_chat", id: "6b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a", status: "waiting", ticket_reference: null, created_at: "2026-10-28T10:00:00.000Z", closed_at: null, messages: [{ id: "m1", author: "customer", body: "Which coins can I trade?", attachments: [], created_at: "2026-10-28T10:00:00.000Z" }] };
+
+  test("signed out, Help is a chat by name and email; signing in follows questions", async () => {
+    setRequest({ "x-real-ip": "203.0.113.7" }, {});
+    answer({ "/v1/afrippa/account/support/visitor-chat": { object: "support_chat_current", chat: null, assistant: null, visitor: null } });
+    const page = await render(await HelpPage());
+    expect(page).toContain("Your name");
+    expect(page).toContain("Your email");
+    expect(page).toContain("/signin?next=%2Fhelp");
+    expect(page).not.toContain("Ask Afrippa&#x27;s team");
+  });
+
+  test("the first message starts the chat and keeps the token in this site's own cookie; later ones send it", async () => {
+    const { request } = await import("./request");
+    setRequest({ "x-real-ip": "203.0.113.7" }, {});
+    const actions = await visitorChat();
+    answer({ "POST /v1/afrippa/account/support/visitor-chat": { object: "support_visitor_chat", token: "bcv_" + "a".repeat(43), visitor: { name: "Kofi", email: "kofi@example.com" }, chat } });
+    const started = await actions.sendVisitorChat({}, form({ name: "Kofi", email: "kofi@example.com", body: "Which coins can I trade?" }));
+    expect(started.chat?.id).toBe(chat.id);
+    expect(JSON.parse(String(calls()[0][1].body))).toEqual({ name: "Kofi", email: "kofi@example.com", body: "Which coins can I trade?" });
+    expect(calls()[0][1].headers["afrippa-signature"]).toMatch(/^t=\d+,v1=/);
+    const cookie = request.set.find(item => item.name === "afr_chat")!;
+    expect(cookie.value).toMatch(/^bcv_/);
+    expect(cookie.options).toMatchObject({ httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30 });
+
+    setRequest({ "x-real-ip": "203.0.113.7" }, { afr_chat: "bcv_" + "a".repeat(43) });
+    answer({ "POST /v1/afrippa/account/support/visitor-chat/messages": chat });
+    expect((await actions.sendVisitorChat({}, form({ body: "And the fees?" }))).chat?.id).toBe(chat.id);
+    expect(calls().at(-1)![1].headers["bitocard-chat-visitor"]).toBe("bcv_" + "a".repeat(43));
+    expect(await actions.visitorChatSince("not-a-uuid", null)).toBeNull();
+  });
+});

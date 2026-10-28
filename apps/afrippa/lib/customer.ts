@@ -42,7 +42,7 @@ const idempotencyKeyPattern = /^[A-Za-z0-9_-]{8,128}$/;
  * Every POST carries a fresh Idempotency-Key unless `idempotencyKey` names one (a form's nonce, so a double submit acts
  * once).
  */
-export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<CustomerResult<T>> {
+export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: unknown, options: { idempotencyKey?: string; headers?: Record<string, string> } = {}): Promise<CustomerResult<T>> {
   const token = (await cookies()).get(sessionCookie)?.value;
   const raw = body !== undefined ? JSON.stringify(body) : undefined;
   try {
@@ -55,6 +55,7 @@ export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | 
         ...(token ? { [sessionHeader]: token } : {}),
         ...signatureFor(method, path, raw),
         ...(await visitorHeader()),
+        ...options.headers,
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
       },
       body: raw,
@@ -64,6 +65,15 @@ export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | 
     return { ok: false, status: res.status, code: json?.error?.code ?? null, message: json?.error?.message ?? "Something went wrong. Try again.", param: json?.error?.param ?? null };
   } catch {
     return { ok: false, status: 0, code: null, message: "We could not reach Afrippa. Try again shortly.", param: null };
+  }
+}
+
+/** A signed GET for a signed-out visitor's chat file, with their chat token; null when the API cannot be reached. */
+export async function visitorFile(path: string, chatToken: string): Promise<Response | null> {
+  try {
+    return await fetch(apiUrl(path), { cache: "no-store", headers: { "bitocard-chat-visitor": chatToken, ...signatureFor("GET", path), ...(await visitorHeader()) } });
+  } catch {
+    return null;
   }
 }
 

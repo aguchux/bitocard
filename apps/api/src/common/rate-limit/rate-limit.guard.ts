@@ -63,7 +63,7 @@ function limiterFor(config: AppConfig, limit: number): Limiter {
  * keeps counting in memory instead.
  */
 const sensitivePath =
-  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|disable|recovery-codes))|(afrippa\/)?admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|afrippa\/account\/(signup|signin|google\/(start|finish)|password\/(forgot|reset|change)|email\/(resend|verify)|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|recovery-codes))|store\/account\/(signup|signin|handoff\/exchange|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|store\/support\/visitor-chat|(afrippa\/)?kyc\/session)(\?|$)/;
+  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|disable|recovery-codes))|(afrippa\/)?admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|afrippa\/account\/(signup|signin|google\/(start|finish)|password\/(forgot|reset|change)|email\/(resend|verify)|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|recovery-codes))|store\/account\/(signup|signin|handoff\/exchange|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|(store|afrippa\/account)\/support\/visitor-chat|(afrippa\/)?kyc\/session)(\?|$)/;
 
 export const isSensitive = (method: string, url: string) => method === 'POST' && sensitivePath.test(url);
 

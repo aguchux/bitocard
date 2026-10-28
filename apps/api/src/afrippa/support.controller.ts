@@ -1,16 +1,18 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBase64, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsBase64, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
+import { afrippaStoreId } from './ids.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { maxDocumentBytes } from '../kyc/files.js';
-import { type ChatAuthor, type ChatStatus, chatStatuses, ChatsService, type ChatUpload, maxChatMessage } from '../support/chats.service.js';
+import { type ChatAuthor, type ChatStatus, chatStatuses, ChatsService, type ChatUpload, maxChatMessage, visitorHeader } from '../support/chats.service.js';
 import { sendFile } from '../support/chats.controller.js';
 import {
   type TicketAuthor,
@@ -158,6 +160,17 @@ export class AfrippaTicketsAdminController {
   }
 }
 
+class VisitorStartDto {
+  @IsString() @Length(1, 80)
+  name: string;
+
+  @IsEmail() @MaxLength(254)
+  email: string;
+
+  @IsString() @Length(1, maxChatMessage)
+  body: string;
+}
+
 class ChatBodyDto {
   @IsString() @Length(1, maxChatMessage)
   body: string;
@@ -256,6 +269,84 @@ export class TraderChatController {
   @SkipIdempotency()
   close(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.chats.closeAsCustomer(caller.customer, id);
+  }
+}
+
+/**
+ * A signed-out visitor's chat with Afrippa (afrippa.com, through its signed server): their name, email and first
+ * message, then the token returned once, which Afrippa's server keeps in its own cookie and sends as
+ * `BitoCard-Chat-Visitor`. Afrippa's team (or its assistant) answers in its own queue; a reply is emailed from Afrippa.
+ * Starting is held to the sign-in rate limit per address. Files come as base64 in the signed JSON, as for traders.
+ */
+@ApiExcludeController()
+@Public()
+@Controller('afrippa/account/support/visitor-chat')
+export class AfrippaVisitorChatController {
+  constructor(
+    private readonly chats: ChatsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private store() {
+    return this.prisma.store.findUniqueOrThrow({ where: { id: afrippaStoreId }, include: { reseller: { select: { house: true } } } });
+  }
+
+  private async as(req: Request) {
+    const requester = await this.chats.visitorAt(req.get(visitorHeader), await this.store());
+    if (!requester) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'visitor_unknown', 'Tell us your name and email to chat.');
+    return requester;
+  }
+
+  @Get()
+  async current(@Req() req: Request) {
+    const store = await this.store();
+    const requester = await this.chats.visitorAt(req.get(visitorHeader), store);
+    const [chat, assistant] = await Promise.all([requester ? this.chats.currentFor(requester) : null, this.chats.assistantProfile(store)]);
+    return { object: 'support_chat_current' as const, chat, assistant, visitor: requester?.kind === 'visitor' ? { name: requester.visitor.name, email: requester.visitor.email } : null };
+  }
+
+  @Post()
+  @SkipIdempotency()
+  async start(@Req() req: Request, @Body() body: VisitorStartDto) {
+    return this.chats.startAsVisitorAt(await this.store(), { token: req.get(visitorHeader), ...body });
+  }
+
+  @Post('messages')
+  @SkipIdempotency()
+  async send(@Req() req: Request, @Body() body: ChatBodyDto) {
+    return this.chats.sendAs(await this.as(req), body.body);
+  }
+
+  @Post('attachments')
+  @SkipIdempotency()
+  async attach(@Req() req: Request, @Body() body: TraderChatFileDto) {
+    const buffer = Buffer.from(body.data, 'base64');
+    const file: ChatUpload = { buffer, mimetype: body.content_type, size: buffer.length, originalname: body.file_name };
+    return this.chats.attachAs(await this.as(req), file, body.body);
+  }
+
+  @Get(':id/messages')
+  async messages(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Query() query: ChatAfterDto) {
+    return this.chats.messagesFor(await this.as(req), id, query.after);
+  }
+
+  @Get(':id/files/:file')
+  async file(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Param('file', ParseUUIDPipe) file: string, @Res() res: Response) {
+    sendFile(res, await this.chats.fileFor(await this.as(req), id, file));
+  }
+
+  @Post(':id/human')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  async human(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chats.askForPersonAs(await this.as(req), id);
+  }
+
+  @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  async close(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chats.closeAs(await this.as(req), id);
   }
 }
 

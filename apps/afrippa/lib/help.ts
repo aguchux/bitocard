@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "@afrippa/ui/forms";
+import type { Chat, ChatMessage, ChatState } from "@/lib/chat-types";
 import { customerApi, signInPath } from "@/lib/customer";
 
 /**
@@ -52,9 +53,6 @@ export async function closeTicket(form: FormData): Promise<void> {
 
 // Live chat with Afrippa's team
 
-export type ChatMessage = { id: string; author: string; body: string; attachments: Array<{ id: string; name: string; content_type: string }>; created_at: string };
-export type Chat = { id: string; status: "bot" | "waiting" | "with_staff" | "closed"; ticket_reference: string | null; messages: ChatMessage[] };
-export type ChatState = FormState & { chat?: Chat };
 
 /** The trader's open chat with Afrippa, or null. */
 export async function currentChat(): Promise<Chat | null> {

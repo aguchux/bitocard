@@ -3,10 +3,13 @@ import Link from "next/link";
 import { cardClass, tradeDate } from "@afrippa/ui/trade-views";
 import { AccountShell } from "@/components/account-shell";
 import { NewTicketForm } from "@/components/help";
+import { Header } from "@/components/header";
 import { HelpChat } from "@/components/help-chat";
-import { requireCustomer } from "@/lib/account";
-import { customerApi } from "@/lib/customer";
-import type { Chat } from "@/lib/help";
+import type { Chat, ChatActions } from "@/lib/chat-types";
+import { currentCustomer, customerApi, signInPath } from "@/lib/customer";
+import { chatSince, endChat, sendChat } from "@/lib/help";
+import { globalMarket } from "@afrippa/ui/market";
+import { endVisitorChat, sendVisitorChat, visitorChat, visitorChatSince } from "@/lib/visitor-chat";
 
 export const metadata: Metadata = { title: "Help", robots: { index: false, follow: false } };
 
@@ -18,14 +21,20 @@ const ticketStatus: Record<Ticket["status"], [string, string]> = {
   resolved: ["Resolved", "bg-slate-100 text-slate-700"],
 };
 
-/** Live chat with Afrippa's team, then the trader's questions (tickets) and a new one. */
+const traderChat: ChatActions = { send: sendChat, since: chatSince, end: endChat, files: "/help/chat/files" };
+const visitorActions: ChatActions = { send: sendVisitorChat, since: visitorChatSince, end: endVisitorChat, files: "/help/chat/visitor-files" };
+
+/**
+ * Live chat with Afrippa's team (or its assistant), then the trader's questions (tickets) and a new one. Signed out,
+ * anyone can chat with their name and email; questions that need following up need an account.
+ */
 export default async function HelpPage() {
-  await requireCustomer("/help");
+  if (!(await currentCustomer())) return <VisitorHelp />;
   const [result, chat] = await Promise.all([customerApi<{ data: Ticket[] }>("GET", "/v1/afrippa/account/support/tickets"), customerApi<Chat | null>("GET", "/v1/afrippa/account/support/chat")]);
   const tickets = result.ok ? result.data.data : [];
   return (
     <AccountShell title="Help" current="/help">
-      <HelpChat initial={chat.ok ? chat.data : null} />
+      <HelpChat initial={chat.ok ? chat.data : null} actions={traderChat} />
       {tickets.length ? (
         <ul className="space-y-2" aria-label="Your questions">
           {tickets.map(ticket => {
@@ -53,5 +62,26 @@ export default async function HelpPage() {
         <NewTicketForm nonce={crypto.randomUUID()} />
       </section>
     </AccountShell>
+  );
+}
+
+/** Signed out: chat with Afrippa by name and email, or sign in to ask a question that is followed up. */
+async function VisitorHelp() {
+  const { chat } = await visitorChat();
+  return (
+    <>
+      <Header current={globalMarket} />
+      <main id="main" className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6 sm:py-8">
+        <h1 className="font-display text-2xl font-extrabold text-navy-900 sm:text-3xl">Help</h1>
+        <HelpChat initial={chat} actions={visitorActions} introduce />
+        <p className="text-sm text-slate-600">
+          Have an account?{" "}
+          <Link href={signInPath("/help")} className="font-semibold text-brand-600 underline">
+            Sign in
+          </Link>{" "}
+          to chat as yourself, follow your questions and ask about your orders.
+        </p>
+      </main>
+    </>
   );
 }

@@ -266,7 +266,12 @@ export class ChatsService {
   /** The visitor a store's server names by token, at that store; null when the token is unknown or another store's. */
   async visitor(token: string | undefined, storeKey: string | null): Promise<StoreRequester | null> {
     if (!token || !visitorTokenPattern.test(token)) return null;
-    const store = await this.sellers.resolve(storeKey);
+    return this.visitorAt(token, await this.sellers.resolve(storeKey));
+  }
+
+  /** The same, at a store already in hand (Afrippa's, which is never published as a BitoCard store). */
+  async visitorAt(token: string | undefined, store: Store & { reseller: { house: boolean } }): Promise<StoreRequester | null> {
+    if (!token || !visitorTokenPattern.test(token)) return null;
     const visitor = await this.prisma.supportVisitor.findUnique({ where: { tokenHash: sha256(token) } });
     if (!visitor || visitor.storeId !== store.id) return null;
     return { kind: 'visitor', visitor, store };
@@ -278,11 +283,16 @@ export class ChatsService {
    * (the store's server keeps it in its own cookie). Their email is not confirmed: staff are shown it as given.
    */
   async startAsVisitor(storeKey: string | null, input: { token?: string; name: string; email: string; body: string }) {
+    return this.startAsVisitorAt(await this.sellers.resolve(storeKey), input);
+  }
+
+  /** The same, at a store already in hand (Afrippa's). */
+  async startAsVisitorAt(at: Store & { reseller: { house: boolean } }, input: { token?: string; name: string; email: string; body: string }) {
     const name = input.name.trim().slice(0, 80);
     const email = input.email.trim().toLowerCase();
     if (!name) throw invalid('parameter_missing', 'Tell us your name.', 'name');
     if (!input.body.trim()) throw invalid('parameter_missing', 'Write a message.', 'body');
-    const known = await this.visitor(input.token, storeKey);
+    const known = await this.visitorAt(input.token, at);
     let token: string | null = null;
     let visitor: SupportVisitor;
     let store: Store & { reseller: { house: boolean } };
@@ -290,7 +300,7 @@ export class ChatsService {
       visitor = await this.prisma.supportVisitor.update({ where: { id: known.visitor.id }, data: { name, email, lastSeenAt: new Date() } });
       store = known.store;
     } else {
-      store = await this.sellers.resolve(storeKey);
+      store = at;
       token = `bcv_${randomBytes(32).toString('base64url')}`;
       visitor = await this.prisma.supportVisitor.create({ data: { storeId: store.id, name, email, tokenHash: sha256(token) } });
     }
@@ -695,6 +705,12 @@ export class ChatsService {
       if (!claimed.count) return;
       const visitor = await this.prisma.supportVisitor.findUnique({ where: { id: chat.visitorId } });
       if (!visitor) return;
+      if (chat.queue === 'afrippa') {
+        // Afrippa's visitors hear from Afrippa (its own email account), back to its help page.
+        const link = new URL('/help?chat=1', this.integrations.config.AFRIPPA_URL).toString();
+        await this.email.sendFor('afrippa', chatReplyEmail(visitor.email, { store: 'Afrippa', name: visitor.name, link })).catch(error => this.logger.warn({ chat: chat.id, error: (error as Error).message }, 'Visitor chat reply email failed'));
+        return;
+      }
       const store = await this.storeLink(chat.storeId);
       try {
         await this.email.send(chatReplyEmail(visitor.email, { store: store.name, name: visitor.name, link: store.url }), store.resellerId && store.name !== 'BitoCard' ? { resellerId: store.resellerId, name: store.name } : undefined);

@@ -3,23 +3,25 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { FileText, Paperclip, Send } from "lucide-react";
 import { FormMessage } from "@afrippa/ui/forms";
-import { type Chat, chatSince, type ChatState, endChat, sendChat } from "@/lib/help";
+import { type Chat, type ChatActions, type ChatState } from "@/lib/chat-types";
 
 const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 const field = "w-full rounded-xl border border-slate-200 bg-white p-3 text-[15px] text-navy-900";
 
 /**
- * Live chat with Afrippa's team: the trader's open chat (or a new one with their first message), polled every 4 seconds
- * while open and the tab is shown. Afrippa's team writes as "Afrippa"; photos and PDFs open through this site.
+ * Live chat with Afrippa's team: the open chat (or a new one with the first message), polled every 4 seconds while open
+ * and the tab is shown. Afrippa's team writes as "Afrippa", its assistant by its name; photos and PDFs open through this
+ * site. Signed-in traders and signed-out visitors alike, each with their own actions (`actions`); a visitor not yet
+ * known gives their name and email with their first message.
  */
-export function HelpChat({ initial }: { initial: Chat | null }) {
+export function HelpChat({ initial, actions, introduce = false }: { initial: Chat | null; actions: ChatActions; introduce?: boolean }) {
   const [chat, setChat] = useState(initial);
   const [file, setFile] = useState<string | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const open = chat !== null && chat.status !== "closed";
   const last = chat?.messages.at(-1)?.id ?? null;
   const [state, action, pending] = useActionState<ChatState, FormData>(async (previous, data) => {
-    const answer = await sendChat(previous, data);
+    const answer = await actions.send(previous, data);
     if (answer.chat) {
       setChat(answer.chat);
       setFile(null);
@@ -32,12 +34,12 @@ export function HelpChat({ initial }: { initial: Chat | null }) {
     if (!chat || !open) return;
     const timer = setInterval(async () => {
       if (document.hidden) return;
-      const page = await chatSince(chat.id, last);
+      const page = await actions.since(chat.id, last);
       if (!page) return;
       setChat(current => (current ? { ...current, status: page.status, messages: [...current.messages, ...page.data.filter(message => !current.messages.some(seen => seen.id === message.id))] } : current));
     }, 4000);
     return () => clearInterval(timer);
-  }, [chat, open, last]);
+  }, [chat, open, last, actions]);
 
   return (
     <section className="space-y-3 rounded-3xl bg-white p-5 ring-1 ring-slate-200/70" aria-labelledby="chat">
@@ -49,7 +51,7 @@ export function HelpChat({ initial }: { initial: Chat | null }) {
           <button
             type="button"
             onClick={async () => {
-              const ended = await endChat(chat.id);
+              const ended = await actions.end(chat.id);
               if (ended) setChat(ended);
             }}
             className="min-h-11 rounded-xl px-3 text-sm font-semibold ring-1 ring-slate-300 hover:ring-slate-400"
@@ -68,10 +70,10 @@ export function HelpChat({ initial }: { initial: Chat | null }) {
             ) : (
               <li key={message.id} className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${message.author === "customer" ? "ml-auto bg-navy-900 text-white" : "bg-white ring-1 ring-slate-200"}`}>
                 <p className="text-xs font-semibold opacity-75">
-                  {message.author === "customer" ? "You" : "Afrippa"} · {time(message.created_at)}
+                  {message.author === "customer" ? "You" : message.author === "bot" ? (message.author_name ?? "Afrippa's assistant") : "Afrippa"} · {time(message.created_at)}
                 </p>
                 {message.attachments.map(item => (
-                  <a key={item.id} href={`/help/chat/files/${chat.id}/${item.id}`} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 font-semibold underline">
+                  <a key={item.id} href={`${actions.files}/${chat.id}/${item.id}`} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 font-semibold underline">
                     <FileText className="size-4" aria-hidden="true" /> {item.name}
                   </a>
                 ))}
@@ -86,6 +88,18 @@ export function HelpChat({ initial }: { initial: Chat | null }) {
       {chat?.status === "closed" && chat.ticket_reference ? <p className="text-sm text-slate-600">This chat became question {chat.ticket_reference}: see it below.</p> : null}
       <form ref={form} action={action} className="space-y-2" aria-label="Write to Afrippa">
         <FormMessage state={state.error ? state : {}} />
+        {introduce && !state.chat && !chat ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-sm font-semibold">
+              Your name
+              <input name="name" required maxLength={80} autoComplete="name" className={`${field} mt-1`} />
+            </label>
+            <label className="text-sm font-semibold">
+              Your email
+              <input name="email" type="email" required maxLength={254} autoComplete="email" className={`${field} mt-1`} />
+            </label>
+          </div>
+        ) : null}
         <label className="sr-only" htmlFor="chat-body">
           Message
         </label>

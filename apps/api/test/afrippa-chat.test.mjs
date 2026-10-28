@@ -170,3 +170,59 @@ describe("Afrippa's live chat", () => {
     assert.equal((await support.get('/v1/afrippa/admin/support/chats')).json.data.some(item => item.id === theirs.id), false);
   });
 });
+
+/** afrippa.com's server for a signed-out visitor: its token (from its own cookie) as `BitoCard-Chat-Visitor`. */
+function visitorServer(token = null) {
+  const request = async (method, path, body) => {
+    const raw = body === undefined ? undefined : JSON.stringify(body);
+    const res = await fetch(`${server.base}${path}`, {
+      method,
+      headers: {
+        'afrippa-signature': signAfrippaRequest(secret, { method, url: path, body: raw }),
+        ...(raw !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { 'bitocard-chat-visitor': token } : {}),
+      },
+      body: raw,
+    });
+    const json = await res.json().catch(() => null);
+    if (json?.token) token = json.token;
+    return { status: res.status, json };
+  };
+  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), token: () => token };
+}
+
+describe("a signed-out visitor's chat with Afrippa", () => {
+  test("goes to Afrippa's queue, is answered by Afrippa's admins, and its reply is emailed from Afrippa", async () => {
+    const visitor = visitorServer();
+    const base = '/v1/afrippa/account/support/visitor-chat';
+    assert.equal((await visitor.get(base)).json.chat, null);
+    // Unsigned, the route is unknown.
+    assert.equal((await fetch(`${server.base}${base}`)).status, 404);
+    assert.equal((await visitor.post(`${base}/messages`, { body: 'Hello?' })).status, 401, 'no token yet');
+    const started = await visitor.post(base, { name: 'Kofi Visitor', email: 'kofi@example.com', body: 'How do fees work on Afrippa?' });
+    assert.equal(started.status, 201, JSON.stringify(started.json));
+    assert.match(visitor.token(), /^bcv_/);
+    const chatId = started.json.chat.id;
+    assert.equal((await visitor.post(`${base}/messages`, { body: 'Also, which coins?' })).status, 201);
+
+    // Afrippa's admins see it with the visitor's name; BitoCard's never do.
+    const support = await afrippaAdminClient(server, ['support']);
+    const listed = (await support.get('/v1/afrippa/admin/support/chats')).json.data.find(item => item.id === chatId);
+    assert.deepEqual([listed.queue, listed.visitor], ['afrippa', { name: 'Kofi Visitor', email: 'kofi@example.com' }]);
+    const bitocard = await adminClient(server, ['support']);
+    assert.equal((await bitocard.get(`/v1/admin/support/chats/${chatId}`)).status, 404);
+
+    // Afrippa replies; the visitor reads it as Afrippa's, and is emailed (from Afrippa's account, to its help page).
+    assert.equal((await support.post(`/v1/afrippa/admin/support/chats/${chatId}/messages`, { body: 'Both sides pay a small fee in the coin.' })).status, 201);
+    const seen = (await visitor.get(`${base}/${chatId}/messages`)).json.data;
+    assert.ok(seen.some(message => message.author === 'afrippa' && message.author_name === null));
+    const email = server.app.get(EmailService).outbox.filter(item => item.to === 'kofi@example.com').at(-1);
+    assert.ok(email, 'the visitor is emailed');
+    assert.match(email.html ?? email.text ?? '', /\/help\?chat=1/);
+
+    // Another browser's token never reaches this chat; a bitocard.com visitor token is unknown here.
+    const other = visitorServer('bcv_' + 'x'.repeat(43));
+    assert.equal((await other.get(`${base}/${chatId}/messages`)).status, 401);
+    assert.equal((await visitor.post(`${base}/${chatId}/close`)).status, 200);
+  });
+});
