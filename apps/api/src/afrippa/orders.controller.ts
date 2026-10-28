@@ -8,6 +8,7 @@ import { adminId } from '../countries/countries.controller.js';
 import { cryptoAmount } from '../crypto/crypto.controller.js';
 import { maxFeeBps, P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { P2pStandingService } from '../crypto/p2p-standing.service.js';
+import { P2pTrustService, type ReportReason, reportReasons } from '../crypto/p2p-trust.service.js';
 import { CryptoWalletsService } from '../crypto/crypto-wallets.service.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode, P2pOrderStatus } from '../generated/prisma/client.js';
@@ -66,6 +67,32 @@ class FeeRateDto {
   @IsInt() @Min(0) @Max(maxFeeBps) seller_bps: number;
 }
 
+class FeedbackDto {
+  @IsIn(['positive', 'negative']) rating: 'positive' | 'negative';
+  @IsOptional() @IsString() @MaxLength(300) comment?: string;
+}
+
+class NicknameDto {
+  @IsString() @Length(3, 30) nickname: string;
+}
+
+class ReportDto {
+  @IsString() @Length(3, 30) nickname: string;
+  @IsIn([...reportReasons]) reason: ReportReason;
+  @IsString() @Length(10, 2000) details: string;
+  @IsOptional() @IsUUID() order_id?: string;
+}
+
+class ReportsQueryDto {
+  @IsOptional() @IsIn(['open', 'upheld', 'dismissed']) status?: 'open' | 'upheld' | 'dismissed';
+  @IsOptional() @IsIn(['test', 'live']) mode?: LedgerMode;
+}
+
+class DecideReportDto {
+  @IsIn(['upheld', 'dismissed']) decision: 'upheld' | 'dismissed';
+  @IsString() @Length(5, 1000) note: string;
+}
+
 class ClearStandingDto {
   @IsIn(['test', 'live']) mode: LedgerMode;
   @IsString() @Length(5, 500) reason: string;
@@ -90,7 +117,14 @@ export class P2pOrdersController {
   constructor(
     private readonly orders: P2pOrdersService,
     private readonly room: OrderRoomService,
+    private readonly trust: P2pTrustService,
   ) {}
+
+  /** Rates the other party once the order is released (once, within 30 days). */
+  @Post(':id/feedback')
+  feedback(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: FeedbackDto) {
+    return this.trust.giveFeedback(caller.customer, id, body);
+  }
 
   /** The order's room, oldest first; with `after`, only what came since (polled while it is open). */
   @Get(':id/messages')
@@ -266,5 +300,68 @@ export class AfrippaStandingAdminController {
   @HttpCode(HttpStatus.OK)
   clear(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ClearStandingDto) {
     return this.standing.clear(adminId(caller), id, body.mode, body.reason);
+  }
+}
+
+/** Traders' cards, blocks and reports (step 3 item 6), through Afrippa's signed server. */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('afrippa/p2p')
+export class P2pTrustController {
+  constructor(
+    private readonly trust: P2pTrustService,
+    private readonly wallets: CryptoWalletsService,
+  ) {}
+
+  @Get('traders/:nickname')
+  async trader(@CurrentCustomer() caller: CustomerCaller, @Param('nickname') nickname: string) {
+    return this.trust.card(nickname, (await this.wallets.context(caller.customer)).mode);
+  }
+
+  @Get('blocks')
+  blocks(@CurrentCustomer() caller: CustomerCaller) {
+    return this.trust.blocks(caller.customer);
+  }
+
+  @Post('blocks')
+  block(@CurrentCustomer() caller: CustomerCaller, @Body() body: NicknameDto) {
+    return this.trust.block(caller.customer, body.nickname);
+  }
+
+  @Delete('blocks/:nickname')
+  unblock(@CurrentCustomer() caller: CustomerCaller, @Param('nickname') nickname: string) {
+    return this.trust.unblock(caller.customer, nickname);
+  }
+
+  @Get('reports')
+  reports(@CurrentCustomer() caller: CustomerCaller) {
+    return this.trust.myReports(caller.customer);
+  }
+
+  @Post('reports')
+  async report(@CurrentCustomer() caller: CustomerCaller, @Body() body: ReportDto) {
+    return this.trust.report(caller.customer, (await this.wallets.context(caller.customer)).mode, body);
+  }
+}
+
+/** Afrippa's admins: traders' reports, oldest first; operations uphold (a strike) or dismiss them, audited. */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@AdminRoles('operations', 'support')
+@Controller('afrippa/admin/p2p/reports')
+export class AfrippaReportsAdminController {
+  constructor(private readonly trust: P2pTrustService) {}
+
+  @Get()
+  list(@Query() query: ReportsQueryDto) {
+    return this.trust.adminReports(query);
+  }
+
+  @AdminRoles('operations')
+  @Post(':id/decide')
+  @HttpCode(HttpStatus.OK)
+  decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideReportDto) {
+    return this.trust.decide(adminId(caller), id, body);
   }
 }

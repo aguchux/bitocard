@@ -2597,6 +2597,10 @@ model Customer {
   p2pOrdersSold             P2pOrder[]                @relation("p2pOrderSeller")
   p2pOrdersBought           P2pOrder[]                @relation("p2pOrderBuyer")
   p2pStandings              P2pStanding[]
+  p2pBlocksMade             P2pBlock[]                @relation("p2pBlocker")
+  p2pBlocksReceived         P2pBlock[]                @relation("p2pBlocked")
+  p2pReportsMade            P2pReport[]               @relation("p2pReporter")
+  p2pReportsReceived        P2pReport[]               @relation("p2pReported")
   /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
   /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
   /// secret, encrypted) until its first code.
@@ -5509,6 +5513,8 @@ model P2pOrder {
   buyer                Customer         @relation("p2pOrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
   paymentMethod        P2pPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
   messages             P2pOrderMessage[]
+  feedback             P2pFeedback[]
+  reports              P2pReport[]
 
   @@index([sellerId, status])
   @@index([buyerId, status])
@@ -5569,4 +5575,60 @@ model P2pStanding {
 
   @@id([customerId, mode])
   @@map("p2p_standings")
+}
+
+/// Feedback after a released Afrippa order (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 6): each party rates the other once.
+model P2pFeedback {
+  id        String     @id @default(uuid()) @db.Uuid
+  mode      LedgerMode
+  orderId   String     @map("order_id") @db.Uuid
+  fromId    String     @map("from_id") @db.Uuid
+  toId      String     @map("to_id") @db.Uuid
+  /// positive or negative.
+  rating    String
+  comment   String?
+  createdAt DateTime   @default(now()) @map("created_at")
+  order     P2pOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, fromId])
+  @@index([toId, mode, createdAt])
+  @@map("p2p_feedback")
+}
+
+/// An Afrippa trader blocking another: neither sees the other's ads nor opens an order on them.
+model P2pBlock {
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  blocker   Customer @relation("p2pBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   Customer @relation("p2pBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("p2p_blocks")
+}
+
+/// A report of one Afrippa trader by another, decided by Afrippa's operations (`R-000123`). An upheld one is a strike.
+model P2pReport {
+  id           String     @id @default(uuid()) @db.Uuid
+  number       Int        @unique @default(autoincrement())
+  mode         LedgerMode
+  reporterId   String     @map("reporter_id") @db.Uuid
+  reportedId   String     @map("reported_id") @db.Uuid
+  orderId      String?    @map("order_id") @db.Uuid
+  reason       String
+  details      String
+  /// open, upheld or dismissed.
+  status       String     @default("open")
+  decidedBy    String?    @map("decided_by") @db.Uuid
+  decidedAt    DateTime?  @map("decided_at")
+  decisionNote String?    @map("decision_note")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  reporter     Customer   @relation("p2pReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported     Customer   @relation("p2pReported", fields: [reportedId], references: [id], onDelete: Cascade)
+  order        P2pOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reportedId, status])
+  @@map("p2p_reports")
 }

@@ -15,6 +15,7 @@ import { type CryptoContext, CryptoWalletsService, cryptoFeesRef, isTrader, notF
 import { CryptoMarketLimitsService, crossBorder } from './market-limits.service.js';
 import { P2pFeesService } from './p2p-fees.service.js';
 import { P2pStandingService } from './p2p-standing.service.js';
+import { P2pTrustService, type Trust } from './p2p-trust.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
@@ -36,7 +37,8 @@ export const globalCurrency = 'USD';
 /** A market a customer trades in, in one of its currencies. */
 export type MarketBook = { market: string; currency: string };
 
-type Stats = { trades_30d: number; trades_total: number };
+/** A trader's figures on an ad: their trades, or for an escrow ad's owner their orders and trust figures. */
+type Stats = { trades_30d: number; trades_total: number } & Partial<Trust>;
 type Owner = { id: string; nickname: string };
 /** An escrow ad's payment methods: what anyone sees (where to pay, never the details), and for its owner which of theirs. */
 type AdMethod = Pick<P2pPaymentMethod, 'id' | 'kind' | 'label' | 'currency' | 'hint'>;
@@ -69,6 +71,7 @@ export class P2pService {
     private readonly house: HouseService,
     private readonly fees: P2pFeesService,
     private readonly standing: P2pStandingService,
+    private readonly trustFigures: P2pTrustService,
   ) {}
 
   /** Whether other countries' residents may trade in `country`'s local book: its market open, and cross-border on there. */
@@ -192,7 +195,7 @@ export class P2pService {
       this.prisma.p2pTrade.groupBy({ by: [field], where: { mode, status: 'completed', [field]: { in: ids }, ...(recent ? { createdAt: { gte: since } } : {}) }, _count: { _all: true } });
     const [buys, sales, recentBuys, recentSales] = await Promise.all([count('buyerId', false), count('sellerId', false), count('buyerId', true), count('sellerId', true)]);
     const result = new Map<string, Stats>(ids.map(id => [id, { trades_30d: 0, trades_total: 0 }]));
-    const add = (rows: Array<Record<string, unknown> & { _count: { _all: number } }>, field: 'buyerId' | 'sellerId', key: keyof Stats) => {
+    const add = (rows: Array<Record<string, unknown> & { _count: { _all: number } }>, field: 'buyerId' | 'sellerId', key: 'trades_30d' | 'trades_total') => {
       for (const row of rows) result.get(row[field] as string)![key] += row._count._all;
     };
     add(buys, 'buyerId', 'trades_total');
@@ -260,6 +263,9 @@ export class P2pService {
       this.prisma.p2pAdPaymentMethod.findMany({ where: { adId: { in: ads.filter(ad => ad.escrow).map(ad => ad.id) } }, include: { paymentMethod: true } }),
     ]);
     const names = new Map(profiles.map(profile => [profile.customerId, profile.nickname]));
+    // Escrow ads' owners (Afrippa's traders) are shown with their orders and trust figures.
+    const traders = [...new Set(ads.filter(ad => ad.escrow).map(ad => ad.customerId))];
+    for (const [id, trust] of await this.trustFigures.trust(traders, mode)) stats.set(id, { trades_30d: trust.orders_30d, trades_total: trust.orders_total, ...trust });
     const methods = new Map<string, AdMethod[]>();
     for (const link of links) methods.set(link.adId, [...(methods.get(link.adId) ?? []), link.paymentMethod]);
     return { owner: (id: string): Owner => ({ id, nickname: names.get(id) ?? 'Trader' }), stats, methods };
@@ -342,8 +348,10 @@ export class P2pService {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
     const known = new Map<string, Promise<boolean>>();
+    // Never the viewer's own ads, nor those of traders they blocked or who blocked them.
+    const hidden = viewerId ? [viewerId, ...(await this.trustFigures.blockedWith(viewerId))] : [];
     const ads = await this.prisma.p2pAd.findMany({
-      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(escrow === undefined ? {} : { escrow }), ...(viewerId ? { customerId: { not: viewerId } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
+      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(escrow === undefined ? {} : { escrow }), ...(viewerId ? { customerId: { notIn: hidden } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });

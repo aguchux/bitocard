@@ -21,8 +21,8 @@ export type Restriction = { code: 'trading_suspended' | 'cool_off' | 'too_many_c
 /**
  * Afrippa traders' standing (docs/CRYPTO_SPINOFF_PLAN.md, step 3): worked out from their orders, never stored as a
  * counter that could drift.
- * - **Strikes:** appeals Afrippa's operations decided against them (`decision_fault` naming their side) in the last
- *   90 days, since operations last cleared them. At `strikeLimit` their trading is paused (`trading_suspended`): no
+ * - **Strikes:** appeals Afrippa's operations decided against them (`decision_fault` naming their side) and reports
+ *   about them operations upheld, in the last 90 days, since operations last cleared them. At `strikeLimit` their trading is paused (`trading_suspended`): no
  *   new orders or ads, and their ads leave the market, until operations clear it.
  * - **Cool-off:** for 24 hours after any appeal decided against them, the same (`cool_off`).
  * - **Cancellations:** a buyer who cancelled or let expire `cancellationLimit` orders within a day cannot open another
@@ -40,16 +40,31 @@ export class P2pStandingService {
     return (await this.prisma.p2pStanding.findUnique({ where: { customerId_mode: { customerId, mode } } }))?.clearedAt ?? null;
   }
 
-  /** Appeals decided against the trader since the window began (and since they were last cleared), newest first. */
-  private async lostAppeals(customerId: string, mode: LedgerMode) {
+  /** When strikes start counting: the window's start, or the last clearing if later. */
+  private async since(customerId: string, mode: LedgerMode) {
     const cleared = await this.clearedAt(customerId, mode);
     const windowStart = new Date(Date.now() - strikeWindowDays * day);
-    const since = cleared && cleared > windowStart ? cleared : windowStart;
+    return cleared && cleared > windowStart ? cleared : windowStart;
+  }
+
+  /** Appeals decided against the trader since strikes start counting, newest first. */
+  private async lostAppeals(customerId: string, mode: LedgerMode) {
     return this.prisma.p2pOrder.findMany({
-      where: { mode, closedAt: { gt: since }, OR: [{ buyerId: customerId, decisionFault: 'buyer' }, { sellerId: customerId, decisionFault: 'seller' }] },
+      where: { mode, closedAt: { gt: await this.since(customerId, mode) }, OR: [{ buyerId: customerId, decisionFault: 'buyer' }, { sellerId: customerId, decisionFault: 'seller' }] },
       orderBy: { closedAt: 'desc' },
       select: { id: true, number: true, closedAt: true },
     });
+  }
+
+  /** Reports about the trader that operations upheld since strikes start counting, newest first. */
+  private async upheldReports(customerId: string, mode: LedgerMode) {
+    return this.prisma.p2pReport.findMany({ where: { mode, reportedId: customerId, status: 'upheld', decidedAt: { gt: await this.since(customerId, mode) } }, orderBy: { decidedAt: 'desc' }, select: { id: true, number: true, decidedAt: true } });
+  }
+
+  /** Every strike's time, newest first: lost appeals and upheld reports. */
+  private async strikes(customerId: string, mode: LedgerMode) {
+    const [appeals, reports] = await Promise.all([this.lostAppeals(customerId, mode), this.upheldReports(customerId, mode)]);
+    return [...appeals.map(order => order.closedAt!), ...reports.map(report => report.decidedAt!)].sort((a, b) => b.getTime() - a.getTime());
   }
 
   /** Orders the trader, as the buyer, cancelled or let expire in the last day, oldest first. */
@@ -63,14 +78,14 @@ export class P2pStandingService {
 
   /** What stops the trader now, if anything. `buying`: they would open an order as the buyer. */
   async restriction(customerId: string, mode: LedgerMode, options: { buying?: boolean } = {}): Promise<Restriction | null> {
-    const strikes = await this.lostAppeals(customerId, mode);
+    const strikes = await this.strikes(customerId, mode);
     if (strikes.length >= strikeLimit) {
-      return { code: 'trading_suspended', until: null, message: "Your trading is paused after appeals were decided against you. Contact Afrippa's team." };
+      return { code: 'trading_suspended', until: null, message: "Your trading is paused after appeals or reports were decided against you. Contact Afrippa's team." };
     }
-    const latest = strikes[0]?.closedAt;
+    const latest = strikes[0];
     if (latest && latest.getTime() + coolOffHours * 3_600_000 > Date.now()) {
       const until = new Date(latest.getTime() + coolOffHours * 3_600_000);
-      return { code: 'cool_off', until, message: `An appeal was decided against you. You can trade again from ${until.toUTCString()}.` };
+      return { code: 'cool_off', until, message: `An appeal or report was decided against you. You can trade again from ${until.toUTCString()}.` };
     }
     if (options.buying) {
       const cancelled = await this.recentCancellations(customerId, mode);
@@ -92,8 +107,9 @@ export class P2pStandingService {
 
   /** The trader's standing: their strikes, recent cancellations and what (if anything) stops them now. */
   async standing(customerId: string, mode: LedgerMode) {
-    const [strikes, cancelled, restriction, cleared] = await Promise.all([
+    const [appeals, reports, cancelled, restriction, cleared] = await Promise.all([
       this.lostAppeals(customerId, mode),
+      this.upheldReports(customerId, mode),
       this.recentCancellations(customerId, mode),
       this.restriction(customerId, mode, { buying: true }),
       this.prisma.p2pStanding.findUnique({ where: { customerId_mode: { customerId, mode } } }),
@@ -101,13 +117,14 @@ export class P2pStandingService {
     return {
       object: 'p2p_standing' as const,
       mode,
-      strikes: strikes.length,
+      strikes: appeals.length + reports.length,
       strike_limit: strikeLimit,
       strike_window_days: strikeWindowDays,
       cancellations_today: cancelled.length,
       cancellation_limit: cancellationLimit,
       restriction: restriction && { code: restriction.code, until: restriction.until?.toISOString() ?? null, message: restriction.message },
-      lost_appeals: strikes.map(order => ({ order_id: order.id, number: `ORD-${String(order.number).padStart(6, '0')}`, decided_at: order.closedAt!.toISOString() })),
+      lost_appeals: appeals.map(order => ({ order_id: order.id, number: `ORD-${String(order.number).padStart(6, '0')}`, decided_at: order.closedAt!.toISOString() })),
+      upheld_reports: reports.map(report => ({ report_id: report.id, number: `R-${String(report.number).padStart(6, '0')}`, decided_at: report.decidedAt!.toISOString() })),
       cleared_at: cleared?.clearedAt?.toISOString() ?? null,
     };
   }

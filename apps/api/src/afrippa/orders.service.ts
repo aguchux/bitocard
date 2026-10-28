@@ -5,6 +5,7 @@ import { feeFor, fromUnits } from '../crypto/amounts.js';
 import { CryptoWalletsService, cryptoFeesRef, isTrader } from '../crypto/crypto-wallets.service.js';
 import { P2pFeesService } from '../crypto/p2p-fees.service.js';
 import { P2pStandingService } from '../crypto/p2p-standing.service.js';
+import { P2pTrustService } from '../crypto/p2p-trust.service.js';
 import { P2pService } from '../crypto/p2p.service.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -65,6 +66,7 @@ export class P2pOrdersService {
     private readonly audit: AuditService,
     private readonly room: OrderRoomService,
     private readonly standing: P2pStandingService,
+    private readonly trust: P2pTrustService,
   ) {}
 
   private requireTrader(customer: CustomerWithStore) {
@@ -88,6 +90,8 @@ export class P2pOrdersService {
     // The ad's market decides: the taker must be allowed to trade there.
     const { context } = await this.p2p.access(customer, { market: found.country, currency: found.currency });
     if (found.customerId === customer.id) throw conflict('own_ad', 'This is your own ad.', 'ad_id');
+    // Traders who blocked each other never trade.
+    if ((await this.trust.blockedWith(customer.id)).includes(found.customerId)) throw adUnavailable();
     if (!(await this.p2p.ownerCanTrade(found.customerId, { market: found.country, currency: found.currency }))) throw adUnavailable();
     const asset = await this.wallets.asset(found.asset);
     if (BigInt(input.price) !== found.priceMinor) throw conflict('price_changed', 'The price of this ad changed. Check the new price and try again.', 'price');
