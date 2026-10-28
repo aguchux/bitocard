@@ -172,7 +172,8 @@ describe("the small parts of a market page", () => {
     for (const href of ["/deposit", "/withdraw"]) expect(html).toContain(`href="${href}"`);
     for (const href of ["/add-money", "/cash-out"]) expect(html).not.toContain(`href="${href}"`);
     expect(html).not.toContain("P2P money");
-    expect(html).toContain("One question before you trade");
+    expect(html).toContain("Before you trade");
+    expect(html).toContain('href="/legal/p2p-rules"');
   });
 
   test("an empty book offers to clear the filters; an unreachable one says so in its own place", async () => {

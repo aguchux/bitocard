@@ -54,8 +54,8 @@ export const verifyBrands: Record<VerifyBrandKey, VerifyBrand> = {
     apiDefault: "https://api.afrippa.com",
     cookie: "afr_kyc",
     review: false,
-    // Afrippa's own legal documents come with step 5 of the spin-off plan, on afrippa.com: published before checks go live.
-    privacyUrl: null,
+    // Afrippa's privacy notice on afrippa.com (a draft for lawyers' review until checks go live).
+    privacyUrl: "https://afrippa.com/legal/privacy",
     hosts: ["afrippa.com"],
     mark: "/afrippa/afrippa-mark.png",
     wordmark: ["Afri", "ppa"],

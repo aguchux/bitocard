@@ -214,7 +214,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 
 ### 5. Hardening
 1. A security review of escrow, release and appeals. **Done (28 October 2026):** a fresh two-step code to release coins and to add a payment method (a stolen session cannot move coins or add an account to be paid into); a decision's fault must fit its outcome; an appeal's reason is quoted as the trader's words in the room. Reviewed and kept: each step claims the order's status in the same transaction that moves the coins (racing steps leave one winner), the ledger entries balance, and coins returning to a closed ad go to the seller's wallet.
-2. The legal documents on afrippa.com (terms, privacy, P2P rules, fees, risk warnings), reviewed by lawyers per market.
+2. The legal documents on afrippa.com (terms, privacy, P2P rules, fees, risk warnings), reviewed by lawyers per market. **Drafted (28 October 2026):** terms of use, P2P trading rules, fees, risk warnings, a privacy notice and a cookie notice at `/legal`, marked drafts, linked from the footer and the identity check's consent; traders accept the terms, P2P rules and risk warnings by version before trading (the trading declaration, now version `2026-10-28`). They name De-Golojan Technologies Ltd as operator until question 1 below is answered. **Still owed:** lawyers' review per market, and `support@afrippa.com` set up.
 3. Browser checks at phone width; the operations runbook for appeals.
 
 ### 6. Pilot

@@ -19,11 +19,20 @@ export const cryptoFrozen = () =>
   new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'crypto_account_frozen', 'Your crypto account is frozen. Contact support to find out why.');
 
 /**
- * The crypto declaration's version (its date): bump it when everyone must declare again. Every account declares, once
- * per version, that it is not a citizen or resident of the United States or the United Kingdom before trading.
+ * The trading declaration's version (its date, the date of Afrippa's terms it accepts): bump it when everyone must
+ * declare again, as when the terms, P2P rules or risk warnings change. Every account declares, once per version, that
+ * it is 18 or over and not a citizen or resident of the United States or the United Kingdom, and accepts those
+ * documents (on afrippa.com, `documents`), before trading. Each acceptance is kept (`crypto_declarations`).
  */
-export const cryptoDeclarationVersion = '2026-10-27';
-export const cryptoDeclarationText = 'I am not a citizen or a resident of the United States or the United Kingdom.';
+export const cryptoDeclarationVersion = '2026-10-28';
+export const cryptoDeclarationText =
+  "I am 18 or over, I am not a citizen or a resident of the United States or the United Kingdom, and I accept Afrippa's terms of use, P2P trading rules and risk warnings.";
+/** The documents the declaration accepts, on afrippa.com. */
+export const cryptoDeclarationDocuments = [
+  { title: 'Terms of use', path: '/legal/terms' },
+  { title: 'P2P trading rules', path: '/legal/p2p-rules' },
+  { title: 'Risk warnings', path: '/legal/risks' },
+] as const;
 
 /** Who a customer is in the crypto market: their store's mode, the seller behind it and their country's currency. */
 export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; seller: Reseller; country: string; currency: string };
@@ -181,13 +190,20 @@ export class CryptoWalletsService {
   /** The customer's declaration for the current version: whether they made it, and what it says. */
   async declaration(customer: CustomerWithStore) {
     const found = await this.prisma.cryptoDeclaration.findUnique({ where: { customerId_version: { customerId: customer.id, version: cryptoDeclarationVersion } } });
-    return { object: 'crypto_declaration' as const, version: cryptoDeclarationVersion, text: cryptoDeclarationText, declared: Boolean(found), declared_at: found?.declaredAt.toISOString() ?? null };
+    return {
+      object: 'crypto_declaration' as const,
+      version: cryptoDeclarationVersion,
+      text: cryptoDeclarationText,
+      documents: cryptoDeclarationDocuments,
+      declared: Boolean(found),
+      declared_at: found?.declaredAt.toISOString() ?? null,
+    };
   }
 
   /** Records the declaration for `version`, which must be the current one; declaring again changes nothing. */
   async declare(customer: CustomerWithStore, version: string) {
     if (version !== cryptoDeclarationVersion) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'declaration_changed', 'The declaration has changed. Read it again and confirm.', 'version');
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'declaration_changed', "Afrippa's terms have changed. Read them again and confirm.", 'version');
     }
     await this.prisma.cryptoDeclaration.upsert({ where: { customerId_version: { customerId: customer.id, version } }, create: { customerId: customer.id, version }, update: {} });
     return this.declaration(customer);
@@ -200,9 +216,9 @@ export class CryptoWalletsService {
    */
   async requireEligible(context: CryptoContext) {
     if (!(await this.prisma.cryptoDeclaration.findUnique({ where: { customerId_version: { customerId: context.customer.id, version: cryptoDeclarationVersion } } }))) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'declaration_required', 'Confirm you are not a citizen or resident of the United States or the United Kingdom first.', 'declaration');
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'declaration_required', "Accept Afrippa's terms, and confirm you are 18 or over and not a citizen or resident of the United States or the United Kingdom, first.", 'declaration');
     }
-    const refused = () => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'country_not_allowed', 'Crypto trading is open only to residents of the countries BitoCard serves.');
+    const refused = () => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'country_not_allowed', 'Trading is open only to residents of the countries Afrippa serves.');
     if (!(await this.allowedCountry(context.country))) throw refused();
     if (context.mode === 'live') {
       const document = await this.identity.customerDocumentCountry(context.seller.id, context.mode, context.customer.id);

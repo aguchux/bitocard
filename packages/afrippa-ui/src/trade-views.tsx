@@ -6,24 +6,44 @@ import { CoinBadge } from "./coins";
 /** A card on the crypto pages. */
 export const cardClass = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
+/** The documents a trader accepts before trading, on afrippa.com (the API's `documents` on the declaration). */
+const acceptedDocuments = [
+  ["Terms of use", "/legal/terms"],
+  ["P2P trading rules", "/legal/p2p-rules"],
+  ["Risk warnings", "/legal/risks"],
+] as const;
+
 /**
- * The declaration every account makes before trading: not a citizen or resident of the United States or the United
- * Kingdom. `action` is the app's server action recording it (`POST /v1/afrippa/crypto/declaration { version }`).
+ * The declaration every account makes before trading, once per version of Afrippa's terms: 18 or over, not a citizen
+ * or resident of the United States or the United Kingdom, and accepting the terms of use, P2P trading rules and risk
+ * warnings. `action` is the app's server action recording it (`POST /v1/afrippa/crypto/declaration { version }`).
  */
 export function CryptoDeclaration({ version, action }: { version: string; action: (form: FormData) => Promise<void> }) {
   return (
     <form action={action} className={cardClass}>
       <p className="flex items-center gap-2 font-semibold">
-        <ShieldCheck className="size-5 text-brand-500" aria-hidden="true" /> One question before you trade
+        <ShieldCheck className="size-5 text-brand-500" aria-hidden="true" /> Before you trade
       </p>
-      <p className="mt-1 text-sm text-slate-600">Crypto trading is open only to residents of the countries we serve.</p>
+      <p className="mt-1 text-sm text-slate-600">
+        Trading is open only to adults living in the countries we serve. Read how Afrippa works, and what can go wrong, first:
+      </p>
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
+        {acceptedDocuments.map(([title, href]) => (
+          <li key={href}>
+            <a href={href} target="_blank" rel="noopener" className="text-brand-700 underline underline-offset-2 hover:text-brand-800">
+              {title}
+            </a>
+          </li>
+        ))}
+      </ul>
       <input type="hidden" name="version" value={version} />
       <label className="mt-4 flex items-start gap-3 text-sm font-medium text-navy-900">
         <input type="checkbox" name="confirm" value="yes" required className="mt-0.5 size-5 shrink-0 accent-brand-500" />
-        I am not a citizen or a resident of the United States or the United Kingdom.
+        I am 18 or over, I am not a citizen or a resident of the United States or the United Kingdom, and I accept Afrippa&apos;s terms of use, P2P trading rules and risk warnings.
       </label>
+      <p className="mt-2 text-xs text-slate-500">Version {version}. We ask again when they change.</p>
       <button type="submit" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
-        Confirm and continue
+        Accept and continue
       </button>
     </form>
   );

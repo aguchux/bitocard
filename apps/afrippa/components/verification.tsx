@@ -6,8 +6,8 @@ import { simulateCheck, startCheck } from "@/lib/verification";
 
 /**
  * Starting (or carrying on with) the identity check: consent first, as the check compares the trader's face with their
- * ID (biometric data); the server sends the browser to Verify in Afrippa's name. Afrippa's privacy notice (step 5 of
- * the spin-off plan) is linked here once published, before checks open live.
+ * ID (biometric data); the server sends the browser to Verify in Afrippa's name. The privacy notice says what is kept,
+ * who sees it and for how long.
  */
 export function StartCheckForm({ label }: { label: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(startCheck, {});
@@ -18,7 +18,11 @@ export function StartCheckForm({ label }: { label: string }) {
         <input type="checkbox" name="consent" required className="mt-0.5 size-5 shrink-0 accent-brand-500" aria-invalid={state.field === "consent"} />
         <span>
           I agree to Afrippa processing my ID document and photos of my face, including a comparison of my face with my ID (biometric data), to check my identity. A
-          person on Afrippa&apos;s team reviews them; they are stored privately and encrypted, and never made public.
+          person on Afrippa&apos;s team reviews them; they are stored privately and encrypted, and never made public. Read the{" "}
+          <a href="/legal/privacy#identity-checks" target="_blank" rel="noopener" className="font-semibold text-brand-700 underline underline-offset-2">
+            privacy notice
+          </a>
+          .
         </span>
       </label>
       <Submit pending={pending}>{label}</Submit>

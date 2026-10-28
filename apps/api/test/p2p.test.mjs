@@ -592,7 +592,9 @@ describe('markets: the global market and trading across borders', () => {
     await setSwitch('p2p_trading', true, 'NG');
     const ada = await trader('Ada Declares', 'NG', { declare: false });
     const declaration = (await ada.get('/v1/afrippa/crypto/declaration')).json;
-    assert.deepEqual([declaration.declared, declaration.text], [false, 'I am not a citizen or a resident of the United States or the United Kingdom.']);
+    assert.deepEqual([declaration.declared, declaration.version], [false, '2026-10-28']);
+    assert.match(declaration.text, /^I am 18 or over, I am not a citizen or a resident of the United States or the United Kingdom, and I accept Afrippa's terms of use/);
+    assert.deepEqual(declaration.documents.map(item => item.path), ['/legal/terms', '/legal/p2p-rules', '/legal/risks'], 'the documents it accepts, on afrippa.com');
     const refused = await ada.get('/v1/afrippa/p2p/market?asset=USDT&side=buy');
     assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.param], [409, 'declaration_required', 'declaration']);
     assert.equal((await ada.post('/v1/afrippa/crypto/declaration', { version: '2020-01-01' })).json.error.code, 'declaration_changed');

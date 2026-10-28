@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Link from "next/link";
 import { appUrl } from "@bitocard/ui/site";
 import { colors } from "@bitocard/ui/tokens";
 import { InstallSupport } from "@bitocard/ui/install-ui";
@@ -7,6 +8,7 @@ import { installCaptureScript } from "@bitocard/ui/install";
 import { CryptoActionsProvider } from "@afrippa/ui/forms";
 import { MoneyActionsProvider } from "@afrippa/ui/money-forms";
 import { changeAd, chooseNickname, postAd, repriceAd } from "@/lib/trade";
+import { legalDocuments } from "@/lib/legal";
 import { addWithdrawalAddress, cancelWithdrawal, confirmWithdrawal, createWithdrawal, removeWithdrawalAddress, resendWithdrawalCode, reviewWithdrawal } from "@/lib/money";
 import "./globals.css";
 
@@ -31,12 +33,23 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: colors.navy900 };
 
-/** The footer: who runs Afrippa. Its own legal documents come with its launch (docs/CRYPTO_SPINOFF_PLAN.md, step 5). */
+/** The footer: who runs Afrippa, and its legal documents. */
 function Footer() {
   return (
     <footer className="mt-12 border-t border-slate-200 bg-white">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-slate-500 sm:px-6">
         <p>© {new Date().getFullYear()} Afrippa · A Golojan Ltd venture</p>
+        <nav aria-label="Legal">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            {legalDocuments.map(doc => (
+              <li key={doc.slug}>
+                <Link href={`/legal/${doc.slug}`} className="hover:text-navy-900">
+                  {doc.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </footer>
   );
