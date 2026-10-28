@@ -9,6 +9,8 @@ const places = [
   { href: "/wallets", label: "Wallets" },
   { href: "/ads", label: "My ads" },
   { href: "/payment-methods", label: "Payment methods" },
+  { href: "/security", label: "Security" },
+  { href: "/trust", label: "Trust and safety" },
 ];
 
 /** A signed-in page: the header, its title (and an action beside it), the account's tabs, then the page. */

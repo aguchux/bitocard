@@ -159,7 +159,7 @@ describe("the small parts of a market page", () => {
     setRequest({}, { afr_session: "bcc_token" });
     const signedIn = renderToStaticMarkup(await AccountArea());
     expect(signedIn).toContain("Sign out (Ada)");
-    for (const href of ["/wallets", "/ads"]) expect(signedIn).toContain(`href="${href}"`);
+    for (const href of ["/wallets", "/ads", "/orders", "/notifications"]) expect(signedIn).toContain(`href="${href}"`);
     expect(signedIn).not.toContain('href="/trades"');
   });
 

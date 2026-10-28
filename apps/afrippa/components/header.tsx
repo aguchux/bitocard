@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Bell } from "lucide-react";
 import { MarketSwitcher } from "@afrippa/ui/market-switcher";
 import { signOut } from "@/lib/account-actions";
 import { marketPath, markets } from "@/lib/api";
-import { currentCustomer, signInPath } from "@/lib/customer";
+import { currentCustomer, customerApi, signInPath } from "@/lib/customer";
 
 /** The lockup on white: the "a" mark, then "Afri" in the ink colour and "ppa" in the accent. */
 export function AfrippaWordmark() {
@@ -53,8 +54,21 @@ export async function AccountArea() {
     );
   }
   const link = "hidden min-h-11 items-center px-2 text-sm font-semibold text-navy-900 hover:underline sm:inline-flex";
+  const unread = await customerApi<{ count: number }>("GET", "/v1/afrippa/account/notifications/unread-count");
+  const count = unread.ok ? unread.data.count : 0;
   return (
     <span className="flex items-center gap-1">
+      <Link href="/notifications" className="relative inline-flex size-11 items-center justify-center rounded-xl text-navy-900 hover:bg-slate-50" aria-label={count ? `Notifications, ${count} unread` : "Notifications"}>
+        <Bell className="size-5" aria-hidden="true" />
+        {count ? (
+          <span aria-hidden="true" className="absolute top-1.5 right-1.5 grid min-w-4 place-items-center rounded-full bg-brand-500 px-1 text-[10px] leading-4 font-bold text-white">
+            {count > 99 ? "99+" : count}
+          </span>
+        ) : null}
+      </Link>
+      <Link href="/orders" className={link}>
+        Orders
+      </Link>
       <Link href="/ads" className={link}>
         My ads
       </Link>

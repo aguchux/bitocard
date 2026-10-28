@@ -502,6 +502,9 @@ export class P2pOrdersService {
     const paidFrom = order.paidFromMethodId ? await this.prisma.p2pPaymentMethod.findUnique({ where: { id: order.paidFromMethodId } }) : null;
     const details = open && options.details !== false ? await this.methods.reveal(method.id) : null;
     const warnings = isReversible(method) || (paidFrom && isReversible(paidFrom)) ? ['reversible_payment'] : [];
+    // Whether the viewer already rated the other party (a released order, its own page only; null in lists).
+    const rater = viewer === 'buyer' ? order.buyerId : viewer === 'seller' ? order.sellerId : null;
+    const feedbackGiven = rater && options.details !== false ? (order.status === 'released' ? (await this.prisma.p2pFeedback.count({ where: { orderId: order.id, fromId: rater } })) > 0 : false) : null;
     return {
       object: 'p2p_order' as const,
       id: order.id,
@@ -543,6 +546,8 @@ export class P2pOrdersService {
       closed_at: order.closedAt?.toISOString() ?? null,
       cancel_reason: order.cancelReason,
       decision: order.decisionFault ? { fault: order.decisionFault, note: viewer === 'admin' ? order.decisionNote : null } : null,
+      /** The viewer rated the other party already (null in lists and for admins). */
+      feedback_given: feedbackGiven,
       created_at: order.createdAt.toISOString(),
       updated_at: order.updatedAt.toISOString(),
     };

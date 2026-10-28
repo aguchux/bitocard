@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addressQr } from "@afrippa/ui/qr";
 import { type Trader, type TwoStepState, customerApi, dropSession, keepSession, nextStep, safeNext } from "@/lib/customer";
+import { googleErrors, googleFailed, keepGoogleFlow } from "@/lib/google";
 
 export type FormState = { error?: string; field?: string | null; notice?: string };
 
@@ -87,7 +88,9 @@ type SetupReply = { method: "authenticator" | "email" | "sms"; secret: string | 
 
 /** Starts setting a two-step method up: an authenticator's secret (with its QR code), or a code emailed or texted. */
 export async function chooseMethod(_state: SetupState, form: FormData): Promise<SetupState> {
-  const result = await customerApi<SetupReply>("POST", "/v1/afrippa/account/two-step/setup", { method: text(form, "method") });
+  // Changing a method already on (from Security) needs a code from it; the first setup does not.
+  const current = text(form, "current_code");
+  const result = await customerApi<SetupReply>("POST", "/v1/afrippa/account/two-step/setup", { method: text(form, "method"), ...(current ? { current_code: current } : {}) });
   if (!result.ok) return failed(result);
   const { method, secret, otpauth_uri, sent_to } = result.data;
   return { method, secret, sentTo: sent_to, qr: otpauth_uri ? await addressQr(otpauth_uri) : null };
@@ -115,4 +118,50 @@ export async function verifyTwoStep(_state: FormState, form: FormData): Promise<
   const next = safeNext(form.get("next"));
   revalidatePath("/", "layout");
   redirect(result.data.signed_in ? next : `/two-step?next=${encodeURIComponent(next)}`);
+}
+
+/**
+ * Starts signing in (or up) with Google: the API's one-time state is kept in this browser's own cookie, then the
+ * browser goes to Google. Signing up needs the country first, as with a password (fixed for good).
+ */
+export async function startGoogle(_state: FormState, form: FormData): Promise<FormState> {
+  const intent = text(form, "intent") === "signup" ? "signup" : "signin";
+  const country = text(form, "country").toUpperCase();
+  if (intent === "signup" && !/^[A-Z]{2}$/.test(country)) return { error: "Choose your country first: it cannot be changed later.", field: "country" };
+  const result = await customerApi<{ url: string; state: string }>("POST", "/v1/afrippa/account/google/start", { intent });
+  if (!result.ok) return { error: (result.code && googleErrors[result.code]) || googleFailed };
+  await keepGoogleFlow({ state: result.data.state, intent, next: safeNext(form.get("next")), country: intent === "signup" ? country : null });
+  redirect(result.data.url);
+}
+
+// Security (signed in)
+
+/** A new password with the current one: the trader's other sessions end. Google-only accounts set one with Forgot password. */
+export async function changePassword(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi("POST", "/v1/afrippa/account/password/change", { current_password: String(form.get("current_password") ?? ""), password: String(form.get("password") ?? "") });
+  if (!result.ok) return failed(result);
+  return { notice: "Your password is changed. You were signed out everywhere else." };
+}
+
+/** Ten new recovery codes (the old ones stop working), with a code from the current method; shown once. */
+export async function newRecoveryCodes(_state: SetupState, form: FormData): Promise<SetupState> {
+  const result = await customerApi<{ recovery_codes: string[] }>("POST", "/v1/afrippa/account/two-step/recovery-codes", { code: text(form, "code") });
+  if (!result.ok) return failed(result);
+  return { recoveryCodes: result.data.recovery_codes };
+}
+
+export type PhoneState = FormState & { sent?: boolean };
+
+/** A mobile number of the trader's own country: a code is texted to it, and confirming it lets text messages be a two-step method. */
+export async function addPhone(_state: PhoneState, form: FormData): Promise<PhoneState> {
+  const result = await customerApi("POST", "/v1/afrippa/account/phone", { phone: text(form, "phone") });
+  if (!result.ok) return failed(result);
+  return { sent: true, notice: "We have texted you a 6-digit code." };
+}
+
+export async function verifyPhone(state: PhoneState, form: FormData): Promise<PhoneState> {
+  const result = await customerApi("POST", "/v1/afrippa/account/phone/verify", { code: text(form, "code") });
+  if (!result.ok) return { ...state, ...failed(result) };
+  revalidatePath("/security");
+  return { notice: "Your mobile number is confirmed." };
 }

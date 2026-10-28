@@ -6,6 +6,7 @@ import { cardClass, tradeDate } from "@afrippa/ui/trade-views";
 import { AccountShell } from "@/components/account-shell";
 import { OrderBadge } from "@/components/order-badge";
 import { AppealForm, AutoRefresh, CancelForm, MarkPaidForm, OrderRoom, ReleaseForm, TimeLeft } from "@/components/orders";
+import { FeedbackForm, ReportForm } from "@/components/trust";
 import { requireCustomer } from "@/lib/account";
 import { customerApi } from "@/lib/customer";
 import { openStatuses, type Order, type OrderMessages, type PaymentMethod, shownDetails } from "@/lib/orders-types";
@@ -78,7 +79,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <AppealForm id={order.id} />
       ) : null}
 
+      {order.status === "released" && order.feedback_given === false ? (
+        <section className={`${cardClass} space-y-3`} aria-label="Feedback">
+          <FeedbackForm orderId={order.id} other={counterparty} />
+        </section>
+      ) : null}
+
       {room.ok ? <OrderRoom orderId={order.id} initial={room.data.data} open={room.data.open} /> : <p className={cardClass}>The order room cannot be shown right now.</p>}
+      <ReportForm nickname={counterparty} orderId={order.id} />
     </AccountShell>
   );
 }

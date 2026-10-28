@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { globalMarket } from "@afrippa/ui/market";
 import { Header } from "@/components/header";
+import { googleErrorText } from "@/lib/google";
 
 /** The narrow page signing in, signing up and two-step use: the header, a title, a line, then a card. */
 export function AuthPage({ title, lead, children, below }: { title: string; lead?: ReactNode; children: ReactNode; below?: ReactNode }) {
@@ -17,4 +18,14 @@ export function AuthPage({ title, lead, children, below }: { title: string; lead
       </main>
     </>
   );
+}
+
+/** Why signing in with Google did not finish (a known code from the callback; the words are this site's own). */
+export function GoogleProblem({ code }: { code?: string }) {
+  const text = googleErrorText(code);
+  return text ? (
+    <p className="mb-3 rounded-xl bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700" role="alert">
+      {text}
+    </p>
+  ) : null;
 }

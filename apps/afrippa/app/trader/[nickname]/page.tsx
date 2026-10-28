@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { globalMarket } from "@afrippa/ui/market";
 import { Header } from "@/components/header";
 import { TraderCard } from "@/components/trader-card";
+import { TraderTrust } from "@/components/trader-trust";
 import { MarketsList } from "@/components/markets-list";
 import { trader } from "@/lib/api";
 
@@ -24,6 +26,9 @@ export default async function TraderPage({ params }: Props) {
       <Header current={globalMarket} />
       <main id="main" className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <TraderCard nickname={nickname} />
+        <Suspense fallback={<div aria-hidden="true" className="h-48 animate-pulse rounded-3xl bg-white ring-1 ring-slate-200/70 motion-reduce:animate-none" />}>
+          <TraderTrust nickname={nickname} />
+        </Suspense>
         <MarketsList title="Markets" />
       </main>
     </>

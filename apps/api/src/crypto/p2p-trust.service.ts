@@ -209,7 +209,7 @@ export class P2pTrustService {
         subject: `p2p_report:${id}`,
         title: 'Your report was reviewed',
         body: input.decision === 'upheld' ? "Afrippa's team upheld your report and acted on it." : "Afrippa's team reviewed your report and took no action.",
-        link: '/reports',
+        link: '/trust',
         mode: report.mode,
       });
     }

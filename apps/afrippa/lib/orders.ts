@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState, NonceFormState } from "@afrippa/ui/forms";
 import { toMinor } from "@afrippa/ui/trade-actions";
-import { customerApi, signInPath } from "@/lib/customer";
+import { customerApi, safeNext, signInPath } from "@/lib/customer";
 import type { Order, OrderMessage, OrderMessages, PaymentMethod } from "@/lib/orders-types";
 
 /**
@@ -139,4 +139,70 @@ export async function sendToRoom(_state: RoomState, form: FormData): Promise<Roo
   }
   if (!result.ok) return refused(result, `/orders/${id}`);
   return { sent: result.data };
+}
+
+// Trust: feedback, blocks and reports
+
+const nickname = (form: FormData) => (/^[A-Za-z0-9_]{3,30}$/.test(text(form, "nickname")) ? text(form, "nickname") : null);
+
+/** Rates the other party once the order is released (once, within 30 days); comments carry no contact details. */
+export async function giveFeedback(_state: FormState, form: FormData): Promise<FormState> {
+  const id = idOf(form);
+  const rating = text(form, "rating");
+  if (!id) return { error: "Choose an order." };
+  if (rating !== "positive" && rating !== "negative") return { error: "Choose positive or negative.", field: "rating" };
+  const comment = text(form, "comment");
+  const result = await customerApi("POST", `/v1/afrippa/p2p/orders/${id}/feedback`, { rating, ...(comment ? { comment } : {}) });
+  if (!result.ok) return refused(result, `/orders/${id}`);
+  revalidatePath(`/orders/${id}`);
+  return { notice: "Thank you: your feedback is on their card." };
+}
+
+/** Blocks a trader: neither sees the other's ads or can open an order on them. */
+export async function blockTrader(_state: FormState, form: FormData): Promise<FormState> {
+  const who = nickname(form);
+  if (!who) return { error: "Choose a trader." };
+  const result = await customerApi("POST", "/v1/afrippa/p2p/blocks", { nickname: who });
+  if (!result.ok) return refused(result, `/trader/${who}`);
+  revalidatePath("/trust");
+  revalidatePath(`/trader/${who}`);
+  return { notice: `${who} is blocked. You will not see each other's ads.` };
+}
+
+export async function unblockTrader(_state: FormState, form: FormData): Promise<FormState> {
+  const who = nickname(form);
+  if (!who) return { error: "Choose a trader." };
+  const result = await customerApi("DELETE", `/v1/afrippa/p2p/blocks/${encodeURIComponent(who)}`);
+  if (!result.ok) return refused(result, "/trust");
+  revalidatePath("/trust");
+  revalidatePath(`/trader/${who}`);
+  return { notice: `${who} is no longer blocked.` };
+}
+
+/** Reports a trader to Afrippa's team (optionally on an order between them); one open report each. */
+export async function reportTrader(_state: FormState, form: FormData): Promise<FormState> {
+  const who = nickname(form);
+  const details = text(form, "details");
+  if (!who) return { error: "Choose a trader." };
+  if (details.length < 10) return { error: "Tell us what happened, in at least 10 characters.", field: "details" };
+  const order = idOf(form, "order_id");
+  const result = await customerApi<{ number: string }>("POST", "/v1/afrippa/p2p/reports", { nickname: who, reason: text(form, "reason"), details, ...(order ? { order_id: order } : {}) });
+  if (!result.ok) return refused(result, "/trust");
+  revalidatePath("/trust");
+  return { notice: `Report ${result.data.number} is with Afrippa's team. We will tell you what we decide.` };
+}
+
+// Notifications
+
+/** Opens a notice: marked read, then to the page it names on this site (never another site). */
+export async function openNotification(form: FormData): Promise<void> {
+  const id = idOf(form);
+  if (id) await customerApi("POST", `/v1/afrippa/account/notifications/${id}/read`, {});
+  revalidatePath("/", "layout");
+  redirect(safeNext(form.get("link"), "/notifications"));
+}
+
+export async function readAllNotifications(): Promise<void> {
+  await customerApi("POST", "/v1/afrippa/account/notifications/read-all", {});
+  revalidatePath("/", "layout");
 }

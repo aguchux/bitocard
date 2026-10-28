@@ -83,6 +83,8 @@ export type Order = {
   closed_at: string | null;
   cancel_reason: string | null;
   decision: { fault: "buyer" | "seller" | "none"; note: string | null } | null;
+  /** The viewer rated the other party already (null in lists). */
+  feedback_given: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -155,3 +157,13 @@ export function shownDetails(details: Record<string, string | null>) {
 
 /** The rail a payment travels on: any bank to any bank, a network or service only to the same one (the API's rule). */
 export const railOf = (method: { kind: PaymentMethodKind; label: string }) => (method.kind === "bank" ? "bank" : `${method.kind}:${method.label.toLowerCase()}`);
+
+/** Why a trader is reported, in the API's codes. */
+export const reportReasons: Array<[string, string]> = [
+  ["fraud", "Fraud or a scam"],
+  ["fake_payment", "Said they paid but did not"],
+  ["third_party_payment", "Paid from someone else's account"],
+  ["off_platform", "Asked to trade off Afrippa"],
+  ["abuse", "Abusive or threatening"],
+  ["other", "Something else"],
+];

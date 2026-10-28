@@ -2,15 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignUpForm } from "@/components/account-forms";
-import { AuthPage } from "@/components/auth-page";
+import { AuthPage, GoogleProblem } from "@/components/auth-page";
 import { countries } from "@/lib/api";
 import { currentSession, nextStep, safeNext } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Create your account", robots: { index: false, follow: true }, alternates: { canonical: "/signup" } };
 
 /** A new Afrippa account: then the emailed code, then two-step sign-in (required from day one). */
-export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const next = safeNext((await searchParams).next);
+export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string; auth_error?: string }> }) {
+  const params = await searchParams;
+  const next = safeNext(params.next);
   const session = await currentSession();
   if (session) redirect(nextStep(session, next));
   return (
@@ -26,6 +27,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         </p>
       }
     >
+      <GoogleProblem code={params.auth_error} />
       <SignUpForm next={next} countries={await countries()} />
     </AuthPage>
   );

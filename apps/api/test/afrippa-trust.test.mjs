@@ -97,6 +97,10 @@ describe('Trust between Afrippa traders', () => {
     const given = await bola.client.post(`/v1/afrippa/p2p/orders/${id}/feedback`, { rating: 'positive', comment: 'Fast release, thank you.' });
     assert.equal(given.status, 201, JSON.stringify(given.json));
     assert.equal((await bola.client.post(`/v1/afrippa/p2p/orders/${id}/feedback`, { rating: 'negative' })).json.error.code, 'feedback_given');
+    // The order says who has rated it already: the buyer has, the seller not yet; lists do not say.
+    assert.equal((await bola.client.get(`/v1/afrippa/p2p/orders/${id}`)).json.feedback_given, true);
+    assert.equal((await ada.client.get(`/v1/afrippa/p2p/orders/${id}`)).json.feedback_given, false);
+    assert.equal((await bola.client.get('/v1/afrippa/p2p/orders?status=closed')).json.data[0].feedback_given, null);
     const phone = await ada.client.post(`/v1/afrippa/p2p/orders/${id}/feedback`, { rating: 'positive', comment: 'Call me on 0803 123 4567 next time' });
     assert.deepEqual([phone.status, phone.json.error.code], [400, 'comment_refused']);
     assert.equal((await ada.client.post(`/v1/afrippa/p2p/orders/${id}/feedback`, { rating: 'positive' })).status, 201);

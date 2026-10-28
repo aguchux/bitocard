@@ -14,6 +14,12 @@ import {
   type SetupState,
   signIn,
   signUp,
+  startGoogle,
+  changePassword,
+  newRecoveryCodes,
+  addPhone,
+  verifyPhone,
+  type PhoneState,
   verifyEmail,
   verifyTwoStep,
 } from "@/lib/account-actions";
@@ -70,21 +76,50 @@ function PasswordField({ invalid, autoComplete = "current-password", label = "Pa
 }
 
 /** The 6 digits of a code, or a recovery code where `recovery` allows one. */
-function CodeField({ state, recovery = false, label = "The 6-digit code" }: { state: FormState; recovery?: boolean; label?: string }) {
+function CodeField({ state, recovery = false, label = "The 6-digit code", name = "code" }: { state: FormState; recovery?: boolean; label?: string; name?: string }) {
   return (
     <label className="grid gap-1.5 text-sm font-semibold">
       {label}
       <input
-        name="code"
+        name={name}
         inputMode={recovery ? "text" : "numeric"}
         autoComplete="one-time-code"
         pattern={recovery ? "\\d{6}|[A-Za-z0-9]{4}-[A-Za-z0-9]{4}" : "\\d{6}"}
         maxLength={recovery ? 9 : 6}
         required
-        aria-invalid={state.field === "code" || undefined}
+        aria-invalid={state.field === name || undefined}
         className={codeField}
       />
     </label>
+  );
+}
+
+/** Google's "G", drawn in its colours. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.8 6.1C12.4 13.6 17.7 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.5 5.8c4.4-4 6.8-10 6.8-17.2z" />
+      <path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z" />
+      <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z" />
+    </svg>
+  );
+}
+
+const googleButton = "inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl font-bold text-navy-900 ring-1 ring-navy-200 hover:ring-navy-400 disabled:opacity-60";
+
+/** Signing in with Google (an account made with Google before): then two-step, as for any sign-in. */
+export function GoogleSignIn({ next }: { next: string }) {
+  const [state, action, pending] = useActionState(startGoogle, empty);
+  return (
+    <form action={action} className="grid gap-2">
+      <input type="hidden" name="intent" value="signin" />
+      <input type="hidden" name="next" value={next} />
+      <Message state={state} />
+      <button type="submit" disabled={pending} className={googleButton}>
+        <GoogleMark /> {pending ? "Opening Google…" : "Continue with Google"}
+      </button>
+    </form>
   );
 }
 
@@ -107,10 +142,11 @@ export function SignInForm({ next }: { next: string }) {
 /** A new account: the name, the country (fixed for good: it decides the market and currency), email and password. */
 export function SignUpForm({ next, countries }: { next: string; countries: Array<{ code: string; name: string }> }) {
   const [state, action, pending] = useActionState(signUp, empty);
+  const [google, startWithGoogle, opening] = useActionState(startGoogle, empty);
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="next" value={next} />
-      <Message state={state} />
+      <Message state={state.error ? state : google} />
       <Input label="Your full name" name="name" autoComplete="name" minLength={2} maxLength={100} state={state} />
       <label className="grid gap-1.5 text-sm font-semibold">
         Your country
@@ -130,6 +166,11 @@ export function SignUpForm({ next, countries }: { next: string; countries: Array
       <PasswordField invalid={state.field === "password"} autoComplete="new-password" />
       <button type="submit" disabled={pending} className={submit}>
         {pending ? "Creating your account…" : "Create my account"}
+      </button>
+      <p className="text-center text-xs font-semibold text-navy-400">or, with the country chosen above</p>
+      {/* Google needs only the country: the other fields are not checked for it. */}
+      <button type="submit" formAction={startWithGoogle} formNoValidate name="intent" value="signup" disabled={opening} className={googleButton}>
+        <GoogleMark /> {opening ? "Opening Google…" : "Sign up with Google"}
       </button>
     </form>
   );
@@ -206,7 +247,7 @@ const unavailable: Record<NonNullable<MethodChoice["reason"]>, string> = {
  * Setting two-step up, required before anything else: choose a method, prove it with its first code, then keep the
  * recovery codes (shown once).
  */
-export function TwoStepSetup({ methods, next }: { methods: MethodChoice[]; next: string }) {
+export function TwoStepSetup({ methods, next, changing }: { methods: MethodChoice[]; next: string; changing?: MethodChoice["method"] }) {
   const [chosen, choose, choosing] = useActionState<SetupState, FormData>(chooseMethod, {});
   const [confirmed, confirm, confirming] = useActionState<SetupState, FormData>(confirmMethod, {});
   if (confirmed.recoveryCodes) {
@@ -249,7 +290,7 @@ export function TwoStepSetup({ methods, next }: { methods: MethodChoice[]; next:
     <form action={choose} className="grid gap-3">
       <Message state={chosen} />
       <fieldset className="grid gap-2">
-        <legend className="mb-1 text-sm font-semibold">How do you want to confirm it is you?</legend>
+        <legend className="mb-1 text-sm font-semibold">{changing ? "Your new method" : "How do you want to confirm it is you?"}</legend>
         {methods.map(({ method, available, reason }) => (
           <label key={method} className={`flex gap-3 rounded-2xl border border-navy-200 p-3 ${available ? "cursor-pointer hover:border-navy-400" : "opacity-60"}`}>
             <input type="radio" name="method" value={method} disabled={!available} required className="mt-1" />
@@ -260,6 +301,7 @@ export function TwoStepSetup({ methods, next }: { methods: MethodChoice[]; next:
           </label>
         ))}
       </fieldset>
+      {changing ? <CodeField state={chosen} recovery label={`A code from your current method (${methodNames[changing][0].toLowerCase()}), or a recovery code`} name="current_code" /> : null}
       <button type="submit" disabled={choosing} className={submit}>
         {choosing ? "Starting…" : "Continue"}
       </button>
@@ -293,5 +335,75 @@ export function TwoStepVerify({ method, sentTo, next }: { method: MethodChoice["
         </button>
       </form>
     </div>
+  );
+}
+
+/** Changing the password: the current one, then the new one. */
+export function ChangePasswordForm() {
+  const [state, action, pending] = useActionState(changePassword, empty);
+  return (
+    <form action={action} className="grid gap-3" aria-label="Change your password">
+      <Message state={state} />
+      <label className="grid gap-1.5 text-sm font-semibold">
+        Current password
+        <input name="current_password" type="password" autoComplete="current-password" required aria-invalid={state.field === "current_password" || undefined} className={field} />
+      </label>
+      <PasswordField invalid={state.field === "password"} autoComplete="new-password" label="New password" />
+      <button type="submit" disabled={pending} className={submit}>
+        {pending ? "Saving…" : "Change my password"}
+      </button>
+    </form>
+  );
+}
+
+/** New recovery codes, with a code from the current method; the old ones stop working. */
+export function RecoveryCodesForm() {
+  const [state, action, pending] = useActionState<SetupState, FormData>(newRecoveryCodes, {});
+  if (state.recoveryCodes) {
+    return (
+      <div className="grid gap-3">
+        <p className="text-sm text-navy-600">Your new recovery codes. Keep them somewhere safe: they are not shown again, and the old ones no longer work.</p>
+        <ul className="grid grid-cols-2 gap-2 rounded-2xl bg-navy-50 p-3 font-mono text-sm" aria-label="Recovery codes">
+          {state.recoveryCodes.map(code => (
+            <li key={code}>{code}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  return (
+    <form action={action} className="grid gap-3" aria-label="New recovery codes">
+      <Message state={state} />
+      <CodeField state={state} recovery label="A code from your method (or a recovery code)" />
+      <button type="submit" disabled={pending} className={submit}>
+        {pending ? "Checking…" : "Give me new recovery codes"}
+      </button>
+    </form>
+  );
+}
+
+/** A mobile number of the trader's country, confirmed by a texted code. */
+export function PhoneForm({ current }: { current: string | null }) {
+  const [state, action, pending] = useActionState<PhoneState, FormData>(addPhone, {});
+  const [verified, verify, verifying] = useActionState<PhoneState, FormData>(verifyPhone, {});
+  if (state.sent && !verified.notice) {
+    return (
+      <form action={verify} className="grid gap-3" aria-label="Confirm your mobile number">
+        <Message state={verified.error ? verified : state} />
+        <CodeField state={verified} />
+        <button type="submit" disabled={verifying} className={submit}>
+          {verifying ? "Checking…" : "Confirm my number"}
+        </button>
+      </form>
+    );
+  }
+  return (
+    <form action={action} className="grid gap-3" aria-label="Your mobile number">
+      <Message state={verified.notice ? verified : state} />
+      <Input label={current ? "A new mobile number" : "Your mobile number"} name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={25} state={state} />
+      <button type="submit" disabled={pending} className={submit}>
+        {pending ? "Sending…" : "Text me a code"}
+      </button>
+    </form>
   );
 }
