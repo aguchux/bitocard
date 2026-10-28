@@ -115,7 +115,7 @@ describe('feature switches', () => {
     // Crypto's switches are kept for Afrippa but never listed in BitoCard, even once set.
     assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: true })).status, 200);
     const again = await admin.get('/v1/admin/switches');
-    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_exchange', 'crypto_app', 'store_template_crypto_desk']) assert.equal(again.json.definitions[key], undefined, key);
+    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_app', 'store_template_crypto_desk']) assert.equal(again.json.definitions[key], undefined, key);
     assert.equal(again.json.data.some(s => s.key === 'crypto_wallets'), false);
     assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: null })).status, 200);
   });

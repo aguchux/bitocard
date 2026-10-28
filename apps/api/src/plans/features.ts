@@ -7,7 +7,6 @@
 export const planFeatureGroups = {
   independence: 'Run independently',
   selling: 'Selling',
-  crypto: 'Crypto',
   support: 'Support and protection',
   team: 'Team',
 } as const;
@@ -28,8 +27,6 @@ export const planFeatureCatalogue = {
   international_selling: { scope: 'store', group: 'selling', name: 'International selling', description: 'Sell to customers outside your country.' },
   white_label: { scope: 'store', group: 'selling', name: 'Your brand only', description: 'BitoCard’s name is left out of the store’s footer and pages (the terms of sale still name the seller).' },
   store_traffic: { scope: 'store', group: 'selling', name: 'Store traffic', description: 'See how many people visit your stores, day by day.' },
-  onchain_crypto: { scope: 'account', group: 'crypto', name: 'Coins on chain', description: 'Deposit and withdraw your own coins on chain.' },
-  reseller_desks: { scope: 'store', group: 'crypto', name: 'Your own exchange desk', description: 'Your customers buy and sell crypto at your desk, from your reserves.' },
   chargeback_protection: { scope: 'store', group: 'support', name: 'Chargeback protection', description: 'Chargebacks are handled by BitoCard, not taken from your wallet.' },
   priority_support: { scope: 'account', group: 'support', name: 'Priority support', description: 'Faster answers from BitoCard, including live chat.' },
   ai_assistant: { scope: 'store', group: 'support', name: 'AI support assistant', description: 'BitoCard’s AI answers your customers, within a monthly allowance.' },
@@ -37,15 +34,6 @@ export const planFeatureCatalogue = {
 } as const satisfies Record<string, { scope: EntitlementScope; group: PlanFeatureGroup; name: string; description: string }>;
 export type PlanFeature = keyof typeof planFeatureCatalogue;
 export const planFeatures = Object.keys(planFeatureCatalogue) as PlanFeature[];
-
-/**
- * Crypto's plan features, kept for Afrippa (crypto has left BitoCard; `docs/CRYPTO_SPINOFF_PLAN.md`): never shown to
- * BitoCard's admins or resellers, nor listed on a plan. Their routes are closed (`AfrippaGateGuard`).
- */
-export const afrippaPlanFeatures: ReadonlySet<PlanFeature> = new Set<PlanFeature>(['onchain_crypto', 'reseller_desks']);
-
-/** The plan features BitoCard shows, in order. */
-export const bitocardPlanFeatures = planFeatures.filter(code => !afrippaPlanFeatures.has(code));
 
 export function isPlanFeature(value: string): value is PlanFeature {
   return (planFeatures as readonly string[]).includes(value);

@@ -3,7 +3,7 @@
 // from adjustments for goodwill), audited, with the reseller or customer told.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let finance;
@@ -148,6 +148,33 @@ describe('codes', () => {
     assert.equal((await browser.get('/v1/wallet')).json.available, 0);
     const listed = (await finance.get(`/v1/admin/top-ups?reseller_id=${resellerId}`)).json.data;
     assert.deepEqual(listed.map(item => item.status), ['cancelled']);
+  });
+});
+
+describe('confirming with the authenticator or the emailed code', () => {
+  // Moved here from the retired exchange's reserve movements, which were confirmed the same way.
+  test('the authenticator app or the emailed code; an authenticator code is used once', async () => {
+    const { resellerId } = await resellerClient(server);
+    const first = await finance.post(`/v1/admin/resellers/${resellerId}/top-ups`, { amount: 500, source: 'goodwill', reason: 'Authenticator test' });
+    assert.deepEqual(first.json.confirm_with, ['authenticator', 'email']);
+    const totp = await adminCode(server, finance);
+    assert.equal((await finance.post(`/v1/admin/top-ups/${first.json.id}/confirm`, { code: totp, method: 'authenticator' })).status, 200);
+    // The same authenticator code cannot confirm another action; the emailed code still can.
+    const second = await finance.post(`/v1/admin/resellers/${resellerId}/top-ups`, { amount: 400, source: 'goodwill', reason: 'Authenticator test' });
+    assert.equal((await finance.post(`/v1/admin/top-ups/${second.json.id}/confirm`, { code: totp, method: 'authenticator' })).status, 400);
+    assert.equal((await finance.post(`/v1/admin/top-ups/${second.json.id}/confirm`, { code: await code() })).status, 200);
+    await ledgerOk();
+  });
+
+  test('a request gets at most five codes: resends never give unlimited guesses', async () => {
+    const { resellerId } = await resellerClient(server);
+    const asked = (await finance.post(`/v1/admin/resellers/${resellerId}/top-ups`, { amount: 300, source: 'goodwill', reason: 'Resend limit' })).json;
+    for (let sent = 1; sent < 5; sent++) {
+      await prisma.manualTopUp.update({ where: { id: asked.id }, data: { codeSentAt: new Date(Date.now() - 120_000) } });
+      assert.equal((await finance.post(`/v1/admin/top-ups/${asked.id}/resend-code`)).status, 200);
+    }
+    await prisma.manualTopUp.update({ where: { id: asked.id }, data: { codeSentAt: new Date(Date.now() - 120_000) } });
+    assert.equal((await finance.post(`/v1/admin/top-ups/${asked.id}/resend-code`)).json.error.code, 'code_resend_limit');
   });
 });
 

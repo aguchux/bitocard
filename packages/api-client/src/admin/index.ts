@@ -338,7 +338,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     /** Country-wide settings, such as who runs its identity checks (`identity_provider`). */
     updateCountry: build.mutation<
       Country,
-      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; public_spins_enabled?: boolean; public_spin_limit?: number; exchange_markup_cap_bps?: number; exchange_reserve_alert_minor?: number | null; reseller_two_step_methods?: TwoStepMethod[] }
+      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; public_spins_enabled?: boolean; public_spin_limit?: number; reseller_two_step_methods?: TwoStepMethod[] }
     >({
       query: ({ code, ...body }) => ({ url: `/v1/admin/countries/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Country', 'Activity'],
@@ -494,7 +494,6 @@ export * from './classifieds';
 export * from './shop-assistants';
 export * from './top-ups';
 export * from './vpn';
-export * from './exchange';
 export * from './domains';
 export * from './reports';
 export * from './supplier-funding';

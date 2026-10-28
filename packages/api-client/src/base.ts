@@ -142,7 +142,6 @@ export const tagTypes = [
   // Reseller (SHQ)
   'Account',
   'Wallet',
-  'Exchange',
   'Esim',
   'Vpn',
   'TopUp',

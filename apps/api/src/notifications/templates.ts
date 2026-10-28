@@ -527,23 +527,6 @@ export function manualTopUpCodeEmail(to: string, input: { code: string; number: 
   };
 }
 
-/** The code an admin enters to fund or draw down one of BitoCard's exchange reserves. */
-export function reserveMovementCodeEmail(to: string, input: { code: string; number: string; action: 'fund' | 'withdraw'; amount: string; reserve: string; sandbox: boolean }): EmailMessage {
-  const verb = input.action === 'fund' ? `add ${input.amount} to` : `take ${input.amount} out of`;
-  return {
-    to,
-    subject: `${input.code} confirms ${input.number}: ${input.action === 'fund' ? 'fund' : 'draw down'} the ${input.reserve}${input.sandbox ? ' (sandbox)' : ''}`,
-    ...layout(
-      `Confirm reserve movement ${input.number}`,
-      [
-        `Enter this code in the admin app to ${verb} BitoCard's ${input.reserve}${input.sandbox ? ' (sandbox)' : ''}. It expires in 10 minutes.`,
-        'Nothing moves until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
-      ],
-      input.code,
-    ),
-  };
-}
-
 /** The code an admin enters to confirm money sent to a supplier outside BitoCard (funding its float). */
 export function supplierFundingCodeEmail(to: string, input: { code: string; number: string; amount: string; supplier: string; sandbox: boolean }): EmailMessage {
   return {

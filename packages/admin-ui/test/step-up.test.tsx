@@ -59,7 +59,7 @@ describe('step-up prompt', () => {
     );
     let done: Promise<unknown> = Promise.resolve();
     act(() => {
-      done = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'crypto_exchange', enabled: true }));
+      done = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'custom_domains', enabled: true }));
     });
     expect(await screen.findByText("Confirm it's you", {}, slow)).toBeTruthy();
     await typeCode('111111');
@@ -71,7 +71,7 @@ describe('step-up prompt', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirm/ }));
     const result = (await done) as { error?: unknown };
     expect(result.error).toBeUndefined();
-    expect(sent.filter(item => item === 'PUT /v1/admin/switches/crypto_exchange')).toHaveLength(2);
+    expect(sent.filter(item => item === 'PUT /v1/admin/switches/custom_domains')).toHaveLength(2);
     await waitFor(() => expect((document.querySelector('dialog') as HTMLDialogElement).open).toBe(false), slow);
   });
 
@@ -84,7 +84,7 @@ describe('step-up prompt', () => {
     );
     let done: Promise<unknown> = Promise.resolve();
     act(() => {
-      done = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'crypto_exchange', enabled: true }));
+      done = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'custom_domains', enabled: true }));
     });
     await screen.findByText("Confirm it's you", {}, slow);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));

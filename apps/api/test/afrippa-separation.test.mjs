@@ -10,7 +10,7 @@ import { adminClient, afrippaAdminClient, afrippaAdminOrigin, lastEmailCode, res
 const { ModulesContainer } = await import('@nestjs/core');
 const { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } = await import('@nestjs/common/constants.js');
 const { PUBLIC_ROUTE, ROUTE_CRON, ROUTE_REALM } = await import('../dist/auth/caller.js');
-const { afrippaSignedRoutes, retiredCryptoRoutes } = await import('../dist/afrippa/gate.guard.js');
+const { afrippaSignedRoutes } = await import('../dist/afrippa/gate.guard.js');
 const { signAfrippaRequest } = await import('../dist/afrippa/signature.js');
 const { customerFor } = await import('../dist/customers/customer-session.js');
 const { CustomersService } = await import('../dist/customers/customers.service.js');
@@ -199,8 +199,8 @@ describe('Afrippa and BitoCard are kept apart', () => {
   test('no Afrippa caller reaches a BitoCard route', async () => {
     const bitocard = routes.filter(route => !isAfrippa(route) && (!route.isPublic || route.customer));
     // Customers' routes want a session of their own store, signed-in routes a BitoCard session or key, jobs the cron
-    // secret; the retired crypto routes (the old exchange, resellers' coins) are closed to everyone.
-    const allowed = route => (retiredCryptoRoutes.test(route.path) ? [404] : route.customer ? [401] : [401, 403]);
+    // secret.
+    const allowed = route => (route.customer ? [401] : [401, 403]);
     const failures = [];
     for (const caller of ['trader', 'traderAsAfrippaStore', 'traderUnsigned', 'afrippaAdmin', 'afrippaServer']) {
       failures.push(...(await sweep(callers[caller], bitocard, allowed)));

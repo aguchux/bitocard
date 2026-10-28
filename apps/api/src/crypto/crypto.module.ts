@@ -22,23 +22,17 @@ import {
   PublicCryptoController,
 } from './crypto.controller.js';
 import { CryptoWalletsService } from './crypto-wallets.service.js';
-import { AdminExchangeController, CustomerExchangeController, ResellerExchangeController } from './exchange/exchange.controller.js';
-import { ExchangeService } from './exchange/exchange.service.js';
-import { ResellerDeskService } from './exchange/reseller-desk.service.js';
-import { ReservesService } from './exchange/reserves.service.js';
 import { CryptoMarketLimitsService } from './market-limits.service.js';
 import { P2pFeesService } from './p2p-fees.service.js';
 import { P2pStandingService } from './p2p-standing.service.js';
 import { P2pTrustService } from './p2p-trust.service.js';
 import { P2pWordsService } from './p2p-words.service.js';
 import { P2pService } from './p2p.service.js';
-import { CryptoPricesService } from './prices.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
-import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.js';
 
 /**
- * Store customers' crypto wallets, on-chain deposits and withdrawals, the P2P market (instant trades paid from BitoCard
- * wallets) and bank payouts of P2P money.
+ * Afrippa's crypto: traders' coin wallets, on-chain deposits and withdrawals, and the P2P market (escrow ads; orders are
+ * in the Afrippa module). The instant exchange and resellers' own coins were retired (docs/CRYPTO_SPINOFF_PLAN.md, step 3).
  */
 @Module({
   imports: [AuthModule, CheckoutModule, FxModule, IdentityModule, PayoutsModule, SettingsModule],
@@ -48,11 +42,7 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     CustomerCashController,
     CustomerP2pController,
     PublicCryptoController,
-    CustomerExchangeController,
-    ResellerExchangeController,
-    ResellerCoinsController,
     AdminCryptoController,
-    AdminExchangeController,
     AdminP2pController,
     AdminChainsController,
     AdminWithdrawalsController,
@@ -60,7 +50,7 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     AdminReconciliationsController,
     ChainWebhooksController,
   ],
-  providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
+  providers: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
   exports: [CryptoWalletsService, CryptoMarketLimitsService, P2pFeesService, P2pStandingService, P2pTrustService, P2pWordsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}

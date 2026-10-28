@@ -40,10 +40,6 @@ class UpdateCountryDto {
   /** Customer Catcher public landing page and its signed-out allowance. */
   @IsOptional() @IsBoolean() public_spins_enabled?: boolean;
   @IsOptional() @IsInt() @Min(1) @Max(10) public_spin_limit?: number;
-  /** Exchange: the most a reseller's own desk may mark up here, in basis points (at most 20%). */
-  @IsOptional() @IsInt() @Min(0) @Max(2000) exchange_markup_cap_bps?: number;
-  /** Exchange: admins are told when BitoCard's fiat reserve here falls below this (minor units); null: never. */
-  @ValidateIf((_object, value) => value !== null) @IsOptional() @IsInt() @Min(0) exchange_reserve_alert_minor?: number | null;
   @IsOptional() @IsInt() @Min(0) min_withdrawal_minor?: number;
   /** Two-step sign-in: the methods resellers based here may choose (at least one). */
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsIn(['authenticator', 'email', 'sms'], { each: true }) reseller_two_step_methods?: Array<'authenticator' | 'email' | 'sms'>;

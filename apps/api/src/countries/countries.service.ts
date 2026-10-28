@@ -39,8 +39,6 @@ export function presentCountryAdmin(country: CountryWithCategories) {
     public_spins_enabled: country.publicSpinsEnabled,
     public_spin_limit: country.publicSpinLimit,
     sms_provider: country.smsProvider as 'termii' | 'africas_talking' | null,
-    exchange_markup_cap_bps: country.exchangeMarkupCapBps,
-    exchange_reserve_alert_minor: country.exchangeReserveAlertMinor === null ? null : Number(country.exchangeReserveAlertMinor),
     /** The two-step sign-in methods resellers based here may choose. */
     reseller_two_step_methods: country.resellerMfaMethods,
     categories: country.categories
@@ -61,8 +59,6 @@ export type CountryUpdate = Partial<{
   spin_daily_limit: number;
   public_spins_enabled: boolean;
   public_spin_limit: number;
-  exchange_markup_cap_bps: number;
-  exchange_reserve_alert_minor: number | null;
   reseller_two_step_methods: Array<'authenticator' | 'email' | 'sms'>;
 }>;
 
@@ -138,8 +134,6 @@ export class CountriesService {
         spinDailyLimit: input.spin_daily_limit,
         publicSpinsEnabled: input.public_spins_enabled,
         publicSpinLimit: input.public_spin_limit,
-        exchangeMarkupCapBps: input.exchange_markup_cap_bps,
-        exchangeReserveAlertMinor: input.exchange_reserve_alert_minor === undefined ? undefined : input.exchange_reserve_alert_minor === null ? null : BigInt(input.exchange_reserve_alert_minor),
         minWithdrawalMinor: input.min_withdrawal_minor === undefined ? undefined : BigInt(input.min_withdrawal_minor),
         // Kept in a fixed order, whatever order they were sent in.
         resellerMfaMethods: input.reseller_two_step_methods ? mfaMethods.filter(method => input.reseller_two_step_methods!.includes(method)) : undefined,

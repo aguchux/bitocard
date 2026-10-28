@@ -1,13 +1,13 @@
 // Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): Afrippa's own routes live under /v1/afrippa/, and with
-// CRYPTO_ROUTES closed (the default) its customer and public routes, and the retired exchange and resellers' coins,
-// answer as an unknown route does. The old addresses are gone, the cash-out Safe pay sellers use stays at
+// CRYPTO_ROUTES closed (the default) its customer and public routes answer as an
+// unknown route does. The old addresses (and the retired exchange and resellers' coins) are gone, the cash-out Safe pay sellers use stays at
 // /v1/store/cash, and production refuses to open them.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, afrippaAdminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 const { loadConfig } = await import('../dist/config/config.js');
-const { closedCryptoRoutes } = await import('../dist/afrippa/gate.guard.js');
+const { afrippaSignedRoutes: closedCryptoRoutes } = await import('../dist/afrippa/gate.guard.js');
 
 let server;
 
@@ -75,10 +75,10 @@ describe('crypto is closed to BitoCard', () => {
   });
 
   test("Afrippa's admin routes and chain notifications are not closed by it, and only these prefixes are", () => {
-    for (const path of ['/v1/afrippa/admin/crypto/assets', '/v1/afrippa/webhooks/chain/alchemy', '/v1/store/cash', '/v1/store/spins', '/v1/store/wallet', '/v1/cryptography', '/v1/afrippa-other']) {
+    for (const path of ['/v1/afrippa/admin/crypto/assets', '/v1/afrippa/webhooks/chain/alchemy', '/v1/store/cash', '/v1/store/spins', '/v1/store/wallet', '/v1/cryptography', '/v1/afrippa-other', '/v1/crypto', '/v1/exchange/desk']) {
       assert.equal(closedCryptoRoutes.test(path), false, path);
     }
-    for (const path of ['/v1/afrippa/crypto', '/v1/afrippa/crypto/withdrawals', '/v1/afrippa/p2p/ads', '/v1/afrippa/markets', '/v1/afrippa/traders/Ada', '/v1/store/exchange/quotes', '/v1/crypto', '/v1/exchange/desk']) {
+    for (const path of ['/v1/afrippa/crypto', '/v1/afrippa/crypto/withdrawals', '/v1/afrippa/p2p/ads', '/v1/afrippa/markets', '/v1/afrippa/traders/Ada']) {
       assert.equal(closedCryptoRoutes.test(path), true, path);
     }
   });

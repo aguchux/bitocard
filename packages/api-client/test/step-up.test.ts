@@ -19,7 +19,7 @@ beforeEach(() => {
     if (input.method !== 'GET' && !windowOpen) {
       return Response.json({ error: { type: 'permission_error', code: 'step_up_required', message: 'Enter the code from your authenticator app to continue.' } }, { status: 403 });
     }
-    return Response.json({ object: 'feature_switch', key: 'crypto_exchange', enabled: true });
+    return Response.json({ object: 'feature_switch', key: 'custom_domains', enabled: true });
   });
 });
 
@@ -39,10 +39,10 @@ describe('admin step-up window', () => {
     });
     setStepUpHandler(asked);
     const store = makeStore();
-    const result = await flip(store, 'crypto_exchange');
+    const result = await flip(store, 'custom_domains');
     expect('error' in result && result.error).toBeFalsy();
     expect(asked).toHaveBeenCalledTimes(1);
-    const sends = calls.filter(call => call.url.endsWith('/v1/admin/switches/crypto_exchange'));
+    const sends = calls.filter(call => call.url.endsWith('/v1/admin/switches/custom_domains'));
     expect(sends).toHaveLength(2);
   });
 
@@ -59,7 +59,7 @@ describe('admin step-up window', () => {
     );
     setStepUpHandler(asked);
     const store = makeStore();
-    const both = Promise.all([flip(store, 'crypto_exchange'), flip(store, 'reseller_exchange')]);
+    const both = Promise.all([flip(store, 'custom_domains'), flip(store, 'reseller_exchange')]);
     await vi.waitFor(() => expect(asked).toHaveBeenCalledTimes(1));
     release(true);
     const results = await both;
@@ -70,14 +70,14 @@ describe('admin step-up window', () => {
   test('cancelling the prompt leaves the action refused, and nothing is retried', async () => {
     setStepUpHandler(async () => false);
     const store = makeStore();
-    const result = await flip(store, 'crypto_exchange');
+    const result = await flip(store, 'custom_domains');
     expect('error' in result ? (result.error as { code: string }).code : null).toBe('step_up_required');
-    expect(calls.filter(call => call.url.endsWith('/v1/admin/switches/crypto_exchange'))).toHaveLength(1);
+    expect(calls.filter(call => call.url.endsWith('/v1/admin/switches/custom_domains'))).toHaveLength(1);
   });
 
   test('without a handler (SHQ, the storefront) the refusal comes back as it is', async () => {
     const store = makeStore();
-    const result = await flip(store, 'crypto_exchange');
+    const result = await flip(store, 'custom_domains');
     expect('error' in result ? (result.error as { code: string }).code : null).toBe('step_up_required');
   });
 });

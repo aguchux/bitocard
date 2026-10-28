@@ -429,10 +429,6 @@ export type Country = {
   /** Customer Catcher public page: signed-out spins enabled here, and its first-visit allowance. */
   public_spins_enabled?: boolean;
   public_spin_limit?: number;
-  /** The most a reseller's exchange desk may mark up here, in basis points (0 to 2000). Missing on older API versions. */
-  exchange_markup_cap_bps?: number;
-  /** Admins are told when BitoCard's money exchange reserve here falls below this (minor units); null: never. */
-  exchange_reserve_alert_minor?: number | null;
   /** The two-step sign-in methods resellers based here may choose. Missing on older API versions. */
   reseller_two_step_methods?: TwoStepMethod[];
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;

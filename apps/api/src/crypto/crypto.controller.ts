@@ -587,14 +587,6 @@ class AssetDto {
   @IsOptional() @cryptoAmount()
   withdrawal_daily_limit?: string;
 
-  /** The most one customer or reseller can exchange with a desk in 24 hours; null removes the limit. */
-  @ValidateIf((_object, value) => value !== null) @IsOptional() @cryptoAmount()
-  exchange_daily_limit?: string | null;
-
-  /** Admins are told when BitoCard's coin reserve falls below this; null: never. */
-  @ValidateIf((_object, value) => value !== null) @IsOptional() @cryptoAmount()
-  exchange_reserve_alert?: string | null;
-
   /** Withdrawals from this amount wait for an admin's approval ("0": none do). */
   @IsOptional() @cryptoAmount()
   withdrawal_review_from?: string;

@@ -110,7 +110,7 @@ describe('the gate in front of Afrippa’s routes', () => {
     assert.equal(own.status, 200);
   });
 
-  test("Afrippa's admin and chain notifications have their own checks, and the retired routes stay shut even signed", async () => {
+  test("Afrippa's admin and chain notifications have their own checks, and the retired routes are gone even signed", async () => {
     const admin = await afrippaAdminClient(server);
     assert.equal((await admin.get('/v1/afrippa/admin/crypto/assets')).status, 200);
     missing(await afrippa(server, 'GET', '/v1/crypto'));

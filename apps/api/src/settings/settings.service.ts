@@ -50,19 +50,6 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too.",
   },
-  crypto_exchange: {
-    scopes: ['global', 'country', 'reseller'],
-    description:
-      "Instant exchange: store customers buy coins with their money wallet and sell coins for P2P money, straight from BitoCard's reserves at the live market price plus BitoCard's markup. Needs crypto wallets on too. Off until cleared in the market.",
-  },
-  reseller_exchange: {
-    scopes: ['global', 'country', 'reseller'],
-    description: 'Resellers buy or sell coins directly with BitoCard using their fiat wallet and their own coin wallet. Needs crypto wallets enabled too.',
-  },
-  reseller_desks: {
-    scopes: ['global', 'country', 'reseller'],
-    description: 'Resellers may run a funded instant exchange desk for their own store customers. Off until cleared in the market.',
-  },
   spin_rewards: {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 over 50 to 100 spins, a few a day, paid by BitoCard into their spin rewards and moved into their store wallet in US dollars or their own currency. Off until the promotion's terms are cleared.",
@@ -107,7 +94,7 @@ export const switchDefinitions = {
   store_template_crypto_desk: {
     scopes: ['global', 'country', 'reseller'],
     default: true,
-    description: "Resellers can choose the Crypto desk store template (also needs the reseller's crypto exchange or P2P trading on). Stores already using it keep it. On unless switched off.",
+    description: "Resellers can choose the Crypto desk store template (retired with crypto: never offered). Stores already using it keep it. On unless switched off.",
   },
   store_template_single_product: {
     scopes: ['global', 'country', 'reseller'],
@@ -196,9 +183,6 @@ export const isSwitchKey = (key: string): key is SwitchKey => key in switchDefin
 export const afrippaSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'crypto_wallets',
   'p2p_trading',
-  'crypto_exchange',
-  'reseller_exchange',
-  'reseller_desks',
   'crypto_app',
   'crypto_global',
   'crypto_cross_border',

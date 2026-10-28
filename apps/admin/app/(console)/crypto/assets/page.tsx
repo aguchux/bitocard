@@ -46,32 +46,6 @@ function AmountField({ asset, field, label, editable }: { asset: CryptoAsset; fi
   );
 }
 
-/**
- * An exchange amount in the coin that can be left blank: the 24-hour limit per customer or reseller trading with a desk
- * (blank: no limit), or the reserve level below which admins are told (blank: never).
- */
-function OptionalAmountField({ asset, field, label, blank, editable }: { asset: CryptoAsset; field: "exchange_daily_limit" | "exchange_reserve_alert"; label: string; blank: string; editable: boolean }) {
-  const [update, state] = useUpdateCryptoAssetMutation();
-  const saved = asset[field] ?? null;
-  const [value, setValue] = useState(saved ?? "");
-  const next = value.trim() === "" ? null : value.trim();
-  const valid = next === null || /^\d+(\.\d+)?$/.test(next);
-  if (asset[field] === undefined) return <span className="text-muted">—</span>;
-  if (!editable) return <span>{saved ?? blank}</span>;
-  return (
-    <span className="flex items-center justify-end gap-2">
-      <label htmlFor={`${field}-${asset.code}`} className="sr-only">
-        {asset.code} {label}
-      </label>
-      <Input id={`${field}-${asset.code}`} inputMode="decimal" className="w-28" placeholder={blank} value={value} onChange={event => setValue(event.target.value)} />
-      <Button size="sm" variant="secondary" disabled={!valid || next === saved} loading={state.isLoading} onClick={() => void update({ code: asset.code, [field]: next })}>
-        Save
-      </Button>
-      {state.error ? <span className="text-xs text-red-700">{errorMessage(state.error)}</span> : null}
-    </span>
-  );
-}
-
 const checkTones: Record<CryptoReconciliation["status"], Tone> = { matched: "green", surplus: "blue", shortfall: "red", unavailable: "grey" };
 
 /** The daily custody check: per asset, what the ledger expects on chain against what the signer's wallets hold. */
@@ -120,7 +94,7 @@ function CustodyCheck({ runs }: { runs: boolean }) {
   );
 }
 
-/** Crypto > Assets: which coins customers can hold and trade, BitoCard's P2P fee on each, withdrawal and exchange limits. */
+/** Crypto > Assets: which coins customers can hold and trade, BitoCard's P2P fee on each, and withdrawal limits. */
 export default function CryptoAssetsPage() {
   const admin = useAdmin();
   const editable = can(admin, "operations");
@@ -154,19 +128,6 @@ export default function CryptoAssetsPage() {
       cell: asset => <AmountField key={asset.withdrawal_review_from} asset={asset} field="withdrawal_review_from" label="withdrawals approved from" editable={editable} />,
     },
     {
-      key: "exchange-limit",
-      header: "Exchanged a day (each trader)",
-      align: "right",
-      cell: asset => <OptionalAmountField key={asset.exchange_daily_limit ?? ""} asset={asset} field="exchange_daily_limit" label="daily exchange limit" blank="No limit" editable={editable} />,
-    },
-    {
-      key: "exchange-alert",
-      header: "Reserve alert below",
-      align: "right",
-      hideOnMobile: true,
-      cell: asset => <OptionalAmountField key={asset.exchange_reserve_alert ?? ""} asset={asset} field="exchange_reserve_alert" label="exchange reserve alert" blank="No alert" editable={editable} />,
-    },
-    {
       key: "enabled",
       header: "Customers can trade it",
       align: "right",
@@ -177,7 +138,7 @@ export default function CryptoAssetsPage() {
     <AdminShell section="crypto" current="/crypto/assets" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Assets" }]}>
       <PageHeader
         title="Assets"
-        description="Coins customers can hold and trade. BitoCard's P2P fee is taken in the coin from what the buyer receives. Withdrawals from the approval amount wait for finance (0: none do). The exchange limit caps what one customer or reseller trades with an exchange desk in 24 hours; admins are told when BitoCard's coin reserve falls below the alert (blank: no limit, no alert)."
+        description="Coins customers can hold and trade. BitoCard's P2P fee is taken in the coin from what the buyer receives. Withdrawals from the approval amount wait for finance (0: none do)."
       />
       <div className="mt-6 space-y-4">
         <Notice tone="amber">

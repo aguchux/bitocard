@@ -1,6 +1,6 @@
 import { apiKeyScopes } from '../../api-keys/api-keys.service.js';
 import { productCategories } from '../../countries/countries.service.js';
-import { bitocardPlanFeatures } from '../../plans/plans.service.js';
+import { planFeatures } from '../../plans/plans.service.js';
 import { bitocardSwitchKeys, optionDefinitions, switchDefinitions } from '../../settings/settings.service.js';
 import { staffRoles } from '../../team/team.service.js';
 import { eventDocs } from '../../webhooks/openapi.js';
@@ -124,7 +124,7 @@ export const accountDocs: DocsArea = {
               },
               'The plan’s price.',
             ),
-            features: array(oneOf('A plan feature.', bitocardPlanFeatures), 'What the plan adds, for example `chargeback_protection`.'),
+            features: array(oneOf('A plan feature.', planFeatures), 'What the plan adds, for example `chargeback_protection`.'),
           },
           'Your plan.',
         ),

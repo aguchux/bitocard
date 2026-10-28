@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { adminApi, adminChargebacksApi, adminExchangeApi, adminTopUpsApi, parseStockCodes, percentToPpb } from '../src/admin';
+import { adminApi, adminChargebacksApi, adminTopUpsApi, parseStockCodes, percentToPpb } from '../src/admin';
 import { resellerCatalogueApi, resellerFeesApi, resellerWalletApi, resellerNumbersApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi, smsLimit } from '../src/reseller';
 import { keepUnusedSeconds, makeStore, notificationsApi, pushApi, readTimeoutMs, revalidateAfterSeconds, setRequestContext, toApiError, uploadMedia } from '../src';
 
@@ -174,37 +174,13 @@ describe('manual top-ups', () => {
 });
 
 describe('confirming money actions with the authenticator app', () => {
-  test('the chosen method is sent with the code, for top-ups and reserve movements', async () => {
+  test('the chosen method is sent with the code', async () => {
     const store = makeStore();
     reply = () => Response.json({ object: 'manual_top_up', id: 'mt1', status: 'completed', target: { type: 'customer', id: 'c1', name: 'Ada', email: null, store: null } });
     await store.dispatch(adminTopUpsApi.endpoints.confirmTopUp.initiate({ id: 'mt1', code: '123456', method: 'authenticator' }));
-    await store.dispatch(adminExchangeApi.endpoints.confirmReserveMovement.initiate({ id: 'rm1', code: '654321', method: 'email' }));
     const posts = calls.filter(call => call.method === 'POST');
-    expect(posts.map(call => call.url)).toEqual(['http://api.test/v1/admin/top-ups/mt1/confirm', 'http://api.test/v1/admin/exchange/reserves/movements/rm1/confirm']);
-    expect(posts.map(call => JSON.parse(call.body!))).toEqual([
-      { code: '123456', method: 'authenticator' },
-      { code: '654321', method: 'email' },
-    ]);
-  });
-});
-
-describe('reseller exchange desks', () => {
-  test('desks, reseller trades and the desk filter hit their admin endpoints; a reseller switch refetches the desks', async () => {
-    const store = makeStore();
-    reply = call => (call.method === 'GET' ? Response.json({ object: 'list', mode: 'live', data: [], definitions: {} }) : Response.json({}));
-    const desks = store.dispatch(adminExchangeApi.endpoints.exchangeDesks.initiate('live'));
-    const trades = store.dispatch(adminExchangeApi.endpoints.resellerExchangeTrades.initiate({ mode: 'live', reseller_id: 'rs1' }));
-    const filtered = store.dispatch(adminExchangeApi.endpoints.exchangeTrades.initiate({ mode: 'test', desk: 'bitocard' }));
-    await Promise.all([desks, trades, filtered]);
-    const urls = calls.map(call => call.url);
-    expect(urls).toContain('http://api.test/v1/admin/exchange/desks?mode=live');
-    expect(urls).toContain('http://api.test/v1/admin/exchange/reseller-trades?mode=live&reseller_id=rs1&limit=50');
-    expect(urls).toContain('http://api.test/v1/admin/exchange/trades?mode=test&desk=bitocard&limit=50');
-    await store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'reseller_desks', reseller_id: 'rs1', enabled: false }));
-    await vi.waitFor(() => expect(calls.filter(call => call.url.includes('/v1/admin/exchange/desks')).length).toBe(2));
-    desks.unsubscribe();
-    trades.unsubscribe();
-    filtered.unsubscribe();
+    expect(posts.map(call => call.url)).toEqual(['http://api.test/v1/admin/top-ups/mt1/confirm']);
+    expect(posts.map(call => JSON.parse(call.body!))).toEqual([{ code: '123456', method: 'authenticator' }]);
   });
 });
 
