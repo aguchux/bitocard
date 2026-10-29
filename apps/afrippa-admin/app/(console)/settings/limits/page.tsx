@@ -16,6 +16,8 @@ const amounts: Array<{ key: Amount; label: string; hint?: string }> = [
   { key: "cross_border_per_day", label: "Per 24 hours, from another country" },
   { key: "new_trader_per_trade", label: "Per order, new traders", hint: "Fewer than 5 completed orders." },
   { key: "new_trader_per_day", label: "Per 24 hours, new traders" },
+  { key: "merchant_per_trade", label: "Per order, merchants", hint: "Approved merchants, in their own market or the global one. Empty: the market's own." },
+  { key: "merchant_per_day", label: "Per 24 hours, merchants" },
 ];
 
 const shown = (value: number | null, currency: string) => (value === null ? "No limit" : formatMoney(value, currency));
@@ -99,11 +101,12 @@ export default function MarketLimitsPage() {
     { key: "day", header: "Per 24 hours", cell: limit => shown(limit.per_day, limit.currency) },
     {
       key: "others",
-      header: "Across borders · new traders",
+      header: "Across borders · new traders · merchants",
       hideOnMobile: true,
       cell: limit => (
         <span className="text-sm text-muted">
-          {shown(limit.cross_border_per_trade, limit.currency)} / {shown(limit.cross_border_per_day, limit.currency)} · {shown(limit.new_trader_per_trade, limit.currency)} / {shown(limit.new_trader_per_day, limit.currency)}
+          {shown(limit.cross_border_per_trade, limit.currency)} / {shown(limit.cross_border_per_day, limit.currency)} · {shown(limit.new_trader_per_trade, limit.currency)} / {shown(limit.new_trader_per_day, limit.currency)} ·{" "}
+          {shown(limit.merchant_per_trade ?? null, limit.currency)} / {shown(limit.merchant_per_day ?? null, limit.currency)}
         </span>
       ),
     },

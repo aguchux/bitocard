@@ -25,6 +25,8 @@ export type MarketState = {
   amount: string;
   q: string;
   experienced: boolean;
+  /** Merchants' ads only (the API filters them). */
+  merchant: boolean;
   sort: MarketSort;
   view: MarketView;
 };
@@ -72,6 +74,7 @@ export function marketState(search: Search, assets: string[], localCurrency: str
     amount: cleanAmount(first(search.amount)),
     q: first(search.q).trim().slice(0, 80),
     experienced: first(search.experienced) === "1",
+    merchant: first(search.merchant) === "1",
     sort: first(search.sort) === "trades" ? "trades" : "price",
     view: first(search.view) === "list" ? "list" : "grid",
   };
@@ -84,12 +87,13 @@ export function marketHref(state: MarketState, change: Partial<MarketState> = {}
   if (next.amount) params.set("amount", next.amount);
   if (next.q) params.set("q", next.q);
   if (next.experienced) params.set("experienced", "1");
+  if (next.merchant) params.set("merchant", "1");
   if (next.sort !== "price") params.set("sort", next.sort);
   if (next.view !== "grid") params.set("view", next.view);
   return `${next.path}?${params.toString()}`;
 }
 
-/** The API's query for the order book (it filters the market, coin, side, currency, trader and amount itself). */
+/** The API's query for the order book (it filters the market, coin, side, currency, trader, merchants and amount itself). */
 export function marketQuery(state: MarketState) {
   const minor = amountMinor(state.amount);
   return new URLSearchParams({
@@ -99,6 +103,7 @@ export function marketQuery(state: MarketState) {
     currency: state.currency,
     ...(state.q ? { q: state.q } : {}),
     ...(minor ? { fiat: String(minor) } : {}),
+    ...(state.merchant ? { merchant: "true" } : {}),
   }).toString();
 }
 

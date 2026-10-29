@@ -164,6 +164,34 @@ describe("trust", () => {
     expect(html).toContain("Upheld");
   });
 
+  test("merchants: where the trader stands, Apply once every requirement is met, and the badge once approved", async () => {
+    const requirements = [
+      { key: "orders", label: "Completed orders", needed: "100", value: "120", met: true },
+      { key: "completion", label: "Completion rate over 90 days", needed: "98%", value: "99%", met: true },
+      { key: "strikes", label: "No current strikes", needed: "0", value: "0", met: true },
+    ];
+    const base = { "/v1/afrippa/account": customer, "/v1/afrippa/p2p/standing": { strikes: 0, strike_limit: 3, strike_window_days: 90, cancellations_today: 0, cancellation_limit: 3, restriction: null, lost_appeals: [], upheld_reports: [] }, "/v1/afrippa/p2p/blocks": { data: [] }, "/v1/afrippa/p2p/reports": { data: [] } };
+    answer({ ...base, "/v1/afrippa/p2p/merchant": { object: "p2p_merchant_status", status: "none", applied_at: null, decided_at: null, reason: null, suspended_reason: null, eligible: true, requirements } });
+    let html = await render(await TrustPage());
+    expect(html).toContain("Completed orders");
+    expect(html).toContain("120 of 100");
+    expect(html).toContain("Apply to be a merchant");
+
+    answer({ ...base, "/v1/afrippa/p2p/merchant": { object: "p2p_merchant_status", status: "suspended", applied_at: null, decided_at: null, reason: null, suspended_reason: "strike", eligible: false, requirements: [{ ...requirements[2], value: "1", met: false }] } });
+    html = await render(await TrustPage());
+    expect(html).toContain("suspended after a strike");
+    expect(html).not.toContain("Apply to be a merchant");
+
+    answer({ ...base, "/v1/afrippa/p2p/merchant": { object: "p2p_merchant_status", status: "active", applied_at: null, decided_at: null, reason: null, suspended_reason: null, eligible: true, requirements } });
+    html = await render(await TrustPage());
+    expect(html).toContain("> Merchant</span>You are an Afrippa merchant");
+    expect(html).not.toContain("Completed orders");
+
+    answer({ "POST /v1/afrippa/p2p/merchant/apply": { object: "p2p_merchant_status", status: "applied" } });
+    expect(await orders.applyMerchant()).toEqual({ notice: "Your application is with Afrippa's team. We will tell you when they decide." });
+    expect(revalidatePath).toHaveBeenCalledWith("/trust", undefined);
+  });
+
   test("a trader's card signed in: their figures, feedback, Block and Report; their own card has neither; signed out asks to sign in", async () => {
     const card = { object: "p2p_trader", nickname: "TraderBola", orders_30d: 12, orders_total: 40, completion_rate_30d: 92.3, avg_pay_minutes: 6.4, avg_release_minutes: 0.5, feedback: { positive: 10, negative: 1 }, latest_feedback: [{ rating: "positive", comment: "Fast release.", from: "TraderAda", created_at: "2026-10-27T00:00:00.000Z" }] };
     answer({ "/v1/afrippa/account": customer, "/v1/afrippa/p2p/traders/TraderBola": card, "/v1/afrippa/p2p/blocks": { data: [] }, "/v1/afrippa/p2p/profile": { nickname: "TraderAda" } });

@@ -108,6 +108,10 @@
     {
       "job": "p2p-orders",
       "schedule": "* * * * *"
+    },
+    {
+      "job": "p2p-merchants",
+      "schedule": "25 4 * * *"
     }
   ]
 }

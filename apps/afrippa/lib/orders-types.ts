@@ -167,3 +167,35 @@ export const reportReasons: Array<[string, string]> = [
   ["abuse", "Abusive or threatening"],
   ["other", "Something else"],
 ];
+
+/** One thing a trader needs to be a merchant, and where they stand. */
+export type MerchantRequirement = { key: string; label: string; needed: string; value: string; met: boolean };
+/** `GET /v1/afrippa/p2p/merchant`: the trader's merchant status and where they stand. */
+export type MerchantStatus = {
+  object: "p2p_merchant_status";
+  status: "none" | "applied" | "active" | "rejected" | "suspended" | "revoked";
+  applied_at: string | null;
+  decided_at: string | null;
+  reason: string | null;
+  suspended_reason: "strike" | "thresholds" | null;
+  eligible: boolean;
+  requirements: MerchantRequirement[];
+};
+
+/** What the trader's merchant status says, in words. */
+export function merchantText(merchant: Pick<MerchantStatus, "status" | "reason" | "suspended_reason">) {
+  switch (merchant.status) {
+    case "active":
+      return "You are an Afrippa merchant: your ads carry the merchant badge and the market's merchant limits apply to you.";
+    case "applied":
+      return "Your application is with Afrippa's team.";
+    case "rejected":
+      return `Your last application was not approved${merchant.reason ? `: ${merchant.reason}` : "."}`;
+    case "suspended":
+      return merchant.suspended_reason === "strike" ? "Your merchant status is suspended after a strike. Apply again once you meet every requirement." : "Your merchant status is suspended: you no longer meet every requirement.";
+    case "revoked":
+      return `Afrippa's team revoked your merchant status${merchant.reason ? `: ${merchant.reason}` : "."}`;
+    default:
+      return "Merchants carry a badge on their ads and have higher limits. Meet every requirement below, then apply.";
+  }
+}

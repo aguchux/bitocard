@@ -5,6 +5,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type LedgerMode } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { P2pStandingService } from './p2p-standing.service.js';
 import { P2pWordsService } from './p2p-words.service.js';
 
 /** What traders may say about each other and what can be reported. */
@@ -45,6 +46,7 @@ export class P2pTrustService {
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
     private readonly words: P2pWordsService,
+    private readonly standing: P2pStandingService,
   ) {}
 
   // -- Figures -------------------------------------------------------------------------------------------------
@@ -91,9 +93,12 @@ export class P2pTrustService {
     const trust = (await this.trust([profile.customerId], mode)).get(profile.customerId)!;
     const latest = await this.prisma.p2pFeedback.findMany({ where: { toId: profile.customerId, mode }, orderBy: { createdAt: 'desc' }, take: 20 });
     const names = new Map((await this.prisma.p2pProfile.findMany({ where: { customerId: { in: latest.map(item => item.fromId) } } })).map(item => [item.customerId, item.nickname]));
+    const merchant = (await this.prisma.p2pMerchant.count({ where: { customerId: profile.customerId, mode, status: 'active' } })) > 0;
     return {
       object: 'p2p_trader' as const,
       nickname: profile.nickname,
+      /** An Afrippa merchant: approved by Afrippa's team, and not suspended. */
+      merchant,
       since: profile.createdAt.toISOString(),
       ...trust,
       latest_feedback: latest.map(item => ({ rating: item.rating, comment: item.comment, from: names.get(item.fromId) ?? 'Trader', created_at: item.createdAt.toISOString() })),
@@ -211,6 +216,8 @@ export class P2pTrustService {
     }
     const report = await this.prisma.p2pReport.findUniqueOrThrow({ where: { id } });
     await this.audit.record({ actorId: adminId, action: `p2p_report.${input.decision}`, targetType: 'p2p_report', targetId: id, after: { reported: report.reportedId, note: input.note.trim() }, platform: 'afrippa' });
+    // An upheld report is a strike: the reported trader is told if it pauses their trading, and a merchant is suspended.
+    if (input.decision === 'upheld') await this.standing.afterStrike(report.reportedId, report.mode);
     const reporter = await this.prisma.customer.findUnique({ where: { id: report.reporterId }, select: { storeId: true } });
     if (reporter) {
       await this.inbox.customer({ customerId: report.reporterId, storeId: reporter.storeId }, 'customer.p2p.report_decided', {

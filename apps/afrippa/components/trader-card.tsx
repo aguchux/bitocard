@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck } from "lucide-react";
 import { experiencedTrades, globalMarket } from "@afrippa/ui/market";
+import { MerchantBadge } from "@afrippa/ui/market-view";
 import { marketPath, markets, trader } from "@/lib/api";
 
 const since = (iso: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(new Date(iso));
@@ -21,6 +22,7 @@ export async function TraderCard({ nickname }: { nickname: string }) {
           <h1 className="flex items-center gap-2 font-display text-2xl font-extrabold text-navy-900">
             <span className="truncate">{card.nickname}</span>
             {card.trades_total >= experiencedTrades ? <BadgeCheck className="size-6 shrink-0 text-brand-500" aria-label="Experienced trader" /> : null}
+            {card.merchant ? <MerchantBadge /> : null}
           </h1>
           <p className="text-sm text-slate-500">Trading since {since(card.since)}</p>
         </div>

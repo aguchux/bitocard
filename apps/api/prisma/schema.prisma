@@ -2592,6 +2592,7 @@ model Customer {
   p2pOrdersSold             P2pOrder[]                @relation("p2pOrderSeller")
   p2pOrdersBought           P2pOrder[]                @relation("p2pOrderBuyer")
   p2pStandings              P2pStanding[]
+  p2pMerchants              P2pMerchant[]
   p2pBlocksMade             P2pBlock[]                @relation("p2pBlocker")
   p2pBlocksReceived         P2pBlock[]                @relation("p2pBlocked")
   p2pReportsMade            P2pReport[]               @relation("p2pReporter")
@@ -4587,6 +4588,9 @@ model CryptoMarketLimit {
   /// Afrippa: tighter limits for new traders (fewer than five completed orders); null for the market's own.
   newTraderPerTradeMinor   BigInt?    @map("new_trader_per_trade_minor")
   newTraderPerDayMinor     BigInt?    @map("new_trader_per_day_minor")
+  /// Afrippa: higher limits for merchants (active merchant status); null for the market's own.
+  merchantPerTradeMinor    BigInt?    @map("merchant_per_trade_minor")
+  merchantPerDayMinor      BigInt?    @map("merchant_per_day_minor")
   updatedById              String?    @map("updated_by_id") @db.Uuid
   createdAt                DateTime   @default(now()) @map("created_at")
   updatedAt                DateTime   @updatedAt @map("updated_at")
@@ -5335,6 +5339,44 @@ model P2pStanding {
 
   @@id([customerId, mode])
   @@map("p2p_standings")
+}
+
+/// Who may apply to be one of Afrippa's merchants: all of Afrippa (`WW`) and per market, the trader's country winning.
+model P2pMerchantRule {
+  market           String   @id @db.VarChar(2)
+  /// Released orders, ever.
+  minOrders        Int      @map("min_orders")
+  /// Completion rate over `windowDays`, in basis points (9800 is 98%).
+  minCompletionBps Int      @map("min_completion_bps")
+  windowDays       Int      @map("window_days")
+  minAccountDays   Int      @map("min_account_days")
+  updatedById      String?  @map("updated_by_id") @db.Uuid
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("p2p_merchant_rules")
+}
+
+/// A trader's merchant status, per mode: `applied`, `active` (badge and merchant limits), `rejected`, `suspended`
+/// (automatically, after a strike or falling below the thresholds) or `revoked` (by operations).
+model P2pMerchant {
+  id              String     @id @default(uuid()) @db.Uuid
+  customerId      String     @map("customer_id") @db.Uuid
+  mode            LedgerMode
+  status          String
+  appliedAt       DateTime   @map("applied_at")
+  decidedAt       DateTime?  @map("decided_at")
+  decidedById     String?    @map("decided_by_id") @db.Uuid
+  /// Operations' note on approving, rejecting or revoking.
+  note            String?
+  /// Why it was suspended: `strike` or `thresholds`.
+  suspendedReason String?    @map("suspended_reason")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  customer        Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, mode])
+  @@index([mode, status])
+  @@map("p2p_merchants")
 }
 
 /// Feedback after a released Afrippa order (docs/CRYPTO_SPINOFF_PLAN.md, step 3 item 6): each party rates the other once.

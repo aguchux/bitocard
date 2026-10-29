@@ -555,7 +555,8 @@ export type StoreP2pAd = {
   terms: string | null;
   status: 'active' | 'paused' | 'completed' | 'cancelled';
   mine: boolean;
-  trader: { nickname: string; trades_30d: number; trades_total: number };
+  /** `merchant`: an Afrippa merchant (approved by Afrippa's team, not suspended). */
+  trader: { nickname: string; trades_30d: number; trades_total: number; merchant?: boolean };
   created_at: string;
   updated_at: string;
 };

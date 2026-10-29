@@ -8,6 +8,7 @@ await import("@/app/admin-product");
 const { default: FeeRatesPage } = await import("@/app/(console)/settings/page");
 const { default: MarketLimitsPage } = await import("@/app/(console)/settings/limits/page");
 const { default: MarketsPage } = await import("@/app/(console)/settings/markets/page");
+const { default: MerchantsPage } = await import("@/app/(console)/traders/merchants/page");
 const { default: TwoStepMethodsPage } = await import("@/app/(console)/settings/two-step/page");
 const { default: RefusedWordsPage } = await import("@/app/(console)/settings/words/page");
 const { default: BooksPage } = await import("@/app/(console)/books/page");
@@ -20,7 +21,7 @@ const { default: AssistantPage } = await import("@/app/(console)/support/assista
 
 const admin = { id: "a1", name: "Ada Okafor", email: "ada@afrippa.com", roles: ["operations", "finance"] };
 const traderId = "5b1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
-const limit = { object: "crypto_market_limit", mode: "live", market: "NG", currency: "NGN", per_trade: 50000000, per_day: null, cross_border_per_trade: null, cross_border_per_day: null, new_trader_per_trade: 10000000, new_trader_per_day: null, updated_at: "2026-10-27T00:00:00.000Z" };
+const limit = { object: "crypto_market_limit", mode: "live", market: "NG", currency: "NGN", per_trade: 50000000, per_day: null, cross_border_per_trade: null, cross_border_per_day: null, new_trader_per_trade: 10000000, new_trader_per_day: null, merchant_per_trade: null, merchant_per_day: null, updated_at: "2026-10-27T00:00:00.000Z" };
 const standing = {
   object: "p2p_standing",
   mode: "live",
@@ -60,6 +61,22 @@ const markets = {
   ],
 };
 
+const applicant = {
+  object: "p2p_merchant",
+  id: "m1",
+  mode: "live",
+  status: "applied",
+  customer: { id: "c1", email: "ada@example.com", name: "Ada Obi", country: "NG", nickname: "TraderAda" },
+  applied_at: "2026-10-29T00:00:00.000Z",
+  decided_at: null,
+  note: null,
+  suspended_reason: null,
+  requirements: [
+    { key: "orders", label: "Completed orders", needed: "100", value: "140", met: true },
+    { key: "strikes", label: "No current strikes", needed: "0", value: "0", met: true },
+  ],
+};
+
 let sent: Array<{ method: string; path: string; body: unknown }>;
 
 beforeAll(() => {
@@ -87,6 +104,10 @@ beforeEach(() => {
     if (path === "/v1/afrippa/admin/devices") return ok({ object: "list", data: [{ object: "device", id: "d1", channel: "web_push", label: "Chrome on Windows", current: false, last_pushed_at: null, last_seen_at: "2026-10-28T00:00:00.000Z", created_at: "2026-10-28T00:00:00.000Z" }] });
     if (path === "/v1/afrippa/admin/notification-preferences")
       return ok({ object: "list", data: [{ object: "notification_preference", type: "admin.p2p.order_appealed", label: "An order was appealed", severity: "warning", push: true, default: true, locked: false }] });
+    if (path === "/v1/afrippa/admin/p2p/merchants") return ok({ object: "list", data: [applicant] });
+    if (path.startsWith("/v1/afrippa/admin/p2p/merchants/")) return ok({ ...applicant, status: "active" });
+    if (path === "/v1/afrippa/admin/p2p/merchant-rules") return ok({ object: "list", data: [{ object: "p2p_merchant_rule", market: "WW", min_orders: 100, min_completion_bps: 9800, window_days: 90, min_account_days: 30, updated_at: "2026-10-29T00:00:00.000Z" }] });
+    if (path.startsWith("/v1/afrippa/admin/p2p/merchant-rules/")) return ok({ object: "p2p_merchant_rule", market: "GH", ...(body as object), updated_at: "2026-10-29T00:00:00.000Z" });
     if (path === "/v1/afrippa/admin/media/settings") return ok({ object: "media_settings", configured: true, purposes: [{ purpose: "afrippa_bot_avatar", label: "Afrippa assistant avatar", max_bytes: 1048576, content_types: ["image/png", "image/jpeg", "image/webp"] }] });
     if (path === "/v1/afrippa/admin/media") return ok({ object: "list", data: [], has_more: false });
     if (path === "/v1/afrippa/admin/markets" || path.startsWith("/v1/afrippa/admin/markets/")) return ok(markets);
@@ -203,6 +224,7 @@ describe("admin.afrippa.com settings", () => {
     fireEvent.change(screen.getByLabelText("Per 24 hours, new traders"), { target: { value: "0" } });
     expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled, "zero is refused").toBe(true);
     fireEvent.change(screen.getByLabelText("Per 24 hours, new traders"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Per order, merchants"), { target: { value: "1000000" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(
       () =>
@@ -216,6 +238,8 @@ describe("admin.afrippa.com settings", () => {
           cross_border_per_day: null,
           new_trader_per_trade: 10000000,
           new_trader_per_day: null,
+          merchant_per_trade: 100000000,
+          merchant_per_day: null,
         }),
       slow,
     );
@@ -240,6 +264,25 @@ describe("admin.afrippa.com settings", () => {
     await waitFor(() => expect(sent.find(call => call.path === "/v1/afrippa/admin/markets/store-mode")?.body).toEqual({ mode: "live", reason: "The pilot opens in Nigeria." }), slow);
     neverBitoCard();
   });
+
+  test("merchants: applications with where each trader stands, approved with a note, and one market's thresholds", async () => {
+    page(<MerchantsPage />);
+    expect((await screen.findAllByText("TraderAda", {}, slow)).length).toBeGreaterThan(0);
+    expect(sent.find(call => call.path.startsWith("/v1/afrippa/admin/p2p/merchants"))?.path).toBe("/v1/afrippa/admin/p2p/merchants?status=applied");
+    expect(screen.getAllByText(/Completed orders: 140 \(needs 100\)/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Approve" })[0]);
+    fireEvent.change(await screen.findByLabelText(/Reason/), { target: { value: "A long, clean record." } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Approve" }).at(-1)!);
+    await waitFor(() => expect(sent.find(call => call.path === "/v1/afrippa/admin/p2p/merchants/m1/approve")?.body).toEqual({ note: "A long, clean record." }), slow);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Set a market" }, slow));
+    fireEvent.change(screen.getByLabelText("Market"), { target: { value: "gh" } });
+    fireEvent.change(screen.getByLabelText("Completed orders"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Completion rate (%)"), { target: { value: "97.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent.find(call => call.path === "/v1/afrippa/admin/p2p/merchant-rules/GH")?.body).toEqual({ min_orders: 50, min_completion_bps: 9750, window_days: 90, min_account_days: 30 }), slow);
+    neverBitoCard();
+   }, 20000);
 
   test("two-step methods: one market's methods, at least one kept", async () => {
     page(<TwoStepMethodsPage />);

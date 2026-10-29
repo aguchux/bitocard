@@ -16,4 +16,5 @@ export type CryptoMarkets = { object: "list"; mode: "live" | "test"; assets: str
 export type CryptoBook = { object: "list"; market: string; asset: string; currency: string; side: "buy" | "sell"; data: StoreP2pAd[] };
 
 /** `GET /v1/afrippa/traders/:nickname`: a trader's public card. */
-export type CryptoTrader = { object: "p2p_trader"; nickname: string; trades_30d: number; trades_total: number; open_ads: number; markets: string[]; since: string };
+/** `merchant`: an Afrippa merchant (approved by Afrippa's team, not suspended). */
+export type CryptoTrader = { object: "p2p_trader"; nickname: string; trades_30d: number; trades_total: number; merchant?: boolean; open_ads: number; markets: string[]; since: string };

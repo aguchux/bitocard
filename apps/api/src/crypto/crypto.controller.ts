@@ -76,6 +76,10 @@ class MarketQueryDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   limit?: number;
+
+  /** Afrippa: merchants' ads only. */
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true' || value === '1') @IsBoolean()
+  merchant?: boolean;
 }
 
 /** A public market's book: the same filters as the signed-in market, without `market` (it is in the address). */
@@ -97,6 +101,10 @@ class PublicMarketQueryDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   limit?: number;
+
+  /** Afrippa: merchants' ads only. */
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true' || value === '1') @IsBoolean()
+  merchant?: boolean;
 }
 
 class CreateAdDto {
@@ -601,6 +609,11 @@ class MarketLimitDto {
 
   @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
   cross_border_per_day?: number | null;
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  merchant_per_trade?: number | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  merchant_per_day?: number | null;
 }
 
 class AdminListDto {

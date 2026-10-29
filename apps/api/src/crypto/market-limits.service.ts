@@ -15,7 +15,7 @@ const dayMs = 86_400_000;
  * One party to a trade: their own country decides whether they trade across borders in this market; a new Afrippa
  * trader (`newTrader`: fewer than five completed orders) has the market's tighter new-trader limits.
  */
-export type TradeParty = { customerId: string; home: string; taker: boolean; newTrader?: boolean };
+export type TradeParty = { customerId: string; home: string; taker: boolean; newTrader?: boolean; merchant?: boolean };
 
 export type MarketLimitInput = {
   mode: LedgerMode;
@@ -27,6 +27,8 @@ export type MarketLimitInput = {
   cross_border_per_day?: number | null;
   new_trader_per_trade?: number | null;
   new_trader_per_day?: number | null;
+  merchant_per_trade?: number | null;
+  merchant_per_day?: number | null;
 };
 
 export function presentMarketLimit(row: CryptoMarketLimit) {
@@ -42,6 +44,8 @@ export function presentMarketLimit(row: CryptoMarketLimit) {
     cross_border_per_day: amount(row.crossBorderPerDayMinor),
     new_trader_per_trade: amount(row.newTraderPerTradeMinor),
     new_trader_per_day: amount(row.newTraderPerDayMinor),
+    merchant_per_trade: amount(row.merchantPerTradeMinor),
+    merchant_per_day: amount(row.merchantPerDayMinor),
     updated_at: row.updatedAt.toISOString(),
   };
 }
@@ -91,6 +95,8 @@ export class CryptoMarketLimitsService {
       crossBorderPerDayMinor: amount(input.cross_border_per_day),
       newTraderPerTradeMinor: amount(input.new_trader_per_trade),
       newTraderPerDayMinor: amount(input.new_trader_per_day),
+      merchantPerTradeMinor: amount(input.merchant_per_trade),
+      merchantPerDayMinor: amount(input.merchant_per_day),
       updatedById: adminId,
     };
     const key = { mode: input.mode, market, currency };
@@ -125,6 +131,11 @@ export class CryptoMarketLimitsService {
       const cross = input.market !== global && party.home !== input.market;
       let perTrade = cross ? (row.crossBorderPerTradeMinor ?? row.perTradeMinor) : row.perTradeMinor;
       let perDay = cross ? (row.crossBorderPerDayMinor ?? row.perDayMinor) : row.perDayMinor;
+      // An Afrippa merchant in their own market or the global one: the market's merchant limits, where set.
+      if (party.merchant && !cross) {
+        perTrade = row.merchantPerTradeMinor ?? perTrade;
+        perDay = row.merchantPerDayMinor ?? perDay;
+      }
       // A new trader: the tighter of their limit and the new-trader one.
       if (party.newTrader) {
         perTrade = tighter(perTrade, row.newTraderPerTradeMinor);

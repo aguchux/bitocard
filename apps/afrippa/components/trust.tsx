@@ -3,10 +3,21 @@
 import { useActionState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { FormMessage, type FormState, Submit } from "@afrippa/ui/forms";
-import { blockTrader, giveFeedback, reportTrader, unblockTrader } from "@/lib/orders";
+import { applyMerchant, blockTrader, giveFeedback, reportTrader, unblockTrader } from "@/lib/orders";
 import { reportReasons } from "@/lib/orders-types";
 
 const quiet = "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ring-1 ring-slate-300 hover:ring-slate-400 disabled:opacity-60";
+
+/** Applying to be a merchant, once every requirement is met. */
+export function ApplyMerchant() {
+  const [state, action, pending] = useActionState<FormState, FormData>(applyMerchant, {});
+  return (
+    <form action={action} className="space-y-3">
+      <FormMessage state={state} />
+      {state.notice ? null : <Submit pending={pending}>Apply to be a merchant</Submit>}
+    </form>
+  );
+}
 
 /** Rating the other trader once an order is released: positive or negative, and a short comment without contact details. */
 export function FeedbackForm({ orderId, other }: { orderId: string; other: string }) {

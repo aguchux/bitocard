@@ -129,8 +129,16 @@ export class P2pStandingService {
     };
   }
 
-  /** After an appeal decided against a trader: tells them once when it pauses their trading. */
+  private readonly strikeListeners: Array<(customerId: string, mode: LedgerMode) => Promise<unknown>> = [];
+
+  /** Runs after every strike (a lost appeal or an upheld report): Afrippa's merchants are suspended by one. */
+  onStrike(listener: (customerId: string, mode: LedgerMode) => Promise<unknown>) {
+    this.strikeListeners.push(listener);
+  }
+
+  /** After a strike (an appeal decided against a trader, or a report upheld): tells them once when it pauses their trading. */
   async afterStrike(customerId: string, mode: LedgerMode) {
+    for (const listener of this.strikeListeners) await listener(customerId, mode).catch(() => undefined);
     const restriction = await this.restriction(customerId, mode);
     if (restriction?.code !== 'trading_suspended') return;
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { storeId: true } });

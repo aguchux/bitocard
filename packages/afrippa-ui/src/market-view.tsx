@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BadgeCheck, LayoutGrid, List, Search, SlidersHorizontal } from "lucide-react";
+import { BadgeCheck, LayoutGrid, List, Search, SlidersHorizontal, Store } from "lucide-react";
 import { formatCrypto, formatFace, type StoreP2pAd } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "./coins";
 import { experiencedTrades, marketHref, type MarketState } from "./market";
@@ -14,7 +14,7 @@ const chip = "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-3
 const chipOn = "bg-navy-900 text-white ring-navy-900";
 const chipOff = "bg-white text-slate-700 ring-slate-200 hover:ring-slate-300";
 
-/** The trader: their market name, a tick once experienced, and their completed trades. */
+/** The trader: their market name, a tick once experienced, the merchant badge, and their completed trades. */
 function Trader({ ad }: { ad: StoreP2pAd }) {
   return (
     <span className="flex min-w-0 items-center gap-2.5">
@@ -25,6 +25,7 @@ function Trader({ ad }: { ad: StoreP2pAd }) {
         <span className="flex items-center gap-1 font-semibold">
           <span className="truncate">{ad.trader.nickname}</span>
           {ad.trader.trades_total >= experiencedTrades ? <BadgeCheck className="size-4 shrink-0 text-brand-500" aria-label="Experienced trader" /> : null}
+          {ad.trader.merchant ? <MerchantBadge /> : null}
         </span>
         <span className="block text-xs text-slate-500">
           {ad.trader.trades_30d} in 30 days · {ad.trader.trades_total} in all
@@ -141,6 +142,23 @@ function CurrencyToggle({ state, currencies }: { state: MarketState; currencies:
   );
 }
 
+/** An Afrippa merchant: approved by Afrippa's team for their record, and not suspended. */
+export function MerchantBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200" title="Approved by Afrippa's team for their trading record">
+      <Store className="size-3" aria-hidden="true" /> Merchant
+    </span>
+  );
+}
+
+function MerchantChip({ state }: { state: MarketState }) {
+  return (
+    <Link href={marketHref(state, { merchant: !state.merchant })} aria-pressed={state.merchant} className={`${chip} ${state.merchant ? chipOn : chipOff}`}>
+      <Store className="size-4" aria-hidden="true" /> Merchants only
+    </Link>
+  );
+}
+
 function ExperiencedChip({ state }: { state: MarketState }) {
   return (
     <Link href={marketHref(state, { experienced: !state.experienced })} aria-pressed={state.experienced} className={`${chip} ${state.experienced ? chipOn : chipOff}`}>
@@ -187,6 +205,7 @@ function Kept({ state }: { state: MarketState }) {
       <input type="hidden" name="sort" value={state.sort} />
       <input type="hidden" name="view" value={state.view} />
       {state.experienced ? <input type="hidden" name="experienced" value="1" /> : null}
+      {state.merchant ? <input type="hidden" name="merchant" value="1" /> : null}
     </>
   );
 }
@@ -201,7 +220,7 @@ const amountLabel = (state: MarketState) => (state.side === "buy" ? `I want to s
  * while any of them is set); wider screens get it all in two rows across the full width.
  */
 export function MarketFilters({ state, assets, currencies }: { state: MarketState; assets: string[]; currencies: string[] }) {
-  const more = Boolean(state.q || state.experienced || state.sort !== "price");
+  const more = Boolean(state.q || state.experienced || state.merchant || state.sort !== "price");
   return (
     <>
       <div className="space-y-2.5 rounded-3xl bg-slate-50 p-3 ring-1 ring-slate-200/70 lg:hidden">
@@ -233,6 +252,7 @@ export function MarketFilters({ state, assets, currencies }: { state: MarketStat
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   <ExperiencedChip state={state} />
+                  <MerchantChip state={state} />
                   <SortToggle state={state} />
                 </div>
               </div>
@@ -264,6 +284,7 @@ export function MarketFilters({ state, assets, currencies }: { state: MarketStat
           </button>
           <span className="flex flex-1 flex-wrap items-center justify-end gap-2">
             <ExperiencedChip state={state} />
+            <MerchantChip state={state} />
             <SortToggle state={state} />
             <ViewToggle state={state} />
           </span>

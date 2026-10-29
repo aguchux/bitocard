@@ -161,6 +161,14 @@ export async function giveFeedback(_state: FormState, form: FormData): Promise<F
   return { notice: "Thank you: your feedback is on their card." };
 }
 
+/** Applies to be a merchant: the API checks every requirement again and refuses with what is missing. */
+export async function applyMerchant(): Promise<FormState> {
+  const result = await customerApi("POST", "/v1/afrippa/p2p/merchant/apply", {});
+  if (!result.ok) return refused(result, "/trust");
+  revalidatePath("/trust");
+  return { notice: "Your application is with Afrippa's team. We will tell you when they decide." };
+}
+
 /** Blocks a trader: neither sees the other's ads or can open an order on them. */
 export async function blockTrader(_state: FormState, form: FormData): Promise<FormState> {
   const who = nickname(form);

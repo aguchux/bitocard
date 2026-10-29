@@ -117,6 +117,7 @@ describe("reading the public data, cached", () => {
 
   test("a book's query is always written in one order, so the same book is one cache entry; each market is tagged", async () => {
     expect(bookQuery({ asset: "USDT", side: "buy", currency: "NGN", fiat: 100000, q: "" })).toBe("asset=USDT&side=buy&currency=NGN&fiat=100000");
+    expect(bookQuery({ asset: "USDT", side: "buy", currency: "NGN", merchant: true })).toBe("asset=USDT&side=buy&currency=NGN&merchant=true");
     answer();
     await book("NG", "asset=USDT&side=buy&currency=NGN");
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/v1\/afrippa\/markets\/NG\/ads\?asset=USDT&side=buy&currency=NGN$/);
@@ -149,6 +150,19 @@ describe("the small parts of a market page", () => {
     expect(html).not.toContain("Orders open soon");
     expect(html).not.toContain("/signin");
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/v1/afrippa/account")), "no session, no account asked").toBe(false);
+  });
+
+  test("merchants: the badge on their ads, and Merchants only asks the API for merchants' ads and stays in the address", async () => {
+    answer([ad("a", { trader: { nickname: "Tradera", trades_30d: 3, trades_total: 12, merchant: true } }), ad("b")]);
+    const html = renderToStaticMarkup(await MarketBook({ market: "NG", name: "Nigeria", state: pageState(nigeria, shown.assets, {}) }));
+    expect(html.match(/> Merchant<\/span>/g)?.length).toBe(1);
+    const { marketHref } = await import("@afrippa/ui/market");
+    expect(marketHref(pageState(nigeria, shown.assets, {}), { merchant: true })).toBe("/ng?side=buy&asset=USDT&currency=NGN&merchant=1");
+    fetchMock.mockClear();
+    const only = pageState(nigeria, shown.assets, { merchant: "1" });
+    expect(only.merchant).toBe(true);
+    await MarketBook({ market: "NG", name: "Nigeria", state: only });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("merchant=true");
   });
 
   test("the account area: Sign in and Create an account signed out; their wallets, ads and Sign out signed in", async () => {

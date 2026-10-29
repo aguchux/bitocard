@@ -18,7 +18,7 @@ export const takeAd: AdAction = (ad, side) => (
  * currency and amount) and streaming in under the filters. An unreachable API says so here alone.
  */
 export async function MarketBook({ market, name, state }: { market: string; name: string; state: MarketState }) {
-  const result = await book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount) }));
+  const result = await book(market, bookQuery({ asset: state.asset, side: state.side, currency: state.currency, q: state.q, fiat: amountMinor(state.amount), merchant: state.merchant }));
   if (!result.ok) return <p className="rounded-3xl bg-white p-5 text-sm text-slate-600 ring-1 ring-slate-200/70">This market cannot be shown right now. Try again shortly.</p>;
   const ads = shownAds(result.data.data, state);
   const filtered = Boolean(state.q || state.amount || state.experienced);
@@ -34,7 +34,7 @@ export async function MarketBook({ market, name, state }: { market: string; name
           <p className="font-semibold">{filtered ? "No ads match your filters" : `Nobody is ${state.side === "buy" ? "selling" : "buying"} ${state.asset} for ${state.currency} here right now`}</p>
           <p className="mt-1 text-sm text-slate-600">{filtered ? "Try another amount or trader, or clear the filters." : "Post your own ad and other traders can come to you."}</p>
           {filtered ? (
-            <Link href={marketHref(state, { q: "", amount: "", experienced: false })} className="mt-4 inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300">
+            <Link href={marketHref(state, { q: "", amount: "", experienced: false, merchant: false })} className="mt-4 inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300">
               Clear filters
             </Link>
           ) : null}

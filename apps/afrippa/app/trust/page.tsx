@@ -3,8 +3,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cardClass, tradeDate } from "@afrippa/ui/trade-views";
 import { AccountShell } from "@/components/account-shell";
-import { BlockButton } from "@/components/trust";
-import { reportReasons } from "@/lib/orders-types";
+import { MerchantBadge } from "@afrippa/ui/market-view";
+import { ApplyMerchant, BlockButton } from "@/components/trust";
+import { type MerchantStatus, merchantText, reportReasons } from "@/lib/orders-types";
 import { requireCustomer } from "@/lib/account";
 import { customerApi } from "@/lib/customer";
 
@@ -31,8 +32,9 @@ const reportStatus: Record<Report["status"], string> = { open: "With Afrippa's t
  */
 export default async function TrustPage() {
   await requireCustomer("/trust");
-  const [standing, blocks, reports] = await Promise.all([
+  const [standing, merchant, blocks, reports] = await Promise.all([
     customerApi<Standing>("GET", "/v1/afrippa/p2p/standing"),
+    customerApi<MerchantStatus>("GET", "/v1/afrippa/p2p/merchant"),
     customerApi<{ data: Array<{ nickname: string; created_at: string }> }>("GET", "/v1/afrippa/p2p/blocks"),
     customerApi<{ data: Report[] }>("GET", "/v1/afrippa/p2p/reports"),
   ]);
@@ -74,6 +76,39 @@ export default async function TrustPage() {
           </>
         ) : (
           <p className="text-sm text-slate-600">{standing.message}</p>
+        )}
+      </Section>
+      <Section title="Merchant">
+        {merchant.ok ? (
+          <>
+            <p className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              {merchant.data.status === "active" ? <MerchantBadge /> : null}
+              {merchantText(merchant.data)}
+            </p>
+            {merchant.data.status === "active" || merchant.data.status === "applied" ? null : (
+              <>
+                <ul className="divide-y divide-slate-100 text-sm">
+                  {merchant.data.requirements.map(item => (
+                    <li key={item.key} className="flex items-center justify-between gap-3 py-2">
+                      <span>
+                        <span aria-hidden="true" className={item.met ? "text-emerald-600" : "text-slate-400"}>
+                          {item.met ? "✓ " : "○ "}
+                        </span>
+                        {item.label}
+                        <span className="sr-only">{item.met ? " (met)" : " (not met yet)"}</span>
+                      </span>
+                      <span className="text-slate-500">
+                        {item.value} of {item.needed}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {merchant.data.eligible ? <ApplyMerchant /> : null}
+              </>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-slate-600">{merchant.message}</p>
         )}
       </Section>
       <Section title="Traders you blocked">

@@ -122,7 +122,13 @@ export class P2pOrdersService {
     }
     const buyerName = await this.payerName(buyerId, context.mode);
     await this.notSamePerson(buyerId, sellerId, buyerName, context.mode);
-    const [takerNew, makerNew, makerHome] = await Promise.all([this.isNew(customer.id, context.mode), this.isNew(found.customerId, context.mode), this.homeOf(found.customerId)]);
+    const [takerNew, makerNew, makerHome, takerMerchant, makerMerchant] = await Promise.all([
+      this.isNew(customer.id, context.mode),
+      this.isNew(found.customerId, context.mode),
+      this.homeOf(found.customerId),
+      this.isMerchant(customer.id, context.mode),
+      this.isMerchant(found.customerId, context.mode),
+    ]);
     const shown = {
       object: 'p2p_order_preview' as const,
       asset: asset.code,
@@ -153,8 +159,8 @@ export class P2pOrdersService {
         currency: ad.currency,
         fiat: terms.fiat,
         parties: [
-          { customerId: customer.id, home: context.country, taker: true, newTrader: takerNew },
-          { customerId: ad.customerId, home: makerHome, taker: false, newTrader: makerNew },
+          { customerId: customer.id, home: context.country, taker: true, newTrader: takerNew, merchant: takerMerchant },
+          { customerId: ad.customerId, home: makerHome, taker: false, newTrader: makerNew, merchant: makerMerchant },
         ],
       });
       // A sell ad pays its seller's fee from the reserve it keeps for it, then the seller's wallet.
@@ -226,6 +232,11 @@ export class P2pOrdersService {
   /** Whether a trader is new: fewer than `newTraderOrders` completed orders. */
   private async isNew(customerId: string, mode: LedgerMode) {
     return (await this.prisma.p2pOrder.count({ where: { mode, status: 'released', OR: [{ buyerId: customerId }, { sellerId: customerId }] } })) < newTraderOrders;
+  }
+
+  /** Whether a trader is an active merchant (the market's merchant limits apply to them). */
+  private async isMerchant(customerId: string, mode: LedgerMode) {
+    return (await this.prisma.p2pMerchant.count({ where: { customerId, mode, status: 'active' } })) > 0;
   }
 
   private async homeOf(customerId: string) {

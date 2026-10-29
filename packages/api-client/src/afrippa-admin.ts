@@ -91,9 +91,31 @@ export type MarketLimit = {
   cross_border_per_day: number | null;
   new_trader_per_trade: number | null;
   new_trader_per_day: number | null;
+  /** Merchants in their own market or the global one; null for the market's own. */
+  merchant_per_trade: number | null;
+  merchant_per_day: number | null;
   updated_at: string;
 };
 export type MarketLimitInput = Omit<MarketLimit, 'object' | 'updated_at'>;
+
+/** Afrippa's merchants. */
+export type MerchantStatus = 'applied' | 'active' | 'rejected' | 'suspended' | 'revoked';
+export type MerchantRequirement = { key: string; label: string; needed: string; value: string; met: boolean };
+export type P2pMerchant = {
+  object: 'p2p_merchant';
+  id: string;
+  mode: Mode;
+  status: MerchantStatus;
+  customer: { id: string; email: string; name: string; country: string | null; nickname: string | null };
+  applied_at: string;
+  decided_at: string | null;
+  note: string | null;
+  suspended_reason: 'strike' | 'thresholds' | null;
+  requirements: MerchantRequirement[];
+};
+/** Who may apply: all of Afrippa (`WW`) and per market. */
+export type MerchantRule = { object: 'p2p_merchant_rule'; market: string; min_orders: number; min_completion_bps: number; window_days: number; min_account_days: number; updated_at: string };
+export type MerchantRuleInput = Omit<MerchantRule, 'object' | 'updated_at'>;
 
 export type TwoStepMethod = 'authenticator' | 'email' | 'sms';
 /** A market switch where it is set (null: follows all of Afrippa, or the default) and whether it is on. */
@@ -226,6 +248,27 @@ export const afrippaAdminApi = bitocardApi.injectEndpoints({
       query: body => ({ url: '/v1/afrippa/admin/markets/store-mode', method: 'PUT', body }),
       invalidatesTags: [{ type: 'P2p', id: 'MARKETS' }],
     }),
+    p2pMerchants: build.query<List<P2pMerchant>, { status?: MerchantStatus; mode?: Mode }>({
+      query: params => ({ url: '/v1/afrippa/admin/p2p/merchants', params: clean(params) }),
+      providesTags: [{ type: 'P2p', id: 'MERCHANTS' }],
+    }),
+    decideMerchant: build.mutation<P2pMerchant, { id: string; outcome: 'approve' | 'reject'; note: string }>({
+      query: ({ id, outcome, note }) => ({ url: `/v1/afrippa/admin/p2p/merchants/${id}/${outcome}`, method: 'POST', body: { note } }),
+      invalidatesTags: [{ type: 'P2p', id: 'MERCHANTS' }],
+    }),
+    revokeMerchant: build.mutation<P2pMerchant, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/afrippa/admin/p2p/merchants/${id}/revoke`, method: 'POST', body: { reason } }),
+      invalidatesTags: [{ type: 'P2p', id: 'MERCHANTS' }],
+    }),
+    merchantRules: build.query<List<MerchantRule>, void>({ query: () => '/v1/afrippa/admin/p2p/merchant-rules', providesTags: [{ type: 'P2p', id: 'MERCHANT_RULES' }] }),
+    setMerchantRule: build.mutation<MerchantRule, MerchantRuleInput>({
+      query: ({ market, ...body }) => ({ url: `/v1/afrippa/admin/p2p/merchant-rules/${market}`, method: 'PUT', body }),
+      invalidatesTags: [{ type: 'P2p', id: 'MERCHANT_RULES' }, { type: 'P2p', id: 'MERCHANTS' }],
+    }),
+    removeMerchantRule: build.mutation<{ market: string; deleted: true }, string>({
+      query: market => ({ url: `/v1/afrippa/admin/p2p/merchant-rules/${market}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'P2p', id: 'MERCHANT_RULES' }, { type: 'P2p', id: 'MERCHANTS' }],
+    }),
     traderDevices: build.query<List<TraderDevice>, string>({ query: id => `/v1/afrippa/admin/traders/${id}/devices` }),
     resetTraderTwoStep: build.mutation<unknown, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/v1/afrippa/admin/traders/${id}/two-step/reset`, method: 'POST', body: { reason } }),
@@ -261,4 +304,10 @@ export const {
   useAfrippaMarketsQuery,
   useSetMarketSwitchMutation,
   useSetStoreModeMutation,
+  useP2pMerchantsQuery,
+  useDecideMerchantMutation,
+  useRevokeMerchantMutation,
+  useMerchantRulesQuery,
+  useSetMerchantRuleMutation,
+  useRemoveMerchantRuleMutation,
 } = afrippaAdminApi;

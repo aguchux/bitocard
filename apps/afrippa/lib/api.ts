@@ -78,11 +78,11 @@ export async function marketAt(segment: string | null): Promise<CryptoMarket | n
   return (await markets()).data.find(market => market.market === code) ?? null;
 }
 
-export type BookQuery = { asset: string; side: "buy" | "sell"; currency: string; q?: string; fiat?: number | null };
+export type BookQuery = { asset: string; side: "buy" | "sell"; currency: string; q?: string; fiat?: number | null; merchant?: boolean };
 
 /** A book's query string, in one order, so the same book is always the same cache key. */
 export const bookQuery = (query: BookQuery) =>
-  new URLSearchParams({ asset: query.asset, side: query.side, currency: query.currency, ...(query.q ? { q: query.q } : {}), ...(query.fiat ? { fiat: String(query.fiat) } : {}) }).toString();
+  new URLSearchParams({ asset: query.asset, side: query.side, currency: query.currency, ...(query.q ? { q: query.q } : {}), ...(query.fiat ? { fiat: String(query.fiat) } : {}), ...(query.merchant ? { merchant: "true" } : {}) }).toString();
 
 /**
  * A market's book for a coin, side and currency, tagged per market so one market's can be refreshed alone. Its query is

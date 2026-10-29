@@ -37,7 +37,7 @@ export const globalCurrency = 'USD';
 export type MarketBook = { market: string; currency: string };
 
 /** A trader's figures: their orders (shown as `trades_30d` and `trades_total`) and trust figures. */
-type Stats = { trades_30d: number; trades_total: number } & Partial<Trust>;
+type Stats = { trades_30d: number; trades_total: number; merchant?: boolean } & Partial<Trust>;
 type Owner = { id: string; nickname: string };
 /** An escrow ad's payment methods: what anyone sees (where to pay, never the details), and for its owner which of theirs. */
 type AdMethod = Pick<P2pPaymentMethod, 'id' | 'kind' | 'label' | 'currency' | 'hint'>;
@@ -189,7 +189,13 @@ export class P2pService {
   /** Each trader's figures: their released orders (in the last 30 days and ever) and trust figures. */
   private async stats(ids: string[], mode: LedgerMode) {
     const result = new Map<string, Stats>(ids.map(id => [id, { trades_30d: 0, trades_total: 0 }]));
-    for (const [id, trust] of await this.trustFigures.trust(ids, mode)) result.set(id, { trades_30d: trust.orders_30d, trades_total: trust.orders_total, ...trust });
+    const [figures, merchants] = await Promise.all([
+      this.trustFigures.trust(ids, mode),
+      // Afrippa's merchants: approved, and not suspended or revoked.
+      this.prisma.p2pMerchant.findMany({ where: { customerId: { in: ids }, mode, status: 'active' }, select: { customerId: true } }),
+    ]);
+    const active = new Set(merchants.map(row => row.customerId));
+    for (const [id, trust] of figures) result.set(id, { trades_30d: trust.orders_30d, trades_total: trust.orders_total, ...trust, merchant: active.has(id) });
     return result;
   }
 
@@ -234,7 +240,7 @@ export class P2pService {
       /** The owner's sell ad: the seller's fee it keeps locked on top of the coins it offers. */
       fee_locked: mine ? fromUnits(ad.feeLocked, asset.decimals) : null,
       mine,
-      trader: { nickname: owner.nickname, ...(stats ?? { trades_30d: 0, trades_total: 0 }) },
+      trader: { nickname: owner.nickname, ...(stats ?? { trades_30d: 0, trades_total: 0, merchant: false }) },
       created_at: ad.createdAt.toISOString(),
       updated_at: ad.updatedAt.toISOString(),
     };
@@ -257,11 +263,11 @@ export class P2pService {
    * The order book a customer sees: to buy, the sell ads cheapest first; to sell, the buy ads paying most first.
    * Never their own ads, paused ones or ads of frozen accounts. With `fiat`, only ads that take that amount.
    */
-  async market(customer: CustomerWithStore, query: { asset: string; side: AdSide; market?: string; currency?: string; q?: string; fiat?: number; limit?: number }) {
+  async market(customer: CustomerWithStore, query: { asset: string; side: AdSide; market?: string; currency?: string; q?: string; fiat?: number; limit?: number; merchant?: boolean }) {
     const { context, book } = await this.access(customer, query);
     const currency = book.currency;
     const asset = await this.wallets.asset(query.asset);
-    const ads = await this.book(context.mode, book, asset, query.side, customer.id, 200, query.q?.trim());
+    const ads = await this.book(context.mode, book, asset, query.side, customer.id, 200, query.q?.trim(), query.merchant);
     const fiat = query.fiat !== undefined ? BigInt(query.fiat) : null;
     const usable = ads.filter(ad => {
       const capacity = this.capacity(ad, asset);
@@ -323,14 +329,14 @@ export class P2pService {
   }
 
   /** The ads of a book for one side. */
-  private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string | null, take: number, trader?: string) {
+  private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string | null, take: number, trader?: string, merchant?: boolean) {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
     const known = new Map<string, Promise<boolean>>();
     // Never the viewer's own ads, nor those of traders they blocked or who blocked them.
     const hidden = viewerId ? [viewerId, ...(await this.trustFigures.blockedWith(viewerId))] : [];
     const ads = await this.prisma.p2pAd.findMany({
-      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(viewerId ? { customerId: { notIn: hidden } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
+      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(viewerId ? { customerId: { notIn: hidden } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}), ...(merchant ? { p2pMerchants: { some: { mode, status: 'active' } } } : {}) } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });
@@ -398,7 +404,7 @@ export class P2pService {
   }
 
   /** A market's book for the public pages: the same ads traders see (nicknames, prices, limits), with no viewer. */
-  async publicAds(market: string, query: { asset: string; side: AdSide; currency?: string; q?: string; fiat?: number; limit?: number }) {
+  async publicAds(market: string, query: { asset: string; side: AdSide; currency?: string; q?: string; fiat?: number; limit?: number; merchant?: boolean }) {
     const code = market.toUpperCase();
     const listed = (await this.publicMarkets()).data.find(item => item.market === code);
     if (!listed) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'market_unavailable', 'This market is not open.', 'market');
@@ -407,7 +413,7 @@ export class P2pService {
     const mode = this.house.mode();
     const asset = await this.wallets.asset(query.asset);
     const book: MarketBook = { market: code, currency };
-    const ads = await this.book(mode, book, asset, query.side, null, 200, query.q?.trim());
+    const ads = await this.book(mode, book, asset, query.side, null, 200, query.q?.trim(), query.merchant);
     const fiat = query.fiat !== undefined ? BigInt(query.fiat) : null;
     const usable = ads.filter(ad => {
       const capacity = this.capacity(ad, asset);

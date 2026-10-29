@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, Ban, Bell, Bot, BookOpen, ChartNoAxesColumn, Coins, Flag, Gauge, Globe2, Gavel, Headset, History, House, ListChecks, MessagesSquare, Percent, PlugZap, ReceiptText, ScanFace, Settings, ShieldCheck, Snowflake, Ticket, Wallet } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Ban, Bell, Bot, BookOpen, ChartNoAxesColumn, Coins, Flag, Gauge, Globe2, Gavel, Headset, History, House, ListChecks, MessagesSquare, Percent, PlugZap, ReceiptText, ScanFace, Settings, ShieldCheck, Snowflake, Store, Ticket, Wallet } from "lucide-react";
 import { humanise } from "@bitocard/admin-ui";
 import { AccountMenu, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -41,7 +41,10 @@ export const menus: Record<AfrippaSection, { title: string; items: SubNavItem[] 
   },
   traders: {
     title: "Traders",
-    items: [{ label: "Identity checks", href: "/verifications", icon: ScanFace }],
+    items: [
+      { label: "Identity checks", href: "/verifications", icon: ScanFace },
+      { label: "Merchants", href: "/traders/merchants", icon: Store },
+    ],
   },
   crypto: {
     title: "Crypto",
