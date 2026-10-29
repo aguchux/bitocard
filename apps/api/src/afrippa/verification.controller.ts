@@ -55,7 +55,7 @@ export class TraderVerificationController {
   /** Starts the check, or continues an open one with a fresh single-use link. */
   @Post()
   @HttpCode(HttpStatus.OK)
-  async start(@CurrentCustomer() caller: CustomerCaller, @Body() _body: StartDto) {
+  async start(@CurrentCustomer() caller: CustomerCaller, @Body() body: StartDto) {
     const customer = caller.customer;
     if (!customer.country) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'Your account has no country yet.');
     const returnUrl = new URL('/verification', this.integrations.config.AFRIPPA_URL).toString();
@@ -63,7 +63,7 @@ export class TraderVerificationController {
       afrippaOperatorId,
       this.stores.mode(customer.store),
       customer.id,
-      { country: customer.country, ...names(customer.name), redirect_url: returnUrl, consent: true },
+      { country: customer.country, ...names(customer.name), redirect_url: returnUrl, consent: body.consent },
       { storeId: afrippaStoreId },
     );
   }

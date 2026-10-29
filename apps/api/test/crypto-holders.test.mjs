@@ -2,10 +2,9 @@
 // traps their crypto. They can still see it, close their ads and withdraw; only new business is refused.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, afrippaAdminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { afrippaAdminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
-let admin;
 let afrippaAdmin;
 let prisma;
 const { LedgerService } = await import('../dist/ledger/ledger.service.js');
@@ -13,7 +12,6 @@ const { LedgerService } = await import('../dist/ledger/ledger.service.js');
 before(async () => {
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
-  admin = await adminClient(server);
   afrippaAdmin = await afrippaAdminClient(server);
 });
 

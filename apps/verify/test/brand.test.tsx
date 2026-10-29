@@ -69,7 +69,8 @@ describe("Verify in Afrippa's name", () => {
     expect(renderToStaticMarkup(<VerifyFooter />)).toContain("Afrippa Verify · A Golojan Ltd venture");
     const { default: ReviewLayout } = await import("@/app/review/layout");
     expect(() => ReviewLayout({ children: null })).toThrow();
-  });
+    // Loading the components cold can pass Vitest's 5 seconds while other workspaces' tests run alongside.
+  }, 20000);
 
   test("its icons are served from public/afrippa at the usual addresses", async () => {
     const { default: config } = await import("@/next.config");

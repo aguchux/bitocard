@@ -9,7 +9,6 @@ import { adminClient, afrippaAdminClient, adminCode, fakeService, lastEmailCode,
 
 let server;
 let admin;
-let finance;
 /** Afrippa's admins (its own realm): Afrippa's admin routes refuse BitoCard's admins. */
 let afrippaAdmin;
 let afrippaFinance;
@@ -108,7 +107,6 @@ before(async () => {
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on', CRON_SECRET: 'cron-secret' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
-  finance = await adminClient(server, ['finance']);
   afrippaAdmin = await afrippaAdminClient(server);
   afrippaFinance = await afrippaAdminClient(server, ['finance']);
   for (const key of ['crypto_wallets', 'p2p_trading']) await afrippaAdmin.put(`/v1/afrippa/admin/markets/switches/${key}`, { enabled: true });
