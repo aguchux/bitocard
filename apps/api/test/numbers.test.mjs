@@ -334,6 +334,8 @@ describe('the number on its order’s page', () => {
     const shown = (await visitor.get(`/v1/store/access/${token}/number`, proof)).json.number;
     assert.deepEqual([shown.auto_renew, shown.can_renew], [false, true]);
     const price = (await browser.get(`/v1/numbers/${number.id}/renewal-price`)).json.amount;
+    // Weeks from expiry, whatever today's date (the fake supplier's numbers expire on a fixed day).
+    await set(number.id, { expiresAt: new Date(Date.now() + 20 * day) });
     const early = await visitor.post(`/v1/store/access/${token}/number/renew`, {}, proof);
     assert.deepEqual([early.status, early.json.error.code], [409, 'renewal_not_due'], 'not months ahead on the reseller’s wallet');
     const soon = new Date(Date.now() + 3 * day);
