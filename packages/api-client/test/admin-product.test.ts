@@ -35,6 +35,14 @@ describe("the admin product (BitoCard's admin app or Afrippa's)", () => {
     expect(adminPath('/v1/administrators')).toBe('/v1/administrators');
   });
 
+  test("a failed connection names the admin's own product", async () => {
+    const { toApiError } = await import('../src');
+    expect(toApiError('FETCH_ERROR', undefined).message).toBe('Could not reach BitoCard. Check your connection and try again.');
+    setAdminProduct('afrippa');
+    expect(toApiError('FETCH_ERROR', undefined).message).toBe('Could not reach Afrippa. Check your connection and try again.');
+    expect(toApiError('TIMEOUT_ERROR', undefined).message).toBe('Afrippa took too long to answer. Try again.');
+  });
+
   test("Afrippa's admin calls api.afrippa.com unless NEXT_PUBLIC_API_URL says otherwise; BitoCard's api.bitocard.com", async () => {
     const { apiBaseUrl } = await import('../src');
     delete process.env.NEXT_PUBLIC_API_URL;
