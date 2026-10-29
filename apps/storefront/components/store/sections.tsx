@@ -353,10 +353,6 @@ function isEmpty(section: ResolvedSection) {
       return section.data.categories.length === 0;
     case "quick_buy":
       return !section.data.categories.some(tab => tab.products.length);
-    // Crypto has left BitoCard: a crypto desk's sections show nothing.
-    case "crypto_quote":
-    case "p2p_market":
-      return true;
     case "listing_rail":
     case "listing_grid":
       return section.data.listings.length === 0;

@@ -1,7 +1,8 @@
-// Reseller store templates: five templates, each with design variants and colour themes; several stores per reseller;
-// what each template sells (its categories, one product, or the crypto desk behind its switches); each store's own home
+// Reseller store templates, each with design variants and colour themes; several stores per reseller;
+// what each template sells (its categories, one product, or BitoCard Shop listings); each store's own home
 // page (draft, publish, versions, restore, preview) limited to its template's sections; and the storefront showing it.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, lastEmailCode, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { responseChecker } from './openapi-docs.mjs';
@@ -57,9 +58,9 @@ async function published(reseller, body) {
 const storeKeys = async subdomain => (await fetch(`${server.base}/v1/store/products?store=${subdomain}`).then(res => res.json())).data.map(product => product.key);
 
 describe('the templates', () => {
-  test('eight templates, each unique, with at least three variants of at least three colour themes, whose pages use only their sections', () => {
+  test('seven templates, each unique, with at least three variants of at least three colour themes, whose pages use only their sections', () => {
     const { storeTemplates, starterHome } = templates;
-    assert.deepEqual(storeTemplates.map(template => template.key), ['all_in_one', 'topups', 'gift_cards', 'crypto_desk', 'single_product', 'vpn_shop', 'rdp_shop', 'resale_shop']);
+    assert.deepEqual(storeTemplates.map(template => template.key), ['all_in_one', 'topups', 'gift_cards', 'single_product', 'vpn_shop', 'rdp_shop', 'resale_shop']);
     const heroes = new Set();
     for (const template of storeTemplates) {
       assert.ok(template.variants.length >= 3, `${template.key}: three variants`);
@@ -82,7 +83,6 @@ describe('the templates', () => {
     const card = { key: 'gift_cards:NG:amazon:x', category: 'gift_cards' };
     assert.equal(templateSells({ template: 'gift_cards', focus: null }, card), true);
     assert.equal(templateSells({ template: 'topups', focus: null }, card), false);
-    assert.equal(templateSells({ template: 'crypto_desk', focus: null }, card), false);
     assert.equal(templateSells({ template: 'all_in_one', focus: null }, card), true);
     assert.equal(templateSells({ template: 'single_product', focus: card.key }, card), true);
     assert.equal(templateSells({ template: 'single_product', focus: 'other' }, card), false);
@@ -92,7 +92,7 @@ describe('the templates', () => {
     assert.equal(templateSells({ template: 'rdp_shop', focus: null }, { key: 'vpn:WW:bitocard:vpn-access-30d', category: 'vpn' }), false);
   });
 
-  test('the list without the crypto desk (it left with crypto), and the Resale shop once reselling is', async () => {
+  test('the list without the crypto desk (removed with crypto), and the Resale shop once reselling is', async () => {
     const reseller = await seller();
     const listed = await reseller.browser.get('/v1/store-templates');
     assert.equal(listed.status, 200, JSON.stringify(listed.json));
@@ -101,10 +101,11 @@ describe('the templates', () => {
     const resale = listed.json.data.find(item => item.key === 'resale_shop');
     assert.deepEqual([resale.available, resale.reason], [false, 'Reselling BitoCard Shop listings is not open to your account yet.']);
     assert.ok(listed.json.data.filter(item => item.key !== 'resale_shop').every(item => item.available));
-    // Not even with crypto's switches on for them.
+    // It no longer exists, whatever crypto's switches say.
     await prisma.featureSwitch.create({ data: { key: 'p2p_trading', resellerId: reseller.resellerId, enabled: true } });
     const refused = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk' });
-    assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.message], [403, 'template_unavailable', 'The crypto desk is no longer offered.']);
+    assert.deepEqual([refused.status, refused.json.error.param], [400, 'template']);
+    assert.ok(listed.json.data.every(item => item.crypto === false), 'kept in the response, always false');
   });
 });
 
@@ -277,5 +278,35 @@ describe('a store’s home page', () => {
     check('GET /v1/store/home', 200, home);
     const spotlight = home.sections.find(item => item.type === 'product_spotlight');
     assert.equal(spotlight.data.product.key, software.key);
+  });
+});
+
+describe('the crypto desk, removed with crypto', () => {
+  test('its migration moves a store still on it to All-in-one on its starting page, and drops its pages, versions and switch', async () => {
+    const reseller = await seller();
+    const store = await published(reseller, { template: 'topups', variant: 'networks' });
+    const other = await published(reseller, { template: 'gift_cards' });
+    const desk = [{ id: 'c1', type: 'crypto_quote', span: { lg: 12, md: 6 }, title: 'Coins' }];
+    const kept = [{ id: 'h1', type: 'hero', span: { lg: 12, md: 6 }, title: 'Hello' }];
+    // As a store on the retired template would be.
+    await prisma.store.update({ where: { id: store.id }, data: { template: 'crypto_desk', variant: 'terminal', theme: 'matrix', homeDraft: desk, homePublished: desk, homePublishedAt: new Date() } });
+    await prisma.store.update({ where: { id: other.id }, data: { homeDraft: kept } });
+    await prisma.storeHomeVersion.create({ data: { storeId: store.id, version: 1, template: 'crypto_desk', variant: 'terminal', sections: desk } });
+    await prisma.storeHomeVersion.create({ data: { storeId: other.id, version: 1, template: 'gift_cards', variant: 'boutique', sections: kept } });
+    await prisma.featureSwitch.create({ data: { key: 'store_template_crypto_desk', enabled: false } });
+
+    const sql = readFileSync(new URL('../prisma/migrations/20270131000000_retire_crypto_desk/migration.sql', import.meta.url), 'utf8');
+    for (const statement of sql.replace(/^--.*$/gm, '').split(';').map(item => item.trim()).filter(Boolean)) await prisma.$executeRawUnsafe(statement);
+
+    const moved = await prisma.store.findUniqueOrThrow({ where: { id: store.id } });
+    assert.deepEqual([moved.template, moved.variant, moved.theme, moved.homeDraft, moved.homePublished], ['all_in_one', 'classic', 'navy_pink', null, null]);
+    assert.deepEqual((await prisma.store.findUniqueOrThrow({ where: { id: other.id } })).homeDraft, kept, 'other pages untouched');
+    assert.deepEqual((await prisma.storeHomeVersion.findMany({ where: { storeId: { in: [store.id, other.id] } } })).map(row => row.storeId), [other.id]);
+    assert.equal(await prisma.featureSwitch.count({ where: { key: 'store_template_crypto_desk' } }), 0);
+
+    // The moved store shows its starting page.
+    const home = await fetch(`${server.base}/v1/store/home?store=${store.subdomain}`).then(res => res.json());
+    assert.equal(home.published, false);
+    assert.ok(home.sections.length > 0 && home.sections.every(item => item.type !== 'crypto_quote'));
   });
 });

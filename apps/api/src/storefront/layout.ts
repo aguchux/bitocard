@@ -174,27 +174,6 @@ const quickBuy = z.object({
   categories: z.array(z.enum(quickBuyCategories)).min(1).max(5).default(['airtime', 'data']),
 });
 
-/** Reseller stores (crypto desk): a buy and sell quote form on the store's exchange desk. */
-const cryptoQuote = z.object({
-  ...base,
-  type: z.literal('crypto_quote'),
-  title: text(80).min(1),
-  subtitle: text(200).default(''),
-  /** Coins offered first (codes such as USDT, BTC), in order; empty means every coin on sale. */
-  assets: z.array(text(10).min(2)).max(9).default([]),
-  side: z.enum(['buy', 'sell']).default('buy'),
-});
-
-/** Reseller stores (crypto desk): the P2P market's best offers for a coin, linking to the market. */
-const p2pMarket = z.object({
-  ...base,
-  type: z.literal('p2p_market'),
-  title: text(80).min(1),
-  subtitle: text(200).default(''),
-  asset: text(10).min(2).default('USDT'),
-  limit: z.number().int().min(1).max(10).default(5),
-});
-
 /** One product in full with its buy form (single product stores; the store's focus product unless another is named). */
 const productSpotlight = z.object({
   ...base,
@@ -261,7 +240,7 @@ const resaleCategories = z.object({
   limit: z.number().int().min(1).max(12).default(8),
 });
 
-export const section = z.discriminatedUnion('type', [hero, productRail, categoryGrid, brandGrid, promo, trustBar, quickBuy, cryptoQuote, p2pMarket, productSpotlight, features, faq, listingRail, listingGrid, resaleCategories]);
+export const section = z.discriminatedUnion('type', [hero, productRail, categoryGrid, brandGrid, promo, trustBar, quickBuy, productSpotlight, features, faq, listingRail, listingGrid, resaleCategories]);
 /** Sections for bitocard.com's Storefront Manager (the others are reseller store templates'). */
 export const bitocardSectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar'] as const;
 export const sections = z

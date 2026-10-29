@@ -132,7 +132,7 @@ const storeDesign = objectSchema(
   },
   'How a store looks: its template, the variant’s style and the theme’s colours (the store’s own primary and accent colours win).',
 );
-const sectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq', 'listing_rail', 'listing_grid', 'resale_categories'];
+const sectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'product_spotlight', 'features', 'faq', 'listing_rail', 'listing_grid', 'resale_categories'];
 const storeTemplate = objectSchema(
   'Store template',
   {
@@ -141,9 +141,9 @@ const storeTemplate = objectSchema(
     name: str('Its name.'),
     tagline: str('One line saying what it is for.'),
     description: str('What the store sells and how it looks.'),
-    categories: { type: ['array', 'null'], items: category(), description: 'The categories the store sells; null for every category, empty for none (the crypto desk sells crypto, not catalogue products).' },
+    categories: { type: ['array', 'null'], items: category(), description: 'The categories the store sells; null for every category, empty for none (the Resale shop sells BitoCard Shop listings, not catalogue products).' },
     single_product: bool('The store sells one product, chosen as its `focus`.'),
-    crypto: bool('The crypto desk: offered where crypto trading is switched on for you.'),
+    crypto: bool('Always false: the crypto desk store was retired.'),
     resale: bool('The Resale shop: sells BitoCard Shop suppliers’ resale listings (offered where reselling is open to you), never catalogue products.'),
     sections: array(str('A section type.', { enum: sectionTypes }), 'Sections the store’s editor offers.'),
     available: bool('Whether you can use it now.'),
@@ -398,18 +398,6 @@ const sections = [
     shape({ categories: array(shape({ category: category(), label: str('Tab label.'), brands: array(ref('StoreBrandListing'), 'Its networks or billers.'), products: array(ref('StoreProduct'), 'Its products (up to 48): each network’s top-up or bundles, each biller’s payment.') }), 'The tabs on sale here, with their networks or billers.') }),
   ),
   section(
-    'crypto_quote',
-    'Reseller stores (crypto desk): an instant buy and sell quote form.',
-    { ...heading, assets: array(str('A coin code.'), 'Coins offered first; empty means every coin on sale.'), side: oneOf('The side shown first.', ['buy', 'sell']) },
-    shape({ assets: array(shape({ code: str('Coin code, for example `USDT`.'), name: str('Coin name.') }), 'Coins offered, in order.') }),
-  ),
-  section(
-    'p2p_market',
-    'Reseller stores (crypto desk): the P2P market for a coin.',
-    { ...heading, asset: str('Coin code.'), limit: int('Most offers to show.') },
-    shape({ asset: nullable(shape({ code: str('Coin code.'), name: str('Coin name.') })) }),
-  ),
-  section(
     'product_spotlight',
     'One product in full with its buy form (the store’s focus product unless another is named).',
     { title: str('Heading; empty uses the product’s name.'), subtitle: str('Text; may be empty.'), productKey: str('A product key; empty means the store’s focus product.'), bullets: array(str('A selling point.')) },
@@ -640,7 +628,7 @@ const templateExamples = storeTemplates.slice(0, 1).map(template => ({
   description: template.description,
   categories: template.categories,
   single_product: template.single,
-  crypto: template.crypto,
+  crypto: false,
   resale: Boolean(template.resale),
   sections: template.sections,
   available: true,

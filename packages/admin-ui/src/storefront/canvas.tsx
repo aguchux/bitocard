@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowLeftRight, ArrowUp, Award, Copy, Eye, EyeOff, GripVertical, HelpCircle, LayoutPanelTop, ListChecks, Megaphone, Rows2, ShieldCheck, ShoppingBag, Sparkles, Trash2, Grid2x2, Users, Zap, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Award, Copy, Eye, EyeOff, GripVertical, HelpCircle, LayoutPanelTop, ListChecks, Megaphone, Rows2, ShieldCheck, ShoppingBag, Sparkles, Trash2, Grid2x2, Zap, type LucideIcon } from "lucide-react";
 import type { StoreSection as Section, StoreSectionType as SectionType } from "@bitocard/api-client/storefront";
 import { cn } from "../format";
 import { Badge } from "../ui/status";
@@ -18,8 +18,6 @@ export const sectionIcons: Record<SectionType, LucideIcon> = {
   promo: Megaphone,
   trust_bar: ShieldCheck,
   quick_buy: Zap,
-  crypto_quote: ArrowLeftRight,
-  p2p_market: Users,
   product_spotlight: Sparkles,
   features: ListChecks,
   faq: HelpCircle,

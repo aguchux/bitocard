@@ -3,8 +3,8 @@ import type { ProductCategory } from '../generated/prisma/client.js';
 import { type SectionType, type Sections, sections } from '../storefront/layout.js';
 
 /**
- * Reseller store templates. A template decides what a store sells (its categories, or one product, or the crypto
- * desk) and which sections its editor offers; each has design variants with their own look (light or dark, the hero,
+ * Reseller store templates. A template decides what a store sells (its categories, or one product, or BitoCard Shop
+ * listings) and which sections its editor offers; each has design variants with their own look (light or dark, the hero,
  * corners, cards, type) and starting home page, and each variant several colour themes. Defined in code, like the
  * layout's sections, so the storefront and SHQ always agree.
  */
@@ -44,19 +44,17 @@ export type VariantStyle = {
 
 export type TemplateVariant = { key: string; name: string; description: string; style: VariantStyle; themes: StoreTheme[]; starter: () => unknown[] };
 
-export type TemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop' | 'resale_shop';
+export type TemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'single_product' | 'vpn_shop' | 'rdp_shop' | 'resale_shop';
 
 export type StoreTemplate = {
   key: TemplateKey;
   name: string;
   tagline: string;
   description: string;
-  /** What the store sells: these categories, every category (null), or nothing from the catalogue (the crypto desk). */
+  /** What the store sells: these categories, every category (null), or nothing from the catalogue (the Resale shop). */
   categories: ProductCategory[] | null;
   /** The store sells one product, chosen as its `focus`. */
   single: boolean;
-  /** The store is the crypto desk: offered only where the reseller's exchange or P2P is switched on. */
-  crypto: boolean;
   /** The store sells BitoCard Shop suppliers' resale listings, never catalogue products (B2B reselling). */
   resale?: boolean;
   /** Sections its editor offers. */
@@ -90,7 +88,6 @@ const allInOne: StoreTemplate = {
   description: 'Gift cards, top-ups, bills, eSIMs, software and more: a full catalogue with search, categories, brands and product rails.',
   categories: null,
   single: false,
-  crypto: false,
   sections: ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'features', 'faq'],
   variants: [
     {
@@ -173,7 +170,6 @@ const topups: StoreTemplate = {
   description: 'A store for everyday top-ups and bills: a quick-buy form up front, the networks and billers, and the popular bundles.',
   categories: topupCategories,
   single: false,
-  crypto: false,
   sections: ['hero', 'quick_buy', 'brand_grid', 'product_rail', 'category_grid', 'promo', 'trust_bar', 'features', 'faq'],
   variants: [
     {
@@ -258,7 +254,6 @@ const giftCards: StoreTemplate = {
   description: 'A shop for gift cards: brand card art front and centre, trending cards and occasions.',
   categories: ['gift_cards'],
   single: false,
-  crypto: false,
   sections: ['hero', 'brand_grid', 'product_rail', 'promo', 'trust_bar', 'features', 'faq'],
   variants: [
     {
@@ -320,100 +315,7 @@ const giftCards: StoreTemplate = {
   ],
 };
 
-// -- 4. Crypto desk ---------------------------------------------------------------------------------------------------
-
-const cryptoFaq = {
-  id: id(),
-  type: 'faq',
-  span: full,
-  title: 'Questions',
-  items: [
-    { question: 'How is the price set?', answer: 'From the coin’s live market price. The quote shows exactly what you get and holds for 30 seconds.' },
-    { question: 'What is P2P?', answer: 'Buying and selling with other traders at the prices they set, paid instantly from your wallet.' },
-    { question: 'Can I withdraw my coins?', answer: 'Yes, to your own wallet address, once it has been saved for 24 hours.' },
-  ],
-};
-
-const cryptoDesk: StoreTemplate = {
-  key: 'crypto_desk',
-  name: 'Crypto desk',
-  tagline: 'Buy and sell crypto instantly, or trade P2P.',
-  description: 'An exchange store: an instant buy and sell quote, the P2P market and coin wallets. Offered where crypto is switched on for you.',
-  categories: [],
-  single: false,
-  crypto: true,
-  sections: ['hero', 'crypto_quote', 'p2p_market', 'promo', 'trust_bar', 'features', 'faq'],
-  variants: [
-    {
-      key: 'terminal',
-      name: 'Trading terminal',
-      description: 'Dark and dense: the quote form beside the P2P book, like a trading screen.',
-      style: { mode: 'dark', hero: 'terminal', corners: 'sharp', cards: 'flat', font: 'mono', density: 'compact' },
-      themes: [
-        theme('matrix', 'Matrix', { primary: '#22c55e', accent: '#ef4444', background: '#05070a', surface: '#0d1117', ink: '#e6edf3', muted: '#8b949e', heroFrom: '#05070a', heroTo: '#0d1117', heroInk: '#e6edf3' }),
-        theme('gold_rush', 'Gold rush', { primary: '#eab308', accent: '#f97316', background: '#0a0804', surface: '#16120a', ink: '#fbf5e6', muted: '#a89f87', heroFrom: '#0a0804', heroTo: '#2a1f06', heroInk: '#ffffff' }),
-        theme('ice', 'Ice', { primary: '#38bdf8', accent: '#a78bfa', background: '#050a12', surface: '#0c1524', ink: '#e8f3ff', muted: '#8ea2bd', heroFrom: '#050a12', heroTo: '#0c2340', heroInk: '#ffffff' }),
-      ],
-      starter: () => [
-        { id: id(), type: 'crypto_quote', span: { lg: 6, md: 6 }, title: 'Instant buy and sell', subtitle: 'Live price, held for 30 seconds.' },
-        { id: id(), type: 'p2p_market', span: { lg: 6, md: 6 }, title: 'P2P market', subtitle: 'Best offers from traders.', asset: 'USDT' },
-        trust([
-          ['chart', 'Live prices', 'From the coin’s market price.'],
-          ['bolt', 'Instant', 'Settled to your wallet at once.'],
-          ['shield', 'Screened', 'Withdrawal addresses are checked.'],
-          ['lock', 'Your keys stay safe', 'Withdrawals need your code.'],
-        ]),
-        cryptoFaq,
-      ],
-    },
-    {
-      key: 'market',
-      name: 'P2P market',
-      description: 'The P2P market leads: offers for each coin, with the instant desk below.',
-      style: { mode: 'light', hero: 'market', corners: 'soft', cards: 'outline', font: 'sans', density: 'comfortable' },
-      themes: [
-        theme('trust_blue', 'Trust blue', { primary: '#1d4ed8', accent: '#16a34a', background: '#f6f8fd', surface: '#ffffff', ink: '#0c1733', muted: '#56627f', heroFrom: '#1d4ed8', heroTo: '#1e3a8a', heroInk: '#ffffff' }),
-        theme('binance_gold', 'Gold', { primary: '#b45309', accent: '#16a34a', background: '#fffbf2', surface: '#ffffff', ink: '#271a03', muted: '#7a6a4a', heroFrom: '#f59e0b', heroTo: '#b45309', heroInk: '#ffffff' }),
-        theme('slate', 'Slate', { primary: '#0f172a', accent: '#22c55e', background: '#f8fafc', surface: '#ffffff', ink: '#0f172a', muted: '#64748b', heroFrom: '#0f172a', heroTo: '#334155', heroInk: '#ffffff' }),
-      ],
-      starter: () => [
-        { id: id(), type: 'hero', span: full, title: 'Trade crypto', accent: 'with people you can trust.', subtitle: 'Buy and sell USDT, BTC and more at traders’ prices, paid instantly.', search: false, categoryChips: false },
-        { id: id(), type: 'p2p_market', span: half, title: 'Buy USDT', asset: 'USDT' },
-        { id: id(), type: 'p2p_market', span: half, title: 'Buy BTC', asset: 'BTC' },
-        { id: id(), type: 'crypto_quote', span: full, title: 'Prefer an instant price?', subtitle: 'Buy or sell straight from the desk.' },
-        cryptoFaq,
-      ],
-    },
-    {
-      key: 'swap',
-      name: 'Simple swap',
-      description: 'One calm swap form in the middle of the page: the easiest way to buy a first coin.',
-      style: { mode: 'light', hero: 'swap', corners: 'round', cards: 'raised', font: 'display', density: 'airy' },
-      themes: [
-        theme('aurora', 'Aurora', { primary: '#7c3aed', accent: '#06b6d4', background: '#faf8ff', surface: '#ffffff', ink: '#1a1033', muted: '#625a7d', heroFrom: '#ede9fe', heroTo: '#cffafe', heroInk: '#1a1033' }),
-        theme('peach', 'Peach', { primary: '#c2410c', accent: '#db2777', background: '#fff8f4', surface: '#ffffff', ink: '#2a1206', muted: '#7d6152', heroFrom: '#ffedd5', heroTo: '#fce7f3', heroInk: '#2a1206' }),
-        theme('seafoam', 'Seafoam', { primary: '#0d9488', accent: '#2563eb', background: '#f5fdfb', surface: '#ffffff', ink: '#062421', muted: '#4f6e6a', heroFrom: '#ccfbf1', heroTo: '#dbeafe', heroInk: '#062421' }),
-      ],
-      starter: () => [
-        { id: id(), type: 'crypto_quote', span: full, title: 'Your first coin in a minute', subtitle: 'Choose a coin and an amount. You see exactly what you get.', assets: ['USDT', 'BTC', 'ETH'] },
-        {
-          id: id(),
-          type: 'features',
-          span: full,
-          title: 'Simple and safe',
-          items: [
-            { icon: 'coin', title: 'Choose a coin', body: 'USDT, BTC, ETH and more.' },
-            { icon: 'chart', title: 'See the price', body: 'Held for 30 seconds while you decide.' },
-            { icon: 'bolt', title: 'It’s yours', body: 'In your wallet at once.' },
-          ],
-        },
-        cryptoFaq,
-      ],
-    },
-  ],
-};
-
-// -- 5. Single product ------------------------------------------------------------------------------------------------
+// -- 4. Single product ------------------------------------------------------------------------------------------------
 
 const singleProduct: StoreTemplate = {
   key: 'single_product',
@@ -422,7 +324,6 @@ const singleProduct: StoreTemplate = {
   description: 'A landing page for one product or brand: an eSIM plan, a virtual number, one gift card brand or a bundle. The buy form sits above the fold.',
   categories: null,
   single: true,
-  crypto: false,
   sections: ['product_spotlight', 'hero', 'features', 'faq', 'promo', 'trust_bar'],
   variants: [
     {
@@ -506,7 +407,7 @@ const singleProduct: StoreTemplate = {
   ],
 };
 
-// -- 6. VPN shop ------------------------------------------------------------------------------------------------------
+// -- 5. VPN shop ------------------------------------------------------------------------------------------------------
 
 // Only what BitoCard's VPN access is (30 days, up to 10 devices, never renewed by itself, details on the order page):
 // no privacy, logging, location or speed claims until they are evidenced (see VPN access in AGENTS.md).
@@ -548,7 +449,6 @@ const vpnShop: StoreTemplate = {
   description: 'A store for VPN access only: the plan and its buy form up front, what it includes and the questions customers ask.',
   categories: ['vpn'],
   single: false,
-  crypto: false,
   sections: ['hero', 'product_spotlight', 'product_rail', 'features', 'faq', 'promo', 'trust_bar'],
   variants: [
     {
@@ -607,7 +507,7 @@ const vpnShop: StoreTemplate = {
   ],
 };
 
-// -- 7. RDP shop ------------------------------------------------------------------------------------------------------
+// -- 6. RDP shop ------------------------------------------------------------------------------------------------------
 
 const rdpFeatures = {
   id: id(),
@@ -645,7 +545,6 @@ const rdpShop: StoreTemplate = {
   description: 'A store for RDP servers only: the plans side by side, how connecting works and the questions customers ask.',
   categories: ['rdp'],
   single: false,
-  crypto: false,
   sections: ['hero', 'product_rail', 'product_spotlight', 'features', 'faq', 'promo', 'trust_bar'],
   variants: [
     {
@@ -704,7 +603,7 @@ const rdpShop: StoreTemplate = {
   ],
 };
 
-// -- 8. Resale shop (B2B reselling: BitoCard Shop suppliers' listings) -------------------------------------------------
+// -- 7. Resale shop (B2B reselling: BitoCard Shop suppliers' listings) -------------------------------------------------
 
 const resaleTrust = trust([
   ['shield', 'Payment protected', 'Your money is held until you have the item.'],
@@ -731,7 +630,6 @@ const resaleShop: StoreTemplate = {
   description: 'Phones, electronics, fashion and more from BitoCard Shop suppliers in your country, at your prices. Every listing shows its supplier, and buyers’ money is held until they have the item.',
   categories: [],
   single: false,
-  crypto: false,
   resale: true,
   sections: ['hero', 'listing_rail', 'listing_grid', 'resale_categories', 'promo', 'features', 'faq', 'trust_bar'],
   variants: [
@@ -791,7 +689,7 @@ const resaleShop: StoreTemplate = {
     },
   ],
 };
-export const storeTemplates: StoreTemplate[] = [allInOne, topups, giftCards, cryptoDesk, singleProduct, vpnShop, rdpShop, resaleShop];
+export const storeTemplates: StoreTemplate[] = [allInOne, topups, giftCards, singleProduct, vpnShop, rdpShop, resaleShop];
 export const templateKeys = storeTemplates.map(template => template.key) as [TemplateKey, ...TemplateKey[]];
 
 export function templateFor(key: string) {

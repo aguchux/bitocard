@@ -7,8 +7,8 @@ import { densityGap, storeShell, storeThemeVars } from "@/lib/store-theme";
 const colors = { primary: "#065f46", accent: "#f59e0b", background: "#f4faf7", surface: "#ffffff", ink: "#062a20", muted: "#4b6b60", heroFrom: "#064e3b", heroTo: "#0f766e", heroInk: "#ffffff" };
 const light: StoreDesign = { template: "all_in_one", variant: "classic", theme: "emerald", style: { mode: "light", hero: "search", corners: "round", cards: "raised", font: "sans", density: "comfortable" }, colors };
 const dark: StoreDesign = {
-  template: "crypto_desk",
-  variant: "terminal",
+  template: "vpn_shop",
+  variant: "night_tunnel",
   theme: "matrix",
   style: { mode: "dark", hero: "terminal", corners: "sharp", cards: "flat", font: "mono", density: "compact" },
   colors: { primary: "#22c55e", accent: "#ef4444", background: "#05070a", surface: "#0d1117", ink: "#e6edf3", muted: "#8b949e", heroFrom: "#05070a", heroTo: "#0d1117", heroInk: "#e6edf3" },
@@ -42,7 +42,7 @@ describe("store theme", () => {
     expect(storeShell(undefined)).toEqual({});
     const shell = storeShell(dark);
     expect(shell["data-mode"]).toBe("dark");
-    expect(shell["data-variant"]).toBe("terminal");
+    expect(shell["data-variant"]).toBe("night_tunnel");
     expect(shell["data-cards"]).toBe("flat");
     expect((shell.style as Record<string, string>).fontFamily).toContain("monospace");
     expect((shell.style as Record<string, string>)["--color-page"]).toBe("#05070a");
@@ -68,11 +68,10 @@ describe("quick buy", () => {
 
 describe("quick links", () => {
   const group = (category: string, on_sale: boolean) => ({ key: category, label: category, on_sale, brands: [], categories: [{ object: "store_category" as const, category: category as never, label: category, group: null, icon_url: null, image_url: null, products: on_sale ? 1 : 0, on_sale }] });
-  test("bitocard.com shows every quick link; a reseller's store only what it sells (crypto has left BitoCard)", () => {
+  test("bitocard.com shows every quick link; a reseller's store only what it sells ", () => {
     expect(quickLinksFor([], null)).toEqual(["/catalogs/virtual_numbers", "/catalogs/rdp", "/catalogs/vpn"]);
     expect(quickLinksFor([group("gift_cards", true)], "gift_cards")).toEqual([]);
     expect(quickLinksFor([group("virtual_numbers", true), group("rdp", false), group("vpn", true), group("virtual_cards", true)], "all_in_one")).toEqual(["/catalogs/virtual_numbers", "/catalogs/vpn"]);
-    expect(quickLinksFor([], "crypto_desk")).toEqual([]);
     expect(quickLinksFor([], "resale_shop")).toEqual(["/listings"]);
   });
 });

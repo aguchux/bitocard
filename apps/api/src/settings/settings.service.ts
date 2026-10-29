@@ -86,11 +86,6 @@ export const switchDefinitions = {
     default: true,
     description: 'Resellers can choose the Gift card shop store template. Stores already using it keep it. On unless switched off.',
   },
-  store_template_crypto_desk: {
-    scopes: ['global', 'country', 'reseller'],
-    default: true,
-    description: "Resellers can choose the Crypto desk store template (retired with crypto: never offered). Stores already using it keep it. On unless switched off.",
-  },
   store_template_single_product: {
     scopes: ['global', 'country', 'reseller'],
     default: true,
@@ -182,7 +177,6 @@ export const afrippaSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'crypto_global',
   'crypto_cross_border',
   'crypto_install_prompt',
-  'store_template_crypto_desk',
 ]);
 
 /** The switches BitoCard's admins and resellers see. */

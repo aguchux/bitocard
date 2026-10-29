@@ -311,8 +311,7 @@ export class StoresService {
 
   /**
    * Whether a template is open to the reseller, and why not: its admin switch (`store_template_<key>`, on by default),
-   * for the crypto desk their exchange or P2P switched on, and for the Resale shop
-   * their `reseller_resale` switch and a verified account.
+   * and for the Resale shop their `reseller_resale` switch and a verified account.
    */
   async templateAvailability(resellerId: string, template: StoreTemplate) {
     if (!(await this.settings.isOn(`store_template_${template.key}`, resellerId))) return { available: false, reason: 'BitoCard does not offer this template for your stores at the moment.' };
@@ -322,17 +321,15 @@ export class StoresService {
       const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { status: true } });
       return reseller?.status === 'active' ? { available: true, reason: null } : { available: false, reason: 'Finish your identity check to open a Resale shop.' };
     }
-    // Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): the crypto desk is never offered again.
-    if (template.crypto) return { available: false, reason: 'The crypto desk is no longer offered.' };
     return { available: true, reason: null };
   }
 
-  /** Every template, its variants and themes, and whether each is open to the reseller (the crypto desk left with crypto). */
+  /** Every template, its variants and themes, and whether each is open to the reseller. */
   async templates(resellerId: string) {
     return {
       object: 'list' as const,
       data: await Promise.all(
-        storeTemplates.filter(template => !template.crypto).map(async template => ({
+        storeTemplates.map(async template => ({
           object: 'store_template' as const,
           key: template.key,
           name: template.name,
@@ -340,7 +337,8 @@ export class StoresService {
           description: template.description,
           categories: template.categories,
           single_product: template.single,
-          crypto: template.crypto,
+          // Kept in the response, always false: the crypto desk left BitoCard with crypto (docs/CRYPTO_SPINOFF_PLAN.md).
+          crypto: false,
           resale: Boolean(template.resale),
           sections: template.sections,
           ...(await this.templateAvailability(resellerId, template)),

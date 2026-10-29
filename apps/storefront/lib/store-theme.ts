@@ -8,7 +8,7 @@ import type { StoreDesign } from "@bitocard/api-client/storefront";
  * ink, the page its background, and on dark variants white and the slate scale turn into its surfaces and text. The
  * variant's corners and type re-point the radius and font variables the same way; its cards (`data-cards`) drop or
  * soften shadows in `globals.css`, since Tailwind writes shadows out in full.
- * `--st-*` name the theme's own colours for the template sections (heroes, quick buy, the crypto desk).
+ * `--st-*` name the theme's own colours for the template sections (heroes, quick buy, the service shops).
  */
 
 const mix = (color: string, other: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, ${other})`;

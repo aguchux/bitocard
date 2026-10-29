@@ -153,8 +153,6 @@ export type SectionType = Section['type'];
 // Reseller store templates' sections (bitocard.com's Storefront Manager offers the six above).
 export type QuickBuyCategory = 'airtime' | 'data' | 'bills' | 'pay_tv' | 'mobile_money';
 export type QuickBuySection = SectionBase & { type: 'quick_buy'; title: string; subtitle: string; categories: QuickBuyCategory[] };
-export type CryptoQuoteSection = SectionBase & { type: 'crypto_quote'; title: string; subtitle: string; assets: string[]; side: 'buy' | 'sell' };
-export type P2pMarketSection = SectionBase & { type: 'p2p_market'; title: string; subtitle: string; asset: string; limit: number };
 export type ProductSpotlightSection = SectionBase & { type: 'product_spotlight'; title: string; subtitle: string; productKey: string; bullets: string[]; imageUrl?: string };
 export type FeaturesSection = SectionBase & { type: 'features'; title: string; subtitle: string; items: Array<{ icon: TrustIcon; title: string; body: string }> };
 export type FaqSection = SectionBase & { type: 'faq'; title: string; items: Array<{ question: string; answer: string }> };
@@ -162,7 +160,7 @@ export type FaqSection = SectionBase & { type: 'faq'; title: string; items: Arra
 export type ListingRailSection = SectionBase & { type: 'listing_rail'; title: string; subtitle: string; source: 'newest' | 'price_low' | 'category'; category?: string; limit: number; viewAllHref?: string };
 export type ListingGridSection = SectionBase & { type: 'listing_grid'; title: string; subtitle: string; category?: string; sort: 'newest' | 'price_asc' | 'price_desc'; limit: number };
 export type ResaleCategoriesSection = SectionBase & { type: 'resale_categories'; title: string; subtitle: string; limit: number };
-export type StoreSection = Section | QuickBuySection | CryptoQuoteSection | P2pMarketSection | ProductSpotlightSection | FeaturesSection | FaqSection | ListingRailSection | ListingGridSection | ResaleCategoriesSection;
+export type StoreSection = Section | QuickBuySection | ProductSpotlightSection | FeaturesSection | FaqSection | ListingRailSection | ListingGridSection | ResaleCategoriesSection;
 
 export type ResalePhoto = { url: string; width: number | null; height: number | null };
 /** Who supplies a resale listing: always shown with it, linking to their page on the store (`/suppliers/<id>`). */
@@ -216,7 +214,6 @@ export type ResaleStoreSupplier = ResaleSupplierLine & {
 export type ResaleCategoryTile = { slug: string; name: string; count: number; cover: ResalePhoto | null };
 export type ResaleStoreListingPage = { object: 'list'; data: ResaleStoreListing[]; total: number; offset: number; limit: number };
 export type StoreSectionType = StoreSection['type'];
-export type CryptoAssetRef = { code: string; name: string };
 
 /** A section as the home page returns it: with what it shows. */
 export type ResolvedSection =
@@ -227,8 +224,6 @@ export type ResolvedSection =
   | (PromoSection & { data: null })
   | (TrustBarSection & { data: null })
   | (QuickBuySection & { data: { categories: Array<{ category: QuickBuyCategory; label: string; brands: StoreBrand[]; products: StoreProduct[] }> } })
-  | (CryptoQuoteSection & { data: { assets: CryptoAssetRef[] } })
-  | (P2pMarketSection & { data: { asset: CryptoAssetRef | null } })
   | (ProductSpotlightSection & { data: { product: StoreProductDetail | null } })
   | (FeaturesSection & { data: null })
   | (FaqSection & { data: null })
@@ -238,7 +233,7 @@ export type ResolvedSection =
 
 // -- Store templates: how a reseller's store looks (`GET /v1/storefronts/:subdomain` `design`) ----------------------
 
-export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop' | 'resale_shop';
+export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'single_product' | 'vpn_shop' | 'rdp_shop' | 'resale_shop';
 export type StoreThemeColors = { primary: string; accent: string; background: string; surface: string; ink: string; muted: string; heroFrom: string; heroTo: string; heroInk: string };
 export type StoreVariantStyle = {
   mode: 'light' | 'dark';

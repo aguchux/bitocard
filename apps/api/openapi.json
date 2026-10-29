@@ -41344,7 +41344,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",
@@ -41431,7 +41430,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",
@@ -51749,7 +51747,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",
@@ -53884,255 +53881,6 @@
                 },
                 {
                   "type": "object",
-                  "title": "crypto_quote section",
-                  "description": "Reseller stores (crypto desk): an instant buy and sell quote form.",
-                  "required": [
-                    "id",
-                    "type",
-                    "span",
-                    "hidden",
-                    "title",
-                    "subtitle",
-                    "assets",
-                    "side",
-                    "data"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "description": "Section ID, unique on the page."
-                    },
-                    "type": {
-                      "type": "string",
-                      "description": "Always `crypto_quote`.",
-                      "const": "crypto_quote"
-                    },
-                    "span": {
-                      "type": "object",
-                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
-                      "required": [
-                        "lg",
-                        "md",
-                        "rows"
-                      ],
-                      "additionalProperties": false,
-                      "properties": {
-                        "lg": {
-                          "type": "integer",
-                          "description": "Desktop width out of 12 columns.",
-                          "enum": [
-                            3,
-                            4,
-                            6,
-                            8,
-                            9,
-                            12
-                          ]
-                        },
-                        "md": {
-                          "type": "integer",
-                          "description": "Tablet width out of 6 columns.",
-                          "enum": [
-                            3,
-                            6
-                          ]
-                        },
-                        "rows": {
-                          "type": "integer",
-                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
-                          "enum": [
-                            1,
-                            2
-                          ]
-                        }
-                      }
-                    },
-                    "hidden": {
-                      "type": "boolean",
-                      "description": "Always false here: hidden sections are left out."
-                    },
-                    "title": {
-                      "type": "string",
-                      "description": "Heading."
-                    },
-                    "subtitle": {
-                      "type": "string",
-                      "description": "Subheading; may be empty."
-                    },
-                    "assets": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "description": "A coin code."
-                      },
-                      "description": "Coins offered first; empty means every coin on sale."
-                    },
-                    "side": {
-                      "type": "string",
-                      "description": "The side shown first.",
-                      "enum": [
-                        "buy",
-                        "sell"
-                      ]
-                    },
-                    "data": {
-                      "type": "object",
-                      "required": [
-                        "assets"
-                      ],
-                      "additionalProperties": false,
-                      "properties": {
-                        "assets": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "required": [
-                              "code",
-                              "name"
-                            ],
-                            "additionalProperties": false,
-                            "properties": {
-                              "code": {
-                                "type": "string",
-                                "description": "Coin code, for example `USDT`."
-                              },
-                              "name": {
-                                "type": "string",
-                                "description": "Coin name."
-                              }
-                            }
-                          },
-                          "description": "Coins offered, in order."
-                        }
-                      }
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "title": "p2p_market section",
-                  "description": "Reseller stores (crypto desk): the P2P market for a coin.",
-                  "required": [
-                    "id",
-                    "type",
-                    "span",
-                    "hidden",
-                    "title",
-                    "subtitle",
-                    "asset",
-                    "limit",
-                    "data"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "description": "Section ID, unique on the page."
-                    },
-                    "type": {
-                      "type": "string",
-                      "description": "Always `p2p_market`.",
-                      "const": "p2p_market"
-                    },
-                    "span": {
-                      "type": "object",
-                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
-                      "required": [
-                        "lg",
-                        "md",
-                        "rows"
-                      ],
-                      "additionalProperties": false,
-                      "properties": {
-                        "lg": {
-                          "type": "integer",
-                          "description": "Desktop width out of 12 columns.",
-                          "enum": [
-                            3,
-                            4,
-                            6,
-                            8,
-                            9,
-                            12
-                          ]
-                        },
-                        "md": {
-                          "type": "integer",
-                          "description": "Tablet width out of 6 columns.",
-                          "enum": [
-                            3,
-                            6
-                          ]
-                        },
-                        "rows": {
-                          "type": "integer",
-                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
-                          "enum": [
-                            1,
-                            2
-                          ]
-                        }
-                      }
-                    },
-                    "hidden": {
-                      "type": "boolean",
-                      "description": "Always false here: hidden sections are left out."
-                    },
-                    "title": {
-                      "type": "string",
-                      "description": "Heading."
-                    },
-                    "subtitle": {
-                      "type": "string",
-                      "description": "Subheading; may be empty."
-                    },
-                    "asset": {
-                      "type": "string",
-                      "description": "Coin code."
-                    },
-                    "limit": {
-                      "type": "integer",
-                      "description": "Most offers to show."
-                    },
-                    "data": {
-                      "type": "object",
-                      "required": [
-                        "asset"
-                      ],
-                      "additionalProperties": false,
-                      "properties": {
-                        "asset": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "required": [
-                                "code",
-                                "name"
-                              ],
-                              "additionalProperties": false,
-                              "properties": {
-                                "code": {
-                                  "type": "string",
-                                  "description": "Coin code."
-                                },
-                                "name": {
-                                  "type": "string",
-                                  "description": "Coin name."
-                                }
-                              }
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                },
-                {
-                  "type": "object",
                   "title": "product_spotlight section",
                   "description": "One product in full with its buy form (the store’s focus product unless another is named).",
                   "required": [
@@ -54662,7 +54410,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",
@@ -54866,7 +54613,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",
@@ -54908,7 +54654,7 @@
                 "mobile_money"
               ]
             },
-            "description": "The categories the store sells; null for every category, empty for none (the crypto desk sells crypto, not catalogue products)."
+            "description": "The categories the store sells; null for every category, empty for none (the Resale shop sells BitoCard Shop listings, not catalogue products)."
           },
           "single_product": {
             "type": "boolean",
@@ -54916,7 +54662,7 @@
           },
           "crypto": {
             "type": "boolean",
-            "description": "The crypto desk: offered where crypto trading is switched on for you."
+            "description": "Always false: the crypto desk store was retired."
           },
           "resale": {
             "type": "boolean",
@@ -54935,8 +54681,6 @@
                 "promo",
                 "trust_bar",
                 "quick_buy",
-                "crypto_quote",
-                "p2p_market",
                 "product_spotlight",
                 "features",
                 "faq",
@@ -55201,7 +54945,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",
@@ -55225,8 +54968,6 @@
                 "promo",
                 "trust_bar",
                 "quick_buy",
-                "crypto_quote",
-                "p2p_market",
                 "product_spotlight",
                 "features",
                 "faq",
@@ -55265,8 +55006,6 @@
                     "promo",
                     "trust_bar",
                     "quick_buy",
-                    "crypto_quote",
-                    "p2p_market",
                     "product_spotlight",
                     "features",
                     "faq",
@@ -55342,7 +55081,6 @@
               "all_in_one",
               "topups",
               "gift_cards",
-              "crypto_desk",
               "single_product",
               "vpn_shop",
               "rdp_shop",

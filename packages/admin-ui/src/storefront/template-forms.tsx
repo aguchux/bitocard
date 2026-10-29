@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { type CryptoQuoteSection, type ListingGridSection, type ListingRailSection, type P2pMarketSection, type QuickBuyCategory, type QuickBuySection, type ResaleCategoriesSection } from "@bitocard/api-client/storefront";
+import { type ListingGridSection, type ListingRailSection, type QuickBuyCategory, type QuickBuySection, type ResaleCategoriesSection } from "@bitocard/api-client/storefront";
 import { Field, Input, Select } from "../ui/primitives";
 import { type FormProps, useSources, quickBuyLabels, TitleFields } from "./inspector-fields";
 
@@ -35,53 +35,6 @@ export function QuickBuyForm({ section, onChange }: FormProps<QuickBuySection>) 
   );
 }
 
-export function CryptoQuoteForm({ section, onChange }: FormProps<CryptoQuoteSection>) {
-  const id = useId();
-  const coins = useSources().coins ?? ["USDT", "USDC", "BTC", "ETH", "BNB", "TRX"];
-  const toggle = (coin: string) => onChange({ ...section, assets: section.assets.includes(coin) ? section.assets.filter(item => item !== coin) : [...section.assets, coin].slice(0, 9) });
-  return (
-    <>
-      <TitleFields section={section} onChange={onChange} />
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold">Coins offered</legend>
-        <p className="text-xs text-muted">None ticked: every coin on sale.</p>
-        <div className="flex flex-wrap gap-2">
-          {coins.map(coin => (
-            <label key={coin} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm">
-              <input type="checkbox" className="size-4 accent-brand-500" checked={section.assets.includes(coin)} onChange={() => toggle(coin)} />
-              {coin}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <Field label="Shown first" htmlFor={`${id}-side`}>
-        <Select id={`${id}-side`} value={section.side} onChange={event => onChange({ ...section, side: event.target.value as "buy" | "sell" })}>
-          <option value="buy">Buy</option>
-          <option value="sell">Sell</option>
-        </Select>
-      </Field>
-    </>
-  );
-}
-
-export function P2pMarketForm({ section, onChange }: FormProps<P2pMarketSection>) {
-  const id = useId();
-  const coins = useSources().coins ?? ["USDT", "USDC", "BTC", "ETH", "BNB", "TRX"];
-  return (
-    <>
-      <TitleFields section={section} onChange={onChange} />
-      <Field label="Coin" htmlFor={`${id}-asset`}>
-        <Select id={`${id}-asset`} value={section.asset} onChange={event => onChange({ ...section, asset: event.target.value })}>
-          {[...new Set([section.asset, ...coins])].map(coin => (
-            <option key={coin} value={coin}>
-              {coin}
-            </option>
-          ))}
-        </Select>
-      </Field>
-    </>
-  );
-}
 
 /** A Resale shop's category picker: every category of the reseller's country, or a typed slug when the list is not loaded. */
 function ResaleCategoryField({ value, onChange, allowAll }: { value: string | undefined; onChange: (slug: string | undefined) => void; allowAll: boolean }) {

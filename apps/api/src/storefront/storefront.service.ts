@@ -748,15 +748,6 @@ export class StorefrontService {
               },
             };
           }
-          case 'crypto_quote': {
-            const assets = await this.prisma.cryptoAsset.findMany({ where: { enabled: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }], select: { code: true, name: true } });
-            const chosen = item.assets.length ? item.assets.map(code => assets.find(asset => asset.code === code.toUpperCase())).filter((asset): asset is { code: string; name: string } => Boolean(asset)) : assets;
-            return { ...item, data: { assets: chosen } };
-          }
-          case 'p2p_market': {
-            const asset = await this.prisma.cryptoAsset.findFirst({ where: { code: item.asset.toUpperCase(), enabled: true }, select: { code: true, name: true } });
-            return { ...item, data: { asset } };
-          }
           case 'product_spotlight': {
             const store = this.scope.getStore()?.store;
             let key = item.productKey || store?.focus || '';

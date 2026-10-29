@@ -24,8 +24,6 @@ export const sectionTypes: ReadonlyArray<{ type: SectionType; label: string; des
   { type: 'promo', label: 'Promo card', description: 'A coloured card with a message, bullets, a button and an image or illustration.' },
   { type: 'trust_bar', label: 'Trust bar', description: 'Up to four short reassurances, such as secure checkout.' },
   { type: 'quick_buy', label: 'Quick buy', description: 'Top up or pay a bill at once: network or biller, number and amount.' },
-  { type: 'crypto_quote', label: 'Crypto quote', description: 'Buy or sell a coin instantly at the live price.' },
-  { type: 'p2p_market', label: 'P2P market', description: 'A coin’s P2P market, with buy and sell buttons.' },
   { type: 'product_spotlight', label: 'Product spotlight', description: 'One product in full, with its buy form.' },
   { type: 'features', label: 'Features', description: 'Up to six features or steps, each with an icon.' },
   { type: 'faq', label: 'Questions', description: 'Questions and answers that open one at a time.' },
@@ -129,10 +127,6 @@ export function newSection(type: SectionType, id: string): Section {
       return { id, type, span: full, hidden: false, items: [{ icon: 'lock', title: 'Secure checkout', body: '' }] };
     case 'quick_buy':
       return { id, type, span: full, hidden: false, title: 'Top up now', subtitle: '', categories: ['airtime', 'data'] };
-    case 'crypto_quote':
-      return { id, type, span: full, hidden: false, title: 'Buy and sell crypto', subtitle: '', assets: [], side: 'buy' };
-    case 'p2p_market':
-      return { id, type, span: { lg: 6, md: 6, rows: 1 }, hidden: false, title: 'P2P market', subtitle: '', asset: 'USDT', limit: 5 };
     case 'product_spotlight':
       return { id, type, span: full, hidden: false, title: '', subtitle: '', productKey: '', bullets: [] };
     case 'features':
@@ -206,10 +200,6 @@ export function sectionSummary(section: Section): string {
       return `${section.items.length} item${section.items.length === 1 ? '' : 's'}`;
     case 'quick_buy':
       return section.categories.map(category => categoryLabels[category]).join(', ');
-    case 'crypto_quote':
-      return [section.assets.length ? section.assets.join(', ') : 'Every coin', `${section.side} first`].join(' · ');
-    case 'p2p_market':
-      return `${section.asset} · up to ${section.limit} offers`;
     case 'product_spotlight':
       return section.productKey || 'The store’s product';
     case 'listing_rail':
