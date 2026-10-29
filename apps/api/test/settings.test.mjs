@@ -112,12 +112,17 @@ describe('feature switches', () => {
     const listed = await admin.get('/v1/admin/switches');
     assert.ok(listed.json.definitions.startup_allowance);
     assert.ok(listed.json.data.some(s => s.key === 'welcome_bonus' && s.scope === 'reseller'));
-    // Crypto's switches are kept for Afrippa but never listed in BitoCard, even once set.
-    assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: true })).status, 200);
+    // Crypto's switches are Afrippa's: never listed in BitoCard, even once set, and never set by BitoCard's admins.
+    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_global', 'store_template_crypto_desk']) {
+      const refused = await admin.put(`/v1/admin/switches/${key}`, { enabled: true });
+      assert.deepEqual([refused.status, refused.json.error.code], [404, 'resource_missing'], key);
+    }
+    const prisma = server.app.get(PrismaService);
+    await prisma.featureSwitch.create({ data: { key: 'crypto_wallets', enabled: true } });
     const again = await admin.get('/v1/admin/switches');
     for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_app', 'store_template_crypto_desk']) assert.equal(again.json.definitions[key], undefined, key);
     assert.equal(again.json.data.some(s => s.key === 'crypto_wallets'), false);
-    assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: null })).status, 200);
+    await prisma.featureSwitch.deleteMany({ where: { key: 'crypto_wallets' } });
   });
 
   test('support admins cannot change switches', async () => {

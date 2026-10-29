@@ -218,7 +218,7 @@ Retired code is switched off and closed first (step 1), then removed once Afripp
 3. Browser checks at phone width; the operations runbook for appeals. **Done (28 October 2026):** afrippa.com's public, legal and signed-in pages (markets, legal, sign-in, wallets, payment methods, an order to pay and one to release, taking an ad, orders, security, trust, help, verification) checked at 375 px against a seeded API: no sideways scroll, the code fields where they belong, Send me a code and a wrong code's message working; the order countdown's hydration mismatch fixed. The runbook is `docs/AFRIPPA_APPEALS_RUNBOOK.md`.
 
 ### 6. Pilot
-Nigeria, Ghana and Kenya with low limits and the coins admins switch on for them, plus the global market for their residents; then more coins and countries as operations prove trustworthy.
+Nigeria, Ghana and Kenya with low limits and the coins admins switch on for them, plus the global market for their residents; then more coins and countries as operations prove trustworthy. **Built for it (29 October 2026):** admin.afrippa.com's Settings > Markets, where Afrippa's operations open each market (its switches, for all of Afrippa or one country), see what each still needs before trading live (fee rates and live limits), and take Afrippa's store live; until then only the database could. The rest is configuration once deployed: coins and networks (Crypto > Assets and Chains), fee rates and limits for each pilot market, the two-step methods, Afrippa's integrations (email, SMS, Google, private files, push, AI, chain providers, the signer, screening), then the pilot markets' switches and Go live.
 
 ### 7. Later
 Move Afrippa to its own database and service when the entity or a licence requires it.

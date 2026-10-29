@@ -111,7 +111,7 @@ before(async () => {
   finance = await adminClient(server, ['finance']);
   afrippaAdmin = await afrippaAdminClient(server);
   afrippaFinance = await afrippaAdminClient(server, ['finance']);
-  for (const key of ['crypto_wallets', 'p2p_trading']) await admin.put(`/v1/admin/switches/${key}`, { enabled: true });
+  for (const key of ['crypto_wallets', 'p2p_trading']) await afrippaAdmin.put(`/v1/afrippa/admin/markets/switches/${key}`, { enabled: true });
   await update('crypto_keys', { CRYPTO_TEST_XPUB_EVM: testnet.derive("m/44'/60'/0'").publicExtendedKey });
   await update('getblock', { GETBLOCK_ETHEREUM_URL: `${fakes.url}/evm`, GETBLOCK_SANDBOX: true });
   const usdt = await prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: 'USDT', chain: 'ETHEREUM' } } });

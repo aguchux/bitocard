@@ -96,7 +96,7 @@ before(async () => {
   derive = await import('../dist/crypto/derive.js');
   admin = await adminClient(server);
   afrippaAdmin = await afrippaAdminClient(server);
-  for (const key of ['crypto_wallets', 'p2p_trading']) await admin.put(`/v1/admin/switches/${key}`, { enabled: true });
+  for (const key of ['crypto_wallets', 'p2p_trading']) await afrippaAdmin.put(`/v1/afrippa/admin/markets/switches/${key}`, { enabled: true });
 });
 
 after(async () => {

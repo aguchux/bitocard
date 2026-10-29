@@ -23,9 +23,10 @@ after(async () => {
 
 const switches = async enabled => {
   for (const key of ['crypto_wallets', 'p2p_trading']) {
-    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+    // Afrippa's own admins open its markets (BitoCard's never can).
+    assert.equal((await afrippaAdmin.put(`/v1/afrippa/admin/markets/switches/${key}`, { enabled })).status, 200);
     // Crypto trading is open only in countries switched on by themselves (the global level never allows a country).
-    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, country_code: 'NG' })).status, 200);
+    assert.equal((await afrippaAdmin.put(`/v1/afrippa/admin/markets/switches/${key}`, { enabled, country_code: 'NG' })).status, 200);
   }
 };
 const outside = '0x52908400098527886E0F7030069857D2E4169EE7';

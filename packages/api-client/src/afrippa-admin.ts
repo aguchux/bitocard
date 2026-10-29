@@ -96,6 +96,20 @@ export type MarketLimit = {
 export type MarketLimitInput = Omit<MarketLimit, 'object' | 'updated_at'>;
 
 export type TwoStepMethod = 'authenticator' | 'email' | 'sms';
+/** A market switch where it is set (null: follows all of Afrippa, or the default) and whether it is on. */
+export type MarketSwitchState = { set: boolean | null; on: boolean };
+export type AfrippaMarketSwitch = 'crypto_wallets' | 'p2p_trading' | 'crypto_app' | 'crypto_global' | 'crypto_cross_border' | 'crypto_install_prompt';
+/** What a market still needs before trading live in it. */
+export type MarketReadiness = { fee_rates: boolean; limits: boolean };
+/** Afrippa's markets: the store's mode, all of Afrippa's switches and each country's. */
+export type AfrippaMarkets = {
+  object: 'afrippa_markets';
+  store_mode: Mode;
+  definitions: Record<AfrippaMarketSwitch, { label: string; description: string; scopes: Array<'global' | 'country'> }>;
+  global: { market: string; switches: Partial<Record<AfrippaMarketSwitch, MarketSwitchState>>; ready: MarketReadiness };
+  countries: Array<{ code: string; name: string; currency: string; switches: Partial<Record<AfrippaMarketSwitch, MarketSwitchState>>; allowed: boolean; ready: MarketReadiness }>;
+};
+
 export type TwoStepPolicy = { object: 'two_step_policy'; market: string; methods: TwoStepMethod[]; updated_at: string };
 export type RefusedWord = { object: 'refused_word'; id: string; phrase: string; market: string | null };
 
@@ -164,16 +178,16 @@ export const afrippaAdminApi = bitocardApi.injectEndpoints({
     p2pFeeRates: build.query<List<P2pFeeRate> & { max_bps: number }, void>({ query: () => '/v1/afrippa/admin/p2p/fee-rates', providesTags: [{ type: 'P2p', id: 'FEES' }] }),
     setP2pFeeRate: build.mutation<P2pFeeRate, { asset: string; market: string | null; buyer_bps: number; seller_bps: number }>({
       query: body => ({ url: '/v1/afrippa/admin/p2p/fee-rates', method: 'PUT', body }),
-      invalidatesTags: [{ type: 'P2p', id: 'FEES' }],
+      invalidatesTags: [{ type: 'P2p', id: 'FEES' }, { type: 'P2p', id: 'MARKETS' }],
     }),
     removeP2pFeeRate: build.mutation<P2pFeeRate, { asset: string; market: string | null }>({
       query: ({ asset, market }) => ({ url: `/v1/afrippa/admin/p2p/fee-rates/${asset}/${market ?? 'all'}`, method: 'DELETE' }),
-      invalidatesTags: [{ type: 'P2p', id: 'FEES' }],
+      invalidatesTags: [{ type: 'P2p', id: 'FEES' }, { type: 'P2p', id: 'MARKETS' }],
     }),
     marketLimits: build.query<List<MarketLimit>, Mode>({ query: mode => ({ url: '/v1/afrippa/admin/crypto/market-limits', params: { mode } }), providesTags: [{ type: 'P2p', id: 'LIMITS' }] }),
     setMarketLimit: build.mutation<MarketLimit, MarketLimitInput>({
       query: body => ({ url: '/v1/afrippa/admin/crypto/market-limits', method: 'PUT', body }),
-      invalidatesTags: [{ type: 'P2p', id: 'LIMITS' }],
+      invalidatesTags: [{ type: 'P2p', id: 'LIMITS' }, { type: 'P2p', id: 'MARKETS' }],
     }),
     twoStepPolicies: build.query<List<TwoStepPolicy>, void>({ query: () => '/v1/afrippa/admin/two-step-methods', providesTags: [{ type: 'P2p', id: 'TWO_STEP' }] }),
     setTwoStepPolicy: build.mutation<TwoStepPolicy, { market: string; methods: TwoStepMethod[] }>({
@@ -202,6 +216,15 @@ export const afrippaAdminApi = bitocardApi.injectEndpoints({
     clearTraderStrikes: build.mutation<TraderStanding, { id: string; mode: Mode; reason: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/afrippa/admin/traders/${id}/standing/clear`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'P2p', id: `STANDING-${id}` }],
+    }),
+    afrippaMarkets: build.query<AfrippaMarkets, void>({ query: () => '/v1/afrippa/admin/markets', providesTags: [{ type: 'P2p', id: 'MARKETS' }] }),
+    setMarketSwitch: build.mutation<AfrippaMarkets, { key: AfrippaMarketSwitch; country_code?: string; enabled: boolean | null }>({
+      query: ({ key, ...body }) => ({ url: `/v1/afrippa/admin/markets/switches/${key}`, method: 'PUT', body }),
+      invalidatesTags: [{ type: 'P2p', id: 'MARKETS' }],
+    }),
+    setStoreMode: build.mutation<AfrippaMarkets, { mode: Mode; reason: string }>({
+      query: body => ({ url: '/v1/afrippa/admin/markets/store-mode', method: 'PUT', body }),
+      invalidatesTags: [{ type: 'P2p', id: 'MARKETS' }],
     }),
     traderDevices: build.query<List<TraderDevice>, string>({ query: id => `/v1/afrippa/admin/traders/${id}/devices` }),
     resetTraderTwoStep: build.mutation<unknown, { id: string; reason: string }>({
@@ -235,4 +258,7 @@ export const {
   useClearTraderStrikesMutation,
   useResetTraderTwoStepMutation,
   useTraderDevicesQuery,
+  useAfrippaMarketsQuery,
+  useSetMarketSwitchMutation,
+  useSetStoreModeMutation,
 } = afrippaAdminApi;

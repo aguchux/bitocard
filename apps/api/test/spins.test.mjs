@@ -244,14 +244,14 @@ describe('spin and win', () => {
 
   test('no crypto is needed: crypto switched off and a crypto freeze change nothing', async () => {
     const shopper = await customer();
-    assert.equal((await admin.put('/v1/admin/switches/crypto_wallets', { enabled: false })).status, 200);
+    await prisma.featureSwitch.create({ data: { key: 'crypto_wallets', enabled: false } });
     try {
       await prisma.customer.update({ where: { id: shopper.id }, data: { cryptoFrozenAt: new Date() } });
       const status = (await shopper.get('/v1/store/spins')).json;
       assert.deepEqual([status.enabled, status.reason], [true, null]);
       assert.equal((await shopper.post('/v1/store/spins')).status, 200);
     } finally {
-      await admin.put('/v1/admin/switches/crypto_wallets', { enabled: null });
+      await prisma.featureSwitch.deleteMany({ where: { key: 'crypto_wallets', countryCode: null, resellerId: null } });
     }
   });
 

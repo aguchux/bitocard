@@ -35,6 +35,8 @@ const protectedRoutes = [
   ['delete', '/v1/afrippa/admin/p2p/fee-rates/USDT/all'],
   ['post', `/v1/afrippa/admin/traders/${randomId}/standing/clear`, { mode: 'test', reason: 'Reviewed and cleared' }],
   ['post', `/v1/afrippa/admin/traders/${randomId}/two-step/reset`, { reason: 'lost phone' }],
+  ['put', '/v1/afrippa/admin/markets/switches/p2p_trading', { country_code: 'NG', enabled: true }],
+  ['put', '/v1/afrippa/admin/markets/store-mode', { mode: 'live', reason: 'The pilot opens.' }],
   ['post', `/v1/admin/orders/${randomId}/refund`, { reason: 'x' }],
   ['post', `/v1/admin/classifieds/orders/${randomId}/dispute/decide`, { decision: 'release', note: 'ok' }],
   ['put', '/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 100 }],

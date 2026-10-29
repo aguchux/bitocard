@@ -102,7 +102,7 @@ describe('the templates', () => {
     assert.deepEqual([resale.available, resale.reason], [false, 'Reselling BitoCard Shop listings is not open to your account yet.']);
     assert.ok(listed.json.data.filter(item => item.key !== 'resale_shop').every(item => item.available));
     // Not even with crypto's switches on for them.
-    assert.equal((await admin.put('/v1/admin/switches/p2p_trading', { reseller_id: reseller.resellerId, enabled: true })).status, 200);
+    await prisma.featureSwitch.create({ data: { key: 'p2p_trading', resellerId: reseller.resellerId, enabled: true } });
     const refused = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk' });
     assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.message], [403, 'template_unavailable', 'The crypto desk is no longer offered.']);
   });

@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, r
 await import("@/app/admin-product");
 const { default: FeeRatesPage } = await import("@/app/(console)/settings/page");
 const { default: MarketLimitsPage } = await import("@/app/(console)/settings/limits/page");
+const { default: MarketsPage } = await import("@/app/(console)/settings/markets/page");
 const { default: TwoStepMethodsPage } = await import("@/app/(console)/settings/two-step/page");
 const { default: RefusedWordsPage } = await import("@/app/(console)/settings/words/page");
 const { default: BooksPage } = await import("@/app/(console)/books/page");
@@ -32,6 +33,31 @@ const standing = {
   lost_appeals: [{ order_id: "o1", number: "ORD-000009", decided_at: "2026-10-20T00:00:00.000Z" }],
   upheld_reports: [],
   cleared_at: null,
+};
+
+const off = { set: null, on: false };
+const markets = {
+  object: "afrippa_markets",
+  store_mode: "test",
+  definitions: {
+    crypto_wallets: { label: "Wallets", description: "Coins in Afrippa wallets.", scopes: ["global", "country"] },
+    p2p_trading: { label: "P2P trading", description: "The market's own book.", scopes: ["global", "country"] },
+    crypto_app: { label: "Shown on afrippa.com", description: "Listed on the site.", scopes: ["global", "country"] },
+    crypto_global: { label: "Global market", description: "US dollars across countries.", scopes: ["global", "country"] },
+    crypto_cross_border: { label: "Open to other countries", description: "Others trade in its book.", scopes: ["country"] },
+    crypto_install_prompt: { label: "Install prompt", description: "Offers to install.", scopes: ["global", "country"] },
+  },
+  global: { market: "WW", switches: { crypto_wallets: off, p2p_trading: off, crypto_app: off, crypto_global: off, crypto_install_prompt: off }, ready: { fee_rates: true, limits: false } },
+  countries: [
+    {
+      code: "NG",
+      name: "Nigeria",
+      currency: "NGN",
+      switches: { crypto_wallets: { set: true, on: true }, p2p_trading: off, crypto_app: off, crypto_global: off, crypto_cross_border: off, crypto_install_prompt: off },
+      allowed: false,
+      ready: { fee_rates: true, limits: true },
+    },
+  ],
 };
 
 let sent: Array<{ method: string; path: string; body: unknown }>;
@@ -61,6 +87,7 @@ beforeEach(() => {
     if (path === "/v1/afrippa/admin/devices") return ok({ object: "list", data: [{ object: "device", id: "d1", channel: "web_push", label: "Chrome on Windows", current: false, last_pushed_at: null, last_seen_at: "2026-10-28T00:00:00.000Z", created_at: "2026-10-28T00:00:00.000Z" }] });
     if (path === "/v1/afrippa/admin/notification-preferences")
       return ok({ object: "list", data: [{ object: "notification_preference", type: "admin.p2p.order_appealed", label: "An order was appealed", severity: "warning", push: true, default: true, locked: false }] });
+    if (path === "/v1/afrippa/admin/markets" || path.startsWith("/v1/afrippa/admin/markets/")) return ok(markets);
     if (path === "/v1/afrippa/admin/crypto/assets") return ok({ object: "list", data: [{ code: "USDT" }, { code: "BTC" }] });
     if (path === "/v1/afrippa/admin/p2p/fee-rates" && input.method === "GET") return ok({ object: "list", max_bps: 1000, data: [{ object: "p2p_fee_rate", asset: "USDT", market: null, buyer_bps: 30, seller_bps: 20 }] });
     if (path === "/v1/afrippa/admin/p2p/fee-rates") return ok({ object: "p2p_fee_rate", asset: "BTC", market: "NG", buyer_bps: 25, seller_bps: 50 });
@@ -190,6 +217,26 @@ describe("admin.afrippa.com settings", () => {
         }),
       slow,
     );
+  });
+
+  test("markets: a country's switch set by itself, readiness shown, and going live with a reason", async () => {
+    page(<MarketsPage />);
+    expect(await screen.findByText("Nigeria", {}, slow)).toBeTruthy();
+    expect(screen.getByText("Afrippa is in the sandbox")).toBeTruthy();
+    expect(screen.getAllByText("Live limits set").length).toBe(1);
+    expect(screen.getAllByText("No live limits").length).toBe(1);
+    fireEvent.change(screen.getByLabelText("P2P trading in NG"), { target: { value: "on" } });
+    await waitFor(() => expect(sent.find(call => call.method === "PUT")).toEqual({ method: "PUT", path: "/v1/afrippa/admin/markets/switches/p2p_trading", body: { country_code: "NG", enabled: true } }), slow);
+    fireEvent.change(screen.getByLabelText("Wallets in NG"), { target: { value: "follow" } });
+    await waitFor(() => expect(sent.filter(call => call.method === "PUT")[1]?.body).toEqual({ country_code: "NG", enabled: null }), slow);
+    fireEvent.change(screen.getByLabelText("Global market for all of Afrippa"), { target: { value: "on" } });
+    await waitFor(() => expect(sent.filter(call => call.method === "PUT")[2]?.body).toEqual({ enabled: true }), slow);
+
+    fireEvent.click(screen.getByRole("button", { name: "Go live" }));
+    fireEvent.change(await screen.findByLabelText(/Reason/), { target: { value: "The pilot opens in Nigeria." } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Go live" }).at(-1)!);
+    await waitFor(() => expect(sent.find(call => call.path === "/v1/afrippa/admin/markets/store-mode")?.body).toEqual({ mode: "live", reason: "The pilot opens in Nigeria." }), slow);
+    neverBitoCard();
   });
 
   test("two-step methods: one market's methods, at least one kept", async () => {
