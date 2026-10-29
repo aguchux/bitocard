@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { AppConfig } from '../config/config.js';
+import type { Platform } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { type Credentials, encodeKey, presign, signRequest } from './sigv4.js';
 
@@ -34,8 +35,25 @@ const unavailable = () => new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sto
 export class MediaStorage {
   private readonly spaces: () => Spaces | null;
 
-  constructor(integrations: IntegrationsService) {
+  private readonly scoped = new Map<Platform, MediaStorage>();
+
+  constructor(private readonly integrations: IntegrationsService) {
     this.spaces = integrations.derive(spacesFrom);
+  }
+
+  /**
+   * The same storage on one product's own File storage settings: Afrippa's files go to Afrippa's bucket and address,
+   * never BitoCard's value or the environment BitoCard runs on (`deriveFor`).
+   */
+  forPlatform(platform: Platform): MediaStorage {
+    if (platform === 'bitocard') return this;
+    let storage = this.scoped.get(platform);
+    if (!storage) {
+      storage = Object.create(MediaStorage.prototype) as MediaStorage;
+      Object.assign(storage, { integrations: this.integrations, spaces: this.integrations.deriveFor(platform, spacesFrom), scoped: this.scoped });
+      this.scoped.set(platform, storage);
+    }
+    return storage;
   }
 
   configured() {

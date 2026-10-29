@@ -7,7 +7,7 @@ export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'regis
 
 export type MediaPurpose = {
   label: string;
-  realm: 'admin' | 'reseller';
+  realm: 'admin' | 'afrippa_admin' | 'reseller';
   /** What `target_id` names; purposes without one need none. */
   target?: MediaTarget;
   folder: (target: string | undefined, resellerId: string | undefined) => string;
@@ -54,9 +54,11 @@ const purposeTable = {
   bot_avatar: { label: 'Assistant avatar', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/bots/avatars`, maxBytes: 1 * MB, types: rasterTypes },
   platform_bot_avatar: { label: 'BitoCard assistant avatar', realm: 'admin', folder: () => 'platform/bots/avatars', maxBytes: 1 * MB, types: rasterTypes },
   shop_bot_avatar: { label: 'Shop assistant avatar', realm: 'admin', folder: () => 'platform/shop/assistants/avatars', maxBytes: 1 * MB, types: rasterTypes },
+  // Afrippa's admins, on Afrippa's own storage (`MediaStorage.forPlatform`).
+  afrippa_bot_avatar: { label: 'Afrippa assistant avatar', realm: 'afrippa_admin', folder: () => 'afrippa/assistants/avatars', maxBytes: 1 * MB, types: rasterTypes },
 } satisfies Record<string, MediaPurpose>;
 
 export type MediaPurposeKey = keyof typeof purposeTable;
 export const mediaPurposes: Record<MediaPurposeKey, MediaPurpose> = purposeTable;
 export const mediaPurposeKeys = Object.keys(mediaPurposes) as MediaPurposeKey[];
-export const purposesFor = (realm: 'admin' | 'reseller') => mediaPurposeKeys.filter(key => mediaPurposes[key].realm === realm);
+export const purposesFor = (realm: MediaPurpose['realm']) => mediaPurposeKeys.filter(key => mediaPurposes[key].realm === realm);

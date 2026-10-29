@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, adminCode, afrippaAdminClient, client, resellerClient, startApp } from './helpers.mjs';
 import { fakeReloadly } from './fakes.mjs';
 
 const { presign, signRequest, emptyPayloadHash } = await import('../dist/media/sigv4.js');
@@ -372,6 +372,51 @@ describe('signed uploads', () => {
     assert.ok((await admin.get('/v1/admin/media?owner=platform')).json.data.every(item => !item.folder.includes('/resellers/')));
     const key = await client(server.base, { autoIdempotency: true }).post('/v1/media/uploads', { purpose: 'store_logo', filename: 'x.png', content_type: 'image/png', size: 64 });
     assert.equal(key.status, 401, 'signed-in only');
+  });
+
+  test("Afrippa's admins upload to Afrippa's own storage and library; neither product's admins see the other's files", async () => {
+    const afrippaCredentials = { accessKey: 'DO00AFRIPPA', secret: 'afrippa-secret', region: 'nyc3' };
+    const afrippaSpaces = await fakeSpaces(afrippaCredentials);
+    try {
+      const afrippa = await afrippaAdminClient(server, ['super_admin']);
+      // BitoCard's storage is set (its environment), but Afrippa's own is not: uploads are off for Afrippa.
+      const before = (await afrippa.get('/v1/afrippa/admin/media/settings')).json;
+      assert.deepEqual([before.configured, before.purposes.map(item => item.purpose)], [false, ['afrippa_bot_avatar']]);
+      const saved = await afrippa.put('/v1/afrippa/admin/integrations/file_storage', {
+        values: { SPACES_KEY: afrippaCredentials.accessKey, SPACES_SECRET: afrippaCredentials.secret, SPACES_BUCKET: 'afrippa-media', SPACES_ENDPOINT: afrippaSpaces.url, SPACES_PUBLIC_URL: 'https://media.afrippa.test', SPACES_ROOT: 'afr' },
+        code: await adminCode(server, afrippa),
+      });
+      assert.equal(saved.status, 200, JSON.stringify(saved.json));
+      assert.equal((await afrippa.get('/v1/afrippa/admin/media/settings')).json.configured, true);
+
+      const avatar = await upload(afrippa, '/v1/afrippa/admin/media', { purpose: 'afrippa_bot_avatar', filename: 'ami.png' }, png(64, 64));
+      assert.equal(avatar.completed.status, 200, JSON.stringify(avatar.completed.json));
+      const id = avatar.created.json.id;
+      assert.equal(avatar.created.json.folder, 'afr/afrippa/assistants/avatars');
+      assert.match(avatar.completed.json.url, /^https:\/\/media\.afrippa\.test\/afr\/afrippa\/assistants\/avatars\//);
+      assert.ok([...afrippaSpaces.objects.keys()].some(key => key.startsWith('afr/afrippa/assistants/avatars/')), "in Afrippa's bucket");
+      assert.ok(![...spaces.objects.keys()].some(key => key.includes('afrippa/assistants')), "never BitoCard's");
+      assert.equal((await prisma.mediaAsset.findUniqueOrThrow({ where: { id } })).platform, 'afrippa');
+
+      // Each product's admins see and touch only their own product's files, and upload only their own purposes.
+      assert.deepEqual((await afrippa.get('/v1/afrippa/admin/media')).json.data.map(item => item.id), [id]);
+      assert.ok(!(await admin.get('/v1/admin/media')).json.data.some(item => item.id === id));
+      assert.equal((await admin.post(`/v1/admin/media/${id}/complete`)).status, 404);
+      assert.equal((await admin.delete(`/v1/admin/media/${id}`)).status, 404);
+      const bitocardFile = await prisma.mediaAsset.findFirstOrThrow({ where: { platform: 'bitocard', resellerId: null, status: 'ready' } });
+      assert.equal((await afrippa.delete(`/v1/afrippa/admin/media/${bitocardFile.id}`)).status, 404);
+      const theirs = await afrippa.post('/v1/afrippa/admin/media/uploads', { purpose: 'brand_logo', target_id: 'amazon', filename: 'x.png', content_type: 'image/png', size: 64 });
+      assert.deepEqual([theirs.status, theirs.json.error.code], [400, 'parameter_invalid']);
+      const ours = await admin.post('/v1/admin/media/uploads', { purpose: 'afrippa_bot_avatar', filename: 'x.png', content_type: 'image/png', size: 64 });
+      assert.deepEqual([ours.status, ours.json.error.code], [400, 'parameter_invalid']);
+
+      assert.equal((await afrippa.delete(`/v1/afrippa/admin/media/${id}`)).status, 200);
+      assert.ok(![...afrippaSpaces.objects.keys()].some(key => key.startsWith('afr/afrippa/assistants/avatars/')), "removed from Afrippa's bucket");
+      const audit = await prisma.auditLog.findFirst({ where: { action: 'media.deleted', targetId: id } });
+      assert.equal(audit.platform, 'afrippa');
+    } finally {
+      await afrippaSpaces.close();
+    }
   });
 
   test('npm run media:cors sets the bucket’s CORS rule for the apps', async () => {

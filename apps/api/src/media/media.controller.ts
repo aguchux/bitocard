@@ -69,6 +69,50 @@ export class AdminMediaController {
   }
 }
 
+/** Afrippa's admins: images for Afrippa (its assistant's picture), on Afrippa's own File storage settings and library. */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin/media')
+export class AfrippaAdminMediaController {
+  constructor(private readonly media: MediaService) {}
+
+  private actor(caller: Caller) {
+    return { realm: 'afrippa_admin' as const, userId: adminId(caller) };
+  }
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get('settings')
+  settings() {
+    return this.media.settings('afrippa_admin');
+  }
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get()
+  list(@CurrentCaller() caller: Caller, @Query() query: MediaQueryDto) {
+    return this.media.list(this.actor(caller), query);
+  }
+
+  /** Operations and support, who set the assistant up. */
+  @AdminRoles('operations', 'support')
+  @Post('uploads')
+  upload(@CurrentCaller() caller: Caller, @Body() body: UploadDto) {
+    return this.media.createUpload(this.actor(caller), body);
+  }
+
+  @AdminRoles('operations', 'support')
+  @Post(':id/complete')
+  @HttpCode(HttpStatus.OK)
+  complete(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.media.complete(this.actor(caller), id);
+  }
+
+  @AdminRoles('operations')
+  @Delete(':id')
+  remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.media.remove(this.actor(caller), id);
+  }
+}
+
 /** Resellers (SHQ only): images for their own store, kept in their own folder. */
 @ApiExcludeController()
 @SessionOnly()

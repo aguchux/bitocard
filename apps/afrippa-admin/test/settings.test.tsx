@@ -87,6 +87,8 @@ beforeEach(() => {
     if (path === "/v1/afrippa/admin/devices") return ok({ object: "list", data: [{ object: "device", id: "d1", channel: "web_push", label: "Chrome on Windows", current: false, last_pushed_at: null, last_seen_at: "2026-10-28T00:00:00.000Z", created_at: "2026-10-28T00:00:00.000Z" }] });
     if (path === "/v1/afrippa/admin/notification-preferences")
       return ok({ object: "list", data: [{ object: "notification_preference", type: "admin.p2p.order_appealed", label: "An order was appealed", severity: "warning", push: true, default: true, locked: false }] });
+    if (path === "/v1/afrippa/admin/media/settings") return ok({ object: "media_settings", configured: true, purposes: [{ purpose: "afrippa_bot_avatar", label: "Afrippa assistant avatar", max_bytes: 1048576, content_types: ["image/png", "image/jpeg", "image/webp"] }] });
+    if (path === "/v1/afrippa/admin/media") return ok({ object: "list", data: [], has_more: false });
     if (path === "/v1/afrippa/admin/markets" || path.startsWith("/v1/afrippa/admin/markets/")) return ok(markets);
     if (path === "/v1/afrippa/admin/crypto/assets") return ok({ object: "list", data: [{ code: "USDT" }, { code: "BTC" }] });
     if (path === "/v1/afrippa/admin/p2p/fee-rates" && input.method === "GET") return ok({ object: "list", max_bps: 1000, data: [{ object: "p2p_fee_rate", asset: "USDT", market: null, buyer_bps: 30, seller_bps: 20 }] });
@@ -315,6 +317,10 @@ describe("admin.afrippa.com books, standing and help", () => {
     expect(screen.getByRole("button", { name: "Generate from Afrippa" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Update knowledge base" })).toBeNull();
     expect((screen.getByLabelText("US dollars a month") as HTMLInputElement).value).toBe("50");
+    // Its picture is uploaded to Afrippa's own storage.
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(await screen.findByText("Face or avatar", {}, slow)).toBeTruthy();
+    await waitFor(() => expect(sent.some(call => call.path === "/v1/afrippa/admin/media/settings")).toBe(true), slow);
     neverBitoCard();
   });
 

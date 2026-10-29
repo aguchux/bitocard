@@ -18,7 +18,7 @@ function useAfrippaAssistantContext(): AssistantContext | null {
   if (!ai.data) return null;
   const models: AssistantContext["ai"]["bitocard"] = {};
   for (const item of ai.data.bitocard_models) models[item.provider] = [...(models[item.provider] ?? []), item.model];
-  return { base, admin: true, stores: [{ id: afrippaStoreId, name: "Afrippa" }], ai: { premium: true, bitocard: models, own: {} }, realm: "admin", avatarPurpose: "platform_bot_avatar", brand: "Afrippa", refresh: false };
+  return { base, admin: true, stores: [{ id: afrippaStoreId, name: "Afrippa" }], ai: { premium: true, bitocard: models, own: {} }, realm: "admin", avatarPurpose: "afrippa_bot_avatar", brand: "Afrippa", refresh: false };
 }
 
 /** The assistant's monthly spend cap on Afrippa's AI: past it, people answer until next month. */

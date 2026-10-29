@@ -5,13 +5,16 @@ import { ApiError } from '../common/errors/api-error.js';
 import { productCategories } from '../countries/countries.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { registryBrand } from '../storefront/brand-registry.js';
-import type { MediaAsset, Prisma, ProductCategory } from '../generated/prisma/client.js';
+import type { MediaAsset, Platform, Prisma, ProductCategory } from '../generated/prisma/client.js';
 import { inspectImage, sniffBytes } from './images.js';
 import { extensions, type MediaPurposeKey, mediaPurposeKeys, mediaPurposes, purposesFor } from './purposes.js';
 import { MediaStorage, uploadLinkSeconds } from './storage.js';
 
-/** Who is uploading: an admin (platform files) or a reseller (their own folder). */
-export type MediaActor = { realm: 'admin'; userId: string | null } | { realm: 'reseller'; userId: string | null; resellerId: string };
+/** Who is uploading: an admin (platform files), one of Afrippa's admins (Afrippa's files) or a reseller (their own folder). */
+export type MediaActor = { realm: 'admin' | 'afrippa_admin'; userId: string | null } | { realm: 'reseller'; userId: string | null; resellerId: string };
+
+/** Whose files an actor works with: Afrippa's admins only Afrippa's, everyone else only BitoCard's. */
+const platformOf = (actor: MediaActor): Platform => (actor.realm === 'afrippa_admin' ? 'afrippa' : 'bitocard');
 
 export type UploadInput = { purpose: string; target_id?: string; filename: string; content_type: string; size: number };
 export type MediaFilter = { purpose?: string; target_id?: string; owner?: string; q?: string; limit?: number; starting_after?: string };
@@ -56,11 +59,16 @@ export class MediaService {
     private readonly audit: AuditService,
   ) {}
 
+  /** The storage a product's files live in. */
+  private storageOf(platform: Platform) {
+    return this.storage.forPlatform(platform);
+  }
+
   /** Whether uploads are on, and what each purpose accepts (for the apps' upload buttons). */
-  settings(realm: 'admin' | 'reseller') {
+  settings(realm: 'admin' | 'afrippa_admin' | 'reseller') {
     return {
       object: 'media_settings' as const,
-      configured: this.storage.configured(),
+      configured: this.storageOf(realm === 'afrippa_admin' ? 'afrippa' : 'bitocard').configured(),
       purposes: purposesFor(realm).map(key => ({ purpose: key, label: mediaPurposes[key].label, max_bytes: mediaPurposes[key].maxBytes, content_types: mediaPurposes[key].types })),
     };
   }
@@ -98,17 +106,20 @@ export class MediaService {
     if (input.size > purpose.maxBytes) throw invalid('file_too_large', `${purpose.label}s can be at most ${megabytes(purpose.maxBytes)}.`, 'size');
     const targetId = await this.target(purpose.target, input.target_id);
     const resellerId = actor.realm === 'reseller' ? actor.resellerId : undefined;
+    const platform = platformOf(actor);
+    const storage = this.storageOf(platform);
     const id = randomUUID();
     const folder = purpose.folder(targetId, resellerId);
-    const key = this.storage.key(folder, `${id}.${extensions[contentType]}`);
-    const upload = this.storage.presignUpload(this.storage.stagingKey(`${id}.${extensions[contentType]}`), contentType, input.size);
+    const key = storage.key(folder, `${id}.${extensions[contentType]}`);
+    const upload = storage.presignUpload(storage.stagingKey(`${id}.${extensions[contentType]}`), contentType, input.size);
     const asset = await this.prisma.mediaAsset.create({
       data: {
         id,
         key,
         folder: key.slice(0, key.lastIndexOf('/')),
-        url: this.storage.publicUrl(key),
+        url: storage.publicUrl(key),
         purpose: input.purpose,
+        platform,
         targetId: targetId ?? null,
         resellerId: resellerId ?? null,
         uploadedById: actor.userId,
@@ -123,19 +134,20 @@ export class MediaService {
 
   private async owned(actor: MediaActor, id: string) {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
-    // Admins manage platform files and can see resellers' (to remove abuse); resellers only their own.
-    if (!asset || (actor.realm === 'reseller' && asset.resellerId !== actor.resellerId)) throw notFound();
+    // Admins manage platform files and can see resellers' (to remove abuse); resellers only their own; each product's
+    // admins only that product's files.
+    if (!asset || asset.platform !== platformOf(actor) || (actor.realm === 'reseller' && asset.resellerId !== actor.resellerId)) throw notFound();
     return asset;
   }
 
   /** The private object the browser uploaded to, before the API copies it to `asset.key`. */
   private staging(asset: MediaAsset) {
-    return this.storage.stagingKey(asset.key.slice(asset.key.lastIndexOf('/') + 1));
+    return this.storageOf(asset.platform).stagingKey(asset.key.slice(asset.key.lastIndexOf('/') + 1));
   }
 
   /** Throws away a file that failed its checks: from storage and from the library. */
   private async discard(asset: MediaAsset, message: string): Promise<never> {
-    for (const key of [asset.key, this.staging(asset)]) await this.storage.remove(key).catch(error => this.logger.warn(`Could not remove ${key}: ${error}`));
+    for (const key of [asset.key, this.staging(asset)]) await this.storageOf(asset.platform).remove(key).catch(error => this.logger.warn(`Could not remove ${key}: ${error}`));
     await this.prisma.mediaAsset.deleteMany({ where: { id: asset.id, status: 'pending' } });
     throw invalid('upload_invalid', message);
   }
@@ -144,25 +156,26 @@ export class MediaService {
   async complete(actor: MediaActor, id: string) {
     const asset = await this.owned(actor, id);
     if (asset.status === 'ready') return presentMedia(asset);
-    if (actor.realm === 'admin' && asset.resellerId) throw notFound();
+    if (actor.realm !== 'reseller' && asset.resellerId) throw notFound();
+    const storage = this.storageOf(asset.platform);
     // The upload is copied to its final key first and only that copy is checked: the upload link can still overwrite the
     // staging object, but never the final one, so what was checked is what is served. (A repeat after a copy finds it there.)
-    if (!(await this.storage.head(asset.key))) {
-      const copied = await this.storage.publish(this.staging(asset), asset.key, asset.contentType);
+    if (!(await storage.head(asset.key))) {
+      const copied = await storage.publish(this.staging(asset), asset.key, asset.contentType);
       if (!copied) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'upload_missing', 'The file has not been uploaded yet. Upload it with the signed link, then try again.');
     }
-    await this.storage.remove(this.staging(asset)).catch(error => this.logger.warn(`Could not remove ${this.staging(asset)}: ${error}`));
-    const stored = await this.storage.head(asset.key);
+    await storage.remove(this.staging(asset)).catch(error => this.logger.warn(`Could not remove ${this.staging(asset)}: ${error}`));
+    const stored = await storage.head(asset.key);
     if (!stored) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'upload_missing', 'The file has not been uploaded yet. Upload it with the signed link, then try again.');
     if (stored.size !== asset.sizeBytes || stored.contentType !== asset.contentType) await this.discard(asset, 'The uploaded file does not match the size or type that was declared.');
-    const bytes = await this.storage.read(asset.key, asset.contentType === 'image/svg+xml' ? asset.sizeBytes : Math.min(asset.sizeBytes, sniffBytes));
+    const bytes = await storage.read(asset.key, asset.contentType === 'image/svg+xml' ? asset.sizeBytes : Math.min(asset.sizeBytes, sniffBytes));
     const info = inspectImage(bytes, asset.contentType);
     if (!info) {
       await this.discard(asset, asset.contentType === 'image/svg+xml' ? 'SVG images must be plain drawings: no scripts, event handlers, embedded HTML or outside references.' : 'The file is not a valid image of its type.');
     }
     const claimed = await this.prisma.mediaAsset.updateMany({ where: { id, status: 'pending' }, data: { status: 'ready', width: info!.width, height: info!.height, completedAt: new Date() } });
     const ready = await this.prisma.mediaAsset.findUniqueOrThrow({ where: { id } });
-    if (claimed.count && actor.realm === 'admin') {
+    if (claimed.count && actor.realm !== 'reseller') {
       await this.audit.record({ actorId: actor.userId, action: 'media.uploaded', targetType: 'media', targetId: id, after: presentMedia(ready) });
     }
     return presentMedia(ready);
@@ -172,6 +185,7 @@ export class MediaService {
     const limit = filter.limit ?? 50;
     const where: Prisma.MediaAssetWhereInput = {
       status: 'ready',
+      platform: platformOf(actor),
       purpose: filter.purpose,
       targetId: filter.target_id,
       ...(actor.realm === 'reseller'
@@ -247,9 +261,9 @@ export class MediaService {
     if (uses.length) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'media_in_use', `The file is still used (${uses.join(', ')}). Replace it there first.`);
     }
-    await this.storage.remove(asset.key);
+    await this.storageOf(asset.platform).remove(asset.key);
     await this.prisma.mediaAsset.delete({ where: { id } });
-    if (actor.realm === 'admin') await this.audit.record({ actorId: actor.userId, action: 'media.deleted', targetType: 'media', targetId: id, before: presentMedia(asset) });
+    if (actor.realm !== 'reseller') await this.audit.record({ actorId: actor.userId, action: 'media.deleted', targetType: 'media', targetId: id, before: presentMedia(asset) });
     return { object: 'media_asset' as const, id, deleted: true };
   }
 
@@ -259,7 +273,8 @@ export class MediaService {
     let removed = 0;
     for (const asset of stale) {
       try {
-        if (this.storage.configured()) for (const key of [asset.key, this.staging(asset)]) await this.storage.remove(key);
+        const storage = this.storageOf(asset.platform);
+        if (storage.configured()) for (const key of [asset.key, this.staging(asset)]) await storage.remove(key);
         await this.prisma.mediaAsset.deleteMany({ where: { id: asset.id, status: 'pending' } });
         removed += 1;
       } catch (error) {

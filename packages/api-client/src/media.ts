@@ -2,7 +2,10 @@ import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { type ApiError, bitocardApi } from './base';
 
-/** Whose files: the admin app (`/v1/admin/media`, platform files) or SHQ (`/v1/media`, the reseller's own folder). */
+/**
+ * Whose files: the admin app (`/v1/admin/media`, platform files; admin.afrippa.com's switch sends it to Afrippa's own
+ * `/v1/afrippa/admin/media`) or SHQ (`/v1/media`, the reseller's own folder).
+ */
 export type MediaRealm = 'admin' | 'reseller';
 
 /** Admin purposes and the reseller's own (`src/media/purposes.ts` in the API). */
@@ -20,7 +23,9 @@ export type MediaPurpose =
   | 'store_image'
   | 'bot_avatar'
   | 'platform_bot_avatar'
-  | 'shop_bot_avatar';
+  | 'shop_bot_avatar'
+  /** Afrippa's admins only, on Afrippa's own storage. */
+  | 'afrippa_bot_avatar';
 
 export type MediaAsset = {
   object: 'media_asset';

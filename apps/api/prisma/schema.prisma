@@ -2461,6 +2461,8 @@ model MediaAsset {
   expiresAt    DateTime    @map("expires_at")
   completedAt  DateTime?   @map("completed_at")
   createdAt    DateTime    @default(now()) @map("created_at")
+  /// Whose file it is: BitoCard's (its storage and library) or Afrippa's (its own File storage settings and library).
+  platform     Platform    @default(bitocard)
   reseller     Reseller?   @relation(fields: [resellerId], references: [id], onDelete: Cascade)
 
   @@index([resellerId, status, createdAt])
