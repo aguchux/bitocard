@@ -167,6 +167,24 @@ describe('jobs', () => {
 });
 
 describe('names', () => {
+  test("Udozo's instance defaults to its own addresses and admin domain, never bitocard.com's", async () => {
+    const { loadConfig } = await import('../dist/config/config.js');
+    const own = loadConfig({ APP_PRODUCT: 'udozo' });
+    assert.deepEqual([own.STOREFRONT_URL, own.SHOP_URL, own.DASHBOARD_URL, own.VERIFY_URL, own.ADMIN_APP_URL, own.ADMIN_EMAIL_DOMAINS], ['https://udozo.com', 'https://udozo.com', 'https://shq.udozo.com', 'https://verify.udozo.com', 'https://admin.udozo.com', ['udozo.com']]);
+    assert.equal(loadConfig({ APP_PRODUCT: 'udozo', STOREFRONT_URL: 'https://staging.udozo.com' }).STOREFRONT_URL, 'https://staging.udozo.com', 'its environment wins');
+    assert.equal(loadConfig({}).STOREFRONT_URL, 'https://bitocard.com', "BitoCard's unchanged");
+  });
+
+  test('each instance says which product it is and fingerprints its own database in /health', async () => {
+    const [ours, theirs] = await Promise.all([bitocard, udozo].map(async server => (await fetch(`${server.base}/health`)).json()));
+    assert.deepEqual([ours.service, ours.product, theirs.service, theirs.product], ['bitocard-api', 'bitocard', 'udozo-api', 'udozo']);
+    const { databaseId } = await import('../dist/health/health.service.js');
+    assert.equal(databaseId('postgresql://u:p@ep-cool-1-pooler.us-east-2.aws.neon.tech/bitocard?sslmode=require'), databaseId('postgresql://u:p@ep-cool-1.us-east-2.aws.neon.tech/bitocard'), 'pooled or direct, the same database');
+    assert.notEqual(databaseId('postgresql://u:p@ep-cool-1.neon.tech/bitocard'), databaseId('postgresql://u:p@ep-other-2.neon.tech/bitocard'));
+    assert.equal(databaseId(undefined), null);
+    assert.equal((await (await fetch(udozo.base)).json()).service, 'udozo-api');
+  });
+
   test("Udozo's sessions, API keys and webhook signatures carry its own names", async () => {
     const owner = await resellerClient(udozo);
     assert.ok(owner.browser.jar.has('udz_session') && !owner.browser.jar.has('bc_session'));

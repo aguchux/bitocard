@@ -37,6 +37,8 @@ const baseEnv = {
   // One test app serves both products' routes (docs/UDOZO_SPINOFF_PLAN.md); product-mode.test.mjs keeps them apart.
   PRODUCT_ROUTES: 'all',
   ALLOWED_ORIGINS: `${appOrigin},https://*.bitocard.com`,
+  // Udozo's instance defaults to udozo.com admins (config.ts, productDefaults); the test admins are bitocard.com's.
+  ADMIN_EMAIL_DOMAINS: 'bitocard.com,golojan.co.uk',
   AFRIPPA_ADMIN_APP_URL: afrippaAdminOrigin,
   COOKIE_SECURE: 'off',
   RESEND_API_KEY: '',

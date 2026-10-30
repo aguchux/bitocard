@@ -281,6 +281,14 @@ The code is moved to Udozo's apps (step 4), not deleted.
 4. **Browser checks** at 375 px, and a sandbox store on its subdomain taken live on a connected domain.
 5. **A pilot** in one market.
 
+**Step 5 status (30 October 2026): the droplet side is built** (in the repository; nothing is switched on until Udozo's environment is on the droplet):
+- `api-udozo` and `scheduler-udozo` in `deploy/droplet/docker-compose.yml` (profile `udozo`, `APP_PRODUCT=udozo` fixed there, 512 MB), secrets in `/etc/udozo/api.env` (`udozo.env.example`), `set-env.sh <NAME> udozo`;
+- Caddy serves `api.udozo.com` (`sites/udozo.caddy`, Cloudflare origin certificate from `origin-cert.sh csr|install udozo`) once deploy.sh enables it;
+- `deploy.sh`: with `/etc/udozo/api.env` present, checks both environments and migrates both databases (Udozo's then seeded) before replacing either instance, then checks both hosts through Caddy serve their own product at the new commit, and refuses two instances on one database (`/health`'s `product` and `database_id`);
+- `deploy-api.yml` copies the site and smoke-tests `https://api.udozo.com` once `UDOZO_API_LIVE` is `true` (`SMOKE_PRODUCT=udozo`; `test/smoke-script.test.mjs` runs the smoke test against both products);
+- Udozo's instance defaults to its own addresses (`productDefaults` in `config.ts`: udozo.com, shq, verify, admin, `udozo.com` admins);
+- runbook: `deploy/droplet/README.md`, Udozo's API. **Still to do:** Vercel projects for Udozo's apps, and Udozo's legal documents.
+
 ### 6. Later
 Drop the Shop and resale tables from BitoCard's database once they are confirmed empty.
 

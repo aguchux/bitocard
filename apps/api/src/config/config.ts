@@ -369,9 +369,26 @@ export type AppConfig = z.infer<typeof configSchema> & {
   webhookQueue: 'vercel' | 'database';
 };
 
+/**
+ * Udozo's own addresses and admin domain where its environment names none (docs/UDOZO_SPINOFF_PLAN.md): the schema's
+ * defaults are BitoCard's, and Udozo's emails, links and admin sign-in must never point at bitocard.com. Its admins
+ * can still change the site addresses in their integration settings.
+ */
+export const productDefaults: Record<'udozo', Record<string, string>> = {
+  udozo: {
+    STOREFRONT_URL: 'https://udozo.com',
+    SHOP_URL: 'https://udozo.com',
+    DASHBOARD_URL: 'https://shq.udozo.com',
+    VERIFY_URL: 'https://verify.udozo.com',
+    ADMIN_APP_URL: 'https://admin.udozo.com',
+    ADMIN_EMAIL_DOMAINS: 'udozo.com',
+  },
+};
+
 /** Empty strings count as unset, so a blank line in .env never fails validation. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const cleaned = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+  const given = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+  const cleaned = given.APP_PRODUCT === 'udozo' ? { ...productDefaults.udozo, ...given } : given;
   const parsed = configSchema.safeParse(cleaned);
   if (!parsed.success) {
     const problems = parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');

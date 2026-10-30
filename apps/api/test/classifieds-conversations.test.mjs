@@ -323,7 +323,7 @@ describe('unread emails', () => {
     const buyer = await customer('Ngozi Eke');
     const tv = await live(seller, 'TCL 65 inch TV');
     const chat = (await buyer.post('/v1/classifieds/conversations', { listing_id: tv.id, body: 'Still available?' })).json;
-    const sent = () => services.email.outbox.filter(item => item.to === seller.email && /BitoCard Shop/.test(item.subject)).length;
+    const sent = () => services.email.outbox.filter(item => item.to === seller.email && /new message on Udozo/.test(item.subject)).length;
 
     await services.conversations.emailUnread();
     assert.equal(sent(), 0, 'not before 10 minutes');

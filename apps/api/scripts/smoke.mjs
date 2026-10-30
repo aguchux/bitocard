@@ -1,5 +1,6 @@
 // Smoke tests against a running API: production (each droplet deploy runs it) or the local Docker API.
 //   node scripts/smoke.mjs https://api.bitocard.com
+//   SMOKE_PRODUCT=udozo node scripts/smoke.mjs https://api.udozo.com   (Udozo's instance, docs/UDOZO_SPINOFF_PLAN.md)
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -9,6 +10,12 @@ if (!base) {
   process.exit(2);
 }
 const get = path => fetch(`${base}${path}`);
+const product = process.env.SMOKE_PRODUCT || 'bitocard';
+const names = { bitocard: { title: 'BitoCard API', event: 'order.completed' }, udozo: { title: 'Udozo API', event: 'resale_order.created' } };
+if (!names[product]) {
+  console.error(`Unknown SMOKE_PRODUCT "${product}"`);
+  process.exit(2);
+}
 
 test(`health is ok and the database is reachable (${base})`, async () => {
   const res = await get('/health');
@@ -16,6 +23,7 @@ test(`health is ok and the database is reachable (${base})`, async () => {
   const body = await res.json();
   assert.equal(body.status, 'ok');
   assert.equal(body.checks.database, 'ok');
+  assert.equal(body.product, product, `this address serves ${body.product}, not ${product}`);
   // After a droplet deploy: the address serves the image just deployed, not an old one (or the old host).
   if (process.env.EXPECT_COMMIT) assert.equal(body.commit, process.env.EXPECT_COMMIT.slice(0, 7), `serving ${body.commit}, expected ${process.env.EXPECT_COMMIT.slice(0, 7)}`);
 });
@@ -31,8 +39,8 @@ test('the OpenAPI document is served', async () => {
   const res = await get('/v1/openapi.json');
   assert.equal(res.status, 200);
   const document = await res.json();
-  assert.equal(document.info.title, 'BitoCard API');
-  assert.ok(document.webhooks?.['order.completed'], 'webhook events are documented');
+  assert.equal(document.info.title, names[product].title);
+  assert.ok(document.webhooks?.[names[product].event], 'webhook events are documented');
 });
 
 test('errors use the BitoCard error format', async () => {
@@ -68,8 +76,9 @@ test('exchange rates are listed for the pilot currencies', async () => {
 
 test('wallets, provider webhooks and scheduled jobs refuse unauthenticated calls', async () => {
   assert.equal((await get('/v1/wallet')).status, 401);
-  assert.equal((await get('/v1/catalogue/products')).status, 401);
-  assert.equal((await get('/v1/orders')).status, 401);
+  // BitoCard's catalogue and orders are not Udozo's: there they are unknown routes.
+  assert.equal((await get('/v1/catalogue/products')).status, product === 'bitocard' ? 401 : 404);
+  assert.equal((await get('/v1/orders')).status, product === 'bitocard' ? 401 : 404);
   assert.equal((await get('/v1/cron/earnings')).status, 401);
   assert.equal((await get('/v1/cron/webhooks')).status, 401);
   assert.equal((await get('/v1/events')).status, 401);
@@ -82,7 +91,7 @@ test('wallets, provider webhooks and scheduled jobs refuse unauthenticated calls
   assert.equal(webhook.status, 401);
 });
 
-test('the public storefront catalogue answers, and never names suppliers', async () => {
+test('the public storefront catalogue answers, and never names suppliers', { skip: product !== 'bitocard' && "BitoCard's catalogue" }, async () => {
   const categories = await get('/v1/store/categories');
   assert.equal(categories.status, 200);
   assert.equal(categories.headers.get('cache-control'), 'public, max-age=60');
@@ -96,4 +105,13 @@ test('the public storefront catalogue answers, and never names suppliers', async
   assert.ok(Array.isArray(homeBody.sections) && homeBody.sections.length > 0, 'home has sections');
   assert.equal(typeof homeBody.published, 'boolean');
   assert.equal((await get('/v1/admin/storefront/home')).status, 401, 'the Storefront Manager needs an admin');
+});
+
+test("Udozo's marketplace answers: its markets and its theme", { skip: product !== 'udozo' && "Udozo's marketplace" }, async () => {
+  const markets = await get('/v1/classifieds/markets');
+  assert.equal(markets.status, 200);
+  assert.ok(Array.isArray((await markets.json()).data));
+  const theme = await get('/v1/theme');
+  assert.equal(theme.status, 200);
+  assert.match((await theme.json()).colors?.primary ?? '', /^#[0-9a-f]{6}$/i);
 });

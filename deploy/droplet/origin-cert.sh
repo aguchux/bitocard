@@ -1,14 +1,17 @@
 #!/bin/sh
-# Cloudflare's origin certificate for api.bitocard.com, with its private key made here: the key never leaves the
-# droplet, Cloudflare signs a request (CSR) and only the certificate, which is public, travels.
-#   sh /opt/bitocard/origin-cert.sh csr       makes origin.key (once) and prints the CSR to paste into Cloudflare
-#   sh /opt/bitocard/origin-cert.sh install   reads Cloudflare's certificate (paste it, then Ctrl-D), checks it, installs it
+# Cloudflare's origin certificate for api.bitocard.com (or, with `udozo`, api.udozo.com from udozo.com's Cloudflare
+# account), with its private key made here: the key never leaves the droplet, Cloudflare signs a request (CSR) and only
+# the certificate, which is public, travels.
+#   sh /opt/bitocard/origin-cert.sh csr [udozo]       makes the key (once) and prints the CSR to paste into Cloudflare
+#   sh /opt/bitocard/origin-cert.sh install [udozo]   reads Cloudflare's certificate (paste it, then Ctrl-D), checks it, installs it
 set -eu
 
 DIR=/etc/bitocard/certs
-KEY=$DIR/origin.key
-CERT=$DIR/origin.pem
-HOST=api.bitocard.com
+case "${2:-bitocard}" in
+  bitocard) KEY=$DIR/origin.key CERT=$DIR/origin.pem HOST=api.bitocard.com ;;
+  udozo) KEY=$DIR/udozo-origin.key CERT=$DIR/udozo-origin.pem HOST=api.udozo.com ;;
+  *) echo "usage: origin-cert.sh csr|install [udozo]" >&2; exit 2 ;;
+esac
 umask 077
 
 case "${1:-}" in
@@ -18,7 +21,7 @@ case "${1:-}" in
     openssl req -new -key "$KEY" -subj "/CN=$HOST" -addext "subjectAltName=DNS:$HOST"
     ;;
   install)
-    [ -f "$KEY" ] || { echo "No $KEY yet: run 'origin-cert.sh csr' first." >&2; exit 1; }
+    [ -f "$KEY" ] || { echo "No $KEY yet: run 'origin-cert.sh csr ${2:-}' first." >&2; exit 1; }
     new=$CERT.new
     cat > "$new"
     fail() { rm -f "$new"; echo "$1: nothing changed." >&2; exit 1; }
@@ -32,10 +35,10 @@ case "${1:-}" in
     openssl x509 -in "$CERT" -noout -subject -issuer -enddate
     # Caddy reads the files at start and on reload; before the first deploy it is not running yet.
     docker compose -f /opt/bitocard/docker-compose.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
-    echo "Installed $CERT."
+    echo "Installed $CERT. The next deploy serves $HOST with it."
     ;;
   *)
-    echo "usage: origin-cert.sh csr | install" >&2
+    echo "usage: origin-cert.sh csr|install [udozo]" >&2
     exit 2
     ;;
 esac
