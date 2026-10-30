@@ -45,7 +45,7 @@ function StatusView({ kase }: { kase: KycCase }) {
       {view.text ? <p className="text-muted">{view.text}</p> : null}
       {kase.status === "declined" ? (
         <Notice tone="red" title={kase.reason_text ?? (kase.reason ? (kycDeclineReasons[kase.reason as KycDeclineReason] ?? "Not approved") : "Not approved")}>
-          {kase.note ? <span className="whitespace-pre-line">{kase.note}</span> : brand.key === "bitocard" ? "If you think this is a mistake, contact the store or BitoCard support." : `If you think this is a mistake, contact ${brand.name} support.`}
+          {kase.note ? <span className="whitespace-pre-line">{kase.note}</span> : brand.key === "afrippa" ? `If you think this is a mistake, contact ${brand.name} support.` : `If you think this is a mistake, contact the store or ${brand.name} support.`}
         </Notice>
       ) : null}
       <BackLink kase={kase} primary />

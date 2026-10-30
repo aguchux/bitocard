@@ -5,7 +5,7 @@ import type { KycCase, KycSession } from "@bitocard/api-client/kyc";
 import { brand } from "./brand";
 
 /**
- * The applicant's side of Verify (BitoCard's or Afrippa's, `brand`). The API gives a session for the case when the one-time link is exchanged;
+ * The applicant's side of Verify (BitoCard's, Afrippa's or Udozo's, `brand`). The API gives a session for the case when the one-time link is exchanged;
  * this server keeps it in its own host-only, httpOnly cookie and sends it to the API in a header. The browser never
  * sees the token, and never calls the API for the applicant.
  */

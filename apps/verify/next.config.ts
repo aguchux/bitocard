@@ -1,5 +1,5 @@
 import { createNextConfig } from "@bitocard/next-config";
-import { afrippaIconFiles, brandKey } from "./lib/brand";
+import { brandIconFiles, brandKey } from "./lib/brand";
 
 /**
  * Private (noindex) like the other consoles, but the camera is allowed for this site itself: the ID, selfie and
@@ -8,11 +8,13 @@ import { afrippaIconFiles, brandKey } from "./lib/brand";
  */
 export default createNextConfig({
   indexable: false,
-  // Afrippa's deployment serves Afrippa's icons (public/afrippa/, written by scripts/brand-assets.py) at the addresses the
-  // icon files and manifest use, before Next.js's own; BitoCard's serves its own. Pages and icon links stay static.
+  // Afrippa's and Udozo's deployments serve their own icons (public/afrippa/ and public/udozo/, written by
+  // scripts/brand-assets.py) at the addresses the icon files and manifest use, before Next.js's own; BitoCard's serves
+  // its own. Pages and icon links stay static.
   async rewrites() {
-    if (brandKey(process.env.NEXT_PUBLIC_VERIFY_BRAND) !== "afrippa") return [];
-    return { beforeFiles: afrippaIconFiles.map(file => ({ source: `/${file}`, destination: `/afrippa/${file}` })), afterFiles: [], fallback: [] };
+    const key = brandKey(process.env.NEXT_PUBLIC_VERIFY_BRAND);
+    if (key === "bitocard") return [];
+    return { beforeFiles: brandIconFiles.map(file => ({ source: `/${file}`, destination: `/${key}/${file}` })), afterFiles: [], fallback: [] };
   },
   async headers() {
     return [

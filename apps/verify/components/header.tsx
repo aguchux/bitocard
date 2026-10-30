@@ -1,7 +1,7 @@
 import { Brand } from "@bitocard/ui/brand";
 import { brand as verifyBrand } from "@/lib/brand";
 
-/** The product's logo: BitoCard's lockup, or Afrippa's mark with "Afri" in ink and "ppa" in the accent. */
+/** The product's logo: BitoCard's lockup, or Afrippa's or Udozo's mark with the name in ink and its end in the accent. */
 function Logo() {
   if (verifyBrand.key === "bitocard") return <Brand />;
   const [first, second] = verifyBrand.wordmark;
@@ -18,7 +18,7 @@ function Logo() {
 }
 
 /**
- * Verify's header: the product's logo (BitoCard's or Afrippa's), and for a store's customers the store they are
+ * Verify's header: the product's logo (BitoCard's, Afrippa's or Udozo's), and for a store's customers the store they are
  * verifying for (its name and logo), so they know why they are here.
  */
 export function VerifyHeader({ brand }: { brand?: { name: string; logo_url: string | null } | null }) {

@@ -32,7 +32,9 @@ export function ConsentStep({ kase, privacyUrl, onSaved }: { kase: KycCase; priv
       <div className="space-y-3 text-sm text-ink">
         <p>
           {customer
-            ? `${kase.brand.name} needs to confirm who you are before you can buy some products. It takes about five minutes.`
+            ? brand.key === "udozo"
+              ? `${kase.brand.name} needs to confirm who you are before you can sell with Safe pay or be paid out. It takes about five minutes.`
+              : `${kase.brand.name} needs to confirm who you are before you can buy some products. It takes about five minutes.`
             : `${brand.name} needs to confirm who runs your business before your account can take live orders. It takes about five minutes.`}
         </p>
         <p className="font-semibold">You will need</p>
@@ -83,7 +85,7 @@ const businessTypes: Array<{ value: KycBusinessType; title: string; text: string
   {
     value: "registered",
     title: "Registered business",
-    text: "Your business is registered with the government (for example the CAC in Nigeria). We check its documents and your ID. Verified registered businesses can review their own customers’ ID checks.",
+    text: `Your business is registered with the government (for example the CAC in Nigeria). We check its documents and your ID.${brand.review ? " Verified registered businesses can review their own customers’ ID checks." : ""}`,
     icon: Building2,
   },
 ];

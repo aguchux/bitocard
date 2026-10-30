@@ -29,7 +29,7 @@ export function LinkProblem({ unreachable }: { unreachable?: boolean }) {
       <Link2Off className="mx-auto size-10 text-muted" aria-hidden />
       <h1 className="text-xl font-extrabold">This link has expired</h1>
       <p className="text-muted">
-        {`Links work once and for a short time. Go back to ${back?.name ?? (brand.key === "bitocard" ? "the store or BitoCard page you came from" : `the ${brand.name} page you came from`)} and start the identity check again.`}
+        {`Links work once and for a short time. Go back to ${back?.name ?? (brand.key === "afrippa" ? `the ${brand.name} page you came from` : `the store or ${brand.name} page you came from`)} and start the identity check again.`}
       </p>
       {back ? (
         <a href={back.url} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800">
