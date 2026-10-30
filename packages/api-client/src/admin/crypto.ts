@@ -262,7 +262,7 @@ const cryptoApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Crypto'],
     }),
     recheckCryptoWithdrawal: build.mutation<CryptoWithdrawal, string>({ query: id => ({ url: `/v1/afrippa/admin/crypto/withdrawals/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
-    customerPayouts: build.query<List<CustomerPayout>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/payouts', params }), providesTags: ['Crypto'] }),
+    customerPayouts: build.query<List<CustomerPayout>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/customer-payouts', params }), providesTags: ['Crypto'] }),
     cryptoReconciliations: build.query<List<CryptoReconciliation>, Mode>({ query: mode => ({ url: '/v1/afrippa/admin/crypto/reconciliations', params: { mode } }), providesTags: ['Crypto'] }),
     runCryptoReconciliation: build.mutation<{ object: 'crypto_reconciliation_run'; error: string | null; data: CryptoReconciliation[] }, Mode>({
       query: mode => ({ url: '/v1/afrippa/admin/crypto/reconciliations/run', method: 'POST', body: { mode } }),

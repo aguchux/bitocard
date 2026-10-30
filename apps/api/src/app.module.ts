@@ -20,6 +20,7 @@ import { LedgerModule } from './ledger/ledger.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { ProvidersModule } from './payments/providers.module.js';
 import { PayoutsModule } from './payouts/payouts.module.js';
+import { CustomerCashModule } from './payouts/customer-cash.js';
 import { TaxModule } from './tax/tax.module.js';
 import { CatalogueModule } from './catalogue/catalogue.module.js';
 import { StockModule } from './stock/stock.module.js';
@@ -96,6 +97,7 @@ export class AppModule {
         FxModule,
         PaymentsModule,
         PayoutsModule,
+        CustomerCashModule,
         TaxModule,
         BillingModule,
         SuppliersModule,

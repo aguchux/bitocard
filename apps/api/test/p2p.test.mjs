@@ -438,7 +438,7 @@ describe('paying withdrawable money out to a bank', () => {
       assert.deepEqual([too.status, too.json.error.code], [402, 'insufficient_funds']);
       assert.deepEqual((await seller.get('/v1/store/cash/payouts')).json.data.map(item => item.status), ['failed', 'paid']);
       assert.ok(await prisma.notification.findFirst({ where: { customerId: seller.id, type: 'customer.payout.paid' } }));
-      const listed = (await admin.get(`/v1/admin/crypto/payouts?customer_id=${seller.id}`)).json.data;
+      const listed = (await admin.get(`/v1/admin/customer-payouts?customer_id=${seller.id}`)).json.data;
       assert.deepEqual(listed.map(item => [item.status, item.account_name]), [['failed', 'SANDBOX ACCOUNT HOLDER'], ['paid', 'SANDBOX ACCOUNT HOLDER']]);
     } finally {
       await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: country.payoutHoldDays } });
@@ -446,13 +446,10 @@ describe('paying withdrawable money out to a bank', () => {
     await ledgerOk();
   });
 
-  test('a frozen account pays nothing out; money can still be paid out after crypto is switched off', async () => {
+  // Payouts left the crypto code (docs/UDOZO_SPINOFF_PLAN.md, step 3): a crypto freeze is Afrippa's and no longer
+  // stops them (a suspended account cannot sign in at all).
+  test('money can still be paid out after crypto is switched off', async () => {
     const seller = await sellerWithProceeds();
-    const account = (await seller.post('/v1/store/cash/bank-accounts', { bank_code: 'SBX002', account_number: '1234567890' })).json;
-    await prisma.customer.update({ where: { id: seller.id }, data: { cryptoFrozenAt: new Date() } });
-    const frozen = await seller.post('/v1/store/cash/payouts', { amount: 15_000_00, bank_account_id: account.id });
-    assert.deepEqual([frozen.status, frozen.json.error.code], [403, 'crypto_account_frozen']);
-    await prisma.customer.update({ where: { id: seller.id }, data: { cryptoFrozenAt: null } });
     await switches(false);
     try {
       const cash = await seller.get('/v1/store/cash');

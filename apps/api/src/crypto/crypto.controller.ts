@@ -16,7 +16,6 @@ import { type AdSide, P2pService } from './p2p.service.js';
 import { CryptoMarketLimitsService } from './market-limits.service.js';
 import { CryptoReconciliationService } from './custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
-import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
 import { ProductOnly } from '../products/product.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
@@ -354,90 +353,6 @@ export class CustomerWithdrawalsController {
   @HttpCode(HttpStatus.OK)
   cancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.withdrawals.cancel(caller.customer, id);
-  }
-}
-
-class CustomerBankAccountDto {
-  @IsString() @Length(1, 20)
-  bank_code: string;
-
-  @Matches(/^\d{6,20}$/, { message: 'account_number must be the account number, digits only' })
-  account_number: string;
-}
-
-class CustomerPayoutDto {
-  /** Minor units of the customer's currency. */
-  @IsInt() @Min(1) @Max(1_000_000_000_000_00)
-  amount: number;
-
-  @IsUUID()
-  bank_account_id: string;
-}
-
-class SimulatePayoutDto {
-  @IsIn(['paid', 'failed'])
-  outcome: 'paid' | 'failed';
-}
-
-/**
- * A store customer's withdrawable money (BitoCard Shop's Safe pay sales) paid out to their
- * own bank account, at `/v1/store/cash`. BitoCard's, not Afrippa's: Afrippa never pays out fiat.
- */
-@ApiExcludeController()
-@Public()
-@UseGuards(CustomerGuard)
-@Controller('store/cash')
-@ProductOnly('udozo')
-export class CustomerCashController {
-  constructor(
-    private readonly wallets: CryptoWalletsService,
-    private readonly payouts: CustomerPayoutsService,
-  ) {}
-
-  @Get()
-  async balance(@CurrentCustomer() caller: CustomerCaller) {
-    return this.payouts.balance(await this.wallets.requireCashOut(caller.customer));
-  }
-
-  @Get('banks')
-  async banks(@CurrentCustomer() caller: CustomerCaller) {
-    return this.payouts.banks(await this.wallets.requireCashOut(caller.customer));
-  }
-
-  @Get('bank-accounts')
-  async accounts(@CurrentCustomer() caller: CustomerCaller) {
-    const { mode } = await this.wallets.context(caller.customer);
-    return this.payouts.accounts(caller.customer.id, mode);
-  }
-
-  @Post('bank-accounts')
-  async addAccount(@CurrentCustomer() caller: CustomerCaller, @Body() body: CustomerBankAccountDto) {
-    return this.payouts.addAccount(await this.wallets.requireCashOut(caller.customer), body);
-  }
-
-  @Delete('bank-accounts/:id')
-  async removeAccount(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    const { mode } = await this.wallets.context(caller.customer);
-    return this.payouts.removeAccount(caller.customer.id, mode, id);
-  }
-
-  @Get('payouts')
-  async list(@CurrentCustomer() caller: CustomerCaller) {
-    const { mode } = await this.wallets.context(caller.customer);
-    return this.payouts.list(caller.customer.id, mode);
-  }
-
-  @Post('payouts')
-  async create(@CurrentCustomer() caller: CustomerCaller, @Body() body: CustomerPayoutDto) {
-    return this.payouts.create(await this.wallets.requireCashOut(caller.customer), body);
-  }
-
-  /** Sandbox stores only. */
-  @Post('payouts/:id/simulate')
-  @HttpCode(HttpStatus.OK)
-  async simulate(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SimulatePayoutDto) {
-    const { mode } = await this.wallets.context(caller.customer);
-    return this.payouts.simulate(caller.customer.id, mode, id, body.outcome);
   }
 }
 
@@ -914,32 +829,6 @@ export class AdminReconciliationsController {
   @HttpCode(HttpStatus.OK)
   run(@CurrentCaller() caller: Caller, @Body() body: ModeDto) {
     return this.reconciliation.runNow(adminId(caller), body.mode ?? 'live');
-  }
-}
-
-class CustomerPayoutListDto {
-  @IsOptional() @IsIn(['live', 'test'])
-  mode?: LedgerMode;
-
-  @IsOptional() @IsIn(['pending', 'processing', 'paid', 'failed'])
-  status?: string;
-
-  @IsOptional() @IsUUID()
-  customer_id?: string;
-}
-
-/** Admin: customers' payouts of their withdrawable money to their banks. */
-@ApiExcludeController()
-@RealmOnly('admin')
-@AdminRoles('operations', 'finance', 'support')
-@Controller('admin/crypto/payouts')
-@ProductOnly('udozo')
-export class AdminCustomerPayoutsController {
-  constructor(private readonly payouts: CustomerPayoutsService) {}
-
-  @Get()
-  list(@Query() query: CustomerPayoutListDto) {
-    return this.payouts.adminList(query);
   }
 }
 

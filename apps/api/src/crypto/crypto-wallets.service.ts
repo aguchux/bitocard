@@ -264,13 +264,6 @@ export class CryptoWalletsService {
     return context;
   }
 
-  /** `requireHolder`, plus the name the identity check verified (live) for matching bank accounts. */
-  async requireCashOut(customer: CustomerWithStore) {
-    const context = await this.requireHolder(customer, 'paying money out');
-    const verifiedName = context.mode === 'live' ? await this.identity.customerVerifiedName(context.seller.id, context.mode, customer.id) : null;
-    return { customer, mode: context.mode, sellerId: context.seller.id, country: context.country, currency: context.currency, verifiedName };
-  }
-
   // -- Balances -------------------------------------------------------------------------------------------------
 
   ref(customerId: string, kind: AccountKind, currency: string): AccountRef {
