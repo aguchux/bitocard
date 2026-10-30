@@ -1,48 +1,24 @@
-import "server-only";
-import { cookies } from "next/headers";
-import { decodeSignedIn, encodeSignedIn, handoffStart, isHouseOrigin, signedInCookie, signedInDomain, signedInMaxAge } from "@bitocard/ui/handoff";
-import { appUrl } from "@bitocard/ui/site";
-import { siteOrigin } from "./customer";
-
-const cookieOptions = () => ({ domain: signedInDomain(), path: "/", sameSite: "lax" as const, httpOnly: true, secure: process.env.NODE_ENV === "production" });
-
-/** After signing in here: bitocard.com and its country stores can offer "Continue as <first name>" (Server Actions and route handlers only). */
-export async function rememberSignedIn(customer: { name: string }) {
-  (await cookies()).set(signedInCookie, encodeSignedIn({ name: customer.name, origin: siteOrigin() }), { ...cookieOptions(), maxAge: signedInMaxAge });
-}
-
-/** After signing out here: the offer goes too, unless it names another site the customer is still signed in on. */
-export async function forgetSignedIn() {
-  const signedIn = decodeSignedIn((await cookies()).get(signedInCookie)?.value);
-  if (signedIn && signedIn.origin !== siteOrigin()) return;
-  (await cookies()).set(signedInCookie, "", { ...cookieOptions(), maxAge: 0 });
-}
+/**
+ * Udozo's sign-in handoff (docs/UDOZO_SPINOFF_PLAN.md, step 3): one Udozo account works on udozo.com and every reseller
+ * store, but each address keeps its own host-only session. A store's sign-in sends the shopper to udozo.com's
+ * `/handoff/go?to=<store origin>&next=<path>`, which signs them in here if needed, asks the API for a one-time code
+ * bound to that store, and sends them to `<store origin>/handoff#c=<code>&n=<path>`. No cookie is shared across sites.
+ */
 
 /**
- * The customer signed in on another of BitoCard's sites, as this browser last saw them, or null. Always null now: BitoCard
- * Shop has left BitoCard's sign-in handoff (docs/UDOZO_SPINOFF_PLAN.md), so its sites no longer hand customers here;
- * this app becomes Udozo's, with accounts of its own (step 4).
+ * Whether an origin can be handed a customer from here: an https origin with no path, user or query (plain http only
+ * for localhost, in development), never this site itself. Which origins are Udozo's stores is the API's to say: it
+ * refuses any other target.
  */
-export async function signedInElsewhere() {
-  if (!isHouseOrigin(siteOrigin())) return null;
-  const signedIn = decodeSignedIn((await cookies()).get(signedInCookie)?.value);
-  if (!signedIn || signedIn.origin === siteOrigin()) return null;
-  return { ...signedIn, host: new URL(signedIn.origin).host };
-}
-
-/**
- * A customer's own country store (`https://ng.bitocard.com`), where their account app and its Shop tab live: a
- * two-letter subdomain of bitocard.com (or of the configured store address in development).
- */
-export function countryStoreOrigin(country: string) {
-  const store = new URL(appUrl("storefront"));
-  return `${store.protocol}//${country.toLowerCase()}.${store.host}`;
-}
-
-/**
- * A link into the customer's Shop tab on their country store (`/shop`, `/shop/post`…), signed in there through the
- * handoff: this site's `/handoff/go` asks for a one-time code and sends them on, so they never sign in twice.
- */
-export function myShopHref(country: string, path = "/shop") {
-  return handoffStart(siteOrigin(), countryStoreOrigin(country), path);
+export function handoffTarget(value: string, self: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const local = url.hostname === "localhost" || url.hostname.endsWith(".localhost");
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) return null;
+  if (url.username || url.password || url.origin !== value.replace(/\/$/, "")) return null;
+  return url.origin === self ? null : url.origin;
 }

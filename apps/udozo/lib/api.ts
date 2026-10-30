@@ -2,12 +2,15 @@ import "server-only";
 import { cache } from "react";
 import type { ShopMarket, ShopMarkets } from "@bitocard/api-client/classifieds";
 
+/** Udozo's own API instance (the same code as BitoCard's, run as `APP_PRODUCT=udozo`, with BitoCard's paths). */
+export const productionApi = "https://api.udozo.com";
+
 /**
- * The BitoCard API, read on the server only (the Shop never calls it from the browser). `API_URL` wins, then the public
+ * Udozo's API, read on the server only (this site never calls it from the browser). `API_URL` wins, then the public
  * API address, then production on Vercel and the local API (port 3001) in development.
  */
 export function apiUrl(path: string) {
-  const base = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? (process.env.VERCEL ? "https://api.bitocard.com" : "http://localhost:3001");
+  const base = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? (process.env.VERCEL ? productionApi : "http://localhost:3001");
   return `${base.replace(/\/+$/, "")}${path}`;
 }
 
@@ -39,7 +42,7 @@ export function query(values: Record<string, string | number | undefined | null 
   return text ? `?${text}` : "";
 }
 
-/** The countries BitoCard Shop is open in. Asked once per request; empty while the API is unreachable. */
+/** The countries Udozo is open in. Asked once per request; empty while the API is unreachable. */
 export const markets = cache(async (): Promise<ShopMarkets> => {
   const result = await shopApi<ShopMarkets>("/v1/classifieds/markets");
   return result.ok ? result.data : { object: "list", data: [], showcase: false };

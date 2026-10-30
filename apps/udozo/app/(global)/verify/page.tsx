@@ -16,7 +16,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
       <h1 className="text-2xl font-extrabold">Confirm your email</h1>
       <p className="text-sm text-navy-600">We sent a 6-digit code to {customer.email}. Enter it to carry on.</p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">
-        <VerifyForm next={next} />
+        <VerifyForm next={next} email={customer.email} />
       </section>
     </div>
   );

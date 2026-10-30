@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cc } = await params;
   const [market, all] = await Promise.all([marketFor(cc), markets()]);
   if (!market) return {};
-  const title = `BitoCard Shop ${market.name}: buy and sell near you`;
-  const description = `Buy and sell phones, cars, property, electronics and more across ${market.name}. Chat with sellers and pay with Safe pay: BitoCard holds the money until you have the item.`;
+  const title = `Udozo ${market.name}: buy and sell near you`;
+  const description = `Buy and sell phones, cars, property, electronics and more across ${market.name}. Chat with sellers and pay with Safe pay: Udozo holds the money until you have the item.`;
   return {
     title: { absolute: title },
     description,
@@ -77,7 +77,7 @@ export default async function CountryHome({ params }: Props) {
           )}
         </section>
       </div>
-      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `BitoCard Shop ${market.name}`, url: `${siteOrigin()}/${cc}`, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />
+      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `Udozo ${market.name}`, url: `${siteOrigin()}/${cc}`, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />
     </>
   );
 }

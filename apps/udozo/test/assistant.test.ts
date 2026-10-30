@@ -29,11 +29,11 @@ afterEach(() => {
 
 describe("who is asking", () => {
   test("a signed-in customer by their session; a visitor by their token; never both", async () => {
-    setRequest({}, { bc_customer: "bcc_token", bc_assistant: visitor });
+    setRequest({}, { udz_customer: "bcc_token", udz_assistant: visitor });
     expect(await assistantHeaders()).toEqual({ "bitocard-customer-session": "bcc_token" });
-    setRequest({}, { bc_assistant: visitor });
+    setRequest({}, { udz_assistant: visitor });
     expect(await assistantHeaders()).toEqual({ "bitocard-assistant-visitor": visitor });
-    setRequest({}, { bc_assistant: "bav_short" });
+    setRequest({}, { udz_assistant: "bav_short" });
     expect(await assistantHeaders()).toEqual({});
   });
 
@@ -41,7 +41,7 @@ describe("who is asking", () => {
     reply = () => Response.json({ object: "assistant_thread", id: thread, visitor_token: visitor, messages: [] }, { status: 201 });
     const started = await startConversation("ng", "en", "browse");
     expect(started.ok && "visitor_token" in started.data).toBe(false);
-    expect(request.set).toEqual([{ name: "bc_assistant", value: visitor, options: expect.objectContaining({ httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30 }) }]);
+    expect(request.set).toEqual([{ name: "udz_assistant", value: visitor, options: expect.objectContaining({ httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30 }) }]);
     expect(calls[0]!.body).toEqual({ country: "NG", surface: "browse", language: "en" });
     expect((await startConversation("ng", null, "browse", "not-an-id")).ok).toBe(false);
   });
@@ -73,7 +73,7 @@ describe("streamed answers", () => {
   const post = (body: unknown, headers: Record<string, string> = { "sec-fetch-site": "same-origin" }) => ask(new Request(`https://shop.bitocard.com/api/assistant/${thread}/messages`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }), { params: Promise.resolve({ thread }) });
 
   test("passed through from the API with the shopper's identity; only from this site's own pages", async () => {
-    setRequest({}, { bc_assistant: visitor });
+    setRequest({}, { udz_assistant: visitor });
     reply = () => new Response("event: message\ndata: {\"id\":\"m1\"}\n\n", { headers: { "content-type": "text/event-stream" } });
     const res = await post({ body: "Any phones?" });
     expect(res.headers.get("content-type")).toContain("text/event-stream");

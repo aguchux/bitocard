@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { apiUrl } from "@/lib/api";
+import { previewHeader, previewToken } from "@/lib/theme-preview";
 
 /** Listings the API says are gone (410), and those it does not, for a minute per instance. */
 const seen = new Map<string, { gone: boolean; at: number }>();
@@ -24,7 +25,19 @@ export async function listingGone(country: string, ref: string, now = Date.now()
 }
 
 const goneHtml = (cc: string) =>
-  `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>This listing is no longer on BitoCard Shop</title></head><body style="margin:0;font-family:Inter,system-ui,sans-serif;background:#fcfdff;color:#070f4c"><main style="max-width:28rem;margin:0 auto;padding:4rem 1rem;text-align:center"><h1 style="font-size:1.5rem">This listing is no longer on BitoCard Shop</h1><p style="color:#414f77">It was sold, or the seller took it down.</p><a href="/${cc}" style="display:inline-block;margin-top:1rem;padding:0.75rem 1.25rem;border-radius:0.75rem;background:#070f4c;color:#fff;font-weight:700;text-decoration:none">See what is for sale</a></main></body></html>`;
+  `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>This listing is no longer on Udozo</title></head><body style="margin:0;font-family:Inter,system-ui,sans-serif;background:#fcfdff;color:#070f4c"><main style="max-width:28rem;margin:0 auto;padding:4rem 1rem;text-align:center"><h1 style="font-size:1.5rem">This listing is no longer on Udozo</h1><p style="color:#414f77">It was sold, or the seller took it down.</p><a href="/${cc}" style="display:inline-block;margin-top:1rem;padding:0.75rem 1.25rem;border-radius:0.75rem;background:#070f4c;color:#fff;font-weight:700;text-decoration:none">See what is for sale</a></main></body></html>`;
+
+/**
+ * Passes an admin's theme preview (`?theme_preview=<token>`, on any page) to the root layout as a request header, so it
+ * shows the draft theme; a header the browser sent itself is never passed on. The API checks the token either way.
+ */
+function withPreview(request: NextRequest) {
+  const forwarded = new Headers(request.headers);
+  forwarded.delete(previewHeader);
+  const token = previewToken(request.nextUrl.searchParams.get("theme_preview"));
+  if (token) forwarded.set(previewHeader, token);
+  return NextResponse.next({ request: { headers: forwarded } });
+}
 
 /**
  * Listing pages that are gone answer 410 Gone (search engines drop them faster than a 404); everything else goes on to
@@ -32,8 +45,9 @@ const goneHtml = (cc: string) =>
  */
 export async function proxy(request: NextRequest) {
   const match = /^\/([a-z]{2})\/l\/(\d{1,15})(?:-[a-z0-9-]*)?$/.exec(request.nextUrl.pathname);
-  if (!match || request.method !== "GET" || !(await listingGone(match[1]!, match[2]!))) return NextResponse.next();
+  if (!match || request.method !== "GET" || !(await listingGone(match[1]!, match[2]!))) return withPreview(request);
   return new NextResponse(goneHtml(match[1]!), { status: 410, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300", "x-robots-tag": "noindex" } });
 }
 
-export const config = { matcher: ["/:cc/l/:listing"] };
+// Every page (never files, `_next` or this site's API), so a preview header can never be sent around the proxy.
+export const config = { matcher: ["/((?!_next/|api/|flags/|sw\.js|favicon\.ico|icon|apple-icon|.*\.(?:png|svg|webp|jpg|ico|xml|txt|json)$).*)"] };

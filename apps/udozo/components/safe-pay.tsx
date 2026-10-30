@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { shopMoney, type ShopSafePayQuote } from "@bitocard/api-client/classifieds";
-import { ShopTermsAccept, shopTermsCode } from "@bitocard/ui/shop-terms";
+import { TermsAccept, termsCode } from "@/components/terms-accept";
 import { acceptShopTerms, cancelSafePay, paySafePay, requestSafePay, shopTerms } from "@/lib/listing-actions";
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
@@ -31,8 +31,8 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
     const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, stateId: fulfilment === "delivery" && zone === "state" ? (charges?.state_id ?? undefined) : undefined, nonce: attempt });
     if (result.ok) return router.refresh();
     setBusy(false);
-    // Safe pay needs the BitoCard Shop terms accepted: ask, then send again (a refused request is final, so a new key).
-    if (result.code === shopTermsCode) return setNeedsTerms(true);
+    // Safe pay needs the Udozo terms accepted: ask, then send again (a refused request is final, so a new key).
+    if (result.code === termsCode) return setNeedsTerms(true);
     setError(result.message);
   };
   const submit = (event: React.FormEvent) => {
@@ -103,7 +103,7 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
           {error}
         </p>
       ) : null}
-      {needsTerms ? <ShopTermsAccept load={shopTerms} accept={acceptShopTerms} onAccepted={afterTerms} /> : null}
+      {needsTerms ? <TermsAccept load={shopTerms} accept={acceptShopTerms} onAccepted={afterTerms} /> : null}
       <button type="submit" disabled={busy || needsTerms} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
         <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Sending…" : "Send request to seller"}
       </button>

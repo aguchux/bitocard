@@ -21,7 +21,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const found = findCategory(categories, slug);
   if (!market || !found) return {};
   const title = `${found.category.name} for sale in ${market.name}`;
-  const description = `${found.category.name} for sale across ${market.name} on BitoCard Shop: chat with sellers near you and pay with Safe pay.`;
+  const description = `${found.category.name} for sale across ${market.name} on Udozo: chat with sellers near you and pay with Safe pay.`;
   return {
     title,
     description,

@@ -1,7 +1,7 @@
 "use server";
 
 import type { ShopChat, ShopMessage, ShopOrder, ShopPhone, ShopReportReason } from "@bitocard/api-client/classifieds";
-import type { ShopTermsStatus } from "@bitocard/ui/shop-terms";
+import type { TermsStatus } from "@/components/terms-accept";
 import { type CustomerResult, customerApi } from "@/lib/customer";
 
 /** What a listing action answers: its data, or why not (`signIn` when the session has ended). */
@@ -15,16 +15,16 @@ function answer<T>(result: CustomerResult<T>): ActionResult<T> {
   return { ok: false, message: result.status === 401 ? "Sign in again to carry on." : result.message, code: result.code, signIn: result.status === 401 };
 }
 
-/** The BitoCard Shop terms' current version and whether this customer accepted it (needed for Safe pay). */
-export async function shopTerms(): Promise<ShopTermsStatus | null> {
-  const result = await customerApi<ShopTermsStatus>("GET", "/v1/classifieds/terms");
+/** The Udozo terms' current version and whether this customer accepted it (needed for Safe pay). */
+export async function shopTerms(): Promise<TermsStatus | null> {
+  const result = await customerApi<TermsStatus>("GET", "/v1/classifieds/terms");
   return result.ok ? result.data : null;
 }
 
 /** Records the customer's acceptance of the version they were shown. */
-export async function acceptShopTerms(version: string): Promise<ActionResult<ShopTermsStatus>> {
+export async function acceptShopTerms(version: string): Promise<ActionResult<TermsStatus>> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) return refused("No such version of the terms.");
-  return answer(await customerApi<ShopTermsStatus>("POST", "/v1/classifieds/terms/accept", { version }));
+  return answer(await customerApi<TermsStatus>("POST", "/v1/classifieds/terms/accept", { version }));
 }
 
 /** Saves a listing to the customer's favourites, or takes it off. */
@@ -40,7 +40,7 @@ export async function showPhone(listingId: string): Promise<ActionResult<ShopPho
   return answer(await customerApi<ShopPhone>("POST", `/v1/classifieds/listings/${listingId}/phone`, {}));
 }
 
-/** Reports a listing to BitoCard's moderators. */
+/** Reports a listing to Udozo's moderators. */
 export async function reportListing(listingId: string, reason: ShopReportReason, details: string): Promise<ActionResult<{ id: string }>> {
   if (!uuid.test(listingId)) return refused("No such listing.");
   return answer(await customerApi<{ id: string }>("POST", "/v1/classifieds/reports", { listing_id: listingId, reason, ...(details.trim() ? { details: details.trim().slice(0, 1000) } : {}) }));
@@ -98,7 +98,7 @@ export async function requestSafePay(input: { listingId: string; offerId?: strin
   );
 }
 
-/** Pays an accepted Safe pay order from the wallet (BitoCard holds the money until the hand-over). */
+/** Pays an accepted Safe pay order from the wallet (Udozo holds the money until the hand-over). */
 export async function paySafePay(orderId: string, nonce?: string): Promise<ActionResult<ShopOrder>> {
   if (!uuid.test(orderId)) return refused("No such order.");
   return answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/pay`, {}, { idempotencyKey: nonce }));

@@ -10,7 +10,7 @@ import { customerCookie, type CustomerResult, shopperHeader } from "./customer";
  * token the API gave their first conversation, kept in this site's own cookie (host-only, httpOnly, 30 days, as long as
  * conversations are kept). Browsers never call the API: the server actions and the streaming route handler do.
  */
-export const assistantCookie = "bc_assistant";
+export const assistantCookie = "udz_assistant";
 const visitorHeader = "bitocard-assistant-visitor";
 const visitorPattern = /^bav_[A-Za-z0-9_-]{43}$/;
 const thirtyDays = 60 * 60 * 24 * 30;

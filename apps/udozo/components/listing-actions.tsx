@@ -43,7 +43,7 @@ export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing
     }
   };
   const share = async () => {
-    const text = `${listing.title} on BitoCard Shop`;
+    const text = `${listing.title} on Udozo`;
     if (navigator.share) {
       await navigator.share({ title: text, url: listing.url }).catch(() => undefined);
       return;
@@ -89,7 +89,7 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }
   const phoneSheet = useRef<HTMLDialogElement>(null);
   const reportSheet = useRef<HTMLDialogElement>(null);
 
-  if (viewer?.own) return <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">This is your listing. Manage it in My Shop.</p>;
+  if (viewer?.own) return <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">This is your listing. Manage it in My listings.</p>;
   if (!listing.active) return null;
   const canContact = !viewer || viewer.can_contact;
 
@@ -141,7 +141,7 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }
           ) : null}
         </div>
       ) : (
-        <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s Shop.</p>
+        <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
       {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} /> : null}
       <div className="text-center">
@@ -162,7 +162,7 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }
             <a href={`tel:${phone}`} className="text-center text-2xl font-extrabold tracking-wide text-navy-900">
               {phone}
             </a>
-            <p className="text-sm text-navy-600">Say you saw it on BitoCard Shop. Never pay before you have seen the item, and never share codes sent to your phone.</p>
+            <p className="text-sm text-navy-600">Say you saw it on Udozo. Never pay before you have seen the item, and never share codes sent to your phone.</p>
             <a href={`tel:${phone}`} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-navy-900 font-bold text-white">
               <Phone className="size-5" aria-hidden="true" /> Call
             </a>

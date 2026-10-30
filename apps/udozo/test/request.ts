@@ -12,6 +12,10 @@ vi.mock("next/headers", () => ({
       request.cookies.set(name, value);
       request.set.push({ name, value, options });
     },
+    delete: (name: string) => {
+      request.cookies.delete(name);
+      request.set.push({ name, value: "", options: { maxAge: 0 } });
+    },
   }),
 }));
 

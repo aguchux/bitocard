@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import manifest from "@/app/manifest";
 import { InstallSheet } from "@bitocard/ui/install-ui";
 import { offlineWorker } from "@bitocard/ui/offline-worker";
@@ -65,10 +65,10 @@ describe("how a device installs", () => {
 });
 
 describe("the prompt", () => {
-  const sheet = (route: "prompt" | "ios") => renderToStaticMarkup(createElement(InstallSheet, { route, appName: "BitoCard Shop", onInstall: () => undefined, onClose: () => undefined }));
+  const sheet = (route: "prompt" | "ios") => renderToStaticMarkup(createElement(InstallSheet, { route, appName: "Udozo", onInstall: () => undefined, onClose: () => undefined }));
 
   it("names the site, offers Install where the browser can, and the two steps on iPhones and iPads", () => {
-    expect(sheet("prompt")).toContain("Install BitoCard Shop");
+    expect(sheet("prompt")).toContain("Install Udozo");
     expect(sheet("prompt")).toContain(">Install<");
     expect(sheet("prompt")).toContain(">Not now<");
     expect(sheet("prompt")).not.toContain("Add to Home Screen");
@@ -105,17 +105,22 @@ async function load(listeners: Record<string, Listener>, mode: string, preloadRe
 
 describe("the app", () => {
   it("is installable: a standalone manifest with its icons, and its service worker at /sw.js", async () => {
-    const app = manifest();
-    expect([app.display, app.start_url, app.scope, app.id]).toEqual(["standalone", "/", "/", "/"]);
+    // The theme cannot be read: the manifest still answers, in the fallback colours.
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("down");
+    });
+    const app = await manifest();
+    vi.unstubAllGlobals();
+    expect([app.display, app.start_url, app.scope, app.id, app.theme_color, app.name]).toEqual(["standalone", "/", "/", "/", "#070f4c", "Udozo – Buy and sell near you"]);
     expect(app.icons?.some(icon => icon.sizes === "512x512")).toBe(true);
     const res = GET();
     expect(res.headers.get("content-type")).toContain("javascript");
     expect(res.headers.get("cache-control")).toContain("no-cache");
-    expect(await res.text()).toBe(offlineWorker("BitoCard Shop"));
+    expect(await res.text()).toBe(offlineWorker("Udozo"));
   });
 
   it("the worker serves pages from the network, and its own page only when there is no connection", async () => {
-    const online = runWorker(offlineWorker("BitoCard Shop"), async () => new Response("from the network"));
+    const online = runWorker(offlineWorker("Udozo"), async () => new Response("from the network"));
     expect(await (await load(online, "navigate"))!.text()).toBe("from the network");
     expect(await (await load(online, "navigate", Promise.resolve(new Response("preloaded"))))!.text()).toBe("preloaded");
     expect(await load(online, "cors"), "images, scripts and API calls never go through it").toBeNull();

@@ -9,7 +9,7 @@ type Props = { params: Promise<{ cc: string }>; searchParams: Promise<{ next?: s
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const market = await marketFor((await params).cc);
-  return { title: `Choose your area in ${market?.name ?? "BitoCard Shop"}`, robots: { index: false, follow: true } };
+  return { title: `Choose your area in ${market?.name ?? "Udozo"}`, robots: { index: false, follow: true } };
 }
 
 /** Choose your area, for listings near you first: back to the search that asked, else the area's own page. */

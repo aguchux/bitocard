@@ -7,12 +7,12 @@ import { categoriesOf } from "@/lib/reference";
 
 export const metadata: Metadata = {
   title: "Safe Trade Guide",
-  description: "How to buy and sell safely on BitoCard Shop: checks before and at a meeting, checks for each category, red flags, and how Safe pay holds the money until you have the item.",
+  description: "How to buy and sell safely on Udozo: checks before and at a meeting, checks for each category, red flags, and how Safe pay holds the money until you have the item.",
   alternates: { canonical: "/safe-trade" },
 };
 
 const groups = [
-  { title: "Before you meet", items: ["Keep the chat on BitoCard", "Check the seller's badges", "The price is close to similar listings", "Agree the place, time and how you will pay", "Tell someone where you are going"] },
+  { title: "Before you meet", items: ["Keep the chat on Udozo", "Check the seller's badges", "The price is close to similar listings", "Agree the place, time and how you will pay", "Tell someone where you are going"] },
   { title: "At the meeting", items: ["A busy public place, in daylight", "Inspect and test it with the checks below", "Check papers and serial numbers", "Pay only when you are happy; confirm a transfer in your own banking app"] },
   { title: "If you are selling", items: ["Hand over only when the money shows in your own account", "Never trust an SMS alert or a screenshot", "Refuse overpayments; check cash notes"] },
 ];
@@ -46,11 +46,11 @@ export default async function SafeTradePage() {
         </h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm">
           <li>You ask to buy; the seller accepts.</li>
-          <li>You pay from your BitoCard wallet. BitoCard holds the money.</li>
+          <li>You pay from your Udozo wallet. Udozo holds the money.</li>
           <li>You check the item: at a meet-up you give the seller your release code, for a delivery you confirm it arrived.</li>
-          <li>Not as described, or it never came? Open a dispute and BitoCard decides. If the seller cancels or does not hand it over in time, you are refunded in full, fee included.</li>
+          <li>Not as described, or it never came? Open a dispute and Udozo decides. If the seller cancels or does not hand it over in time, you are refunded in full, fee included.</li>
         </ol>
-        <p className="text-xs text-navy-600">BitoCard is not the seller and does not inspect goods. Safe pay is your choice on each purchase, for a small fee shown before you pay.</p>
+        <p className="text-xs text-navy-600">Udozo is not the seller and does not inspect goods. Safe pay is your choice on each purchase, for a small fee shown before you pay.</p>
       </section>
       {groups.map(group => (
         <section key={group.title} aria-labelledby={group.title}>
@@ -91,7 +91,7 @@ export default async function SafeTradePage() {
           <AlertTriangle className="size-5" aria-hidden="true" /> Red flags
         </h2>
         <p className="text-sm text-navy-800">{redFlags}</p>
-        <p className="text-sm text-navy-800">BitoCard never asks for your codes, PINs or passwords, in a chat or anywhere else.</p>
+        <p className="text-sm text-navy-800">Udozo never asks for your codes, PINs or passwords, in a chat or anywhere else.</p>
       </section>
     </div>
   );

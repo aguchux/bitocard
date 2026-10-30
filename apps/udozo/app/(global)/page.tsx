@@ -16,7 +16,7 @@ const listingCount = (count: number) => `${count.toLocaleString("en-GB")} ${coun
 export async function generateMetadata(): Promise<Metadata> {
   const all = await markets();
   return {
-    title: { absolute: "BitoCard Shop across Africa: buy and sell near you" },
+    title: { absolute: "Udozo across Africa: buy and sell near you" },
     description: `Buy and sell near you in ${all.data.map(market => market.name).join(", ") || "Africa"}, protected by Safe pay.`,
     alternates: { canonical: "/", languages: regionalAlternates(all.data, all.showcase, code => `/${code}`, "/") },
   };
@@ -33,7 +33,7 @@ export default async function GlobalHome() {
     if (all.data.length === 1) redirect(`/${all.data[0]!.country.toLowerCase()}`);
     return (
       <div className="mx-auto grid max-w-md gap-3 px-4 py-16 text-center">
-        <h1 className="text-2xl font-extrabold">BitoCard Shop is opening soon</h1>
+        <h1 className="text-2xl font-extrabold">Udozo is opening soon</h1>
         <p className="text-navy-600">Buy and sell near you, protected by Safe pay. Check back shortly.</p>
       </div>
     );
@@ -45,7 +45,7 @@ export default async function GlobalHome() {
       <section className="bg-navy-900 pt-5 pb-6">
         <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-4">
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">
-            BitoCard Shop across Africa
+            Udozo across Africa
             <br />
             <span className="text-brand-300">buy and sell near you, protected by Safe pay</span>
           </h1>

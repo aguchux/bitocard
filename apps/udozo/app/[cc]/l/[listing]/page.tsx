@@ -30,7 +30,6 @@ import { ListingGrid } from "@/components/listing-card";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { buyButton } from "@/lib/buy";
-import { myShopHref } from "@/lib/handoff";
 import { breadcrumbJsonLd, listingJsonLd } from "@/lib/seo";
 import type { ShopViewer } from "@bitocard/api-client/classifieds";
 
@@ -46,11 +45,11 @@ async function load(cc: string, segment: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cc, listing: segment } = await params;
   const { listing } = await load(cc, segment);
-  if (!listing) return { title: "This listing is no longer on BitoCard Shop", robots: { index: false, follow: true } };
+  if (!listing) return { title: "This listing is no longer on Udozo", robots: { index: false, follow: true } };
   const path = listingPath(cc, listing.ref, listing.slug);
   const price = shopPriceText(listing.price);
   const title = `${listing.title}, ${price}`;
-  const description = `${listing.status === "sold" ? "Sold. " : ""}${listing.title} for ${price} in ${listing.area.name}, ${listing.area.state.name}. ${listing.condition ? `${conditionLabels[listing.condition]}. ` : ""}Chat with the seller on BitoCard Shop and pay with Safe pay.`;
+  const description = `${listing.status === "sold" ? "Sold. " : ""}${listing.title} for ${price} in ${listing.area.name}, ${listing.area.state.name}. ${listing.condition ? `${conditionLabels[listing.condition]}. ` : ""}Chat with the seller on Udozo and pay with Safe pay.`;
   const cover = listing.photos[0];
   return {
     title,
@@ -199,7 +198,7 @@ export default async function ListingPage({ params }: Props) {
               viewer={viewer}
               signedIn={Boolean(customer)}
               chat={chatResult?.ok ? chatResult.data : null}
-              messagesHref={customer?.country && viewer?.conversation_id ? myShopHref(customer.country, `/shop/messages/${viewer.conversation_id}`) : customer?.country ? myShopHref(customer.country, "/shop/messages") : null}
+              messagesHref={customer ? (viewer?.conversation_id ? `/account/messages/${viewer.conversation_id}` : "/account/messages") : null}
             />
           )}
           {sold ? null : <AskAboutListing listingId={listing.id} title={listing.title} />}
@@ -211,7 +210,7 @@ export default async function ListingPage({ params }: Props) {
               <span className="grid">
                 <strong>{listing.seller.name}</strong>
                 <span className="text-xs text-navy-600">
-                  On BitoCard since {new Date(listing.seller.member_since).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+                  On Udozo since {new Date(listing.seller.member_since).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
                   {listing.seller.response_rate !== null ? ` · answers ${listing.seller.response_rate}% of chats` : ""}
                 </span>
               </span>
@@ -238,7 +237,7 @@ export default async function ListingPage({ params }: Props) {
               {listing.category.safety_checklist.slice(0, 3).map(item => (
                 <li key={item}>{item}</li>
               ))}
-              <li>Never pay in advance. BitoCard never asks for your codes.</li>
+              <li>Never pay in advance. Udozo never asks for your codes.</li>
             </ul>
             <Link href="/safe-trade" className="text-sm font-semibold text-brand-700 hover:underline">
               Read the Safe Trade Guide
@@ -264,7 +263,7 @@ export default async function ListingPage({ params }: Props) {
 function Gone({ cc }: { cc: string }) {
   return (
     <div className="mx-auto grid max-w-md gap-3 px-4 py-14 text-center">
-      <h1 className="text-2xl font-extrabold">This listing is no longer on BitoCard Shop</h1>
+      <h1 className="text-2xl font-extrabold">This listing is no longer on Udozo</h1>
       <p className="text-navy-600">It was sold, or the seller took it down.</p>
       <Link href={`/${cc}`} className="mx-auto flex h-11 items-center rounded-xl bg-navy-900 px-5 font-bold text-white">
         See what is for sale

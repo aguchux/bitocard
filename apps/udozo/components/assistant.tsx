@@ -26,7 +26,7 @@ const AssistantContext = createContext<Assistant>({ available: false, name: "", 
 /** Whether an assistant answers here, its name, and how to open it (the header, the search bar, a listing page). */
 export const useAssistant = () => useContext(AssistantContext);
 
-const languageKey = "bc_assistant_language";
+const languageKey = "udz_assistant_language";
 const readLanguage = () => {
   try {
     return localStorage.getItem(languageKey);
@@ -42,7 +42,7 @@ const saveLanguage = (code: string) => {
   }
 };
 
-/** A listing card's address on this site (the API gives the full https://shop.bitocard.com one). */
+/** A listing card's address on this site (the API gives the full https://udozo.com one). */
 const localPath = (url: string) => {
   try {
     return new URL(url).pathname;
@@ -140,7 +140,7 @@ function CardView({ card, signedIn, listingOnPage, onPerson }: { card: ShopAssis
             <dt>You pay</dt>
             <dd>{shopMoney(card.total, card.currency)}</dd>
           </div>
-          <p className="text-xs text-navy-500">Held by BitoCard until you have the item.</p>
+          <p className="text-xs text-navy-500">Held by Udozo until you have the item.</p>
         </dl>
       );
     case "price_range":
@@ -171,7 +171,7 @@ function CardView({ card, signedIn, listingOnPage, onPerson }: { card: ShopAssis
     case "person":
       return (
         <div className={box}>
-          <p>Talk to a person at BitoCard about this.</p>
+          <p>Talk to a person at Udozo about this.</p>
           {signedIn ? (
             <button type="button" onClick={onPerson} className="inline-flex h-9 items-center justify-self-start rounded-xl bg-navy-900 px-3 text-sm font-bold text-white hover:bg-navy-700">
               Talk to a person
@@ -359,7 +359,7 @@ function Panel({ country, initial, signedIn, opening, onClose, dialog }: { count
   const handOver = async () => {
     if (!thread) return;
     const result = await talkToPerson(thread.id);
-    setPerson(result.ok ? "A person at BitoCard will answer in your messages on bitocard.com, with this conversation." : result.message);
+    setPerson(result.ok ? "A person at Udozo will answer in your messages, with this conversation." : result.message);
   };
 
   return (
@@ -468,7 +468,7 @@ function Panel({ country, initial, signedIn, opening, onClose, dialog }: { count
             </button>
           </div>
           <p className="text-center text-[11px] text-navy-500">
-            {assistant.name} is BitoCard’s AI and can make mistakes. Never share codes or bank details. {thread && signedIn ? (
+            {assistant.name} is Udozo’s AI and can make mistakes. Never share codes or bank details. {thread && signedIn ? (
               <button type="button" onClick={() => void handOver()} className="font-semibold underline">
                 Talk to a person
               </button>

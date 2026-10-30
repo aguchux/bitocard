@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { decodeSignedIn, encodeSignedIn, signedInCookie } from "@bitocard/ui/handoff";
 import { request, setRequest } from "./request";
 import { customerApi, safeNext, shopperHeader, signInPath, siteOrigin } from "@/lib/customer";
-import { countryStoreOrigin, forgetSignedIn, myShopHref, rememberSignedIn, signedInElsewhere } from "@/lib/handoff";
+import { handoffTarget } from "@/lib/handoff";
 import { continueSignIn } from "@/lib/handoff-actions";
 import { acceptShopTerms, answerOffer, loadChat, makeOffer, requestSafePay, saveListing, shopTerms, showPhone, startChat } from "@/lib/listing-actions";
-import { marketFor } from "@/lib/api";
+import { apiUrl, marketFor } from "@/lib/api";
 import { GET as handoffGo } from "@/app/(global)/handoff/go/route";
 import { listingGone, proxy } from "@/proxy";
 
@@ -16,10 +15,9 @@ let reply: (url: string, method: string) => Response | null;
 const listing = "6f1c2e8a-1b2c-4d3e-8f90-1234567890ab";
 
 beforeEach(() => {
-  vi.stubEnv("STOREFRONT_URL", "https://bitocard.com");
-  vi.stubEnv("SHOP_URL", "https://shop.bitocard.com");
+  vi.stubEnv("UDOZO_URL", "https://udozo.com");
   vi.stubEnv("API_URL", "https://api.test");
-  setRequest({ host: "shop.bitocard.com" });
+  setRequest({ host: "udozo.com" });
   calls = [];
   reply = () => null;
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
@@ -35,8 +33,8 @@ afterEach(() => {
 });
 
 describe("the customer's session", () => {
-  test("sent to the API as a header from this site's own cookie; no store is named, so it is bitocard.com's account", async () => {
-    setRequest({ host: "shop.bitocard.com" }, { bc_customer: "bcc_token" });
+  test("sent to the API as a header from this site's own cookie; no store is named, so it is udozo.com's own account", async () => {
+    setRequest({ host: "udozo.com" }, { udz_customer: "bcc_token" });
     reply = () => Response.json({ object: "customer", id: "c1" });
     expect((await customerApi("POST", "/v1/classifieds/favourites", { listing_id: listing })).ok).toBe(true);
     const call = calls[0]!;
@@ -62,7 +60,10 @@ describe("the customer's session", () => {
     expect(safeNext("/ng/l/1-tv")).toBe("/ng/l/1-tv");
     for (const bad of ["//evil.com", "https://evil.com", "/\t/evil.com", "/\\evil.com"]) expect(safeNext(bad), bad).toBe("/");
     expect(signInPath("/ng/l/1-tv", "chat")).toBe("/signin?next=%2Fng%2Fl%2F1-tv&for=chat");
-    expect(siteOrigin()).toBe("https://shop.bitocard.com");
+    expect(siteOrigin()).toBe("https://udozo.com");
+    vi.stubEnv("UDOZO_URL", "");
+    vi.stubEnv("VERCEL", "1");
+    expect(siteOrigin(), "udozo.com in production").toBe("https://udozo.com");
   });
 
   test("only open markets, by lower-case codes", async () => {
@@ -73,46 +74,59 @@ describe("the customer's session", () => {
   });
 });
 
-describe("the sign-in handoff", () => {
-  test("BitoCard's sign-in is no longer offered here: the Shop left BitoCard's handoff for Udozo", async () => {
-    // docs/UDOZO_SPINOFF_PLAN.md, step 2: this app becomes Udozo's (step 4), with accounts and a handoff of its own.
-    await rememberSignedIn({ name: "Adaeze Okafor" });
-    const set = request.set.find(cookie => cookie.name === signedInCookie)!;
-    expect(set.options).toMatchObject({ domain: ".bitocard.com", httpOnly: true });
-    // What this site still writes names no BitoCard site, so every one of them ignores it.
-    expect(decodeSignedIn(set.value)).toBeNull();
-    expect(await signedInElsewhere()).toBeNull();
-    setRequest({}, { [signedInCookie]: encodeSignedIn({ name: "Ada", origin: "https://ng.bitocard.com" }) });
-    expect(await signedInElsewhere()).toBeNull();
-    await forgetSignedIn();
-    expect(request.set).toEqual([]);
+describe("Udozo's API", () => {
+  test("production calls api.udozo.com; API_URL and the public address override it; locally the API on 3001", () => {
+    vi.stubEnv("API_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    delete process.env.API_URL;
+    delete process.env.NEXT_PUBLIC_API_URL;
+    vi.stubEnv("VERCEL", "1");
+    expect(apiUrl("/v1/theme")).toBe("https://api.udozo.com/v1/theme");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.staging.test/");
+    expect(apiUrl("/v1/theme")).toBe("https://api.staging.test/v1/theme");
+    vi.stubEnv("API_URL", "http://localhost:4001");
+    expect(apiUrl("/v1/theme")).toBe("http://localhost:4001/v1/theme");
+  });
+});
+
+describe("the sign-in handoff to Udozo's stores", () => {
+  test("only an https origin (http for localhost), never this site, a path or credentials", () => {
+    const self = "https://udozo.com";
+    expect(handoffTarget("https://acme.udozo.com", self)).toBe("https://acme.udozo.com");
+    expect(handoffTarget("https://shop.acme.ng", self)).toBe("https://shop.acme.ng");
+    expect(handoffTarget("http://acme.localhost:3007", self)).toBe("http://acme.localhost:3007");
+    for (const bad of ["http://acme.udozo.com", "https://udozo.com", "https://acme.udozo.com/x", "https://a:b@acme.udozo.com", "javascript:alert(1)", "nope"]) expect(handoffTarget(bad, self), bad).toBeNull();
   });
 
-  test("My Shop is the Shop tab on the customer's own country store, through this site's /handoff/go", () => {
-    expect(countryStoreOrigin("NG")).toBe("https://ng.bitocard.com");
-    expect(myShopHref("NG", "/shop/post")).toBe("https://shop.bitocard.com/handoff/go?to=https%3A%2F%2Fng.bitocard.com&next=%2Fshop%2Fpost");
-    vi.stubEnv("STOREFRONT_URL", "http://localhost:3000");
-    expect(countryStoreOrigin("ng")).toBe("http://ng.localhost:3000");
-  });
-
-  test("/handoff/go: a code for that site in its fragment; signed out, sign in here first; never to another site", async () => {
-    setRequest({}, { bc_customer: "bcc_session" });
-    reply = (url, method) => (method === "POST" && url.endsWith("/v1/store/account/handoff") ? Response.json({ code: "bch_abc", to: "https://ng.bitocard.com" }) : null);
-    const go = (query: string) => handoffGo(new NextRequest(`https://shop.bitocard.com/handoff/go?${query}`));
-    const response = await go("to=https%3A%2F%2Fng.bitocard.com&next=%2Fshop");
-    expect([response.status, response.headers.get("location")]).toEqual([303, "https://ng.bitocard.com/handoff#c=bch_abc&n=%2Fshop"]);
-    expect(calls.find(call => call.method === "POST")?.body).toEqual({ to: "https://ng.bitocard.com" });
-    expect((await go("to=https%3A%2F%2Fevil.com&next=%2Fng")).headers.get("location")).toBe("https://shop.bitocard.com/ng");
+  test("/handoff/go: a code for that store in its fragment; signed out, sign in here first; never to another site", async () => {
+    setRequest({}, { udz_customer: "bcc_session" });
+    // The API hands customers only to Udozo's own stores.
+    reply = (url, method) =>
+      method === "POST" && url.endsWith("/v1/store/account/handoff")
+        ? (calls.at(-1)!.body as { to: string }).to === "https://acme.udozo.com"
+          ? Response.json({ code: "bch_abc", to: "https://acme.udozo.com" })
+          : Response.json({ error: { code: "parameter_invalid", message: "Not a Udozo site." } }, { status: 400 })
+        : null;
+    const go = (query: string) => handoffGo(new NextRequest(`https://udozo.com/handoff/go?${query}`));
+    const response = await go("to=https%3A%2F%2Facme.udozo.com&next=%2Flistings");
+    expect([response.status, response.headers.get("location")]).toEqual([303, "https://acme.udozo.com/handoff#c=bch_abc&n=%2Flistings"]);
+    expect(calls.find(call => call.method === "POST")?.body).toEqual({ to: "https://acme.udozo.com" });
+    // A target the API refuses (not a Udozo store) leaves the customer here, never there.
+    expect((await go("to=https%3A%2F%2Fevil.com&next=%2Fng")).headers.get("location")).toBe("https://udozo.com/ng");
+    expect((await go("to=javascript%3Aalert(1)&next=%2Fng")).headers.get("location")).toBe("https://udozo.com/ng");
     setRequest({});
-    expect((await go("to=https%3A%2F%2Fng.bitocard.com&next=%2Fshop")).headers.get("location")).toBe(`https://shop.bitocard.com/signin?next=${encodeURIComponent("/handoff/go?to=https%3A%2F%2Fng.bitocard.com&next=%2Fshop")}`);
+    expect((await go("to=https%3A%2F%2Facme.udozo.com&next=%2Flistings")).headers.get("location")).toBe(`https://udozo.com/signin?next=${encodeURIComponent("/handoff/go?to=https%3A%2F%2Facme.udozo.com&next=%2Flistings")}`);
   });
 
-  test("the code another site sent is exchanged here, naming this site, for this site's own session", async () => {
+  test("the code udozo.com sent is exchanged here, naming this site, for this site's own udz_customer session", async () => {
     reply = (url, method) =>
       method === "POST" && url.endsWith("/handoff/exchange") ? Response.json({ customer: { object: "customer", id: "c1", name: "Adaeze Okafor", email_verified: false }, session: { token: "bcc_new" } }) : null;
     expect(await continueSignIn("bch_abcdefghijklmnopqrstuvwxyz", "/ng/l/1-tv")).toEqual({ ok: true, next: "/verify?next=%2Fng%2Fl%2F1-tv" });
-    expect(calls[0]!.body).toEqual({ code: "bch_abcdefghijklmnopqrstuvwxyz", origin: "https://shop.bitocard.com" });
-    expect(request.cookies.get("bc_customer")).toBe("bcc_new");
+    expect(calls[0]!.body).toEqual({ code: "bch_abcdefghijklmnopqrstuvwxyz", origin: "https://udozo.com" });
+    expect(request.cookies.get("udz_customer")).toBe("bcc_new");
+    expect(request.set.find(cookie => cookie.name === "udz_customer")?.options).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+    expect(request.set.find(cookie => cookie.name === "udz_customer")?.options?.domain).toBeUndefined();
+    expect(request.set.map(cookie => cookie.name)).not.toContain("bc_signed_in");
     expect(await continueSignIn("nope", "/")).toEqual({ ok: false, unreachable: false });
   });
 });
@@ -162,8 +176,8 @@ describe("listing actions", () => {
     expect(await requestSafePay({ listingId: listing, fulfilment: "delivery", stateId: "../x" })).toMatchObject({ ok: false });
   });
 
-  test("the BitoCard Shop terms: read, then accepted by the version shown; a refused request says why", async () => {
-    reply = url => (url.endsWith("/orders") ? Response.json({ error: { code: "terms_not_accepted", message: "Accept the BitoCard Shop terms.", param: "terms" } }, { status: 409 }) : Response.json({ object: "classified_terms", version: "2026-10-25", path: "/documents/shop-terms", accepted: false, accepted_at: null, previous_version: null }));
+  test("Udozo's terms: read, then accepted by the version shown; a refused request says why", async () => {
+    reply = url => (url.endsWith("/orders") ? Response.json({ error: { code: "terms_not_accepted", message: "Accept the Udozo terms.", param: "terms" } }, { status: 409 }) : Response.json({ object: "classified_terms", version: "2026-10-25", path: "/documents/shop-terms", accepted: false, accepted_at: null, previous_version: null }));
     expect(await requestSafePay({ listingId: listing, fulfilment: "meet_up" })).toMatchObject({ ok: false, code: "terms_not_accepted" });
     expect(await shopTerms()).toMatchObject({ version: "2026-10-25" });
     expect(await acceptShopTerms("2026-10-25")).toMatchObject({ ok: true });
@@ -176,12 +190,12 @@ describe("listing actions", () => {
 describe("gone listings", () => {
   test("answer 410 once the API says so; live, unknown or unreachable ones go on to the page", async () => {
     reply = url => (url.includes("/listings/100001?") ? new Response("{}", { status: 410 }) : url.includes("/listings/100002?") ? Response.json({}) : null);
-    const gone = await proxy(new NextRequest("https://shop.bitocard.com/ng/l/100001-old-tv"));
+    const gone = await proxy(new NextRequest("https://udozo.com/ng/l/100001-old-tv"));
     expect(gone.status).toBe(410);
     expect(gone.headers.get("x-robots-tag")).toBe("noindex");
-    expect(await gone.text()).toContain("no longer on BitoCard Shop");
-    expect((await proxy(new NextRequest("https://shop.bitocard.com/ng/l/100002-tv"))).headers.get("x-middleware-next")).toBe("1");
-    expect((await proxy(new NextRequest("https://shop.bitocard.com/ng/l/100001/buy"))).headers.get("x-middleware-next")).toBe("1");
+    expect(await gone.text()).toContain("no longer on Udozo");
+    expect((await proxy(new NextRequest("https://udozo.com/ng/l/100002-tv"))).headers.get("x-middleware-next")).toBe("1");
+    expect((await proxy(new NextRequest("https://udozo.com/ng/l/100001/buy"))).headers.get("x-middleware-next")).toBe("1");
     const asked = calls.length;
     expect(await listingGone("ng", "100001")).toBe(true);
     expect(calls.length).toBe(asked); // remembered for a minute

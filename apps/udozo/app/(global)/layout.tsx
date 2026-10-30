@@ -1,5 +1,5 @@
-import { ShopFooter } from "@/components/footer";
-import { ShopHeader } from "@/components/header";
+import { SiteFooter } from "@/components/footer";
+import { SiteHeader } from "@/components/header";
 import { markets } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
 
@@ -9,9 +9,9 @@ export default async function GlobalLayout({ children }: { children: React.React
   const own = all.data.find(market => market.country === customer?.country) ?? null;
   return (
     <>
-      <ShopHeader market={all.showcase ? null : own ?? all.data[0] ?? null} customer={customer} showcase={all.showcase} />
+      <SiteHeader market={all.showcase ? null : own ?? all.data[0] ?? null} customer={customer} showcase={all.showcase} />
       <main>{children}</main>
-      <ShopFooter />
+      <SiteFooter />
     </>
   );
 }

@@ -1,0 +1,88 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { Phone } from "lucide-react";
+import { addPhone, verifyPhone } from "@/lib/account-actions";
+import { PhoneInput } from "@bitocard/ui/phone-input";
+import { FormMessage, Submit, TextField } from "@/components/account-forms";
+
+/**
+ * The customer's mobile number, from their own (fixed) country only: the field is locked to it and the API checks it
+ * again. A number saved unverified (for example, added at sign-up) gets its own "Verify this number" action that
+ * sends the code straight away, without retyping it; "Use a different number" still opens the typed field.
+ */
+export function PhoneForm({ phone, verified, country, available }: { phone: string | null; verified: boolean; country: string | null; available: boolean }) {
+  const countrySet = Boolean(country);
+  const [adding, setAdding] = useState(false);
+  const [sendState, sendAction, sendPending] = useActionState(addPhone, {});
+  const [verifyState, verifyAction, verifyPending] = useActionState(verifyPhone, {});
+  const complete = Boolean(verifyState.notice);
+  const showCode = Boolean(sendState.notice) && !complete;
+  // A number is already on file but not yet confirmed (for example, added at sign-up): offer to verify it directly.
+  const pendingVerify = Boolean(phone) && !verified;
+  return <div className="space-y-3">
+    <p className="text-sm font-semibold text-navy-900">Phone number</p>
+    {phone && verified ? (
+      <p className="flex min-h-12 items-center gap-2.5 rounded-xl bg-slate-50 px-3.5 text-[15px] text-slate-700 ring-1 ring-slate-200/70">
+        <Phone className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+        {phone}
+        <span className="ml-auto text-xs font-semibold text-emerald-700">Verified</span>
+      </p>
+    ) : phone ? (
+      <p className="flex min-h-12 items-center gap-2.5 rounded-xl bg-amber-50 px-3.5 text-[15px] text-navy-900 ring-1 ring-amber-200/70">
+        <Phone className="size-4 shrink-0 text-amber-500" aria-hidden="true" />
+        {phone}
+        <span className="ml-auto text-xs font-semibold text-amber-700">Not confirmed</span>
+      </p>
+    ) : (
+      <p className="text-sm text-slate-500">No phone number yet.</p>
+    )}
+    {!countrySet ? <p className="text-xs text-slate-500">Choose your country below before adding a phone number.</p> : null}
+    {countrySet && !available ? <p className="text-xs text-slate-500">Phone verification is not available in your country yet.</p> : null}
+
+    {countrySet && available && pendingVerify && !adding && !showCode ? (
+      <form action={sendAction} className="space-y-2">
+        <FormMessage state={sendState} />
+        <input type="hidden" name="phone" value={phone!} />
+        <div className="flex flex-wrap gap-3">
+          <Submit pending={sendPending}>Verify this number</Submit>
+          <button type="button" onClick={() => setAdding(true)} className="text-sm font-semibold text-brand-600 hover:underline">
+            Use a different number
+          </button>
+        </div>
+      </form>
+    ) : null}
+
+    {countrySet && available && !pendingVerify && (!adding || complete) && !showCode ? (
+      <button type="button" onClick={() => setAdding(true)} className="text-sm font-semibold text-brand-600 hover:underline">
+        {phone ? 'Change phone number' : 'Add phone number'}
+      </button>
+    ) : null}
+
+    {countrySet && available && adding && !showCode && !complete ? <form action={sendAction} className="space-y-3">
+      <FormMessage state={sendState} />
+      <PhoneInput
+        country={country!}
+        name="phone"
+        required
+        className="text-navy-900"
+        inputClassName="min-h-12 border border-slate-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400"
+        errorClassName="text-red-700"
+      />
+      <p className="text-xs text-slate-500">A mobile number from your country. Type it the way you dial it locally.</p>
+      <div className="flex flex-wrap gap-3">
+        <Submit pending={sendPending}>Send verification code</Submit>
+        {pendingVerify ? (
+          <button type="button" onClick={() => setAdding(false)} className="text-sm font-semibold text-slate-500 hover:underline">
+            Cancel
+          </button>
+        ) : null}
+      </div>
+    </form> : null}
+    {countrySet && available && showCode ? <form action={verifyAction} className="space-y-3">
+      <FormMessage state={verifyState} />
+      <TextField label="6-digit SMS code" name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required state={verifyState} />
+      <Submit pending={verifyPending}>Verify phone</Submit>
+    </form> : null}
+  </div>;
+}

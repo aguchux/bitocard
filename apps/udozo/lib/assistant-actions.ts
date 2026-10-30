@@ -40,7 +40,7 @@ export async function reportAnswer(messageId: string, reason: string): Promise<A
   return answer(await assistantApi<ShopAssistantMessage>("POST", `/v1/classifieds/assistant/messages/${messageId}/report`, { reason: reason.trim().slice(0, 500) }));
 }
 
-/** Talk to a person: a support chat with BitoCard, opened with the conversation (signed in). */
+/** Talk to a person: a support chat with Udozo, opened with the conversation (signed in). */
 export async function talkToPerson(threadId: string): Promise<ActionResult<{ chat_id: string }>> {
   if (!uuid.test(threadId)) return refused("No such conversation.");
   return answer(await assistantApi<{ chat_id: string }>("POST", `/v1/classifieds/assistant/threads/${threadId}/human`, {}));

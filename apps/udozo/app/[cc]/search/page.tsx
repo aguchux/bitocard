@@ -17,7 +17,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const { cc } = await params;
   const market = await marketFor(cc);
   const { q } = readFilters(await searchParams);
-  return { title: q ? `“${q}” in ${market?.name ?? "BitoCard Shop"}` : `Search ${market?.name ?? "BitoCard Shop"}`, robots: noindexFollow, alternates: { canonical: `/${cc}/search` } };
+  return { title: q ? `“${q}” in ${market?.name ?? "Udozo"}` : `Search ${market?.name ?? "Udozo"}`, robots: noindexFollow, alternates: { canonical: `/${cc}/search` } };
 }
 
 /** Search results in the country, local first when the buyer chose an area. Never indexed. */

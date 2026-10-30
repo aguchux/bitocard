@@ -53,7 +53,7 @@ function OfferCard({ message, onAnswer, busy, buyPath }: { message: ShopMessage;
 /**
  * The chat with the seller, in place on the listing page: the buyer's first message opens it (quick replies to start),
  * then it polls for new messages while open. Offers are sent and answered here; photos, blocking and reports are in the
- * Shop tab's Messages, where the chat continues.
+ * account's Messages, where the chat continues.
  */
 export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath, draft }: { listingId: string; currency: string; initial: ShopChat | null; messagesHref: string | null; buyPath: string; draft?: { text: string; at: number } | null }) {
   const [chat, setChat] = useState<ShopChat | null>(initial);
@@ -216,7 +216,7 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath,
       ) : null}
       {chat && messagesHref ? (
         <a href={messagesHref} className="text-sm font-semibold text-brand-700 hover:underline">
-          Continue in My Shop, with photos
+          Continue in Messages, with photos
         </a>
       ) : null}
     </section>

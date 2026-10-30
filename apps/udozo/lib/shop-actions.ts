@@ -1,0 +1,399 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import type {
+  ShopChat,
+  ShopContact,
+  ShopCondition,
+  ShopDelivery,
+  ShopDispute,
+  ShopDisputeMessage,
+  ShopDisputeReason,
+  ShopFeature,
+  ShopMessage,
+  ShopMyListing,
+  ShopOrder,
+  ShopOrderMessage,
+  ShopPriceKind,
+  ShopReleaseCode,
+  ShopReportReason,
+  ShopResaleDeal,
+  ShopResaleMessage,
+  ShopReseller,
+  ShopShipmentStatus,
+  ShopStoreReport,
+  ShopStoreReportReason,
+  ShopSuggestion,
+  ShopVideoUpload,
+} from "@bitocard/api-client/classifieds";
+import type { TermsStatus } from "@/components/terms-accept";
+import { apiUrl } from "./api";
+import { type CustomerResult, customerApi } from "./customer";
+import { toMinor, uuidPattern } from "./shop";
+
+/** What a Shop action answers: its data, or why not (`param` names the field, `signIn` when the session has ended). */
+export type ShopResult<T> = { ok: true; data: T } | { ok: false; message: string; code: string | null; param: string | null; signIn: boolean };
+
+const refused = (message: string, param: string | null = null): ShopResult<never> => ({ ok: false, message, code: "parameter_invalid", param, signIn: false });
+
+function answer<T>(result: CustomerResult<T>): ShopResult<T> {
+  if (result.ok) return { ok: true, data: result.data };
+  return { ok: false, message: result.status === 401 ? "Sign in again to carry on." : result.message, code: result.code, param: result.param, signIn: result.status === 401 };
+}
+
+const id = (value: string) => uuidPattern.test(value);
+
+// ---- The Udozo terms ----
+
+/** The terms' current version and whether this customer accepted it (needed to post and to use Safe pay). */
+export async function shopTerms(): Promise<TermsStatus | null> {
+  const result = await customerApi<TermsStatus>("GET", "/v1/classifieds/terms");
+  return result.ok ? result.data : null;
+}
+
+/** Records the customer's acceptance of the version they were shown. */
+export async function acceptShopTerms(version: string): Promise<ShopResult<TermsStatus>> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) return refused("No such version of the terms.");
+  return answer(await customerApi<TermsStatus>("POST", "/v1/classifieds/terms/accept", { version }));
+}
+
+// ---- Listings ----
+
+/** The fields the Post an ad form saves as the seller goes (every one optional; null clears it). */
+export type ListingFields = Partial<{
+  title: string | null;
+  description: string | null;
+  category_id: string | null;
+  area_id: string | null;
+  price_kind: ShopPriceKind;
+  /** As typed, in the currency's main unit ("520,000"); empty clears it. */
+  price: string;
+  condition: ShopCondition | null;
+  delivery: ShopDelivery;
+  /** Handed over in person, with the buyer's release code (at least one of this and delivery). */
+  pickup: boolean;
+  /** The delivery charge within the seller's state and elsewhere, as typed ("2,000"); empty is free. */
+  delivery_fee_state: string;
+  delivery_fee_nationwide: string;
+  contact: ShopContact;
+  features: Array<{ key: string; value: string | number | boolean | null }>;
+  /** Where it is sold: Udozo, resellers' stores, or both. */
+  on_shop: boolean;
+  resale: boolean;
+  /** Resellers' discount and how far above the price they may sell, in basis points. */
+  resale_discount_bps: number;
+  resale_markup_max_bps: number;
+  /** Units to sell, shared by every channel. */
+  stock: number;
+}>;
+
+function body(fields: ListingFields): { body: Record<string, unknown> } | { problem: ShopResult<never> } {
+  const out: Record<string, unknown> = {};
+  for (const key of ["title", "description", "category_id", "area_id", "price_kind", "condition", "delivery", "contact"] as const) {
+    if (fields[key] !== undefined) out[key] = typeof fields[key] === "string" ? (fields[key] as string).trim() || null : fields[key];
+  }
+  if (fields.price !== undefined) {
+    if (!fields.price.trim()) out.price = null;
+    else {
+      const minor = toMinor(fields.price);
+      if (minor === null) return { problem: refused("Give the price as an amount, such as 520,000.", "price") };
+      out.price = minor;
+    }
+  }
+  for (const key of ["delivery_fee_state", "delivery_fee_nationwide"] as const) {
+    const typed = fields[key];
+    if (typed === undefined) continue;
+    const minor = typed.trim() ? toMinor(typed) : 0;
+    if (minor === null) return { problem: refused("Give the delivery charge as an amount, such as 2,000 (or leave it empty for free).", key) };
+    out[key] = minor;
+  }
+  if (fields.pickup !== undefined) out.pickup = fields.pickup;
+  if (fields.features) out.features = fields.features.filter(item => item.value !== null && item.value !== "");
+  for (const key of ["on_shop", "resale", "resale_discount_bps", "resale_markup_max_bps", "stock"] as const) if (fields[key] !== undefined) out[key] = fields[key];
+  return { body: out };
+}
+
+/** A new draft with the first fields the seller gave (it is created on their first change, never by opening the page). */
+export async function createListing(fields: ListingFields, nonce?: string): Promise<ShopResult<ShopMyListing>> {
+  const made = body(fields);
+  if ("problem" in made) return made.problem;
+  return answer(await customerApi<ShopMyListing>("POST", "/v1/classifieds/listings", made.body, { idempotencyKey: nonce }));
+}
+
+export async function updateListing(listingId: string, fields: ListingFields): Promise<ShopResult<ShopMyListing>> {
+  if (!id(listingId)) return refused("No such listing.");
+  const made = body(fields);
+  if ("problem" in made) return made.problem;
+  return answer(await customerApi<ShopMyListing>("PATCH", `/v1/classifieds/listings/${listingId}`, made.body));
+}
+
+export async function loadListing(listingId: string): Promise<ShopResult<ShopMyListing>> {
+  if (!id(listingId)) return refused("No such listing.");
+  return answer(await customerApi<ShopMyListing>("GET", `/v1/classifieds/me/listings/${listingId}`));
+}
+
+/** Posts the listing: live at once, or to Udozo's review first. */
+export async function submitListing(listingId: string): Promise<ShopResult<ShopMyListing>> {
+  if (!id(listingId)) return refused("No such listing.");
+  const result = answer(await customerApi<ShopMyListing>("POST", `/v1/classifieds/listings/${listingId}/submit`, {}));
+  if (result.ok) revalidatePath("/account");
+  return result;
+}
+
+/** Renews an expired listing, marks a live one sold, or deletes one (My listings' buttons). */
+export async function listingAction(listingId: string, action: "renew" | "sold" | "delete"): Promise<ShopResult<unknown>> {
+  if (!id(listingId) || !["renew", "sold", "delete"].includes(action)) return refused("No such listing.");
+  const result = answer(action === "delete" ? await customerApi("DELETE", `/v1/classifieds/listings/${listingId}`) : await customerApi("POST", `/v1/classifieds/listings/${listingId}/${action}`, {}));
+  if (result.ok) revalidatePath("/account");
+  return result;
+}
+
+/** The photos in their new order: the first is the cover. */
+export async function reorderPhotos(listingId: string, order: string[]): Promise<ShopResult<unknown>> {
+  if (!id(listingId) || !order.length || order.length > 20 || !order.every(id)) return refused("No such photos.");
+  return answer(await customerApi("PATCH", `/v1/classifieds/listings/${listingId}/photos`, { order }));
+}
+
+export async function removeMedia(listingId: string, mediaId: string): Promise<ShopResult<unknown>> {
+  if (!id(listingId) || !id(mediaId)) return refused("No such photo.");
+  return answer(await customerApi("DELETE", `/v1/classifieds/listings/${listingId}/media/${mediaId}`));
+}
+
+/**
+ * Where the browser sends the video itself (a 15-minute link to the API: this server cannot pass 50 MB on). The link
+ * is the only credential it carries.
+ */
+export async function videoUploadUrl(listingId: string): Promise<ShopResult<{ url: string }>> {
+  if (!id(listingId)) return refused("No such listing.");
+  const result = answer(await customerApi<ShopVideoUpload>("POST", `/v1/classifieds/listings/${listingId}/video-upload`, {}));
+  return result.ok ? { ok: true, data: { url: apiUrl(result.data.path) } } : result;
+}
+
+/** The feature registry, searched by name and search words ("ram" finds Memory). */
+export async function searchFeatures(q: string): Promise<ShopResult<ShopFeature[]>> {
+  const words = q.trim().slice(0, 60);
+  if (words.length < 2) return { ok: true, data: [] };
+  const result = answer(await customerApi<{ data: ShopFeature[] }>("GET", `/v1/classifieds/features?q=${encodeURIComponent(words)}`));
+  return result.ok ? { ok: true, data: result.data.data.slice(0, 12) } : result;
+}
+
+/** Asks Udozo to add a feature the registry does not have. */
+export async function suggestFeature(name: string, categoryId: string | null): Promise<ShopResult<unknown>> {
+  const text = name.trim().slice(0, 60);
+  if (text.length < 2) return refused("Name the feature.", "name");
+  if (categoryId && !id(categoryId)) return refused("No such category.");
+  return answer(await customerApi("POST", "/v1/classifieds/feature-suggestions", { name: text, ...(categoryId ? { category_id: categoryId } : {}) }));
+}
+
+// ---- Chats ----
+
+export async function loadChat(chatId: string, after?: string): Promise<ShopResult<ShopChat>> {
+  if (!id(chatId) || (after && !id(after))) return refused("No such chat.");
+  return answer(await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${chatId}${after ? `?after=${after}` : ""}`));
+}
+
+export async function sendMessage(chatId: string, text: string, nonce?: string): Promise<ShopResult<ShopMessage>> {
+  if (!id(chatId)) return refused("No such chat.");
+  if (!text.trim()) return refused("Write a message.");
+  return answer(await customerApi<ShopMessage>("POST", `/v1/classifieds/conversations/${chatId}/messages`, { body: text.slice(0, 2000) }, { idempotencyKey: nonce }));
+}
+
+/** An offer in the chat, typed in the currency's main unit (naira) and sent in minor units. */
+export async function makeOffer(chatId: string, amount: string, nonce?: string): Promise<ShopResult<ShopMessage>> {
+  if (!id(chatId)) return refused("No such chat.");
+  const minor = toMinor(amount);
+  if (minor === null) return refused("Give your offer as an amount.");
+  return answer(await customerApi<ShopMessage>("POST", `/v1/classifieds/conversations/${chatId}/offers`, { price: minor }, { idempotencyKey: nonce }));
+}
+
+export async function answerOffer(offerId: string, action: "accept" | "decline" | "withdraw"): Promise<ShopResult<unknown>> {
+  if (!id(offerId) || !["accept", "decline", "withdraw"].includes(action)) return refused("No such offer.");
+  return answer(await customerApi("POST", `/v1/classifieds/offers/${offerId}/${action}`, {}));
+}
+
+/** Blocks the other person in this chat (neither side can write while it lasts), or lifts it. */
+export async function blockChat(chatId: string, block: boolean): Promise<ShopResult<unknown>> {
+  if (!id(chatId)) return refused("No such chat.");
+  return answer(await customerApi("POST", `/v1/classifieds/conversations/${chatId}/${block ? "block" : "unblock"}`, {}));
+}
+
+export async function reportChat(chatId: string, reason: ShopReportReason, details: string): Promise<ShopResult<unknown>> {
+  if (!id(chatId)) return refused("No such chat.");
+  return answer(await customerApi("POST", `/v1/classifieds/conversations/${chatId}/report`, { reason, ...(details.trim() ? { details: details.trim().slice(0, 1000) } : {}) }));
+}
+
+// ---- Safe pay orders ----
+
+type OrderStep = "accept" | "decline" | "pay" | "sent" | "received" | "cancel";
+
+/** A step on an order: the seller accepts or declines, the buyer pays or confirms it arrived, the seller marks it sent, either side cancels. */
+export async function orderStep(orderId: string, step: OrderStep, input: { reason?: string; tracking_note?: string; courier?: string; tracking_number?: string; tracking_url?: string; nonce?: string } = {}): Promise<ShopResult<ShopOrder>> {
+  if (!id(orderId) || !["accept", "decline", "pay", "sent", "received", "cancel"].includes(step)) return refused("No such order.");
+  const sent: Record<string, string> = {};
+  if ((step === "decline" || step === "cancel") && input.reason?.trim()) sent.reason = input.reason.trim().slice(0, 300);
+  if (step === "sent") {
+    if (!input.courier?.trim()) return refused("Choose the courier.", "courier");
+    if (!input.tracking_number?.trim()) return refused("Enter the tracking number.", "tracking_number");
+    sent.courier = input.courier.trim().slice(0, 60);
+    sent.tracking_number = input.tracking_number.trim().slice(0, 60);
+    if (input.tracking_url?.trim()) sent.tracking_url = input.tracking_url.trim().slice(0, 500);
+    if (input.tracking_note?.trim()) sent.tracking_note = input.tracking_note.trim().slice(0, 300);
+  }
+  const result = answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/${step}`, sent, { idempotencyKey: input.nonce }));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+/** The seller reports where a shipped parcel is (in transit, out for delivery, delivered, a failed attempt, returned). */
+export async function shipmentUpdate(orderId: string, status: ShopShipmentStatus, note?: string): Promise<ShopResult<ShopOrder>> {
+  if (!id(orderId) || !["in_transit", "out_for_delivery", "delivered", "failed_attempt", "returned"].includes(status)) return refused("No such order.");
+  const result = answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/shipment`, { status, ...(note?.trim() ? { note: note.trim().slice(0, 300) } : {}) }));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+/** A resale order's thread, for its supplier: the order chat with the buyer, or the trade thread with the reseller. */
+export async function loadOrderMessages(orderId: string, thread: "order" | "trade", after?: string): Promise<ShopResult<{ data: ShopOrderMessage[] }>> {
+  if (!id(orderId) || (after && !id(after))) return refused("No such order.");
+  return answer(await customerApi<{ data: ShopOrderMessage[] }>("GET", `/v1/classifieds/orders/${orderId}/messages?thread=${thread}${after ? `&after=${after}` : ""}`));
+}
+
+export async function sendOrderMessage(orderId: string, thread: "order" | "trade", text: string): Promise<ShopResult<ShopOrderMessage>> {
+  if (!id(orderId)) return refused("No such order.");
+  if (!text.trim()) return refused("Write a message.", "body");
+  return answer(await customerApi<ShopOrderMessage>("POST", `/v1/classifieds/orders/${orderId}/messages`, { thread, body: text.trim().slice(0, 2000) }));
+}
+
+/** Whether new resale orders are accepted by themselves (the supplier's choice). */
+export async function setAutoAccept(enabled: boolean): Promise<ShopResult<{ enabled: boolean }>> {
+  const result = answer(await customerApi<{ enabled: boolean }>("PUT", "/v1/classifieds/me/resale/auto-accept", { enabled }));
+  if (result.ok) revalidatePath("/account/resellers");
+  return result;
+}
+
+/** The buyer's release code for a meet-up (only ever shown to them). */
+export async function releaseCode(orderId: string): Promise<ShopResult<ShopReleaseCode>> {
+  if (!id(orderId)) return refused("No such order.");
+  return answer(await customerApi<ShopReleaseCode>("GET", `/v1/classifieds/orders/${orderId}/release-code`));
+}
+
+/** The seller enters the buyer's 6-digit code at the meet-up: the money is released at once. */
+export async function enterReleaseCode(orderId: string, code: string): Promise<ShopResult<ShopOrder>> {
+  if (!id(orderId)) return refused("No such order.");
+  if (!/^\d{6}$/.test(code)) return refused("Enter the 6 digits the buyer tells you.", "code");
+  const result = answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/release`, { code }));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+/** The buyer opens a dispute (before release): the payment to the seller stops until Udozo decides. */
+export async function openDispute(orderId: string, reason: ShopDisputeReason, details: string, nonce?: string): Promise<ShopResult<unknown>> {
+  if (!id(orderId) || !["not_received", "not_as_described", "damaged", "other"].includes(reason)) return refused("No such order.");
+  if (details.trim().length < 10) return refused("Tell us what happened, in a sentence or two.", "details");
+  const result = answer(await customerApi("POST", `/v1/classifieds/orders/${orderId}/dispute`, { reason, details: details.trim().slice(0, 2000) }, { idempotencyKey: nonce }));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+export async function loadDispute(orderId: string): Promise<ShopResult<ShopDispute>> {
+  if (!id(orderId)) return refused("No such order.");
+  return answer(await customerApi<ShopDispute>("GET", `/v1/classifieds/orders/${orderId}/dispute`));
+}
+
+/** A message on the dispute (photos go through `/api/account/orders/<id>/dispute`). */
+export async function disputeMessage(orderId: string, text: string): Promise<ShopResult<ShopDisputeMessage>> {
+  if (!id(orderId)) return refused("No such order.");
+  if (!text.trim()) return refused("Write a message.");
+  const form = new FormData();
+  form.set("body", text.trim().slice(0, 2000));
+  return answer(await customerApi<ShopDisputeMessage>("POST", `/v1/classifieds/orders/${orderId}/dispute/messages`, form));
+}
+
+// ---- Favourites ----
+
+export async function removeFavourite(listingId: string): Promise<ShopResult<unknown>> {
+  if (!id(listingId)) return refused("No such listing.");
+  const result = answer(await customerApi("DELETE", `/v1/classifieds/favourites/${listingId}`));
+  if (result.ok) revalidatePath("/account/favourites");
+  return result;
+}
+
+// ---- The shop assistant ----
+
+/**
+ * A suggestion from the shop assistant for the seller to accept or change: from the listing's photos (`draft`), a price
+ * range from comparable listings (`price`), what would make it better (`improve`), or a reply in a chat (`reply`).
+ * Every suggestion is checked by Udozo before it comes back; nothing changes until the seller presses a button.
+ */
+export async function assistantSuggestion(kind: ShopSuggestion["kind"], input: { listingId?: string; conversationId?: string }): Promise<ShopResult<ShopSuggestion>> {
+  if (input.listingId && !id(input.listingId)) return refused("No such listing.");
+  if (input.conversationId && !id(input.conversationId)) return refused("No such chat.");
+  if (kind === "reply" ? !input.conversationId : !input.listingId) return refused(kind === "reply" ? "Open a chat first." : "Save the ad first.");
+  return answer(await customerApi<ShopSuggestion>("POST", "/v1/classifieds/assistant/suggestions", { kind, ...(input.listingId ? { listing_id: input.listingId } : {}), ...(input.conversationId ? { conversation_id: input.conversationId } : {}) }));
+}
+
+// ---- My Resellers (B2B reselling: the supplier's side) ----
+
+export async function loadResaleMessages(relationshipId: string, after?: string): Promise<ShopResult<{ data: ShopResaleMessage[]; closed: boolean }>> {
+  if (!id(relationshipId) || (after && !id(after))) return refused("No such reseller.");
+  return answer(await customerApi<{ data: ShopResaleMessage[]; closed: boolean }>("GET", `/v1/classifieds/me/resellers/${relationshipId}/messages${after ? `?after=${after}` : ""}`));
+}
+
+export async function sendResaleMessage(relationshipId: string, text: string, nonce?: string): Promise<ShopResult<ShopResaleMessage>> {
+  if (!id(relationshipId)) return refused("No such reseller.");
+  if (!text.trim()) return refused("Write a message.");
+  return answer(await customerApi<ShopResaleMessage>("POST", `/v1/classifieds/me/resellers/${relationshipId}/messages`, { body: text.trim().slice(0, 2000) }, { idempotencyKey: nonce }));
+}
+
+/** Offers a reseller better terms: a discount (percent) and how far below the price they may sell, on one listing or all. */
+export async function offerResaleDeal(relationshipId: string, input: { listingId: string | null; discount: string; floor: string; endsOn: string }, nonce?: string): Promise<ShopResult<ShopResaleDeal>> {
+  if (!id(relationshipId) || (input.listingId && !id(input.listingId))) return refused("No such reseller.");
+  const percent = (text: string) => (/^\s*\d{1,3}(\.\d{1,2})?\s*$/.test(text) ? Math.round(Number(text) * 100) : null);
+  const discount = percent(input.discount);
+  const floor = input.floor.trim() ? percent(input.floor) : 0;
+  if (discount === null || discount < 1) return refused("Give the discount as a percentage.", "discount_bps");
+  if (floor === null) return refused("Give the floor as a percentage.", "floor_bps");
+  if (input.endsOn && !/^\d{4}-\d{2}-\d{2}$/.test(input.endsOn)) return refused("Choose an end date.", "ends_at");
+  const result = await customerApi<ShopResaleDeal>(
+    "POST",
+    `/v1/classifieds/me/resellers/${relationshipId}/deals`,
+    { listing_id: input.listingId, discount_bps: discount, floor_bps: floor, ends_at: input.endsOn ? `${input.endsOn}T23:59:59.000Z` : null },
+    { idempotencyKey: nonce },
+  );
+  revalidatePath(`/account/resellers/${relationshipId}`);
+  return answer(result);
+}
+
+/** Withdraws an offered deal, or ends a running one. */
+export async function endResaleDeal(relationshipId: string, dealId: string): Promise<ShopResult<ShopResaleDeal>> {
+  if (!id(relationshipId) || !id(dealId)) return refused("No such deal.");
+  const result = await customerApi<ShopResaleDeal>("POST", `/v1/classifieds/me/resale-deals/${dealId}/end`, {});
+  revalidatePath(`/account/resellers/${relationshipId}`);
+  return answer(result);
+}
+
+/** Approves a reseller's note exactly as shown, refuses it, or withdraws an approval. */
+export async function decideResaleNote(relationshipId: string, storeListingId: string, decision: "approve" | "refuse" | "withdraw", input: { note?: string; reason?: string }): Promise<ShopResult<ShopReseller>> {
+  if (!id(relationshipId) || !id(storeListingId) || !["approve", "refuse", "withdraw"].includes(decision)) return refused("No such note.");
+  const body = decision === "approve" ? { note: input.note ?? "" } : input.reason?.trim() ? { reason: input.reason.trim().slice(0, 300) } : {};
+  const result = await customerApi<ShopReseller>("POST", `/v1/classifieds/me/resale-notes/${storeListingId}/${decision}`, body);
+  revalidatePath(`/account/resellers/${relationshipId}`);
+  return answer(result);
+}
+
+/** Reports one of this reseller's stores to Udozo (B2B reselling, stage 5); an upheld report is a strike for them. */
+export async function reportResellerStore(relationshipId: string, storeId: string, reason: ShopStoreReportReason, details: string): Promise<ShopResult<ShopStoreReport>> {
+  if (!id(relationshipId) || !id(storeId)) return refused("Choose one of their stores.", "store_id");
+  const text = details.trim();
+  if (text.length < 10) return refused("Say what happened, in at least 10 characters.", "details");
+  return answer(await customerApi<ShopStoreReport>("POST", `/v1/classifieds/me/resellers/${relationshipId}/report`, { store_id: storeId, reason, details: text.slice(0, 2000) }));
+}
+
+/** Stops this reseller selling the supplier's listings (every store of theirs), or lets them again. */
+export async function setResellerStopped(relationshipId: string, stopped: boolean): Promise<ShopResult<ShopReseller>> {
+  if (!id(relationshipId)) return refused("No such reseller.");
+  const result = await customerApi<ShopReseller>("POST", `/v1/classifieds/me/resellers/${relationshipId}/${stopped ? "stop" : "resume"}`, {});
+  revalidatePath(`/account/resellers/${relationshipId}`);
+  revalidatePath("/account/resellers");
+  return answer(result);
+}

@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // This page is the x-default of each country's own category page (`/ng/c/<category>`), which carries the prices.
   return {
     title: `${name} for sale across Africa`,
-    description: `${name} for sale in ${all.data.map(market => market.name).join(", ")} on BitoCard Shop.`,
+    description: `${name} for sale in ${all.data.map(market => market.name).join(", ")} on Udozo.`,
     alternates: { canonical: `/c/${category}`, languages: regionalAlternates(all.data.filter(market => showcase.data.categories.find(row => row.slug === category)?.countries.includes(market.country)), all.showcase, code => categoryPath(code, category), `/c/${category}`) },
   };
 }

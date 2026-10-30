@@ -1,8 +1,12 @@
 import type { MetadataRoute } from "next";
-import { appUrl } from "@bitocard/ui/site";
+import { siteOrigin } from "@/lib/customer";
 
 export default function robots(): MetadataRoute.Robots {
-  const origin = new URL(appUrl("shop")).origin;
-  // Signing in, the handoff, Safe pay checkouts and this site's own API are never crawled (each also says noindex).
-  return { rules: { userAgent: "*", allow: "/", disallow: ["/signin", "/verify", "/handoff", "/api/", "/*/l/*/buy"] }, sitemap: `${origin}/sitemap.xml`, host: origin };
+  const origin = siteOrigin();
+  // Signing in, the account, the handoff, Safe pay checkouts and this site's own API are never crawled (each also says noindex).
+  return {
+    rules: { userAgent: "*", allow: "/", disallow: ["/signin", "/signup", "/verify", "/forgot-password", "/reset-password", "/account", "/sell", "/handoff", "/api/", "/*/l/*/buy"] },
+    sitemap: `${origin}/sitemap.xml`,
+    host: origin,
+  };
 }

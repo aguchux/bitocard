@@ -45,7 +45,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const path = placePath(cc, { state, area: found.place.area?.slug, category: found.category?.category.slug });
   const what = found.category?.category.name ?? "Things";
   const title = `${what} for sale in ${where(found.place)}`;
-  const description = `${what} for sale in ${where(found.place)} on BitoCard Shop: listings near you first, chat with sellers and pay with Safe pay.`;
+  const description = `${what} for sale in ${where(found.place)} on Udozo: listings near you first, chat with sellers and pay with Safe pay.`;
   // Indexed once the place itself has enough live listings (not counting the rest of the country shown after them);
   // thin pages and filtered views stay out of the index.
   const filtered = isFiltered(readFilters(await searchParams));

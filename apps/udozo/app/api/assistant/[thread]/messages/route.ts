@@ -12,7 +12,7 @@ const json = (data: unknown, status: number) => Response.json(data, { status, he
 export async function POST(request: Request, { params }: { params: Promise<{ thread: string }> }) {
   const { thread } = await params;
   const site = request.headers.get("sec-fetch-site");
-  if (site !== null && site !== "same-origin") return json({ error: { message: "Ask from BitoCard Shop." } }, 403);
+  if (site !== null && site !== "same-origin") return json({ error: { message: "Ask from Udozo." } }, 403);
   if (!uuid.test(thread)) return json({ error: { message: "No such conversation." } }, 404);
   const input = (await request.json().catch(() => null)) as { body?: unknown } | null;
   const body = typeof input?.body === "string" ? input.body.trim().slice(0, 1000) : "";

@@ -56,7 +56,7 @@ export function SearchBar({ country, q = "", area, state, autoFocus }: { country
             if (event.key === "Escape") setOpen(false);
           }}
           placeholder="Phones, cars, flats, jobs…"
-          aria-label="Search the Shop"
+          aria-label="Search Udozo"
           aria-autocomplete="list"
           aria-controls={shown ? list : undefined}
           aria-expanded={Boolean(shown)}

@@ -7,13 +7,12 @@ import { buyerOrderLabels, listingPath, listingRef, shopMoney, type ShopListingP
 import { SafePayOrderActions, SafePayRequest } from "@/components/safe-pay";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, signInPath } from "@/lib/customer";
-import { myShopHref } from "@/lib/handoff";
 
 type Props = { params: Promise<{ cc: string; listing: string }>; searchParams: Promise<{ offer?: string }> };
 
 export const metadata: Metadata = { title: "Buy with Safe pay", robots: { index: false, follow: false } };
 
-const steps = ["You ask; the seller accepts.", "You pay from your BitoCard wallet. We hold the money.", "You check the item, then release the money.", "Not as described? Open a dispute and we decide."];
+const steps = ["You ask; the seller accepts.", "You pay from your Udozo wallet. We hold the money.", "You check the item, then release the money.", "Not as described? Open a dispute and we decide."];
 
 const unavailable: Record<string, string> = {
   safe_pay_unavailable: "Safe pay is not open here yet. You can still chat with the seller.",
@@ -21,13 +20,13 @@ const unavailable: Record<string, string> = {
   offer_not_accepted: "Use an offer the seller accepted in the last 7 days.",
   listing_reserved: "Someone has already paid for this with Safe pay.",
   safe_pay_limited: "This seller cannot take Safe pay orders right now. You can still chat with them.",
-  classifieds_unavailable: "BitoCard Shop is not open in your country yet.",
+  classifieds_unavailable: "Udozo is not open in your country yet.",
 };
 
 /**
  * Buy with Safe pay (`/ng/l/<number>/buy`): how it protects the buyer, meet-up or delivery, the price, fee and total
  * and the wallet, then the request to the seller. Once asked, the same page shows the order: waiting for the seller,
- * then **Pay** from the wallet once they accept; from there the order continues in the Shop tab.
+ * then **Pay** from the wallet once they accept; from there the order continues in the seller's account.
  */
 export default async function BuyPage({ params, searchParams }: Props) {
   const { cc, listing: segment } = await params;
@@ -52,8 +51,8 @@ export default async function BuyPage({ params, searchParams }: Props) {
   const wallet = await customerApi<ShopWallet>("GET", `/v1/store/wallet?currency=${currency}`);
   const total = order?.ok ? (order.data.total ?? 0) : quote?.ok ? quote.data.total : 0;
   const balance = wallet.ok ? wallet.data.balance : null;
-  const addFunds = customer.country ? myShopHref(customer.country, "/account/wallet") : null;
-  const myOrder = order?.ok && customer.country ? myShopHref(customer.country, `/shop/orders/${order.data.id}`) : null;
+  const addFunds = "/account/wallet";
+  const myOrder = order?.ok ? `/account/orders/${order.data.id}` : null;
 
   return (
     <div className="mx-auto grid max-w-xl gap-5 px-4 pt-4">
@@ -88,7 +87,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
           <SafePayOrderActions orderId={order.data.id} canPay={order.data.status === "awaiting_payment"} canCancel={["requested", "awaiting_payment"].includes(order.data.status)} addFundsHref={addFunds} total={total} currency={currency} />
           {myOrder && !["requested", "awaiting_payment"].includes(order.data.status) ? (
             <a href={myOrder} className="flex h-12 items-center justify-center rounded-2xl bg-navy-900 font-bold text-white">
-              {order.data.fulfilment === "meet_up" && order.data.status === "paid" ? "See my release code" : "Open the order in My Shop"}
+              {order.data.fulfilment === "meet_up" && order.data.status === "paid" ? "See my release code" : "Open the order"}
             </a>
           ) : null}
         </section>
@@ -128,7 +127,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
         </section>
       )}
       <p className="flex items-center gap-2 text-xs text-navy-600">
-        <ShieldCheck className="size-4 text-mint-700" aria-hidden="true" /> BitoCard holds the money and pays the seller only once you have the item. BitoCard is not the seller.
+        <ShieldCheck className="size-4 text-mint-700" aria-hidden="true" /> Udozo holds the money and pays the seller only once you have the item. Udozo is not the seller.
       </p>
     </div>
   );
@@ -167,7 +166,7 @@ function WalletLine({ balance, total, currency, addFunds }: { balance: number | 
     <section className="flex items-center gap-3 rounded-2xl border border-navy-200 bg-white p-3.5">
       <Wallet className="size-6 shrink-0 text-navy-700" aria-hidden="true" />
       <span className="grid flex-1 gap-0.5 text-sm">
-        <strong>Paid from your BitoCard wallet</strong>
+        <strong>Paid from your Udozo wallet</strong>
         <span className="text-navy-600">{balance === null ? "Your balance could not be read just now." : `Balance ${shopMoney(balance, currency)}${short ? ` · add ${shopMoney(short, currency)} before paying` : ""}`}</span>
       </span>
       {addFunds ? (
