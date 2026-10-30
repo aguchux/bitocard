@@ -1,4 +1,6 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { SetupFeesService } from './setup-fees.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -48,6 +50,8 @@ export class StoreSubscriptionsService {
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
     private readonly invoices: InvoicesService,
+    private readonly setupFees: SetupFeesService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   private freePlan() {
@@ -196,6 +200,9 @@ export class StoreSubscriptionsService {
       if (period > 0) credit = (current.paidMinor * BigInt(Math.floor((left / period) * 1_000_000))) / 1_000_000n;
     }
     const due = price.amount > credit ? price.amount - credit : 0n;
+    // Udozo: a seller's first paid plan brings their one-time setup fee, taken first (with this first month it pays
+    // for the store's free domain). Paid already, or not charged in their market: nothing more.
+    if (this.config.APP_PRODUCT === 'udozo' && price.amount > 0n) await this.setupFees.pay(resellerId, actorId, storeId);
     const how = credit > 0n ? ` less ${formatMoney(credit, price.currency)} unused from ${current!.plan.name}` : '';
     await this.charge(resellerId, due, `plan:store:${storeId}:${planCode}:${now.toISOString()}`, `${plan.name} plan for ${store.name}: ${formatMoney(due, price.currency)} (${formatMoney(price.amount, price.currency)} a month${how})`, { storeId, currency: price.currency });
     const data = { planCode, renewsAt: addMonth(now), periodStartedAt: now, paidMinor: price.amount, paidCurrency: price.currency, cancelAtPeriodEnd: false, nextPlanCode: null, pastDueSince: null, migrated: false };

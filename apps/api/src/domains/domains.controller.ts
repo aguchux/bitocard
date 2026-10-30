@@ -6,6 +6,7 @@ import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, 
 import { adminId } from '../countries/countries.controller.js';
 import { recordTypes, type RecordType } from './dns.js';
 import { DomainsService } from './domains.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -44,6 +45,13 @@ class PurchaseDomainDto extends ConnectDomainDto {
   @ValidateNested() @Type(() => ContactDto)
   contact: ContactDto;
 }
+
+class FreeDomainDto extends ConnectDomainDto {
+  @ValidateNested() @Type(() => ContactDto)
+  contact: ContactDto;
+}
+
+const contactOf = (c: ContactDto) => ({ firstName: c.first_name, lastName: c.last_name, email: c.email, phone: c.phone, address1: c.address1, ...(c.address2 ? { address2: c.address2 } : {}), city: c.city, state: c.state, zip: c.zip, country: c.country.toUpperCase(), ...(c.company_name ? { companyName: c.company_name } : {}) });
 
 class UpdateDomainDto {
   @ApiPropertyOptional({ description: 'Make it the store’s main address (links, payment returns and emails use it).' })
@@ -106,6 +114,29 @@ class ReasonDto {
  * A store's own domains (SHQ only: buying spends from the wallet). Owners and admins manage them; the transfer code is
  * the owner's alone.
  */
+/**
+ * Premium's free domain for a Udozo store (docs/UDOZO_SPINOFF_PLAN.md, step 3): what the store is owed, and buying it
+ * with nothing taken from the wallet. Seller HQ only.
+ */
+@ApiExcludeController()
+@SessionOnly()
+@Roles('admin')
+@Controller('stores/:store/free-domain')
+@ProductOnly('udozo')
+export class FreeDomainController {
+  constructor(private readonly domains: DomainsService) {}
+
+  @Get()
+  status(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string) {
+    return this.domains.freeDomain(resellerOf(caller), store);
+  }
+
+  @Post()
+  purchase(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string, @Body() body: FreeDomainDto) {
+    return this.domains.purchaseFree(resellerOf(caller), store, { domain: body.domain, contact: contactOf(body.contact) });
+  }
+}
+
 @ApiTags('Stores')
 @SessionOnly()
 @Roles('admin')
@@ -131,12 +162,7 @@ export class DomainsController {
   })
   @Post('purchase')
   purchase(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string, @Body() body: PurchaseDomainDto) {
-    const c = body.contact;
-    return this.domains.purchase(resellerOf(caller), store, {
-      domain: body.domain,
-      expected_price: body.expected_price,
-      contact: { firstName: c.first_name, lastName: c.last_name, email: c.email, phone: c.phone, address1: c.address1, ...(c.address2 ? { address2: c.address2 } : {}), city: c.city, state: c.state, zip: c.zip, country: c.country.toUpperCase(), ...(c.company_name ? { companyName: c.company_name } : {}) },
-    });
+    return this.domains.purchase(resellerOf(caller), store, { domain: body.domain, expected_price: body.expected_price, contact: contactOf(body.contact) });
   }
 
   @ApiOperation({ summary: 'Connect a domain you own', description: 'Adds it to your store. Then set the records shown (or point the nameservers to BitoCard) at your DNS host; HTTPS is issued once it resolves.' })

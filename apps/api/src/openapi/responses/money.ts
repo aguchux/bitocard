@@ -1,4 +1,4 @@
-import { planLimitCatalogue, planLimits } from '../../plans/features.js';
+import { planLimitCatalogue, planLimitsFor } from '../../plans/features.js';
 import { planFeatureCatalogue, planFeatureGroups, planFeatures } from '../../plans/plans.service.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, num, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
@@ -366,7 +366,7 @@ const Plan = objectSchema(
       'The features in words, in the order they are shown.',
     ),
     limits: shape(
-      Object.fromEntries(planLimits.map(limit => [limit, nullableInt(`${planLimitCatalogue[limit].name}: ${planLimitCatalogue[limit].description} Null: no limit.`)])),
+      Object.fromEntries(planLimitsFor('bitocard').map(limit => [limit, nullableInt(`${planLimitCatalogue[limit].name}: ${planLimitCatalogue[limit].description} Null: no limit.`)])),
       'How much the plan allows. Adding one more past a limit is refused (409 `store_limit_reached`, `too_many_domains` or `plan_limit_reached` with `param` the limit; 400 `endpoint_limit`; 402 `ai_allowance_reached`); nothing is removed when a limit is lowered.',
     ),
     local_price: nullable(

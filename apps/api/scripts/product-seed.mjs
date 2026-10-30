@@ -18,6 +18,8 @@ export const productSeeds = {
     },
     // Udozo's plans are Startup and Premium.
     { name: 'Enterprise hidden', sql: `UPDATE "plans" SET "available" = false WHERE "code" = 'enterprise' AND "available" = true` },
+    // Premium includes one free domain per store (paid for by the setup fee and its first month); admins change it.
+    { name: 'Premium with a free domain', sql: `UPDATE "plans" SET "limits" = "limits" || '{"free_domains": 1}'::jsonb WHERE "code" = 'premium' AND NOT ("limits" ? 'free_domains')` },
   ],
 };
 

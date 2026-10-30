@@ -1,5 +1,6 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { setupFeeOf } from '../billing/setup-fee.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CountriesService } from '../countries/countries.service.js';
@@ -216,6 +217,10 @@ export class StoresService {
       // Udozo's stores take live payments only on their own domain; their `<store>.udozo.com` address is the sandbox.
       if (this.config.APP_PRODUCT === 'udozo' && (await this.prisma.storeDomain.count({ where: { storeId: id, status: 'active' } })) === 0) {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'domain_required', 'Connect or buy a domain for this store first: a store takes live payments only on its own domain.', 'checkout_mode');
+      }
+      // And the seller's one-time setup fee is paid (with a first Premium month, or on its own).
+      if (this.config.APP_PRODUCT === 'udozo' && (await setupFeeOf(this.prisma, resellerId)).due) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'setup_fee_unpaid', 'Pay your Seller HQ setup fee first: Settings > Plans.', 'checkout_mode');
       }
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
       if (reseller.status !== 'active') {

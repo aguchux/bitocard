@@ -517,6 +517,12 @@ model Reseller {
   house                     Boolean                   @default(false)
   /// Resale strikes before this no longer count (an admin lifted the reseller's limit).
   resaleStrikesClearedAt    DateTime?                 @map("resale_strikes_cleared_at")
+  /// Udozo's one-time Seller HQ setup fee, once paid (docs/UDOZO_SPINOFF_PLAN.md, step 3): when, how much, in which
+  /// currency, and the store whose Premium it was paid with (it helps pay for that store's free domain).
+  setupFeePaidAt            DateTime?                 @map("setup_fee_paid_at")
+  setupFeeMinor             BigInt?                   @map("setup_fee_minor")
+  setupFeeCurrency          String?                   @map("setup_fee_currency") @db.Char(3)
+  setupFeeStoreId           String?                   @map("setup_fee_store_id") @db.Uuid
   checkouts                 Checkout[]
   manualTopUps              ManualTopUp[]
   resaleListings            ResaleListing[]
@@ -2405,6 +2411,19 @@ model StorefrontPage {
 }
 
 /// Every published version of a storefront page, so an earlier one can be restored.
+/// Udozo's one-time Seller HQ setup fee per market (docs/UDOZO_SPINOFF_PLAN.md, step 3): switched on or off and its
+/// amount in the market's currency, set by Udozo's finance admins. Charged once per seller, before their first store goes
+/// live, or with their first Premium month.
+model SetupFee {
+  country     String   @id @db.Char(2)
+  enabled     Boolean  @default(false)
+  amountMinor BigInt   @default(0) @map("amount_minor")
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("setup_fees")
+}
+
 /// The product's colour theme, chosen by its admins (docs/UDOZO_SPINOFF_PLAN.md, step 3): one row (`site`), the draft
 /// and the published theme, each `{ preset, colors: { primary, accent, ink, page } }`.
 model SiteTheme {
@@ -3671,6 +3690,8 @@ model StoreDomain {
   emailStatus      String?      @map("email_status")
   emailRecords     Json?        @map("email_records")
   mailProvider     String?      @map("mail_provider")
+  /// Bought free with the store's Premium plan (Udozo's `free_domains`): renewed free while the plan includes it.
+  free             Boolean      @default(false)
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
   reseller         Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)

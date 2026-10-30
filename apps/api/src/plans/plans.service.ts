@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { apiKeyScopes } from '../api-keys/api-keys.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -7,7 +8,7 @@ import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
 import { FxService } from '../fx/fx.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureCatalogue, planFeatureGroups, planFeatures, planLimitCatalogue, planLimits } from './features.js';
+import { freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureCatalogue, planFeatureGroups, planFeatures, planLimitCatalogue, planLimitsFor } from './features.js';
 import { PlanAccessService } from './plan-access.js';
 
 export { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures, type PlanFeature } from './features.js';
@@ -54,11 +55,17 @@ export class PlansService {
     private readonly inbox: InboxService,
     private readonly fx: FxService,
     private readonly access: PlanAccessService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /** Every limit's value for a plan: what it sets, else the default. */
+  /** This product's limits (Udozo's plans have `free_domains`, BitoCard's never). */
+  private shownLimits() {
+    return planLimitsFor(this.config.APP_PRODUCT);
+  }
+
   limitsOf(plan: { limits: unknown }): PlanLimitValues {
-    return Object.fromEntries(planLimits.map(limit => [limit, this.access.limitOf(plan, limit)])) as PlanLimitValues;
+    return Object.fromEntries(this.shownLimits().map(limit => [limit, this.access.limitOf(plan, limit)])) as PlanLimitValues;
   }
 
   list() {
@@ -116,7 +123,7 @@ export class PlansService {
           /** Every limit's value (null: unlimited). */
           limits: this.limitsOf(plan),
           /** The limits this plan sets itself; the others have their default. */
-          limits_set: planLimits.filter(limit => Object.prototype.hasOwnProperty.call(plan.limits ?? {}, limit)),
+          limits_set: this.shownLimits().filter(limit => Object.prototype.hasOwnProperty.call(plan.limits ?? {}, limit)),
           resellers: counts.find(row => row.planCode === plan.code)?._count._all ?? 0,
           local_prices: await Promise.all(
             currencies.map(async currency => {
@@ -136,7 +143,7 @@ export class PlansService {
       ),
       groups: Object.entries(planFeatureGroups).map(([code, name]) => ({ code, name })),
       features: planFeatures.map(code => ({ code, ...planFeatureCatalogue[code] })),
-      limits: planLimits.map(code => {
+      limits: this.shownLimits().map(code => {
         const { scope, group, name, unit, description, max } = planLimitCatalogue[code];
         return { code, scope, group, name, unit, description, max, default: this.access.limitOf({ limits: {} }, code) };
       }),
@@ -148,7 +155,7 @@ export class PlansService {
    * below what resellers already use only stops new additions; nothing is removed. Audited.
    */
   async setLimit(actorId: string | null, code: string, limit: string, input: { value?: number | null; reset?: boolean }) {
-    if (!isPlanLimit(limit)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan limit.');
+    if (!isPlanLimit(limit) || !this.shownLimits().includes(limit)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan limit.');
     const plan = await this.prisma.plan.findUnique({ where: { code } });
     if (!plan) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
     const { max, name } = planLimitCatalogue[limit];
