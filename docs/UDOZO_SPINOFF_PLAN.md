@@ -2,7 +2,7 @@
 
 Decided by the owner on 30 October 2026. **BitoCard Shop** (the B2C classifieds marketplace with Safe pay and the Anjio shop assistants; `docs/BITOCARD_CLASSIFIEDS_PLAN.md`) and **B2B reselling** (suppliers' listings sold on resellers' Resale shop stores; `docs/BITOCARD_B2B_RESELLING_PLAN.md`) leave BitoCard and become their own brand, **Udozo**, at **udozo.com**. The domain is already owned. It was a memorial portal, which the owner is deleting themselves; nothing of it is carried over and no work for it is in this plan.
 
-**Status:** steps 1 and 2 built (30 October 2026); the rest planned.
+**Status:** steps 1 to 3 built (30 October 2026), committed locally; steps 4 to 6 planned.
 
 ## The decision
 
@@ -210,6 +210,36 @@ The code is moved to Udozo's apps (step 4), not deleted.
    - ready-made themes, or custom primary, accent, ink and page colours, with a contrast check (`theme_contrast`) and a preview before publishing;
    - BitoCard's navy and pink are the default until Udozo's own theme is chosen.
 8. **Branding in the API:** the shop emails, notices, the assistant's rules (`shopSystemPrompt`), Verify outcomes and the authenticator issuer say Udozo, from the product config.
+
+**Step 3 status (30 October 2026): built.** Everything below applies on Udozo's instance only; BitoCard is unchanged.
+- **Theme:** `site_themes`, `src/theme`.
+  - `GET /v1/theme` (public, cached; `?preview=`);
+  - `GET /v1/admin/theme`, `PUT …/draft` (a ready-made theme or four colours, contrast checked: `theme_contrast`), `POST …/preview`, `POST …/publish` (operations, step-up, audited).
+- **One account everywhere:**
+  - `StoreSellers.sharesAccounts`/`accountStore`, `CustomersService.sharedStore` and `customerFor`;
+  - resale purchases are one history;
+  - a resale order's buyer is emailed by the store it was bought at.
+- **Handoff:** udozo.com (`STOREFRONT_URL`), any published store's `<store>.udozo.com`, and the active domains of published stores (and their `www`), over https only.
+- **By country:** resale quotes and orders refuse a shopper from another country (`market_unavailable`); Safe pay already compared the listing's country.
+- **Stores:**
+  - no store limit, and Resale shops only (the default template);
+  - no Cloudflare record (the wildcard serves them);
+  - live only with an active domain (`domain_required`); a live store left without one goes back to the sandbox, at once or by the `domains` job, and its reseller is told (`store.sandbox_without_domain`).
+- **Setup fee** (`setup_fees`, `resellers.setup_fee_*`; `src/billing/setup-fees.*`):
+  - finance sets it per market at `/v1/admin/setup-fees` (step-up, audited; `fees_below_domain_price`);
+  - a seller pays it once (`/v1/billing/setup-fee`, or with their first Premium month);
+  - going live answers `setup_fee_unpaid` until it is paid.
+- **Free domain:**
+  - the `free_domains` plan limit (Udozo's only; the product seed sets Premium's to 1);
+  - `GET/POST /v1/stores/:store/free-domain`: bought with nothing taken from the wallet within what the store's Premium collected (its paid month, plus the setup fee when paid with it; otherwise `domain_not_covered`), and renewed free while the store keeps Premium;
+  - Vercel's price is still booked as cost of sales, not as the promotions expense first planned;
+  - domains are open on every plan (the `custom_domains` switch still gates them).
+- **Payouts:** `/v1/store/cash` left the crypto code (`src/payouts/customer-cash.ts`, with its own check; a crypto freeze no longer applies). The admins' list is `/v1/admin/customer-payouts`.
+- **Words:** the marketplace's and reselling's errors, notices, emails, order messages, the shop assistant's rules and knowledge, the template and switch descriptions say Udozo. Listing links are on udozo.com, and notice links on Udozo's `/account/...` pages.
+- **Not done here:**
+  - the subdomain lookup answering in test mode: instead, the store's own `checkout_mode` decides, and Udozo's app sends a live store's subdomain to its domain (step 4);
+  - Verify outcome emails and the webhook headers other than the signature (`bitocard-event-id` and the rest), left for the apps step;
+  - resellers' Store > Customers lists stay per store, so on Udozo they are empty (shoppers are Udozo's accounts), to rethink with Seller HQ.
 
 ### 4. Udozo's apps (its own apps, on BitoCard's shared UI)
 1. **`apps/udozo`** (`@udozo/web`, from `apps/shop`) serves `udozo.com`, `*.udozo.com` and connected domains:
