@@ -43,7 +43,7 @@ The planned upstream sources are Reloadly, Zendit, DT One, Prestmit and Cardtoni
   - **What leaves:** the classifieds marketplace (Safe pay, the Anjio assistants) and B2B reselling (Resale shops, SHQ's Resale section, `/v1/resale`).
   - **Where it goes:** **Udozo** (udozo.com), with its own database and Redis. It runs the same API code as a second deployment (`APP_PRODUCT=udozo`, `api.udozo.com`, on BitoCard's droplet).
   - **Its own:** accounts (one Udozo account on udozo.com and every reseller store, country by country), merchant accounts and books, admins (admin.udozo.com), Seller HQ (shq.udozo.com: any number of stores), and Udozo's own apps on BitoCard's shared UI, themed by its admins.
-  - **Stores:** sandbox only on `<store>.udozo.com` (a Vercel wildcard). Live stores use their own domain, and Premium includes a free domain paid for by the setup fee and the first month.
+  - **Stores:** sandbox only on `<store>.udozo.com` (made per store in udozo.com's Cloudflare zone, as BitoCard's are). Live stores use their own domain, and Premium includes a free domain paid for by the setup fee and the first month.
   - Build nothing new for the Shop or B2B inside BitoCard. The Shop and B2B descriptions below are the code Udozo inherits.
   - **Product mode (step 1, built):** `APP_PRODUCT` (`bitocard` or `udozo`, environment only) decides what an instance serves.
     - A controller or route of one product carries `@ProductOnly(...)`; unmarked ones are shared. A new controller must be marked unless both products need it. `ProductRoutesGuard` answers the other product's routes as unknown, and `PRODUCT_ROUTES=all` (tests only) serves everything.

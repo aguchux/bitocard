@@ -24,6 +24,8 @@ export type ProductInfo = {
   /** The prefix of the webhook deliveries' other headers (`<prefix>-event-id`, `-event-type`, `-delivery-attempt`) and their user agent. */
   webhookHeaderPrefix: string;
   webhookUserAgent: string;
+  /** The zone resellers' stores have their own address under (`<subdomain>.<zone>`), in its Cloudflare account. */
+  storeHostDomain: 'bitocard.com' | 'udozo.com';
 };
 
 export const productInfo: Record<Product, ProductInfo> = {
@@ -35,6 +37,7 @@ export const productInfo: Record<Product, ProductInfo> = {
     signatureHeader: 'BitoCard-Signature',
     webhookHeaderPrefix: 'bitocard',
     webhookUserAgent: 'BitoCard-Webhooks/1.0 (+https://docs.bitocard.com/webhooks)',
+    storeHostDomain: 'bitocard.com',
   },
   udozo: {
     name: 'Udozo',
@@ -44,6 +47,7 @@ export const productInfo: Record<Product, ProductInfo> = {
     signatureHeader: 'Udozo-Signature',
     webhookHeaderPrefix: 'udozo',
     webhookUserAgent: 'Udozo-Webhooks/1.0',
+    storeHostDomain: 'udozo.com',
   },
 };
 

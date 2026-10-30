@@ -30,7 +30,7 @@ Decided by the owner on 30 October 2026. **BitoCard Shop** (the B2C classifieds 
 5. **Money:** Udozo's own merchant accounts (Paystack, Flutterwave, pawaPay, the transfer provider), set in its own integration settings, and its own books. Udozo, not BitoCard, holds Safe pay money.
 6. **B2B leaves with the Shop:**
    - **Seller HQ** at `shq.udozo.com` (Udozo's SHQ). One account runs **any number of stores**: there is no store limit.
-   - **Subdomains are only for the sandbox and testing.** Every store gets `<store>.udozo.com` at once, provisioned automatically by Vercel through a wildcard on Udozo's stores project, so no DNS record is made per store. A store on its subdomain runs only in the sandbox.
+   - **Subdomains are only for the sandbox and testing.** Every store gets `<store>.udozo.com` at once, set up automatically: a DNS-only CNAME in udozo.com's Cloudflare zone and the address on Udozo's stores project, where Vercel issues its certificate (udozo.com's DNS is on Cloudflare, so a Vercel wildcard is not possible). A store on its subdomain runs only in the sandbox.
    - **A live store must use its own domain,** bought through Vercel automatically (purchase, connection and certificate) or connected. Once live, the subdomain redirects to it.
    - Udozo has its own reseller API and webhooks.
 7. **Admin:** `admin.udozo.com`, with Udozo's own admins.
@@ -89,7 +89,7 @@ The shared foundations come with it, in Udozo's own database:
 
 ### 0. Owner and operations inputs
 1. **DNS for udozo.com:**
-   - nameservers on **Vercel DNS**, with the wildcard `*.udozo.com` on Udozo's stores project, so sandbox subdomains need no record per store;
+   - udozo.com's DNS on **Cloudflare** (the owner's answer): `api.udozo.com` an A record to the droplet, proxied; stores' sandbox subdomains made one by one through Cloudflare's API (Udozo's Store addresses (Cloudflare) settings);
    - records for `shq`, `admin` and `verify`;
    - Udozo's Vercel account for buying resellers' domains (Domains Registrar API) and adding them to the stores project.
 2. **`api.udozo.com` on the shared droplet.** It is not on a Cloudflare zone, so Cloudflare cannot proxy it, and the droplet's firewall (`bitocard-api`) admits only Cloudflare's ranges today.
@@ -197,7 +197,7 @@ The code is moved to Udozo's apps (step 4), not deleted.
 4. **Stores:**
    - **No limit:** `maxStoresPerReseller` becomes a product setting, and Udozo has none.
    - **One template:** Udozo's stores use `resale_shop` only (`src/stores/templates.ts` per product).
-   - **Subdomains:** served by the wildcard, so `StoreHostsService` (BitoCard's Cloudflare records) does nothing in Udozo.
+   - **Subdomains:** `StoreHostsService` makes each in udozo.com's Cloudflare zone (see the owner's answers below).
    - **Live needs a domain:** `checkout_mode` may be `live` only with an active domain (`domain_required`, 409). It goes back to `test` when the store's last active domain is lost (expired, suspended or disconnected). On a live store, the subdomain redirects to the primary domain for good.
 5. **Domains:** `src/domains` (`StoreDomainsService`: buying through Vercel, connecting, DNS, renewals) on Udozo's own Vercel settings. It is gated on Udozo's own switch, not BitoCard's `custom_domains` plan feature.
 6. **Plans and fees:** BitoCard's plan code (`PlansService`, `PlanAccessService`, subscriptions, the `plans` job with its 7-day grace), plus:
@@ -223,7 +223,7 @@ The code is moved to Udozo's apps (step 4), not deleted.
 - **By country:** resale quotes and orders refuse a shopper from another country (`market_unavailable`); Safe pay already compared the listing's country.
 - **Stores:**
   - no store limit, and Resale shops only (the default template);
-  - no Cloudflare record (the wildcard serves them);
+  - each one's address made in udozo.com's Cloudflare zone and on the stores project (`StoreHostsService`, `productOf(config).storeHostDomain`; house stores none);
   - live only with an active domain (`domain_required`); a live store left without one goes back to the sandbox, at once or by the `domains` job, and its reseller is told (`store.sandbox_without_domain`).
 - **Setup fee** (`setup_fees`, `resellers.setup_fee_*`; `src/billing/setup-fees.*`):
   - finance sets it for every market in US dollars (`PUT /v1/admin/setup-fees/WW`, charged in each market's currency at the `pay` rate) and, where wanted, a market's own in its currency (`PUT …/:country`, `DELETE …/:country` to follow every market's again); step-up, audited, `fees_below_domain_price`;
@@ -276,7 +276,7 @@ The code is moved to Udozo's apps (step 4), not deleted.
    - a Caddy site for `api.udozo.com` (step 0 item 2);
    - `deploy.sh` migrating and seeding both databases and waiting for both instances to be healthy;
    - `deploy-api.yml` smoke-testing both hosts.
-2. **Vercel projects:** udozo (with the wildcard), udozo-shq, udozo-admin and verify-udozo, each with affected-projects skipping and `VERCEL_DEEP_CLONE`.
+2. **Vercel projects:** udozo (stores' addresses added to it by the API), udozo-shq, udozo-admin and verify-udozo, each with affected-projects skipping and `VERCEL_DEEP_CLONE`.
 3. **Udozo's legal documents** (terms, Safe pay, reseller terms, privacy, cookies), accepted by version.
 4. **Browser checks** at 375 px, and a sandbox store on its subdomain taken live on a connected domain.
 5. **A pilot** in one market.

@@ -598,10 +598,10 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     id: 'store_hosts',
     name: 'Store addresses (Cloudflare)',
     description:
-      'Each reseller store’s address, <subdomain>.bitocard.com, set up when it is created or renamed: a DNS-only CNAME in bitocard.com’s Cloudflare zone pointing to Vercel, and the address on the storefront project (with the Vercel settings in Domains), which issues its HTTPS. Stores waiting for these settings are set up by the domains job.',
+      'Each reseller store’s address, <subdomain>.bitocard.com (<subdomain>.udozo.com on Udozo), set up when it is created or renamed: a DNS-only CNAME in the site’s Cloudflare zone pointing to Vercel, and the address on the storefront project (with the Vercel settings in Domains), which issues its HTTPS. Stores waiting for these settings are set up by the domains job.',
     fields: [
-      secret('CLOUDFLARE_API_TOKEN', 'API token', { help: 'Cloudflare > My Profile > API Tokens > Create Token, “Edit zone DNS” template, limited to the bitocard.com zone (Zone: DNS: Edit, and Zone: Zone: Read).' }),
-      field('CLOUDFLARE_ZONE_ID', 'Zone ID', { required: true, help: 'Cloudflare > bitocard.com > Overview, API section: the Zone ID.' }),
+      secret('CLOUDFLARE_API_TOKEN', 'API token', { help: 'Cloudflare > My Profile > API Tokens > Create Token, “Edit zone DNS” template, limited to the bitocard.com zone (udozo.com on Udozo) (Zone: DNS: Edit, and Zone: Zone: Read).' }),
+      field('CLOUDFLARE_ZONE_ID', 'Zone ID', { required: true, help: 'Cloudflare > bitocard.com (udozo.com on Udozo) > Overview, API section: the Zone ID.' }),
       field('STORE_HOST_TARGET', 'Record target', { required: false, help: 'Where each store’s CNAME points. Default: cname.vercel-dns.com' }),
       field('CLOUDFLARE_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://api.cloudflare.com/client/v4' }),
     ],

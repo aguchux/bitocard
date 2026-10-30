@@ -1,6 +1,6 @@
 /**
  * Which site a request is for (docs/UDOZO_SPINOFF_PLAN.md, step 4). This app serves udozo.com, the marketplace, and
- * every reseller's store: `<store>.udozo.com` (the sandbox, served by Vercel's wildcard) and resellers' own domains
+ * every reseller's store: `<store>.udozo.com` (the sandbox, each added to this app's Vercel project by the API) and resellers' own domains
  * (their live stores). Pure, for the proxy and tests.
  */
 

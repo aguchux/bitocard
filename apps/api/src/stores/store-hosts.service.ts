@@ -6,16 +6,17 @@ import { CloudflareDns } from '../domains/cloudflare.js';
 import { VercelDomains } from '../domains/vercel.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { productOf } from '../products/product.js';
 
-/** The zone every hosted store lives under. */
+/** BitoCard's zone, every BitoCard store lives under (Udozo's are under udozo.com: `productOf(config).storeHostDomain`). */
 export const storeHostDomain = 'bitocard.com';
 
-/** The `comment` on the Cloudflare records BitoCard makes for stores. */
-const recordComment = (storeId: string) => `bitocard:store:${storeId}`;
+/** The `comment` on the Cloudflare records the product makes for stores (`bitocard:store:<id>`, `udozo:store:<id>`). */
+const recordComment = (product: string, storeId: string) => `${product}:store:${storeId}`;
 
 const sameHost = (a: string, b: string) => a.trim().toLowerCase().replace(/\.$/, '') === b.trim().toLowerCase().replace(/\.$/, '');
 
-type HostConfig = Pick<AppConfig, 'VERCEL_API_TOKEN' | 'VERCEL_TEAM_ID' | 'VERCEL_STOREFRONT_PROJECT' | 'VERCEL_API_URL' | 'CLOUDFLARE_API_TOKEN' | 'CLOUDFLARE_ZONE_ID' | 'CLOUDFLARE_API_URL' | 'STORE_HOST_TARGET'>;
+type HostConfig = Pick<AppConfig, 'APP_PRODUCT' | 'VERCEL_API_TOKEN' | 'VERCEL_TEAM_ID' | 'VERCEL_STOREFRONT_PROJECT' | 'VERCEL_API_URL' | 'CLOUDFLARE_API_TOKEN' | 'CLOUDFLARE_ZONE_ID' | 'CLOUDFLARE_API_URL' | 'STORE_HOST_TARGET'>;
 
 export function storeHostClients(config: HostConfig) {
   return {
@@ -25,13 +26,17 @@ export function storeHostClients(config: HostConfig) {
   };
 }
 
-/** Test connection: bitocard.com's zone and the storefront project, read with their tokens. Provider errors are thrown. */
+/**
+ * Test connection: the product's zone (bitocard.com, or udozo.com on Udozo's instance) and the storefront project, read
+ * with their tokens. Provider errors are thrown.
+ */
 export async function checkStoreHosts(config: HostConfig) {
   const { vercel, cloudflare } = storeHostClients(config);
+  const expected = productOf(config).storeHostDomain;
   if (!cloudflare.configured()) return { ok: false, message: 'Set the Cloudflare API token and zone ID first.' };
   if (!vercel.configured()) return { ok: false, message: 'Set the Vercel token and storefront project in Domains (Vercel) first.' };
   const zone = await cloudflare.zone();
-  if (zone !== storeHostDomain) return { ok: false, message: `That zone is ${zone}: use the ${storeHostDomain} zone.` };
+  if (zone !== expected) return { ok: false, message: `That zone is ${zone}: use the ${expected} zone.` };
   const project = await vercel.check();
   return { ok: true, message: `Connected to the ${zone} zone and the ${project} project.` };
 }
@@ -44,7 +49,9 @@ class HostConflict extends Error {}
  * Vercel, and the address on the storefront's Vercel project (which issues its certificate). Set up when the store is
  * created or renamed; the `domains` job retries anything pending or failed. Reseller stores and BitoCard's own
  * country stores (`ng`, `gh`, `ke`…) are both hosted this way; only the single root `bitocard` store is skipped (it
- * already is bitocard.com, with no address of its own to set up).
+ * already is bitocard.com, with no address of its own to set up). On Udozo's instance the same is done in udozo.com's
+ * zone for its resellers' stores (their sandbox addresses: udozo.com's DNS is on Cloudflare, where Vercel cannot issue a
+ * wildcard certificate); Udozo's own house stores (udozo.com itself, BitoCard's old country stores) are skipped.
  */
 @Injectable()
 export class StoreHostsService {
@@ -67,25 +74,27 @@ export class StoreHostsService {
 
   /** Sets the store's address up (or moves it after a rename). Never throws: a failure is kept on the store for the job. */
   async sync(storeId: string) {
-    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
-    // Root bitocard.com needs no address, and Afrippa's store is reached on afrippa.com, never a bitocard.com one.
-    // Udozo's stores are served on its wildcard (`*.udozo.com` on Vercel), so they need no address of their own.
-    if (!store || store.id === rootStoreId || store.platform !== 'bitocard' || this.config.APP_PRODUCT === 'udozo') return null;
+    const store = await this.prisma.store.findUnique({ where: { id: storeId }, include: { reseller: { select: { house: true } } } });
+    // Root bitocard.com needs no address, and Afrippa's store is reached on afrippa.com, never a bitocard.com one. Udozo's
+    // house stores are udozo.com itself and BitoCard's old country stores, which Udozo never serves.
+    const udozo = this.config.APP_PRODUCT === 'udozo';
+    if (!store || store.id === rootStoreId || store.platform !== 'bitocard' || (udozo && store.reseller.house)) return null;
     if (!this.configured()) return 'pending' as const;
     const { vercel, cloudflare, target } = this.clients();
-    const name = `${store.subdomain}.${storeHostDomain}`;
+    const zone = productOf(this.config).storeHostDomain;
+    const name = `${store.subdomain}.${zone}`;
     try {
       // A rename: the old address is taken down first (only BitoCard's own record), so it can be someone else's later.
       if (store.hostName && store.hostName !== store.subdomain) {
-        await vercel.removeFromProject(`${store.hostName}.${storeHostDomain}`);
+        await vercel.removeFromProject(`${store.hostName}.${zone}`);
         if (store.hostRecordId) await cloudflare.deleteRecord(store.hostRecordId);
         await this.prisma.store.update({ where: { id: store.id }, data: { hostName: null, hostRecordId: null } });
       }
       const existing = await cloudflare.records(name);
       const ours = existing.find(record => record.type === 'CNAME' && sameHost(record.content, target));
       const other = existing.find(record => record !== ours);
-      if (other) throw new HostConflict(`${name} already has a ${other.type} record in Cloudflare that BitoCard did not make. Remove it, then the store is set up on the next run.`);
-      const recordId = ours?.id ?? (await cloudflare.createRecord({ type: 'CNAME', name, content: target, comment: recordComment(store.id) }));
+      if (other) throw new HostConflict(`${name} already has a ${other.type} record in Cloudflare that ${productOf(this.config).name} did not make. Remove it, then the store is set up on the next run.`);
+      const recordId = ours?.id ?? (await cloudflare.createRecord({ type: 'CNAME', name, content: target, comment: recordComment(this.config.APP_PRODUCT, store.id) }));
       await vercel.addToProject(name);
       await this.prisma.store.update({
         where: { id: store.id },
@@ -112,7 +121,7 @@ export class StoreHostsService {
   async job() {
     if (!this.configured()) return { set_up: 0, failed: 0, skipped: 'store addresses not configured' };
     const due = await this.prisma.store.findMany({
-      where: { hostStatus: { in: ['pending', 'failed'] }, id: { not: rootStoreId }, platform: 'bitocard' },
+      where: { hostStatus: { in: ['pending', 'failed'] }, id: { not: rootStoreId }, platform: 'bitocard', ...(this.config.APP_PRODUCT === 'udozo' ? { reseller: { house: false } } : {}) },
       orderBy: [{ hostSyncedAt: { sort: 'asc', nulls: 'first' } }],
       select: { id: true },
       take: 50,
