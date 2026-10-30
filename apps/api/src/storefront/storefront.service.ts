@@ -772,28 +772,35 @@ export class StorefrontService {
   }
 
   /**
+   * A reseller's store's home page (within `inStore`): the page they published in SHQ (the draft through a preview link),
+   * else their design's starting page, every section filled in. Udozo's Resale shops read it alone (they have no catalogue
+   * menu or countries); BitoCard's stores get it inside `home`.
+   */
+  async storeHome(previewToken?: string) {
+    const store = this.scope.getStore()?.store;
+    if (!store) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
+    const preview = previewToken ? verifyStorePreview(this.previewKey(), store.id, previewToken) : false;
+    if (previewToken && !preview) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'preview_expired', 'This preview link has expired. Open a new one from SHQ.');
+    const published = !preview && Boolean(store.homePublished);
+    return {
+      object: 'store_home' as const,
+      preview,
+      published,
+      version: published ? store.homeVersion : null,
+      published_at: published ? (store.homePublishedAt?.toISOString() ?? null) : null,
+      sections: await this.resolve(storeLayout(store, preview)),
+    };
+  }
+
+  /**
    * The published home page, ready to render: its sections filled in, the menu and the countries on sale. With a
    * valid preview token (from the Storefront Manager), the draft instead. Until a layout is published (or after it is
    * taken offline), the approved default layout (`defaultHome()`), so bitocard.com is always the store.
    */
   async home(previewToken?: string) {
-    const store = this.scope.getStore()?.store;
-    if (store) {
-      // A reseller's store: the home page they published in SHQ (the draft through a preview link), else their design's starting page.
-      const preview = previewToken ? verifyStorePreview(this.previewKey(), store.id, previewToken) : false;
-      if (previewToken && !preview) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'preview_expired', 'This preview link has expired. Open a new one from SHQ.');
-      const published = !preview && Boolean(store.homePublished);
-      const [sections, navigation, countries] = await Promise.all([this.resolve(storeLayout(store, preview)), this.navigation(), this.countries()]);
-      return {
-        object: 'store_home' as const,
-        preview,
-        published,
-        version: published ? store.homeVersion : null,
-        published_at: published ? (store.homePublishedAt?.toISOString() ?? null) : null,
-        sections,
-        navigation,
-        countries,
-      };
+    if (this.scope.getStore()?.store) {
+      const [page, navigation, countries] = await Promise.all([this.storeHome(previewToken), this.navigation(), this.countries()]);
+      return { ...page, navigation, countries };
     }
     const page = await this.prisma.storefrontPage.findUnique({ where: { key: homeKey } });
     const preview = previewToken ? this.verifyPreview(previewToken) : false;

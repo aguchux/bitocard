@@ -3,6 +3,10 @@ import { createHmac, randomUUID } from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { apiUrl } from "./api";
+import { siteOrigin } from "./site";
+import { storeHeader } from "./store-host";
+
+export { siteOrigin };
 
 /**
  * Udozo's customers on udozo.com. Their accounts are Udozo's own (one account works on udozo.com and every reseller
@@ -61,6 +65,8 @@ type Options = { idempotencyKey?: string; headers?: Record<string, string> };
  */
 export async function customerFetch(method: Method, path: string, body?: unknown, options: Options = {}): Promise<Response | null> {
   const token = (await cookies()).get(customerCookie)?.value;
+  // On a reseller's store (the proxy named it), the API is told which: its Udozo account works there as on udozo.com.
+  const store = (await headers()).get(storeHeader);
   const form = body instanceof FormData;
   try {
     return await fetch(apiUrl(path), {
@@ -70,6 +76,7 @@ export async function customerFetch(method: Method, path: string, body?: unknown
         accept: "application/json",
         ...(body !== undefined && !form ? { "content-type": "application/json" } : {}),
         ...(token ? { [sessionHeader]: token } : {}),
+        ...(store ? { "bitocard-store": store } : {}),
         ...(await shopperHeader()),
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
         ...options.headers,
@@ -104,14 +111,6 @@ export async function keepSession(session: { token: string }) {
 
 export async function dropSession() {
   (await cookies()).delete(customerCookie);
-}
-
-/**
- * This site's own address (`UDOZO_URL`, else udozo.com on Vercel, else localhost:3007), never from forwarded headers a
- * proxy might let callers set. Payment pages return here, and the handoff names it.
- */
-export function siteOrigin() {
-  return new URL(process.env.UDOZO_URL || (process.env.VERCEL ? "https://udozo.com" : "http://localhost:3007")).origin;
 }
 
 /** Only paths on this site are followed after signing in, never another site. */

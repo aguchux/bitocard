@@ -32,6 +32,11 @@ class ListingsDto extends StoreDto {
   limit?: number;
 }
 
+class HomeDto extends StoreDto {
+  @IsOptional() @IsString() @MaxLength(200)
+  preview?: string;
+}
+
 class SupplierDto extends StoreDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1)
   listing?: number;
@@ -52,6 +57,12 @@ class PhraseDto {
 @ProductOnly('udozo')
 export class ResaleShopController {
   constructor(private readonly shop: ResaleShopService) {}
+
+  @Get('home')
+  @Header('Cache-Control', 'public, max-age=60')
+  home(@Query() query: HomeDto) {
+    return this.shop.homePage(query.store, query.preview);
+  }
 
   @Get('listings')
   @Header('Cache-Control', 'public, max-age=60')

@@ -261,6 +261,15 @@ The code is moved to Udozo's apps (step 4), not deleted.
 4. **verify.udozo.com:** `NEXT_PUBLIC_VERIFY_BRAND=udozo`, a third brand in `apps/verify/lib/brand.ts`.
 5. Every Udozo app calls `api.udozo.com` through its `NEXT_PUBLIC_API_URL`.
 
+**Step 4 status (30 October 2026): the apps are built** (not deployed; that is step 5):
+- **`apps/udozo`** (`@udozo/web`, port 3007): the marketplace, Udozo's own accounts (`udz_customer`), the handoff, `/sell` and the seller's `/account/*`, the theme, and **resellers' stores**:
+  - `proxy.ts` tells udozo.com (and its www and Vercel previews) from a store's sandbox subdomain or a reseller's own domain (`classifyHost` in `lib/store-host.ts`), finds the published store (`GET /v1/storefronts/:subdomain`, or `/v1/storefronts/domains/:domain` first; a minute per instance) and rewrites its request to `app/store/[store]/…`, naming the store, its origin and the path asked for in request headers (`x-udozo-store`, `x-udozo-store-origin`, `x-udozo-store-path`; any the browser sent are removed on every request). udozo.com never serves `/store/…` (404); an unknown store is "This store is not open" (404), an unreachable API a 503.
+  - A live store with a domain is served there only: its subdomain answers 308 to the domain, keeping the path.
+  - Pages: home (`GET /v1/store/resale/home?store=&preview=`, new: the store's sections alone, filled; `StorefrontService.storeHome`), `/preview?token=` (Seller HQ's draft link), `/listings`, `/l/<ref>-<slug>` with buying from the Udozo wallet, `/suppliers/<id>`, `/account/purchases(/<id>)`, `/api/purchases/<order>/dispatch-photos/<photo>`, and a social image in the store's colours. The layout wears the store's design (`storeShell`), shows "Test store" while in the sandbox, and indexes only a live store on its own domain (its robots.txt too).
+  - Signing in on a store goes to udozo.com's `/handoff/go?to=<store origin>&next=<path>`; the store's `/handoff` exchanges the code naming its own origin. `customerFetch` sends `BitoCard-Store` on a store's requests. The phone and wallet links go to the shopper's account on udozo.com.
+- **`apps/udozo-shq`** (Seller HQ, port 3011) and **`apps/udozo-admin`** (port 3012), on the shared console; **verify.udozo.com** is `NEXT_PUBLIC_VERIFY_BRAND=udozo`.
+- **Still to do:** Udozo's legal documents and the deployments (step 5). Seller HQ's Developers page keeps Udozo's scopes and events by hand, and its first-store guide is BitoCard's text.
+
 ### 5. Deploy and launch
 1. **The droplet:**
    - `api-udozo` and `scheduler-udozo` in `deploy/droplet/docker-compose.yml`, from the same image, with secrets in `/etc/udozo/api.env`;

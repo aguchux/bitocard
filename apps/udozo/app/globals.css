@@ -32,3 +32,8 @@ dialog.sheet::backdrop {
     animation: none;
   }
 }
+
+/* Resellers' stores (lib/store-theme.ts): flat and outline cards drop shadows; glass ones blur what is behind them. */
+[data-cards="flat"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl),
+[data-cards="outline"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl) { box-shadow: none; }
+[data-cards="glass"] .bg-white { backdrop-filter: blur(12px); }

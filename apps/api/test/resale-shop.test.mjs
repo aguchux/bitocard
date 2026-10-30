@@ -144,8 +144,10 @@ describe('a Resale shop’s pages', () => {
     assert.ok(!JSON.stringify(profile.json).includes(seller.id), 'never the supplier’s own account ID');
 
     // The template's sections and hero are filled with what is on sale.
-    const home = await get(`/v1/store/home?store=${store.subdomain}`);
+    const home = await get(`/v1/store/resale/home?store=${store.subdomain}`);
     assert.equal(home.status, 200, JSON.stringify(home.json));
+    assert.deepEqual([home.json.object, home.json.published, 'navigation' in home.json, 'countries' in home.json], ['store_home', false, false, false], 'the sections alone, no catalogue menu');
+    assert.equal((await get(`/v1/store/resale/home?store=${store.subdomain}&preview=1700000000000.nonsense`)).json.error.code, 'preview_expired');
     const rail = home.json.sections.find(section => section.type === 'listing_rail');
     assert.deepEqual(rail.data.listings.map(item => item.title), ['Hisense 50 inch TV']);
     assert.deepEqual(home.json.sections.find(section => section.type === 'hero').data.listings.length, 1);
@@ -160,6 +162,7 @@ describe('a Resale shop’s pages', () => {
     // Another template's store has no resale pages.
     const plain = await prisma.store.create({ data: { resellerId: owner.resellerId, name: 'Plain', subdomain: `plain${counter}x${Date.now() % 10000}`, status: 'published' } });
     assert.equal((await get(`/v1/store/resale/listings?store=${plain.subdomain}`)).json.error.code, 'store_unavailable');
+    assert.equal((await get(`/v1/store/resale/home?store=${plain.subdomain}`)).json.error.code, 'store_unavailable');
   });
 });
 

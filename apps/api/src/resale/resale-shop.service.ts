@@ -111,6 +111,15 @@ export class ResaleShopService implements OnModuleInit {
   }
 
   /** One listing on sale here, as its supplier wrote it, with the store's price and how the buyer's payment is protected. */
+  /**
+   * The store's home page (Udozo): what its owner published in Seller HQ, else its design's starting page, with the
+   * template's sections filled in (its listings, rails and categories). A preview link's token shows the draft.
+   */
+  async homePage(subdomain: string, previewToken?: string) {
+    await this.store(subdomain);
+    return this.storefront.inStore(subdomain, undefined, () => this.storefront.storeHome(previewToken));
+  }
+
   async listing(subdomain: string, ref: number) {
     const store = await this.store(subdomain);
     const [item] = await this.onSale(store, { listingRef: BigInt(ref) });
