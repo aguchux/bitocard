@@ -19,6 +19,13 @@ export const productSeeds = {
     // Udozo's plans are Startup and Premium.
     { name: 'Enterprise hidden', sql: `UPDATE "plans" SET "available" = false WHERE "code" = 'enterprise' AND "available" = true` },
     // Premium includes one free domain per store (paid for by the setup fee and its first month); admins change it.
+    // Udozo's starting prices (the owner, 30 October 2026): the Seller HQ setup fee US$10 for every market, and Premium
+    // US$5 a month. Set once, with the fee's first row, so admins' later changes are never put back.
+    {
+      name: 'starting prices',
+      sql: `WITH fee AS (INSERT INTO "setup_fees" ("country", "enabled", "amount_minor", "updated_at") VALUES ('WW', true, 1000, CURRENT_TIMESTAMP) ON CONFLICT ("country") DO NOTHING RETURNING 1)
+            UPDATE "plans" SET "price_cents" = 500 WHERE "code" = 'premium' AND EXISTS (SELECT 1 FROM fee)`,
+    },
     { name: 'Premium with a free domain', sql: `UPDATE "plans" SET "limits" = "limits" || '{"free_domains": 1}'::jsonb WHERE "code" = 'premium' AND NOT ("limits" ? 'free_domains')` },
   ],
 };

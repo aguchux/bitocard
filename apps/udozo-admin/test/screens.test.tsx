@@ -27,7 +27,7 @@ const theme = {
     { key: "forest", name: "Forest", colors: forest },
   ],
 };
-const fee = { object: "setup_fee_setting", country: "NG", name: "Nigeria", currency: "NGN", enabled: true, amount: 500000, premium_month: 1000000, dearest_domain: 2500000, warnings: ["fees_below_domain_price"] };
+const fee = { object: "setup_fee_setting", country: "NG", name: "Nigeria", currency: "NGN", source: "market", enabled: true, amount: 500000, premium_month: 1000000, dearest_domain: 2500000, warnings: ["fees_below_domain_price"] };
 const listing = {
   object: "classified_listing",
   id: "l1",
@@ -46,6 +46,8 @@ const listing = {
 
 let sent: Array<{ method: string; path: string; body: unknown }>;
 let savedFee: typeof fee;
+const ghana = { ...fee, country: "GH", name: "Ghana", currency: "GHS", source: "every_market", amount: 15500, warnings: [] };
+let everyMarket = { object: "setup_fee_default", currency: "USD", enabled: true, amount: 1000 };
 let opened: { location: { href: string }; close: () => void } | null;
 
 beforeAll(() => {
@@ -61,6 +63,7 @@ beforeEach(() => {
   sent = [];
   opened = null;
   savedFee = fee;
+  everyMarket = { object: "setup_fee_default", currency: "USD", enabled: true, amount: 1000 };
   process.env.NEXT_PUBLIC_API_URL = "http://api.test";
   process.env.NEXT_PUBLIC_UDOZO_URL = "https://udozo.test";
   vi.stubGlobal("open", () => {
@@ -85,7 +88,12 @@ beforeEach(() => {
     }
     if (path === "/v1/admin/theme/preview") return ok({ object: "theme_preview", token: "tok.sig", expires_at: "2026-10-30T01:00:00.000Z" });
     if (path === "/v1/admin/theme/publish") return ok({ ...theme, published: theme.draft, version: 2 });
-    if (path === "/v1/admin/setup-fees") return ok({ object: "list", data: [savedFee] });
+    if (path === "/v1/admin/setup-fees") return ok({ object: "list", every_market: everyMarket, data: [savedFee, ghana] });
+    if (path === "/v1/admin/setup-fees/WW") {
+      everyMarket = { ...everyMarket, ...(body as object) };
+      return ok(everyMarket);
+    }
+    if (path === "/v1/admin/setup-fees/NG" && input.method === "DELETE") return ok({ ...fee, source: "every_market", amount: 1522500, warnings: [] });
     if (path === "/v1/admin/setup-fees/NG") {
       savedFee = { ...fee, ...(body as object), warnings: [] };
       return ok(savedFee);
@@ -195,6 +203,26 @@ describe("admin.udozo.com", () => {
     fireEvent.click(within(market).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(sent.find(call => call.method === "PUT")).toEqual({ method: "PUT", path: "/v1/admin/setup-fees/NG", body: { enabled: true, amount: 2000000 } }), slow);
     expect(await screen.findByText(/Saved\. New sellers in this market/, {}, slow)).toBeTruthy();
+  });
+
+  test("setup fees: every market's fee in US dollars, a market following it, and going back to it", async () => {
+    page(<SetupFeesPage />);
+    const all = await screen.findByLabelText("Every market", {}, slow);
+    expect(within(all).getByText("On: USD 10.00")).toBeTruthy();
+    const usd = within(all).getByLabelText("Amount (USD)") as HTMLInputElement;
+    expect(usd.value).toBe("10");
+    fireEvent.change(usd, { target: { value: "12" } });
+    fireEvent.click(within(all).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent.find(call => call.method === "PUT")).toEqual({ method: "PUT", path: "/v1/admin/setup-fees/WW", body: { enabled: true, amount: 1200 } }), slow);
+    // Ghana follows it, in cedis, with no form until its own fee is chosen.
+    const gh = screen.getByRole("listitem", { name: "Ghana" });
+    expect(within(gh).getByText(/Every market's fee/)).toBeTruthy();
+    expect(within(gh).queryByLabelText("Amount (GHS)")).toBeNull();
+    fireEvent.click(within(gh).getByRole("button", { name: "Set its own fee" }));
+    expect(within(gh).getByLabelText("Amount (GHS)")).toBeTruthy();
+    // Nigeria has its own, and can go back to every market's.
+    fireEvent.click(within(screen.getByRole("listitem", { name: "Nigeria" })).getByRole("button", { name: "Use every market's fee" }));
+    await waitFor(() => expect(sent.find(call => call.method === "DELETE")).toEqual({ method: "DELETE", path: "/v1/admin/setup-fees/NG", body: null }), slow);
   });
 
   test("marketplace: the moderation queue lists ads waiting for a person", async () => {

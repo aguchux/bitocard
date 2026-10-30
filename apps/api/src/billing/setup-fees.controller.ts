@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsBoolean, IsInt, Max, Min } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, personOf, RealmOnly, resellerOf, Roles, SessionOnly, StepUp } from '../auth/caller.js';
@@ -11,7 +11,7 @@ import { SetupFeesService } from './setup-fees.service.js';
 
 class SetupFeeDto {
   @IsBoolean() enabled: boolean;
-  /** In the market's currency, minor units. */
+  /** In the market's currency, minor units; for every market (`WW`), US cents. */
   @IsInt() @Min(0) @Max(1_000_000_000_000) amount: number;
 }
 
@@ -57,5 +57,13 @@ export class AdminSetupFeesController {
   @Put(':country')
   set(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: SetupFeeDto) {
     return this.fees.set(adminId(caller), country, body);
+  }
+
+  /** The market goes back to Udozo's fee for every market. */
+  @AdminRoles('finance')
+  @StepUp()
+  @Delete(':country')
+  clear(@CurrentCaller() caller: Caller, @Param('country') country: string) {
+    return this.fees.clear(adminId(caller), country);
   }
 }

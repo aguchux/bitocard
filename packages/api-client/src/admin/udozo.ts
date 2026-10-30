@@ -1,5 +1,4 @@
 import { bitocardApi } from '../base';
-import type { List } from './types';
 
 // Udozo's own admin endpoints (docs/UDOZO_SPINOFF_PLAN.md, step 3), served only by Udozo's API instance
 // (api.udozo.com); BitoCard's answers them as unknown routes. Plus the shared ones Udozo's admin reads that had no
@@ -34,8 +33,11 @@ export type SetupFeeSetting = {
   country: string;
   name: string;
   currency: string;
+  /** `market`: the market's own fee; `every_market`: Udozo's fee for every market, converted at today's rate; null: none. */
+  source: 'market' | 'every_market' | null;
   enabled: boolean;
-  amount: number;
+  /** Null while Udozo's fee in US dollars cannot be converted (no exchange rate). */
+  amount: number | null;
   /** One Premium month in the market's currency (its fixed price, else converted), or null when it cannot be priced. */
   premium_month: number | null;
   /** The dearest domain ending on offer, in the market's currency, or null when unknown. */
@@ -43,6 +45,10 @@ export type SetupFeeSetting = {
   /** `fees_below_domain_price`: the fee (when on) plus one Premium month is less than the dearest domain ending. */
   warnings: Array<'fees_below_domain_price' | (string & {})>;
 };
+
+/** Udozo's setup fee for every market without its own, in US cents. */
+export type SetupFeeDefault = { object: 'setup_fee_default'; currency: 'USD'; enabled: boolean; amount: number };
+export type SetupFeeList = { object: 'list'; every_market: SetupFeeDefault; data: SetupFeeSetting[] };
 
 /** `GET /v1/admin/ledger/check`: whether every balance matches its postings and every entry balances. */
 export type LedgerCheck = {
@@ -80,9 +86,15 @@ export const adminUdozoApi = bitocardApi.injectEndpoints({
     }),
 
     // -- Seller HQ setup fees (finance change them, with step-up) -------------------------------------------------
-    setupFees: build.query<List<SetupFeeSetting>, void>({ query: () => '/v1/admin/setup-fees', providesTags: [{ type: 'Plan', id: 'SETUP_FEES' }] }),
-    setSetupFee: build.mutation<SetupFeeSetting, { country: string; enabled: boolean; amount: number }>({
+    setupFees: build.query<SetupFeeList, void>({ query: () => '/v1/admin/setup-fees', providesTags: [{ type: 'Plan', id: 'SETUP_FEES' }] }),
+    /** A market's fee (in its currency), or Udozo's for every market (`country: 'WW'`, in US cents). */
+    setSetupFee: build.mutation<SetupFeeSetting | SetupFeeDefault, { country: string; enabled: boolean; amount: number }>({
       query: ({ country, ...body }) => ({ url: `/v1/admin/setup-fees/${country}`, method: 'PUT', body }),
+      invalidatesTags: [{ type: 'Plan', id: 'SETUP_FEES' }, 'Activity'],
+    }),
+    /** The market goes back to Udozo's fee for every market. */
+    clearSetupFee: build.mutation<SetupFeeSetting, string>({
+      query: country => ({ url: `/v1/admin/setup-fees/${country}`, method: 'DELETE' }),
       invalidatesTags: [{ type: 'Plan', id: 'SETUP_FEES' }, 'Activity'],
     }),
 
@@ -105,6 +117,7 @@ export const {
   usePublishThemeMutation,
   useSetupFeesQuery,
   useSetSetupFeeMutation,
+  useClearSetupFeeMutation,
   useLedgerCheckQuery,
   useResellerCreditQuery,
   useSetResellerCreditLimitMutation,

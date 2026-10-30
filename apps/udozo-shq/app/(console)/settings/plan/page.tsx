@@ -69,7 +69,7 @@ function PlanCard({ plan, store, onChoose, canChange }: { plan: PlanDetail; stor
 }
 
 /** What the setup fee adds to a first paid month, when it is still due. */
-const feeNote = (fee: SetupFee | undefined) => (fee?.due && fee.currency ? ` Your one-time Seller HQ setup fee of ${formatMoney(fee.amount, fee.currency)} is charged with it.` : "");
+const feeNote = (fee: SetupFee | undefined) => (fee?.due && fee.currency ? ` Your one-time Seller HQ setup fee${fee.amount === null ? "" : ` of ${formatMoney(fee.amount, fee.currency)}`} is charged with it.` : "");
 
 /** Each store is on Startup or Premium; account-wide features follow the highest. `?store=` opens one store's plans. */
 export default function PlanPage() {

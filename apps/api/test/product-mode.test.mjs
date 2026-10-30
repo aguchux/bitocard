@@ -236,7 +236,13 @@ describe('product seed', () => {
     assert.equal((await db.query(`SELECT count(*)::int AS n FROM "resellers" WHERE "house" = true AND "name" = 'BitoCard'`)).rows[0].n, 0);
     assert.equal((await db.query(`SELECT "available" FROM "plans" WHERE "code" = 'enterprise'`)).rows[0].available, false);
     assert.equal((await db.query(`SELECT count(*)::int AS n FROM "stores" WHERE "status" = 'published' AND "id" <> '00000000-0000-4000-8000-0000000000b2'`)).rows[0].n, 0);
+    // The owner's starting prices: a US$10 setup fee for every market and Premium at US$5 a month.
+    assert.deepEqual((await db.query(`SELECT "enabled", "amount_minor"::int AS amount FROM "setup_fees" WHERE "country" = 'WW'`)).rows[0], { enabled: true, amount: 1000 });
+    assert.equal((await db.query(`SELECT "price_cents" FROM "plans" WHERE "code" = 'premium'`)).rows[0].price_cents, 500);
+    // Set once: an admin's later price is never put back.
+    await db.query(`UPDATE "plans" SET "price_cents" = 700 WHERE "code" = 'premium'`);
     assert.ok((await seedProduct(query, 'udozo')).every(seed => seed.rows === 0));
+    assert.equal((await db.query(`SELECT "price_cents" FROM "plans" WHERE "code" = 'premium'`)).rows[0].price_cents, 700);
     await assert.rejects(() => seedProduct(query, 'nope'), /Unknown APP_PRODUCT/);
     await db.close();
   });

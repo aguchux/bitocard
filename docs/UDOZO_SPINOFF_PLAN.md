@@ -226,7 +226,7 @@ The code is moved to Udozo's apps (step 4), not deleted.
   - no Cloudflare record (the wildcard serves them);
   - live only with an active domain (`domain_required`); a live store left without one goes back to the sandbox, at once or by the `domains` job, and its reseller is told (`store.sandbox_without_domain`).
 - **Setup fee** (`setup_fees`, `resellers.setup_fee_*`; `src/billing/setup-fees.*`):
-  - finance sets it per market at `/v1/admin/setup-fees` (step-up, audited; `fees_below_domain_price`);
+  - finance sets it for every market in US dollars (`PUT /v1/admin/setup-fees/WW`, charged in each market's currency at the `pay` rate) and, where wanted, a market's own in its currency (`PUT …/:country`, `DELETE …/:country` to follow every market's again); step-up, audited, `fees_below_domain_price`;
   - a seller pays it once (`/v1/billing/setup-fee`, or with their first Premium month);
   - going live answers `setup_fee_unpaid` until it is paid.
 - **Free domain:**
@@ -302,8 +302,8 @@ Drop the Shop and resale tables from BitoCard's database once they are confirmed
   - a Safe pay and a resale order end to end in the sandbox.
 - **Step 5:** both instances healthy with their own databases (`/health` names the database on each host), and no Udozo request ever reaching BitoCard's database.
 
-## Questions for the owner
+## Owner's answers (30 October 2026)
 
-1. **The operating entity:** will Udozo be operated by a separate company? This is recommended, as it holds Safe pay money and is the data controller.
-2. **`api.udozo.com`:** open the shared droplet to Let's Encrypt for it (recommended), or use a Cloudflare zone for the API host name?
-3. **Starting prices per market:** Premium's price, the setup fee, and the domain endings offered.
+1. **The operating entity:** De-Golojan Technologies Ltd (Nigeria) owns and operates Udozo. Udozo's legal documents name it.
+2. **DNS:** udozo.com's DNS is on Cloudflare, with an A record for `api.udozo.com` to the droplet (proxied, as `api.bitocard.com` is). So the droplet stays behind Cloudflare, and Caddy serves `api.udozo.com` with a Cloudflare origin certificate for udozo.com. Vercel cannot issue a wildcard certificate without its own nameservers, so stores' sandbox addresses are made one by one as BitoCard's are: a DNS-only CNAME per store through Cloudflare's API (`StoreHostsService`, on Udozo's own Cloudflare settings) and the address added to Udozo's stores project, instead of a wildcard.
+3. **Starting prices:** a US$10 Seller HQ setup fee for every market and Premium at US$5 a month, set by the product seed once (admins change them later). US$15 covers a .com in the first store's month; a later store's Premium (US$5 alone) does not, so its free domain answers `domain_not_covered` unless the price rises or the domain is cheaper. Domain endings: .com, as for BitoCard.

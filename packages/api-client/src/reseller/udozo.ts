@@ -13,8 +13,8 @@ export type SetupFee = {
   charged: boolean;
   /** Charged and not paid yet: going live answers `setup_fee_unpaid` until it is. */
   due: boolean;
-  /** What is due, or what was paid. */
-  amount: number;
+  /** What is due, or what was paid, in `currency`'s minor units; null while Udozo's fee in US dollars cannot be converted (no exchange rate). */
+  amount: number | null;
   currency: string | null;
   paid_at: string | null;
 };

@@ -7,7 +7,7 @@ import { FxService } from '../fx/fx.service.js';
 import { InvoicesService } from './invoices.service.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { PlansService } from '../plans/plans.service.js';
-import { setupFeeOf } from './setup-fee.js';
+import { everyMarket, setupFeeOf } from './setup-fee.js';
 import { formatMoney } from '../notifications/templates.js';
 
 const premiumCode = 'premium';
@@ -33,12 +33,14 @@ export class SetupFeesService {
 
   /** The seller's setup fee: whether their market charges one, how much, and whether it is paid. */
   async status(resellerId: string) {
-    const fee = await setupFeeOf(this.prisma, resellerId);
+    const fee = await setupFeeOf(this.prisma, resellerId, this.fx);
+    const amount = fee.paid ? fee.paid.amount : fee.charged ? fee.amount : 0n;
     return {
       object: 'setup_fee' as const,
       charged: fee.charged,
       due: fee.due,
-      amount: fee.charged || fee.paid ? Number(fee.paid?.amount ?? fee.amount) : 0,
+      /** In `currency`'s minor units; null while Udozo's fee in US dollars cannot be converted (no exchange rate). */
+      amount: amount === null ? null : Number(amount),
       currency: fee.paid?.currency ?? fee.currency,
       paid_at: fee.paidAt?.toISOString() ?? null,
     };
@@ -49,11 +51,13 @@ export class SetupFeesService {
    * is the seller's, so a repeat or a race takes it once. `storeId`: the store whose Premium it is paid with.
    */
   async pay(resellerId: string, actorId: string | null, storeId: string | null = null) {
-    const fee = await setupFeeOf(this.prisma, resellerId);
+    const fee = await setupFeeOf(this.prisma, resellerId, this.fx);
     if (!fee.due || !fee.currency) return this.status(resellerId);
+    // Udozo's fee in US dollars, converted now; without a rate it cannot be charged yet (`conversion_unavailable`).
+    if (fee.amount === null) await this.fx.chargeForUsdCents(1, fee.currency);
     const reference = `setup_fee:${resellerId}`;
-    const hold = await this.wallets.hold({ resellerId, mode: 'live', amount: fee.amount, reference, description: 'Seller HQ setup fee' });
-    await this.wallets.captureHold(hold.id, `Seller HQ setup fee: ${formatMoney(fee.amount, fee.currency)}`);
+    const hold = await this.wallets.hold({ resellerId, mode: 'live', amount: fee.amount!, reference, description: 'Seller HQ setup fee' });
+    await this.wallets.captureHold(hold.id, `Seller HQ setup fee: ${formatMoney(hold.amountMinor, fee.currency)}`);
     const claimed = await this.prisma.reseller.updateMany({
       where: { id: resellerId, setupFeePaidAt: null },
       data: { setupFeePaidAt: new Date(), setupFeeMinor: hold.amountMinor, setupFeeCurrency: hold.currency, setupFeeStoreId: storeId },
@@ -67,40 +71,73 @@ export class SetupFeesService {
 
   // Admins -----------------------------------------------------------------------------------------------------------
 
-  /** Every market's setup fee, with what Premium's first month adds and whether the two pay for a domain. */
+  /**
+   * Udozo's fee for every market (in US dollars) and each market's, with what Premium's first month adds and whether the
+   * two pay for a domain. A market without its own fee charges the one for every market, in its currency.
+   */
   async list() {
     const countries = await this.prisma.country.findMany({ orderBy: { code: 'asc' } });
     const fees = new Map((await this.prisma.setupFee.findMany()).map(fee => [fee.country, fee]));
     const endings = await this.domains.endingPrices();
+    const all = fees.get(everyMarket) ?? null;
     const data = [];
-    for (const country of countries) data.push(await this.present(country, fees.get(country.code) ?? null, endings));
-    return { object: 'list' as const, data };
+    for (const country of countries) data.push(await this.present(country, fees.get(country.code) ?? null, all, endings));
+    return { object: 'list' as const, every_market: this.presentEveryMarket(all), data };
   }
 
-  /** Finance: switches a market's fee on or off and sets it, in the market's currency. Audited. */
+  /**
+   * Finance: switches a fee on or off and sets it, audited: a market's (`code`, in its currency) or Udozo's for every
+   * market (`WW`, in US cents).
+   */
   async set(actorId: string | null, code: string, input: { enabled: boolean; amount: number }) {
-    const country = await this.prisma.country.findUnique({ where: { code: code.toUpperCase() } });
-    if (!country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such market.', 'country');
+    const key = code.toUpperCase();
+    const country = key === everyMarket ? null : await this.prisma.country.findUnique({ where: { code: key } });
+    if (key !== everyMarket && !country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such market.', 'country');
     if (input.enabled && input.amount <= 0) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Set an amount above zero to charge a setup fee.', 'amount');
-    const before = await this.prisma.setupFee.findUnique({ where: { country: country.code } });
+    const before = await this.prisma.setupFee.findUnique({ where: { country: key } });
     const data = { enabled: input.enabled, amountMinor: BigInt(input.amount), updatedById: actorId };
-    const after = await this.prisma.setupFee.upsert({ where: { country: country.code }, create: { country: country.code, ...data }, update: data });
+    const after = await this.prisma.setupFee.upsert({ where: { country: key }, create: { country: key, ...data }, update: data });
     await this.audit.record({
       actorId,
       action: 'setup_fee.changed',
       targetType: 'country',
-      targetId: country.code,
+      targetId: key,
       before: before ? { enabled: before.enabled, amount: Number(before.amountMinor) } : null,
       after: { enabled: after.enabled, amount: Number(after.amountMinor) },
     });
-    return this.present(country, after, await this.domains.endingPrices());
+    if (!country) return this.presentEveryMarket(after);
+    return this.present(country, after, await this.prisma.setupFee.findUnique({ where: { country: everyMarket } }), await this.domains.endingPrices());
+  }
+
+  /** Finance: a market goes back to charging Udozo's fee for every market. Audited. */
+  async clear(actorId: string | null, code: string) {
+    const key = code.toUpperCase();
+    const country = key === everyMarket ? null : await this.prisma.country.findUnique({ where: { code: key } });
+    if (!country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such market.', 'country');
+    const before = await this.prisma.setupFee.findUnique({ where: { country: key } });
+    if (before) {
+      await this.prisma.setupFee.delete({ where: { country: key } });
+      await this.audit.record({ actorId, action: 'setup_fee.cleared', targetType: 'country', targetId: key, before: { enabled: before.enabled, amount: Number(before.amountMinor) }, after: null });
+    }
+    return this.present(country, null, await this.prisma.setupFee.findUnique({ where: { country: everyMarket } }), await this.domains.endingPrices());
+  }
+
+  /** Udozo's fee for every market, in US cents. */
+  private presentEveryMarket(fee: { enabled: boolean; amountMinor: bigint } | null) {
+    return { object: 'setup_fee_default' as const, currency: 'USD', enabled: fee?.enabled ?? false, amount: Number(fee?.amountMinor ?? 0n) };
   }
 
   /**
    * A market's fee as admins see it. `warnings`: `fees_below_domain_price` when the fee and one Premium month together
    * are less than the dearest domain ending on offer, so a free domain could cost Udozo more than it collected.
    */
-  private async present(country: { code: string; name: string; currency: string }, fee: { enabled: boolean; amountMinor: bigint } | null, endings: Array<{ tld: string; price: number }> | null) {
+  private async present(country: { code: string; name: string; currency: string }, own: { enabled: boolean; amountMinor: bigint } | null, all: { enabled: boolean; amountMinor: bigint } | null, endings: Array<{ tld: string; price: number }> | null) {
+    // The market's own fee, else Udozo's for every market in the market's currency (null without a rate).
+    let fee: { enabled: boolean; amountMinor: bigint | null } | null = own;
+    if (!own && all) {
+      const amountMinor = country.currency === 'USD' ? all.amountMinor : await this.fx.chargeForUsdCents(Number(all.amountMinor), country.currency).then(result => result.amount, () => null);
+      fee = { enabled: all.enabled, amountMinor };
+    }
     const premium = await this.prisma.plan.findUnique({ where: { code: premiumCode } });
     const month = premium ? await this.plans.localPrice(premium, country.currency) : null;
     let dearest: bigint | null = null;
@@ -108,15 +145,18 @@ export class SetupFeesService {
       const local = country.currency === 'USD' ? BigInt(ending.price) : await this.fx.chargeForUsdCents(ending.price, country.currency).then(result => result.amount, () => null);
       if (local !== null && (dearest === null || local > dearest)) dearest = local;
     }
-    const collected = (fee?.enabled ? fee.amountMinor : 0n) + (month?.amount ?? 0n);
+    const collected = (fee?.enabled ? (fee.amountMinor ?? 0n) : 0n) + (month?.amount ?? 0n);
     const warnings = dearest !== null && collected < dearest ? ['fees_below_domain_price'] : [];
     return {
       object: 'setup_fee_setting' as const,
       country: country.code,
       name: country.name,
       currency: country.currency,
+      /** `market`: its own fee; `every_market`: Udozo's fee for every market, converted; null: no fee at all. */
+      source: own ? ('market' as const) : all ? ('every_market' as const) : null,
       enabled: fee?.enabled ?? false,
-      amount: Number(fee?.amountMinor ?? 0n),
+      /** In the market's currency; null while Udozo's fee in US dollars cannot be converted (no exchange rate). */
+      amount: fee ? (fee.amountMinor === null ? null : Number(fee.amountMinor)) : 0,
       premium_month: month ? Number(month.amount) : null,
       dearest_domain: dearest === null ? null : Number(dearest),
       warnings,

@@ -18,7 +18,7 @@ export function SetupFeeCard() {
   const [confirming, setConfirming] = useState(false);
   const canPay = can(membership, "finance");
   const data = fee.data;
-  const amount = data?.currency ? formatMoney(data.amount, data.currency) : null;
+  const amount = data?.currency && data.amount !== null ? formatMoney(data.amount, data.currency) : null;
   return (
     <Card>
       <CardHeader

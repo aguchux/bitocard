@@ -46,6 +46,7 @@ const protectedRoutes = [
   ['put', '/v1/admin/classifieds/resale-settings/NG', { reseller_fee_bps: 100 }],
   ['post', '/v1/admin/theme/publish', {}],
   ['put', '/v1/admin/setup-fees/NG', { enabled: false, amount: 0 }],
+  ['delete', '/v1/admin/setup-fees/NG'],
   ['post', `/v1/admin/classifieds/orders/${randomId}/payout-review`, { decision: 'approve', note: 'ok' }],
   ['post', `/v1/admin/vpn/subscriptions/${randomId}/enable`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/startup-allowance`, {}],

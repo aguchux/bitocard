@@ -92,6 +92,28 @@ describe('the setup fee', () => {
   });
 });
 
+describe('the setup fee for every market', () => {
+  test("set in US dollars and charged in the market's currency, unless the market has its own", async () => {
+    const all = await admin.put('/v1/admin/setup-fees/WW', { enabled: true, amount: 1000 });
+    assert.deepEqual([all.status, all.json.currency, all.json.amount], [200, 'USD', 1000], JSON.stringify(all.json));
+    // Nigeria's own fee wins until it is cleared; then US$10 at NGN 1,522.50.
+    assert.equal((await admin.get('/v1/admin/setup-fees')).json.data.find(row => row.country === 'NG').source, 'market');
+    const cleared = await admin.delete('/v1/admin/setup-fees/NG');
+    assert.deepEqual([cleared.status, cleared.json.source, cleared.json.enabled, cleared.json.amount], [200, 'every_market', true, 1_522_500], JSON.stringify(cleared.json));
+    const listed = (await admin.get('/v1/admin/setup-fees')).json;
+    assert.deepEqual(listed.every_market, { object: 'setup_fee_default', currency: 'USD', enabled: true, amount: 1000 });
+    assert.equal((await admin.delete('/v1/admin/setup-fees/WW')).json.error.code, 'resource_missing', 'the fee for every market is switched off, never cleared');
+
+    const s = await seller();
+    assert.deepEqual([(await s.browser.get('/v1/billing/setup-fee')).json.amount, (await s.browser.get('/v1/billing/setup-fee')).json.currency], [1_522_500, 'NGN']);
+    const before = await available(s);
+    assert.equal((await s.browser.post('/v1/billing/setup-fee')).json.due, false);
+    assert.equal(before - (await available(s)), 1_522_500);
+    // Put back as it was for the tests below.
+    assert.equal((await admin.put('/v1/admin/setup-fees/NG', { enabled: true, amount: 2_000_000 })).status, 200);
+  });
+});
+
 describe("Premium's free domain", () => {
   test('taking Premium takes the setup fee and the first month together; the free domain is then bought with nothing more', async () => {
     const s = await seller();
