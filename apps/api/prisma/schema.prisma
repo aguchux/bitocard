@@ -2405,6 +2405,22 @@ model StorefrontPage {
 }
 
 /// Every published version of a storefront page, so an earlier one can be restored.
+/// The product's colour theme, chosen by its admins (docs/UDOZO_SPINOFF_PLAN.md, step 3): one row (`site`), the draft
+/// and the published theme, each `{ preset, colors: { primary, accent, ink, page } }`.
+model SiteTheme {
+  key           String    @id
+  draft         Json
+  published     Json?
+  /// The published version number.
+  version       Int       @default(0)
+  publishedAt   DateTime? @map("published_at")
+  publishedById String?   @map("published_by_id") @db.Uuid
+  updatedById   String?   @map("updated_by_id") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("site_themes")
+}
+
 model StorefrontPageVersion {
   pageKey       String         @map("page_key")
   version       Int

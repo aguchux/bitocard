@@ -60,6 +60,7 @@ import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { VpnApiModule, VpnModule } from './vpn/vpn.module.js';
 import { PlanAccessModule } from './plans/plan-access.js';
+import { ThemeModule } from './theme/theme.module.js';
 
 export type AppOptions = {
   /** Database driver adapter to use instead of DATABASE_URL (tests use an in-process Postgres). */
@@ -124,6 +125,7 @@ export class AppModule {
         VpnApiModule,
         CheckoutModule,
         ManualTopUpsModule,
+        ThemeModule,
         CronModule,
         ...(options.extraModules ?? []),
       ],
