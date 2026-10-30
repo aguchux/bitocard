@@ -7,6 +7,7 @@ import type { FeeKind, LedgerMode, ProductCategory } from '../generated/prisma/c
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { maxRatePpb, PlatformFeesService } from './platform-fees.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 const thisMonth = () => new Date().toISOString().slice(0, 7);
@@ -90,6 +91,7 @@ class AdminFeesQueryDto extends FeesQueryDto {
 @Roles('admin', 'finance', 'developer')
 @Scopes('wallet:read')
 @Controller('wallet')
+@ProductOnly('bitocard')
 export class FeesController {
   constructor(private readonly fees: PlatformFeesService) {}
 
@@ -120,6 +122,7 @@ export class FeesController {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin')
+@ProductOnly('bitocard')
 export class AdminFeesController {
   constructor(private readonly fees: PlatformFeesService) {}
 

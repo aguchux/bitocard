@@ -6,6 +6,7 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { SpinsService } from './spins.service.js';
 import { StoreKey } from '../customers/store-key.js';
+import { ProductOnly } from '../products/product.js';
 
 const publicClaimHeader = 'bitocard-spin-claim';
 
@@ -45,6 +46,7 @@ class SpinExchangeDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('store/spins')
+@ProductOnly('bitocard')
 export class CustomerSpinsController {
   constructor(private readonly spins: SpinsService) {}
 
@@ -83,6 +85,7 @@ export class CustomerSpinsController {
 @ApiExcludeController()
 @Public()
 @Controller('store/spins/public')
+@ProductOnly('bitocard')
 export class PublicSpinsController {
   constructor(private readonly spins: SpinsService) {}
 
@@ -103,6 +106,7 @@ export class PublicSpinsController {
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('admin/spins')
+@ProductOnly('bitocard')
 export class AdminSpinsController {
   constructor(private readonly spins: SpinsService) {}
 

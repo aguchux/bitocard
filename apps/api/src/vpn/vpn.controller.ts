@@ -15,6 +15,7 @@ import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { OrderAccessService } from '../orders/order-access.service.js';
 import { vpnStatuses } from './presenter.js';
 import { VpnService } from './vpn.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class VpnFilterDto extends PageDto {
   @ApiPropertyOptional({ description: 'Only the VPN access this order bought.' })
@@ -31,6 +32,7 @@ class VpnFilterDto extends PageDto {
 @ApiBearerAuth()
 @modeHeader
 @Controller('vpn-subscriptions')
+@ProductOnly('bitocard')
 export class VpnController {
   constructor(private readonly vpn: VpnService, private readonly scope: StoreScope) {}
 
@@ -70,6 +72,7 @@ const proofOf = (req: Request) => ({ customerSession: req.get('bitocard-customer
 @ApiExcludeController()
 @Public()
 @Controller('store/access')
+@ProductOnly('bitocard')
 export class VpnAccessController {
   constructor(
     private readonly access: OrderAccessService,
@@ -98,6 +101,7 @@ export class VpnAccessController {
 @ApiExcludeController()
 @Public()
 @Controller('store')
+@ProductOnly('bitocard')
 export class VpnCustomerController {
   constructor(
     private readonly checkout: CheckoutService,
@@ -151,6 +155,7 @@ class ReasonDto {
 @RealmOnly('admin')
 @AdminRoles('operations', 'support', 'finance')
 @Controller('admin/vpn')
+@ProductOnly('bitocard')
 export class AdminVpnController {
   constructor(private readonly vpn: VpnService) {}
 

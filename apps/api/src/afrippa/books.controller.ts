@@ -5,6 +5,7 @@ import { AdminRoles, RealmOnly } from '../auth/caller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { reportRange } from '../reports/range.js';
 import { AfrippaBooksService } from './books.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class BooksQueryDto {
   @IsIn(['test', 'live']) mode: LedgerMode;
@@ -17,6 +18,7 @@ class BooksQueryDto {
 @RealmOnly('afrippa_admin')
 @AdminRoles('finance', 'operations')
 @Controller('afrippa/admin/books')
+@ProductOnly('bitocard')
 export class AfrippaBooksController {
   constructor(private readonly books: AfrippaBooksService) {}
 

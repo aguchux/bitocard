@@ -26,6 +26,7 @@ import {
   type TicketVisibility,
   ticketVisibilities,
 } from '../support/tickets.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class TicketPageDto {
   @IsOptional() @IsIn(ticketStatuses)
@@ -85,6 +86,7 @@ class AfrippaUpdateDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/account/support/tickets')
+@ProductOnly('bitocard')
 export class TraderTicketsController {
   constructor(private readonly tickets: TicketsService) {}
 
@@ -120,6 +122,7 @@ export class TraderTicketsController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('support', 'operations')
 @Controller('afrippa/admin/support/tickets')
+@ProductOnly('bitocard')
 export class AfrippaTicketsAdminController {
   constructor(
     private readonly tickets: TicketsService,
@@ -232,6 +235,7 @@ const chatUpload = FileInterceptor('file', { limits: { fileSize: maxDocumentByte
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/account/support/chat')
+@ProductOnly('bitocard')
 export class TraderChatController {
   constructor(private readonly chats: ChatsService) {}
 
@@ -281,6 +285,7 @@ export class TraderChatController {
 @ApiExcludeController()
 @Public()
 @Controller('afrippa/account/support/visitor-chat')
+@ProductOnly('bitocard')
 export class AfrippaVisitorChatController {
   constructor(
     private readonly chats: ChatsService,
@@ -355,6 +360,7 @@ export class AfrippaVisitorChatController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('support', 'operations')
 @Controller('afrippa/admin/support/chats')
+@ProductOnly('bitocard')
 export class AfrippaChatsAdminController {
   constructor(
     private readonly chats: ChatsService,

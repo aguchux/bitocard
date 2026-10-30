@@ -2,7 +2,7 @@
 
 Decided by the owner on 30 October 2026. **BitoCard Shop** (the B2C classifieds marketplace with Safe pay and the Anjio shop assistants; `docs/BITOCARD_CLASSIFIEDS_PLAN.md`) and **B2B reselling** (suppliers' listings sold on resellers' Resale shop stores; `docs/BITOCARD_B2B_RESELLING_PLAN.md`) leave BitoCard and become their own brand, **Udozo**, at **udozo.com**. The domain is already owned. It was a memorial portal, which the owner is deleting themselves; nothing of it is carried over and no work for it is in this plan.
 
-**Status:** planned, nothing built yet.
+**Status:** step 1 built (30 October 2026); the rest planned.
 
 ## The decision
 
@@ -130,6 +130,22 @@ The shared foundations come with it, in Udozo's own database:
    - cookie names, key prefixes and senders follow the product;
    - every existing test passes in BitoCard mode;
    - the classifieds and resale tests run in Udozo mode.
+
+**Step 1 status (30 October 2026): built.**
+- **Routes are owned per controller, not by unmounting modules.**
+  - `@ProductOnly('bitocard' | 'udozo')` marks every controller (or route) of one product; unmarked ones are shared.
+  - `ProductRoutesGuard`, the first global guard, answers the other product's routes as unknown routes. `PRODUCT_ROUTES=all` (tests and local development; refused in production) serves every route.
+  - **Why not unmount modules:** `CheckoutModule` imports the catalogue and orders, so unmounting would pull in BitoCard's whole commerce. Splitting the modules can come later; the guard already keeps each instance to its own surface.
+- **Udozo's:** classifieds, shop assistants, resale, Safe pay payouts (`/v1/store/cash`, `/v1/admin/crypto/payouts`) and the resale reports.
+- **BitoCard's:** Afrippa and crypto; catalogue, quotes, pricing, suppliers, stock; orders, numbers, eSIMs, VPN; Spin and win; order disputes; checkout and the storefront catalogue; country stores; resellers' own integrations and platform fees; customers' checks by reference.
+- **Names per product** (`src/products/product.ts`, `productOf(config)`): session cookies (`udz_session`, `udz_admin_session`), API keys (`udz_test_…`; a key of the other product's shape is refused unread), the webhook signature header (`Udozo-Signature`), and the admins' authenticator and emails (`Udozo Admin`).
+- **Jobs:** `cron.json` names the owner of product jobs (`src/products/jobs.ts`, `jobOwners`). Each scheduler runs its own and the shared ones, and the API refuses the other product's (404).
+- **OpenAPI:** each instance describes only its own routes. BitoCard's `openapi.json` lost the Resale endpoints, and the docs' Resale section went with them (changelog entry).
+- **Product seed:** `scripts/product-seed.mjs`, run by `migrate-deploy.mjs` after migrations. On Udozo's database it names the house accounts and marketplace store Udozo, unpublishes BitoCard's country stores, and hides Enterprise.
+- **Tests:** `test/product-mode.test.mjs` sweeps both instances, both ways. The resale tests run as Udozo (`APP_PRODUCT=udozo`), so their responses are checked against Udozo's document.
+- **Left for later steps:**
+  - moving `CustomerCashController` out of `src/crypto` (its gate is `CryptoWalletsService.requireCashOut`) and the rest of Udozo's branding (emails, the other webhook headers), in step 3;
+  - the `resale_order.*` event types in BitoCard's webhook catalogue and the apps' pages, in step 2.
 
 ### 2. Unhook the Shop and B2B from BitoCard's apps
 1. **Storefront** (these go):

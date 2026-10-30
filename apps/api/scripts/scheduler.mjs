@@ -49,10 +49,13 @@ export function matches(parsed, date) {
   return parsed.minute.has(date.getUTCMinutes()) && parsed.hour.has(date.getUTCHours()) && parsed.month.has(date.getUTCMonth() + 1) && days;
 }
 
-/** The jobs in cron.json, each with its parsed schedule. */
-export function loadJobs(path = new URL('../cron.json', import.meta.url)) {
+/**
+ * The jobs in cron.json this product's instance runs (`APP_PRODUCT`, BitoCard's by default), each with its parsed
+ * schedule: a job naming another `product` belongs to that product's instance (docs/UDOZO_SPINOFF_PLAN.md).
+ */
+export function loadJobs(path = new URL('../cron.json', import.meta.url), product = process.env.APP_PRODUCT || 'bitocard') {
   const { jobs } = JSON.parse(readFileSync(path, 'utf8'));
-  return jobs.map(job => ({ ...job, parsed: parseSchedule(job.schedule) }));
+  return jobs.filter(job => !job.product || job.product === product).map(job => ({ ...job, parsed: parseSchedule(job.schedule) }));
 }
 
 const log = entry => console.log(JSON.stringify({ time: new Date().toISOString(), service: 'scheduler', ...entry }));
@@ -92,7 +95,7 @@ async function main() {
     running: new Set(),
   };
   const jobs = loadJobs();
-  log({ outcome: 'started', jobs: jobs.length, api: options.baseUrl });
+  log({ outcome: 'started', product: process.env.APP_PRODUCT || 'bitocard', jobs: jobs.length, api: options.baseUrl });
   // Stopping at once is safe: a job already called keeps running in the API, which finishes it.
   for (const signal of ['SIGTERM', 'SIGINT']) {
     process.on(signal, () => {

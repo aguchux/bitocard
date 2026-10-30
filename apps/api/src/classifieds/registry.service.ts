@@ -12,6 +12,7 @@ import type { ClassifiedFeature, Prisma } from '../generated/prisma/client.js';
 import { ListingsService } from './listings.service.js';
 import { presentFeature } from './reference.service.js';
 import { checkFeatureValue, invalid, linkPattern, onShopWhere, slugify } from './rules.js';
+import { ProductOnly } from '../products/product.js';
 
 const dataTypes = ['text', 'number', 'choice', 'boolean'] as const;
 type DataType = (typeof dataTypes)[number];
@@ -361,6 +362,7 @@ export class ClassifiedRegistryService {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations')
 @Controller('admin/classifieds')
+@ProductOnly('udozo')
 export class AdminRegistryController {
   constructor(private readonly registry: ClassifiedRegistryService) {}
 
@@ -416,6 +418,7 @@ export class AdminRegistryController {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class ClassifiedSuggestionsController {
   constructor(private readonly registry: ClassifiedRegistryService) {}
 

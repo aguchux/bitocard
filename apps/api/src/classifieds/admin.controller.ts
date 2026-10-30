@@ -17,6 +17,7 @@ import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { type ListingStatus, listingStatuses } from './rules.js';
 import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFaults, SafePayService } from './safe-pay.service.js';
 import { ResaleService } from './resale.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -421,6 +422,7 @@ export class ClassifiedsAdminService {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations')
 @Controller('admin/classifieds')
+@ProductOnly('udozo')
 export class AdminClassifiedsController {
   constructor(
     private readonly admin: ClassifiedsAdminService,
@@ -703,6 +705,7 @@ class PayoutReviewDto {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations', 'finance')
 @Controller('admin/classifieds')
+@ProductOnly('udozo')
 export class AdminSafePayController {
   constructor(
     private readonly safePay: SafePayService,

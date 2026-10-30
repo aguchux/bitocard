@@ -30,7 +30,8 @@ before(async () => {
     if (call.method === 'GET') return objects.has(key) ? { status: 200, headers: { 'content-type': 'application/octet-stream' }, body: objects.get(key).body } : { status: 404, body: '' };
     return { status: 405, body: '' };
   });
-  server = await startApp({ env: { KYC_SPACES_KEY: 'kyc-key', KYC_SPACES_SECRET: 'kyc-secret', KYC_SPACES_BUCKET: 'kyc-private', KYC_SPACES_ENDPOINT: bucket.url, LOG_LEVEL: process.env.DEBUG_LOG ?? 'silent' } });
+  // Resale is Udozo's (docs/UDOZO_SPINOFF_PLAN.md): its responses are checked against Udozo's API document.
+  server = await startApp({ env: { APP_PRODUCT: 'udozo', KYC_SPACES_KEY: 'kyc-key', KYC_SPACES_SECRET: 'kyc-secret', KYC_SPACES_BUCKET: 'kyc-private', KYC_SPACES_ENDPOINT: bucket.url, LOG_LEVEL: process.env.DEBUG_LOG ?? 'silent' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
   ledger = server.app.get((await import('../dist/ledger/ledger.service.js')).LedgerService);

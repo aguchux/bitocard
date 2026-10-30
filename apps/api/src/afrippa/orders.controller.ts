@@ -17,6 +17,7 @@ import { sendFile } from '../support/chats.controller.js';
 import { maxMessageLength, OrderRoomService } from './order-room.service.js';
 import { P2pOrdersService } from './orders.service.js';
 import { TraderDevicesService } from './devices.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class OpenOrderDto {
   @IsUUID() ad_id: string;
@@ -133,6 +134,7 @@ class DecideDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p/orders')
+@ProductOnly('bitocard')
 export class P2pOrdersController {
   constructor(
     private readonly devices: TraderDevicesService,
@@ -215,6 +217,7 @@ export class P2pOrdersController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support', 'finance')
 @Controller('afrippa/admin/p2p/orders')
+@ProductOnly('bitocard')
 export class AfrippaOrdersAdminController {
   constructor(
     private readonly orders: P2pOrdersService,
@@ -262,6 +265,7 @@ export class AfrippaOrdersAdminController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support', 'finance')
 @Controller('afrippa/admin/p2p/fee-rates')
+@ProductOnly('bitocard')
 export class AfrippaFeeRatesAdminController {
   constructor(private readonly fees: P2pFeesService) {}
 
@@ -291,6 +295,7 @@ export class AfrippaFeeRatesAdminController {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p/standing')
+@ProductOnly('bitocard')
 export class P2pStandingController {
   constructor(
     private readonly standing: P2pStandingService,
@@ -309,6 +314,7 @@ export class P2pStandingController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support', 'finance')
 @Controller('afrippa/admin/traders')
+@ProductOnly('bitocard')
 export class AfrippaStandingAdminController {
   constructor(private readonly standing: P2pStandingService) {}
 
@@ -331,6 +337,7 @@ export class AfrippaStandingAdminController {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p')
+@ProductOnly('bitocard')
 export class P2pTrustController {
   constructor(
     private readonly trust: P2pTrustService,
@@ -373,6 +380,7 @@ export class P2pTrustController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support')
 @Controller('afrippa/admin/p2p/reports')
+@ProductOnly('bitocard')
 export class AfrippaReportsAdminController {
   constructor(private readonly trust: P2pTrustService) {}
 
@@ -394,6 +402,7 @@ export class AfrippaReportsAdminController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support')
 @Controller('afrippa/admin/p2p/refused-words')
+@ProductOnly('bitocard')
 export class AfrippaRefusedWordsAdminController {
   constructor(private readonly words: P2pWordsService) {}
 

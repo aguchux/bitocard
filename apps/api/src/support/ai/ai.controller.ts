@@ -6,6 +6,7 @@ import { afrippaOperatorId } from '../../afrippa/ids.js';
 import { adminId } from '../../countries/countries.controller.js';
 import { AiService } from './ai.service.js';
 import { type AiProviderName, aiProviders } from './providers.js';
+import { ProductOnly } from '../../products/product.js';
 
 class KeyDto {
   @IsString() @Length(16, 500)
@@ -77,6 +78,7 @@ export class AdminAiController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/support/ai')
+@ProductOnly('bitocard')
 export class AfrippaAiController {
   constructor(private readonly ai: AiService) {}
 

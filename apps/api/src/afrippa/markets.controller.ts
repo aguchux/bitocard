@@ -5,6 +5,7 @@ import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../au
 import { adminId } from '../countries/countries.controller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { AfrippaMarketsService } from './markets.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class MarketSwitchDto {
   /** Leave it out for all of Afrippa. */
@@ -23,6 +24,7 @@ class StoreModeDto {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/markets')
+@ProductOnly('bitocard')
 export class AfrippaMarketsAdminController {
   constructor(private readonly markets: AfrippaMarketsService) {}
 

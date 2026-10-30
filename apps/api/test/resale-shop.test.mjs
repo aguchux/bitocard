@@ -15,7 +15,8 @@ let house;
 let check;
 
 before(async () => {
-  server = await startApp();
+  // Resale is Udozo's (docs/UDOZO_SPINOFF_PLAN.md): its responses are checked against Udozo's API document.
+  server = await startApp({ env: { APP_PRODUCT: 'udozo' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
   check = await responseChecker(server.app);

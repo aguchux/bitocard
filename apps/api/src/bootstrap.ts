@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import cookieParser from 'cookie-parser';
-import { NestFactory } from '@nestjs/core';
+import { ModulesContainer, NestFactory } from '@nestjs/core';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants.js';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { json, type NextFunction, type Request, type Response } from 'express';
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
@@ -12,6 +13,7 @@ import { validationPipe } from './common/errors/validation.js';
 import { securityHeaders } from './common/security-headers.js';
 import { addResponses } from './openapi/responses/index.js';
 import { addWebhooks } from './webhooks/openapi.js';
+import { PRODUCT_ONLY, productOf } from './products/product.js';
 
 /** Routes outside /v1: service info, health and robots.txt. Everything else is versioned. */
 const unversioned = ['/', 'health', 'robots.txt'];
@@ -76,12 +78,53 @@ export async function createApp(options: AppOptions = {}) {
 
 /** The public API description. The docs app renders it; `npm run openapi` writes it to openapi.json. */
 export function buildOpenApi(app: NestExpressApplication): OpenAPIObject {
+  const appConfig = app.get<AppConfig>(APP_CONFIG);
+  const product = productOf(appConfig);
+  const udozo = appConfig.APP_PRODUCT === 'udozo';
   const config = new DocumentBuilder()
-    .setTitle('BitoCard API')
+    .setTitle(`${product.name} API`)
     .setVersion('v1')
-    .setDescription('One API for catalogue, quotes, orders, wallets and webhooks. Sandbox and live share this address; your API key decides the mode.')
-    .addServer('https://api.bitocard.com')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'API key', description: 'API key: bc_test_… (sandbox) or bc_live_… (live).' })
+    .setDescription(
+      udozo
+        ? 'One API for resale listings, orders, wallets and webhooks. Sandbox and live share this address; your API key decides the mode.'
+        : 'One API for catalogue, quotes, orders, wallets and webhooks. Sandbox and live share this address; your API key decides the mode.',
+    )
+    .addServer(udozo ? 'https://api.udozo.com' : 'https://api.bitocard.com')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'API key', description: `API key: ${product.apiKeyPrefix}test_… (sandbox) or ${product.apiKeyPrefix}live_… (live).` })
     .build();
-  return addResponses(addWebhooks(SwaggerModule.createDocument(app, config)));
+  return addResponses(addWebhooks(withoutOtherProducts(app, SwaggerModule.createDocument(app, config))));
+}
+
+/** Leaves out the routes of the other product (`@ProductOnly`), and the tags no route uses any more. */
+function withoutOtherProducts(app: NestExpressApplication, document: OpenAPIObject): OpenAPIObject {
+  const product = app.get<AppConfig>(APP_CONFIG).APP_PRODUCT;
+  // Indexed by Nest's RequestMethod.
+  const methods = ['get', 'post', 'put', 'delete', 'patch', 'all', 'options', 'head'];
+  for (const module of app.get(ModulesContainer).values()) {
+    for (const wrapper of module.controllers.values()) {
+      const type = wrapper.metatype as (new (...args: never[]) => object) | null;
+      if (!type?.prototype) continue;
+      const bases = [Reflect.getMetadata(PATH_METADATA, type) ?? ''].flat() as string[];
+      for (const name of Object.getOwnPropertyNames(type.prototype)) {
+        const handler = name === 'constructor' ? undefined : (type.prototype as Record<string, unknown>)[name];
+        if (typeof handler !== 'function' || Reflect.getMetadata(PATH_METADATA, handler) === undefined) continue;
+        const owner = (Reflect.getMetadata(PRODUCT_ONLY, handler) ?? Reflect.getMetadata(PRODUCT_ONLY, type)) as string | undefined;
+        if (!owner || owner === product) continue;
+        const method = methods[Reflect.getMetadata(METHOD_METADATA, handler) as number];
+        for (const base of bases) {
+          for (const sub of [Reflect.getMetadata(PATH_METADATA, handler)].flat() as string[]) {
+            const joined = [base, sub].map(part => String(part).replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/');
+            const path = `/v1/${joined}`.replace(/:([A-Za-z_]+)/g, '{$1}');
+            const item = document.paths[path] as Record<string, unknown> | undefined;
+            if (!item || !method) continue;
+            delete item[method];
+            if (!methods.some(each => each in item)) delete document.paths[path];
+          }
+        }
+      }
+    }
+  }
+  const used = new Set(Object.values(document.paths).flatMap(item => methods.flatMap(method => ((item as Record<string, { tags?: string[] }>)[method]?.tags ?? []))));
+  if (document.tags) document.tags = document.tags.filter(tag => used.has(tag.name));
+  return document;
 }

@@ -6,6 +6,7 @@ import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, S
 import { adminId } from '../countries/countries.controller.js';
 import { MediaService } from './media.service.js';
 import { mediaPurposeKeys } from './purposes.js';
+import { ProductOnly } from '../products/product.js';
 
 class UploadDto {
   /** Checked against the caller's realm in the service, so the message lists only what they may upload. */
@@ -73,6 +74,7 @@ export class AdminMediaController {
 @ApiExcludeController()
 @RealmOnly('afrippa_admin')
 @Controller('afrippa/admin/media')
+@ProductOnly('bitocard')
 export class AfrippaAdminMediaController {
   constructor(private readonly media: MediaService) {}
 

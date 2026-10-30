@@ -11,6 +11,7 @@ import { PageDto } from '../ledger/wallet.controller.js';
 import { reportRange } from '../reports/range.js';
 import { SupplierFundingService } from './supplier-funding.service.js';
 import { SuppliersService } from './suppliers.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const statuses = ['mvp_live', 'mvp_qualify', 'pilot', 'later', 'backup'] as const;
 const nullable = (_dto: unknown, value: unknown) => value !== null;
@@ -133,6 +134,7 @@ class ConfirmFundingDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin')
+@ProductOnly('bitocard')
 export class AdminSuppliersController {
   constructor(
     private readonly suppliers: SuppliersService,

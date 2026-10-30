@@ -10,6 +10,7 @@ import { maxDailyRangeDays, reportRange, statementTooLarge } from './range.js';
 import { type ResellerReportMetric, ResellerReportsService } from './reseller-reports.service.js';
 import { ResaleReportsService } from './resale-reports.service.js';
 import { statementPdf } from './statement-pdf.js';
+import { ProductOnly } from '../products/product.js';
 
 /** A PDF of more lines than this is refused (download the CSV, or choose a shorter period). */
 const pdfMaxRows = 5_000;
@@ -65,6 +66,7 @@ export class ResellerReportsController {
 
   /** Resale orders on the reseller's Resale shops: by state, and the sales, margin, fee and earnings released in the period. */
   @Get('resale')
+  @ProductOnly('udozo')
   resaleReport(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: ResaleDto) {
     return this.resale.reseller({ resellerId: resellerOf(caller), mode, ...reportRange(query.from, query.to), storeId: query.store_id });
   }

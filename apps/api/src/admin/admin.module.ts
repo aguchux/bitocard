@@ -7,6 +7,7 @@ import type { LedgerMode, Platform } from '../generated/prisma/client.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { FxModule } from '../fx/fx.module.js';
 import { AdminOverviewService } from './overview.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class OverviewQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365) days?: number;
@@ -80,6 +81,7 @@ export class AdminActivityController {
 @ApiExcludeController()
 @RealmOnly('afrippa_admin')
 @Controller('afrippa/admin/activity')
+@ProductOnly('bitocard')
 export class AfrippaAdminActivityController {
   constructor(private readonly prisma: PrismaService) {}
 

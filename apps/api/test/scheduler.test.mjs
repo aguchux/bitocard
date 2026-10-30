@@ -32,7 +32,19 @@ describe('schedules', () => {
     const table = source.slice(source.indexOf('this.jobs = {'), source.indexOf('@Get('));
     const defined = [...table.matchAll(/^\s{6}'?([a-z0-9-]+)'?: (?:async )?\(\) =>/gm)].map(match => match[1]).sort();
     assert.ok(defined.length >= 20, 'the job table was read');
-    assert.deepEqual(jobs.map(job => job.job).sort(), defined);
+    const all = JSON.parse(readFileSync(new URL('../cron.json', import.meta.url), 'utf8')).jobs;
+    assert.deepEqual(all.map(job => job.job).sort(), defined);
+    assert.ok(jobs.length < all.length && jobs.every(job => job.product !== 'udozo'), "BitoCard's scheduler leaves Udozo's jobs out");
+  });
+
+  test("each product's scheduler runs its own jobs and the shared ones, as the API's job owners say", async () => {
+    const { jobOwners } = await import('../dist/products/jobs.js');
+    const all = JSON.parse(readFileSync(new URL('../cron.json', import.meta.url), 'utf8')).jobs;
+    assert.deepEqual(Object.fromEntries(all.filter(job => job.product).map(job => [job.job, job.product])), { ...jobOwners });
+    const udozo = loadJobs(undefined, 'udozo').map(job => job.job);
+    assert.ok(udozo.includes('classifieds') && udozo.includes('payments') && !udozo.includes('orders') && !udozo.includes('crypto'));
+    const bitocard = loadJobs(undefined, 'bitocard').map(job => job.job);
+    assert.ok(bitocard.includes('orders') && bitocard.includes('payments') && !bitocard.includes('classifieds'));
   });
 });
 

@@ -10,6 +10,7 @@ import type { ProductCategory } from '../generated/prisma/client.js';
 import { categoryLabels, navigationGroups } from './layout.js';
 import { StorefrontAdminService } from './storefront-admin.service.js';
 import { StorefrontService } from './storefront.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const categories = Object.keys(categoryLabels) as ProductCategory[];
 const groups = navigationGroups.map(group => group.key);
@@ -251,6 +252,7 @@ const storeOf = (query: { store?: string }) => (query.store && query.store !== '
 @ApiTags('Storefront')
 @Public()
 @Controller('store')
+@ProductOnly('bitocard')
 export class StorefrontController {
   constructor(
     private readonly storefront: StorefrontService,
@@ -370,6 +372,7 @@ class CategoryPresentationDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin/storefront')
+@ProductOnly('bitocard')
 export class AdminStorefrontController {
   constructor(private readonly admin: StorefrontAdminService) {}
 

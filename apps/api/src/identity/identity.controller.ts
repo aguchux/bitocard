@@ -10,6 +10,7 @@ import type { LedgerMode, VerificationStatus } from '../generated/prisma/client.
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { IdentityService } from './identity.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const referencePattern = /^[A-Za-z0-9._:@-]{1,100}$/;
 
@@ -137,6 +138,7 @@ export class ResellerBvnController {
 @modeHeader
 @Scopes('customers:verify')
 @Controller('customers/:reference/verification')
+@ProductOnly('bitocard')
 export class CustomerVerificationController {
   constructor(private readonly identity: IdentityService) {}
 

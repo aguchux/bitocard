@@ -8,6 +8,7 @@ import { type CustomerCaller, CustomerGuard, CurrentCustomer } from '../customer
 import { IdentityService } from '../identity/identity.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { afrippaOperatorId, afrippaStoreId } from './ids.js';
+import { ProductOnly } from '../products/product.js';
 
 class StartDto {
   /** The trader agrees to the check, including the face check (biometric data). */
@@ -36,6 +37,7 @@ const names = (name: string) => {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/account/verification')
+@ProductOnly('bitocard')
 export class TraderVerificationController {
   constructor(
     private readonly identity: IdentityService,

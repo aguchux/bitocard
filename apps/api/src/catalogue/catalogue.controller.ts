@@ -14,6 +14,7 @@ import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { CatalogueService } from './catalogue.service.js';
 import { maxMarginBps, type PriceKind, priceKinds, PricingService } from './pricing.service.js';
 import { maxQuantity, QuotesService } from './quotes.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class CatalogueFilterDto extends PageDto {
   @ApiPropertyOptional({ enum: productCategories })
@@ -214,6 +215,7 @@ class PricingRuleDto {
 @modeHeader
 @Scopes('catalogue:read')
 @Controller('catalogue')
+@ProductOnly('bitocard')
 export class CatalogueController {
   constructor(private readonly catalogue: CatalogueService) {}
 
@@ -261,6 +263,7 @@ export class CatalogueController {
 @ApiBearerAuth()
 @modeHeader
 @Controller('quotes')
+@ProductOnly('bitocard')
 export class QuotesController {
   constructor(private readonly quotes: QuotesService) {}
 
@@ -286,6 +289,7 @@ export class QuotesController {
 @ApiTags('Catalogue')
 @ApiBearerAuth()
 @Controller('pricing')
+@ProductOnly('bitocard')
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}
 
@@ -324,6 +328,7 @@ export class PricingController {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin/pricing-rules')
+@ProductOnly('bitocard')
 export class AdminPricingController {
   constructor(
     private readonly pricing: PricingService,

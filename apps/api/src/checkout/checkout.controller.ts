@@ -17,6 +17,7 @@ import { desktopNavFor, installPromptFor } from '../stores/stores.service.js';
 import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.service.js';
 import { EsimsService } from '../esims/esims.service.js';
 import { StoreSellers } from './store-sellers.js';
+import { ProductOnly } from '../products/product.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -355,6 +356,7 @@ export class CustomerAccountController {
 @ApiExcludeController()
 @Public()
 @Controller('store')
+@ProductOnly('bitocard')
 export class CheckoutController {
   constructor(
     private readonly checkout: CheckoutService,

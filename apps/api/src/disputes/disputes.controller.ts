@@ -22,6 +22,7 @@ import {
   type MessageVisibility,
   messageVisibilities,
 } from './disputes.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class DisputeFilterDto extends PageDto {
   @ApiPropertyOptional({ enum: disputeStatuses, description: '`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.' })
@@ -147,6 +148,7 @@ async function authorOf(prisma: PrismaService, caller: Caller, kind: 'reseller' 
 @modeHeader
 @Roles('admin', 'support', 'finance')
 @Controller('disputes')
+@ProductOnly('bitocard')
 export class DisputesController {
   constructor(
     private readonly disputes: DisputesService,
@@ -216,6 +218,7 @@ export class DisputesController {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('store/account/disputes')
+@ProductOnly('bitocard')
 export class CustomerDisputesController {
   constructor(private readonly disputes: DisputesService) {}
 
@@ -245,6 +248,7 @@ export class CustomerDisputesController {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations', 'finance')
 @Controller('admin/disputes')
+@ProductOnly('bitocard')
 export class AdminDisputesController {
   constructor(
     private readonly disputes: DisputesService,

@@ -17,6 +17,7 @@ import { afrippaStoreId } from './ids.js';
 import { TraderGoogleService } from './google.service.js';
 import { everywhere, type TraderSession, TraderTwoStepService } from './two-step.service.js';
 import { TraderDevicesService } from './devices.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -144,6 +145,7 @@ const session = (caller: CustomerCaller): TraderSession => ({ customer: caller.c
 @ApiExcludeController()
 @Public()
 @Controller('afrippa/account')
+@ProductOnly('bitocard')
 export class AfrippaAccountController {
   constructor(
     private readonly prisma: PrismaService,
@@ -327,6 +329,7 @@ export class AfrippaAccountController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support')
 @Controller('afrippa/admin')
+@ProductOnly('bitocard')
 export class AfrippaTraderAdminController {
   constructor(
     private readonly prisma: PrismaService,

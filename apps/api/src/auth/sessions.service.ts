@@ -5,14 +5,15 @@ import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sha256 } from '../common/crypto.js';
 import type { Realm } from '../generated/prisma/client.js';
 import { isAdminRealm } from './caller.js';
+import { productOf } from '../products/product.js';
 
 const hour = 60 * 60 * 1000;
 
-/** Each realm has its own cookie, so a session of one realm never reaches another's app or routes. */
-export const sessionPolicy: Record<Realm, { cookie: string; lifetimeMs: number }> = {
-  reseller: { cookie: 'bc_session', lifetimeMs: 30 * 24 * hour },
-  admin: { cookie: 'bc_admin_session', lifetimeMs: 12 * hour },
-  afrippa_admin: { cookie: 'afr_admin_session', lifetimeMs: 12 * hour },
+/** How long each realm's sessions last. */
+export const sessionPolicy: Record<Realm, { lifetimeMs: number }> = {
+  reseller: { lifetimeMs: 30 * 24 * hour },
+  admin: { lifetimeMs: 12 * hour },
+  afrippa_admin: { lifetimeMs: 12 * hour },
 };
 
 const touchEveryMs = 5 * 60 * 1000;
@@ -27,7 +28,8 @@ export class SessionsService {
 
   async create(userId: string, realm: Realm, req: Request, res: Response) {
     const token = `bcs_${randomToken()}`;
-    const { lifetimeMs, cookie } = sessionPolicy[realm];
+    const { lifetimeMs } = sessionPolicy[realm];
+    const cookie = this.cookieName(realm);
     const session = await this.prisma.session.create({
       data: {
         userId,
@@ -64,8 +66,8 @@ export class SessionsService {
   }
 
   clearCookie(realm: Realm, res: Response) {
-    if (realm === 'admin' && this.config.SESSION_COOKIE_DOMAIN) res.clearCookie(sessionPolicy[realm].cookie, this.sharedCookieOptions());
-    res.clearCookie(sessionPolicy[realm].cookie, this.cookieOptions(realm));
+    if (realm === 'admin' && this.config.SESSION_COOKIE_DOMAIN) res.clearCookie(this.cookieName(realm), this.sharedCookieOptions());
+    res.clearCookie(this.cookieName(realm), this.cookieOptions(realm));
   }
 
   /**
@@ -73,6 +75,11 @@ export class SessionsService {
    * Afrippa's) are host-only and SameSite=Strict: they only ever go to the API host that set them, never to resellers'
    * `<store>.bitocard.com` or any other subdomain, and never with a request started from another site.
    */
+  /** Each realm has its own cookie, named for the product (`bc_session`, `udz_session`…), so a session of one realm never reaches another's app or routes. */
+  cookieName(realm: Realm) {
+    return productOf(this.config).cookies[realm];
+  }
+
   private cookieOptions(realm: Realm): CookieOptions {
     return isAdminRealm(realm) ? { httpOnly: true, secure: this.config.cookieSecure, sameSite: 'strict', path: '/' } : this.sharedCookieOptions();
   }

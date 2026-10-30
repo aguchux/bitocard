@@ -10,9 +10,9 @@ import { twoStepPending } from './mfa-policy.js';
 import { freePlanCode } from '../plans/features.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
 import { reservedSubdomains } from '../stores/reserved.js';
-import { SessionsService, sessionPolicy } from './sessions.service.js';
+import { SessionsService } from './sessions.service.js';
+import { isApiKeyShape } from '../products/product.js';
 
-const apiKeyPattern = /^bc_(test|live)_[A-Za-z0-9_-]{20,}$/;
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 const touchEveryMs = 5 * 60 * 1000;
 
@@ -118,11 +118,11 @@ export class AuthGuard implements CanActivate {
       const [scheme, token] = authorization.split(' ');
       if (scheme?.toLowerCase() !== 'bearer' || !token) throw unauthenticated();
       if (docsTokenPattern.test(token)) return this.identifyDocsToken(token);
-      if (!apiKeyPattern.test(token)) throw unauthenticated();
+      if (!isApiKeyShape(token, this.config)) throw unauthenticated();
       return this.identifyApiKey(token);
     }
 
-    const token = (req.cookies as Record<string, string> | undefined)?.[sessionPolicy[realm].cookie];
+    const token = (req.cookies as Record<string, string> | undefined)?.[this.sessions.cookieName(realm)];
     if (!token) return null;
     const session = await this.sessions.resolve(token, realm);
     if (!session) return null;

@@ -6,6 +6,7 @@ import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { type MerchantStatus, merchantStatuses, P2pMerchantsService } from './merchants.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class MerchantsQueryDto {
   @IsOptional() @IsIn(merchantStatuses) status?: MerchantStatus;
@@ -33,6 +34,7 @@ class RuleDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p/merchant')
+@ProductOnly('bitocard')
 export class P2pMerchantController {
   constructor(private readonly merchants: P2pMerchantsService) {}
 
@@ -53,6 +55,7 @@ export class P2pMerchantController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support', 'finance')
 @Controller('afrippa/admin/p2p/merchants')
+@ProductOnly('bitocard')
 export class AfrippaMerchantsAdminController {
   constructor(private readonly merchants: P2pMerchantsService) {}
 
@@ -90,6 +93,7 @@ export class AfrippaMerchantsAdminController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'support', 'finance')
 @Controller('afrippa/admin/p2p/merchant-rules')
+@ProductOnly('bitocard')
 export class AfrippaMerchantRulesAdminController {
   constructor(private readonly merchants: P2pMerchantsService) {}
 

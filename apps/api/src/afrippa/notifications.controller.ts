@@ -5,6 +5,7 @@ import { IsBoolean, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator'
 import { type Caller, CurrentCaller, personOf, Public, RealmOnly } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class TraderNotificationsDto {
   @IsOptional()
@@ -28,6 +29,7 @@ class TraderNotificationsDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/account/notifications')
+@ProductOnly('bitocard')
 export class TraderNotificationsController {
   constructor(private readonly inbox: InboxService) {}
 
@@ -61,6 +63,7 @@ export class TraderNotificationsController {
 @ApiExcludeController()
 @RealmOnly('afrippa_admin')
 @Controller('afrippa/admin/notifications')
+@ProductOnly('bitocard')
 export class AfrippaAdminNotificationsController {
   constructor(private readonly inbox: InboxService) {}
 

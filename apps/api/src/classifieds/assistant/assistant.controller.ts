@@ -14,6 +14,7 @@ import { CustomersService } from '../../customers/customers.service.js';
 import { type ShopRole, shopRoles } from '../../support/bots.service.js';
 import { type Asker, maxQuestion, ShopAssistantService, type SuggestionKind, suggestionKinds, visitorHeader, visitorPattern } from './assistant.service.js';
 import { ShopAssistantsService } from './shop-assistants.service.js';
+import { ProductOnly } from '../../products/product.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 const language = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
@@ -79,6 +80,7 @@ class SuggestDto {
 @ApiExcludeController()
 @Public()
 @Controller('classifieds/assistant')
+@ProductOnly('udozo')
 export class ShopAssistantController {
   constructor(
     private readonly assistant: ShopAssistantService,
@@ -211,6 +213,7 @@ class EvalRunDto {
 @RealmOnly('admin')
 @AdminRoles('operations', 'support')
 @Controller('admin/support')
+@ProductOnly('udozo')
 export class AdminShopAssistantsController {
   constructor(
     private readonly shops: ShopAssistantsService,

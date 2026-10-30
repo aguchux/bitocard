@@ -10,6 +10,7 @@ import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { OrderAccessService } from '../orders/order-access.service.js';
 import { EsimsService } from './esims.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class EsimFilterDto extends PageDto {
   @ApiPropertyOptional({ description: 'Only the eSIMs this order delivered.' })
@@ -33,6 +34,7 @@ class CustomerTopUpDto extends TopUpDto {
 @ApiBearerAuth()
 @modeHeader
 @Controller('esims')
+@ProductOnly('bitocard')
 export class EsimsController {
   constructor(private readonly esims: EsimsService, private readonly scope: StoreScope) {}
 
@@ -101,6 +103,7 @@ const proofOf = (req: Request) => ({ customerSession: req.get('bitocard-customer
 @ApiExcludeController()
 @Public()
 @Controller('store/access')
+@ProductOnly('bitocard')
 export class EsimAccessController {
   constructor(
     private readonly access: OrderAccessService,

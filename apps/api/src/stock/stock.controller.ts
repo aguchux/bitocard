@@ -8,6 +8,7 @@ import type { StockCodeStatus } from '../generated/prisma/client.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { stockCategories } from '../suppliers/stock.adapter.js';
 import { type StockCategory, StockService } from './stock.service.js';
+import { ProductOnly } from '../products/product.js';
 
 /** At most this many codes in one request. */
 const maxCodes = 1000;
@@ -70,6 +71,7 @@ class WithdrawDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin/stock')
+@ProductOnly('bitocard')
 export class AdminStockController {
   constructor(private readonly stock: StockService) {}
 

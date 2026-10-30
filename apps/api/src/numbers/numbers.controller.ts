@@ -11,6 +11,7 @@ import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { OrderAccessService } from '../orders/order-access.service.js';
 import { NumbersService } from './numbers.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class NumberFilterDto extends PageDto {
   @ApiPropertyOptional({ enum: ['active', 'expired', 'deleted'] })
@@ -42,6 +43,7 @@ class SendMessageDto {
 @ApiBearerAuth()
 @modeHeader
 @Controller('numbers')
+@ProductOnly('bitocard')
 export class NumbersController {
   constructor(private readonly numbers: NumbersService, private readonly scope: StoreScope) {}
 
@@ -122,6 +124,7 @@ const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_er
 @Public()
 @SkipIdempotency()
 @Controller('webhooks')
+@ProductOnly('bitocard')
 export class NumberWebhooksController {
   constructor(private readonly numbers: NumbersService) {}
 
@@ -159,6 +162,7 @@ const proofOf = (req: Request) => ({ customerSession: req.get('bitocard-customer
 @ApiExcludeController()
 @Public()
 @Controller('store/access')
+@ProductOnly('bitocard')
 export class NumberAccessController {
   constructor(
     private readonly access: OrderAccessService,

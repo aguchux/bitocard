@@ -23,6 +23,7 @@ import { pawapayCallbackValid, pawapayNotice } from '../suppliers/pawapay.adapte
 import { africasTalkingCallbackValid, africasTalkingNotice } from '../suppliers/africas-talking.adapter.js';
 import { zenditNotice, zenditWebhookHeader, zenditWebhookValid } from '../suppliers/zendit.adapter.js';
 import { OrdersService } from './orders.service.js';
+import { ProductOnly } from '../products/product.js';
 
 /** After the first try (straight after receipt): 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 1 day. */
 export const supplierWebhookRetryMs = [60_000, 5 * 60_000, 30 * 60_000, 2 * 3600_000, 6 * 3600_000, 24 * 3600_000];
@@ -398,6 +399,7 @@ export class SupplierWebhooksService {
 @Public()
 @SkipIdempotency()
 @Controller('webhooks')
+@ProductOnly('bitocard')
 export class SupplierWebhooksController {
   constructor(private readonly webhooks: SupplierWebhooksService) {}
 
@@ -461,6 +463,7 @@ class ResellerNotificationFilterDto {
 @ApiTags('Integrations')
 @SessionOnly()
 @Controller('integrations')
+@ProductOnly('bitocard')
 export class ResellerSupplierWebhooksController {
   constructor(private readonly webhooks: SupplierWebhooksService) {}
 
@@ -487,6 +490,7 @@ class SupplierWebhookFilterDto {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin/supplier-webhooks')
+@ProductOnly('bitocard')
 export class AdminSupplierWebhooksController {
   constructor(private readonly webhooks: SupplierWebhooksService) {}
 

@@ -8,6 +8,7 @@ import { Mode } from '../ledger/mode.js';
 import { modeHeader } from '../ledger/wallet.controller.js';
 import { type ConnectionDecision, type PaymentCollector, paymentCollectors, ResellerIntegrationsService } from './reseller-integrations.service.js';
 import { OwnSuppliersService } from './own-suppliers.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class ConnectDto {
   @ApiProperty({
@@ -86,6 +87,7 @@ const integrationId = (value: string) => value.trim().toLowerCase();
 @modeHeader
 @SessionOnly()
 @Controller('integrations')
+@ProductOnly('bitocard')
 export class ResellerIntegrationsController {
   constructor(
     private readonly integrations: ResellerIntegrationsService,
@@ -174,6 +176,7 @@ export class ResellerIntegrationsController {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin')
+@ProductOnly('bitocard')
 export class AdminResellerIntegrationsController {
   constructor(private readonly integrations: ResellerIntegrationsService) {}
 

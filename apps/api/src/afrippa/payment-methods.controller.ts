@@ -5,6 +5,7 @@ import { Public } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { P2pPaymentMethodKind } from '../generated/prisma/client.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class PaymentMethodDto {
   @IsIn(['bank', 'mobile_money', 'named']) kind: P2pPaymentMethodKind;
@@ -28,6 +29,7 @@ class PaymentMethodDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p/payment-methods')
+@ProductOnly('bitocard')
 export class PaymentMethodsController {
   constructor(private readonly methods: PaymentMethodsService) {}
 

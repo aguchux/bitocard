@@ -17,6 +17,7 @@ import { CryptoMarketLimitsService } from './market-limits.service.js';
 import { CryptoReconciliationService } from './custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
 import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 const assetCode = () => Matches(/^[A-Z0-9]{2,10}$/, { message: 'asset must be an asset code such as USDT' });
@@ -194,6 +195,7 @@ export class DepositAddressDto extends DepositNetworksDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/crypto')
+@ProductOnly('bitocard')
 export class CustomerCryptoController {
   constructor(
     private readonly wallets: CryptoWalletsService,
@@ -296,6 +298,7 @@ export class CodeDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/crypto')
+@ProductOnly('bitocard')
 export class CustomerWithdrawalsController {
   constructor(private readonly withdrawals: CryptoWithdrawalsService) {}
 
@@ -384,6 +387,7 @@ class SimulatePayoutDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('store/cash')
+@ProductOnly('udozo')
 export class CustomerCashController {
   constructor(
     private readonly wallets: CryptoWalletsService,
@@ -444,6 +448,7 @@ export class CustomerCashController {
 @ApiExcludeController()
 @Public()
 @Controller('afrippa')
+@ProductOnly('bitocard')
 export class PublicCryptoController {
   constructor(private readonly p2p: P2pService) {}
 
@@ -473,6 +478,7 @@ export class PublicCryptoController {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('afrippa/p2p')
+@ProductOnly('bitocard')
 export class CustomerP2pController {
   constructor(private readonly p2p: P2pService) {}
 
@@ -638,6 +644,7 @@ class AdminListDto {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/crypto')
+@ProductOnly('bitocard')
 export class AdminCryptoController {
   constructor(
     private readonly wallets: CryptoWalletsService,
@@ -722,6 +729,7 @@ export class AdminCryptoController {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/p2p')
+@ProductOnly('bitocard')
 export class AdminP2pController {
   constructor(private readonly p2p: P2pService) {}
 
@@ -790,6 +798,7 @@ class DepositListDto {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/crypto')
+@ProductOnly('bitocard')
 export class AdminChainsController {
   constructor(private readonly deposits: CryptoDepositsService) {}
 
@@ -849,6 +858,7 @@ class WithdrawalListDto {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('afrippa/admin/crypto/withdrawals')
+@ProductOnly('bitocard')
 export class AdminWithdrawalsController {
   constructor(private readonly withdrawals: CryptoWithdrawalsService) {}
 
@@ -891,6 +901,7 @@ class ModeDto {
 @RealmOnly('afrippa_admin')
 @AdminRoles('operations', 'finance')
 @Controller('afrippa/admin/crypto/reconciliations')
+@ProductOnly('bitocard')
 export class AdminReconciliationsController {
   constructor(private readonly reconciliation: CryptoReconciliationService) {}
 
@@ -922,6 +933,7 @@ class CustomerPayoutListDto {
 @RealmOnly('admin')
 @AdminRoles('operations', 'finance', 'support')
 @Controller('admin/crypto/payouts')
+@ProductOnly('udozo')
 export class AdminCustomerPayoutsController {
   constructor(private readonly payouts: CustomerPayoutsService) {}
 
@@ -936,6 +948,7 @@ export class AdminCustomerPayoutsController {
 @Public()
 @SkipIdempotency()
 @Controller('afrippa/webhooks/chain')
+@ProductOnly('bitocard')
 export class ChainWebhooksController {
   constructor(private readonly deposits: CryptoDepositsService) {}
 

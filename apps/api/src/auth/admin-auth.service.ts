@@ -14,6 +14,7 @@ import { recordFailedSignIn } from './auth.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { SessionsService } from './sessions.service.js';
 import { claimTotpStep, newTotpSecret, totpFor, totpStep } from './totp.js';
+import { productOf } from '../products/product.js';
 
 const challengeLifetimeMs = 5 * 60 * 1000;
 const maxChallengeAttempts = 5;
@@ -76,7 +77,7 @@ export class AdminAuthService {
           product: 'Afrippa',
           platform: 'afrippa',
         }
-      : { domains: this.config.ADMIN_EMAIL_DOMAINS, setupEmails: this.config.ADMIN_SETUP_EMAILS, appUrl: this.config.ADMIN_APP_URL, issuer: 'BitoCard Admin', product: 'BitoCard', platform: 'bitocard' };
+      : { domains: this.config.ADMIN_EMAIL_DOMAINS, setupEmails: this.config.ADMIN_SETUP_EMAILS, appUrl: this.config.ADMIN_APP_URL, issuer: productOf(this.config).adminIssuer, product: productOf(this.config).name, platform: 'bitocard' };
   }
 
   /** The realm of an admin account (never a reseller's). */

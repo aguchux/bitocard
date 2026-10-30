@@ -14,6 +14,7 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import { maxDocumentBytes } from '../kyc/files.js';
 import { maxQuantity, type OrderThread, orderThreads, resaleOrderStatuses, ResaleOrdersService } from './resale-orders.service.js';
 import { type StoreReportDecision, storeReportDecisions, type StoreReportReason, storeReportReasons, ResaleStoreReportsService } from './resale-store-reports.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class OrdersQueryDto {
   @ApiPropertyOptional({ enum: resaleOrderStatuses, description: 'Only orders in this status.' })
@@ -74,6 +75,7 @@ class ThreadMessageDto {
 @ApiTags('Resale')
 @ApiBearerAuth()
 @Controller('resale/orders')
+@ProductOnly('udozo')
 export class ResaleOrdersController {
   constructor(
     private readonly orders: ResaleOrdersService,
@@ -187,6 +189,7 @@ class SupplierReportDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class SupplierResaleOrdersController {
   constructor(
     private readonly orders: ResaleOrdersService,
@@ -294,6 +297,7 @@ class BuyerDisputeMessageDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('store/resale/orders')
+@ProductOnly('udozo')
 export class StoreResaleOrdersController {
   constructor(
     private readonly orders: ResaleOrdersService,
@@ -396,6 +400,7 @@ class BuyerReportDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('store/resale/reports')
+@ProductOnly('udozo')
 export class StoreResaleReportsController {
   constructor(private readonly reports: ResaleStoreReportsService) {}
 
@@ -437,6 +442,7 @@ class DecideReportDto {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations')
 @Controller('admin/classifieds/resale-reports')
+@ProductOnly('udozo')
 export class AdminResaleReportsController {
   constructor(private readonly reports: ResaleStoreReportsService) {}
 
@@ -468,6 +474,7 @@ class ClearStrikesDto {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations')
 @Controller('admin/classifieds/resellers/:id/resale-standing')
+@ProductOnly('udozo')
 export class AdminResaleOrdersController {
   constructor(private readonly orders: ResaleOrdersService) {}
 

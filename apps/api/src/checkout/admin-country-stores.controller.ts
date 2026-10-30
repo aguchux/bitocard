@@ -4,6 +4,7 @@ import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/calle
 import { AuditService } from '../audit/audit.service.js';
 import { presentStore } from '../stores/stores.service.js';
 import { HouseService } from './house.service.js';
+import { ProductOnly } from '../products/product.js';
 
 /** The signed-in admin, for the audit log. */
 const adminId = (caller: Caller) => (caller.kind === 'session' ? caller.userId : null);
@@ -18,6 +19,7 @@ const adminId = (caller: Caller) => (caller.kind === 'session' ? caller.userId :
 @RealmOnly('admin')
 @AdminRoles('operations')
 @Controller('admin/countries')
+@ProductOnly('bitocard')
 export class AdminCountryStoresController {
   constructor(
     private readonly house: HouseService,

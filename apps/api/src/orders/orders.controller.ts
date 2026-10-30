@@ -11,6 +11,7 @@ import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { type AccessProof, OrderAccessService } from './order-access.service.js';
 import { OrdersService } from './orders.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const statuses = ['processing', 'completed', 'failed', 'refunded'] as const;
 
@@ -69,6 +70,7 @@ class RefundOrderDto {
 @ApiBearerAuth()
 @modeHeader
 @Controller('orders')
+@ProductOnly('bitocard')
 export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
@@ -150,6 +152,7 @@ const proofOf = (req: Request): AccessProof => ({ customerSession: req.get('bito
 @ApiExcludeController()
 @Public()
 @Controller('store/access')
+@ProductOnly('bitocard')
 export class OrderAccessController {
   constructor(private readonly access: OrderAccessService) {}
 
@@ -188,6 +191,7 @@ export class OrderAccessController {
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin/orders')
+@ProductOnly('bitocard')
 export class AdminOrdersController {
   constructor(private readonly orders: OrdersService) {}
 

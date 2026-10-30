@@ -5,6 +5,7 @@ import { IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { ResaleShopService } from './resale-shop.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const storeSubdomain = /^[a-z0-9-]{2,30}$/;
 const slug = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -48,6 +49,7 @@ class PhraseDto {
 @ApiExcludeController()
 @Public()
 @Controller('store/resale')
+@ProductOnly('udozo')
 export class ResaleShopController {
   constructor(private readonly shop: ResaleShopService) {}
 
@@ -81,6 +83,7 @@ export class ResaleShopController {
 @RealmOnly('admin')
 @AdminRoles('support', 'operations')
 @Controller('admin/classifieds/resale-claim-phrases')
+@ProductOnly('udozo')
 export class AdminResaleShopController {
   constructor(private readonly shop: ResaleShopService) {}
 

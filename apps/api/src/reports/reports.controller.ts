@@ -9,6 +9,7 @@ import { maxDailyRangeDays, reportRange } from './range.js';
 import { type ReportMetric, ReportsService } from './reports.service.js';
 import { ResaleReportsService } from './resale-reports.service.js';
 import { pnlTotals, statementPdf } from './statement-pdf.js';
+import { ProductOnly } from '../products/product.js';
 
 /** A PDF of more lines than this is refused (download the CSV, or choose a shorter period). */
 const pdfMaxRows = 5_000;
@@ -63,6 +64,7 @@ export class AdminReportsController {
 
   /** Safe pay's fees by market and kind (BitoCard Shop's own sales and resale), each side's fee apart. */
   @Get('resale')
+  @ProductOnly('udozo')
   resaleFees(@Query() query: ResaleFeesDto) {
     return this.resale.platform({ mode: query.mode, ...reportRange(query.from, query.to), country: query.country });
   }

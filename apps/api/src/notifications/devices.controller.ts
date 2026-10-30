@@ -6,6 +6,7 @@ import type { Request } from 'express';
 import { type Caller, CurrentCaller, RealmOnly, SessionOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { type PushCaller, PushService } from './push.service.js';
+import { ProductOnly } from '../products/product.js';
 
 class PushKeysDto {
   @ApiProperty({ description: 'The subscription’s P-256 public key (base64url), from `PushSubscription.toJSON().keys`.' })
@@ -159,6 +160,7 @@ export class AdminDevicesController {
 @ApiExcludeController()
 @RealmOnly('afrippa_admin')
 @Controller('afrippa/admin')
+@ProductOnly('bitocard')
 export class AfrippaAdminDevicesController {
   constructor(private readonly push: PushService) {}
 

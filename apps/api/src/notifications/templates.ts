@@ -3,8 +3,8 @@ import type { EmailMessage } from './email.service.js';
 const escape = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
 /** Whose email it is: BitoCard's, or Afrippa's (its admins' sign-in emails). */
-export type EmailProduct = 'BitoCard' | 'Afrippa';
-const footers: Record<EmailProduct, string> = { BitoCard: 'BitoCard, a Golojan Ltd venture.', Afrippa: 'Afrippa.' };
+export type EmailProduct = 'BitoCard' | 'Afrippa' | 'Udozo';
+const footers: Record<EmailProduct, string> = { BitoCard: 'BitoCard, a Golojan Ltd venture.', Afrippa: 'Afrippa.', Udozo: 'Udozo.' };
 
 function layout(heading: string, paragraphs: string[], code?: string, product: EmailProduct = 'BitoCard') {
   const footer = footers[product];

@@ -24,6 +24,7 @@ import { ShopTermsService } from './terms.service.js';
 import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, invalid, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
+import { ProductOnly } from '../products/product.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -266,6 +267,7 @@ class MyListingsDto extends PageDto {
 @ApiExcludeController()
 @Public()
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class ClassifiedReferenceController {
   constructor(
     private readonly reference: ClassifiedReferenceService,
@@ -348,6 +350,7 @@ export class ClassifiedReferenceController {
 @ApiExcludeController()
 @Public()
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class ClassifiedVideoUploadsController {
   constructor(private readonly media: ListingMediaService) {}
 
@@ -371,6 +374,7 @@ class TermsAcceptDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class ClassifiedListingsController {
   constructor(
     private readonly terms: ShopTermsService,
@@ -509,6 +513,7 @@ export class ClassifiedListingsController {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class ClassifiedChatsController {
   constructor(
     private readonly conversations: ConversationsService,
@@ -709,6 +714,7 @@ class OrdersDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
+@ProductOnly('udozo')
 export class ClassifiedSafePayController {
   constructor(private readonly safePay: SafePayService) {}
 

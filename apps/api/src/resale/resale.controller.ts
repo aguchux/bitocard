@@ -7,6 +7,7 @@ import { ListingsService } from '../classifieds/listings.service.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { maxNote, type ResaleListingStatus, resaleListingStatuses, ResaleStoresService } from './resale-stores.service.js';
 import { maxMessage, ResaleTradeService } from './resale-trade.service.js';
+import { ProductOnly } from '../products/product.js';
 
 const slug = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -168,6 +169,7 @@ class AfterDto {
 @ApiTags('Resale')
 @ApiBearerAuth()
 @Controller('resale')
+@ProductOnly('udozo')
 export class ResaleController {
   constructor(
     private readonly stores: ResaleStoresService,
@@ -411,6 +413,7 @@ class SupplierAfterDto {
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds/me')
+@ProductOnly('udozo')
 export class SupplierResaleController {
   constructor(
     private readonly trade: ResaleTradeService,

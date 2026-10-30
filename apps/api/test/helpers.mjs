@@ -34,6 +34,8 @@ const baseEnv = {
   PASSWORD_BREACH_CHECK: 'off',
   // Crypto's routes are closed for BitoCard (afrippa/gate.guard.ts: Afrippa's need its server's signature); the crypto code's tests run them unsigned.
   CRYPTO_ROUTES: 'open',
+  // One test app serves both products' routes (docs/UDOZO_SPINOFF_PLAN.md); product-mode.test.mjs keeps them apart.
+  PRODUCT_ROUTES: 'all',
   ALLOWED_ORIGINS: `${appOrigin},https://*.bitocard.com`,
   AFRIPPA_ADMIN_APP_URL: afrippaAdminOrigin,
   COOKIE_SECURE: 'off',

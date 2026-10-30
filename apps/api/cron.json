@@ -1,5 +1,5 @@
 {
-  "$comment": "When each scheduled job (GET /v1/cron/<job>) runs, in UTC. The droplet scheduler (scripts/scheduler.mjs) reads this; test/scheduler.test.mjs checks it lists every job the API has.",
+  "$comment": "When each scheduled job (GET /v1/cron/<job>) runs, in UTC. The droplet scheduler (scripts/scheduler.mjs) reads this; test/scheduler.test.mjs checks it lists every job the API has. A job with a `product` runs only on that product's instance (APP_PRODUCT; src/products/jobs.ts); the rest run on both.",
   "jobs": [
     {
       "job": "exchange-rates",
@@ -11,7 +11,8 @@
     },
     {
       "job": "checkout",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/5 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "earnings",
@@ -27,27 +28,33 @@
     },
     {
       "job": "catalogue",
-      "schedule": "30 4 * * *"
+      "schedule": "30 4 * * *",
+      "product": "bitocard"
     },
     {
       "job": "orders",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/2 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "crypto",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/2 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "crypto-reconcile",
-      "schedule": "40 5 * * *"
+      "schedule": "40 5 * * *",
+      "product": "bitocard"
     },
     {
       "job": "chain-health",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/15 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "numbers",
-      "schedule": "20 * * * *"
+      "schedule": "20 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "domains",
@@ -55,15 +62,18 @@
     },
     {
       "job": "esims",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/10 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "vpn",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/15 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "vpn-reconcile",
-      "schedule": "40 3 * * *"
+      "schedule": "40 3 * * *",
+      "product": "bitocard"
     },
     {
       "job": "support",
@@ -87,7 +97,8 @@
     },
     {
       "job": "supplier-webhooks",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/5 * * * *",
+      "product": "bitocard"
     },
     {
       "job": "push",
@@ -103,15 +114,18 @@
     },
     {
       "job": "classifieds",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/15 * * * *",
+      "product": "udozo"
     },
     {
       "job": "p2p-orders",
-      "schedule": "* * * * *"
+      "schedule": "* * * * *",
+      "product": "bitocard"
     },
     {
       "job": "p2p-merchants",
-      "schedule": "25 4 * * *"
+      "schedule": "25 4 * * *",
+      "product": "bitocard"
     }
   ]
 }

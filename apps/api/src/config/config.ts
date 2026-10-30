@@ -341,6 +341,16 @@ export const configSchema = z.object({
    */
   CRYPTO_ROUTES: z.enum(['closed', 'open']).default('closed'),
   /**
+   * The product this instance serves (docs/UDOZO_SPINOFF_PLAN.md): BitoCard's API (with Afrippa inside it), or Udozo's,
+   * which runs the same code on its own database and Redis. Environment only.
+   */
+  APP_PRODUCT: z.enum(['bitocard', 'udozo']).default('bitocard'),
+  /**
+   * `separate`: the other product's routes answer as unknown routes (`ProductRoutesGuard`). `all` serves every route,
+   * for tests and local development; refused in production.
+   */
+  PRODUCT_ROUTES: z.enum(['separate', 'all']).default('separate'),
+  /**
    * How deliveries are scheduled: vercel (Vercel Queues pushes each endpoint's work and retries to the API) or database
    * (runs after each change plus the cron). Defaults to vercel on Vercel, database elsewhere.
    */
@@ -374,6 +384,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.CRYPTO_ROUTES === 'open' && appEnv === 'production') {
     throw new Error('Invalid environment configuration: CRYPTO_ROUTES must be closed in production');
+  }
+  if (config.PRODUCT_ROUTES === 'all' && appEnv === 'production') {
+    throw new Error('Invalid environment configuration: PRODUCT_ROUTES must be separate in production');
   }
   // One secret for two servers would let either pass for the other.
   if (config.AFRIPPA_SERVER_SECRET && config.AFRIPPA_SERVER_SECRET === config.STORE_SERVER_SECRET) {

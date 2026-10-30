@@ -31,6 +31,7 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { adminId } from '../countries/countries.controller.js';
 import { maxDocumentBytes } from './files.js';
 import { KycService, type Reviewer } from './kyc.service.js';
+import { ProductOnly } from '../products/product.js';
 
 export const kycSessionHeader = 'bitocard-kyc-session';
 type KycRequest = Request & { kyc?: { caseId: string; sessionId: string }; kycSessionId?: string };
@@ -362,6 +363,7 @@ export class AdminKycController {
 @Public()
 @SkipIdempotency()
 @Controller('afrippa/kyc/session')
+@ProductOnly('bitocard')
 export class AfrippaKycSessionController {
   constructor(private readonly kyc: KycService) {}
 
@@ -377,6 +379,7 @@ export class AfrippaKycSessionController {
 @Public()
 @UseGuards(AfrippaKycSessionGuard)
 @Controller('afrippa/kyc/case')
+@ProductOnly('bitocard')
 export class AfrippaKycCaseController {
   constructor(private readonly kyc: KycService) {}
 
@@ -422,6 +425,7 @@ export class AfrippaKycCaseController {
 @ApiExcludeController()
 @RealmOnly('afrippa_admin')
 @Controller('afrippa/admin/kyc/cases')
+@ProductOnly('bitocard')
 export class AfrippaAdminKycController {
   constructor(
     private readonly kyc: KycService,

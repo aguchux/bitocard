@@ -1,9 +1,11 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { storeForNew } from '../stores/store-scope.js';
 import type { ApiKey, ApiKeyMode } from '../generated/prisma/client.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { productOf } from '../products/product.js';
 
 /** Every scope an API key can hold. New endpoints add their scope here and document it. */
 export const apiKeyScopes = [
@@ -50,7 +52,10 @@ export function presentApiKey(key: ApiKey) {
 /** Secret keys for reseller systems: shown once, stored only as a SHA-256 hash. */
 @Injectable()
 export class ApiKeysService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
 
   async create(resellerId: string, userId: string, input: { name: string; mode: ApiKeyMode; scopes?: string[]; store_id?: string }) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
@@ -97,7 +102,7 @@ export class ApiKeysService {
   }
 
   private async issue(resellerId: string, storeId: string, userId: string, name: string, mode: ApiKeyMode, scopes: string[]) {
-    const secret = `bc_${mode}_${randomToken()}`;
+    const secret = `${productOf(this.config).apiKeyPrefix}${mode}_${randomToken()}`;
     const key = await this.prisma.apiKey.create({
       data: { resellerId, storeId, name, mode, scopes, prefix: secret.slice(0, prefixLength), keyHash: sha256(secret), createdById: userId },
     });

@@ -11,8 +11,9 @@ import { EmailService } from '../notifications/email.service.js';
 import { webhookEndpointDisabledEmail } from '../notifications/templates.js';
 import { BlockedDestinationError, isBlockedAddress, safeLookup } from './destinations.js';
 import { EndpointBusyError, type EndpointMessage, WebhookQueue } from './queue.js';
-import { signatureHeader, signatureValue } from './signing.js';
+import { signatureValue } from './signing.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { productOf } from '../products/product.js';
 
 /** Seconds to wait after each failed attempt: 1 min, 5 min, 30 min, 2 h, 6 h, then every 12 h. */
 export const retryScheduleSeconds = [60, 300, 1800, 7200, 21_600];
@@ -327,7 +328,7 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     const headers = {
       'content-type': 'application/json',
       'user-agent': 'BitoCard-Webhooks/1.0 (+https://docs.bitocard.com/webhooks)',
-      [signatureHeader.toLowerCase()]: signatureValue(this.secrets(endpoint), timestamp, event.payload),
+      [productOf(this.config).signatureHeader.toLowerCase()]: signatureValue(this.secrets(endpoint), timestamp, event.payload),
       'bitocard-event-id': event.id,
       'bitocard-event-type': event.type,
       'bitocard-delivery-attempt': String(attemptNumber),

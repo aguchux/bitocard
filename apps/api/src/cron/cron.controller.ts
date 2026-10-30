@@ -45,6 +45,7 @@ import { ChatsService } from '../support/chats.service.js';
 import { RepliesService } from '../support/replies.service.js';
 import { TicketsService } from '../support/tickets.service.js';
 import { ShopAssistantsService } from '../classifieds/assistant/shop-assistants.service.js';
+import { jobRunsFor } from '../products/jobs.js';
 
 /**
  * Scheduled jobs, called by the droplet's scheduler (`scripts/scheduler.mjs`, schedules in `cron.json`) with
@@ -212,7 +213,7 @@ export class CronController {
     if (!secret || given.length !== expected.length || !timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {
       throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'unauthenticated', 'Cron secret missing or wrong.');
     }
-    const handler = this.jobs[job];
+    const handler = jobRunsFor(job, this.config.APP_PRODUCT) || this.config.PRODUCT_ROUTES === 'all' ? this.jobs[job] : undefined;
     if (!handler) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such job.');
     return { object: 'cron_run' as const, job, result: await handler() };
   }
