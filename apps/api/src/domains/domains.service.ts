@@ -281,16 +281,31 @@ export class DomainsService {
    * (`free_domains`), how many it has, and the most one may cost: what the store's Premium month and, when it was paid
    * with it, the seller's setup fee collected, in the wallet's currency. Never on BitoCard.
    */
-  async freeDomain(resellerId: string, storeId: string) {
+  async freeDomain(resellerId: string, storeId: string, query?: string) {
     await this.storeOf(resellerId, storeId);
     const allowance = await this.freeAllowance(resellerId, storeId);
+    // With `q`: the search's offers, each saying whether the free domain covers it (its price in the wallet's
+    // currency within what the store's Premium collected), so Seller HQ can show it before the seller tries.
+    const offers = query && allowance.available ? await this.coveredOffers(resellerId, storeId, query, allowance) : null;
     return {
       object: 'free_domain' as const,
       allowance: allowance.limit,
       used: allowance.used,
       available: allowance.available,
       covers_up_to: { amount: Number(allowance.covered), currency: allowance.currency },
+      ...(offers ? { offers } : {}),
     };
+  }
+
+  private async coveredOffers(resellerId: string, storeId: string, query: string, allowance: { covered: bigint; currency: string }) {
+    const { data } = await this.search(resellerId, storeId, query);
+    return Promise.all(
+      data.map(async offer => {
+        if (!offer.available || !offer.price) return { domain: offer.domain, available: false, price: null, covered: false };
+        const local = allowance.currency === 'USD' ? BigInt(offer.price.amount) : await this.fx.chargeForUsdCents(offer.price.amount, allowance.currency).then(result => result.amount, () => null);
+        return { domain: offer.domain, available: true, price: local === null ? null : { amount: Number(local), currency: allowance.currency }, covered: local !== null && local <= allowance.covered };
+      }),
+    );
   }
 
   private async freeAllowance(resellerId: string, storeId: string) {

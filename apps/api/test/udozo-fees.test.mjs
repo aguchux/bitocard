@@ -108,6 +108,8 @@ describe("Premium's free domain", () => {
 
     const status = (await s.browser.get(`/v1/stores/${s.store.id}/free-domain`)).json;
     assert.deepEqual([status.allowance, status.used, status.available, status.covers_up_to], [1, 0, true, { amount: 2_100_000, currency: 'NGN' }]);
+    const searched = (await s.browser.get(`/v1/stores/${s.store.id}/free-domain?q=gadgetsfree`)).json.offers;
+    assert.deepEqual(searched, [{ domain: 'gadgetsfree.com', available: true, price: { amount: 2_055_375, currency: 'NGN' }, covered: true }]);
     const paidSoFar = await available(s);
     const bought = await s.browser.post(`/v1/stores/${s.store.id}/free-domain`, { domain: 'gadgetsfree.com', contact });
     assert.equal(bought.status, 201, JSON.stringify(bought.json));
@@ -131,6 +133,7 @@ describe("Premium's free domain", () => {
     const beforeSecond = await available(s);
     assert.equal((await s.browser.post(`/v1/stores/${second.id}/subscription`, { plan: 'premium' })).status, 200);
     assert.equal(beforeSecond - (await available(s)), 100_000, 'the month only');
+    assert.equal((await s.browser.get(`/v1/stores/${second.id}/free-domain?q=gadgetsshort`)).json.offers[0].covered, false, 'the search says so first');
     const short = await s.browser.post(`/v1/stores/${second.id}/free-domain`, { domain: 'gadgetsshort.com', contact });
     assert.deepEqual([short.status, short.json.error.code, short.json.error.param], [409, 'domain_not_covered', 'domain']);
     assert.match(short.json.error.message, /costs NGN 20,553\.75, more than the NGN 1,000\.00 your Premium covers/);

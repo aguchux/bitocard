@@ -46,6 +46,11 @@ class PurchaseDomainDto extends ConnectDomainDto {
   contact: ContactDto;
 }
 
+class FreeDomainQueryDto {
+  @IsOptional() @Transform(trim) @IsString() @Length(2, 80)
+  q?: string;
+}
+
 class FreeDomainDto extends ConnectDomainDto {
   @ValidateNested() @Type(() => ContactDto)
   contact: ContactDto;
@@ -126,9 +131,10 @@ class ReasonDto {
 export class FreeDomainController {
   constructor(private readonly domains: DomainsService) {}
 
+  /** `?q=`: also the search's offers, each with whether the free domain covers it. */
   @Get()
-  status(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string) {
-    return this.domains.freeDomain(resellerOf(caller), store);
+  status(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string, @Query() query: FreeDomainQueryDto) {
+    return this.domains.freeDomain(resellerOf(caller), store, query.q);
   }
 
   @Post()
