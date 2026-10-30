@@ -325,13 +325,14 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     if (!allowPrivate && isIP(host) && isBlockedAddress(host)) return finish({ success: false, status: null, body: null, error: 'blocked_destination' });
 
     const timestamp = Math.floor(Date.now() / 1000);
+    const product = productOf(this.config);
     const headers = {
       'content-type': 'application/json',
-      'user-agent': 'BitoCard-Webhooks/1.0 (+https://docs.bitocard.com/webhooks)',
-      [productOf(this.config).signatureHeader.toLowerCase()]: signatureValue(this.secrets(endpoint), timestamp, event.payload),
-      'bitocard-event-id': event.id,
-      'bitocard-event-type': event.type,
-      'bitocard-delivery-attempt': String(attemptNumber),
+      'user-agent': product.webhookUserAgent,
+      [product.signatureHeader.toLowerCase()]: signatureValue(this.secrets(endpoint), timestamp, event.payload),
+      [`${product.webhookHeaderPrefix}-event-id`]: event.id,
+      [`${product.webhookHeaderPrefix}-event-type`]: event.type,
+      [`${product.webhookHeaderPrefix}-delivery-attempt`]: String(attemptNumber),
       'content-length': String(Buffer.byteLength(event.payload)),
     };
     const send = url.protocol === 'https:' ? httpsRequest : httpRequest;

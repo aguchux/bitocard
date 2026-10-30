@@ -187,6 +187,22 @@ describe('names', () => {
     assert.ok(hook.calls.length > 0, 'the event was delivered');
     assert.match(hook.calls[0].headers['udozo-signature'] ?? '', /^t=\d+,v1=[0-9a-f]{64}$/);
     assert.equal(hook.calls[0].headers['bitocard-signature'], undefined);
+    assert.ok(hook.calls[0].headers['udozo-event-id'] && hook.calls[0].headers['udozo-event-type'] && !hook.calls[0].headers['bitocard-event-id']);
+    assert.match(hook.calls[0].headers['user-agent'], /^Udozo-Webhooks\//);
+  });
+
+  test("Udozo's emails and texts say Udozo, where the shared templates say BitoCard", async () => {
+    const { inProductWords } = await import('../dist/products/product.js');
+    assert.equal(inProductWords('Your BitoCard code. BitoCard Shop and BitoCard Verify. support@bitocard.com. BitoCard, a Golojan Ltd venture.', 'udozo'), 'Your Udozo code. Udozo and Udozo Verify. support@udozo.com. Udozo.');
+    assert.equal(inProductWords('Your BitoCard code', 'bitocard'), 'Your BitoCard code');
+    const owner = await resellerClient(udozo);
+    const { EmailService } = await import('../dist/notifications/email.service.js');
+    const sent = udozo.app.get(EmailService).outbox.filter(item => item.to === owner.email);
+    assert.ok(sent.length > 0, 'the sign-up code was emailed');
+    for (const message of sent) {
+      assert.doesNotMatch(`${message.subject} ${message.text} ${message.html}`, /BitoCard/);
+      assert.match(`${message.subject} ${message.text}`, /Udozo/);
+    }
   });
 
   test("BitoCard's names are unchanged", async () => {

@@ -3,6 +3,7 @@ import { IntegrationsService } from '../integrations/integrations.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { Platform } from '../generated/prisma/client.js';
+import { inProductWords } from '../products/product.js';
 
 export type SmsMessage = { to: string; text: string };
 
@@ -23,7 +24,8 @@ export class SmsService {
   constructor(private readonly integrations: IntegrationsService, private readonly prisma: PrismaService) {}
 
   /** A country is disabled until an admin assigns a provider and configures its credentials. */
-  async sendForCountry(countryCode: string | null, message: SmsMessage, platform: Platform = 'bitocard') {
+  async sendForCountry(countryCode: string | null, original: SmsMessage, platform: Platform = 'bitocard') {
+    const message = platform === 'bitocard' ? { ...original, text: inProductWords(original.text, this.integrations.config.APP_PRODUCT) } : original;
     const country = countryCode ? await this.prisma.country.findUnique({ where: { code: countryCode } }) : null;
     if (!countryCode) return this.send(message, platform);
     if (!country?.smsProvider) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_verification_unavailable', 'Phone verification is not available in your country yet.');
@@ -50,7 +52,8 @@ export class SmsService {
   }
 
   /** `to` is E.164 (+2348012345678). Throws if Termii rejects the message or cannot be reached. */
-  async send(message: SmsMessage, platform: Platform = 'bitocard'): Promise<string> {
+  async send(original: SmsMessage, platform: Platform = 'bitocard'): Promise<string> {
+    const message = platform === 'bitocard' ? { ...original, text: inProductWords(original.text, this.integrations.config.APP_PRODUCT) } : original;
     const { TERMII_API_KEY: apiKey, TERMII_API_URL: baseUrl, TERMII_SENDER_ID: from } = this.config(platform);
     if (!apiKey) {
       this.outbox.push(message);

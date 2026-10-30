@@ -4,6 +4,7 @@ import { domainSender } from '../domains/sender.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import type { AppConfig } from '../config/config.js';
 import type { Platform } from '../generated/prisma/client.js';
+import { inProductWords } from '../products/product.js';
 
 /** `from` is set only on captured messages (the outbox), to show which sender was chosen. */
 export type EmailMessage = { to: string; subject: string; text: string; html: string; from?: string };
@@ -72,7 +73,7 @@ export class EmailService {
   readonly outbox: EmailMessage[] = [];
 
   constructor(
-    integrations: IntegrationsService,
+    private readonly integrations: IntegrationsService,
     private readonly prisma: PrismaService,
   ) {
     const build = (config: AppConfig) => ({
@@ -122,7 +123,10 @@ export class EmailService {
    * sends a reseller store's email from their own domain once it is verified for sending (through Resend, where the
    * domain is verified; the fallback provider uses BitoCard's sender).
    */
-  async send(message: EmailMessage, store?: { resellerId: string; name: string }): Promise<string> {
+  async send(original: EmailMessage, store?: { resellerId: string; name: string }): Promise<string> {
+    // This instance's own product's words (Udozo's on its instance; BitoCard's text unchanged).
+    const product = this.integrations.config.APP_PRODUCT;
+    const message = { ...original, subject: inProductWords(original.subject, product), text: inProductWords(original.text, product), html: inProductWords(original.html, product) };
     const own = store ? await domainSender(this.prisma, store.resellerId, store.name).catch(() => null) : null;
     if (this.providers.length === 0) {
       this.outbox.push(own ? { ...message, from: own } : message);

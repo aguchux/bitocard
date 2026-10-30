@@ -21,6 +21,9 @@ export type ProductInfo = {
   apiKeyPrefix: string;
   /** The header each webhook delivery is signed in. */
   signatureHeader: string;
+  /** The prefix of the webhook deliveries' other headers (`<prefix>-event-id`, `-event-type`, `-delivery-attempt`) and their user agent. */
+  webhookHeaderPrefix: string;
+  webhookUserAgent: string;
 };
 
 export const productInfo: Record<Product, ProductInfo> = {
@@ -30,6 +33,8 @@ export const productInfo: Record<Product, ProductInfo> = {
     cookies: { reseller: 'bc_session', admin: 'bc_admin_session', afrippa_admin: 'afr_admin_session' },
     apiKeyPrefix: 'bc_',
     signatureHeader: 'BitoCard-Signature',
+    webhookHeaderPrefix: 'bitocard',
+    webhookUserAgent: 'BitoCard-Webhooks/1.0 (+https://docs.bitocard.com/webhooks)',
   },
   udozo: {
     name: 'Udozo',
@@ -37,6 +42,8 @@ export const productInfo: Record<Product, ProductInfo> = {
     cookies: { reseller: 'udz_session', admin: 'udz_admin_session', afrippa_admin: 'afr_admin_session' },
     apiKeyPrefix: 'udz_',
     signatureHeader: 'Udozo-Signature',
+    webhookHeaderPrefix: 'udozo',
+    webhookUserAgent: 'Udozo-Webhooks/1.0',
   },
 };
 
@@ -46,6 +53,19 @@ export const productOf = (config: Pick<AppConfig, 'APP_PRODUCT'>): ProductInfo =
 export function isApiKeyShape(token: string, config: Pick<AppConfig, 'APP_PRODUCT'>) {
   const prefix = productOf(config).apiKeyPrefix;
   return token.startsWith(prefix) && /^(test|live)_[A-Za-z0-9_-]{20,}$/.test(token.slice(prefix.length));
+}
+
+/**
+ * Shared emails and texts are written in BitoCard's words; on Udozo's instance its senders put Udozo's in their place
+ * (the name, its sign-off and support address), so a shared template never needs the product passed in.
+ */
+export function inProductWords(text: string, product: Product) {
+  if (product !== 'udozo') return text;
+  return text
+    .replace(/BitoCard( Shop)?, a Golojan Ltd venture\./g, 'Udozo.')
+    .replace(/support@bitocard\.com/g, 'support@udozo.com')
+    .replace(/BitoCard (Shop|Verify)\b/g, (_match, what: string) => (what === 'Verify' ? 'Udozo Verify' : 'Udozo'))
+    .replace(/\bBitoCard\b/g, 'Udozo');
 }
 
 export const PRODUCT_ONLY = 'product:only';
