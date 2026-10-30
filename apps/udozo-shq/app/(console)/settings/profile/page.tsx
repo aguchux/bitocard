@@ -1,0 +1,494 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { KeyRound, LogOut, Mail, Pencil, Plus, Smartphone, Star, Trash2 } from "lucide-react";
+import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader, PasswordInput, Skeleton } from "@bitocard/admin-ui";
+import { AppLink } from "@bitocard/admin-ui/shell";
+import {
+  useAddAdditionalPhoneMutation,
+  useChangePasswordMutation,
+  useAddEmailMutation,
+  useConfirmEmailMutation,
+  useEmailsQuery,
+  useMakePrimaryEmailMutation,
+  useRemoveEmailMutation,
+  useUpdateProfileMutation,
+  useConfirmAdditionalPhoneMutation,
+  usePhonesQuery,
+  useMakePrimaryPhoneMutation,
+  useRemoveAdditionalPhoneMutation,
+} from "@bitocard/api-client/reseller";
+import { PhoneInput } from "@bitocard/ui/phone-input";
+import { ShqShell } from "@/components/shq-shell";
+import { useReseller, useSignOut } from "@/components/reseller";
+
+/** Confirm up to five mobile numbers. Any confirmed number can be used to sign in. */
+function MobileNumber() {
+  const { user, membership } = useReseller();
+  // Numbers come from the business country only (the API checks it again).
+  const country = membership.reseller.country;
+  const [editing, setEditing] = useState(!user.phone_verified);
+  const [phone, setPhone] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const phones = usePhonesQuery();
+  const [addPhone, addState] = useAddAdditionalPhoneMutation();
+  const [verifyPhone, verifyState] = useConfirmAdditionalPhoneMutation();
+  const [makePrimary, primaryState] = useMakePrimaryPhoneMutation();
+  const [removePhone, removeState] = useRemoveAdditionalPhoneMutation();
+  const [promoting, setPromoting] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [done, setDone] = useState(false);
+
+  const send = async (event: FormEvent) => {
+    event.preventDefault();
+    setDone(false);
+    const notice = await addPhone({ phone: phone.trim() })
+      .unwrap()
+      .catch(() => null);
+    if (notice) {
+      setSentTo(phone.trim());
+      setCode("");
+    }
+  };
+
+  const confirm = async (value: string) => {
+    if (verifyState.isLoading) return;
+    const session = await verifyPhone({ code: value })
+      .unwrap()
+      .catch(() => null);
+    if (session) {
+      setDone(true);
+      setSentTo(null);
+      setPhone("");
+      setEditing(false);
+    } else setCode("");
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title="Phone numbers"
+        description="Add up to five confirmed numbers. Any confirmed number can be used to sign in."
+        actions={user.phone ? <Badge tone={user.phone_verified ? "green" : "amber"}>{user.phone_verified ? "Confirmed" : "Not confirmed"}</Badge> : null}
+      />
+      <div className="space-y-4 p-5 sm:p-6">
+        {done ? <Notice tone="green">Your mobile number is confirmed.</Notice> : null}
+        {!phones.data && !phones.error ? (
+          <div className="space-y-2" aria-busy="true" aria-label="Loading phone numbers">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : null}
+        <ul className="divide-y divide-line rounded-xl border border-line empty:hidden">
+          {(phones.data?.data ?? []).map(item => <li key={item.phone} className="space-y-2 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-2"><Smartphone className="size-4 text-subtle" aria-hidden />{item.phone}{item.primary ? <Badge tone="blue">Primary</Badge> : null}<Badge tone={item.verified ? "green" : "amber"}>{item.verified ? "Confirmed" : "Not confirmed"}</Badge></span>
+              {!item.primary ? <span className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setPromoting(item.phone)}>Make primary</Button><Button variant="ghost" size="sm" loading={removeState.isLoading} onClick={() => void removePhone(item.phone)}>Remove</Button></span> : null}
+            </div>
+            {promoting === item.phone ? <form className="space-y-2" onSubmit={async event => { event.preventDefault(); if (await makePrimary({ phone: item.phone, password: user.has_password ? password : undefined }).unwrap().catch(() => null)) { setPromoting(null); setPassword(""); } }}>
+              {primaryState.error ? <Notice tone="red">{errorMessage(primaryState.error)}</Notice> : null}
+              {user.has_password ? <Field label="Current password" htmlFor="phone-primary-password"><PasswordInput id="phone-primary-password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></Field> : null}
+              <div className="flex gap-2"><Button type="submit" loading={primaryState.isLoading}>Confirm</Button><Button type="button" variant="ghost" onClick={() => setPromoting(null)}>Cancel</Button></div>
+            </form> : null}
+          </li>)}
+        </ul>
+        {removeState.error ? <Notice tone="red">{errorMessage(removeState.error)}</Notice> : null}
+
+        {!editing ? (
+          <Button variant="secondary" size="sm" icon={<Smartphone className="size-4" aria-hidden />} onClick={() => setEditing(true)}>
+            Add phone number
+          </Button>
+        ) : sentTo ? (
+          <form
+            onSubmit={event => {
+              event.preventDefault();
+              void confirm(code);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-muted">
+              Enter the 6-digit code we texted to <span className="font-semibold text-ink">{sentTo}</span>. It expires in 30 minutes.
+            </p>
+            {verifyState.error ? <Notice tone="red">{errorMessage(verifyState.error)}</Notice> : null}
+            <CodeInput label="Confirmation code" value={code} onChange={setCode} onComplete={confirm} autoFocus disabled={verifyState.isLoading} invalid={Boolean(verifyState.error)} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={verifyState.isLoading} disabled={code.length !== 6}>
+                Confirm number
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setSentTo(null)}>
+                Use a different number
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={send} className="space-y-4">
+            {addState.error ? <Notice tone="red">{errorMessage(addState.error)}</Notice> : null}
+            {country ? (
+              <PhoneInput
+                country={country}
+                label={user.phone ? "New mobile number" : "Mobile number"}
+                onChange={value => setPhone(value ?? "")}
+                required
+                inputClassName="min-h-11 border border-line bg-white px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 aria-[invalid=true]:border-red-400"
+                errorClassName="text-red-700"
+              />
+            ) : (
+              <Notice tone="amber">Choose your business country before adding a phone number.</Notice>
+            )}
+            <p className="text-xs text-muted">A mobile number from your business country. Type it the way you dial it locally.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={addState.isLoading} disabled={!phone}>
+                Send code
+              </Button>
+              {user.phone_verified ? (
+                <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </form>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** The name shown to your team and in emails. */
+function NameForm({ onDone }: { onDone: () => void }) {
+  const { user } = useReseller();
+  const [name, setName] = useState(user.name);
+  const [update, state] = useUpdateProfileMutation();
+  return (
+    <form
+      onSubmit={async event => {
+        event.preventDefault();
+        if (await update({ name: name.trim() }).unwrap().catch(() => null)) onDone();
+      }}
+      className="space-y-3"
+    >
+      {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      <Field label="Name" htmlFor="profile-name">
+        <Input id="profile-name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} minLength={2} maxLength={100} required />
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" loading={state.isLoading} disabled={name.trim().length < 2 || name.trim() === user.name}>
+          Save name
+        </Button>
+        <Button type="button" variant="ghost" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Email addresses: the primary one signs in and gets notices; others are added with a code sent to each. The primary
+ * address is never removed or typed over: another confirmed address is made primary instead.
+ */
+function EmailAddresses() {
+  const { user } = useReseller();
+  const emails = useEmailsQuery();
+  const [adding, setAdding] = useState(false);
+  const [email, setEmail] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [promoting, setPromoting] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [add, addState] = useAddEmailMutation();
+  const [confirm, confirmState] = useConfirmEmailMutation();
+  const [makePrimary, primaryState] = useMakePrimaryEmailMutation();
+  const [remove, removeState] = useRemoveEmailMutation();
+  const others = emails.data?.data.filter(item => !item.primary) ?? [];
+
+  const reset = () => {
+    setAdding(false);
+    setEmail("");
+    setSentTo(null);
+    setCode("");
+  };
+
+  const submitCode = async (value: string) => {
+    if (confirmState.isLoading) return;
+    if (await confirm({ code: value }).unwrap().catch(() => null)) {
+      setNotice(`${sentTo} was added.`);
+      reset();
+    } else setCode("");
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title="Email addresses"
+        description="You sign in with your primary email and notices go to it. To change it, add another address and make it primary."
+        actions={
+          adding || others.length >= 4 ? null : (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Plus className="size-4" aria-hidden />}
+              onClick={() => {
+                setNotice(null);
+                setAdding(true);
+              }}
+            >
+              Add email
+            </Button>
+          )
+        }
+      />
+      <div className="space-y-4 p-5 sm:p-6">
+        {notice ? <Notice tone="green">{notice}</Notice> : null}
+        {removeState.error ? <Notice tone="red">{errorMessage(removeState.error)}</Notice> : null}
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {(emails.data?.data ?? [{ object: "user_email" as const, email: user.email, primary: true, verified: user.email_verified, added_at: user.created_at }]).map(item => (
+            <li key={item.email} className="space-y-3 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Mail className="size-4 shrink-0 text-subtle" aria-hidden />
+                  <span className="font-medium break-all">{item.email}</span>
+                  {item.primary ? <Badge tone="blue">Primary</Badge> : null}
+                  <Badge tone={item.verified ? "green" : "amber"}>{item.verified ? "Confirmed" : "Not confirmed"}</Badge>
+                </span>
+                {item.primary ? (
+                  <span className="text-xs text-muted">Signs in · cannot be removed</span>
+                ) : (
+                  <span className="flex flex-wrap gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Star className="size-4" aria-hidden />}
+                      disabled={primaryState.isLoading}
+                      onClick={async () => {
+                        setNotice(null);
+                        if (user.has_password) {
+                          setPromoting(item.email);
+                          setPassword("");
+                        } else if (await makePrimary({ email: item.email }).unwrap().catch(() => null)) setNotice(`You now sign in with ${item.email}.`);
+                      }}
+                    >
+                      Make primary
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Trash2 className="size-4" aria-hidden />}
+                      loading={removeState.isLoading && removeState.originalArgs === item.email}
+                      onClick={async () => {
+                        setNotice(null);
+                        if (await remove(item.email).unwrap().catch(() => null)) setNotice(`${item.email} was removed.`);
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </span>
+                )}
+              </div>
+              {promoting === item.email ? (
+                <form
+                  className="space-y-3"
+                  onSubmit={async event => {
+                    event.preventDefault();
+                    if (await makePrimary({ email: item.email, password }).unwrap().catch(() => null)) {
+                      setPromoting(null);
+                      setPassword("");
+                      setNotice(`You now sign in with ${item.email}. We told your old address too.`);
+                    }
+                  }}
+                >
+                  {primaryState.error ? <Notice tone="red">{errorMessage(primaryState.error)}</Notice> : null}
+                  <Field label="Current password" htmlFor="primary-email-password" hint={`To confirm it is you. You will sign in with ${item.email} from now on.`}>
+                    <PasswordInput id="primary-email-password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required autoFocus />
+                  </Field>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" size="sm" loading={primaryState.isLoading} disabled={!password}>
+                      Make primary
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setPromoting(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {adding && sentTo ? (
+          <form
+            onSubmit={event => {
+              event.preventDefault();
+              void submitCode(code);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-muted">
+              Enter the 6-digit code we sent to <span className="font-semibold break-all text-ink">{sentTo}</span>. It expires in 30 minutes.
+            </p>
+            {confirmState.error ? <Notice tone="red">{errorMessage(confirmState.error)}</Notice> : null}
+            <CodeInput label="Code from the email" value={code} onChange={setCode} onComplete={submitCode} autoFocus disabled={confirmState.isLoading} invalid={Boolean(confirmState.error)} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={confirmState.isLoading} disabled={code.length !== 6}>
+                Add email
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setSentTo(null)}>
+                Use a different email
+              </Button>
+            </div>
+          </form>
+        ) : adding ? (
+          <form
+            onSubmit={async event => {
+              event.preventDefault();
+              const next = email.trim();
+              if (await add({ email: next }).unwrap().catch(() => null)) {
+                setSentTo(next);
+                setCode("");
+              }
+            }}
+            className="space-y-4"
+          >
+            {addState.error ? <Notice tone="red">{errorMessage(addState.error)}</Notice> : null}
+            <Field label="Email to add" htmlFor="profile-add-email" hint="We send a code to it to confirm it is yours.">
+              <Input id="profile-add-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required autoFocus />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={addState.isLoading} disabled={!email.trim()}>
+                Send code
+              </Button>
+              <Button type="button" variant="ghost" onClick={reset}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** A new password needs the current one; every other session is signed out. Accounts without one use Forgot password. */
+function PasswordCard() {
+  const { user } = useReseller();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [open, setOpen] = useState(false);
+  const [change, state] = useChangePasswordMutation();
+  return (
+    <Card>
+      <CardHeader title="Password" description="Changing it signs you out everywhere else." />
+      <div className="space-y-4 p-5 sm:p-6">
+        {state.isSuccess && !open ? <Notice tone="green">Your password was changed. Your other sessions were signed out.</Notice> : null}
+        {!user.has_password ? (
+          <>
+            <p className="text-sm text-muted">You sign in with Google and have no password yet. Set one with a code sent to your email.</p>
+            <AppLink href="/forgot-password" className="inline-flex min-h-11 items-center rounded-lg border border-brand-500 px-4 text-sm font-semibold text-brand-600 hover:bg-brand-50">
+              Set a password
+            </AppLink>
+          </>
+        ) : !open ? (
+          <Button variant="secondary" size="sm" icon={<KeyRound className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+            Change password
+          </Button>
+        ) : (
+          <form
+            onSubmit={async event => {
+              event.preventDefault();
+              if (await change({ current_password: current, new_password: next }).unwrap().catch(() => null)) {
+                setOpen(false);
+                setCurrent("");
+                setNext("");
+              }
+            }}
+            className="space-y-4"
+          >
+            {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+            <Field label="Current password" htmlFor="password-current">
+              <PasswordInput id="password-current" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} required />
+            </Field>
+            <Field label="New password" htmlFor="password-new" hint="At least 10 characters. Passwords found in data breaches are refused.">
+              <PasswordInput id="password-new" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} minLength={10} maxLength={128} required />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={state.isLoading} disabled={!current || next.length < 10}>
+                Change password
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+            <p className="text-xs text-muted">
+              Forgotten it?{" "}
+              <AppLink href="/forgot-password" className="font-semibold text-brand-600 hover:underline">
+                Reset it by email
+              </AppLink>
+            </p>
+          </form>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** The signed-in person: their details, mobile number and signing out. */
+export default function ProfilePage() {
+  const { user, membership } = useReseller();
+  const [signOut, signingOut] = useSignOut();
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <ShqShell section="settings" current="/settings/profile" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Your profile" }]}>
+      <PageHeader title="Your profile" description="Your own sign-in details. They apply to every reseller account you belong to." />
+
+      <Card>
+        <CardHeader
+          title="Your details"
+          actions={
+            editing ? null : (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(true)}>
+                  Name
+                </Button>
+              </div>
+            )
+          }
+        />
+        <div className="space-y-4 p-5 sm:p-6">
+          {editing ? <NameForm onDone={() => setEditing(false)} /> : null}
+          <KeyValue
+            items={[
+              { label: "Name", value: user.name },
+              {
+                label: "Primary email",
+                value: (
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <span className="break-all">{user.email}</span>
+                    <Badge tone={user.email_verified ? "green" : "amber"}>{user.email_verified ? "Confirmed" : "Not confirmed"}</Badge>
+                  </span>
+                ),
+              },
+              { label: `Role at ${membership.reseller.name}`, value: humanise(membership.role) },
+              { label: "Member since", value: formatDate(user.created_at) },
+            ]}
+          />
+        </div>
+      </Card>
+
+      <EmailAddresses />
+
+      <MobileNumber />
+
+      <PasswordCard />
+
+      <Card>
+        <CardHeader title="Sign out" description="Ends this session on this device." />
+        <div className="flex flex-wrap items-center gap-3 p-5 sm:p-6">
+          <Button variant="ghost" icon={<LogOut className="size-4" aria-hidden />} loading={signingOut} onClick={signOut}>
+            Sign out
+          </Button>
+        </div>
+      </Card>
+    </ShqShell>
+  );
+}

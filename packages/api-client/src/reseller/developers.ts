@@ -1,6 +1,7 @@
 import { bitocardApi } from '../base';
 import { apiKeyScopes, webhookEventTypes } from './api-lists.generated';
 import { cursorPages, type List, type Mode, type Page, params } from './common';
+import type { UdozoApiKeyScope, UdozoWebhookEventType } from './udozo';
 
 // Generated from the API, so a new scope or event type reaches SHQ without editing this package.
 export { apiKeyScopes, webhookEventTypes };
@@ -92,7 +93,7 @@ export type WebhookEvent = {
 export const resellerDevelopersApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     apiKeys: build.query<List<ApiKey>, void>({ query: () => '/v1/api-keys', providesTags: ['ApiKey'] }),
-    createApiKey: build.mutation<CreatedApiKey, { name: string; mode: Mode; scopes?: ApiKeyScope[]; store_id?: string }>({
+    createApiKey: build.mutation<CreatedApiKey, { name: string; mode: Mode; scopes?: Array<ApiKeyScope | UdozoApiKeyScope>; store_id?: string }>({
       query: body => ({ url: '/v1/api-keys', method: 'POST', body }),
       invalidatesTags: ['ApiKey'],
     }),
@@ -108,11 +109,11 @@ export const resellerDevelopersApi = bitocardApi.injectEndpoints({
       providesTags: result => [{ type: 'WebhookEndpoint', id: 'LIST' }, ...(result?.data.map(item => ({ type: 'WebhookEndpoint' as const, id: item.id })) ?? [])],
     }),
     webhookEndpoint: build.query<WebhookEndpoint, string>({ query: id => `/v1/webhook-endpoints/${id}`, providesTags: (_result, _error, id) => [{ type: 'WebhookEndpoint', id }] }),
-    createWebhookEndpoint: build.mutation<CreatedWebhookEndpoint, { url: string; description?: string; events?: Array<WebhookEventType | '*'>; store_id?: string }>({
+    createWebhookEndpoint: build.mutation<CreatedWebhookEndpoint, { url: string; description?: string; events?: Array<WebhookEventType | UdozoWebhookEventType | '*'>; store_id?: string }>({
       query: body => ({ url: '/v1/webhook-endpoints', method: 'POST', body }),
       invalidatesTags: [{ type: 'WebhookEndpoint', id: 'LIST' }],
     }),
-    updateWebhookEndpoint: build.mutation<WebhookEndpoint, { id: string; url?: string; description?: string; events?: Array<WebhookEventType | '*'>; status?: 'enabled' | 'disabled' }>({
+    updateWebhookEndpoint: build.mutation<WebhookEndpoint, { id: string; url?: string; description?: string; events?: Array<WebhookEventType | UdozoWebhookEventType | '*'>; status?: 'enabled' | 'disabled' }>({
       query: ({ id, ...body }) => ({ url: `/v1/webhook-endpoints/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'WebhookEndpoint', id: 'LIST' }, { type: 'WebhookEndpoint', id }],
     }),
@@ -155,7 +156,7 @@ export const resellerDevelopersApi = bitocardApi.injectEndpoints({
      * Events from the last 30 days, oldest first. `since` is an event ID or an ISO 8601 time; each next page starts
      * after the last event of the previous one.
      */
-    events: build.infiniteQuery<List<WebhookEvent>, { since?: string; type?: WebhookEventType; limit?: number }, string>({
+    events: build.infiniteQuery<List<WebhookEvent>, { since?: string; type?: WebhookEventType | UdozoWebhookEventType; limit?: number }, string>({
       infiniteQueryOptions: cursorPages,
       query: ({ queryArg, pageParam }) => ({ url: '/v1/events', params: params({ ...queryArg, limit: queryArg.limit ?? 50, since: pageParam || queryArg.since }) }),
       providesTags: ['Event'],
