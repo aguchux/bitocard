@@ -9,7 +9,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Event, LedgerMode, WebhookAttempt, WebhookDelivery, WebhookDeliveryStatus, WebhookEndpoint } from '../generated/prisma/client.js';
 import { WebhookDeliveryService } from './delivery.service.js';
 import { checkDestination } from './destinations.js';
-import { eventPayload, eventTypes, pingEvent } from './events.js';
+import { eventPayload, eventTypesFor, pingEvent } from './events.js';
 import { newWebhookSecret } from './signing.js';
 
 /** Endpoints per reseller in each mode. */
@@ -99,7 +99,8 @@ export class WebhookEndpointsService {
   /** Stored empty for "every type". */
   private eventList(events: string[]) {
     if (events.includes('*')) return [];
-    const unknown = events.filter(type => !(eventTypes as readonly string[]).includes(type));
+    const known: readonly string[] = eventTypesFor(this.config.APP_PRODUCT);
+    const unknown = events.filter(type => !known.includes(type));
     if (unknown.length) throw invalid('event_type_invalid', `Unknown event type: ${unknown.join(', ')}.`, 'events');
     return [...new Set(events)];
   }

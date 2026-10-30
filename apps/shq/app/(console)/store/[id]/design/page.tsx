@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Layers } from "lucide-react";
 import { ActionDialog, Button, Card, CardHeader, Dialog, EmptyState, errorMessage, Notice, QueryView, Skeleton } from "@bitocard/admin-ui";
@@ -26,7 +26,6 @@ import {
   useStoreHomeQuery,
   useStoreHomeVersionsQuery,
   useStoresQuery,
-  useResaleCategoriesQuery,
   useStoreTemplatesQuery,
   useUpdateStoreMutation,
 } from "@bitocard/api-client/reseller";
@@ -36,7 +35,7 @@ import { can, useReseller } from "@/components/reseller";
 import { resolveDesign, TemplateCards, templateIcons, VariantAndTheme } from "@/components/store-templates";
 
 /** The reseller's listed products, brands typed by slug, and their store image storage. */
-function sourcesFor(template: StoreTemplate | undefined, resaleCategories?: Array<{ slug: string; name: string }>): EditorSources {
+function sourcesFor(template: StoreTemplate | undefined): EditorSources {
   return {
     useProductSearch: q => {
       const products = useCatalogueProductsInfiniteQuery({ listed: true, q }, { skip: q.length < 2 });
@@ -45,7 +44,6 @@ function sourcesFor(template: StoreTemplate | undefined, resaleCategories?: Arra
     useBrands: () => null,
     image: { realm: "reseller", purpose: "store_image" },
     categories: (template?.categories as ProductCategory[] | null | undefined) ?? undefined,
-    resaleCategories,
   };
 }
 
@@ -110,13 +108,7 @@ function Designer({ store, home, templates }: { store: Store; home: StoreHomeEdi
   const [restore] = useRestoreStoreHomeMutation();
   const [preview] = usePreviewStoreHomeMutation();
   const { template } = resolveDesign(templates, store);
-  // A Resale shop's listing sections choose among BitoCard Shop's categories in the reseller's country.
-  const { membership } = useReseller();
-  const country = membership.reseller.country ?? "";
-  const categories = useResaleCategoriesQuery(country, { skip: !template?.resale || !country });
-  const resaleCategories = useMemo(() => categories.data?.data.flatMap(top => [{ slug: top.slug, name: top.name }, ...top.children.map(child => ({ slug: child.slug, name: `  ${child.name}` }))]), [categories.data]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the editor keeps one set of sources; the categories arrive once
-  const sources = useMemo(() => sourcesFor(template, resaleCategories), [resaleCategories]);
+  const [sources] = useState(() => sourcesFor(template));
   return (
     <HomeEditor
       key={home.template}

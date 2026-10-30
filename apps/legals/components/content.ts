@@ -5,7 +5,6 @@ export const documentDetails: Record<string, { icon: IconName; summary: string }
   "/documents/privacy": { icon: "shield", summary: "What our websites collect, why, who we share it with, and your rights in each region." },
   "/documents/terms": { icon: "document", summary: "The rules for using BitoCard websites, and the law that applies where you are." },
   "/documents/reseller-terms": { icon: "scale", summary: "For resellers: checks, your wallet and payouts, prices, your stores and what you publish, domains and your customers." },
-  "/documents/shop-terms": { icon: "check", summary: "Buying and selling on BitoCard Shop: listings, what may be sold, chats, Safe pay and the shop assistants." },
   "/documents/cookies": { icon: "cookie", summary: "The few cookies we use: your chosen country and keeping you signed in. Never for tracking." },
   "/documents/notice": { icon: "building", summary: "The Golojan group companies behind BitoCard and how to reach them." },
 };

@@ -11,7 +11,8 @@ let prisma;
 const made = {};
 
 before(async () => {
-  server = await startApp();
+  // BitoCard Shop is Udozo's (docs/UDOZO_SPINOFF_PLAN.md).
+  server = await startApp({ env: { APP_PRODUCT: 'udozo' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
   assert.equal((await admin.put('/v1/admin/switches/classifieds', { country_code: 'NG', enabled: true })).status, 200);

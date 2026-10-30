@@ -27,7 +27,8 @@ describe("store footer", () => {
   test("bitocard.com shows its business links and credit", () => {
     const html = render(null);
     for (const text of ["Open a reseller store", "Reseller sign in", "Reseller terms", "A Golojan Ltd venture"]) expect(html).toContain(text);
-    expect(html, "BitoCard Shop is BitoCard's own").toContain("/documents/shop-terms");
+    // BitoCard Shop has left BitoCard (docs/UDOZO_SPINOFF_PLAN.md): its terms are never linked.
+    expect(html).not.toContain("/documents/shop-terms");
   });
 
   test("a reseller's store shows nothing of BitoCard's own business, only what it sells, and who sells it", () => {

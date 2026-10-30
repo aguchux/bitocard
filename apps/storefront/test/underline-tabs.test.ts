@@ -8,7 +8,6 @@ vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
 const { UnderlineTabs } = await import("@bitocard/ui/underline-tabs");
 const { AccountPills } = await import("@/components/app/account-pills");
-const { ShopPills } = await import("@/components/app/shop/shop-nav");
 
 const currentLink = (html: string) => html.match(/<a [^>]*aria-current="page"[^>]*>(.*?)<\/a>/)?.[1] ?? null;
 
@@ -22,7 +21,7 @@ describe("BitoCard's standard tabs", () => {
           { href: "/a", label: "First", icon: Gift },
           { href: "/b", label: "Second", badge: 120 },
           { href: "/c", label: "Third", soon: true },
-          { href: "https://shop.bitocard.com", label: "Browse", external: true },
+          { href: "https://legals.bitocard.com", label: "Legals", external: true },
         ],
       }),
     );
@@ -41,7 +40,7 @@ describe("BitoCard's standard tabs", () => {
     expect(html).toContain("[scrollbar-width:none]");
     expect(html).not.toContain("snap-");
     // Another site is a plain link and never current.
-    expect(html).toMatch(/<a href="https:\/\/shop\.bitocard\.com" class="[^"]*">Browse<\/a>/);
+    expect(html).toMatch(/<a href="https:\/\/legals\.bitocard\.com" class="[^"]*">Legals<\/a>/);
   });
 
   test("without bleed, no gutter: the row keeps to its box", () => {
@@ -59,15 +58,5 @@ describe("the account app's rows are the standard tabs", () => {
     expect(currentLink(html)).toContain("Security");
     expect(html.match(/Soon/g)).toHaveLength(2);
     expect(html).not.toContain("bg-brand-500");
-  });
-
-  test("the Shop tab's places, Messages with its unread count, Browse leaving for BitoCard Shop", () => {
-    const html = renderToStaticMarkup(createElement(ShopPills, { shop: { browse: "https://shop.bitocard.com/ng", unread: 3 }, active: "/shop/messages" }));
-    expect(html).toContain('aria-label="Shop"');
-    expect(html).toContain("lg:hidden");
-    expect(currentLink(html)).toContain("Messages");
-    expect(html).toContain("3<span class=\"sr-only\"> unread</span>");
-    expect(html).not.toContain("Post an ad");
-    expect(html).not.toContain("bg-navy-900");
   });
 });

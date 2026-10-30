@@ -21,13 +21,9 @@ import {
   ListOrdered,
   MessageSquareWarning,
   Package,
-  ShoppingBag,
   Percent,
   Phone,
   PieChart,
-  Repeat,
-  SlidersHorizontal,
-  Truck,
   Plug,
   ReceiptText,
   Settings,
@@ -43,7 +39,7 @@ import {
   Webhook,
 } from "lucide-react";
 
-export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "store" | "resale" | "reports" | "support" | "integrations" | "developers" | "team" | "settings";
+export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "store" | "reports" | "support" | "integrations" | "developers" | "team" | "settings";
 export type ShqNavItem = { key: ShqSection; label: string; href: string; icon: LucideIcon };
 export type ShqSubNavItem = { label: string; href: string; icon?: LucideIcon };
 
@@ -54,7 +50,6 @@ export const sections: ShqNavItem[] = [
   { key: "catalogue", label: "Catalogue", href: "/catalogue", icon: Package },
   { key: "wallet", label: "Wallet", href: "/wallet", icon: Wallet },
   { key: "store", label: "Store", href: "/store", icon: Store },
-  { key: "resale", label: "Resale", href: "/resale", icon: Repeat },
   { key: "reports", label: "Reports", href: "/reports", icon: PieChart },
   { key: "support", label: "Support", href: "/support", icon: LifeBuoy },
   { key: "integrations", label: "Integrations", href: "/integrations", icon: Plug },
@@ -107,16 +102,6 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Your stores", href: "/store", icon: Store },
       { label: "Customers", href: "/store/customers", icon: Users },
       { label: "Domains", href: "/store/domains", icon: Globe },
-    ],
-  },
-  resale: {
-    title: "Resale",
-    items: [
-      { label: "Browse", href: "/resale", icon: Repeat },
-      { label: "Your listings", href: "/resale/listings", icon: ListOrdered },
-      { label: "Orders", href: "/resale/orders", icon: ShoppingBag },
-      { label: "Rules", href: "/resale/rules", icon: SlidersHorizontal },
-      { label: "Suppliers", href: "/resale/suppliers", icon: Truck },
     ],
   },
   reports: {

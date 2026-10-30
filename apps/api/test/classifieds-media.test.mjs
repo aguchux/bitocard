@@ -24,8 +24,9 @@ before(async () => {
     }
     return { status: 405, body: '' };
   });
+  // BitoCard Shop is Udozo's (docs/UDOZO_SPINOFF_PLAN.md).
   server = await startApp({
-    env: { CRON_SECRET: 'cron-secret', SPACES_KEY: 'spaces-key', SPACES_SECRET: 'spaces-secret', SPACES_BUCKET: 'bitocard-media', SPACES_ENDPOINT: bucket.url, SPACES_PUBLIC_URL: 'https://media.bitocard.test', SPACES_ROOT: 'test' },
+    env: { APP_PRODUCT: 'udozo', CRON_SECRET: 'cron-secret', SPACES_KEY: 'spaces-key', SPACES_SECRET: 'spaces-secret', SPACES_BUCKET: 'bitocard-media', SPACES_ENDPOINT: bucket.url, SPACES_PUBLIC_URL: 'https://media.bitocard.test', SPACES_ROOT: 'test' },
   });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   media = server.app.get((await import('../dist/classifieds/media.service.js')).ListingMediaService);

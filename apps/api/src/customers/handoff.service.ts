@@ -12,8 +12,8 @@ export const handoffMs = 60_000;
 const refused = () => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'handoff_invalid', 'This sign-in link has expired or was already used. Sign in again.');
 
 /**
- * Signing a bitocard.com customer in on another of BitoCard's own sites without their password: bitocard.com, its
- * country stores (ng.bitocard.com…) and shop.bitocard.com share one account each but keep their own session cookies.
+ * Signing a bitocard.com customer in on another of BitoCard's own sites without their password: bitocard.com and its
+ * country stores (ng.bitocard.com…) share one account but each keeps its own session cookie.
  * The site the customer is signed in on asks for a code for the other (`issue`, `to` one of BitoCard's own origins);
  * the code travels in the address's fragment, so it never reaches a log or a Referer, and that site's server exchanges
  * it once, within 60 seconds, for a new session there (`exchange`, naming its own origin). Only the code's hash is kept.
@@ -28,9 +28,10 @@ export class HandoffService {
   ) {}
 
   /**
-   * The origin, if it is one of BitoCard's own sites a customer may be handed to: bitocard.com (`STOREFRONT_URL`), a
-   * published BitoCard country store under it (`<cc>.<host>`, same scheme and port) or BitoCard Shop (`SHOP_URL`).
-   * Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): its site has accounts of its own and is never a target.
+   * The origin, if it is one of BitoCard's own sites a customer may be handed to: bitocard.com (`STOREFRONT_URL`) or a
+   * published BitoCard country store under it (`<cc>.<host>`, same scheme and port). Crypto and BitoCard Shop have left
+   * BitoCard (docs/CRYPTO_SPINOFF_PLAN.md, docs/UDOZO_SPINOFF_PLAN.md): their sites have accounts of their own and are
+   * never targets (Udozo's handoff, to its stores' own domains, is step 3 of its plan).
    */
   async target(to: string) {
     let url: URL;
@@ -41,8 +42,7 @@ export class HandoffService {
     }
     if (`${url.origin}` !== to.replace(/\/+$/, '')) return null;
     const store = new URL(this.integrations.config.STOREFRONT_URL);
-    const sites = [new URL(this.integrations.config.SHOP_URL).origin];
-    if (url.origin === store.origin || sites.includes(url.origin)) return url.origin;
+    if (url.origin === store.origin) return url.origin;
     const suffix = `.${store.host}`;
     if (url.protocol === store.protocol && url.host.endsWith(suffix)) {
       const subdomain = url.host.slice(0, -suffix.length);

@@ -61,7 +61,7 @@ function Wizard({ templates }: { templates: StoreTemplate[] }) {
   const router = useRouter();
   const { membership } = useReseller();
   const [step, setStep] = useState(0);
-  const firstOpen = templates.find(item => item.available) ?? templates[0];
+  const firstOpen = templates.find(item => item.available && !item.resale) ?? templates[0];
   const [design, setDesign] = useState({ template: firstOpen.key, variant: firstOpen.variants[0].key, theme: firstOpen.variants[0].themes[0].key });
   const [name, setName] = useState("");
   const [subdomain, setSubdomain] = useState("");

@@ -92,15 +92,17 @@ describe('the templates', () => {
     assert.equal(templateSells({ template: 'rdp_shop', focus: null }, { key: 'vpn:WW:bitocard:vpn-access-30d', category: 'vpn' }), false);
   });
 
-  test('the list without the crypto desk (removed with crypto), and the Resale shop once reselling is', async () => {
+  test("the list without the crypto desk (removed with crypto) or the Resale shop (Udozo's)", async () => {
     const reseller = await seller();
     const listed = await reseller.browser.get('/v1/store-templates');
     assert.equal(listed.status, 200, JSON.stringify(listed.json));
     check('GET /v1/store-templates', 200, listed.json);
     assert.equal(listed.json.data.some(item => item.key === 'crypto_desk'), false);
-    const resale = listed.json.data.find(item => item.key === 'resale_shop');
-    assert.deepEqual([resale.available, resale.reason], [false, 'Reselling BitoCard Shop listings is not open to your account yet.']);
-    assert.ok(listed.json.data.filter(item => item.key !== 'resale_shop').every(item => item.available));
+    // B2B reselling left BitoCard for Udozo (docs/UDOZO_SPINOFF_PLAN.md): its template is neither listed nor chosen.
+    assert.equal(listed.json.data.some(item => item.key === 'resale_shop'), false);
+    assert.ok(listed.json.data.every(item => item.available));
+    const resale = await reseller.browser.post('/v1/stores', { name: 'Resale', subdomain: sub('resale'), template: 'resale_shop' });
+    assert.deepEqual([resale.status, resale.json.error.code, resale.json.error.param], [400, 'template_unknown', 'template']);
     // It no longer exists, whatever crypto's switches say.
     await prisma.featureSwitch.create({ data: { key: 'p2p_trading', resellerId: reseller.resellerId, enabled: true } });
     const refused = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk' });

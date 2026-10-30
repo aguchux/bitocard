@@ -1707,16 +1707,9 @@
                     "store_template_single_product": true,
                     "store_template_vpn_shop": true,
                     "store_template_rdp_shop": true,
-                    "store_template_resale_shop": true,
                     "reseller_two_step": false,
                     "manual_reseller_approval": false,
                     "country_stores": true,
-                    "classifieds": false,
-                    "classifieds_safe_pay": false,
-                    "classifieds_assistant": false,
-                    "classifieds_install_prompt": false,
-                    "classifieds_resale": false,
-                    "reseller_resale": false,
                     "shq_install_prompt": false,
                     "shq_store_guide": true,
                     "storefront_install_prompt": false
@@ -22803,9 +22796,7 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received",
-                "resale_order.created",
-                "resale_order.updated"
+                "support_ticket.message_received"
               ]
             }
           },
@@ -36744,9 +36735,7 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received",
-                "resale_order.created",
-                "resale_order.updated"
+                "support_ticket.message_received"
               ]
             }
           },
@@ -36799,9 +36788,7 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received",
-                "resale_order.created",
-                "resale_order.updated"
+                "support_ticket.message_received"
               ]
             }
           },
@@ -40453,124 +40440,6 @@
           }
         }
       },
-      "ResaleOrderCreatedEvent": {
-        "type": "object",
-        "title": "resale_order.created event",
-        "required": [
-          "id",
-          "object",
-          "type",
-          "api_version",
-          "mode",
-          "created_at",
-          "data"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
-            "format": "uuid"
-          },
-          "object": {
-            "type": "string",
-            "description": "Always `event`.",
-            "const": "event"
-          },
-          "type": {
-            "type": "string",
-            "description": "The event type.",
-            "const": "resale_order.created"
-          },
-          "api_version": {
-            "type": "string",
-            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
-            "const": "2026-10-01"
-          },
-          "mode": {
-            "type": "string",
-            "description": "`test` (sandbox) or `live`.",
-            "enum": [
-              "test",
-              "live"
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When the event happened.",
-            "format": "date-time"
-          },
-          "data": {
-            "type": "object",
-            "required": [
-              "object"
-            ],
-            "properties": {
-              "object": {
-                "$ref": "#/components/schemas/ResaleOrder"
-              }
-            }
-          }
-        }
-      },
-      "ResaleOrderUpdatedEvent": {
-        "type": "object",
-        "title": "resale_order.updated event",
-        "required": [
-          "id",
-          "object",
-          "type",
-          "api_version",
-          "mode",
-          "created_at",
-          "data"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
-            "format": "uuid"
-          },
-          "object": {
-            "type": "string",
-            "description": "Always `event`.",
-            "const": "event"
-          },
-          "type": {
-            "type": "string",
-            "description": "The event type.",
-            "const": "resale_order.updated"
-          },
-          "api_version": {
-            "type": "string",
-            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
-            "const": "2026-10-01"
-          },
-          "mode": {
-            "type": "string",
-            "description": "`test` (sandbox) or `live`.",
-            "enum": [
-              "test",
-              "live"
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When the event happened.",
-            "format": "date-time"
-          },
-          "data": {
-            "type": "object",
-            "required": [
-              "object"
-            ],
-            "properties": {
-              "object": {
-                "$ref": "#/components/schemas/ResaleOrder"
-              }
-            }
-          }
-        }
-      },
       "Error": {
         "type": "object",
         "title": "Error",
@@ -41310,20 +41179,13 @@
               "store_template_gift_cards",
               "store_template_single_product",
               "store_template_vpn_shop",
-              "store_template_resale_shop",
               "store_template_rdp_shop",
               "reseller_two_step",
               "shq_install_prompt",
               "shq_store_guide",
               "storefront_install_prompt",
               "manual_reseller_approval",
-              "country_stores",
-              "classifieds",
-              "classifieds_safe_pay",
-              "classifieds_assistant",
-              "classifieds_resale",
-              "reseller_resale",
-              "classifieds_install_prompt"
+              "country_stores"
             ],
             "additionalProperties": false,
             "properties": {
@@ -41383,10 +41245,6 @@
                 "type": "boolean",
                 "description": "Resellers can choose the VPN shop store template (it sells only once VPN is on sale in their market). Stores already using it keep it. On unless switched off."
               },
-              "store_template_resale_shop": {
-                "type": "boolean",
-                "description": "Resellers can choose the Resale shop store template (also needs the reseller's reseller_resale switch on and a verified account). Stores already using it keep it. On unless switched off."
-              },
               "store_template_rdp_shop": {
                 "type": "boolean",
                 "description": "Resellers can choose the RDP shop store template (it sells only once RDP is on sale in their market). Stores already using it keep it. On unless switched off."
@@ -41414,30 +41272,6 @@
               "country_stores": {
                 "type": "boolean",
                 "description": "bitocard.com serves this market through its own country store (`<country>.bitocard.com`, for example ng.bitocard.com), with that market’s house account as seller of record for every purchase there, instead of the buyer’s own country. Root bitocard.com redirects into it once set up. Off: root bitocard.com serves the market as today."
-              },
-              "classifieds": {
-                "type": "boolean",
-                "description": "BitoCard Shop (classifieds) in this market: browsing at shop.bitocard.com/<country>, posting and chatting, and the Shop tab on its country store. Off until the marketplace terms are cleared there."
-              },
-              "classifieds_safe_pay": {
-                "type": "boolean",
-                "description": "Safe pay in BitoCard Shop: buyers pay from their wallet, BitoCard holds the money until they confirm, then pays the seller. Needs classifieds on and the market's Safe pay fees set. Off until holding buyers' money is cleared there."
-              },
-              "classifieds_assistant": {
-                "type": "boolean",
-                "description": "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market."
-              },
-              "classifieds_resale": {
-                "type": "boolean",
-                "description": "B2B reselling: BitoCard Shop sellers can open their listings to resellers' stores (docs/BITOCARD_B2B_RESELLING_PLAN.md), with the discount and markup limit they choose inside BitoCard's limits (Shop > Settings > Resale). Needs classifieds on and the reseller fee set there. Off until holding money for two parties is cleared."
-              },
-              "reseller_resale": {
-                "type": "boolean",
-                "description": "B2B reselling for resellers: a verified reseller with a Resale shop store browses BitoCard Shop suppliers' resale listings in their country, adds them to the store at their own price within the supplier's limits, and works with suppliers in a chat with deals (docs/BITOCARD_B2B_RESELLING_PLAN.md). Needs classifieds_resale open in the country. Every plan."
-              },
-              "classifieds_install_prompt": {
-                "type": "boolean",
-                "description": "BitoCard Shop asks visitors in this market to install shop.bitocard.com as an app (home screen, full screen): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too."
               }
             }
           }
@@ -45487,9 +45321,7 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received",
-                "resale_order.created",
-                "resale_order.updated"
+                "support_ticket.message_received"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -45623,9 +45455,7 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received",
-                "resale_order.created",
-                "resale_order.updated"
+                "support_ticket.message_received"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -45755,9 +45585,7 @@
                   "dispute.resolved",
                   "support_ticket.created",
                   "support_ticket.updated",
-                  "support_ticket.message_received",
-                  "resale_order.created",
-                  "resale_order.updated"
+                  "support_ticket.message_received"
                 ]
               },
               "created_at": {
@@ -45895,9 +45723,7 @@
                   "dispute.resolved",
                   "support_ticket.created",
                   "support_ticket.updated",
-                  "support_ticket.message_received",
-                  "resale_order.created",
-                  "resale_order.updated"
+                  "support_ticket.message_received"
                 ]
               },
               "created_at": {
@@ -46089,12 +45915,6 @@
           },
           {
             "$ref": "#/components/schemas/SupportTicketMessageReceivedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ResaleOrderCreatedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ResaleOrderUpdatedEvent"
           }
         ]
       },
@@ -56868,228 +56688,6 @@
                     "last_message_at": "2026-10-19T10:05:00.000Z",
                     "created_at": "2026-10-19T09:12:00.000Z",
                     "updated_at": "2026-10-19T10:05:00.000Z"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
-          }
-        }
-      }
-    },
-    "resale_order.created": {
-      "post": {
-        "operationId": "webhook_resale_order_created",
-        "summary": "A customer bought on your Resale shop",
-        "description": "Fires once when a customer buys a resale listing on one of your stores: the total is locked in their store wallet (`status: locked`) and the supplier has until `accept_by` to accept. Nothing is in your earnings yet.\n\nDoes not fire for orders on BitoCard Shop itself, or for anything that only reaches the checkout.\n\nComes first. `resale_order.updated` follows for each change, often straight away when the supplier accepts orders automatically.",
-        "tags": [
-          "Webhook events"
-        ],
-        "parameters": [
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Signature",
-            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
-            "schema": {
-              "type": "string"
-            },
-            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
-          },
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Event-Id",
-            "description": "The event ID (also in the body).",
-            "schema": {
-              "type": "string"
-            },
-            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
-          },
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Event-Type",
-            "description": "The event type (also in the body).",
-            "schema": {
-              "type": "string"
-            },
-            "example": "order.completed"
-          },
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Delivery-Attempt",
-            "description": "Which attempt this is for this endpoint, starting at 1.",
-            "schema": {
-              "type": "string"
-            },
-            "example": "1"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResaleOrderCreatedEvent"
-              },
-              "example": {
-                "id": "7e25d6e7-f8a9-4b0c-9dbe-3f4a5b6c7d9f",
-                "object": "event",
-                "type": "resale_order.created",
-                "api_version": "2026-10-01",
-                "mode": "live",
-                "created_at": "2026-10-26T09:12:00.000Z",
-                "data": {
-                  "object": {
-                    "object": "resale_order",
-                    "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
-                    "number": "SP-100042",
-                    "mode": "live",
-                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
-                    "status": "locked",
-                    "listing": {
-                      "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
-                      "ref": 100231,
-                      "title": "iPhone 13, 128GB, blue"
-                    },
-                    "quantity": 1,
-                    "currency": "NGN",
-                    "price": 46000000,
-                    "delivery_fee": 300000,
-                    "buyer_fee": 230000,
-                    "total": 46530000,
-                    "supplier_net": 36000000,
-                    "margin": 10000000,
-                    "reseller_fee": null,
-                    "earnings": null,
-                    "refund": null,
-                    "deal_id": null,
-                    "fulfilment": "delivery",
-                    "courier": null,
-                    "tracking_number": null,
-                    "tracking_url": null,
-                    "delivered_at": null,
-                    "accept_by": "2026-10-27T09:12:00.000Z",
-                    "accepted_at": null,
-                    "created_at": "2026-10-26T09:12:00.000Z",
-                    "updated_at": "2026-10-26T09:12:00.000Z"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
-          }
-        }
-      }
-    },
-    "resale_order.updated": {
-      "post": {
-        "operationId": "webhook_resale_order_updated",
-        "summary": "A resale order changed",
-        "description": "Fires each time an order on your Resale shops changes: accepted (`paid`), declined, cancelled or not accepted in time (`lapsed`, the buyer’s money unlocked), shipped (`sent`, with the courier and tracking), reported delivered, disputed, completed (`released`, with `reseller_fee` and `earnings`), refunded or partly refunded.\n\nDoes not fire for messages in the order’s threads: read them with `GET /v1/resale/orders/{id}/messages`. The buyer’s details are never in the event.\n\nComes after `resale_order.created`, any number of times; compare `updated_at` (events can arrive out of order) and read the order to be sure.",
-        "tags": [
-          "Webhook events"
-        ],
-        "parameters": [
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Signature",
-            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
-            "schema": {
-              "type": "string"
-            },
-            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
-          },
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Event-Id",
-            "description": "The event ID (also in the body).",
-            "schema": {
-              "type": "string"
-            },
-            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
-          },
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Event-Type",
-            "description": "The event type (also in the body).",
-            "schema": {
-              "type": "string"
-            },
-            "example": "order.completed"
-          },
-          {
-            "in": "header",
-            "required": true,
-            "name": "BitoCard-Delivery-Attempt",
-            "description": "Which attempt this is for this endpoint, starting at 1.",
-            "schema": {
-              "type": "string"
-            },
-            "example": "1"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResaleOrderUpdatedEvent"
-              },
-              "example": {
-                "id": "8f36e7f8-a9b0-4c1d-8ecf-4a5b6c7d8e0a",
-                "object": "event",
-                "type": "resale_order.updated",
-                "api_version": "2026-10-01",
-                "mode": "live",
-                "created_at": "2026-10-29T08:00:00.000Z",
-                "data": {
-                  "object": {
-                    "object": "resale_order",
-                    "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
-                    "number": "SP-100042",
-                    "mode": "live",
-                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
-                    "status": "released",
-                    "listing": {
-                      "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
-                      "ref": 100231,
-                      "title": "iPhone 13, 128GB, blue"
-                    },
-                    "quantity": 1,
-                    "currency": "NGN",
-                    "price": 46000000,
-                    "delivery_fee": 300000,
-                    "buyer_fee": 230000,
-                    "total": 46530000,
-                    "supplier_net": 36000000,
-                    "margin": 10000000,
-                    "reseller_fee": 500000,
-                    "earnings": 9500000,
-                    "refund": null,
-                    "deal_id": null,
-                    "fulfilment": "delivery",
-                    "courier": "GIG Logistics",
-                    "tracking_number": "GIG123456789",
-                    "tracking_url": "https://giglogistics.com/track/GIG123456789",
-                    "delivered_at": "2026-10-28T15:30:00.000Z",
-                    "accept_by": "2026-10-27T09:12:00.000Z",
-                    "accepted_at": "2026-10-26T10:02:00.000Z",
-                    "created_at": "2026-10-26T09:12:00.000Z",
-                    "updated_at": "2026-10-29T08:00:00.000Z"
                   }
                 }
               }

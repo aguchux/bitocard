@@ -13,7 +13,7 @@ import { fakeReloadly, fakeVercelQueue, fakeVtpass } from './fakes.mjs';
 
 const { verifySignature, sign, signatureTestVector } = await import('../dist/webhooks/signing.js');
 const { isBlockedAddress, checkDestination } = await import('../dist/webhooks/destinations.js');
-const { eventTypes } = await import('../dist/webhooks/events.js');
+const { eventTypesFor } = await import('../dist/webhooks/events.js');
 const { eventObjectSchemas } = await import('../dist/webhooks/openapi.js');
 
 let server;
@@ -217,8 +217,8 @@ describe('delivery', () => {
     }
     const doc = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8'));
     assert.equal(doc.openapi, '3.1.0');
-    assert.deepEqual(Object.keys(doc.webhooks).sort(), [...eventTypes].sort(), 'every event type is documented');
-    for (const type of eventTypes) {
+    assert.deepEqual(Object.keys(doc.webhooks).sort(), [...eventTypesFor('bitocard')].sort(), "every BitoCard event type is documented (Udozo's in its own document)");
+    for (const type of eventTypesFor('bitocard')) {
       const post = doc.webhooks[type].post;
       assert.ok(post.description.includes('Does not fire'), `${type} says when it does not fire`);
       const example = post.requestBody.content['application/json'].example;

@@ -18,14 +18,12 @@ describe("next.config redirects", () => {
     }
   });
 
-  test("a listing's address on a country store goes for good to its one address on BitoCard Shop", async () => {
+
+  test("crypto's old addresses go to the wallet, cash-out included; nothing goes to BitoCard Shop", async () => {
     const redirects = await config.redirects!();
-    const rule = redirects!.find(item => item.source === "/shop/l/:listing") as { has: Array<{ value: string }>; destination: string; permanent: boolean };
-    const pattern = new RegExp(`^${rule.has[0].value}$`);
-    expect(pattern.exec("ng.bitocard.com")?.groups?.cc).toBe("ng");
-    expect(pattern.exec("gh.localhost:3000")?.groups?.cc).toBe("gh");
-    for (const host of ["bitocard.com", "acme.bitocard.com", "ng.bitocard.com.evil.com"]) expect(pattern.test(host), host).toBe(false);
-    expect(rule.destination).toMatch(/\/:cc\/l\/:listing$/);
-    expect(rule.permanent).toBe(true);
+    const crypto = redirects!.find(item => item.source === "/account/crypto/:path*");
+    expect(crypto?.destination).toBe("/account/wallet");
+    expect(redirects!.some(item => item.source === "/account/crypto/cash-out")).toBe(false);
+    expect(redirects!.some(item => item.source.startsWith("/shop") || item.destination.includes("/shop"))).toBe(false);
   });
 });

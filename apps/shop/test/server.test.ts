@@ -74,14 +74,16 @@ describe("the customer's session", () => {
 });
 
 describe("the sign-in handoff", () => {
-  test("signing in here is offered on BitoCard's other sites; theirs is offered here", async () => {
+  test("BitoCard's sign-in is no longer offered here: the Shop left BitoCard's handoff for Udozo", async () => {
+    // docs/UDOZO_SPINOFF_PLAN.md, step 2: this app becomes Udozo's (step 4), with accounts and a handoff of its own.
     await rememberSignedIn({ name: "Adaeze Okafor" });
     const set = request.set.find(cookie => cookie.name === signedInCookie)!;
     expect(set.options).toMatchObject({ domain: ".bitocard.com", httpOnly: true });
-    expect(decodeSignedIn(set.value)).toEqual({ name: "Adaeze", origin: "https://shop.bitocard.com" });
+    // What this site still writes names no BitoCard site, so every one of them ignores it.
+    expect(decodeSignedIn(set.value)).toBeNull();
     expect(await signedInElsewhere()).toBeNull();
     setRequest({}, { [signedInCookie]: encodeSignedIn({ name: "Ada", origin: "https://ng.bitocard.com" }) });
-    expect(await signedInElsewhere()).toEqual({ name: "Ada", origin: "https://ng.bitocard.com", host: "ng.bitocard.com" });
+    expect(await signedInElsewhere()).toBeNull();
     await forgetSignedIn();
     expect(request.set).toEqual([]);
   });

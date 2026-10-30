@@ -49,14 +49,13 @@ describe("store header", () => {
     expect(html).not.toContain("Shop globally");
   });
 
-  test("BitoCard Shop leads the menu's quick links, never on a reseller's store", () => {
-    const shop = "/handoff/go?to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng";
-    const html = renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: "NG", signedIn: true, store: null, shop }));
+  test("the menu's quick links lead to the catalogue, never to BitoCard Shop", () => {
+    const html = renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: "NG", signedIn: true, store: null }));
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)</g)].map(match => [match[1]!.replaceAll("&amp;", "&"), match[2]]);
-    const quick = links.filter(([href]) => href === shop || href!.startsWith("/catalogs/"));
-    expect(quick[0]).toEqual([shop, "Shop"]);
-    expect(quick.map(([, label]) => label)).toEqual(["Shop", "Virtual numbers", "RDP", "VPN"]);
-    expect(render(null)).not.toContain(">Shop<");
-    expect(renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: "NG", signedIn: false, store: store(false), shop }))).not.toContain(shop.replaceAll("&", "&amp;"));
+    const quick = links.filter(([href]) => href!.startsWith("/catalogs/"));
+    expect(quick.map(([, label]) => label)).toEqual(["Virtual numbers", "RDP", "VPN"]);
+    expect(html).not.toContain(">Shop<");
+    expect(html).not.toContain("shop.bitocard.com");
+    expect(html).not.toContain("/listings");
   });
 });

@@ -5,7 +5,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { storeForNew } from '../stores/store-scope.js';
 import type { ApiKey, ApiKeyMode } from '../generated/prisma/client.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
-import { productOf } from '../products/product.js';
+import { productOf, type Product } from '../products/product.js';
 
 /** Every scope an API key can hold. New endpoints add their scope here and document it. */
 export const apiKeyScopes = [
@@ -26,6 +26,12 @@ export const apiKeyScopes = [
   'resale:read',
   'resale:write',
 ] as const;
+
+/** Scopes that belong to one product (docs/UDOZO_SPINOFF_PLAN.md): resale is Udozo's; the rest are both products'. */
+const scopeOwners: Partial<Record<(typeof apiKeyScopes)[number], Product>> = { 'resale:read': 'udozo', 'resale:write': 'udozo' };
+
+/** The scopes a product's API keys can hold. */
+export const apiKeyScopesFor = (product: Product) => apiKeyScopes.filter(scope => (scopeOwners[scope] ?? product) === product);
 
 export const maxActiveKeys = 20;
 const prefixLength = 14;
@@ -72,8 +78,11 @@ export class ApiKeysService {
     if (active >= maxActiveKeys) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'api_key_limit_reached', `You can have up to ${maxActiveKeys} active keys. Revoke one first.`);
     }
+    const scopes: readonly string[] = apiKeyScopesFor(this.config.APP_PRODUCT);
+    const other = (input.scopes ?? []).filter(scope => !scopes.includes(scope));
+    if (other.length) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', `Unknown scope: ${other.join(', ')}.`, 'scopes');
     const storeId = await storeForNew(this.prisma, resellerId, input.store_id);
-    return this.issue(resellerId, storeId, userId, input.name, input.mode, input.scopes ?? [...apiKeyScopes]);
+    return this.issue(resellerId, storeId, userId, input.name, input.mode, input.scopes ?? [...scopes]);
   }
 
   async list(resellerId: string, storeId?: string) {

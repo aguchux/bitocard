@@ -9,7 +9,6 @@ import { SearchForm } from "./layout";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 import { groupInk, trustIcon } from "./theme";
 import { Faq, Features, ProductSpotlight, QuickBuy, VariantHero } from "./template-sections";
-import { ListingGrid, ListingRail, ResaleCategories } from "./resale";
 
 // Literal class names, so Tailwind generates them.
 const lgSpan = { 3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 9: "lg:col-span-9", 12: "lg:col-span-12" } as const;
@@ -353,22 +352,19 @@ function isEmpty(section: ResolvedSection) {
       return section.data.categories.length === 0;
     case "quick_buy":
       return !section.data.categories.some(tab => tab.products.length);
-    case "listing_rail":
-    case "listing_grid":
-      return section.data.listings.length === 0;
-    case "resale_categories":
-      return section.data.categories.length === 0;
     default:
       return false;
   }
 }
 
+/** Sections of the Resale shop template, which left BitoCard with BitoCard Shop (docs/UDOZO_SPINOFF_PLAN.md): never shown. */
+const resaleSections = new Set<ResolvedSection["type"]>(["listing_rail", "listing_grid", "resale_categories"]);
+
 /**
  * The home page: each section on the grid (12 columns on desktop, 6 on tablets, one on phones), densely packed. A
  * reseller's store passes its `design`: its variant's hero, spacing and the template sections' shapes.
  */
-/** `afterHero`: shown right under the hero, above the laid-out sections (bitocard.com's BitoCard Shop band). */
-export function HomeSections({ sections, groups, countries, design, afterHero }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[]; design?: StoreDesign | null; afterHero?: React.ReactNode }) {
+export function HomeSections({ sections, groups, countries, design }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[]; design?: StoreDesign | null }) {
   // A full-width hero at the top runs edge to edge under the header (full bleed); the rest sit in the grid.
   const [first, ...others] = sections;
   const bleed = first?.type === "hero" && first.span.lg === 12 ? first : null;
@@ -380,9 +376,8 @@ export function HomeSections({ sections, groups, countries, design, afterHero }:
   return (
     <>
       {bleed ? <div className="relative z-20 -mt-6 mb-6 lg:mb-7">{hero(bleed, true)}</div> : null}
-      {afterHero ? <div className="mb-8 lg:mb-10">{afterHero}</div> : null}
     <div className={`grid grid-flow-row-dense grid-cols-1 md:grid-cols-6 lg:grid-cols-12 ${densityGap[style?.density ?? "comfortable"]}`}>
-      {grid.filter(section => !(style && isEmpty(section))).map(section => (
+      {grid.filter(section => !resaleSections.has(section.type) && !(style && isEmpty(section))).map(section => (
         <div key={section.id} className={`min-w-0 ${mdSpan[section.span.md]} ${lgSpan[section.span.lg]} ${section.span.rows === 2 ? "md:row-span-2" : ""}`}>
           {section.type === "hero" ? hero(section, false) : null}
           {section.type === "product_rail" ? <ProductRail section={section} /> : null}
@@ -394,9 +389,6 @@ export function HomeSections({ sections, groups, countries, design, afterHero }:
           {section.type === "product_spotlight" && style ? <ProductSpotlight section={section} style={style} /> : null}
           {section.type === "features" ? <Features section={section} /> : null}
           {section.type === "faq" ? <Faq section={section} /> : null}
-          {section.type === "listing_rail" ? <ListingRail section={section} /> : null}
-          {section.type === "listing_grid" ? <ListingGrid section={section} /> : null}
-          {section.type === "resale_categories" ? <ResaleCategories section={section} /> : null}
         </div>
       ))}
     </div>

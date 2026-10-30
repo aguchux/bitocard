@@ -1,6 +1,6 @@
-import { AlertTriangle, Repeat, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Store, Flag, HandCoins, SlidersHorizontal, Tags, MapPin, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
 
-export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'classifieds' | 'reports' | 'support' | 'settings';
+export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'reports' | 'support' | 'settings';
 
 export type NavItem<K extends string = SectionKey> = { key: K; label: string; href: string; icon: LucideIcon };
 
@@ -13,7 +13,6 @@ export const sections: NavItem[] = [
   { key: 'verifications', label: 'Identity', href: '/verifications', icon: ShieldCheck },
   { key: 'activity', label: 'Activity', href: '/activity', icon: History },
   { key: 'storefront', label: 'Storefront', href: '/storefront', icon: LayoutGrid },
-  { key: 'classifieds', label: 'Shop', href: '/classifieds', icon: Store },
   { key: 'reports', label: 'Reports', href: '/reports', icon: TrendingUp },
   { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy },
   { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
@@ -93,36 +92,12 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Settings', href: '/storefront/settings', icon: Settings },
     ],
   },
-  // Crypto's pages moved to Afrippa's own admin (apps/afrippa-admin); customers' payouts (Safe pay sellers) stay here.
-  crypto: {
-    title: 'Payouts',
-    items: [{ label: 'Customer payouts', href: '/crypto/payouts', icon: Building2 }],
-  },
-  classifieds: {
-    title: 'BitoCard Shop',
-    items: [
-      { label: 'Moderation queue', href: '/classifieds', icon: ListChecks },
-      { label: 'Reports', href: '/classifieds/reports', icon: Flag },
-      { label: 'Listings', href: '/classifieds/listings', icon: Package },
-      { label: 'Users', href: '/classifieds/sellers', icon: Users },
-      { label: 'Categories', href: '/classifieds/categories', icon: Shapes },
-      { label: 'Feature registry', href: '/classifieds/features', icon: Tags },
-      { label: 'Areas', href: '/classifieds/areas', icon: MapPin },
-      { label: 'Safe pay orders', href: '/classifieds/orders', icon: HandCoins },
-      { label: 'Disputes', href: '/classifieds/disputes', icon: MessageSquareWarning },
-      { label: 'Limits and words', href: '/classifieds/rules', icon: SlidersHorizontal },
-      { label: 'Safe pay settings', href: '/classifieds/safe-pay', icon: Percent },
-      { label: 'Resale settings', href: '/classifieds/resale', icon: Repeat },
-      { label: 'Store reports', href: '/classifieds/resale-reports', icon: Flag },
-    ],
-  },
   reports: {
     title: 'Reports',
     items: [
       { label: 'P&L', href: '/reports', icon: ChartNoAxesColumn },
       { label: 'Growth', href: '/reports/growth', icon: TrendingUp },
       { label: 'Supplier funding', href: '/reports/suppliers', icon: Wallet },
-      { label: 'Safe pay and resale', href: '/reports/resale', icon: HandCoins },
       { label: 'Statements', href: '/reports/statements', icon: ReceiptText },
     ],
   },

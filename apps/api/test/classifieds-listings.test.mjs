@@ -9,7 +9,8 @@ let admin;
 let prisma;
 
 before(async () => {
-  server = await startApp({ env: { CRON_SECRET: 'cron-secret' } });
+  // BitoCard Shop is Udozo's (docs/UDOZO_SPINOFF_PLAN.md).
+  server = await startApp({ env: { APP_PRODUCT: 'udozo', CRON_SECRET: 'cron-secret' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
 });

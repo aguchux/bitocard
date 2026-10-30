@@ -1,5 +1,6 @@
-import { eventApiVersion, type EventType, eventTypes } from './events.js';
+import { eventApiVersion, type EventType, eventTypes, eventTypesFor } from './events.js';
 import { signatureHeader, signatureTestVector, signatureToleranceSeconds, signatureValue } from './signing.js';
+import type { Product } from '../products/product.js';
 
 /**
  * The `webhooks` section of the OpenAPI document: one entry per event type, with its payload schema, a full example
@@ -916,3 +917,26 @@ export function addWebhooks<T extends { openapi: string; components?: { schemas?
   }
   return { ...document, openapi: '3.1.0', components: { ...document.components, schemas }, webhooks };
 }
+
+/**
+ * Leaves the other product's event types out of a finished document (docs/UDOZO_SPINOFF_PLAN.md): their webhooks and
+ * envelopes, and their names wherever the document lists event types (enums, the event envelope's `oneOf`).
+ */
+export function withoutOtherEvents<T extends { components?: { schemas?: Record<string, unknown> }; webhooks?: Record<string, unknown> }>(document: T, product: Product): T {
+  const own = new Set<string>(eventTypesFor(product));
+  const others = eventTypes.filter(type => !own.has(type));
+  if (others.length === 0) return document;
+  const other = new Set<string>(others);
+  const envelopes = new Set(others.map(type => `#/components/schemas/${type.replace(/(^|[._])(\w)/g, (_m, _sep: string, char: string) => char.toUpperCase())}Event`));
+  const prune = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.filter(item => !(typeof item === 'string' && other.has(item)) && !(isObject(item) && typeof item.$ref === 'string' && envelopes.has(item.$ref))).map(prune);
+    if (!isObject(value)) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, prune(item)]));
+  };
+  const pruned = prune(document) as T;
+  for (const type of others) delete pruned.webhooks?.[type];
+  for (const ref of envelopes) delete pruned.components?.schemas?.[ref.slice('#/components/schemas/'.length)];
+  return pruned;
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

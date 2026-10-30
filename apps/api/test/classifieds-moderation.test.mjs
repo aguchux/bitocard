@@ -10,7 +10,8 @@ let support;
 let prisma;
 
 before(async () => {
-  server = await startApp();
+  // BitoCard Shop is Udozo's (docs/UDOZO_SPINOFF_PLAN.md).
+  server = await startApp({ env: { APP_PRODUCT: 'udozo' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server, ['operations']);
   support = await adminClient(server, ['support']);

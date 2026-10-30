@@ -7,8 +7,6 @@ import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
 import { query, storeApi } from "@/lib/api";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
-import { redirect } from "next/navigation";
-import { resaleStore } from "@/lib/resale";
 
 export const metadata: Metadata = { title: "Search", robots: { index: false, follow: true } };
 
@@ -18,8 +16,6 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? va
 export default async function Search({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const search = await searchParams;
   const q = one(search.q).trim().slice(0, 100);
-  // A Resale shop searches its own listings.
-  if (await resaleStore()) redirect(q ? `/listings?q=${encodeURIComponent(q)}` : "/listings");
   const country = one(search.country).toLowerCase();
   const validCountry = /^([a-z]{2}|global)$/.test(country) ? country : "";
   const [{ countries, groups }, result] = await Promise.all([storeNavigation(), q ? storeApi<StoreSearch>(await inMarket(`/v1/store/search${query({ q, country: validCountry, limit: 36 })}`)) : null]);

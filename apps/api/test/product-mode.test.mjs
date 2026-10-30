@@ -128,6 +128,33 @@ describe('routes', () => {
   });
 });
 
+describe('what each product offers', () => {
+  test("BitoCard's stores, keys, switches and webhooks leave out the Resale shop; Udozo's keep it", async () => {
+    const owners = { bitocard: await resellerClient(bitocard), udozo: await resellerClient(udozo) };
+    const templates = async name => (await owners[name].browser.get('/v1/store-templates')).json.data.map(item => item.key);
+    assert.ok(!(await templates('bitocard')).includes('resale_shop'));
+    assert.ok((await templates('udozo')).includes('resale_shop'));
+
+    const key = async (name, scopes) => owners[name].browser.post('/v1/api-keys', { name: 'Keys', mode: 'test', ...(scopes ? { scopes } : {}) });
+    assert.ok(!(await key('bitocard')).json.scopes.includes('resale:read'), "BitoCard's keys hold no resale scopes");
+    assert.deepEqual([(await key('bitocard', ['resale:read'])).status, (await key('bitocard', ['resale:read'])).json.error.param], [400, 'scopes']);
+    assert.ok((await key('udozo')).json.scopes.includes('resale:read'));
+
+    const features = async name => Object.keys((await owners[name].browser.get('/v1/settings')).json.features);
+    assert.ok(!(await features('bitocard')).includes('reseller_resale') && !(await features('bitocard')).includes('classifieds'));
+    assert.ok((await features('udozo')).includes('reseller_resale'));
+
+    const hook = async name => owners[name].browser.post('/v1/webhook-endpoints', { url: 'https://example.com/hooks', events: ['resale_order.created'] }, sandbox);
+    assert.equal((await hook('bitocard')).json.error?.code, 'event_type_invalid');
+    assert.equal((await hook('udozo')).status, 201);
+
+    const documents = {};
+    for (const [name, server] of Object.entries({ bitocard, udozo })) documents[name] = await (await fetch(`${server.base}/v1/openapi.json`)).json();
+    assert.ok(!('resale_order.created' in documents.bitocard.webhooks) && !JSON.stringify(documents.bitocard).includes('"resale_order.updated"'));
+    assert.ok('resale_order.created' in documents.udozo.webhooks && !('order.completed' in documents.udozo.webhooks));
+  });
+});
+
 describe('jobs', () => {
   test("each instance runs its own jobs and the shared ones, never the other product's", async () => {
     const run = (server, job) => fetch(`${server.base}/v1/cron/${job}`, { headers: { authorization: 'Bearer cron-secret' } });

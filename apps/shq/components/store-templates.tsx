@@ -7,7 +7,7 @@ import { Badge, cn, Select } from "@bitocard/admin-ui";
 import type { Store, StoreTemplate } from "@bitocard/api-client/reseller";
 import type { StoreTemplateKey, StoreThemeColors, StoreVariantStyle } from "@bitocard/api-client/storefront";
 
-/** Each template's icon, for cards and lists. */
+/** Each template's icon, for cards and lists (`resale_shop` left BitoCard with B2B reselling; kept for the type). */
 export const templateIcons: Record<StoreTemplateKey, typeof Layers> = { all_in_one: Layers, topups: Smartphone, gift_cards: Gift, single_product: Sparkles, vpn_shop: ShieldCheck, rdp_shop: MonitorSmartphone, resale_shop: Repeat };
 
 export type Design = { template: StoreTemplateKey; variant: string; theme: string };
@@ -73,9 +73,11 @@ export function ThemeDots({ colors }: { colors: StoreThemeColors }) {
 
 /** The five templates as cards; one closed to the reseller shows why. */
 export function TemplateCards({ templates, value, onChange, disabled }: { templates: StoreTemplate[]; value: StoreTemplateKey; onChange: (key: StoreTemplateKey) => void; disabled?: boolean }) {
+  // Resale shops left BitoCard for Udozo (docs/UDOZO_SPINOFF_PLAN.md): never offered, whatever the API lists.
+  const offered = templates.filter(template => !template.resale || template.key === value);
   return (
     <div role="radiogroup" aria-label="Template" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-      {templates.map(template => {
+      {offered.map(template => {
         const Icon = templateIcons[template.key];
         const selected = template.key === value;
         const first = template.variants[0];

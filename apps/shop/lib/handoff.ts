@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { decodeSignedIn, encodeSignedIn, handoffStart, signedInCookie, signedInDomain, signedInMaxAge } from "@bitocard/ui/handoff";
+import { decodeSignedIn, encodeSignedIn, handoffStart, isHouseOrigin, signedInCookie, signedInDomain, signedInMaxAge } from "@bitocard/ui/handoff";
 import { appUrl } from "@bitocard/ui/site";
 import { siteOrigin } from "./customer";
 
@@ -18,8 +18,13 @@ export async function forgetSignedIn() {
   (await cookies()).set(signedInCookie, "", { ...cookieOptions(), maxAge: 0 });
 }
 
-/** The customer signed in on another of BitoCard's sites, as this browser last saw them, or null. */
+/**
+ * The customer signed in on another of BitoCard's sites, as this browser last saw them, or null. Always null now: BitoCard
+ * Shop has left BitoCard's sign-in handoff (docs/UDOZO_SPINOFF_PLAN.md), so its sites no longer hand customers here;
+ * this app becomes Udozo's, with accounts of its own (step 4).
+ */
 export async function signedInElsewhere() {
+  if (!isHouseOrigin(siteOrigin())) return null;
   const signedIn = decodeSignedIn((await cookies()).get(signedInCookie)?.value);
   if (!signedIn || signedIn.origin === siteOrigin()) return null;
   return { ...signedIn, host: new URL(signedIn.origin).host };

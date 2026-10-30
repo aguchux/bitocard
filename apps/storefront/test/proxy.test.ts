@@ -13,15 +13,9 @@ describe("proxy", () => {
     expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBe("/account/orders/abc?x=1");
   });
 
-  test("the Shop tab is part of the account app: signing in returns there too", () => {
-    for (const path of ["/shop", "/shop/orders/abc?x=1"]) {
-      const response = proxy(new NextRequest(`https://ng.bitocard.com${path}`, { headers: { [pathHeader]: "//evil.com" } }));
-      expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBe(path);
-    }
-  });
-
   test("leaves other pages’ headers alone", () => {
-    for (const path of ["/catalogs", "/shopping", "/accounts"]) {
+    // BitoCard Shop's old tab (/shop) is no longer part of the account app.
+    for (const path of ["/catalogs", "/shop", "/shop/orders/abc", "/accounts"]) {
       const response = proxy(new NextRequest(`https://acme.bitocard.com${path}`, { headers: { [pathHeader]: "//evil.com" } }));
       expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBeNull();
     }

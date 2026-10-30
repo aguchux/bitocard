@@ -1,9 +1,9 @@
 import { appUrl } from "./site";
 
 /**
- * The sign-in handoff between BitoCard's own sites: bitocard.com, its country stores (ng.bitocard.com…), BitoCard Shop
- * (shop.bitocard.com) share one customer account but each keeps its own session cookie (crypto has left BitoCard and has
- * accounts of its own; docs/CRYPTO_SPINOFF_PLAN.md). So that a site can offer
+ * The sign-in handoff between BitoCard's own sites: bitocard.com and its country stores (ng.bitocard.com…) share one
+ * customer account but each keeps its own session cookie (crypto and BitoCard Shop have left BitoCard, for Afrippa and
+ * Udozo; docs/CRYPTO_SPINOFF_PLAN.md, docs/UDOZO_SPINOFF_PLAN.md). So that a site can offer
  * "Continue as Adaeze" before anyone clicks, the site a customer signs in on also sets `bc_signed_in` across the parent
  * domain: their first name and the site they are signed in on, nothing else. It is not a credential: continuing still
  * goes through a one-time code from that site (`/handoff/go`), so a forged cookie only changes a button's words.
@@ -14,15 +14,14 @@ export const signedInMaxAge = 60 * 60 * 24 * 30;
 
 export type SignedIn = { name: string; origin: string };
 
-/** bitocard.com (or the configured store address) and BitoCard Shop, as URLs. */
-function bases() {
-  return { store: new URL(appUrl("storefront")), shop: new URL(appUrl("shop")) };
+/** bitocard.com (or the configured store address), as a URL. */
+function storeBase() {
+  return new URL(appUrl("storefront"));
 }
 
 /**
  * Whether an origin is one of BitoCard's own sites a customer can be handed between: bitocard.com, a two-letter
- * country store under it (same scheme and port) or BitoCard Shop. Whether a country store is open is
- * the API's to say.
+ * country store under it (same scheme and port). Whether a country store is open is the API's to say.
  */
 export function isHouseOrigin(origin: string) {
   let url: URL;
@@ -32,14 +31,14 @@ export function isHouseOrigin(origin: string) {
     return false;
   }
   if (url.origin !== origin) return false;
-  const { store, shop } = bases();
-  if (url.origin === store.origin || url.origin === shop.origin) return true;
+  const store = storeBase();
+  if (url.origin === store.origin) return true;
   return url.protocol === store.protocol && new RegExp(`^[a-z]{2}\\.${store.host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`).test(url.host);
 }
 
 /** The parent domain the cookie is shared on (`.bitocard.com`), or none where browsers would refuse it (localhost, an IP). */
 export function signedInDomain() {
-  const host = bases().store.hostname;
+  const host = storeBase().hostname;
   return host === "localhost" || /^[\d.]+$/.test(host) || host.includes(":") ? undefined : `.${host}`;
 }
 

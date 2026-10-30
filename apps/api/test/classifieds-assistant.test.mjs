@@ -33,8 +33,9 @@ before(async () => {
     if (call.method === 'GET') return objects.has(key) ? { status: 200, headers: { 'content-type': 'image/jpeg' }, body: objects.get(key) } : { status: 404, body: '' };
     return { status: 200, body: '' };
   });
+  // BitoCard Shop is Udozo's (docs/UDOZO_SPINOFF_PLAN.md).
   server = await startApp({
-    env: {
+    env: { APP_PRODUCT: 'udozo',
       ...ai.env,
       ANTHROPIC_API_KEY: 'good-anthropic-bitocard',
       ANTHROPIC_PRICES: 'claude-sonnet-5-5 3 15 0.3; claude-haiku-5-5 1 5 0.1',

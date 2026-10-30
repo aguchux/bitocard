@@ -25,7 +25,8 @@ before(async () => {
     }
     return { status: 405, body: '' };
   });
-  server = await startApp({ env: { KYC_SPACES_KEY: 'kyc-key', KYC_SPACES_SECRET: 'kyc-secret', KYC_SPACES_BUCKET: 'kyc-private', KYC_SPACES_ENDPOINT: bucket.url } });
+  // BitoCard Shop is Udozo's (docs/UDOZO_SPINOFF_PLAN.md).
+  server = await startApp({ env: { APP_PRODUCT: 'udozo', KYC_SPACES_KEY: 'kyc-key', KYC_SPACES_SECRET: 'kyc-secret', KYC_SPACES_BUCKET: 'kyc-private', KYC_SPACES_ENDPOINT: bucket.url } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   services = {
     conversations: server.app.get((await import('../dist/classifieds/conversations.service.js')).ConversationsService),

@@ -7,8 +7,8 @@ import { firstName, readHandoffHash } from "./handoff";
 export type HandoffResult = { ok: true; next: string } | { ok: false; unreachable: boolean };
 
 /**
- * The sign-in handoff's landing page, shared by BitoCard's own sites (bitocard.com and its country stores, BitoCard
- * Shop): reads the code from the address's fragment, removes it from the address bar at once (so it is not kept in
+ * The sign-in handoff's landing page, shared by BitoCard's own sites (bitocard.com and its country stores): reads the
+ * code from the address's fragment, removes it from the address bar at once (so it is not kept in
  * history or shared by mistake), and has this site's server exchange it once (`continueSignIn`, the site's own server
  * action), even if the effect runs twice; then on to `next`.
  */

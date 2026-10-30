@@ -5,11 +5,11 @@ import { visitRequest } from "./lib/visits";
 /**
  * Every page (never files, `_next` or prefetches):
  * - counts the view of a reseller's store after the response (`lib/visits.ts`), never delaying or breaking the page;
- * - on account pages (`/account`, and the Shop tab's `/shop`), passes the requested path to the layout (layouts are not
+ * - on account pages (`/account`), passes the requested path to the layout (layouts are not
  *   given it), so signing in from an order link returns to that order. Always set here, so a caller cannot choose it; the layout still checks it is a local path.
  */
-/** The customer account app's pages: `/account` and the Shop tab, `/shop`. */
-const accountApp = (pathname: string) => ["/account", "/shop"].some(base => pathname === base || pathname.startsWith(`${base}/`));
+/** The customer account app's pages: `/account`. */
+const accountApp = (pathname: string) => pathname === "/account" || pathname.startsWith("/account/");
 
 export function proxy(request: NextRequest, event?: NextFetchEvent) {
   const visit = visitRequest(request);

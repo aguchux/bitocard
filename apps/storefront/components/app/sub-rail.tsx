@@ -33,26 +33,13 @@ export function SubRail({ context }: { context: SubMenuContext }) {
               <item.icon className={`size-[18px] shrink-0 ${current ? "text-brand-500" : "text-slate-400 group-hover:text-slate-600"}`} aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
               {item.soon ? <span className="shrink-0 rounded-full bg-slate-200/70 px-1.5 py-0.5 text-[10px] leading-none font-bold tracking-wide text-slate-500 uppercase">Soon</span> : null}
-              {item.badge ? (
-                <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-brand-700 px-1.5 text-[11px] font-bold text-white">
-                  {item.badge > 99 ? "99+" : item.badge}
-                  <span className="sr-only"> unread</span>
-                </span>
-              ) : null}
             </>
           );
           return (
             <li key={item.href}>
-              {/* Browse leaves the app through the sign-in handoff (a route, not a page): a plain link. */}
-              {item.external ? (
-                <a href={item.href} className={className}>
-                  {inner}
-                </a>
-              ) : (
-                <Link href={item.href} aria-current={current ? "page" : undefined} className={className}>
-                  {inner}
-                </Link>
-              )}
+              <Link href={item.href} aria-current={current ? "page" : undefined} className={className}>
+                {inner}
+              </Link>
             </li>
           );
         })}

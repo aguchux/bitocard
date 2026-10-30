@@ -12,7 +12,7 @@ import { APP_CONFIG, type AppConfig } from './config/config.js';
 import { validationPipe } from './common/errors/validation.js';
 import { securityHeaders } from './common/security-headers.js';
 import { addResponses } from './openapi/responses/index.js';
-import { addWebhooks } from './webhooks/openapi.js';
+import { addWebhooks, withoutOtherEvents } from './webhooks/openapi.js';
 import { PRODUCT_ONLY, productOf } from './products/product.js';
 
 /** Routes outside /v1: service info, health and robots.txt. Everything else is versioned. */
@@ -92,7 +92,7 @@ export function buildOpenApi(app: NestExpressApplication): OpenAPIObject {
     .addServer(udozo ? 'https://api.udozo.com' : 'https://api.bitocard.com')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'API key', description: `API key: ${product.apiKeyPrefix}test_… (sandbox) or ${product.apiKeyPrefix}live_… (live).` })
     .build();
-  return addResponses(addWebhooks(withoutOtherProducts(app, SwaggerModule.createDocument(app, config))));
+  return withoutOtherEvents(addResponses(addWebhooks(withoutOtherProducts(app, SwaggerModule.createDocument(app, config)))), appConfig.APP_PRODUCT);
 }
 
 /** Leaves out the routes of the other product (`@ProductOnly`), and the tags no route uses any more. */

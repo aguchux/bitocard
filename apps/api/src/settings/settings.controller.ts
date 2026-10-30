@@ -4,7 +4,7 @@ import { ArrayUnique, IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length, 
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, Roles, SessionOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
-import { afrippaSwitches, SettingsService } from './settings.service.js';
+import { SettingsService } from './settings.service.js';
 
 class OptionValueDto {
   @ApiProperty({ example: 'bank' })
@@ -88,8 +88,9 @@ export class AdminSettingsController {
   @StepUp()
   @Put('switches/:key')
   setSwitch(@CurrentCaller() caller: Caller, @Param('key') key: string, @Body() body: SwitchDto) {
-    // Afrippa's switches are its own admins' (`/v1/afrippa/admin/markets`): unknown here, as in the list.
-    if ((afrippaSwitches as ReadonlySet<string>).has(key)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such setting.', 'key');
+    // Afrippa's switches are its own admins' (`/v1/afrippa/admin/markets`), and the other product's are not this
+    // instance's: unknown here, as in the list.
+    if (!(this.settings.shownSwitches() as readonly string[]).includes(key)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such setting.', 'key');
     return this.settings.setSwitch(adminId(caller), key, { countryCode: body.country_code, resellerId: body.reseller_id }, body.enabled);
   }
 }

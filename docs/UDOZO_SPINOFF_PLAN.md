@@ -2,7 +2,7 @@
 
 Decided by the owner on 30 October 2026. **BitoCard Shop** (the B2C classifieds marketplace with Safe pay and the Anjio shop assistants; `docs/BITOCARD_CLASSIFIEDS_PLAN.md`) and **B2B reselling** (suppliers' listings sold on resellers' Resale shop stores; `docs/BITOCARD_B2B_RESELLING_PLAN.md`) leave BitoCard and become their own brand, **Udozo**, at **udozo.com**. The domain is already owned. It was a memorial portal, which the owner is deleting themselves; nothing of it is carried over and no work for it is in this plan.
 
-**Status:** step 1 built (30 October 2026); the rest planned.
+**Status:** steps 1 and 2 built (30 October 2026); the rest planned.
 
 ## The decision
 
@@ -163,6 +163,25 @@ The shared foundations come with it, in Udozo's own database:
 6. **Docs:** `AGENTS.md`, `PLANS.md` and the Classifieds and B2B plans point here.
 
 The code is moved to Udozo's apps (step 4), not deleted.
+
+**Step 2 status (30 October 2026): built.** The removed apps' code is in git at `f5ee491` (the step 1 commit, the last tree with it): step 4 takes it from there.
+- **Storefront** (removed):
+  - the Shop tab and its pages (Payouts included), the home page's Shop band, the Shop quick link;
+  - the Resale shop's pages (`/listings`, `/l/`, `/suppliers`, `/account/purchases`) and their sections and heroes;
+  - the `/shop/l/` redirect, and the Shop terms link.
+  - Account is always a tab again, and `/account/crypto/cash-out` goes to the wallet.
+- **SHQ:** the Resale section is gone (`/resale` redirects to `/store`), so are the resale scopes' labels and the Resale orders report, and the template picker never offers the Resale shop.
+- **Admin:** the Shop section, the shop assistants, Safe pay payouts and Reports > Safe pay and resale are gone, with redirects for their old addresses. The rail's Shop entry is gone too (`packages/admin-ui` nav, tested in `test/nav.test.ts`).
+- **Legal:** the Shop terms are gone (redirected to the documents hub), along with the Shop sections of the privacy and cookie notices (`bc_assistant` removed), reseller terms 12b and the terms of use's pointer. `legalUpdated` is 30 October 2026.
+- **Handoff:** shop.bitocard.com is no longer a target, neither in `isHouseOrigin` nor in the API's `HandoffService`. The old Shop app no longer offers BitoCard's sign-in.
+- **API:**
+  - the Resale shop template is neither listed nor chosen on BitoCard (`template_unknown`);
+  - the Shop's switches are hidden from BitoCard's admins and resellers (`udozoSwitches`, `switchKeysFor`);
+  - resale API key scopes are refused on BitoCard (`apiKeyScopesFor`);
+  - `resale_order.*` events are refused for BitoCard's endpoints and left out of its OpenAPI document (`eventOwners`, `eventTypesFor`, `withoutOtherEvents`);
+  - SHQ's generated lists follow (`api-lists.generated.ts`);
+  - the Shop's API tests run as Udozo.
+- **Note:** shop.bitocard.com is still deployed and now fails against BitoCard's API. Pausing its Vercel project (`bitocard-shop`) is an operations step until step 4 makes it Udozo's.
 
 ### 3. Udozo's rules in the API
 1. **One account everywhere:** in Udozo, every store's customer accounts are the house store's, as BitoCard's country stores share bitocard.com's (`StoreSellers.accountStore`, `CustomersService.countryStore`).

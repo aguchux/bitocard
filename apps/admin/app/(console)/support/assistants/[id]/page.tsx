@@ -6,7 +6,6 @@ import { ActionDialog, Button, Card, Field, Notice, QueryView, Skeleton, Textare
 import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { AssistantDetail, botStatusLabels, providerLabels } from "@bitocard/admin-ui/support";
 import { type SupportBot, useSupportBotQuery, useSuspendSupportBotMutation, useUnsuspendSupportBotMutation } from "@bitocard/api-client/admin";
-import { ShopAssistantDetail } from "@/components/shop-assistants/detail";
 import { houseStoreId, useAdminAssistantContext } from "../context";
 
 function SuspendControls({ bot }: { bot: SupportBot }) {
@@ -46,7 +45,7 @@ function SuspendControls({ bot }: { bot: SupportBot }) {
   );
 }
 
-/** One assistant: BitoCard's own are managed in full (BitoCard Shop's with their own screen); a reseller's are read and can be suspended. */
+/** One assistant: BitoCard's own are managed in full; a reseller's are read and can be suspended. */
 export default function AdminAssistantPage() {
   const { id } = useParams<{ id: string }>();
   const context = useAdminAssistantContext();
@@ -55,7 +54,6 @@ export default function AdminAssistantPage() {
     <AdminShell section="support" current="/support/assistants" crumbs={[{ label: "Support", href: "/support" }, { label: "Assistants", href: "/support/assistants" }, { label: query.data?.name ?? "Assistant" }]}>
       <QueryView query={query} loading={<Skeleton className="h-96 w-full" />}>
         {bot => {
-          if (bot.scope === "shop" && context) return <ShopAssistantDetail context={context} bot={bot} extraActions={<SuspendControls bot={bot} />} />;
           const ours = bot.scope === "platform" || bot.store_id === houseStoreId;
           if (ours && context) return <AssistantDetail context={context} bot={bot} extraActions={<SuspendControls bot={bot} />} />;
           return (

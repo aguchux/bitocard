@@ -2,35 +2,30 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, CardHeader, DataTable, errorMessage, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, DataTable, errorMessage, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
 import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { AssistantProfileForm, botStatusLabels, providerLabels, roleLabels } from "@bitocard/admin-ui/support";
 import { type SupportBot, useCreateSupportBotMutation, useSupportBotsQuery } from "@bitocard/api-client/admin";
-import { ShopAssistantForm } from "@/components/shop-assistants/form";
 import { houseStoreId, useAdminAssistantContext } from "./context";
 
 const status = (row: SupportBot) => <StatusBadge status={row.status === "active" ? "active" : row.status === "suspended" ? "failed" : "pending"} label={botStatusLabels[row.status]} />;
 
-/**
- * Every assistant (to suspend one), and BitoCard's own: bitocard.com's, the assistant for resellers in SHQ, and BitoCard
- * Shop's (Anjio, the default, first; then those assigned to countries).
- */
+/** Every assistant (to suspend one), and BitoCard's own: bitocard.com's and the assistant for resellers in SHQ. */
 export default function AdminAssistantsPage() {
   const router = useRouter();
   const query = useSupportBotsQuery("/v1/admin/support/bots");
   const context = useAdminAssistantContext();
   const [create, state] = useCreateSupportBotMutation();
-  const [creating, setCreating] = useState<null | "store" | "platform" | "shop">(null);
-  const rows = query.data?.data;
-  const support = rows?.filter(row => row.scope !== "shop");
-  const shop = rows?.filter(row => row.scope === "shop");
+  const [creating, setCreating] = useState<null | "store" | "platform">(null);
+  // BitoCard Shop's assistants left with the Shop (docs/UDOZO_SPINOFF_PLAN.md): Udozo's admin manages them.
+  const rows = query.data?.data.filter(row => row.scope !== "shop");
   const ours = (row: SupportBot) => row.scope === "platform" || row.store_id === houseStoreId;
   const open = (row: SupportBot) => router.push(`/support/assistants/${row.id}`);
   return (
     <AdminShell section="support" current="/support/assistants" crumbs={[{ label: "Support", href: "/support" }, { label: "Assistants" }]}>
       <PageHeader
         title="Assistants"
-        description="BitoCard’s assistants (bitocard.com’s customers, resellers in SHQ, and BitoCard Shop) and every store’s, which you can suspend."
+        description="BitoCard’s assistants (bitocard.com’s customers and resellers in SHQ) and every store’s, which you can suspend."
         actions={
           <>
             {!rows?.some(row => row.store_id === houseStoreId) ? (
@@ -43,40 +38,24 @@ export default function AdminAssistantsPage() {
                 Assistant for resellers
               </Button>
             ) : null}
-            <Button onClick={() => setCreating("shop")}>Shop assistant</Button>
           </>
         }
       />
       {creating && context ? (
         <Card className="p-5 sm:p-6">
-          {creating === "shop" ? (
-            <ShopAssistantForm
-              context={context}
-              submitLabel="Create, then choose its countries"
-              busy={state.isLoading}
-              error={state.error ? errorMessage(state.error) : null}
-              onSubmit={async input => {
-                const created = await create({ base: "/v1/admin/support/bots", body: input })
-                  .unwrap()
-                  .catch(() => null);
-                if (created) router.push(`/support/assistants/${created.id}`);
-              }}
-            />
-          ) : (
-            <AssistantProfileForm
-              context={context}
-              showStore={creating === "store"}
-              submitLabel="Create and add knowledge"
-              busy={state.isLoading}
-              error={state.error ? errorMessage(state.error) : null}
-              onSubmit={async input => {
-                const created = await create({ base: "/v1/admin/support/bots", body: { ...input, funding: "bitocard", ...(creating === "platform" ? { scope: "platform", store_id: null } : { store_id: houseStoreId }) } })
-                  .unwrap()
-                  .catch(() => null);
-                if (created) router.push(`/support/assistants/${created.id}`);
-              }}
-            />
-          )}
+          <AssistantProfileForm
+            context={context}
+            showStore={creating === "store"}
+            submitLabel="Create and add knowledge"
+            busy={state.isLoading}
+            error={state.error ? errorMessage(state.error) : null}
+            onSubmit={async input => {
+              const created = await create({ base: "/v1/admin/support/bots", body: { ...input, funding: "bitocard", ...(creating === "platform" ? { scope: "platform", store_id: null } : { store_id: houseStoreId }) } })
+                .unwrap()
+                .catch(() => null);
+              if (created) router.push(`/support/assistants/${created.id}`);
+            }}
+          />
         </Card>
       ) : null}
       {context && !Object.values(context.ai.bitocard).some(list => (list ?? []).length) ? (
@@ -85,50 +64,10 @@ export default function AdminAssistantsPage() {
         </Notice>
       ) : null}
       <Card>
-        <CardHeader
-          title="BitoCard Shop"
-          description="Anjio answers every country without its own assistant; others take over in their countries and languages."
-          actions={
-            <AppLink href="/support/assistants/who-answers" className="text-sm font-semibold text-brand-600 hover:underline">
-              Coverage
-            </AppLink>
-          }
-        />
-        <DataTable<SupportBot>
-          caption="Shop assistants"
-          rows={query.isLoading ? undefined : shop}
-          loading={query.isLoading}
-          error={query.error ? errorMessage(query.error) : null}
-          onRetry={query.refetch}
-          rowKey={row => row.id}
-          onRowClick={open}
-          empty="No shop assistants."
-          columns={[
-            {
-              key: "name",
-              header: "Assistant",
-              cell: row => (
-                <span className="flex items-center gap-2">
-                  <AppLink href={`/support/assistants/${row.id}`} className="font-semibold text-brand-600 hover:underline">
-                    {row.name}
-                  </AppLink>
-                  {row.shop?.default ? <Badge tone="pink">Default</Badge> : null}
-                </span>
-              ),
-            },
-            { key: "languages", header: "Languages", cell: row => row.shop?.languages.map(item => item.name).join(", ") ?? "—", hideOnMobile: true },
-            { key: "where", header: "Countries", cell: row => (row.shop?.default ? "Every country without its own" : row.shop?.assignments.map(item => (item.language ? `${item.country} (${item.language})` : item.country)).join(", ") || "None yet") },
-            { key: "month", header: "This month", cell: row => (row.shop ? `US$${row.shop.month.cost_usd.toFixed(2)}${row.shop.month.budget_usd ? ` of ${row.shop.month.budget_usd}` : ""}` : "—"), hideOnMobile: true },
-            { key: "review", header: "Review", cell: row => (row.shop ? `${row.shop.ratings.down} 👎 · ${row.shop.reported} reported` : "—"), hideOnMobile: true },
-            { key: "status", header: "Status", cell: status },
-          ]}
-        />
-      </Card>
-      <Card>
         <CardHeader title="Support" description="bitocard.com’s customers, resellers in SHQ, and every store’s." />
         <DataTable<SupportBot>
           caption="Assistants"
-          rows={query.isLoading ? undefined : support}
+          rows={query.isLoading ? undefined : rows}
           loading={query.isLoading}
           error={query.error ? errorMessage(query.error) : null}
           onRetry={query.refetch}

@@ -1,4 +1,6 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import type { Product } from '../products/product.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -185,8 +187,26 @@ export const afrippaSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'crypto_install_prompt',
 ]);
 
+/**
+ * BitoCard Shop's and B2B reselling's switches, Udozo's since they left BitoCard (`docs/UDOZO_SPINOFF_PLAN.md`): never
+ * listed to BitoCard's admins or resellers, whose instance answers their routes as unknown.
+ */
+export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
+  'classifieds',
+  'classifieds_safe_pay',
+  'classifieds_assistant',
+  'classifieds_install_prompt',
+  'classifieds_resale',
+  'reseller_resale',
+  'store_template_resale_shop',
+]);
+
+/** The switches a product's admins and resellers see (Afrippa's never: its own admins set them). */
+export const switchKeysFor = (product: Product) =>
+  (Object.keys(switchDefinitions) as SwitchKey[]).filter(key => !afrippaSwitches.has(key) && (product === 'udozo' || !udozoSwitches.has(key)));
+
 /** The switches BitoCard's admins and resellers see. */
-export const bitocardSwitchKeys = (Object.keys(switchDefinitions) as SwitchKey[]).filter(key => !afrippaSwitches.has(key));
+export const bitocardSwitchKeys = switchKeysFor('bitocard');
 
 export const switchDefault = (key: SwitchKey): boolean => ('default' in switchDefinitions[key] ? Boolean(switchDefinitions[key].default) : false);
 
@@ -197,6 +217,7 @@ export class SettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /** The reseller's effective options, with what their country allows and where each value comes from. */
@@ -288,8 +309,13 @@ export class SettingsService {
     return pick(row => row.countryCode === countryCode) ?? pick(row => row.countryCode === null && row.resellerId === null) ?? switchDefault(key);
   }
 
+  /** The switches this product's admins and resellers see. */
+  shownSwitches() {
+    return switchKeysFor(this.config.APP_PRODUCT);
+  }
+
   async switchesFor(resellerId: string) {
-    const keys = bitocardSwitchKeys;
+    const keys = this.shownSwitches();
     return Object.fromEntries(await Promise.all(keys.map(async key => [key, await this.isOn(key, resellerId)] as const)));
   }
 
@@ -328,11 +354,12 @@ export class SettingsService {
 
   async listSwitches() {
     const rows = await this.prisma.featureSwitch.findMany({ orderBy: [{ key: 'asc' }, { updatedAt: 'desc' }] });
+    const shown = new Set<string>(this.shownSwitches());
     return {
       object: 'list' as const,
       /** Each switch's scopes, description and `default` (its value where nothing is set). */
-      definitions: Object.fromEntries(bitocardSwitchKeys.map(key => [key, { ...switchDefinitions[key], default: switchDefault(key) }])),
-      data: rows.filter(row => !afrippaSwitches.has(row.key as SwitchKey)).map(row => ({
+      definitions: Object.fromEntries(this.shownSwitches().map(key => [key, { ...switchDefinitions[key], default: switchDefault(key) }])),
+      data: rows.filter(row => shown.has(row.key)).map(row => ({
         object: 'switch' as const,
         key: row.key,
         scope: row.resellerId ? 'reseller' : row.countryCode ? 'country' : 'global',

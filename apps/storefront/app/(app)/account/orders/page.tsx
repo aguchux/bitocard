@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
-import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreList } from "@bitocard/api-client/storefront";
 import { StatusPill } from "@/components/store/order-status";
 import { query } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
-import { resaleStore } from "@/lib/resale";
 
 export const metadata: Metadata = { title: "Orders" };
 
@@ -25,8 +23,6 @@ const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "med
 /** The customer's orders, newest first, 50 a page, filtered by where they are. */
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; after?: string }> }) {
   const { show, after } = await searchParams;
-  // A Resale shop sells only its suppliers' listings: its orders are the customer's purchases.
-  if (await resaleStore()) redirect("/account/purchases");
   const filter: Filter = show && show in filters ? (show as Filter) : "all";
   const group = filter === "all" ? undefined : filter;
   const result = await customerApi<StoreList<StoreCheckout>>("GET", `/v1/store/checkouts${query({ limit: 50, starting_after: after, show: group })}`);

@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CountriesService } from '../countries/countries.service.js';
@@ -118,7 +119,13 @@ export class StoresService {
     private readonly settings: SettingsService,
     private readonly hosts: StoreHostsService,
     private readonly planAccess: PlanAccessService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
+
+  /** Whether this product's stores may use a template: the Resale shop left BitoCard with B2B reselling (docs/UDOZO_SPINOFF_PLAN.md). */
+  private offered(template: StoreTemplate) {
+    return this.config.APP_PRODUCT === 'udozo' || !template.resale;
+  }
 
   /** Business name, and the country if it is not yet set (Google sign-ups choose it during onboarding). */
   async updateReseller(resellerId: string, input: { name?: string; country?: string }) {
@@ -329,7 +336,7 @@ export class StoresService {
     return {
       object: 'list' as const,
       data: await Promise.all(
-        storeTemplates.map(async template => ({
+        storeTemplates.filter(template => this.offered(template)).map(async template => ({
           object: 'store_template' as const,
           key: template.key,
           name: template.name,
@@ -356,7 +363,8 @@ export class StoresService {
 
   /** Checks a template, variant, theme and (single product stores) the product, all of which must exist and be open. */
   private async chooseDesign(resellerId: string, input: { template: string; variant?: string; theme?: string; focus: string | null }, current?: string) {
-    const template = templateFor(input.template);
+    const found = templateFor(input.template);
+    const template = found && (this.offered(found) || found.key === current) ? found : undefined;
     if (!template) throw invalid('template_unknown', 'Choose one of the store templates.', 'template');
     // A store keeps the template it has (its design and colours can still change); only choosing one is checked.
     const { available, reason } = template.key === current ? { available: true, reason: null } : await this.templateAvailability(resellerId, template);

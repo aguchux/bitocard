@@ -13,7 +13,6 @@ let reply: (url: string, method: string) => Response | null;
 
 beforeEach(() => {
   vi.stubEnv("STOREFRONT_URL", "https://bitocard.com");
-  vi.stubEnv("SHOP_URL", "https://shop.bitocard.com");
   calls = [];
   reply = () => null;
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
@@ -34,8 +33,9 @@ afterEach(() => {
 
 describe("the signed-in cookie", () => {
   test("names only BitoCard's own sites, on the parent domain", () => {
-    for (const origin of ["https://bitocard.com", "https://ng.bitocard.com", "https://shop.bitocard.com"]) expect(isHouseOrigin(origin), origin).toBe(true);
-    for (const origin of ["https://evil.com", "https://acme-store.bitocard.com", "http://ng.bitocard.com", "https://ng.bitocard.com/", "https://bitocard.com.evil.com", "https://crypto.bitocard.com", "nope"]) expect(isHouseOrigin(origin), origin).toBe(false);
+    for (const origin of ["https://bitocard.com", "https://ng.bitocard.com", "https://gh.bitocard.com"]) expect(isHouseOrigin(origin), origin).toBe(true);
+    // BitoCard Shop and crypto have left BitoCard (Udozo and Afrippa keep accounts of their own).
+    for (const origin of ["https://evil.com", "https://acme-store.bitocard.com", "http://ng.bitocard.com", "https://ng.bitocard.com/", "https://bitocard.com.evil.com", "https://crypto.bitocard.com", "https://shop.bitocard.com", "nope"]) expect(isHouseOrigin(origin), origin).toBe(false);
     expect(signedInDomain()).toBe(".bitocard.com");
     vi.stubEnv("STOREFRONT_URL", "http://localhost:3000");
     expect(signedInDomain()).toBeUndefined();
@@ -48,7 +48,7 @@ describe("the signed-in cookie", () => {
     expect(decodeSignedIn(encodeSignedIn({ name: "Ada", origin: "https://evil.com" }))).toBeNull();
     expect(decodeSignedIn("not base64 json")).toBeNull();
     expect(decodeSignedIn(undefined)).toBeNull();
-    expect(handoffStart("https://ng.bitocard.com", "https://shop.bitocard.com", "/ng/l/100001-tv")).toBe("https://ng.bitocard.com/handoff/go?to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng%2Fl%2F100001-tv");
+    expect(handoffStart("https://ng.bitocard.com", "https://bitocard.com", "/account/orders")).toBe("https://ng.bitocard.com/handoff/go?to=https%3A%2F%2Fbitocard.com&next=%2Faccount%2Forders");
   });
 
   test("set on BitoCard's sites when signing in, never on a reseller's store; offered only on another site", async () => {
@@ -84,31 +84,33 @@ describe("/handoff/go", () => {
 
   test("signed in: a code for that site, in the fragment of its /handoff", async () => {
     setRequest({ host: "ng.bitocard.com" }, { bc_customer: "bcc_session" });
-    reply = (url, method) => (method === "POST" && url.endsWith("/v1/store/account/handoff") ? Response.json({ object: "customer_handoff", code: "bch_abc-DEF_123", to: "https://shop.bitocard.com" }) : null);
-    const response = await go("to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng%2Fl%2F100001-tv");
+    reply = (url, method) => (method === "POST" && url.endsWith("/v1/store/account/handoff") ? Response.json({ object: "customer_handoff", code: "bch_abc-DEF_123", to: "https://bitocard.com" }) : null);
+    const response = await go("to=https%3A%2F%2Fbitocard.com&next=%2Faccount%2Forders");
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("https://shop.bitocard.com/handoff#c=bch_abc-DEF_123&n=%2Fng%2Fl%2F100001-tv");
+    expect(response.headers.get("location")).toBe("https://bitocard.com/handoff#c=bch_abc-DEF_123&n=%2Faccount%2Forders");
     const asked = calls.find(call => call.method === "POST")!;
-    expect(asked.body).toEqual({ to: "https://shop.bitocard.com" });
+    expect(asked.body).toEqual({ to: "https://bitocard.com" });
     expect(asked.headers.get("bitocard-customer-session")).toBe("bcc_session");
     expect(asked.headers.get("bitocard-store")).toBe("ng");
   });
 
   test("signed out: sign in here first, then on; never to a site that is not BitoCard's", async () => {
     setRequest({ host: "ng.bitocard.com" });
-    const signIn = await go("to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng");
-    expect(signIn.headers.get("location")).toBe(`https://ng.bitocard.com/signin?next=${encodeURIComponent("/handoff/go?to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng")}`);
+    const signIn = await go("to=https%3A%2F%2Fbitocard.com&next=%2Fcatalogs");
+    expect(signIn.headers.get("location")).toBe(`https://ng.bitocard.com/signin?next=${encodeURIComponent("/handoff/go?to=https%3A%2F%2Fbitocard.com&next=%2Fcatalogs")}`);
     setRequest({ host: "ng.bitocard.com" }, { bc_customer: "bcc_session" });
     expect((await go("to=https%3A%2F%2Fevil.com&next=%2Forders")).headers.get("location")).toBe("https://ng.bitocard.com/orders");
+    // BitoCard Shop is no longer one of BitoCard's sites: no code is made for it.
+    expect((await go("to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng")).headers.get("location")).toBe("https://ng.bitocard.com/ng");
     expect(calls.some(call => call.method === "POST")).toBe(false);
     setRequest({ host: "acme.bitocard.com" }, { bc_customer: "bcc_session" });
-    expect((await GET(new NextRequest("https://acme.bitocard.com/handoff/go?to=https%3A%2F%2Fshop.bitocard.com"))).status).toBe(404);
+    expect((await GET(new NextRequest("https://acme.bitocard.com/handoff/go?to=https%3A%2F%2Fbitocard.com"))).status).toBe(404);
   });
 });
 
 describe("/handoff", () => {
   test("reads the code and where to go from the fragment", () => {
-    expect(readHandoffHash("#c=bch_abc&n=%2Fng%2Fl%2F1")).toEqual({ code: "bch_abc", next: "/ng/l/1" });
+    expect(readHandoffHash("#c=bch_abc&n=%2Faccount%2Forders")).toEqual({ code: "bch_abc", next: "/account/orders" });
     expect(readHandoffHash("")).toEqual({ code: "", next: "/" });
   });
 
