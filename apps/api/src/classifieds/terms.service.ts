@@ -33,7 +33,7 @@ export class ShopTermsService {
 
   /** Records the acceptance of the version the customer was shown; accepting again changes nothing. */
   async accept(customerId: string, version: string) {
-    if (version !== shopTermsVersion) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'terms_changed', 'The BitoCard Shop terms have changed. Read the new version, then accept it.', 'version');
+    if (version !== shopTermsVersion) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'terms_changed', 'The Udozo terms have changed. Read the new version, then accept it.', 'version');
     await this.prisma.classifiedTermsAcceptance.createMany({ data: [{ customerId, version }], skipDuplicates: true });
     return this.status(customerId);
   }
@@ -45,6 +45,6 @@ export class ShopTermsService {
   /** Posting a listing and Safe pay need the current terms accepted. */
   async require(customerId: string) {
     if (await this.accepted(customerId)) return;
-    throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'terms_not_accepted', 'Accept the BitoCard Shop terms to post listings and use Safe pay.', 'terms');
+    throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'terms_not_accepted', 'Accept the Udozo terms to post listings and use Safe pay.', 'terms');
   }
 }

@@ -338,7 +338,7 @@ export class StoresService {
     if (!(await this.settings.isOn(`store_template_${template.key}`, resellerId))) return { available: false, reason: 'BitoCard does not offer this template for your stores at the moment.' };
     if (template.resale) {
       // B2B reselling: the reseller's own switch and a verified account (the resale catalogue checks the rest).
-      if (!(await this.settings.isOn('reseller_resale', resellerId))) return { available: false, reason: 'Reselling BitoCard Shop listings is not open to your account yet.' };
+      if (!(await this.settings.isOn('reseller_resale', resellerId))) return { available: false, reason: 'Reselling Udozo listings is not open to your account yet.' };
       const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { status: true } });
       return reseller?.status === 'active' ? { available: true, reason: null } : { available: false, reason: 'Finish your identity check to open a Resale shop.' };
     }

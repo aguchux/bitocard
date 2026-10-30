@@ -198,7 +198,7 @@ describe('submitting', () => {
     const live = await shopper.post(`/v1/classifieds/listings/${next.id}/submit`);
     assert.equal(live.json.status, 'active');
     assert.ok(Math.abs(new Date(live.json.expires_at) - Date.now() - 30 * 86_400_000) < 60_000, 'live for 30 days');
-    assert.match(live.json.url, new RegExp(`^https://shop\\.bitocard\\.com/ng/l/${live.json.ref}-iphone-12-64-gb$`));
+    assert.match(live.json.url, new RegExp(`^https://udozo\\.com/ng/l/${live.json.ref}-iphone-12-64-gb$`));
     assert.ok(live.json.ref > 100000);
     assert.equal(await prisma.classifiedPriceHistory.count({ where: { listingId: next.id, to: null } }), 1, 'its price is recorded');
 

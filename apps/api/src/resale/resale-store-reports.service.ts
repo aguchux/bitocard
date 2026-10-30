@@ -20,7 +20,7 @@ export type StoreReportDecision = (typeof storeReportDecisions)[number];
 const reasonText: Record<StoreReportReason, string> = {
   claims_ownership: 'claims to own or make the items',
   misleading: 'says things about an item the supplier did not',
-  pay_outside: 'asked to be paid outside BitoCard',
+  pay_outside: 'asked to be paid outside Udozo',
   misused_details: 'used a buyer’s details for something else',
   other: 'something else',
 };
@@ -63,7 +63,7 @@ export class ResaleStoreReportsService {
       await this.inbox.admins('admin.classifieds.resale_store_report', { subject: `resale_store_report:${report.id}`, title: `A Resale shop was reported: ${report.store.name}`, body: `By a ${input.reporterKind}: it ${reasonText[input.reason]}.`, link: `/classifieds/resale-reports/${report.id}` });
       return this.present(report, 'reporter');
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002') throw conflict('report_open', 'You have already reported this store; BitoCard is looking at it.');
+      if ((error as { code?: string }).code === 'P2002') throw conflict('report_open', 'You have already reported this store; Udozo is looking at it.');
       throw error;
     }
   }
@@ -119,9 +119,9 @@ export class ResaleStoreReportsService {
     if (!claimed.count) throw conflict('report_decided', 'This report was already decided.');
     await this.audit.record({ actorId, action: `resale.store_report_${input.decision}`, targetType: 'reseller', targetId: row.resellerId, before: { status: 'open' }, after: { report: id, store: row.storeId, reason: row.reason, note: input.note } });
     const verdict = input.decision === 'upheld' ? 'upheld' : 'looked into and closed';
-    this.emails.customer(row.reporter.id, { title: `Your report of ${row.store.name}`, body: `BitoCard ${verdict} your report. ${input.note}`.slice(0, 280), path: row.reporterKind === 'supplier' ? '/shop/resellers' : '/account/purchases' });
+    this.emails.customer(row.reporter.id, { title: `Your report of ${row.store.name}`, body: `Udozo ${verdict} your report. ${input.note}`.slice(0, 280), path: row.reporterKind === 'supplier' ? '/account/resellers' : '/account/purchases' });
     if (input.decision === 'upheld') this.emails.reseller(row.resellerId, { title: `A report of ${row.store.name} was upheld`, body: `It ${reasonText[row.reason as StoreReportReason]}. This counts as a strike. ${input.note}`.slice(0, 280), path: '/resale/orders' });
-    await this.inbox.customer({ customerId: row.reporter.id, storeId: row.reporter.storeId }, 'customer.purchase.updated', { subject: `resale_store_report:${id}:decided`, title: `Your report of ${row.store.name}`, body: `BitoCard ${verdict} your report. ${input.note}`.slice(0, 280), link: row.reporterKind === 'supplier' ? '/shop/resellers' : '/account/purchases' });
+    await this.inbox.customer({ customerId: row.reporter.id, storeId: row.reporter.storeId }, 'customer.purchase.updated', { subject: `resale_store_report:${id}:decided`, title: `Your report of ${row.store.name}`, body: `Udozo ${verdict} your report. ${input.note}`.slice(0, 280), link: row.reporterKind === 'supplier' ? '/account/resellers' : '/account/purchases' });
     if (input.decision === 'upheld') {
       await this.inbox.reseller(row.resellerId, 'resale.order_updated', { subject: `resale_store_report:${id}`, title: `A report of ${row.store.name} was upheld`, body: `It ${reasonText[row.reason as StoreReportReason]}. This counts as a strike. ${input.note}`.slice(0, 280), link: '/resale/orders' });
       const reseller = await this.prisma.reseller.findUnique({ where: { id: row.resellerId }, select: { country: true } });

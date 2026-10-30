@@ -108,7 +108,7 @@ export function deadlineText(at: Date, country: string) {
 }
 
 const covers = [
-  'Your money is held by BitoCard until you have the item.',
+  'Your money is held by Udozo until you have the item.',
   'At a meet-up, give the release code only once you have inspected it.',
   'For a delivery, confirm when it arrives, or open a dispute if it does not, or is not as described.',
   'If the seller cancels or does not hand it over in time, you are refunded in full, fee included.',
@@ -187,7 +187,7 @@ export class SafePayService {
     const row = await this.prisma.classifiedSafePaySettings.findUnique({ where: { country } });
     if (!row || row.buyerFeeBps === null || row.buyerFeeCapMinor === null || row.sellerFeeBps === null || row.sellerFeeCapMinor === null) throw unavailable('Safe pay is not set up in this country yet.');
     const seller = await this.stores.sellerFor(customer);
-    if (!(await this.wallets.enabled(seller, mode))) throw unavailable('Safe pay is paid from your BitoCard wallet, which is not open in this country.');
+    if (!(await this.wallets.enabled(seller, mode))) throw unavailable('Safe pay is paid from your Udozo wallet, which is not open in this country.');
     const settings: Settings = { ...row, buyerFeeBps: row.buyerFeeBps, buyerFeeCapMinor: row.buyerFeeCapMinor, sellerFeeBps: row.sellerFeeBps, sellerFeeCapMinor: row.sellerFeeCapMinor };
     return { country, mode, settings, house: seller };
   }
@@ -377,7 +377,7 @@ export class SafePayService {
       if (ended.count) await this.tell(other, 'buyer', 'customer.classifieds.order_cancelled', `"${other.listing.title}" is no longer available`, 'Another buyer paid for it with Safe pay first.');
     }
     const paid = await this.reload(order.id);
-    await this.noteInChat(paid, 'Paid with Safe pay: BitoCard holds the money until the hand-over.');
+    await this.noteInChat(paid, 'Paid with Safe pay: Udozo holds the money until the hand-over.');
     await this.tell(
       paid,
       'seller',
@@ -420,8 +420,8 @@ export class SafePayService {
     if (!opened) throw conflict('order_changed', 'This order changed: refresh and try again.');
     if (order.kind === 'resale') this.resaleEvents?.committed();
     const disputed = await this.reload(order.id);
-    await this.tellReseller(disputed, `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until BitoCard decides.`);
-    await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until BitoCard decides; add your side in the dispute.`);
+    await this.tellReseller(disputed, `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides.`);
+    await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides; add your side in the dispute.`);
     await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `Safe pay dispute on SP-${disputed.number}`, body: `${input.reason.replace(/_/g, ' ')}: ${details.slice(0, 120)}`, link: `/classifieds/disputes/${disputed.dispute!.id}` });
     return this.present(disputed, 'buyer');
   }
@@ -474,7 +474,7 @@ export class SafePayService {
     const order = await this.mine(customer, id, 'seller');
     if (order.fulfilment !== 'meet_up' || order.status !== 'paid' || !order.releaseCode) throw this.wrongStatus(order, 'released');
     const tried = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: 'paid', releaseAttempts: { lt: releaseCodeTries } }, data: { releaseAttempts: { increment: 1 } } });
-    if (!tried.count) throw conflict('release_locked', 'The code was entered wrongly too many times. Ask the buyer to confirm it in their app, or contact BitoCard.');
+    if (!tried.count) throw conflict('release_locked', 'The code was entered wrongly too many times. Ask the buyer to confirm it in their app, or contact Udozo.');
     const expected = Buffer.from(this.encryption().decrypt(order.releaseCode));
     const given = Buffer.from(code.trim());
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
@@ -649,8 +649,8 @@ export class SafePayService {
     );
     if (!claimed) throw conflict('order_changed', 'This order changed: refresh and try again.');
     const paid = await this.reload(order.id);
-    await this.noteInChat(paid, `${auto ? 'Accepted' : 'The supplier accepted'}: BitoCard holds the money until the hand-over.`);
-    await this.tell(paid, 'buyer', 'customer.purchase.updated', `Your order for "${paid.listing.title}" is confirmed`, paid.fulfilment === 'meet_up' ? 'Your payment is held by BitoCard. Arrange the hand-over in the order chat; give your release code only once you have checked the item.' : 'Your payment is held by BitoCard until it arrives. You will be told when it is shipped.');
+    await this.noteInChat(paid, `${auto ? 'Accepted' : 'The supplier accepted'}: Udozo holds the money until the hand-over.`);
+    await this.tell(paid, 'buyer', 'customer.purchase.updated', `Your order for "${paid.listing.title}" is confirmed`, paid.fulfilment === 'meet_up' ? 'Your payment is held by Udozo. Arrange the hand-over in the order chat; give your release code only once you have checked the item.' : 'Your payment is held by Udozo until it arrives. You will be told when it is shipped.');
     if (auto) await this.tell(paid, 'seller', 'customer.classifieds.order_paid', `Resale order SP-${paid.number} was accepted for you`, paid.fulfilment === 'meet_up' ? `Hand "${paid.listing.title}" over to the buyer; enter their release code to be paid.` : `Ship "${paid.listing.title}" to the buyer with tracking, after adding dispatch photos.`);
     await this.tellReseller(paid, `SP-${paid.number} was accepted`, `The supplier ${auto ? 'accepts orders automatically' : 'accepted it'}: the buyer's money is held until the hand-over.`);
     return paid;
@@ -885,8 +885,8 @@ export class SafePayService {
     const text = body.trim().slice(0, 2000);
     if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: 'bitocard', authorId: actorId, body: text } });
-    for (const side of ['buyer', 'seller'] as const) await this.tell(order, side, 'customer.classifieds.dispute_message', `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140));
-    await this.tellReseller(order, `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140), true);
+    for (const side of ['buyer', 'seller'] as const) await this.tell(order, side, 'customer.classifieds.dispute_message', `Udozo wrote on the dispute for SP-${order.number}`, text.slice(0, 140));
+    await this.tellReseller(order, `Udozo wrote on the dispute for SP-${order.number}`, text.slice(0, 140), true);
     return this.presentDisputeMessage(message, order, 'admin');
   }
 
@@ -957,8 +957,8 @@ export class SafePayService {
     if (fault === 'supplier') await this.guards.afterStrike(decided.seller, decided.country);
     if (fault === 'reseller' && decided.resellerId) await this.resellerStrike?.(decided.resellerId, decided.country);
     const outcome = { release: 'the money was released to the seller', refund: 'the buyer was refunded in full', partial: `${priceText(decision.kind === 'partial' ? decision.refund : 0n, order.currency)} was refunded to the buyer and the rest released to the seller` }[input.decision];
-    for (const side of ['buyer', 'seller'] as const) await this.tell(decided, side, 'customer.classifieds.dispute_decided', `The dispute on SP-${decided.number} is decided`, `BitoCard decided: ${outcome}. ${input.note}`.slice(0, 280));
-    await this.tellReseller(decided, `The dispute on SP-${decided.number} is decided`, `BitoCard decided: ${outcome}.`);
+    for (const side of ['buyer', 'seller'] as const) await this.tell(decided, side, 'customer.classifieds.dispute_decided', `The dispute on SP-${decided.number} is decided`, `Udozo decided: ${outcome}. ${input.note}`.slice(0, 280));
+    await this.tellReseller(decided, `The dispute on SP-${decided.number} is decided`, `Udozo decided: ${outcome}.`);
     return this.adminGet(order.id, actorId);
   }
 
@@ -1204,7 +1204,7 @@ export class SafePayService {
         'customer.classifieds.order_released',
         `You were paid for SP-${done.number}`,
         review
-          ? `${priceText(sellerPayout!, order.currency)} is in your Shop money. BitoCard checks this payment before it can be withdrawn; you will be told when it is ready.`
+          ? `${priceText(sellerPayout!, order.currency)} is in your Shop money. Udozo checks this payment before it can be withdrawn; you will be told when it is ready.`
           : `${priceText(sellerPayout!, order.currency)} is in your Shop money, ready to withdraw once the payout hold ends.`,
       );
       if (review) await this.inbox.admins('admin.classifieds.payout_review', { subject: done.id, title: `Check the payout of SP-${done.number}`, body: `The buyer topped up by card or mobile money in the last 60 days. Approve the seller's ${priceText(sellerPayout!, order.currency)} for withdrawal, or keep it held.`, link: `/classifieds/orders/${done.id}` });
@@ -1278,7 +1278,7 @@ export class SafePayService {
       subject: `${order.id}:${type}:${Date.now()}`,
       title,
       body,
-      link: resaleBuyer ? `/account/purchases/${order.id}` : `/shop/orders/${order.id}`,
+      link: resaleBuyer ? `/account/purchases/${order.id}` : `/account/orders/${order.id}`,
       mode: order.mode,
     });
     this.emails.order(order, to === 'buyer' ? 'buyer' : 'supplier', { title, body, message: type === 'customer.classifieds.dispute_message' });
@@ -1316,7 +1316,7 @@ export class SafePayService {
     const store = order.store?.name ?? 'The store';
     const name =
       message.author === 'bitocard'
-        ? 'BitoCard'
+        ? 'Udozo'
         : message.author === 'buyer'
           ? publicName(order.buyer.name)
           : order.kind === 'resale' && viewer === 'buyer'

@@ -137,7 +137,7 @@ describe('search', () => {
 
   test('cards carry what a buyer scans: price, cover, place and badges, never a full name or a phone', async () => {
     const [card] = (await get('/v1/classifieds/listings?country=NG&q=samsung')).json.data;
-    assert.equal(card.url, `https://shop.bitocard.com/ng/l/${made.ikeja.ref}-samsung-galaxy-a54-128-gb`);
+    assert.equal(card.url, `https://udozo.com/ng/l/${made.ikeja.ref}-samsung-galaxy-a54-128-gb`);
     assert.deepEqual(card.price, { kind: 'fixed', amount: 28000000, currency: 'NGN' });
     assert.deepEqual([card.cover.url.endsWith('/0.jpg'), card.photo_count, card.area.name, card.area.state.name], [true, 4, 'Ikeja', 'Lagos']);
     assert.deepEqual(card.seller, { name: 'Chinedu O.', badges: [] });

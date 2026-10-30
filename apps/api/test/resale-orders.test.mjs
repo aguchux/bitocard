@@ -315,7 +315,7 @@ describe('who talks, who buys', () => {
     }
 
     const seen = (await person.get(`/v1/store/resale/orders/${order.id}/messages`)).json.data;
-    assert.deepEqual(seen.map(message => [message.from, message.name]), [['bitocard', 'BitoCard'], ['me', 'Amaka E.'], ['store', 'Ngozi Electronics Store'], ['store', 'Ngozi Electronics Store']], 'every store message as the store’s');
+    assert.deepEqual(seen.map(message => [message.from, message.name]), [['bitocard', 'Udozo'], ['me', 'Amaka E.'], ['store', 'Ngozi Electronics Store'], ['store', 'Ngozi Electronics Store']], 'every store message as the store’s');
     assert.ok(!seen.some(message => message.body.includes('receipt')), 'never the trade thread');
     const resellerView = await reseller.api.get(`/v1/resale/orders/${order.id}/messages?thread=trade`);
     check('GET /v1/resale/orders/{id}/messages', 200, resellerView.json);
@@ -502,7 +502,7 @@ describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with 
     assert.ok(placed.text.includes(`https://${reseller.store.subdomain}.`) && placed.text.includes(`/account/purchases/${order.id}`), placed.text);
     assert.ok(placed.text.includes('Sent for Bola Electronics'));
     const [toSupplier] = await mail(supplierEmail, /New order through Bola Electronics/);
-    assert.ok(toSupplier.text.includes(`/shop/orders/${order.id}`));
+    assert.ok(toSupplier.text.includes(`/account/orders/${order.id}`));
     const [toReseller] = await mail(ownerEmail, /New order SP-/);
     assert.ok(toReseller.text.includes(`/resale/orders/${order.id}`));
 
@@ -568,7 +568,7 @@ describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with 
     const relationship = (await seller.get('/v1/classifieds/me/resellers')).json.data[0];
     for (const body of ['Can you give 12% on the 50 inch?', 'Also the 43 inch.']) assert.equal((await reseller.api.post(`/v1/resale/suppliers/${relationship.id}/messages`, { body })).status, 201);
     const [toSupplier] = await mail(supplierEmail, /New message from Tunde Hub/);
-    assert.ok(!toSupplier.text.includes('12%') && toSupplier.text.includes(`/shop/resellers/${relationship.id}`));
+    assert.ok(!toSupplier.text.includes('12%') && toSupplier.text.includes(`/account/resellers/${relationship.id}`));
     assert.equal((await seller.post(`/v1/classifieds/me/resellers/${relationship.id}/messages`, { body: 'Yes, from Monday.' })).status, 201);
     const [toReseller] = await mail(ownerEmail, /New message from Tunde B\./);
     assert.ok(!toReseller.text.includes('Monday'));
@@ -578,14 +578,14 @@ describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with 
     // A listing BitoCard removes is emailed to its seller.
     assert.equal((await admin.post(`/v1/admin/classifieds/listings/${item.id}/remove`, { reason: 'Photos of another seller.' })).status, 200);
     const [removed] = await mail(supplierEmail, /Your ad was removed/);
-    assert.ok(removed.text.includes('BitoCard Shop, a Golojan Ltd venture.'));
+    assert.ok(removed.text.includes('Udozo.'));
 
     // A direct Safe pay order's seller and buyer (bitocard.com accounts) hear from BitoCard Shop.
     const emails = server.app.get((await import('../dist/classifieds/shop-emails.service.js')).ShopEmails);
     const id = randomUUID();
     emails.order({ id, kind: 'direct', mode: 'live', storeId: null, resellerId: null, buyerId: seller.id, sellerId: seller.id }, 'supplier', { title: 'Direct order step', body: 'Hand it over.' });
     const [direct] = await mail(supplierEmail, /^Direct order step$/);
-    assert.ok(direct.text.includes(`/shop/orders/${id}`) && direct.text.includes('BitoCard Shop, a Golojan Ltd venture.'));
+    assert.ok(direct.text.includes(`/account/orders/${id}`) && direct.text.includes('Udozo.'));
     emails.order({ id, kind: 'direct', mode: 'live', storeId: null, resellerId: null, buyerId: seller.id, sellerId: seller.id }, 'reseller', { title: 'Never sent', body: '' });
     await new Promise(resolve => setTimeout(resolve, 100));
     assert.equal(outbox().filter(item => item.subject === 'Never sent').length, 0, 'no reseller on a direct order');

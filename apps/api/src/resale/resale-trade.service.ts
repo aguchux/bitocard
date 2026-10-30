@@ -77,12 +77,12 @@ export class ResaleTradeService {
   private async tellSupplier(relationshipId: string, type: 'customer.resale.reseller_added' | 'customer.resale.message' | 'customer.resale.note_pending' | 'customer.resale.deal_answered', subject: string, title: string, body: string) {
     const row = await this.prisma.resaleRelationship.findUnique({ where: { id: relationshipId }, select: { supplier: { select: { id: true, storeId: true } } } });
     if (!row) return;
-    await this.inbox.customer({ customerId: row.supplier.id, storeId: row.supplier.storeId }, type, { subject, title, body, link: `/shop/resellers/${relationshipId}` });
+    await this.inbox.customer({ customerId: row.supplier.id, storeId: row.supplier.storeId }, type, { subject, title, body, link: `/account/resellers/${relationshipId}` });
     const message = type === 'customer.resale.message';
     this.emails.customer(row.supplier.id, {
       title,
       body: message ? 'Open the chat to read it and reply.' : body,
-      path: `/shop/resellers/${relationshipId}`,
+      path: `/account/resellers/${relationshipId}`,
       action: 'Open My Resellers',
       throttle: message ? { model: 'resaleRelationship', id: relationshipId, field: 'supplierEmailedAt' } : undefined,
     });
@@ -259,7 +259,7 @@ export class ResaleTradeService {
   // ---- Messages (either side) ----
 
   private presentMessage(message: { id: string; author: string; userId: string | null; body: string; dealId: string | null; createdAt: Date }, names: { supplier: string; reseller: string; people: Map<string, string> }, side: Side, deals: Map<string, ReturnType<ResaleTradeService['presentDeal']>>) {
-    const name = message.author === 'system' ? 'BitoCard' : message.author === 'supplier' ? names.supplier : side === 'reseller' && message.userId ? (names.people.get(message.userId) ?? names.reseller) : names.reseller;
+    const name = message.author === 'system' ? 'Udozo' : message.author === 'supplier' ? names.supplier : side === 'reseller' && message.userId ? (names.people.get(message.userId) ?? names.reseller) : names.reseller;
     return {
       object: 'resale_message' as const,
       id: message.id,
@@ -358,7 +358,7 @@ export class ResaleTradeService {
           verified: row.reseller.status === 'active',
           phone: !this.closed(row) ? this.resellerPhone(row) : null,
         },
-        stores: stores.map(store => ({ id: store.id, name: store.name, url: `https://${store.subdomain}.bitocard.com` })),
+        stores: stores.map(store => ({ id: store.id, name: store.name, url: `https://${store.subdomain}.udozo.com` })),
         stopped: Boolean(row.supplierBlockedAt),
         closed_by_reseller: Boolean(row.resellerBlockedAt),
         listings_carried: mine.length,

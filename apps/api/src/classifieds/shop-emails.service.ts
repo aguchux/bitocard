@@ -47,7 +47,7 @@ export class ShopEmails {
       body: input.message ? 'Open the order to read it and reply.' : input.body,
       sandbox: order.mode === 'test',
       throttle: input.message ? { model: 'classifiedOrder', id: order.id, field: orderField[to] } : undefined,
-      path: to === 'reseller' ? `/resale/orders/${order.id}` : to === 'buyer' && resale ? `/account/purchases/${order.id}` : `/shop/orders/${order.id}`,
+      path: to === 'reseller' ? `/resale/orders/${order.id}` : to === 'buyer' && resale ? `/account/purchases/${order.id}` : `/account/orders/${order.id}`,
       action: to === 'buyer' ? 'View your order' : 'Open the order',
       held: to === 'buyer',
       ...(to === 'buyer' && resale && order.storeId ? { storeId: order.storeId } : {}),
@@ -67,7 +67,7 @@ export class ShopEmails {
   }
 
   private later(work: Promise<unknown>, who: string) {
-    waitUntil(work.catch(error => this.logger.warn({ err: error, who }, 'Could not send a BitoCard Shop email')));
+    waitUntil(work.catch(error => this.logger.warn({ err: error, who }, 'Could not send a Udozo email')));
   }
 
   private async claim(throttle?: EmailThrottle) {
@@ -84,7 +84,7 @@ export class ShopEmails {
     const owner = await this.prisma.resellerMember.findFirst({ where: { resellerId, role: 'owner' }, select: { user: { select: { email: true } } } });
     if (!owner) return;
     const link = `${this.integrations.config.DASHBOARD_URL.replace(/\/+$/, '')}${notice.path}`;
-    await this.email.send(resaleOrderEmail(owner.user.email, { title: notice.title, body: notice.body, link, action: notice.action ?? 'Open in SHQ', signature: 'BitoCard, a Golojan Ltd venture.', sandbox: notice.sandbox ?? false }));
+    await this.email.send(resaleOrderEmail(owner.user.email, { title: notice.title, body: notice.body, link, action: notice.action ?? 'Open in Seller HQ', signature: 'Udozo.', sandbox: notice.sandbox ?? false }));
   }
 
   private async sendCustomer(customerId: string, notice: Notice) {
@@ -92,7 +92,7 @@ export class ShopEmails {
     if (!customer?.emailVerifiedAt || customer.status !== 'active') return;
     if (!(await this.claim(notice.throttle))) return;
     const store = await this.storeOf(notice.storeId ?? customer.storeId);
-    const signature = store.own ? `Sent for ${store.name}.${notice.held ? ' Your payment is held by BitoCard until you have the item.' : ''}` : 'BitoCard Shop, a Golojan Ltd venture.';
+    const signature = store.own ? `Sent for ${store.name}.${notice.held ? ' Your payment is held by Udozo until you have the item.' : ''}` : 'Udozo.';
     const message = resaleOrderEmail(customer.email, { title: notice.title, body: notice.body, link: `${store.origin}${notice.path}`, action: notice.action ?? 'Open it', signature, sandbox: notice.sandbox ?? false });
     await this.email.send(message, store.own ? { resellerId: store.resellerId, name: store.name } : undefined);
   }
@@ -100,7 +100,7 @@ export class ShopEmails {
   /** Where a customer's account lives: a reseller's store (its main address, its name) or BitoCard's own. */
   private async storeOf(storeId: string) {
     const base = new URL(this.integrations.config.STOREFRONT_URL);
-    const bitocard = { own: false as const, origin: `${base.protocol}//${base.host}`, name: 'BitoCard', resellerId: '' };
+    const bitocard = { own: false as const, origin: `${base.protocol}//${base.host}`, name: 'Udozo', resellerId: '' };
     const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { name: true, subdomain: true, resellerId: true, reseller: { select: { house: true } } } });
     if (!store || store.subdomain === 'bitocard' || store.reseller.house) return bitocard;
     const domain = await this.prisma.storeDomain.findFirst({ where: { storeId, primary: true, status: 'active' }, select: { name: true } });

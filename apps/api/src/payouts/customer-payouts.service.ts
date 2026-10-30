@@ -204,7 +204,7 @@ export class CustomerPayoutsService {
       subject: account.id,
       title: 'Bank account added',
       body: `${bank.name} ending ${account.accountNumberLast4} can receive your payouts from ${when}. If this was not you, remove it and change your password.`,
-      link: '/shop/payouts',
+      link: '/account/payouts',
       mode,
     });
     return presentCustomerBankAccount(account);
@@ -250,7 +250,7 @@ export class CustomerPayoutsService {
           HttpStatus.PAYMENT_REQUIRED,
           'invalid_request_error',
           'insufficient_funds',
-          `You can pay out up to ${formatMoney(available > 0n ? available : 0n, currency)} now. Money from P2P and Shop sales can be paid out ${country.payoutHoldDays} days after each sale, and Safe pay money BitoCard is checking once it is approved.`,
+          `You can pay out up to ${formatMoney(available > 0n ? available : 0n, currency)} now. Money from P2P and Shop sales can be paid out ${country.payoutHoldDays} days after each sale, and Safe pay money Udozo is checking once it is approved.`,
           'amount',
         );
       }
@@ -346,7 +346,7 @@ export class CustomerPayoutsService {
         body: paid
           ? `Your money was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
           : `The payout to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your P2P balance.`,
-        link: '/shop/payouts',
+        link: '/account/payouts',
         mode: updated.mode,
       });
     }

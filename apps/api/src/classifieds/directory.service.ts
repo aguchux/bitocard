@@ -125,7 +125,7 @@ export class ShopDirectoryService {
    */
   async showcase(category?: string) {
     const markets = await this.markets();
-    if (!markets.showcase) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'showcase_unavailable', 'BitoCard Shop opens across countries with its second market.');
+    if (!markets.showcase) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'showcase_unavailable', 'Udozo opens across countries with its second market.');
     const codes = markets.data.map(market => market.country);
 
     const categories = await this.prisma.classifiedCategory.findMany({

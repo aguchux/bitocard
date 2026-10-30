@@ -105,7 +105,7 @@ export class ShopAssistantService {
   }
 
   private checkAsker(asker: Asker) {
-    if (asker.customer && !asker.customer.store.reseller.house) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_unavailable', 'BitoCard Shop is for bitocard.com accounts.');
+    if (asker.customer && !asker.customer.store.reseller.house) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_unavailable', 'Sign in with your Udozo account.');
   }
 
   // -- Who answers ----------------------------------------------------------------------------------------------
@@ -378,7 +378,7 @@ export class ShopAssistantService {
       .reverse()
       .map(message => `${message.role === 'user' ? 'Me' : (bot?.name ?? 'Assistant')}: ${message.body || '(showed results)'}`)
       .join('\n');
-    const body = `I was talking to ${bot?.name ?? 'the assistant'} on BitoCard Shop (${thread.country}) and need a person.\n\n${transcript}`.slice(0, 1900);
+    const body = `I was talking to ${bot?.name ?? 'the assistant'} on Udozo (${thread.country}) and need a person.\n\n${transcript}`.slice(0, 1900);
     const chat = await this.chats.sendAs({ kind: 'customer', customer: asker.customer }, body);
     if (chat.status === 'bot') await this.chats.askForPersonAs({ kind: 'customer', customer: asker.customer }, chat.id);
     await this.prisma.assistantThread.update({ where: { id: thread.id }, data: { chatId: chat.id } });
@@ -543,7 +543,7 @@ export class ShopAssistantService {
     const done = await this.structured(
       bot,
       scope,
-      `Suggest the person's next reply in this chat about "${chat.title ?? 'a listing'}" (they are the ${chat.side}): short, polite, keeping the trade on BitoCard, recommending Safe pay or a public meet-up where money is involved, never asking for or sharing codes, phone numbers or bank details.\n\n${quoted('Messages', chat.lines.join('\n'), 3000) ?? '(no messages yet)'}`,
+      `Suggest the person's next reply in this chat about "${chat.title ?? 'a listing'}" (they are the ${chat.side}): short, polite, keeping the trade on Udozo, recommending Safe pay or a public meet-up where money is involved, never asking for or sharing codes, phone numbers or bank details.\n\n${quoted('Messages', chat.lines.join('\n'), 3000) ?? '(no messages yet)'}`,
       { name: 'propose_reply', description: 'The suggested reply.', parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
     );
     const raw = typeof done.args?.text === 'string' ? done.args.text : '';

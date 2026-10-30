@@ -8,7 +8,7 @@ import { priceText } from '../rules.js';
 export const shopKnowledgeKeys = ['shop', 'categories', 'posting', 'safe_pay', 'safe_trade', 'prohibited', 'badges', 'contact'] as const;
 export type ShopKnowledgeKey = (typeof shopKnowledgeKeys)[number];
 export const shopKnowledgeTitles: Record<ShopKnowledgeKey, string> = {
-  shop: 'BitoCard Shop',
+  shop: 'Udozo',
   categories: 'Categories and what to fill in',
   posting: 'Posting rules and limits',
   safe_pay: 'Safe pay',
@@ -33,7 +33,7 @@ export function shopSections(content: string): Partial<Record<ShopKnowledgeKey, 
 
 /** The checks for every trade a buyer pays for themselves, as on the Safe Trade Guide page. */
 export const safeTradeGuide = [
-  { title: 'Before you meet', items: ['Keep the chat on BitoCard', "Check the seller's badges", 'The price is close to similar listings', 'Agree the place, time and how you will pay', 'Tell someone where you are going'] },
+  { title: 'Before you meet', items: ['Keep the chat on Udozo', "Check the seller's badges", 'The price is close to similar listings', 'Agree the place, time and how you will pay', 'Tell someone where you are going'] },
   { title: 'At the meeting', items: ['A busy public place, in daylight', 'Inspect and test it with the checks for its category', 'Check papers and serial numbers', 'Pay only when you are happy; confirm a transfer in your own banking app'] },
   { title: 'If you are selling', items: ['Hand over only when the money shows in your own account', 'Never trust an SMS alert or a screenshot', 'Refuse overpayments; check cash notes'] },
 ];
@@ -111,9 +111,9 @@ export class ShopKnowledgeService {
     return {
       shop: [
         `# ${shopKnowledgeTitles.shop}`,
-        `- BitoCard Shop in ${data.name}: shop.bitocard.com/${data.country.toLowerCase()}. People buy and sell near them: phones, cars, property, electronics and more.`,
-        `- Prices are in ${data.currency}. Every account can buy and sell; sellers post from the Shop tab of their account on ${data.country.toLowerCase()}.bitocard.com.`,
-        '- Buyers chat with sellers on BitoCard, make offers, and can pay with Safe pay where it is open.',
+        `- Udozo in ${data.name}: udozo.com/${data.country.toLowerCase()}. People buy and sell near them: phones, cars, property, electronics and more.`,
+        `- Prices are in ${data.currency}. Every account can buy and sell; sellers post from their account on udozo.com (Sell).`,
+        '- Buyers chat with sellers on Udozo, make offers, and can pay with Safe pay where it is open.',
       ].join('\n'),
       categories: [
         `# ${shopKnowledgeTitles.categories}`,
@@ -132,12 +132,12 @@ export class ShopKnowledgeService {
       safe_pay: sp
         ? [
             `# ${shopKnowledgeTitles.safe_pay}`,
-            '- The buyer asks to buy with Safe pay at the listed price or an accepted offer; the seller accepts; the buyer pays from their BitoCard wallet and BitoCard holds the money.',
+            '- The buyer asks to buy with Safe pay at the listed price or an accepted offer; the seller accepts; the buyer pays from their Udozo wallet and Udozo holds the money.',
             `- Fees: the buyer pays ${sp.buyer} on top; the seller pays ${sp.seller} out of what they are paid. The total is shown before paying.`,
             `- Deadlines: the seller accepts within ${sp.acceptHours} hours, the buyer pays within ${sp.payHours} hours, the hand-over happens within ${sp.handoverDays} days, and a delivery is confirmed within ${sp.confirmDays} days (then it is released by itself).`,
             '- At a meet-up the buyer gives the seller their release code only once they have inspected the item; the seller enters it and is paid. For a delivery the buyer confirms it arrived.',
-            '- Never share the release code before inspecting, and never anywhere but face to face. BitoCard never asks for it.',
-            '- If the seller cancels or does not hand over in time, the buyer is refunded in full, fee included. Not as described, or it never came: the buyer opens a dispute and BitoCard decides (a refund, part refund or release).',
+            '- Never share the release code before inspecting, and never anywhere but face to face. Udozo never asks for it.',
+            '- If the seller cancels or does not hand over in time, the buyer is refunded in full, fee included. Not as described, or it never came: the buyer opens a dispute and Udozo decides (a refund, part refund or release).',
             '- Sellers need an identity check and a payout bank account in their verified name before their first Safe pay sale; what they are paid can be withdrawn after the payout hold.',
           ].join('\n')
         : `# ${shopKnowledgeTitles.safe_pay}\n- Safe pay is not open in ${data.name} yet: buyers and sellers arrange payment themselves. Follow the Safe Trade Guide.`,
@@ -155,14 +155,14 @@ export class ShopKnowledgeService {
       badges: [
         `# ${shopKnowledgeTitles.badges}`,
         '- Phone confirmed: the seller confirmed a mobile number with a code.',
-        '- ID checked: BitoCard checked the seller’s identity document.',
+        '- ID checked: Udozo checked the seller’s identity document.',
         '- Badges say what was checked, not that a seller or item is trustworthy: still inspect before paying.',
       ].join('\n'),
       contact: [
         `# ${shopKnowledgeTitles.contact}`,
         '- Report a listing or a chat from its menu; enough reports send it back to a moderator.',
         '- A Safe pay order’s problems go through its dispute, from the order.',
-        '- Anything else: Talk to a person opens a chat with BitoCard’s support.',
+        '- Anything else: Talk to a person opens a chat with Udozo’s support.',
       ].join('\n'),
     };
   }
@@ -177,7 +177,7 @@ export class ShopKnowledgeService {
   sharedTemplate(name: string) {
     return [
       `# About ${name}`,
-      `(Who ${name} is and how it should come across, in two or three sentences. BitoCard's sections for each country are added by themselves.)`,
+      `(Who ${name} is and how it should come across, in two or three sentences. Udozo's sections for each country are added by themselves.)`,
       '# FAQs',
       '(Questions people ask most, each as "## Question" followed by the answer.)',
       '# Things the assistant must not do',

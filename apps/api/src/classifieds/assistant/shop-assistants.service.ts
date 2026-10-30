@@ -115,7 +115,7 @@ export class ShopAssistantsService {
     const unique = [...new Map(wanted.map(item => [slotOf(item), item])).values()];
     const known = await this.prisma.country.findMany({ where: { code: { in: unique.map(item => item.country) } }, select: { code: true } });
     const missing = unique.find(item => !known.some(country => country.code === item.country));
-    if (missing) throw invalid('parameter_invalid', `${missing.country} is not a BitoCard market.`, 'assignments');
+    if (missing) throw invalid('parameter_invalid', `${missing.country} is not a Udozo market.`, 'assignments');
     const before = await this.prisma.shopBotAssignment.findMany({ where: { botId: id }, select: { country: true, language: true } });
     await this.prisma.$transaction(async tx => {
       await tx.shopBotAssignment.deleteMany({ where: { botId: id } });

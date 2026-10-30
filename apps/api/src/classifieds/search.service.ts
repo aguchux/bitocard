@@ -36,7 +36,7 @@ export type SearchInput = {
 
 type FeatureFilter = { featureId: string; values?: string[]; min?: number; max?: number };
 
-const gone = () => new ApiError(HttpStatus.GONE, 'invalid_request_error', 'listing_gone', 'This listing is no longer on BitoCard Shop.');
+const gone = () => new ApiError(HttpStatus.GONE, 'invalid_request_error', 'listing_gone', 'This listing is no longer on Udozo.');
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
 
 /** How many feature values a card shows under its title ("256 GB · 6 GB RAM · Black"). */

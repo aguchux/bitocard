@@ -42,7 +42,7 @@ export class SafePayGuardsService {
     await this.inbox.admins('admin.classifieds.same_person', {
       subject: `${first}:${second}`,
       title: 'Safe pay refused: one person on both sides',
-      body: `A buyer and seller on BitoCard Shop matched by ${reason.replace(/_/g, ' ')}. Their order was refused; check both accounts.`,
+      body: `A buyer and seller on Udozo matched by ${reason.replace(/_/g, ' ')}. Their order was refused; check both accounts.`,
       link: `/storefront/customers/${buyerId}`,
     });
     throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'same_person', 'Safe pay is for trades between two different people, so it cannot be used here.');
@@ -117,11 +117,11 @@ export class SafePayGuardsService {
     await this.inbox.customer({ customerId: seller.id, storeId: seller.storeId }, 'customer.classifieds.safe_pay_limited', {
       subject,
       title: 'You cannot take Safe pay orders for now',
-      body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact BitoCard to have it reviewed.`,
-      link: '/shop/orders',
+      body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact Udozo to have it reviewed.`,
+      link: '/account/orders',
     });
-    this.emails.customer(seller.id, { title: 'You cannot take Safe pay orders for now', body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you. Contact BitoCard to have it reviewed.`, path: '/shop/orders' });
-    await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A BitoCard Shop seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/storefront/customers/${seller.id}` });
+    this.emails.customer(seller.id, { title: 'You cannot take Safe pay orders for now', body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you. Contact Udozo to have it reviewed.`, path: '/account/orders' });
+    await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A Udozo seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/storefront/customers/${seller.id}` });
   }
 
   /** `safe_pay_limited` once a seller has reached the strike limit. */
@@ -131,7 +131,7 @@ export class SafePayGuardsService {
       HttpStatus.FORBIDDEN,
       'permission_error',
       'safe_pay_limited',
-      asSeller ? `You cannot take Safe pay orders for now: too many were cancelled, not handed over or lost in the last ${strikeWindowDays} days. Contact BitoCard to have it reviewed.` : 'This seller cannot take Safe pay orders at the moment. You can still chat with them.',
+      asSeller ? `You cannot take Safe pay orders for now: too many were cancelled, not handed over or lost in the last ${strikeWindowDays} days. Contact Udozo to have it reviewed.` : 'This seller cannot take Safe pay orders at the moment. You can still chat with them.',
     );
   }
 

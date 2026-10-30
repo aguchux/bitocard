@@ -96,7 +96,7 @@ const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 're
 const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
 
 /** Where a listing is public. */
-export const shopOrigin = 'https://shop.bitocard.com';
+export const shopOrigin = 'https://udozo.com';
 
 /**
  * BitoCard Shop's listings, from the seller's side: drafts saved as they go, checked against the feature registry,
@@ -118,7 +118,7 @@ export class ListingsService {
   /** The seller's country, once they may sell there. */
   async sellerCountry(customer: CustomerWithStore) {
     if (!customer.store.reseller.house) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_unavailable', 'BitoCard Shop is for bitocard.com accounts.');
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_unavailable', 'Sign in with your Udozo account.');
     }
     if (!customer.emailVerifiedAt) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
@@ -134,7 +134,7 @@ export class ListingsService {
   /** `classifieds_unavailable` unless BitoCard Shop is open in the country. */
   async requireOpen(country: string) {
     if (!(await this.settings.isOnForCountry('classifieds', country))) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_unavailable', 'BitoCard Shop is not open in this country yet.');
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_unavailable', 'Udozo is not open in this country yet.');
     }
   }
 
@@ -424,7 +424,7 @@ export class ListingsService {
     }
     const onShop = fields.onShop ?? current?.onShop ?? true;
     const resale = fields.resale ?? current?.resale ?? false;
-    if (!onShop && !resale) throw invalid('channel_required', 'Sell it on BitoCard Shop, through resellers, or both.', 'on_shop');
+    if (!onShop && !resale) throw invalid('channel_required', 'Sell it on Udozo, through resellers, or both.', 'on_shop');
     if (resale && ['resale', 'resaleDiscountBps', 'resaleMarkupMaxBps', 'priceKind'].some(key => key in fields)) {
       if (priceKind === 'on_request') throw invalid('resale_price_required', 'Resellers sell at a price: give one to let them sell it.', 'price_kind');
       const discount = 'resaleDiscountBps' in fields ? fields.resaleDiscountBps! : (current?.resaleDiscountBps ?? null);

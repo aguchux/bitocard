@@ -22,7 +22,7 @@ class PageQueryDto {
 }
 
 class CatalogueQueryDto extends PageQueryDto {
-  @ApiPropertyOptional({ description: 'A BitoCard Shop category slug (its subcategories included), for example `phones`.' })
+  @ApiPropertyOptional({ description: 'A Udozo category slug (its subcategories included), for example `phones`.' })
   @IsOptional() @Matches(slug)
   category?: string;
 
@@ -176,7 +176,7 @@ export class ResaleController {
     private readonly trade: ResaleTradeService,
   ) {}
 
-  @ApiOperation({ summary: 'Get your reselling status', description: 'Whether you can resell BitoCard Shop listings (and why not), your stores on the Resale shop template, and BitoCard’s fee on your margin.' })
+  @ApiOperation({ summary: 'Get your reselling status', description: 'Whether you can resell Udozo listings (and why not), your stores on the Resale shop template, and Udozo’s fee on your margin.' })
   @Scopes('resale:read')
   @Get()
   account(@CurrentCaller() caller: Caller) {
@@ -197,7 +197,7 @@ export class ResaleController {
     return this.stores.catalogueListing(resellerOf(caller), id);
   }
 
-  @ApiOperation({ summary: 'Preview a resale price', description: 'What one sale at a markup or fixed price would give: your margin, BitoCard’s fee on it, your earnings and what the buyer pays. Nothing is saved.' })
+  @ApiOperation({ summary: 'Preview a resale price', description: 'What one sale at a markup or fixed price would give: your margin, Udozo’s fee on it, your earnings and what the buyer pays. Nothing is saved.' })
   @Scopes('resale:read')
   @Get('price-preview')
   preview(@CurrentCaller() caller: Caller, @Query() query: PreviewQueryDto) {

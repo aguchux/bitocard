@@ -27,8 +27,8 @@ const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found
 const unavailable = (message: string, param?: string) => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'resale_unavailable', message, param);
 
 const gateMessages = {
-  switch_off: 'Reselling BitoCard Shop listings is not open to your account yet.',
-  house_account: 'BitoCard’s own stores do not resell listings.',
+  switch_off: 'Reselling Udozo listings is not open to your account yet.',
+  house_account: 'Udozo’s own stores do not resell listings.',
   not_verified: 'Finish your verification before reselling listings.',
   no_country: 'Choose your business country before reselling listings.',
   resale_closed: 'Reselling is not open in your country yet.',
@@ -538,7 +538,7 @@ export class ResaleStoresService {
     }
     const text = ` ${note.toLowerCase().replace(/[^\p{L}\p{N}-]+/gu, ' ')} `;
     const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { platform: 'bitocard', OR: [{ country: null }, { country }] } });
-    if (words.some(word => text.includes(` ${word.phrase.replace(/[^\p{L}\p{N}-]+/gu, ' ')} `))) throw invalid('note_refused', 'This note uses words BitoCard Shop does not allow.', 'note');
+    if (words.some(word => text.includes(` ${word.phrase.replace(/[^\p{L}\p{N}-]+/gu, ' ')} `))) throw invalid('note_refused', 'This note uses words Udozo does not allow.', 'note');
     return note;
   }
 

@@ -200,7 +200,7 @@ describe("category covers (bitocard.com's Shop band)", () => {
     const covers = await get('/v1/classifieds/category-covers?country=ng');
     assert.equal(covers.status, 200, JSON.stringify(covers.json));
     assert.equal(covers.cache, 'public, max-age=60');
-    assert.equal(covers.json.url, 'https://shop.bitocard.com/ng');
+    assert.equal(covers.json.url, 'https://udozo.com/ng');
     const categories = (await get('/v1/classifieds/categories?country=NG')).json.data.map(row => row.slug);
     assert.deepEqual(
       covers.json.data.map(row => row.slug),
@@ -209,7 +209,7 @@ describe("category covers (bitocard.com's Shop band)", () => {
     );
     const phones = covers.json.data.find(row => row.slug === 'phones-tablets');
     assert.ok(phones.listings >= 1, 'a top category counts its subcategories’ listings');
-    assert.equal(phones.url, 'https://shop.bitocard.com/ng/c/phones-tablets');
+    assert.equal(phones.url, 'https://udozo.com/ng/c/phones-tablets');
     // The cover is the first photo of one of its live listings (sold ones are not live).
     const liveIds = [made.phone.id, made.laptop.id];
     assert.match(phones.photo.url, new RegExp(`^https://media\\.test/(${liveIds.join('|')})/0\\.jpg$`));

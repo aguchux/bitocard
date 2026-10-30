@@ -61,7 +61,7 @@ class ThreadMessageDto {
   @IsOptional() @IsIn(orderThreads)
   thread?: OrderThread;
 
-  @ApiProperty({ description: 'The message: no links, account or card numbers, or requests to pay outside BitoCard.', maxLength: 2000 })
+  @ApiProperty({ description: 'The message: no links, account or card numbers, or requests to pay outside Udozo.', maxLength: 2000 })
   @IsString() @Length(1, 2000)
   body: string;
 }
@@ -82,14 +82,14 @@ export class ResaleOrdersController {
     private readonly safePay: SafePayService,
   ) {}
 
-  @ApiOperation({ summary: 'Get an order’s dispute', description: 'The buyer’s dispute on one of your resale orders: its reason, state and BitoCard’s decision, and every message from the buyer, the supplier, you and BitoCard, oldest first. BitoCard decides it; add your side while it is open.' })
+  @ApiOperation({ summary: 'Get an order’s dispute', description: 'The buyer’s dispute on one of your resale orders: its reason, state and Udozo’s decision, and every message from the buyer, the supplier, you and Udozo, oldest first. Udozo decides it; add your side while it is open.' })
   @Scopes('resale:read')
   @Get(':id/dispute')
   dispute(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
     return this.safePay.resellerDisputeThread(resellerOf(caller), id, storeScopeOf(caller));
   }
 
-  @ApiOperation({ summary: 'Add to an order’s dispute', description: 'Your side while the dispute is open: what your store told the buyer, or evidence you hold. The buyer reads it as from your store; the supplier and BitoCard see it too.' })
+  @ApiOperation({ summary: 'Add to an order’s dispute', description: 'Your side while the dispute is open: what your store told the buyer, or evidence you hold. The buyer reads it as from your store; the supplier and Udozo see it too.' })
   @Roles('admin', 'support')
   @Scopes('resale:write')
   @Post(':id/dispute/messages')

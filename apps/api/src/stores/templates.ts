@@ -627,7 +627,7 @@ const resaleShop: StoreTemplate = {
   key: 'resale_shop',
   name: 'Resale shop',
   tagline: 'Sell checked suppliers’ products under your brand.',
-  description: 'Phones, electronics, fashion and more from BitoCard Shop suppliers in your country, at your prices. Every listing shows its supplier, and buyers’ money is held until they have the item.',
+  description: 'Phones, electronics, fashion and more from Udozo suppliers in your country, at your prices. Every listing shows its supplier, and buyers’ money is held until they have the item.',
   categories: [],
   single: false,
   resale: true,

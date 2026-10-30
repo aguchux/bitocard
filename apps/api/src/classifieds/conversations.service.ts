@@ -38,7 +38,7 @@ export const emailAfterMs = 10 * minuteMs;
 /** Chats with no message for this long are deleted, unless reported. */
 export const keepChatsMs = 365 * dayMs;
 /** Every chat opens with this, from BitoCard. */
-export const safetyNote = 'Stay safe: keep the chat on BitoCard, meet in a busy public place, inspect before paying and never pay in advance. BitoCard never asks for codes or passwords.';
+export const safetyNote = 'Stay safe: keep the chat on Udozo, meet in a busy public place, inspect before paying and never pay in advance. Udozo never asks for codes or passwords.';
 
 type Side = 'buyer' | 'seller';
 
@@ -310,7 +310,7 @@ export class ConversationsService {
       subject: offer.id,
       title: `${publicName(customer.name)} offered ${priceText(price, chat.listing.currency)}`,
       body: `For "${chat.listing.title}". Accept or decline it in the chat within 48 hours.`,
-      link: `/shop/messages/${chat.id}`,
+      link: `/account/messages/${chat.id}`,
     });
     return this.presentOffer(offer, customer.id);
   }
@@ -362,7 +362,7 @@ export class ConversationsService {
         subject: `${offer.id}:${outcome}`,
         title: `Your offer of ${amount} was ${outcome}`,
         body: outcome === 'accepted' ? `For "${chat.listing.title}". Agree how to pay and hand over in the chat, or use Safe pay.` : `For "${chat.listing.title}". You can make another offer in the chat.`,
-        link: `/shop/messages/${chat.id}`,
+        link: `/account/messages/${chat.id}`,
       });
     }
     return this.presentOffer(await this.prisma.classifiedOffer.findUniqueOrThrow({ where: { id: offer.id } }), customer.id);
@@ -404,7 +404,7 @@ export class ConversationsService {
       byRecipient.set(row.recipient_id, [...(byRecipient.get(row.recipient_id) ?? []), { id: row.id, side: row.side, unread: Number(row.unread) }]);
     }
     let sent = 0;
-    const link = `${this.integrations.config.STOREFRONT_URL.replace(/\/+$/, '')}/shop/messages`;
+    const link = `${this.integrations.config.STOREFRONT_URL.replace(/\/+$/, '')}/account/messages`;
     for (const [recipientId, chats] of byRecipient) {
       const recipient = await this.prisma.customer.findUnique({ where: { id: recipientId }, select: { email: true, name: true, emailVerifiedAt: true, status: true } });
       if (!recipient?.emailVerifiedAt || recipient.status !== 'active') continue;
@@ -417,7 +417,7 @@ export class ConversationsService {
         await this.email.send(shopMessagesEmail(recipient.email, { name: recipient.name.split(/\s+/)[0], chats: lines, link }));
         sent += 1;
       } catch (error) {
-        this.logger.warn({ err: error }, 'Could not email unread BitoCard Shop messages');
+        this.logger.warn({ err: error }, 'Could not email unread Udozo messages');
       }
     }
     return { emailed: sent };
@@ -494,7 +494,7 @@ export class ConversationsService {
     const side = this.sideOf(chat, customerId)!;
     if ((side === 'buyer' && chat.buyerBlockedAt) || (side === 'seller' && chat.sellerBlockedAt)) throw conflict('conversation_blocked', 'You blocked this person. Unblock them to write.');
     if (chat.buyerBlockedAt || chat.sellerBlockedAt) throw conflict('conversation_blocked', 'You can no longer write in this chat.');
-    if (chat.listing.status === 'removed') throw conflict('listing_removed', 'BitoCard removed this listing, so this chat is closed.');
+    if (chat.listing.status === 'removed') throw conflict('listing_removed', 'Udozo removed this listing, so this chat is closed.');
     return side;
   }
 
@@ -528,7 +528,7 @@ export class ConversationsService {
       subject: `${chat.id}:${now.getTime()}`,
       title,
       body: body.length > 140 ? `${body.slice(0, 137)}...` : body,
-      link: `/shop/messages/${chat.id}`,
+      link: `/account/messages/${chat.id}`,
     });
   }
 

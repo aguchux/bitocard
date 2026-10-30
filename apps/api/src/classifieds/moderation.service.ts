@@ -44,7 +44,7 @@ export class ModerationService {
   /** `classifieds_suspended` for a suspended seller. */
   async requireNotSuspended(customerId: string) {
     const seller = await this.prisma.classifiedSeller.findUnique({ where: { customerId } });
-    if (seller?.suspendedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_suspended', 'Your BitoCard Shop account is suspended. Contact support if you think this is a mistake.');
+    if (seller?.suspendedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'classifieds_suspended', 'Your Udozo account is suspended. Contact support if you think this is a mistake.');
   }
 
   /**
@@ -58,7 +58,7 @@ export class ModerationService {
     const words = await this.prisma.classifiedProhibitedWord.findMany({ where: { platform: 'bitocard', OR: [{ country: null }, { country: listing.country }] } });
     const found = words.filter(word => text.includes(` ${word.phrase.replace(/[^\p{L}\p{N}-]+/gu, ' ')} `));
     if (found.some(word => word.action === 'block')) {
-      throw invalid('listing_prohibited', 'This listing mentions something that cannot be sold on BitoCard Shop. See the prohibited items in the marketplace terms.', 'title');
+      throw invalid('listing_prohibited', 'This listing mentions something that cannot be sold on Udozo. See the prohibited items in the marketplace terms.', 'title');
     }
     if (found.length) flags.push('prohibited_words');
 
@@ -109,8 +109,8 @@ export class ModerationService {
   }
 
   private notify(listing: { id: string; title: string | null; customer: { id: string; storeId: string } }, type: 'customer.classifieds.listing_live' | 'customer.classifieds.listing_rejected' | 'customer.classifieds.listing_removed', title: string, body: string) {
-    this.emails.customer(listing.customer.id, { title, body, path: '/shop', action: 'Open My listings' });
-    return this.inbox.customer({ customerId: listing.customer.id, storeId: listing.customer.storeId }, type, { subject: `${listing.id}:${Date.now()}`, title, body, link: '/shop/listings' });
+    this.emails.customer(listing.customer.id, { title, body, path: '/account/listings', action: 'Open My listings' });
+    return this.inbox.customer({ customerId: listing.customer.id, storeId: listing.customer.storeId }, type, { subject: `${listing.id}:${Date.now()}`, title, body, link: '/account/listings' });
   }
 
   /** A listing waiting for review goes live. */
@@ -126,7 +126,7 @@ export class ModerationService {
     if (!claimed.count) throw conflict('listing_not_in_review', 'This listing is not waiting for review.');
     await this.prisma.classifiedReport.updateMany({ where: { listingId: id, status: 'open' }, data: { status: 'dismissed', decidedById: actorId, decidedAt: now, note: note ?? 'Listing approved' } });
     await this.audit.record({ actorId, action: 'classifieds.listing_approved', targetType: 'classified_listing', targetId: id, before: { status: 'pending_review', flags: listing.reviewFlags }, after: { status: 'active', note: note ?? null } });
-    await this.notify(listing, 'customer.classifieds.listing_live', 'Your ad is live', `"${listing.title}" is now on BitoCard Shop.`);
+    await this.notify(listing, 'customer.classifieds.listing_live', 'Your ad is live', `"${listing.title}" is now on Udozo.`);
   }
 
   /** A listing waiting for review is sent back: the seller fixes it and submits again. */
@@ -142,14 +142,14 @@ export class ModerationService {
   /** A listing is taken off BitoCard Shop for good (banned goods, a scam), live or not. */
   async remove(actorId: string | null, id: string, reason: string) {
     const listing = await this.listingFor(id);
-    if (['removed', 'deleted'].includes(listing.status)) throw conflict('listing_closed', 'This listing is already off BitoCard Shop.');
+    if (['removed', 'deleted'].includes(listing.status)) throw conflict('listing_closed', 'This listing is already off Udozo.');
     const now = new Date();
     const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: listing.status }, data: { status: 'removed', reviewReason: reason, closedAt: now } });
     if (!claimed.count) throw conflict('listing_closed', 'This listing changed: refresh and try again.');
     await this.prisma.classifiedPriceHistory.updateMany({ where: { listingId: id, to: null }, data: { to: now } });
     await this.prisma.classifiedReport.updateMany({ where: { listingId: id, status: 'open' }, data: { status: 'actioned', decidedById: actorId, decidedAt: now, note: reason } });
     await this.audit.record({ actorId, action: 'classifieds.listing_removed', targetType: 'classified_listing', targetId: id, before: { status: listing.status }, after: { status: 'removed', reason } });
-    if (listing.status !== 'draft') await this.notify(listing, 'customer.classifieds.listing_removed', 'Your ad was removed', `"${listing.title}" was removed from BitoCard Shop: ${reason}`);
+    if (listing.status !== 'draft') await this.notify(listing, 'customer.classifieds.listing_removed', 'Your ad was removed', `"${listing.title}" was removed from Udozo: ${reason}`);
   }
 
   /** A report decided without removing anything (nothing wrong), or by removing the listing. */

@@ -62,7 +62,7 @@ const nextStep: Record<string, { buyer: string; seller: string }> = {
   accepted: { buyer: 'Pay from your wallet before the deadline.', seller: 'Waiting for the buyer to pay.' },
   paid: { buyer: 'Meet the seller (give your release code only after inspecting) or wait for the delivery.', seller: 'Hand it over: enter the buyer’s release code at the meet-up, or mark the delivery sent.' },
   sent: { buyer: 'Confirm when it arrives, or open a dispute.', seller: 'Waiting for the buyer to confirm the delivery.' },
-  disputed: { buyer: 'BitoCard is deciding the dispute.', seller: 'BitoCard is deciding the dispute.' },
+  disputed: { buyer: 'Udozo is deciding the dispute.', seller: 'Udozo is deciding the dispute.' },
   released: { buyer: 'Done.', seller: 'Paid: withdrawable after the payout hold.' },
   refunded: { buyer: 'Refunded to your wallet.', seller: 'Closed: the buyer was refunded.' },
   cancelled: { buyer: 'Cancelled.', seller: 'Cancelled.' },
@@ -102,7 +102,7 @@ export class ShopAssistantTools {
             price_max: number,
             condition: { type: 'array', items: { type: 'string', enum: [...conditions] } },
             features: { type: 'array', items: { type: 'object', properties: { key: text, value: text, min: number, max: number }, required: ['key'] }, description: 'Registry keys (search_features) with a value, or a min and max for numbers.' },
-            id_checked_only: { type: 'boolean', description: 'Only sellers whose ID BitoCard checked.' },
+            id_checked_only: { type: 'boolean', description: 'Only sellers whose ID Udozo checked.' },
             safe_pay_ready_only: { type: 'boolean', description: 'Only sellers set up to take Safe pay.' },
             sort: { type: 'string', enum: [...searchSorts] },
           },
@@ -131,7 +131,7 @@ export class ShopAssistantTools {
       if (scope.listingId) list.push(tool('my_listing', 'The listing the seller is working on (their own, drafts too): what is filled in and what is missing.'));
       if (scope.conversationId) list.push(tool('chat_messages', 'The latest messages of the chat the seller opened you from, for a reply suggestion.'));
     }
-    list.push(tool('offer_person', 'Offer the person a chat with BitoCard’s support, for anything you cannot do or decide.', { reason: text }, ['reason']));
+    list.push(tool('offer_person', 'Offer the person a chat with Udozo’s support, for anything you cannot do or decide.', { reason: text }, ['reason']));
     return list;
   }
 
@@ -372,7 +372,7 @@ export class ShopAssistantTools {
     }
     const fee = safePayFee(price, settings.buyerFeeBps, settings.buyerFeeCapMinor);
     const card: AssistantCard = { type: 'safe_pay', currency: scope.currency, price: Number(price), fee: Number(fee), total: Number(price + fee), listing_id: listingId };
-    return { result: json({ price: priceText(price, scope.currency), buyer_fee: priceText(fee, scope.currency), total: priceText(price + fee, scope.currency), note: 'Paid from the BitoCard wallet; held by BitoCard until the buyer has the item.' }), cards: [card] };
+    return { result: json({ price: priceText(price, scope.currency), buyer_fee: priceText(fee, scope.currency), total: priceText(price + fee, scope.currency), note: 'Paid from the Udozo wallet; held by Udozo until the buyer has the item.' }), cards: [card] };
   }
 
   private async checklist(scope: ToolScope, args: Record<string, unknown>): Promise<ToolOutcome> {

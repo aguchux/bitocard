@@ -140,30 +140,30 @@ export const switchDefinitions = {
   },
   classifieds: {
     scopes: ['global', 'country'],
-    description: 'BitoCard Shop (classifieds) in this market: browsing at shop.bitocard.com/<country>, posting and chatting, and the Shop tab on its country store. Off until the marketplace terms are cleared there.',
+    description: "Udozo's marketplace in this market: browsing at udozo.com/<country>, posting and chatting. Off until the marketplace terms are cleared there.",
   },
   classifieds_safe_pay: {
     scopes: ['global', 'country'],
-    description: "Safe pay in BitoCard Shop: buyers pay from their wallet, BitoCard holds the money until they confirm, then pays the seller. Needs classifieds on and the market's Safe pay fees set. Off until holding buyers' money is cleared there.",
+    description: "Safe pay on Udozo: buyers pay from their wallet, Udozo holds the money until they confirm, then pays the seller. Needs classifieds on and the market's Safe pay fees set. Off until holding buyers' money is cleared there.",
   },
   classifieds_assistant: {
     scopes: ['global', 'country'],
-    description: "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
+    description: "Shop assistants (Anjio) on Udozo: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
   },
   classifieds_resale: {
     scopes: ['global', 'country'],
     description:
-      "B2B reselling: BitoCard Shop sellers can open their listings to resellers' stores (docs/BITOCARD_B2B_RESELLING_PLAN.md), with the discount and markup limit they choose inside BitoCard's limits (Shop > Settings > Resale). Needs classifieds on and the reseller fee set there. Off until holding money for two parties is cleared.",
+      "B2B reselling: Udozo sellers can open their listings to resellers' stores (docs/BITOCARD_B2B_RESELLING_PLAN.md), with the discount and markup limit they choose inside Udozo's limits (Shop > Settings > Resale). Needs classifieds on and the reseller fee set there. Off until holding money for two parties is cleared.",
   },
   reseller_resale: {
     scopes: ['global', 'country', 'reseller'],
     description:
-      "B2B reselling for resellers: a verified reseller with a Resale shop store browses BitoCard Shop suppliers' resale listings in their country, adds them to the store at their own price within the supplier's limits, and works with suppliers in a chat with deals (docs/BITOCARD_B2B_RESELLING_PLAN.md). Needs classifieds_resale open in the country. Every plan.",
+      "B2B reselling for resellers: a verified reseller with a Resale shop store browses Udozo suppliers' resale listings in their country, adds them to the store at their own price within the supplier's limits, and works with suppliers in a chat with deals (docs/BITOCARD_B2B_RESELLING_PLAN.md). Needs classifieds_resale open in the country. Every plan.",
   },
   classifieds_install_prompt: {
     scopes: ['global', 'country'],
     description:
-      "BitoCard Shop asks visitors in this market to install shop.bitocard.com as an app (home screen, full screen): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too.",
+      "Udozo asks visitors in this market to install udozo.com as an app (home screen, full screen): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too.",
   },
 } as const;
 

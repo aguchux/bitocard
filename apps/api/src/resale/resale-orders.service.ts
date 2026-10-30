@@ -51,13 +51,13 @@ export function checkOrderMessage(raw: string) {
   if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
   if (text.length > maxThreadMessage) throw invalid('parameter_invalid', `Messages can be at most ${maxThreadMessage} characters.`, 'body');
   if (linkPattern.test(text) || /\d(?:[ -]?\d){9,}/.test(text) || paymentWords.test(text)) {
-    throw invalid('message_refused', 'Links, account or card numbers and requests to pay outside BitoCard cannot be sent here: the order is already paid through BitoCard.', 'body');
+    throw invalid('message_refused', 'Links, account or card numbers and requests to pay outside Udozo cannot be sent here: the order is already paid through Udozo.', 'body');
   }
   return redact(text);
 }
 
 const covers = [
-  'Your money is locked in your wallet until the supplier confirms, then held by BitoCard until you have the item.',
+  'Your money is locked in your wallet until the supplier confirms, then held by Udozo until you have the item.',
   'If the order is not confirmed, or is cancelled, it goes straight back to your wallet.',
   'At a hand-over in person, give your release code only once you have checked the item.',
   'For a delivery, confirm when it arrives in good condition, or open a dispute if it does not, or is not as described.',
@@ -292,7 +292,7 @@ export class ResaleOrdersService implements OnModuleInit {
           },
         });
         await this.ledger.write(tx, entry);
-        await tx.resaleOrderMessage.create({ data: { orderId: id, thread: 'order', author: 'bitocard', body: 'Your order is placed. Your payment is locked in your wallet until the supplier confirms it; never pay anyone outside BitoCard.' } });
+        await tx.resaleOrderMessage.create({ data: { orderId: id, thread: 'order', author: 'bitocard', body: 'Your order is placed. Your payment is locked in your wallet until the supplier confirms it; never pay anyone outside Udozo.' } });
         await this.recordEvent(tx, id, 'resale_order.created');
       });
     } catch (error) {
@@ -305,7 +305,7 @@ export class ResaleOrdersService implements OnModuleInit {
       subject: `${id}:requested`,
       title: `New order through ${context.store.name}`,
       body: `"${order.listing.title}" × ${order.quantity}, paid and locked. Accept within ${figures.acceptHours} hours.`,
-      link: `/shop/orders/${id}`,
+      link: `/account/orders/${id}`,
       mode: order.mode,
     });
     await this.inbox.reseller(context.reseller.id, 'resale.order_new', { subject: `${id}:new`, title: `New order SP-${order.number}`, body: `"${order.listing.title}" × ${order.quantity} for ${priceText(order.priceMinor, order.currency)}. It waits for the supplier to accept.`, link: `/resale/orders/${id}`, mode: order.mode });
@@ -392,8 +392,8 @@ export class ResaleOrdersService implements OnModuleInit {
     const standing = await this.standing(resellerId, country);
     if (!standing.limited) return standing;
     const subject = `${resellerId}:${standing.cleared_at ?? 'never'}`;
-    await this.inbox.reseller(resellerId, 'resale.order_updated', { subject: `limited:${subject}`, title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact BitoCard to have it reviewed.`, link: '/resale/orders' });
-    this.emails.reseller(resellerId, { title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact BitoCard to have it reviewed.`, path: '/resale/orders' });
+    await this.inbox.reseller(resellerId, 'resale.order_updated', { subject: `limited:${subject}`, title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact Udozo to have it reviewed.`, link: '/resale/orders' });
+    this.emails.reseller(resellerId, { title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact Udozo to have it reviewed.`, path: '/resale/orders' });
     await this.inbox.admins('admin.classifieds.seller_limited', { subject: `reseller:${subject}`, title: 'A reseller reached the resale strike limit', body: `${standing.cancelled_by_store} orders cancelled, ${standing.disputes_lost} disputes lost and ${standing.reports_upheld} reports upheld in ${resellerStrikeDays} days.`, link: `/resellers/${resellerId}` });
     return standing;
   }
@@ -486,7 +486,7 @@ export class ResaleOrdersService implements OnModuleInit {
       id: message.id,
       thread: message.thread as OrderThread,
       from,
-      name: message.author === 'bitocard' ? 'BitoCard' : storeSide && viewer === 'buyer' ? (order.store?.name ?? '') : message.author === 'buyer' ? publicName(order.buyer.name) : message.author === 'supplier' ? publicName(order.seller.name) : (order.store?.name ?? ''),
+      name: message.author === 'bitocard' ? 'Udozo' : storeSide && viewer === 'buyer' ? (order.store?.name ?? '') : message.author === 'buyer' ? publicName(order.buyer.name) : message.author === 'supplier' ? publicName(order.seller.name) : (order.store?.name ?? ''),
       body: message.body,
       created_at: message.createdAt.toISOString(),
     };
@@ -511,7 +511,7 @@ export class ResaleOrdersService implements OnModuleInit {
     const toSupplier = author !== 'supplier';
     const toReseller = author !== 'reseller';
     if (toBuyer) await this.inbox.customer({ customerId: order.buyer.id, storeId: order.buyer.storeId }, 'customer.purchase.message', { subject: message.id, title: `${order.store?.name ?? 'The store'} wrote about your order`, body: preview, link: `/account/purchases/${order.id}`, mode: order.mode });
-    if (toSupplier) await this.inbox.customer({ customerId: order.seller.id, storeId: order.seller.storeId }, 'customer.classifieds.order_message', { subject: message.id, title: `${author === 'buyer' ? 'The buyer' : order.store?.name} wrote on SP-${order.number}${thread === 'trade' ? ' (trade thread)' : ''}`, body: preview, link: `/shop/orders/${order.id}`, mode: order.mode });
+    if (toSupplier) await this.inbox.customer({ customerId: order.seller.id, storeId: order.seller.storeId }, 'customer.classifieds.order_message', { subject: message.id, title: `${author === 'buyer' ? 'The buyer' : order.store?.name} wrote on SP-${order.number}${thread === 'trade' ? ' (trade thread)' : ''}`, body: preview, link: `/account/orders/${order.id}`, mode: order.mode });
     if (toReseller && order.resellerId) await this.inbox.reseller(order.resellerId, 'resale.order_message', { subject: message.id, title: `${author === 'buyer' ? 'The buyer' : 'The supplier'} wrote on SP-${order.number}${thread === 'trade' ? ' (trade thread)' : ''}`, body: preview, link: `/resale/orders/${order.id}`, mode: order.mode });
     // Emailed without the text, at most every 10 minutes per order and person.
     if (toBuyer) this.emails.order(order, 'buyer', { title: `${order.store?.name ?? 'The store'} wrote about your order SP-${order.number}`, body: '', message: true });
