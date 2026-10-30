@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PasswordsService } from '../auth/passwords.service.js';
 import { normalisePhone } from '../auth/auth.service.js';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
@@ -81,6 +82,7 @@ export class CustomersService {
     private readonly passwords: PasswordsService,
     private readonly email: EmailService,
     private readonly sms: SmsService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /** The customer signed in with this token, or null (ended, expired or suspended). */
@@ -103,6 +105,21 @@ export class CustomersService {
     if (cached && cached.until > Date.now()) return cached.store;
     const found = subdomain === houseSubdomain ? null : await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: { select: { house: true } } } });
     const store = found && found.status === 'published' && found.reseller.house ? found : null;
+    this.countryStores.set(subdomain, { store, until: Date.now() + 60_000 });
+    return store;
+  }
+
+  /**
+   * The published store at this subdomain where accounts of the house store (bitocard.com, or Udozo's marketplace)
+   * work too, or null. BitoCard: its country stores (`countryStore`). Udozo: every published store whose reseller is not
+   * suspended, so one Udozo account works on udozo.com and every reseller's store (docs/UDOZO_SPINOFF_PLAN.md, step 3).
+   */
+  async sharedStore(subdomain: string): Promise<CustomerWithStore['store'] | null> {
+    if (this.config.APP_PRODUCT !== 'udozo') return this.countryStore(subdomain);
+    const cached = this.countryStores.get(subdomain);
+    if (cached && cached.until > Date.now()) return cached.store;
+    const found = subdomain === houseSubdomain ? null : await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: { select: { house: true, status: true } } } });
+    const store = found && found.status === 'published' && found.reseller.status !== 'suspended' ? found : null;
     this.countryStores.set(subdomain, { store, until: Date.now() + 60_000 });
     return store;
   }

@@ -1229,7 +1229,7 @@ export class SafePayService {
     const actual = order ? this.sideOf(order, customer.id) : null;
     if (!order || !actual) throw notFound();
     if (customer.store.reseller.house) await this.listings.sellerCountry(customer);
-    else if (!(order.kind === 'resale' && actual === 'buyer' && order.storeId === customer.storeId)) throw notFound();
+    else if (!(order.kind === 'resale' && actual === 'buyer' && (this.stores.sharesAccounts() || order.storeId === customer.storeId))) throw notFound();
     if (side && actual !== side) throw notYours(side === 'seller' ? 'Only the seller can do this.' : 'Only the buyer can do this.');
     return order;
   }

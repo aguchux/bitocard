@@ -64,9 +64,10 @@ export async function customerFor(customers: CustomersService, req: Request, opt
   if (session.customer.store.platform === 'afrippa' && !afrippaSignedRoutes.test(req.path)) return null;
   const requested = storeKey(req) ?? houseSubdomain;
   if (session.customer.store.subdomain !== requested) {
-    const country = session.customer.store.subdomain === houseSubdomain ? await customers.countryStore(requested) : null;
-    if (!country) return null;
-    session.customer = { ...session.customer, store: country };
+    // A house account (bitocard.com's, or Udozo's) also shops at the stores that share its accounts.
+    const shared = session.customer.store.subdomain === houseSubdomain ? await customers.sharedStore(requested) : null;
+    if (!shared) return null;
+    session.customer = { ...session.customer, store: shared };
   }
   if (twoStepPendingFor(session) && !options.allowPending) return null;
   return session;

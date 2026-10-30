@@ -17,7 +17,8 @@ export type EmailThrottle = { model: 'classifiedOrder' | 'resaleRelationship'; i
 
 const orderField = { buyer: 'buyerEmailedAt', supplier: 'supplierEmailedAt', reseller: 'resellerEmailedAt' } as const;
 
-type Notice = { title: string; body: string; path: string; action?: string; sandbox?: boolean; throttle?: EmailThrottle; held?: boolean };
+/** `storeId`: the store the email comes from, when not the customer's own (a resale order's store, as Udozo's one account buys on every store). */
+type Notice = { title: string; body: string; path: string; action?: string; sandbox?: boolean; throttle?: EmailThrottle; held?: boolean; storeId?: string };
 
 /**
  * Emails for BitoCard Shop and B2B reselling, beside the inbox and push: every Safe pay order's steps (direct and
@@ -49,6 +50,7 @@ export class ShopEmails {
       path: to === 'reseller' ? `/resale/orders/${order.id}` : to === 'buyer' && resale ? `/account/purchases/${order.id}` : `/shop/orders/${order.id}`,
       action: to === 'buyer' ? 'View your order' : 'Open the order',
       held: to === 'buyer',
+      ...(to === 'buyer' && resale && order.storeId ? { storeId: order.storeId } : {}),
     };
     if (to === 'reseller') this.reseller(order.resellerId!, notice);
     else this.customer(to === 'buyer' ? order.buyerId : order.sellerId, notice);
@@ -89,7 +91,7 @@ export class ShopEmails {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { email: true, emailVerifiedAt: true, status: true, storeId: true } });
     if (!customer?.emailVerifiedAt || customer.status !== 'active') return;
     if (!(await this.claim(notice.throttle))) return;
-    const store = await this.storeOf(customer.storeId);
+    const store = await this.storeOf(notice.storeId ?? customer.storeId);
     const signature = store.own ? `Sent for ${store.name}.${notice.held ? ' Your payment is held by BitoCard until you have the item.' : ''}` : 'BitoCard Shop, a Golojan Ltd venture.';
     const message = resaleOrderEmail(customer.email, { title: notice.title, body: notice.body, link: `${store.origin}${notice.path}`, action: notice.action ?? 'Open it', signature, sandbox: notice.sandbox ?? false });
     await this.email.send(message, store.own ? { resellerId: store.resellerId, name: store.name } : undefined);

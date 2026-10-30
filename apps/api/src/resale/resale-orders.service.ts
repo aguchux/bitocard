@@ -118,6 +118,17 @@ export class ResaleOrdersService implements OnModuleInit {
     return { store, reseller, country, mode: this.sellers.mode(store) };
   }
 
+  /**
+   * A store sells only to shoppers of its reseller's country. On Udozo one account shops at every store, so a shopper
+   * from elsewhere may browse a store but not buy (docs/UDOZO_SPINOFF_PLAN.md, step 3).
+   */
+  private sellsTo<T extends { country: string }>(customer: CustomerWithStore, context: T) {
+    if (customer.country && customer.country !== context.country) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'market_unavailable', 'This store sells only to people in its own country.', 'country');
+    }
+    return context;
+  }
+
   /** The listing on sale in the buyer's store, with the price and terms worked out now. */
   private async item(storeId: string, country: string, ref: number) {
     const [item] = await this.stores.onSale(storeId, country, { listingRef: BigInt(ref) });
@@ -127,7 +138,7 @@ export class ResaleOrdersService implements OnModuleInit {
 
   /** What buying would cost: the price for the units, any delivery charge, BitoCard's fee and the total, and the wallet. */
   async quote(customer: CustomerWithStore, input: BuyInput) {
-    const context = await this.shop(customer);
+    const context = this.sellsTo(customer, await this.shop(customer));
     const figures = await this.figures(customer, context, input);
     const balance = await this.wallets.balance(customer.id, context.mode, figures.currency);
     return {
@@ -195,7 +206,7 @@ export class ResaleOrdersService implements OnModuleInit {
    * so stock is never sold twice. `expected_total` (what the buyer was shown) refuses a changed total.
    */
   async buy(customer: CustomerWithStore, input: BuyInput & { expected_total: number }) {
-    const context = await this.shop(customer);
+    const context = this.sellsTo(customer, await this.shop(customer));
     if (!customer.emailVerifiedAt) throw unavailable('email_not_verified', 'Confirm your email first: enter the code we emailed you.');
     if (!customer.phone || !customer.phoneVerifiedAt) throw conflict('phone_required', 'Confirm your mobile number on your account first: the supplier calls it to deliver.', 'phone');
     if (!(await this.wallets.enabled({ id: context.reseller.id }, context.mode, context.store))) throw unavailable('resale_checkout_unavailable', 'This store cannot take orders at the moment.');
@@ -311,7 +322,8 @@ export class ResaleOrdersService implements OnModuleInit {
 
   async purchases(customer: CustomerWithStore, filter: { limit?: number; offset?: number }) {
     if (customer.store.reseller.house) throw notFound('store');
-    const where = { buyerId: customer.id, kind: 'resale', storeId: customer.storeId };
+    // One Udozo account buys on every store, so its purchases are one history; elsewhere a store's accounts are its own.
+    const where = { buyerId: customer.id, kind: 'resale', ...(this.sellers.sharesAccounts() ? {} : { storeId: customer.storeId }) };
     const [rows, total] = await Promise.all([
       this.prisma.classifiedOrder.findMany({ where, include: orderInclude, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: filter.limit ?? 30, skip: filter.offset ?? 0 }),
       this.prisma.classifiedOrder.count({ where }),
@@ -325,7 +337,7 @@ export class ResaleOrdersService implements OnModuleInit {
 
   private async buyerOrder(customer: CustomerWithStore, id: string) {
     const order = await this.prisma.classifiedOrder.findUnique({ where: { id }, include: orderInclude });
-    if (!order || order.kind !== 'resale' || order.buyerId !== customer.id || order.storeId !== customer.storeId) throw notFound();
+    if (!order || order.kind !== 'resale' || order.buyerId !== customer.id || (!this.sellers.sharesAccounts() && order.storeId !== customer.storeId)) throw notFound();
     return order;
   }
 

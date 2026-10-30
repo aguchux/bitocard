@@ -125,10 +125,10 @@ async function shop(item, name = 'Gadget Hub') {
 }
 
 /** A customer of the store, email and phone confirmed, with money in their store wallet (the store is in sandbox). */
-async function buyer(store, { funds = 0, email, confirmedPhone = true } = {}) {
+async function buyer(store, { funds = 0, email, confirmedPhone = true, country = 'NG' } = {}) {
   const person = shopper(store.subdomain);
   const address = email ?? `rbuyer${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await person.post('/v1/store/account/signup', { name: 'Amaka Eze', email: address, password: 'correct horse battery', country: 'NG' });
+  const signup = await person.post('/v1/store/account/signup', { name: 'Amaka Eze', email: address, password: 'correct horse battery', country });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await person.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, address) })).status, 200);
   person.id = signup.json.customer.id;
@@ -589,5 +589,20 @@ describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with 
     emails.order({ id, kind: 'direct', mode: 'live', storeId: null, resellerId: null, buyerId: seller.id, sellerId: seller.id }, 'reseller', { title: 'Never sent', body: '' });
     await new Promise(resolve => setTimeout(resolve, 100));
     assert.equal(outbox().filter(item => item.subject === 'Never sent').length, 0, 'no reseller on a direct order');
+  });
+});
+
+describe('one Udozo account, a store by country', () => {
+  test("a shopper from another country may browse a store but not buy there; the store's own country buys", async () => {
+    const seller = await supplier('Country Supplier');
+    const item = await listing(seller, 'Country check television');
+    const { store } = await shop(item, 'Lagos Gadgets');
+    const visitor = await buyer(store, { funds: 50_000_000, country: 'GH' });
+    const refused = await visitor.post('/v1/store/resale/orders/quote', { ref: item.ref, fulfilment: 'meet_up' });
+    assert.deepEqual([refused.status, refused.json.error.code], [403, 'market_unavailable']);
+    assert.equal((await visitor.get(`/v1/store/resale/listings?store=${store.subdomain}`)).status, 200, 'browsing is open to everyone');
+    const local = await buyer(store, { funds: 50_000_000 });
+    const quoted = await local.post('/v1/store/resale/orders/quote', { ref: item.ref, fulfilment: 'meet_up' });
+    assert.equal(quoted.status, 200, JSON.stringify(quoted.json));
   });
 });

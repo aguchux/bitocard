@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Customer, LedgerMode, Reseller, Store } from '../generated/prisma/client.js';
@@ -34,7 +35,16 @@ export class StoreSellers {
     private readonly methods: PaymentMethodsService,
     private readonly providers: PaymentProviders,
     private readonly integrations: ResellerIntegrationsService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
+
+  /**
+   * Whether every store shares the house store's customer accounts: Udozo's, where one account works on udozo.com and
+   * every reseller's store (docs/UDOZO_SPINOFF_PLAN.md, step 3). On BitoCard a reseller's store keeps its own.
+   */
+  sharesAccounts() {
+    return this.config.APP_PRODUCT === 'udozo';
+  }
 
   /** A payment option as payers see it, with its mobile money networks in the country. Own gateways are BitoCard's labels. */
   async describe(option: PaymentOption, country: { code: string; currency: string }) {
@@ -69,7 +79,7 @@ export class StoreSellers {
    */
   async accountStore(key: string | null): Promise<Store & { reseller: Reseller }> {
     const store = await this.resolve(key);
-    return this.isHouse(store) && !this.isRoot(store) ? this.house.store() : store;
+    return (this.isHouse(store) || this.sharesAccounts()) && !this.isRoot(store) ? this.house.store() : store;
   }
 
   /** Whether the store's checkout is live or the sandbox. Every house store (root or a country store) shares BitoCard's own switch. */
