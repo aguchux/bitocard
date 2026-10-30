@@ -82,6 +82,21 @@ describe('Africa’s Talking catalogue', () => {
     assert.match(adapter.syncReport(), /not understood: "KE nonsense"/, 'a plan it cannot read is reported, not guessed');
   });
 
+  test('one market synced stocks airtime in every country Africa’s Talking serves, from its smallest amount', async () => {
+    const offers = await prisma.supplierProduct.findMany({ where: { supplierCode: 'africas_talking', available: true, product: { category: 'airtime' } }, include: { product: true } });
+    const byCountry = {};
+    for (const offer of offers) (byCountry[offer.product.country] ??= []).push(offer.product.brand);
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(byCountry).map(([country, brands]) => [country, brands.sort()]).sort()),
+      { GH: ['airteltigo', 'mtn', 'telecel'], KE: ['airtel', 'safaricom', 'telkom'], NG: ['9mobile', 'airtel', 'glo', 'mtn'], TZ: ['airtel', 'halotel', 'tigo', 'vodacom'], UG: ['airtel', 'mtn'], ZA: ['cell-c', 'mtn', 'telkom', 'vodacom'] },
+      'only Kenya’s market is switched on, yet every country is stocked',
+    );
+    const uganda = await prisma.product.findUniqueOrThrow({ where: { key: 'airtime:UG:mtn:topup' } });
+    assert.deepEqual([uganda.faceCurrency, Number(uganda.minValueMinor), Number(uganda.maxValueMinor)], ['UGX', 5000, 20_000_000], 'its published limits, from the smallest amount');
+    const southAfrica = await prisma.product.findUniqueOrThrow({ where: { key: 'airtime:ZA:cell-c:topup' } });
+    assert.equal(southAfrica.name, 'Cell C airtime');
+  });
+
   test('airtime refuses to sync until the discount is set; settings are read line by line', async () => {
     const adapter = new AfricasTalkingAdapter({ username: 'bitocard', apiKey: 'at-key', apiUrl: at.url, dataUrl: at.url });
     await assert.rejects(() => adapter.catalogue({ category: 'airtime', country: 'KE' }), /airtime discount/);
@@ -89,7 +104,11 @@ describe('Africa’s Talking catalogue', () => {
     const markets = parseAirtimeMarkets('KE KES 5-5000 safaricom, airtel; UG UGX 500 to 9');
     assert.deepEqual(markets.markets, [{ country: 'KE', currency: 'KES', min: 5, max: 5000, networks: ['safaricom', 'airtel'] }]);
     assert.deepEqual(markets.problems, ['"UG UGX 500 to 9"']);
-    assert.equal(parseAirtimeMarkets('').markets.length, 8, 'empty: the published countries');
+    assert.deepEqual(
+      parseAirtimeMarkets('').markets.map(market => market.country),
+      ['KE', 'UG', 'TZ', 'NG', 'GH', 'ZA'],
+      'empty: the countries Africa’s Talking lists airtime as live in',
+    );
     assert.deepEqual(parseDataPlans('ng mtn 2gb biweek 600 540').plans, [{ country: 'NG', network: 'mtn', quantity: 2, unit: 'GB', validity: 'BiWeek', price: '600', cost: '540' }]);
     assert.deepEqual(atAmount('KES 100.5000'), { currency: 'KES', minor: 10050n });
   });

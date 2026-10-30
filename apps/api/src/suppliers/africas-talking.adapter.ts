@@ -10,19 +10,19 @@ const Decimal = Prisma.Decimal;
 export type AirtimeMarket = { country: string; currency: string; min: number; max: number; networks: string[] };
 
 /**
- * Africa's Talking's airtime markets as published (confirm the limits on BitoCard's account; Settings > Integrations >
- * Africa's Talking > Airtime countries overrides them). Network slugs match the other suppliers' brands (Reloadly's
- * "MTN Nigeria" is `mtn`), so Africa's Talking's offers share their products and are routed by net margin.
+ * Africa's Talking's airtime markets: the countries its help centre lists airtime as live in, with the per-number limits
+ * it publishes (Kenya, Uganda, Tanzania and Nigeria; Ghana's and South Africa's are not published, so theirs are kept
+ * narrow until confirmed on BitoCard's account). Settings > Integrations > Africa's Talking > Airtime countries
+ * overrides them. Network slugs match the other suppliers' brands (Reloadly's "MTN Nigeria" is `mtn`), so Africa's
+ * Talking's offers share their products and are routed by net margin.
  */
 export const defaultAirtimeMarkets: AirtimeMarket[] = [
   { country: 'KE', currency: 'KES', min: 10, max: 10_000, networks: ['safaricom', 'airtel', 'telkom'] },
-  { country: 'UG', currency: 'UGX', min: 500, max: 200_000, networks: ['mtn', 'airtel'] },
-  { country: 'TZ', currency: 'TZS', min: 500, max: 200_000, networks: ['vodacom', 'airtel', 'tigo', 'halotel'] },
-  { country: 'RW', currency: 'RWF', min: 100, max: 40_000, networks: ['mtn', 'airtel'] },
-  { country: 'NG', currency: 'NGN', min: 50, max: 20_000, networks: ['mtn', 'airtel', 'glo', '9mobile'] },
+  { country: 'UG', currency: 'UGX', min: 50, max: 200_000, networks: ['mtn', 'airtel'] },
+  { country: 'TZ', currency: 'TZS', min: 1_000, max: 200_000, networks: ['vodacom', 'airtel', 'tigo', 'halotel'] },
+  { country: 'NG', currency: 'NGN', min: 50, max: 5_000, networks: ['mtn', 'airtel', 'glo', '9mobile'] },
   { country: 'GH', currency: 'GHS', min: 1, max: 1_000, networks: ['mtn', 'telecel', 'airteltigo'] },
-  { country: 'MW', currency: 'MWK', min: 100, max: 50_000, networks: ['airtel', 'tnm'] },
-  { country: 'ZM', currency: 'ZMW', min: 1, max: 1_000, networks: ['mtn', 'airtel', 'zamtel'] },
+  { country: 'ZA', currency: 'ZAR', min: 5, max: 1_000, networks: ['vodacom', 'mtn', 'cell-c', 'telkom'] },
 ];
 
 const networkNames: Record<string, string> = {
@@ -39,6 +39,7 @@ const networkNames: Record<string, string> = {
   airteltigo: 'AirtelTigo',
   tnm: 'TNM',
   zamtel: 'Zamtel',
+  'cell-c': 'Cell C',
 };
 const networkName = (network: string) => networkNames[network] ?? network.replace(/(^|-)([a-z])/g, (_, dash: string, letter: string) => `${dash ? ' ' : ''}${letter.toUpperCase()}`);
 
@@ -137,7 +138,9 @@ export type AfricasTalkingConfig = {
  * - **Airtime** is any amount within the country's limits, to any of its networks: Africa's Talking finds the network
  *   from the number. One product per country and network (`airtime:KE:safaricom:topup`, the key Reloadly's offers use),
  *   costing the amount less the agreed discount (an integration setting; the actual discount each send reports is
- *   kept for reconciliation).
+ *   kept for reconciliation). Africa's Talking lists no products, so every airtime country it serves is stocked
+ *   whichever market asks (as pawaPay's catalogue is): a reseller sells their own country's airtime, and other
+ *   countries' with the international plan.
  * - **Data** bundles are the plans an admin sets (Africa's Talking publishes no plan list), sent through the Mobile
  *   Data product made in its dashboard, each at the price customers know it by (face value) and BitoCard's cost.
  *
@@ -188,13 +191,13 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
     }
     const { markets, problems } = parseAirtimeMarkets(this.config.airtimeCountries);
     if (problems.length) this.report.push(`Airtime countries not understood: ${problems.join(', ')}.`);
-    const market = markets.find(item => item.country === country);
-    if (!market) {
-      this.report.push(`Africa’s Talking sells no airtime in ${country ?? 'that market'} (as set up).`);
+    if (!markets.length) {
+      this.report.push('No airtime countries are set up for Africa’s Talking.');
       return [];
     }
+    if (country && !markets.some(item => item.country === country)) this.report.push(`Africa’s Talking sells no airtime in ${country} (as set up).`);
     const ratio = new Decimal(1).minus(new Decimal(discount).div(100)).toString();
-    return market.networks.map(network => ({
+    return markets.flatMap(market => market.networks.map(network => ({
       sku: `airtime:${market.country}:${network}`,
       productKey: `airtime:${market.country}:${network}:topup`,
       category: 'airtime' as const,
@@ -212,7 +215,7 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
       costRatio: ratio,
       costFee: 0n,
       meta: { currency: market.currency, network },
-    }));
+    })));
   }
 
   private data(country: string | null): CatalogueItem[] {

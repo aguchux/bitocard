@@ -482,7 +482,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       }),
       field('AFRICAS_TALKING_AIRTIME_COUNTRIES', 'Airtime countries', {
         required: false,
-        help: 'Leave empty for Africa’s Talking’s published countries (KE, UG, TZ, RW, NG, GH, MW, ZM). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
+        help: 'Leave empty for the countries Africa’s Talking lists airtime as live in (KE, UG, TZ, NG, GH, ZA; every one is stocked whichever market is synced). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
       }),
       field('AFRICAS_TALKING_DATA_PRODUCT', 'Mobile Data product', { required: false, help: 'The product name created in the dashboard (Mobile Data > Products). Data bundles are synced only once it is set.' }),
       field('AFRICAS_TALKING_DATA_PLANS', 'Data plans', {
