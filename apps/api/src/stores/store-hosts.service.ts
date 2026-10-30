@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { houseStoreId as rootStoreId } from '../checkout/house-ids.js';
-import type { AppConfig } from '../config/config.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CloudflareDns } from '../domains/cloudflare.js';
 import { VercelDomains } from '../domains/vercel.js';
@@ -55,6 +55,7 @@ export class StoreHostsService {
     private readonly prisma: PrismaService,
     private readonly inbox: InboxService,
     integrations: IntegrationsService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {
     this.clients = integrations.derive(storeHostClients);
   }
@@ -68,7 +69,8 @@ export class StoreHostsService {
   async sync(storeId: string) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId } });
     // Root bitocard.com needs no address, and Afrippa's store is reached on afrippa.com, never a bitocard.com one.
-    if (!store || store.id === rootStoreId || store.platform !== 'bitocard') return null;
+    // Udozo's stores are served on its wildcard (`*.udozo.com` on Vercel), so they need no address of their own.
+    if (!store || store.id === rootStoreId || store.platform !== 'bitocard' || this.config.APP_PRODUCT === 'udozo') return null;
     if (!this.configured()) return 'pending' as const;
     const { vercel, cloudflare, target } = this.clients();
     const name = `${store.subdomain}.${storeHostDomain}`;

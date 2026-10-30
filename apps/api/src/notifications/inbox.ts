@@ -63,6 +63,7 @@ export const notificationTypes = {
   'domain.renewal_failed': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'critical', label: 'Domain renewal failed' },
   'domain.expired': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'critical', label: 'Domain expired' },
   'domain.suspended': { realm: 'reseller', roles: ['admin'], severity: 'critical', label: 'Domain suspended' },
+  'store.sandbox_without_domain': { realm: 'reseller', roles: ['admin'], severity: 'critical', label: 'Store back in the sandbox' },
   'account.suspended': { realm: 'reseller', roles: ['admin', 'developer', 'finance', 'support'], severity: 'critical', label: 'Account suspended' },
   'account.reinstated': { realm: 'reseller', roles: ['admin', 'developer', 'finance', 'support'], severity: 'success', label: 'Account no longer suspended' },
   'connection.approved': { realm: 'reseller', roles: ['admin'], severity: 'success', label: 'Own integration approved' },

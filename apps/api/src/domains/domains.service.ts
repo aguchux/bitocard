@@ -1,5 +1,6 @@
 import { InvoicesService } from '../billing/invoices.service.js';
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -64,6 +65,7 @@ export class DomainsService {
     private readonly inbox: InboxService,
     private readonly settings: SettingsService,
     private readonly planAccess: PlanAccessService,
+    @Inject(APP_CONFIG) private readonly appConfig: AppConfig,
   ) {
     this.clients = integrations.derive(config => {
       const margin = config.DOMAIN_MARGIN_PERCENT?.trim();
@@ -451,6 +453,7 @@ export class DomainsService {
       await vercel.removeFromProject(`www.${domain.name}`);
     }
     await this.prisma.storeDomain.update({ where: { id }, data: { status: 'removed', primary: false } });
+    await this.liveOnlyOnDomain(domain.storeId);
     return { object: 'store_domain' as const, id, deleted: true };
   }
 
@@ -702,6 +705,7 @@ export class DomainsService {
       }
       if (left < 0 && domain.status !== 'expired') {
         await this.prisma.storeDomain.update({ where: { id: domain.id }, data: { status: 'expired', primary: false } });
+        await this.liveOnlyOnDomain(domain.storeId);
         await this.inbox.reseller(domain.resellerId, 'domain.expired', { subject: `${domain.id}:expired:${domain.expiresAt!.toISOString()}`, title: `${domain.name} has expired`, body: 'Your store and email on it have stopped. Renew it now to get them back before it is released.', link: '/store/domains' });
         outcome.expired += 1;
         continue;
@@ -762,6 +766,35 @@ export class DomainsService {
   }
 
   /** Abuse or a dispute: the store stops being served on the domain (audited); reinstating serves it again. */
+  /**
+   * Udozo's stores take live payments only on their own domain (docs/UDOZO_SPINOFF_PLAN.md, step 3): a live store left
+   * with no active domain goes back to the sandbox, and its reseller is told. Nothing on BitoCard.
+   */
+  async liveOnlyOnDomain(storeId: string) {
+    if (this.appConfig.APP_PRODUCT !== 'udozo') return false;
+    const active = await this.prisma.storeDomain.count({ where: { storeId, status: 'active' } });
+    if (active > 0) return false;
+    const moved = await this.prisma.store.updateMany({ where: { id: storeId, checkoutMode: 'live' }, data: { checkoutMode: 'test' } });
+    if (moved.count === 0) return false;
+    const store = await this.prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true, resellerId: true, updatedAt: true } });
+    await this.inbox.reseller(store.resellerId, 'store.sandbox_without_domain', {
+      subject: `${storeId}:sandbox:${store.updatedAt.toISOString()}`,
+      title: `${store.name} is back in the sandbox`,
+      body: 'It has no working domain, so it cannot take live payments. Connect or renew a domain, then switch it live again.',
+      link: '/store/domains',
+    });
+    return true;
+  }
+
+  /** The `domains` job's sweep: every live Udozo store that has lost its last active domain goes back to the sandbox. */
+  async liveStoresWithoutDomain() {
+    if (this.appConfig.APP_PRODUCT !== 'udozo') return 0;
+    const stores = await this.prisma.store.findMany({ where: { checkoutMode: 'live', reseller: { house: false }, domains: { none: { status: 'active' } } }, select: { id: true }, take: 100 });
+    let moved = 0;
+    for (const store of stores) if (await this.liveOnlyOnDomain(store.id)) moved += 1;
+    return moved;
+  }
+
   async adminSuspend(actorId: string | null, id: string, input: { reason: string }) {
     const before = await this.prisma.storeDomain.findUnique({ where: { id } });
     if (!before || ['removed', 'failed', 'purchasing'].includes(before.status)) throw missing();
@@ -769,6 +802,7 @@ export class DomainsService {
     await this.vercel.removeFromProject(before.name);
     await this.vercel.removeFromProject(`www.${before.name}`);
     const after = await this.prisma.storeDomain.update({ where: { id }, data: { status: 'suspended', primary: false, lastError: input.reason.trim() } });
+    await this.liveOnlyOnDomain(before.storeId);
     await this.audit.record({ actorId, action: 'domain.suspended', targetType: 'store_domain', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
     await this.inbox.reseller(before.resellerId, 'domain.suspended', { subject: `${id}:suspended:${after.updatedAt.toISOString()}`, title: `${before.name} is suspended`, body: 'Your store is no longer served on it. Contact support to find out why.', link: '/store/domains' });
     return this.present(after);

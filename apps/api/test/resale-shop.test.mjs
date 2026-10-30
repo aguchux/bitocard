@@ -182,8 +182,8 @@ describe('the store’s own words', () => {
     assert.equal((await owner.browser.put(`/v1/stores/${made.json.id}/home/draft`, { sections: branded })).status, 200);
     assert.ok(await prisma.auditLog.count({ where: { action: 'classifieds.resale_phrase_added' } }));
 
-    // Other templates' stores are not checked.
-    const gift = await owner.browser.post('/v1/stores', { name: 'Gift Store', subdomain: `gifts${Date.now() % 100000}`, template: 'gift_cards' });
+    // Other templates' stores are not checked (made directly: Udozo's own stores are Resale shops only).
+    const gift = { json: await prisma.store.create({ data: { resellerId: owner.resellerId, name: 'Gift Store', subdomain: `gifts${Date.now() % 100000}`, template: 'gift_cards' } }) };
     const giftDraft = (await owner.browser.get(`/v1/stores/${gift.json.id}/home`)).json.draft.map((section, index) => (index === 0 && section.type === 'hero' ? { ...section, subtitle: 'Made by us.' } : section));
     assert.equal((await owner.browser.put(`/v1/stores/${gift.json.id}/home/draft`, { sections: giftDraft })).status, 200);
   });

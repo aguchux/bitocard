@@ -122,9 +122,12 @@ export class StoresService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** Whether this product's stores may use a template: the Resale shop left BitoCard with B2B reselling (docs/UDOZO_SPINOFF_PLAN.md). */
+  /**
+   * Whether this product's stores may use a template (docs/UDOZO_SPINOFF_PLAN.md): Udozo's stores are Resale shops only,
+   * and the Resale shop left BitoCard with B2B reselling.
+   */
   private offered(template: StoreTemplate) {
-    return this.config.APP_PRODUCT === 'udozo' || !template.resale;
+    return this.config.APP_PRODUCT === 'udozo' ? Boolean(template.resale) : !template.resale;
   }
 
   /** Business name, and the country if it is not yet set (Google sign-ups choose it during onboarding). */
@@ -160,10 +163,12 @@ export class StoresService {
     if (!reseller.country) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'Set your business country before creating a store.');
     }
-    // A second store needs a plan with several stores.
-    if (reseller.stores.length >= 1 && !planIncludes(reseller, 'multiple_stores')) throw planFeatureRequired('multiple_stores', reseller.plan.name);
-    await this.planAccess.requireRoom(resellerId, 'stores', reseller.stores.length, { code: 'store_limit_reached', param: 'name' });
-    const design = await this.chooseDesign(resellerId, { template: input.template ?? 'all_in_one', variant: input.variant, theme: input.theme, focus: input.focus ?? null });
+    // A second store needs a plan with several stores, up to the plan's limit; Udozo's sellers run as many as they like
+    // (docs/UDOZO_SPINOFF_PLAN.md, step 3).
+    const udozo = this.config.APP_PRODUCT === 'udozo';
+    if (!udozo && reseller.stores.length >= 1 && !planIncludes(reseller, 'multiple_stores')) throw planFeatureRequired('multiple_stores', reseller.plan.name);
+    if (!udozo) await this.planAccess.requireRoom(resellerId, 'stores', reseller.stores.length, { code: 'store_limit_reached', param: 'name' });
+    const design = await this.chooseDesign(resellerId, { template: input.template ?? (udozo ? 'resale_shop' : 'all_in_one'), variant: input.variant, theme: input.theme, focus: input.focus ?? null });
     const subdomain = await this.assertSubdomain(input.subdomain);
     try {
       const store = await this.prisma.store.create({
@@ -208,6 +213,10 @@ export class StoresService {
   async update(resellerId: string, id: string, input: StoreInput) {
     const store = await this.get(resellerId, id);
     if (input.checkout_mode === 'live' && store.checkoutMode !== 'live') {
+      // Udozo's stores take live payments only on their own domain; their `<store>.udozo.com` address is the sandbox.
+      if (this.config.APP_PRODUCT === 'udozo' && (await this.prisma.storeDomain.count({ where: { storeId: id, status: 'active' } })) === 0) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'domain_required', 'Connect or buy a domain for this store first: a store takes live payments only on its own domain.', 'checkout_mode');
+      }
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
       if (reseller.status !== 'active') {
         throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'reseller_not_verified', 'Your store can take real payments once your business is verified. Use test checkout until then.', 'checkout_mode');
