@@ -476,13 +476,13 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('AFRICAS_TALKING_USERNAME', 'Username', { required: true, help: 'Your app’s username (Africa’s Talking dashboard > your team > the app). Its sandbox app’s username is always sandbox.' }),
       secret('AFRICAS_TALKING_API_KEY', 'API key', { help: 'The app’s Settings > API Key. Sandbox and live apps have different keys.' }),
       field('AFRICAS_TALKING_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Africa’s Talking’s sandbox (api.sandbox.africastalking.com, username sandbox), for Test connection only; it is not synced or used for live orders. Off: live.' }),
-      field('AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT', 'Airtime discount (%)', {
+      field('AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT', 'Airtime discounts (%)', {
         required: true,
-        help: 'The airtime discount on your Africa’s Talking account, for example 3 (use the lowest across your countries and networks). BitoCard’s cost is the amount less this; the discount each send reports is kept for reconciliation. Syncing airtime refuses until it is set.',
+        help: 'The airtime discounts on your Africa’s Talking pricing schedule, one per line or separated by semicolons: a network in a country (NG mtn 1.8; NG airtel 2; NG glo 3; NG t2 3), a whole country (KE 4) or one number for everything else (3). The most specific wins and a network with none is not synced. The schedule raises the rates with monthly volume: set the tier your account is on and change them when it moves up. BitoCard’s cost is the amount less the discount; the discount each send reports is kept for reconciliation, so a different one is flagged. Syncing airtime refuses until one is set.',
       }),
       field('AFRICAS_TALKING_AIRTIME_COUNTRIES', 'Airtime countries', {
         required: false,
-        help: 'Leave empty for the countries Africa’s Talking lists airtime as live in (KE, UG, TZ, NG, GH, ZA; every one is stocked whichever market is synced). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
+        help: 'Leave empty for the countries Africa’s Talking lists airtime as live in (KE, UG, TZ, NG, GH, ZA; every one is stocked whichever market is synced, each country’s only for its own resellers and customers, never cross-border). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
       }),
       field('AFRICAS_TALKING_DATA_PRODUCT', 'Mobile Data product', { required: false, help: 'The product name created in the dashboard (Mobile Data > Products). Data bundles are synced only once it is set.' }),
       field('AFRICAS_TALKING_DATA_PLANS', 'Data plans', {

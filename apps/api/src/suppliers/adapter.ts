@@ -172,6 +172,11 @@ export interface SupplierAdapter {
   configured(): boolean;
   /** Categories this adapter can sync. */
   readonly syncs: ProductCategory[];
+  /**
+   * Optional: its offers serve only their own country (a product for Kenya only Kenyan resellers and their customers,
+   * in their own currency), whatever the reseller's plan allows abroad.
+   */
+  readonly domesticOnly?: boolean;
   catalogue(scope: CatalogueScope): Promise<CatalogueItem[]>;
   /** Optional: what the last catalogue fetch found, so a sync that brings back nothing can say why. */
   syncReport?(): string | null;

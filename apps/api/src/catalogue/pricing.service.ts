@@ -268,7 +268,8 @@ export class PricingService {
 
   /**
    * Offers that may be used: available, supplier on, supplier switched on for this market (BitoCard's own stock sells
-   * in every market), and (live) configured.
+   * in every market), its product this market's own when the supplier serves only its own country, and (live)
+   * configured.
    */
   eligibleOffers(ctx: PricingContext, product: ProductWithOffers, exclude: ReadonlySet<string> = new Set()) {
     return product.supplierProducts.filter(
@@ -277,8 +278,14 @@ export class PricingService {
         offer.available &&
         offer.supplier.enabled &&
         (offer.supplierCode === stockSupplier || ctx.markets.has(`${offer.supplierCode}:${product.category}`)) &&
+        this.servesHere(ctx, product, offer.supplierCode) &&
         (ctx.mode === 'test' || this.adapters.get(offer.supplierCode).configured()),
     );
+  }
+
+  /** False for another country's product from a supplier whose stock serves only its own country (Africa's Talking). */
+  private servesHere(ctx: PricingContext, product: Product, supplierCode: string) {
+    return product.country === ctx.country.code || !this.adapters.get(supplierCode).domesticOnly;
   }
 
   /**
@@ -347,10 +354,12 @@ export class PricingService {
 
   /** Prices one unit of a face value through the cheapest viable offer, optionally leaving some suppliers out. */
   async price(ctx: PricingContext, product: ProductWithOffers, faceValue: bigint, exclude?: ReadonlySet<string>): Promise<Priced> {
+    const offers = this.eligibleOffers(ctx, product, exclude);
+    if (!offers.length) throw unavailable('product_unavailable', 'This product is not available right now.');
     const face = await this.faceIn(ctx, product, faceValue);
     let best: (Priced & { offer: Offer }) | null = null;
     let unconverted: ApiError | null = null;
-    for (const offer of this.eligibleOffers(ctx, product, exclude)) {
+    for (const offer of offers) {
       // An offer whose cost currency has no usable rate (a supplier's wallet currency not fetched, or paused) is left
       // out, never the whole product: another supplier may still sell it.
       const priced = await this.priceOffer(ctx, product, faceValue, face, offer).catch((error: unknown) => {
@@ -387,9 +396,11 @@ export class PricingService {
    */
   async priceOwn(ctx: PricingContext, product: Product, faceValue: bigint): Promise<Priced | null> {
     const feeRule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category, planCode: ctx.planCode });
+    const offers = (ctx.own.get(product.id) ?? []).filter(offer => this.servesHere(ctx, product, offer.supplierCode));
+    if (!offers.length) return null;
     const face = await this.faceIn(ctx, product, faceValue);
     let best: Priced | null = null;
-    for (const offer of ctx.own.get(product.id) ?? []) {
+    for (const offer of offers) {
       if (!offerCovers(offer, faceValue)) continue;
       const supplierCost = BigInt(new Decimal(faceValue.toString()).mul(offer.costRatio).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
       const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);

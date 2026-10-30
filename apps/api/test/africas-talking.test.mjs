@@ -6,7 +6,7 @@ import { after, before, describe, test } from 'node:test';
 import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
 import { fakeAfricasTalking } from './fakes.mjs';
 
-const { AfricasTalkingAdapter, parseAirtimeMarkets, parseDataPlans, africasTalkingNotice, atAmount } = await import('../dist/suppliers/africas-talking.adapter.js');
+const { AfricasTalkingAdapter, parseAirtimeMarkets, parseAirtimeDiscounts, parseDataPlans, africasTalkingNotice, atAmount } = await import('../dist/suppliers/africas-talking.adapter.js');
 
 let server;
 let at;
@@ -111,6 +111,47 @@ describe('Africa’s Talking catalogue', () => {
     );
     assert.deepEqual(parseDataPlans('ng mtn 2gb biweek 600 540').plans, [{ country: 'NG', network: 'mtn', quantity: 2, unit: 'GB', validity: 'BiWeek', price: '600', cost: '540' }]);
     assert.deepEqual(atAmount('KES 100.5000'), { currency: 'KES', minor: 10050n });
+  });
+
+  test('airtime discounts are set per network, per country or for everything, the most specific winning', async () => {
+    const parsed = parseAirtimeDiscounts('NG mtn 1.8; NG airtel 2\nNG glo 3, NG t2 3; KE 4; 2.5; NG mtn 25; mtn 2');
+    assert.deepEqual(
+      [['NG', 'mtn'], ['NG', 'airtel'], ['NG', 'glo'], ['NG', '9mobile'], ['KE', 'safaricom'], ['UG', 'mtn']].map(([country, network]) => parsed.of(country, network)?.toString()),
+      ['1.8', '2', '3', '3', '4', '2.5'],
+      'T2 is 9mobile; a country’s rate, then the general one, cover the rest',
+    );
+    assert.deepEqual(parsed.problems, ['"NG mtn 25"', '"mtn 2"'], 'a discount of 20% or more, or a network without its country, is not guessed');
+    assert.equal(parseAirtimeDiscounts('').discounts.size, 0);
+
+    // Nigeria's schedule (Basic tier) and nothing else: only Nigeria's networks are synced, each at its own rate.
+    const adapter = new AfricasTalkingAdapter({ username: 'bitocard', apiKey: 'at-key', apiUrl: at.url, dataUrl: at.url, airtimeDiscountPercent: 'NG airtel 2; NG glo 3; NG mtn 1.8; NG t2 3' });
+    const items = await adapter.catalogue({ category: 'airtime', country: 'NG' });
+    assert.deepEqual(
+      items.map(item => [item.productKey, item.costRatio]),
+      [
+        ['airtime:NG:mtn:topup', '0.982'],
+        ['airtime:NG:airtel:topup', '0.98'],
+        ['airtime:NG:glo:topup', '0.97'],
+        ['airtime:NG:9mobile:topup', '0.97'],
+      ],
+    );
+    assert.match(adapter.syncReport(), /No airtime discount set for KE safaricom, .*: not synced/);
+  });
+
+  test('each country’s stock serves only its own resellers and their customers, whatever their plan', async () => {
+    const { browser, resellerId } = await resellerClient(server, { country: 'NG' });
+    await prisma.reseller.update({ where: { id: resellerId }, data: { status: 'active', planCode: 'premium' } });
+    assert.equal((await admin.put('/v1/admin/suppliers/africas_talking/markets/NG/airtime', { enabled: true })).status, 200);
+    await prisma.countryCategory.update({ where: { countryCode_category: { countryCode: 'NG', category: 'airtime' } }, data: { enabled: true } });
+
+    const product = key => prisma.product.findUniqueOrThrow({ where: { key } });
+    const nigeria = await browser.post('/v1/quotes', { product_id: (await product('airtime:NG:mtn:topup')).id, face_value: 100000, recipient: { phone: '08031234567' } });
+    assert.equal(nigeria.status, 201, JSON.stringify(nigeria.json));
+    assert.equal(nigeria.json.currency, 'NGN');
+    const kenya = await browser.post('/v1/quotes', { product_id: (await product('airtime:KE:safaricom:topup')).id, face_value: 10000, recipient: { phone: '+254712345678' } });
+    assert.equal(kenya.json.error?.code, 'product_unavailable', 'the international plan does not open another country’s Africa’s Talking stock');
+    const listed = (await browser.get('/v1/catalogue/products?category=airtime&limit=100')).json.data;
+    assert.ok(listed.some(p => p.country === 'NG') && !listed.some(p => p.country !== 'NG'), 'only Nigeria’s airtime is listed');
   });
 
   test('callbacks name the transaction (airtime) or our reference (data), as JSON or a form', () => {

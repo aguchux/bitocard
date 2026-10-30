@@ -154,7 +154,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     fields: [
       field('username', 'Username', { help: 'Your app’s username in the Africa’s Talking dashboard.' }),
       secret('api_key', 'API key', { help: 'The app’s Settings > API Key.' }),
-      field('airtime_discount_percent', 'Airtime discount (%)', { help: 'The airtime discount on your account, for example 3: your cost is the amount less it.' }),
+      field('airtime_discount_percent', 'Airtime discounts (%)', { help: 'The airtime discounts on your account: one number for all (3), or per network, for example NG mtn 1.8; NG airtel 2; NG glo 3. Your cost is the amount less it.' }),
       field('airtime_countries', 'Airtime countries', { required: false, help: 'Empty: Africa’s Talking’s published countries. Otherwise, for example, KE KES 10-10000 safaricom,airtel,telkom; one per line or separated by semicolons.' }),
       field('data_product', 'Mobile Data product', { required: false, help: 'The product name made in your dashboard (Mobile Data > Products).' }),
       field('data_plans', 'Data plans', { required: false, help: 'For example KE safaricom 1GB Month 299 250 (country, network, size, validity, price, your cost); one per line or separated by semicolons.' }),

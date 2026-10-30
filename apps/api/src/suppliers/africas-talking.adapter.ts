@@ -66,7 +66,7 @@ export function parseAirtimeMarkets(value: string | undefined): { markets: Airti
   const problems: string[] = [];
   for (const line of lines(value)) {
     const match = /^([A-Za-z]{2})\s+([A-Za-z]{3})\s+(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s+([a-z0-9][a-z0-9 ,-]*)$/i.exec(line);
-    const networks = match?.[5].split(/[\s,]+/).map(item => slug(item)).filter(Boolean) ?? [];
+    const networks = match?.[5].split(/[\s,]+/).map(item => networkSlug(item)).filter(Boolean) ?? [];
     if (!match || !networks.length || Number(match[3]) <= 0 || Number(match[3]) > Number(match[4])) {
       problems.push(`"${line}"`);
       continue;
@@ -74,6 +74,35 @@ export function parseAirtimeMarkets(value: string | undefined): { markets: Airti
     markets.push({ country: match[1].toUpperCase(), currency: match[2].toUpperCase(), min: Number(match[3]), max: Number(match[4]), networks });
   }
   return { markets, problems };
+}
+
+/** Networks Africa's Talking (or a price list) names differently from the shared product brands. */
+const networkAliases: Record<string, string> = { t2: '9mobile', etisalat: '9mobile', 'airtel-tigo': 'airteltigo', vodafone: 'telecel' };
+const networkSlug = (value: string) => {
+  const name = slug(value);
+  return networkAliases[name] ?? name;
+};
+
+/**
+ * The airtime discounts agreed with Africa's Talking, in percent, one per line or separated by semicolons or commas:
+ * a bare number for every country and network (`3`), a country's (`NG 2`), or a network's in a country (`NG mtn 1.8`;
+ * T2 is 9mobile's new name). The most specific wins; a network with none is not synced. Africa's Talking's schedule
+ * raises the rates with monthly volume, so set the tier the account is on.
+ */
+export function parseAirtimeDiscounts(value: string | undefined) {
+  const discounts = new Map<string, Prisma.Decimal>();
+  const problems: string[] = [];
+  for (const entry of (value ?? '').split(/[\n;,]+/).map(item => item.trim()).filter(Boolean)) {
+    const match = /^(?:([A-Za-z]{2})\s+(?:([a-z0-9][a-z0-9-]*)\s+)?)?(\d{1,2}(?:\.\d{1,4})?)\s*%?$/i.exec(entry);
+    const percent = match ? new Decimal(match[3]) : null;
+    if (!match || !percent || percent.gte(20)) {
+      problems.push(`"${entry}"`);
+      continue;
+    }
+    discounts.set([match[1]?.toUpperCase() ?? '*', match[2] ? networkSlug(match[2]) : '*'].join(':'), percent);
+  }
+  const of = (country: string, network: string) => discounts.get(`${country}:${network}`) ?? discounts.get(`${country}:*`) ?? discounts.get('*:*') ?? null;
+  return { discounts, problems, of };
 }
 
 /**
@@ -124,7 +153,7 @@ export type AfricasTalkingConfig = {
   /** api.africastalking.com (airtime, transaction lookups) and bundles.africastalking.com (mobile data). */
   apiUrl: string;
   dataUrl: string;
-  /** The airtime discount agreed with Africa's Talking, in percent: BitoCard's cost is the amount less it. */
+  /** The airtime discounts agreed with Africa's Talking (`parseAirtimeDiscounts`): BitoCard's cost is the amount less them. */
   airtimeDiscountPercent?: string;
   airtimeCountries?: string;
   /** The Mobile Data product created in the Africa's Talking dashboard, and the plans sold through it. */
@@ -137,10 +166,10 @@ export type AfricasTalkingConfig = {
  *
  * - **Airtime** is any amount within the country's limits, to any of its networks: Africa's Talking finds the network
  *   from the number. One product per country and network (`airtime:KE:safaricom:topup`, the key Reloadly's offers use),
- *   costing the amount less the agreed discount (an integration setting; the actual discount each send reports is
- *   kept for reconciliation). Africa's Talking lists no products, so every airtime country it serves is stocked
- *   whichever market asks (as pawaPay's catalogue is): a reseller sells their own country's airtime, and other
- *   countries' with the international plan.
+ *   costing the amount less the discount agreed for that country and network (`parseAirtimeDiscounts`, an
+ *   integration setting; the actual discount each send reports is kept for reconciliation). Africa's Talking lists no products, so every airtime country it serves is stocked
+ *   whichever market asks (as pawaPay's catalogue is), but each country's offers serve only that country's
+ *   resellers and their customers, in their own currency, never another country's (`domesticOnly`).
  * - **Data** bundles are the plans an admin sets (Africa's Talking publishes no plan list), sent through the Mobile
  *   Data product made in its dashboard, each at the price customers know it by (face value) and BitoCard's cost.
  *
@@ -151,6 +180,11 @@ export type AfricasTalkingConfig = {
 export class AfricasTalkingAdapter implements SupplierAdapter {
   readonly code = 'africas_talking';
   readonly syncs: ProductCategory[] = ['airtime', 'data'];
+  /**
+   * Africa's Talking sends airtime abroad only from an app whose base currency is US dollars, so each country's stock
+   * serves only that country: its resellers and their customers buy in their own currency, never cross-border.
+   */
+  readonly domesticOnly = true;
   private report: string[] = [];
 
   constructor(private readonly config: AfricasTalkingConfig) {}
@@ -185,9 +219,10 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
   }
 
   private airtime(country: string | null): CatalogueItem[] {
-    const discount = this.config.airtimeDiscountPercent?.trim();
-    if (!discount || !/^\d{1,2}(\.\d{1,4})?$/.test(discount)) {
-      throw new ProviderError(this.code, 'set the airtime discount agreed with Africa’s Talking (Settings > Integrations > Africa’s Talking) before syncing', true);
+    const discounts = parseAirtimeDiscounts(this.config.airtimeDiscountPercent);
+    if (discounts.problems.length) this.report.push(`Airtime discounts not understood: ${discounts.problems.join(', ')}.`);
+    if (!discounts.discounts.size) {
+      throw new ProviderError(this.code, 'set the airtime discounts agreed with Africa’s Talking (Settings > Integrations > Africa’s Talking) before syncing', true);
     }
     const { markets, problems } = parseAirtimeMarkets(this.config.airtimeCountries);
     if (problems.length) this.report.push(`Airtime countries not understood: ${problems.join(', ')}.`);
@@ -196,26 +231,39 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
       return [];
     }
     if (country && !markets.some(item => item.country === country)) this.report.push(`Africa’s Talking sells no airtime in ${country} (as set up).`);
-    const ratio = new Decimal(1).minus(new Decimal(discount).div(100)).toString();
-    return markets.flatMap(market => market.networks.map(network => ({
-      sku: `airtime:${market.country}:${network}`,
-      productKey: `airtime:${market.country}:${network}:topup`,
-      category: 'airtime' as const,
-      country: market.country,
-      brand: network,
-      name: `${networkName(network)} airtime`,
-      faceCurrency: market.currency,
-      denominationType: 'range' as const,
-      fixedValues: [],
-      minValue: BigInt(Math.round(market.min * 100)),
-      maxValue: BigInt(Math.round(market.max * 100)),
-      recipientType: 'phone' as const,
-      description: `${networkName(network)} airtime, any amount from ${market.currency} ${market.min} to ${market.max}. Credited to the number straight away.`,
-      costCurrency: market.currency,
-      costRatio: ratio,
-      costFee: 0n,
-      meta: { currency: market.currency, network },
-    })));
+    const missing: string[] = [];
+    const items = markets.flatMap(market =>
+      market.networks.flatMap(network => {
+        const discount = discounts.of(market.country, network);
+        if (!discount) {
+          missing.push(`${market.country} ${network}`);
+          return [];
+        }
+        return [
+          {
+            sku: `airtime:${market.country}:${network}`,
+            productKey: `airtime:${market.country}:${network}:topup`,
+            category: 'airtime' as const,
+            country: market.country,
+            brand: network,
+            name: `${networkName(network)} airtime`,
+            faceCurrency: market.currency,
+            denominationType: 'range' as const,
+            fixedValues: [],
+            minValue: BigInt(Math.round(market.min * 100)),
+            maxValue: BigInt(Math.round(market.max * 100)),
+            recipientType: 'phone' as const,
+            description: `${networkName(network)} airtime, any amount from ${market.currency} ${market.min} to ${market.max}. Credited to the number straight away.`,
+            costCurrency: market.currency,
+            costRatio: new Decimal(1).minus(discount.div(100)).toString(),
+            costFee: 0n,
+            meta: { currency: market.currency, network },
+          },
+        ];
+      }),
+    );
+    if (missing.length) this.report.push(`No airtime discount set for ${missing.join(', ')}: not synced.`);
+    return items;
   }
 
   private data(country: string | null): CatalogueItem[] {
