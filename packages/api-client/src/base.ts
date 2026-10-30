@@ -69,8 +69,8 @@ export function toApiError(status: number | string, data: unknown): ApiError {
   if (body?.code && body.message) {
     return { status: typeof status === 'number' ? status : 0, type: body.type ?? 'api_error', code: body.code, message: body.message, param: body.param, requestId: body.request_id };
   }
-  // Afrippa's admin names its own product.
-  const product = adminProduct === 'afrippa' ? 'Afrippa' : 'BitoCard';
+  // Afrippa's admin and Udozo's apps name their own product.
+  const product = adminProduct === 'afrippa' ? 'Afrippa' : apiProduct === 'udozo' ? 'Udozo' : 'BitoCard';
   if (status === 'FETCH_ERROR') return { status: 0, type: 'network_error', code: 'network_error', message: `Could not reach ${product}. Check your connection and try again.` };
   if (status === 'TIMEOUT_ERROR') return { status: 0, type: 'network_error', code: 'timeout', message: `${product} took too long to answer. Try again.` };
   return { status: typeof status === 'number' ? status : 0, type: 'api_error', code: 'unexpected', message: 'Something went wrong. Try again.' };
