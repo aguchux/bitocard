@@ -5,10 +5,20 @@ export type ApiError = { status: number; type: string; code: string; message: st
 
 /**
  * Where the API lives: NEXT_PUBLIC_API_URL (for example http://localhost:3001 in development), else production:
- * api.bitocard.com, or api.afrippa.com for Afrippa's admin (its own host, so its admin cookie stays same-site).
+ * api.bitocard.com, api.afrippa.com for Afrippa's admin (its own host, so its admin cookie stays same-site), or
+ * api.udozo.com for Udozo's apps (its own instance of the API, `setApiProduct('udozo')`).
  */
 // eslint-disable-next-line @typescript-eslint/no-use-before-define -- read when called, long after it is set
-export const apiBaseUrl = () => (process.env.NEXT_PUBLIC_API_URL ?? (adminProduct === 'afrippa' ? 'https://api.afrippa.com' : 'https://api.bitocard.com')).replace(/\/$/, '');
+export const apiBaseUrl = () => (process.env.NEXT_PUBLIC_API_URL ?? (adminProduct === 'afrippa' ? 'https://api.afrippa.com' : apiProduct === 'udozo' ? 'https://api.udozo.com' : 'https://api.bitocard.com')).replace(/\/$/, '');
+
+/**
+ * Which product's API instance the apps call (docs/UDOZO_SPINOFF_PLAN.md): Udozo's apps set `udozo` once at start-up,
+ * so production calls go to api.udozo.com. The paths are BitoCard's own (the same code runs there); nothing is rewritten.
+ */
+let apiProduct: 'bitocard' | 'udozo' = 'bitocard';
+export function setApiProduct(product: 'bitocard' | 'udozo') {
+  apiProduct = product;
+}
 
 /**
  * Headers SHQ adds to every request: which of the person's reseller accounts it acts for (`BitoCard-Reseller`) and

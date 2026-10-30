@@ -1,5 +1,5 @@
 """Generates every logo file from each brand's master artwork: BitoCard's assets/logo.png (the lowercase "b" mark) for
-BitoCard's apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
+BitoCard's apps, Udozo's placeholder "u" (assets/udozo/drafts/mark-placeholder.png) for its apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
 master arrives) for apps/afrippa.
 
 Run from the repository root after the logo changes: python scripts/brand-assets.py (needs Pillow and NumPy).
@@ -29,13 +29,15 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 # Each brand: its master artwork and the apps that wear it.
 BRANDS = [
-    ("bitocard", ROOT / "assets" / "logo.png", ["storefront", "docs", "legals", "admin", "shq", "verify", "shop"]),
+    ("bitocard", ROOT / "assets" / "logo.png", ["storefront", "docs", "legals", "admin", "shq", "verify"]),
     ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa", "afrippa-admin"]),
+    # Udozo's placeholder "u" (scripts/udozo-mark-draft.py) until its artwork arrives (docs/UDOZO_SPINOFF_PLAN.md).
+    ("udozo", ROOT / "assets" / "udozo" / "drafts" / "mark-placeholder.png", ["udozo", "udozo-shq", "udozo-admin"]),
 ]
 
 # Apps deployed a second time in another brand: that brand's whole set (marks, favicons, app and manifest icons) goes in
 # one folder of the app's public/, served at the usual addresses by that deployment (apps/verify/next.config.ts).
-SECOND_BRAND = {"afrippa": [ROOT / "apps" / "verify" / "public" / "afrippa"]}
+SECOND_BRAND = {"afrippa": [ROOT / "apps" / "verify" / "public" / "afrippa"], "udozo": [ROOT / "apps" / "verify" / "public" / "udozo"]}
 
 WHITE = np.array([255, 255, 255])
 
