@@ -3,14 +3,15 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 
 /**
- * The BitoCard Shop terms' version: their date on the legals site (`/documents/shop-terms`). Bump it when the terms change
- * in a way people must accept again; everyone is then asked once more before they next post or use Safe pay.
+ * The Udozo terms' version: their date on udozo.com (`legalVersion` in apps/udozo/lib/legal.ts, kept equal by its test).
+ * Bump both when the terms change in a way people must accept again; everyone is then asked once more before they next
+ * post or use Safe pay.
  */
-export const shopTermsVersion = '2026-10-26';
-/** Their path on the legals site (apps use `appUrl("legals", path)`). */
-export const shopTermsPath = '/documents/shop-terms';
+export const shopTermsVersion = '2026-10-30';
+/** Their path on udozo.com, where the apps link it (the Safe pay rules and privacy notice are beside it, under `/legal`). */
+export const shopTermsPath = '/legal/terms';
 
-/** Each customer's acceptance of the BitoCard Shop terms, once per version, before they post a listing or use Safe pay. */
+/** Each customer's acceptance of the Udozo terms, once per version, before they post a listing or use Safe pay. */
 @Injectable()
 export class ShopTermsService {
   constructor(private readonly prisma: PrismaService) {}

@@ -68,7 +68,7 @@ function Progress({ steps, current }: { steps: Step[]; current: Step }) {
  * fails). It creates the person; the gate then onboards them (business name and country), or with an invitation they
  * return to accept it. Google errors come back here as `?auth_error=`.
  */
-export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl: string }) {
+export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUrl: string; termsUrl: string; privacyUrl: string }) {
   const router = useRouter();
   const search = useSearchParams();
   const invitation = search.get("invitation")?.trim() || null;
@@ -381,10 +381,14 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
             </div>
             <p className="text-xs text-muted">
               By creating an account you agree to the{" "}
-              <a href={termsUrl} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">
+              <a href={sellerTermsUrl} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">
                 Seller terms
               </a>{" "}
-              and confirm you have read the{" "}
+              and the{" "}
+              <a href={termsUrl} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">
+                Terms of use
+              </a>
+              , and confirm you have read the{" "}
               <a href={privacyUrl} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">
                 Privacy notice
               </a>

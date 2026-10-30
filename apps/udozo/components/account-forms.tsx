@@ -184,6 +184,17 @@ export function SignUpForm({ next, markets, market = null }: { next: string; mar
         </>
       ) : null}
       <TextField label="Password" name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={128} state={state} hint={passwordHint} />
+      <p className="text-xs text-navy-500">
+        By creating an account you agree to Udozo&apos;s{" "}
+        <Link href="/legal/terms" target="_blank" className="font-semibold text-navy-900 underline">
+          terms of use
+        </Link>{" "}
+        and confirm you have read the{" "}
+        <Link href="/legal/privacy" target="_blank" className="font-semibold text-navy-900 underline">
+          privacy notice
+        </Link>
+        .
+      </p>
       <Submit pending={pending} className="w-full">
         Create account
       </Submit>
@@ -303,7 +314,12 @@ export function VerificationForm({ country, countryName, resume }: { country: st
       <p className="text-sm text-navy-600">{`We will take you to Udozo Verify to photograph an ID document from ${countryName}, take a selfie and make two short movements. It takes about five minutes. Your documents are stored encrypted and never made public.`}</p>
       <label className="flex items-start gap-3 text-sm text-navy-700">
         <input type="checkbox" name="consent" required checked={consent} onChange={event => setConsent(event.target.checked)} className="mt-1 size-4 accent-brand-500" />
-        <span>I agree to Udozo checking my identity, including a check of my face against my ID (biometric data).</span>
+        <span>
+          I agree to Udozo checking my identity, including a check of my face against my ID (biometric data).{" "}
+          <Link href="/legal/privacy#identity-checks" target="_blank" className="font-semibold text-navy-900 underline">
+            How we use it
+          </Link>
+        </span>
       </label>
       <Submit pending={pending}>{resume ? "Continue your check" : "Start the check"}</Submit>
     </form>

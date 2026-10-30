@@ -177,7 +177,7 @@ describe("listing actions", () => {
   });
 
   test("Udozo's terms: read, then accepted by the version shown; a refused request says why", async () => {
-    reply = url => (url.endsWith("/orders") ? Response.json({ error: { code: "terms_not_accepted", message: "Accept the Udozo terms.", param: "terms" } }, { status: 409 }) : Response.json({ object: "classified_terms", version: "2026-10-25", path: "/documents/shop-terms", accepted: false, accepted_at: null, previous_version: null }));
+    reply = url => (url.endsWith("/orders") ? Response.json({ error: { code: "terms_not_accepted", message: "Accept the Udozo terms.", param: "terms" } }, { status: 409 }) : Response.json({ object: "classified_terms", version: "2026-10-25", path: "/legal/terms", accepted: false, accepted_at: null, previous_version: null }));
     expect(await requestSafePay({ listingId: listing, fulfilment: "meet_up" })).toMatchObject({ ok: false, code: "terms_not_accepted" });
     expect(await shopTerms()).toMatchObject({ version: "2026-10-25" });
     expect(await acceptShopTerms("2026-10-25")).toMatchObject({ ok: true });

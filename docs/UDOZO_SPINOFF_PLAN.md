@@ -287,7 +287,8 @@ The code is moved to Udozo's apps (step 4), not deleted.
 - `deploy.sh`: with `/etc/udozo/api.env` present, checks both environments and migrates both databases (Udozo's then seeded) before replacing either instance, then checks both hosts through Caddy serve their own product at the new commit, and refuses two instances on one database (`/health`'s `product` and `database_id`);
 - `deploy-api.yml` copies the site and smoke-tests `https://api.udozo.com` once `UDOZO_API_LIVE` is `true` (`SMOKE_PRODUCT=udozo`; `test/smoke-script.test.mjs` runs the smoke test against both products);
 - Udozo's instance defaults to its own addresses (`productDefaults` in `config.ts`: udozo.com, shq, verify, admin, `udozo.com` admins);
-- runbook: `deploy/droplet/README.md`, Udozo's API. **Still to do:** Vercel projects for Udozo's apps, and Udozo's legal documents.
+- runbook: `deploy/droplet/README.md`, Udozo's API. **Still to do:** Vercel projects for Udozo's apps.
+- **Legal documents drafted** (30 October 2026; item 3), drafts for lawyers' review on udozo.com: `/legal` and `/legal/<slug>` (`terms`, `safe-pay`, `sellers`, `privacy`, `cookies`; content in `apps/udozo/lib/legal.ts`, pages in `app/(global)/legal`), naming De-Golojan Technologies Ltd as owner and operator, `support@udozo.com` and `legal@udozo.com` (to be set up). Linked from udozo.com's footer and sitemap, stores' footers, sign-up and the identity check's consent, Seller HQ's sign-up and verify.udozo.com. **Accepted by version:** the API's `shopTermsVersion` is `2026-10-30`, equal to `legalVersion`, and `shopTermsPath` is `/legal/terms`, which the accept prompt links. Tests: `apps/udozo/test/legal.test.ts`. Still owed: lawyers' review per market (Safe pay licensing, the liability cap, the setup fee's refund terms, the controller split with sellers).
 
 ### 6. Later
 Drop the Shop and resale tables from BitoCard's database once they are confirmed empty.

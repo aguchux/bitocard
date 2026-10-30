@@ -209,11 +209,11 @@ describe('submitting', () => {
     assert.equal(emptied.json.error.code, 'listing_incomplete', 'a live listing keeps everything a buyer needs');
   });
 
-  test('posting needs the current BitoCard Shop terms accepted, recorded by version', async () => {
+  test('posting needs the current Udozo terms accepted, recorded by version', async () => {
     await open();
     const shopper = await seller({ terms: false });
     const status = await shopper.get('/v1/classifieds/terms');
-    assert.deepEqual(status.json, { object: 'classified_terms', version: status.json.version, path: '/documents/shop-terms', accepted: false, accepted_at: null, previous_version: null });
+    assert.deepEqual(status.json, { object: 'classified_terms', version: status.json.version, path: '/legal/terms', accepted: false, accepted_at: null, previous_version: null });
     assert.match(status.json.version, /^\d{4}-\d{2}-\d{2}$/);
 
     const draft = (await shopper.post('/v1/classifieds/listings', await phone({ title: 'iPhone 11, 64 GB' }))).json;

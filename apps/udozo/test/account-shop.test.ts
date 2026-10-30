@@ -305,7 +305,7 @@ describe("the shop assistant for sellers", () => {
   });
 
   test("the Udozo terms: read, then accepted by the version shown; anything else never leaves", async () => {
-    const status = { object: "classified_terms", version: "2026-10-25", path: "/documents/shop-terms", accepted: false, accepted_at: null, previous_version: null };
+    const status = { object: "classified_terms", version: "2026-10-25", path: "/legal/terms", accepted: false, accepted_at: null, previous_version: null };
     const fetch = vi.fn(async () => reply(status));
     vi.stubGlobal("fetch", fetch);
     expect(await actions.shopTerms()).toMatchObject({ version: "2026-10-25", accepted: false });

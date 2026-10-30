@@ -8,6 +8,9 @@ export type TermsStatus = { version: string; path: string; accepted: boolean; pr
 /** The error code the API answers when posting or Safe pay needs the terms accepted first. */
 export const termsCode = "terms_not_accepted";
 
+/** Where the terms are read: the API's path on this site (udozo.com), else the terms of use. */
+export const termsHref = (terms: TermsStatus | null) => (terms?.path.startsWith("/legal/") ? terms.path : "/legal/terms");
+
 const dateOf = (version: string) => {
   const date = new Date(`${version}T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? version : date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
@@ -16,8 +19,8 @@ const dateOf = (version: string) => {
 /**
  * Asks for Udozo's terms to be accepted, shown where posting a listing or Safe pay was refused for it: the version read
  * from the API (`load`), then "I accept", which records that version (`accept`, a server action) and retries what was
- * refused (`onAccepted`). Udozo's own legal documents are still to be published (docs/UDOZO_SPINOFF_PLAN.md, step 5);
- * until then nothing is linked, and never BitoCard's.
+ * refused (`onAccepted`). The terms are read on udozo.com (`/legal/terms`, the API's `path`), in a new tab so nothing
+ * typed is lost.
  */
 export function TermsAccept({ load, accept, onAccepted }: { load: () => Promise<TermsStatus | null>; accept: (version: string) => Promise<{ ok: boolean; message?: string }>; onAccepted: () => void }) {
   const [terms, setTerms] = useState<TermsStatus | null>(null);
@@ -50,8 +53,11 @@ export function TermsAccept({ load, accept, onAccepted }: { load: () => Promise<
     <div role="alert" className="grid gap-2.5 rounded-2xl border border-navy-200 bg-white p-4 text-left text-sm text-navy-700">
       <strong className="text-[15px] text-navy-900">{terms?.previous_version ? "Udozo's terms have changed" : "Accept Udozo's terms"}</strong>
       <p>
-        Before you post listings or use Safe pay, accept Udozo&apos;s terms{terms ? ` (${dateOf(terms.version)})` : ""}. They cover what may be sold, Safe pay&apos;s fees, deadlines and disputes, and paying
-        directly.
+        Before you post listings or use Safe pay, read and accept{" "}
+        <a href={termsHref(terms)} target="_blank" rel="noopener" className="font-semibold text-navy-900 underline">
+          Udozo&apos;s terms
+        </a>
+        {terms ? ` (${dateOf(terms.version)})` : ""}. They cover what may be sold, Safe pay&apos;s fees, deadlines and disputes, and paying directly.
       </p>
       {failed ? <p className="font-semibold text-brand-700">{failed}</p> : null}
       <button

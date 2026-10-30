@@ -73,7 +73,7 @@ export const verifyBrands: Record<VerifyBrandKey, VerifyBrand> = {
     apiDefault: "https://api.udozo.com",
     cookie: "udz_kyc",
     review: false,
-    // A placeholder until Udozo publishes its own privacy notice (docs/UDOZO_SPINOFF_PLAN.md, step 5).
+    // Udozo's privacy notice on udozo.com (a draft for lawyers' review until checks go live).
     privacyUrl: "https://udozo.com/legal/privacy",
     // udozo.com, Seller HQ and every store's <store>.udozo.com address.
     hosts: ["udozo.com"],

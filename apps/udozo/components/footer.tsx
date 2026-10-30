@@ -1,9 +1,6 @@
 import Link from "next/link";
 
-/**
- * Udozo's footer: the Safe Trade Guide and the credit. Udozo's own legal documents are still to be written
- * (docs/UDOZO_SPINOFF_PLAN.md, step 5); they are linked here once published, never BitoCard's.
- */
+/** Udozo's footer: the Safe Trade Guide, Udozo's own legal documents (on udozo.com, `/legal`) and the credit. */
 export function SiteFooter({ country }: { country?: { code: string; name: string } | null }) {
   return (
     <footer className="mt-12 border-t border-navy-200 bg-white">
@@ -18,6 +15,21 @@ export function SiteFooter({ country }: { country?: { code: string; name: string
           </Link>
           <Link href="/safe-trade#safe-pay" className="hover:underline">
             Safe pay
+          </Link>
+          <Link href="/legal/terms" className="hover:underline">
+            Terms of use
+          </Link>
+          <Link href="/legal/safe-pay" className="hover:underline">
+            Safe pay rules
+          </Link>
+          <Link href="/legal/sellers" className="hover:underline">
+            Seller terms
+          </Link>
+          <Link href="/legal/privacy" className="hover:underline">
+            Privacy
+          </Link>
+          <Link href="/legal/cookies" className="hover:underline">
+            Cookies
           </Link>
         </nav>
       </div>
