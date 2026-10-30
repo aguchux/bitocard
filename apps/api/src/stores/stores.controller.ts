@@ -9,6 +9,7 @@ import { adminId } from '../countries/countries.controller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { clientHeader, signedClientIp } from '../common/rate-limit/client-ip.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { StoreGuideService } from './store-guide.service.js';
 import { StoreHomeService } from './store-home.service.js';
 import { maxTrafficDays, StoreVisitsService } from './store-visits.service.js';
 import { templateKeys } from './templates.js';
@@ -249,6 +250,25 @@ export class StoresController {
 }
 
 /** The store templates: what each sells, its design variants and colour themes, and whether it is open to you. */
+/**
+ * SHQ's guide to creating a first store. Left out of the public OpenAPI document: it only tells SHQ when to open the
+ * guide. Every team member may ask; only owners and admins without a store are ever shown it.
+ */
+@ApiExcludeController()
+@SessionOnly()
+@Controller('onboarding')
+export class StoreGuideController {
+  constructor(private readonly guide: StoreGuideService) {}
+
+  /** Claims the next showing, if one is due (at most three, 10 minutes apart). */
+  @Post('store-guide')
+  @HttpCode(HttpStatus.OK)
+  claim(@CurrentCaller() caller: Caller) {
+    if (caller.kind !== 'session') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'Sign in to SHQ to see the store guide.');
+    return this.guide.claim({ resellerId: resellerOf(caller), userId: caller.userId, role: caller.role });
+  }
+}
+
 @ApiTags('Stores')
 @ApiBearerAuth()
 @Roles('admin')

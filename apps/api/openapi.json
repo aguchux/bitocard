@@ -1718,6 +1718,7 @@
                     "classifieds_resale": false,
                     "reseller_resale": false,
                     "shq_install_prompt": false,
+                    "shq_store_guide": true,
                     "storefront_install_prompt": false
                   }
                 }
@@ -46874,6 +46875,7 @@
               "store_template_rdp_shop",
               "reseller_two_step",
               "shq_install_prompt",
+              "shq_store_guide",
               "storefront_install_prompt",
               "manual_reseller_approval",
               "country_stores",
@@ -46957,6 +46959,10 @@
               "shq_install_prompt": {
                 "type": "boolean",
                 "description": "SHQ asks the reseller's team to install it as an app (home screen, full screen; iPhones need it for push notifications): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too."
+              },
+              "shq_store_guide": {
+                "type": "boolean",
+                "description": "SHQ shows the reseller's owner and admins a short guide to creating their first store until they have one: at most three times each, at least 10 minutes apart, closing it or not. On unless switched off."
               },
               "storefront_install_prompt": {
                 "type": "boolean",

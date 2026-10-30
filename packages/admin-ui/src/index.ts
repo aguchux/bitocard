@@ -11,6 +11,7 @@ export { Wordmark } from './ui/wordmark';
 export { ImageField, type ImageFieldProps } from './ui/image-field';
 export { ExternalLinks } from './ui/external-links';
 export { PhoneContact, whatsappUrl } from './ui/phone-contact';
+export { StoreGuideDialog, storeGuideSteps } from './ui/store-guide';
 export { amountToMinor, bpsToPercent, percentToBps, PriceBreakdown, PricingSchemes, type BreakdownRow } from './ui/pricing';
 export { ticketCategoryLabels, ticketPriorityLabels, ticketSourceLabels, ticketStatusLabel } from './ui/support';
 export { ChatAvatar, ChatPanel, chatStatusLabels, RequesterCard, type ChatPanelAttachment, type ChatPanelMessage } from './ui/chat';

@@ -92,6 +92,12 @@ export type SettingsOptionKey = 'gift_card_payout';
 export type SettingsOption = { value: string | null; allowed: string[]; source: 'reseller' | 'country_default' };
 export type SettingsOptions = Record<SettingsOptionKey, SettingsOption>;
 export type ResellerSettings = { object: 'settings'; options: SettingsOptions; features: Record<string, boolean> };
+/**
+ * SHQ's guide to creating a first store (`POST /v1/onboarding/store-guide`): `show` means open it now (the showing is
+ * counted). Owners and admins without a store, at most `limit` times, 10 minutes apart; `next_at` is when it may come
+ * back, null once it never will.
+ */
+export type StoreGuide = { object: 'store_guide'; show: boolean; times_shown: number; limit: number; next_at: string | null };
 
 export type Country = {
   object: 'country';
@@ -156,6 +162,7 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Session', 'Account', 'Settings', 'IdentityCheck'],
     }),
     resellerSettings: build.query<ResellerSettings, void>({ query: () => '/v1/settings', providesTags: ['Settings'] }),
+    claimStoreGuide: build.mutation<StoreGuide, void>({ query: () => ({ url: '/v1/onboarding/store-guide', method: 'POST' }) }),
     setSettingsOption: build.mutation<{ object: 'settings'; options: SettingsOptions }, { key: SettingsOptionKey; value: string }>({
       query: ({ key, value }) => ({ url: `/v1/settings/options/${key}`, method: 'PUT', body: { value } }),
       invalidatesTags: ['Settings'],
@@ -204,6 +211,7 @@ export const {
   useSubdomainCheckQuery,
   useUpdateBusinessMutation,
   useResellerSettingsQuery,
+  useClaimStoreGuideMutation,
   useSetSettingsOptionMutation,
   useStoreCustomersQuery,
   useStoreCustomerQuery,

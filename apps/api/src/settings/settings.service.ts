@@ -116,6 +116,12 @@ export const switchDefinitions = {
     description:
       "SHQ asks the reseller's team to install it as an app (home screen, full screen; iPhones need it for push notifications): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too.",
   },
+  shq_store_guide: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description:
+      "SHQ shows the reseller's owner and admins a short guide to creating their first store until they have one: at most three times each, at least 10 minutes apart, closing it or not. On unless switched off.",
+  },
   storefront_install_prompt: {
     scopes: ['global', 'country'],
     description:

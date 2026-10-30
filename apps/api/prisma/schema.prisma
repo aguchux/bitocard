@@ -541,6 +541,9 @@ model ResellerMember {
   userId     String       @map("user_id") @db.Uuid
   role       ResellerRole
   createdAt  DateTime     @default(now()) @map("created_at")
+  /// SHQ's guide to creating a first store: how many times this person was shown it for this account (at most 3), and when last.
+  storeGuideShown   Int       @default(0) @map("store_guide_shown") @db.SmallInt
+  storeGuideShownAt DateTime? @map("store_guide_shown_at")
   reseller   Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
