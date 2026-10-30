@@ -1,5 +1,7 @@
 # B2B reselling: plan
 
+**Moving to Udozo (decided 30 October 2026):** this leaves BitoCard for its own brand, Udozo (udozo.com). See `docs/UDOZO_SPINOFF_PLAN.md`.
+
 **Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 6 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; stage 4 and 4b: buying, shipping and payouts; stage 5: disputes, reports and strikes; stage 6: emails and reminders; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
