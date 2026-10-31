@@ -116,6 +116,23 @@ describe('categories', () => {
     assert.equal(bySlug.get('motorcycles').name, 'Motorbikes, scooters and kekes');
   });
 
+  test('the registry asks what buyers ask in each category, never more than a listing can hold', async () => {
+    const categories = await prisma.classifiedCategory.findMany({ where: { parentId: { not: null } }, include: { features: { include: { feature: true } } } });
+    const suggests = slug => Object.fromEntries(categories.find(c => c.slug === slug).features.map(link => [link.feature.key, link.filter]));
+    for (const c of categories) assert.ok(c.features.length <= 20, `${c.slug} suggests no more than a listing takes`);
+    assert.deepEqual([suggests('mobile-phones').accounts_removed, suggests('mobile-phones').network], [true, true], 'phones: signed out of accounts, network');
+    assert.deepEqual([suggests('houses-for-rent').rent_period, suggests('houses-for-rent').backup_power, suggests('houses-for-rent').property_type], [true, true, true]);
+    assert.equal(suggests('land').dry_land, true);
+    assert.deepEqual([suggests('hair-beauty').hair_type, suggests('hair-beauty').hair_length], [true, true]);
+    assert.ok('volume' in suggests('fragrances') && !('capacity' in suggests('fragrances')), 'perfume is sized in millilitres');
+    assert.equal(suggests('generators-solar').battery_type, true);
+    for (const slug of ['repair-services', 'cleaning', 'lessons', 'car-services']) assert.equal(suggests(slug).pricing, true, `${slug} says how it charges`);
+    const keys = Object.fromEntries((await prisma.classifiedFeature.findMany()).map(f => [f.key, f]));
+    assert.ok(Object.keys(keys).length >= 160, 'the registry covers the categories');
+    assert.deepEqual([keys.job_type.enabled, keys.salary.enabled], [false, false], "jobs' keys went with Jobs");
+    assert.equal(keys.remote.name, 'Online or remote');
+  });
+
   test('a category cannot be its own parent', async () => {
     const [{ id }] = await prisma.$queryRawUnsafe(`SELECT "id" FROM "classified_categories" WHERE "slug" = 'cars'`);
     assert.match(await failure(`UPDATE "classified_categories" SET "parent_id" = "id" WHERE "id" = '${id}'`), /classified_categories_not_own_parent_check/);

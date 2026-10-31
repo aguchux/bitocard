@@ -298,19 +298,19 @@ describe('reference data and the queue', () => {
   });
 
   test('the feature registry: operations add and change keys, checked against their data type, audited', async () => {
-    assert.equal((await support.post('/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Refresh rate', icon: 'monitor', data_type: 'number' })).status, 403);
-    const created = await admin.post('/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Refresh rate', icon: 'monitor', data_type: 'number', unit: 'Hz', min: 30, max: 500, placeholder: 'e.g. 120', synonyms: ['Hz', 'refresh'], filterable: true });
+    assert.equal((await support.post('/v1/admin/classifieds/features', { key: 'brightness', name: 'Brightness', icon: 'monitor', data_type: 'number' })).status, 403);
+    const created = await admin.post('/v1/admin/classifieds/features', { key: 'brightness', name: 'Brightness', icon: 'monitor', data_type: 'number', unit: 'nits', min: 30, max: 500, placeholder: 'e.g. 120', synonyms: ['Nits', 'brightness'], filterable: true });
     assert.equal(created.status, 201, JSON.stringify(created.json));
-    assert.deepEqual([created.json.key, created.json.unit, created.json.synonyms, created.json.enabled], ['refresh_rate', 'Hz', ['hz', 'refresh'], true]);
-    assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Again', icon: 'monitor', data_type: 'text' })).json.error.code, 'feature_exists');
+    assert.deepEqual([created.json.key, created.json.unit, created.json.synonyms, created.json.enabled], ['brightness', 'nits', ['nits', 'brightness'], true]);
+    assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'brightness', name: 'Again', icon: 'monitor', data_type: 'text' })).json.error.code, 'feature_exists');
     assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'screen_finish', name: 'Screen finish', icon: 'monitor', data_type: 'choice' })).json.error.param, 'choices');
     assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'warranty', name: 'Warranty', icon: 'shield', data_type: 'text', unit: 'months' })).json.error.param, 'unit');
     assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'ports', name: 'Ports', icon: 'plug', data_type: 'number', default_value: 'many' })).json.error.code, 'feature_value_invalid');
 
-    const changed = await admin.patch('/v1/admin/classifieds/features/refresh_rate', { max: 360, default_value: '60' });
+    const changed = await admin.patch('/v1/admin/classifieds/features/brightness', { max: 360, default_value: '60' });
     assert.deepEqual([changed.status, changed.json.max, changed.json.default_value], [200, 360, '60']);
-    assert.equal((await admin.patch('/v1/admin/classifieds/features/refresh_rate', { min: 400 })).json.error.param, 'max');
-    assert.ok((await support.get('/v1/admin/classifieds/features?q=hz')).json.data.some(item => item.key === 'refresh_rate'));
+    assert.equal((await admin.patch('/v1/admin/classifieds/features/brightness', { min: 400 })).json.error.param, 'max');
+    assert.ok((await support.get('/v1/admin/classifieds/features?q=nits')).json.data.some(item => item.key === 'brightness'));
 
     // A choice a listing uses cannot be taken away.
     const colour = (await support.get('/v1/admin/classifieds/features?q=colour')).json.data.find(item => item.key === 'colour');
@@ -319,8 +319,8 @@ describe('reference data and the queue', () => {
     const used = colour.choices[0];
     assert.equal((await seller.patch(`/v1/classifieds/listings/${ad.id}`, { features: [{ key: 'colour', value: used }] })).status, 200);
     assert.equal((await admin.patch('/v1/admin/classifieds/features/colour', { choices: colour.choices.slice(1) })).json.error.param, 'choices');
-    assert.equal((await admin.patch('/v1/admin/classifieds/features/refresh_rate', { enabled: false })).json.enabled, false);
-    assert.ok(!(await fetch(`${server.base}/v1/classifieds/features?q=refresh`).then(res => res.json())).data.some(item => item.key === 'refresh_rate'), 'switched off keys leave the sellers\' list');
+    assert.equal((await admin.patch('/v1/admin/classifieds/features/brightness', { enabled: false })).json.enabled, false);
+    assert.ok(!(await fetch(`${server.base}/v1/classifieds/features?q=brightness`).then(res => res.json())).data.some(item => item.key === 'brightness'), 'switched off keys leave the sellers\' list');
     assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.feature_changed' } }), 2);
   });
 
