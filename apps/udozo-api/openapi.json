@@ -8366,6 +8366,157 @@
         "x-bitocard-auth": "public"
       }
     },
+    "/v1/auth/signup/phone": {
+      "post": {
+        "description": "After confirming the email. Texts a 6-digit code (30 minutes, 5 attempts, one a minute, five per sign-up) through the country's SMS provider. Refused with `phone_in_use` when it is already someone's sign-in number, and `phone_verification_unavailable` where the country has no SMS provider (sign up with the number unconfirmed).",
+        "operationId": "AuthController_startSignupPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupPhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The code is on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notice"
+                },
+                "example": {
+                  "object": "notice",
+                  "message": "A code is on its way to +2348031234567."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Text a code to the owner's mobile number",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/auth/signup/phone/verify": {
+      "post": {
+        "description": "Pass the same `signup_token` and `phone` to `POST /v1/auth/signup`: the account is created with the number confirmed, as a sign-in number.",
+        "operationId": "AuthController_verifySignupPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupPhoneVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The number is confirmed for this sign-up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupPhoneVerification"
+                },
+                "example": {
+                  "object": "signup_phone_verification",
+                  "phone": "+2348031234567",
+                  "verified_at": "2026-10-06T09:20:12.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm the texted sign-up code",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
     "/v1/auth/signup": {
       "post": {
         "description": "With a `signup_token` (from confirming the email first) the email is already confirmed; otherwise a 6-digit code is emailed to confirm it.",
@@ -29890,6 +30041,68 @@
           "code"
         ]
       },
+      "SignupPhoneDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email to sign up with; a 6-digit code is sent to it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@example.com"
+          },
+          "signup_token": {
+            "type": "string",
+            "description": "From `POST /v1/auth/signup/email/verify`, for the same email."
+          },
+          "country": {
+            "type": "string",
+            "description": "The business country (ISO 3166-1 alpha-2); the number must be a mobile of it.",
+            "pattern": "^[A-Z]{2}$",
+            "example": "NG"
+          },
+          "phone": {
+            "type": "string",
+            "description": "The owner's mobile number, with or without the country's dialling code; a 6-digit code is texted to it.",
+            "minLength": 5,
+            "maxLength": 20,
+            "example": "+2348031234567"
+          }
+        },
+        "required": [
+          "email",
+          "signup_token",
+          "country",
+          "phone"
+        ]
+      },
+      "SignupPhoneVerifyDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email to sign up with; a 6-digit code is sent to it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@example.com"
+          },
+          "signup_token": {
+            "type": "string",
+            "description": "From `POST /v1/auth/signup/email/verify`, for the same email."
+          },
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code that was sent to you.",
+            "pattern": "^\\d{6}$",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "email",
+          "signup_token",
+          "code"
+        ]
+      },
       "SignUpDto": {
         "type": "object",
         "properties": {
@@ -42708,6 +42921,33 @@
           "expires_at": {
             "type": "string",
             "description": "When the token stops working.",
+            "format": "date-time"
+          }
+        }
+      },
+      "SignupPhoneVerification": {
+        "type": "object",
+        "title": "SignupPhoneVerification",
+        "description": "The owner's mobile number, confirmed for this sign-up: pass it with the same `signup_token` to `POST /v1/auth/signup`.",
+        "required": [
+          "object",
+          "phone",
+          "verified_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `signup_phone_verification`.",
+            "const": "signup_phone_verification"
+          },
+          "phone": {
+            "type": "string",
+            "description": "The confirmed mobile number, in E.164."
+          },
+          "verified_at": {
+            "type": "string",
+            "description": "When it was confirmed.",
             "format": "date-time"
           }
         }

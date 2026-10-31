@@ -86,8 +86,11 @@ export class AuthService {
   async signUp(input: SignUpDto, req: Request, res: Response) {
     const invitation = input.invitation_token ? await this.team.findValid(input.invitation_token, input.email) : null;
     if (!invitation) await this.countries.assertSignupOpen(input.country ?? '');
-    // The owner's mobile number, from the business country; kept unconfirmed for BitoCard's operations (never signs in).
+    // The owner's mobile number, from the business country. Confirmed with a texted code during this sign-up
+    // (`POST /v1/auth/signup/phone`) it is their sign-in number from the start; otherwise it is kept unconfirmed for
+    // Udozo's operations and never signs in.
     const signupPhone = !invitation && input.phone ? normalisePhone(input.phone, input.country ?? null) : null;
+    let phoneConfirmed = false;
     await this.passwords.assertAcceptable(input.password);
     if (await this.emailTaken(input.email)) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
@@ -105,11 +108,14 @@ export class AuthService {
           await tx.invitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } });
           return created;
         }
-        // A sign-up token proves the email was confirmed with a code before the account existed.
-        if (input.signup_token) await this.signupVerification.consume(tx, input.email, input.signup_token);
+        // A sign-up token proves the email was confirmed with a code before the account existed (and the number, if texted).
+        if (input.signup_token) ({ phoneConfirmed } = await this.signupVerification.consume(tx, input.email, input.signup_token, signupPhone));
+        if (phoneConfirmed && signupPhone && await this.phoneTaken(tx, signupPhone)) throw phoneInUse();
+        const confirmedPhone = phoneConfirmed && signupPhone ? { phone: signupPhone, phoneVerifiedAt: new Date() } : {};
         const created = await tx.user.create({
-          data: { realm: 'reseller', email: input.email, name: input.name, passwordHash, emailVerifiedAt: input.signup_token ? new Date() : null },
+          data: { realm: 'reseller', email: input.email, name: input.name, passwordHash, emailVerifiedAt: input.signup_token ? new Date() : null, ...confirmedPhone },
         });
+        if (phoneConfirmed && signupPhone) await tx.userPhone.create({ data: { userId: created.id, realm: 'reseller', phone: signupPhone, verifiedAt: new Date() } });
         const reseller = await tx.reseller.create({ data: { name: input.business_name ?? input.name, country: input.country, signupPhone } });
         await tx.resellerMember.create({ data: { resellerId: reseller.id, userId: created.id, role: 'owner' } });
         openedReseller = reseller;
@@ -117,6 +123,8 @@ export class AuthService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Two sign-ups at once: whichever of the email or the confirmed number the other took.
+        if (phoneConfirmed && !(await this.emailTaken(input.email))) throw phoneInUse();
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
       }
       throw error;
@@ -135,6 +143,32 @@ export class AuthService {
     if (!user.emailVerifiedAt) await this.sendVerification(user).catch(error => this.logger.error({ err: error }, 'Could not send the sign-up confirmation code'));
     const session = await this.sessions.create(user.id, 'reseller', req, res);
     return this.describe(user.id, session.id);
+  }
+
+  /** A confirmed sign-in number of another reseller person. */
+  private async phoneTaken(db: Pick<Prisma.TransactionClient, 'user' | 'userPhone'>, phone: string) {
+    const [user, other] = await Promise.all([
+      db.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null } } }),
+      db.userPhone.findUnique({ where: { realm_phone: { realm: 'reseller', phone } } }),
+    ]);
+    return Boolean(user || other);
+  }
+
+  /**
+   * Step-by-step sign-up, after the email: texts a code to the owner's mobile number (a mobile of the business country,
+   * not already someone's sign-in number) through the country's SMS provider. `phone_verification_unavailable` where
+   * the country has none: sign-up then carries on with the number unconfirmed.
+   */
+  async startSignupPhone(input: { email: string; signup_token: string; country: string; phone: string }) {
+    await this.countries.assertSignupOpen(input.country);
+    const phone = normalisePhone(input.phone, input.country);
+    if (await this.phoneTaken(this.prisma, phone)) throw phoneInUse();
+    await this.signupVerification.startPhone(input.email, input.signup_token, input.country, phone);
+    return { object: 'notice' as const, message: `A code is on its way to ${phone}.` };
+  }
+
+  verifySignupPhone(input: { email: string; signup_token: string; code: string }) {
+    return this.signupVerification.verifyPhone(input.email, input.signup_token, input.code);
   }
 
   /** A signed-in person with a confirmed email opens their own reseller account; one owned account per person. */

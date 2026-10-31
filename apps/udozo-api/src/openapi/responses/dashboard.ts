@@ -300,6 +300,15 @@ const schemas = {
     },
     'A confirmed sign-up email address, ready for creating the account.',
   ),
+  SignupPhoneVerification: objectSchema(
+    'SignupPhoneVerification',
+    {
+      object: constant('signup_phone_verification'),
+      phone: str('The confirmed mobile number, in E.164.'),
+      verified_at: time('When it was confirmed.'),
+    },
+    "The owner's mobile number, confirmed for this sign-up: pass it with the same `signup_token` to `POST /v1/auth/signup`.",
+  ),
 
   DocsToken: objectSchema(
     'DocsToken',
@@ -563,6 +572,13 @@ export const dashboardDocs: DocsArea = {
       description: 'The email is confirmed; use the token to create the account.',
       schema: 'SignupVerification',
       example: { object: 'signup_verification', email: 'ada@adadigital.ng', signup_token: 'EXAMPLE-signup-token-not-real-3kQ9vX2', expires_at: '2026-10-06T10:12:44.000Z' },
+    },
+    'POST /v1/auth/signup/phone': notice202('The code is on its way.', 'A code is on its way to +2348031234567.'),
+    'POST /v1/auth/signup/phone/verify': {
+      status: 200,
+      description: 'The number is confirmed for this sign-up.',
+      schema: 'SignupPhoneVerification',
+      example: { object: 'signup_phone_verification', phone: '+2348031234567', verified_at: '2026-10-06T09:20:12.000Z' },
     },
     'POST /v1/auth/signup': {
       status: 201,

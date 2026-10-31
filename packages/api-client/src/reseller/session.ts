@@ -67,6 +67,8 @@ export type SignUpInput = { name: string; email: string; password: string } & (
 );
 /** From confirming the sign-up code: pass `signup_token` to sign-up with the same email (one hour, once). */
 export type SignupVerification = { object: 'signup_verification'; email: string; signup_token: string; expires_at: string };
+/** The owner's mobile number confirmed for a sign-up (Udozo's API): sign up with the same token and `phone`. */
+export type SignupPhoneVerification = { object: 'signup_phone_verification'; phone: string; verified_at: string };
 
 /** Sign-in and the signed-in person (`/v1/auth`), and the account the dashboard acts for (`/v1/account`). */
 export const resellerSessionApi = bitocardApi.injectEndpoints({
@@ -76,6 +78,10 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     startSignupEmail: build.mutation<Notice, { email: string }>({ query: body => ({ url: '/v1/auth/signup/email', method: 'POST', body }) }),
     /** Confirms the code; the token finishes sign-up with the email already confirmed. */
     verifySignupEmail: build.mutation<SignupVerification, { email: string; code: string }>({ query: body => ({ url: '/v1/auth/signup/email/verify', method: 'POST', body }) }),
+    /** Udozo's API: after the email, texts a code to the owner's mobile (`phone_verification_unavailable` where the country has no SMS provider). */
+    startSignupPhone: build.mutation<Notice, { email: string; signup_token: string; country: string; phone: string }>({ query: body => ({ url: '/v1/auth/signup/phone', method: 'POST', body }) }),
+    /** Confirms the texted code; sign-up with the same token and number then makes it a sign-in number. */
+    verifySignupPhone: build.mutation<SignupPhoneVerification, { email: string; signup_token: string; code: string }>({ query: body => ({ url: '/v1/auth/signup/phone/verify', method: 'POST', body }) }),
     /** Creates the person and, without an invitation, their reseller account (they own it); signs them in. A code is emailed to confirm the address. */
     signUp: build.mutation<Session, SignUpInput>({ query: body => ({ url: '/v1/auth/signup', method: 'POST', body }), invalidatesTags: ['Session'] }),
     /** A signed-in person with a confirmed email opens their own reseller account (one owned account each). */
@@ -138,6 +144,8 @@ export const {
   useSignUpMutation,
   useStartSignupEmailMutation,
   useVerifySignupEmailMutation,
+  useStartSignupPhoneMutation,
+  useVerifySignupPhoneMutation,
   useCreateResellerAccountMutation,
   useSignOutMutation,
   useVerifyEmailMutation,

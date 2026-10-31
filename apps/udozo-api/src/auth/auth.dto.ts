@@ -142,6 +142,37 @@ export class SignupEmailVerifyDto extends SignupEmailDto {
   code: string;
 }
 
+export class SignupPhoneDto extends SignupEmailDto {
+  @ApiProperty({ description: 'From `POST /v1/auth/signup/email/verify`, for the same email.' })
+  @IsString()
+  @Length(20, 100)
+  signup_token: string;
+
+  @ApiProperty({ description: 'The business country (ISO 3166-1 alpha-2); the number must be a mobile of it.', pattern: '^[A-Z]{2}$', example: 'NG' })
+  @Transform(upperTrim)
+  @IsString()
+  @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter country code' })
+  country: string;
+
+  @ApiProperty({ description: "The owner's mobile number, with or without the country's dialling code; a 6-digit code is texted to it.", minLength: 5, maxLength: 20, example: '+2348031234567' })
+  @Transform(trim)
+  @IsString()
+  @Length(5, 20)
+  phone: string;
+}
+
+export class SignupPhoneVerifyDto extends SignupEmailDto {
+  @ApiProperty({ description: 'From `POST /v1/auth/signup/email/verify`, for the same email.' })
+  @IsString()
+  @Length(20, 100)
+  signup_token: string;
+
+  @ApiProperty(codeDoc)
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}
+
 export class ForgotPasswordDto {
   @ApiProperty({ format: 'email', example: 'ada@example.com' })
   @Transform(lowerTrim)

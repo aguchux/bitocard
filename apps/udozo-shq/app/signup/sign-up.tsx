@@ -9,7 +9,9 @@ import {
   useSessionQuery,
   useSignUpMutation,
   useStartSignupEmailMutation,
+  useStartSignupPhoneMutation,
   useVerifySignupEmailMutation,
+  useVerifySignupPhoneMutation,
 } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { PhoneInput } from "@bitocard/ui/phone-input";
@@ -17,12 +19,13 @@ import { Button, CodeInput, cn, errorMessage, Notice, PasswordToggleButton, Sele
 import { UdozoWordmark } from "@/components/wordmark";
 import { continueWithGoogle, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
-type Step = "details" | "verify" | "business" | "password";
+type Step = "details" | "verify" | "business" | "mobile" | "password";
 
 const stepTitles: Record<Step, string> = {
   details: "Your details",
   verify: "Confirm your email",
   business: "Your business",
+  mobile: "Confirm your mobile",
   password: "Choose a password",
 };
 
@@ -60,7 +63,9 @@ function Progress({ steps, current }: { steps: Step[]; current: Step }) {
 
 /**
  * Reseller sign-up, one step at a time: (1) first name, last name and email; (2) the code emailed to confirm it, before
- * any account exists; (3) business name, country and the owner's mobile number (kept unconfirmed); (4) password, then the account is created already confirmed.
+ * any account exists; (3) business name, country and the owner's mobile number; (4) the 6-digit code texted to that
+ * number (through the country's SMS provider), so it signs in from the start; (5) password, then the account is created
+ * with both confirmed. Where the country has no SMS provider, step 4 is skipped and the number is kept unconfirmed.
  * With `?invitation=` it is details then password, and the account joins the inviting team (the link proves the
  * email). udozo.com stays for shoppers and suppliers, so sellers sign up for Seller HQ only here.
  *
@@ -75,7 +80,9 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
   // Where a signed-in person goes: with an invitation, to accept it (Google sign-ups arrive back here signed in).
   const next = safeNext(search.get("next") ?? (invitation ? `/invitations/accept?token=${encodeURIComponent(invitation)}` : null));
   const authError = search.get("auth_error");
-  const steps: Step[] = invitation ? ["details", "password"] : ["details", "verify", "business", "password"];
+  // False once the country turns out to have no SMS provider: the number is then kept unconfirmed.
+  const [textable, setTextable] = useState(true);
+  const steps: Step[] = invitation ? ["details", "password"] : ["details", "verify", "business", ...(textable ? (["mobile"] as Step[]) : []), "password"];
 
   const session = useSessionQuery();
   const countries = usePublicCountriesQuery(undefined, { skip: Boolean(invitation) });
@@ -92,10 +99,17 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
   const [country, setCountry] = useState("");
   // The owner's mobile number in E.164 (null until valid for the country); kept unconfirmed for Udozo's operations.
   const [phone, setPhone] = useState<string | null>(null);
+  // The number whose texted code was confirmed for this sign-up.
+  const [phoneConfirmed, setPhoneConfirmed] = useState<string | null>(null);
+  const [phoneCode, setPhoneCode] = useState("");
+  // The number last texted a code, so going back and on again does not ask for another within the minute.
+  const [texted, setTexted] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [startEmail, startState] = useStartSignupEmailMutation();
   const [verifyEmail, verifyState] = useVerifySignupEmailMutation();
+  const [startPhone, startPhoneState] = useStartSignupPhoneMutation();
+  const [verifyPhone, verifyPhoneState] = useVerifySignupPhoneMutation();
   const [signUp, signUpState] = useSignUpMutation();
   const cleanEmail = email.trim().toLowerCase();
 
@@ -108,6 +122,8 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
     setNotice(message);
     startState.reset();
     verifyState.reset();
+    startPhoneState.reset();
+    verifyPhoneState.reset();
     signUpState.reset();
     setStep(target);
   };
@@ -144,6 +160,49 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
     if (sent) setNotice("A new code is on its way.");
   }
 
+  /** After the business: text a code to the number, unless it is already confirmed or the country cannot text. */
+  async function submitBusiness(event: FormEvent) {
+    event.preventDefault();
+    if (!phone || !confirmed || phoneConfirmed === phone) return go("password");
+    const sent = await startPhone({ email: confirmed.email, signup_token: confirmed.token, country, phone })
+      .unwrap()
+      .then(() => true)
+      .catch((error: unknown) => failure(error)?.code ?? "failed");
+    if (sent === true) {
+      setTexted(phone);
+      setTextable(true);
+      setPhoneCode("");
+      go("mobile");
+    } else if (sent === "code_recently_sent" && texted === phone) {
+      go("mobile");
+    } else if (sent === "phone_verification_unavailable") {
+      setTextable(false);
+      go("password", "We cannot text numbers in your country yet, so your number is kept for our team only. Add a sign-in number later in Settings.");
+    } else if (sent === "signup_token_invalid") {
+      setConfirmed(null);
+      go("details", "Your email confirmation expired. Continue to get a new code.");
+    }
+  }
+
+  async function submitPhoneCode(value: string) {
+    if (verifyPhoneState.isLoading || value.length !== 6 || !confirmed) return;
+    const result = await verifyPhone({ email: confirmed.email, signup_token: confirmed.token, code: value })
+      .unwrap()
+      .catch(() => null);
+    if (!result) return setPhoneCode("");
+    setPhoneConfirmed(result.phone);
+    go("password");
+  }
+
+  async function resendPhone() {
+    if (!confirmed || !phone) return;
+    setPhoneCode("");
+    const sent = await startPhone({ email: confirmed.email, signup_token: confirmed.token, country, phone })
+      .unwrap()
+      .catch(() => null);
+    if (sent) setNotice("A new code is on its way.");
+  }
+
   async function create(event: FormEvent) {
     event.preventDefault();
     const person = { name: `${firstName.trim()} ${lastName.trim()}`, email: cleanEmail, password };
@@ -158,6 +217,9 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
         if (errorCode === "signup_token_invalid") {
           setConfirmed(null);
           go("details", "Your email confirmation expired. Continue to get a new code.");
+        } else if (errorCode === "phone_in_use") {
+          setPhoneConfirmed(null);
+          go("business");
         } else if (param === "country" || param === "business_name" || param === "phone") go("business");
         else if (param === "email" || param === "name") go("details");
         return null;
@@ -174,7 +236,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
     continueWithGoogle(`/signup${query ? `?${query}` : ""}`, "signup");
   };
 
-  const error = startState.error ?? verifyState.error ?? signUpState.error;
+  const error = startState.error ?? verifyState.error ?? startPhoneState.error ?? verifyPhoneState.error ?? signUpState.error;
   const errorCode = failure(error)?.code;
   const back = (target: Step) => (
     <Button type="button" variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => go(target)}>
@@ -291,14 +353,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
         ) : null}
 
         {step === "business" ? (
-          <form
-            key="business"
-            onSubmit={(event: FormEvent) => {
-              event.preventDefault();
-              go("password");
-            }}
-            className="space-y-4"
-          >
+          <form key="business" onSubmit={submitBusiness} className="space-y-4">
             <Notice tone="green">
               <span className="break-all">{confirmed?.email}</span> is confirmed.
             </Notice>
@@ -321,6 +376,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
                     setCountry(event.target.value);
                     // A number is checked against its country, so a new country starts it again.
                     setPhone(null);
+                    setTextable(true);
                   }}
                   className="min-h-14 rounded-lg text-base"
                 >
@@ -349,13 +405,40 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
                   inputClassName="min-h-14 border border-line bg-white px-3 text-base text-ink focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none aria-[invalid=true]:border-red-400"
                   errorClassName="text-red-700"
                 />
-                <p className="mt-1.5 text-xs text-muted">So our team can reach you about your account. We do not text it a code now; add sign-in numbers later in Settings.</p>
+                <p className="mt-1.5 text-xs text-muted">We will text it a 6-digit code to confirm it. You can then sign in with it too.</p>
               </div>
             ) : null}
-            <Button type="submit" className="min-h-12 w-full text-base" disabled={business.trim().length < 2 || !country || !phone}>
+            <Button type="submit" className="min-h-12 w-full text-base" loading={startPhoneState.isLoading} disabled={business.trim().length < 2 || !country || !phone}>
               Continue
             </Button>
             {back("details")}
+          </form>
+        ) : null}
+
+        {step === "mobile" ? (
+          <form
+            key="mobile"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              void submitPhoneCode(phoneCode);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-muted">
+              Enter the 6-digit code we texted to <span className="font-semibold text-ink">{phone}</span>. It expires in 30 minutes.
+            </p>
+            <CodeInput label="Code from the text message" value={phoneCode} onChange={setPhoneCode} onComplete={submitPhoneCode} autoFocus disabled={verifyPhoneState.isLoading} invalid={Boolean(verifyPhoneState.error)} />
+            <Button type="submit" className="min-h-12 w-full text-base" loading={verifyPhoneState.isLoading} disabled={phoneCode.length !== 6}>
+              Confirm mobile
+            </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button type="button" variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => go("business")}>
+                Change number
+              </Button>
+              <Button type="button" variant="ghost" size="sm" loading={startPhoneState.isLoading} onClick={resendPhone}>
+                Send a new code
+              </Button>
+            </div>
           </form>
         ) : null}
 
@@ -397,7 +480,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
             <Button type="submit" className="min-h-12 w-full text-base" loading={signUpState.isLoading || signUpState.isSuccess} disabled={password.length < 10}>
               {invitation ? "Create account and join" : "Create account"}
             </Button>
-            {back(invitation ? "details" : "business")}
+            {back(invitation ? "details" : textable && phoneConfirmed !== phone ? "mobile" : "business")}
           </form>
         ) : null}
 

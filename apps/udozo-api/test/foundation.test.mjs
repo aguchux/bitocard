@@ -264,7 +264,7 @@ describe('limits before the caller is identified', () => {
 describe('sign-in and code routes', () => {
   test('are held to a strict limit per address; other routes are not', async () => {
     const { isSensitive } = await import('../dist/common/rate-limit/rate-limit.guard.js');
-    for (const path of ['/v1/auth/signin', '/v1/auth/password/reset', '/v1/auth/signup/email', '/v1/admin/auth/mfa/verify', '/v1/store/account/signin', '/v1/store/access/bca_x/verify', '/v1/auth/phone/verify']) {
+    for (const path of ['/v1/auth/signin', '/v1/auth/password/reset', '/v1/auth/signup/email', '/v1/auth/signup/phone', '/v1/auth/signup/phone/verify', '/v1/admin/auth/mfa/verify', '/v1/store/account/signin', '/v1/store/access/bca_x/verify', '/v1/auth/phone/verify']) {
       assert.equal(isSensitive('POST', path), true, path);
     }
     for (const [method, path] of [['GET', '/v1/auth/session'], ['POST', '/v1/orders'], ['POST', '/v1/auth/signout'], ['POST', '/v1/store/access/bca_x/reveal'], ['POST', '/v1/auth/signinx']]) {

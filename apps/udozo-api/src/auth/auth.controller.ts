@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, PrimaryPhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, SignupPhoneDto, SignupPhoneVerifyDto, PhoneDto, PrimaryEmailDto, PrimaryPhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { AllowTwoStepPending, type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { DocsTokensService } from './docs-tokens.service.js';
@@ -47,6 +47,31 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   verifySignupEmail(@Body() body: SignupEmailVerifyDto) {
     return this.signupVerification.verify(body.email, body.code);
+  }
+
+  /** Step-by-step sign-up, after the email: text a code to the owner's mobile number. */
+  @ApiOperation({
+    summary: "Text a code to the owner's mobile number",
+    description:
+      "After confirming the email. Texts a 6-digit code (30 minutes, 5 attempts, one a minute, five per sign-up) through the country's SMS provider. Refused with `phone_in_use` when it is already someone's sign-in number, and `phone_verification_unavailable` where the country has no SMS provider (sign up with the number unconfirmed).",
+  })
+  @Public()
+  @Post('signup/phone')
+  @HttpCode(HttpStatus.ACCEPTED)
+  startSignupPhone(@Body() body: SignupPhoneDto) {
+    return this.auth.startSignupPhone(body);
+  }
+
+  /** Step-by-step sign-up: confirm the texted code; sign-up with the same token and number then makes it a sign-in number. */
+  @ApiOperation({
+    summary: 'Confirm the texted sign-up code',
+    description: 'Pass the same `signup_token` and `phone` to `POST /v1/auth/signup`: the account is created with the number confirmed, as a sign-in number.',
+  })
+  @Public()
+  @Post('signup/phone/verify')
+  @HttpCode(HttpStatus.OK)
+  verifySignupPhone(@Body() body: SignupPhoneVerifyDto) {
+    return this.auth.verifySignupPhone(body);
   }
 
   /** Create a reseller account and sign in. Without a `signup_token`, a 6-digit code is emailed to confirm the address. */
