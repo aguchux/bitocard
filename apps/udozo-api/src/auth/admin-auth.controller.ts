@@ -74,7 +74,8 @@ class CompletePasswordLinkDto extends PasswordLinkDto {
 }
 
 /**
- * Admin sign-in, two steps: password, then an authenticator code every time. The same routes serve both admin realms
+ * Admin sign-in, two steps: password, then an authenticator code every time one is set up (team members other than
+ * super admins may skip setting it up and turn it on later). The same routes serve both admin realms
  * (below), each only for its own accounts.
  */
 @Injectable()
@@ -127,6 +128,31 @@ abstract class AdminAuthRoutes {
   @HttpCode(HttpStatus.OK)
   verify(@Body() body: MfaVerifyDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.adminAuth.verify(body.challenge_token, body.code, req, res, this.realm);
+  }
+
+  /**
+   * "Not now" on the first sign-in's authenticator step: a team member who need not use one is signed in without it
+   * (super admins must set it up).
+   */
+  @Public()
+  @Post('mfa/skip')
+  @HttpCode(HttpStatus.OK)
+  skip(@Body() body: ChallengeDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return this.adminAuth.skipSetup(body.challenge_token, req, res, this.realm);
+  }
+
+  /** From their account: a new authenticator secret (and QR-code URI) to scan, until it is confirmed. */
+  @Post('authenticator/setup')
+  @HttpCode(HttpStatus.OK)
+  startAuthenticator(@CurrentCaller() caller: Caller) {
+    return this.adminAuth.startAuthenticator(caller.kind === 'session' ? caller.userId : '');
+  }
+
+  /** Confirms it with the first 6-digit code: 2-step verification is on, and 10 recovery codes are returned once. */
+  @Post('authenticator/confirm')
+  @HttpCode(HttpStatus.OK)
+  confirmAuthenticator(@CurrentCaller() caller: Caller, @Body() body: StepUpDto) {
+    return this.adminAuth.confirmAuthenticator(caller.kind === 'session' ? caller.userId : '', body.code);
   }
 
   /** The set-password page: whose link it is (the token is sent in the body, never in an address). */

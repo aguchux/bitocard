@@ -60,7 +60,7 @@ function InviteDialog({ open, onClose, roles, domains, onSent }: { open: boolean
       open={open}
       onClose={close}
       title="Invite to the team"
-      description="They get an email with a link to set their password, then set up their authenticator app at their first sign-in."
+      description="They get an email with a link to set their password. 2-step verification is their choice, from their account; super admins must set it up at their first sign-in."
       footer={
         <>
           <Button variant="ghost" onClick={close} disabled={state.isLoading}>
@@ -167,7 +167,7 @@ export default function TeamPage() {
     <UdozoShell section="settings" current="/settings/team" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Team" }]}>
       <PageHeader
         title="Team"
-        description="Everyone who can sign in to Udozo's admin, and what each can do. Invite staff by email; they choose a password and set up their authenticator app."
+        description="Everyone who can sign in to Udozo's admin, and what each can do. Invite staff by email; they choose a password, and may turn on 2-step verification (super admins must)."
         actions={
           allowed ? (
             <Button icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setInviting(true)}>
@@ -218,7 +218,7 @@ export default function TeamPage() {
                       ),
                     },
                     { key: "status", header: "Status", cell: status },
-                    { key: "authenticator", header: "Authenticator", hideOnMobile: true, cell: member => (member.authenticator ? "Set up" : "Not yet") },
+                    { key: "authenticator", header: "2-step", hideOnMobile: true, cell: member => (member.authenticator ? "On" : "Off") },
                     { key: "seen", header: "Last signed in", hideOnMobile: true, cell: member => (member.last_sign_in_at ? formatRelative(member.last_sign_in_at) : "Never") },
                     {
                       key: "actions",
@@ -294,7 +294,7 @@ export default function TeamPage() {
             open={pending?.kind === "authenticator"}
             onClose={() => setPending(null)}
             title={`Reset ${pending?.member.name ?? ""}'s authenticator?`}
-            description="For a lost phone: their authenticator is removed and they are signed out. They set up a new one at their next sign-in."
+            description="For a lost phone: their authenticator is removed and they are signed out. Super admins set up a new one at their next sign-in; others may turn it on again from their account."
             confirmLabel="Reset authenticator"
             tone="danger"
             onConfirm={async reason => pending && resetAuthenticator({ id: pending.member.id, reason }).unwrap()}

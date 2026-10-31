@@ -18,6 +18,7 @@ import type {
   List,
   MfaChallenge,
   MfaSetup,
+  AdminAuthenticatorOn,
   AdminPasswordLink,
   AdminSignInStart,
   AdminPasswordSet,
@@ -70,6 +71,17 @@ export const adminApi = bitocardApi.injectEndpoints({
     adminMfaVerify: build.mutation<AdminSession, { challenge_token: string; code: string }>({
       query: body => ({ url: '/v1/admin/auth/mfa/verify', method: 'POST', body }),
       invalidatesTags: ['Session'],
+    }),
+    /** "Not now": signs in a team member who need not use an authenticator without setting one up. */
+    adminMfaSkip: build.mutation<AdminSession, { challenge_token: string }>({
+      query: body => ({ url: '/v1/admin/auth/mfa/skip', method: 'POST', body }),
+      invalidatesTags: ['Session'],
+    }),
+    /** From their account: a new authenticator secret to scan, then its first code turns 2-step verification on. */
+    adminAuthenticatorSetup: build.mutation<MfaSetup, void>({ query: () => ({ url: '/v1/admin/auth/authenticator/setup', method: 'POST' }) }),
+    adminAuthenticatorConfirm: build.mutation<AdminAuthenticatorOn, { code: string }>({
+      query: body => ({ url: '/v1/admin/auth/authenticator/confirm', method: 'POST', body }),
+      invalidatesTags: ['Session', 'AdminTeam'],
     }),
     adminSignInStart: build.mutation<AdminSignInStart, { email: string }>({ query: body => ({ url: '/v1/admin/auth/start', method: 'POST', body }) }),
     adminForgotPassword: build.mutation<{ object: 'admin_password_reset_requested' }, { email: string }>({ query: body => ({ url: '/v1/admin/auth/password/forgot', method: 'POST', body }) }),
@@ -422,6 +434,9 @@ export const {
   useAdminSignInMutation,
   useAdminMfaSetupMutation,
   useAdminMfaVerifyMutation,
+  useAdminMfaSkipMutation,
+  useAdminAuthenticatorSetupMutation,
+  useAdminAuthenticatorConfirmMutation,
   useAdminSignOutMutation,
   useAdminStepUpMutation,
   useAdminSignInStartMutation,

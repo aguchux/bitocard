@@ -39,6 +39,15 @@ const invalidLink = (product: EmailProduct = 'BitoCard') =>
   new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'link_invalid', `This link has expired or was already used. Ask the ${product} team for a new one.`);
 const invalidCode = () =>
   new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'mfa_code_invalid', 'That code is not valid. Check your authenticator app.', 'code');
+const alreadySetUp = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'mfa_already_set_up', 'Your authenticator is already set up.');
+
+/**
+ * Whether an admin must use an authenticator app. Super admins always (they manage everyone else), and every Afrippa
+ * admin; Udozo's other team members choose (off until they set it up).
+ */
+export function authenticatorRequired(user: Pick<User, 'realm' | 'adminRoles'>) {
+  return user.realm !== 'admin' || user.adminRoles.includes('super_admin');
+}
 
 function recoveryCode() {
   const raw = randomToken(8).replace(/[^a-zA-Z0-9]/g, '').toLowerCase().padEnd(8, '0').slice(0, 8);
@@ -49,10 +58,12 @@ function recoveryCode() {
 type RealmSettings = { domains: string[]; setupEmails: string[]; appUrl: string; issuer: string; product: EmailProduct; platform: Platform };
 
 /**
- * Admin sign-in, for both admin realms: BitoCard's (admin.bitocard.com, `admin`) and Afrippa's (admin.afrippa.com,
+ * Admin sign-in, for both admin realms: Udozo's (admin.udozo.com, `admin`) and Afrippa's (admin.afrippa.com,
  * `afrippa_admin`; docs/CRYPTO_SPINOFF_PLAN.md). Email and password (each realm's own domains, never Google), then an
- * authenticator-app code on every sign-in. The first sign-in sets the authenticator up and issues recovery codes. Each
- * step works only in its own realm: a link, challenge or account of one never signs in to the other.
+ * authenticator-app code on every sign-in where one is set up. Super admins (and every Afrippa admin) must set it up at
+ * their first sign-in; Udozo's other team members may skip it (`mfa/skip`) and turn it on later from their account
+ * (`authenticator/setup`, then `authenticator/confirm`), though step-up always needs it. Setting it up issues recovery
+ * codes. Each step works only in its own realm: a link, challenge or account of one never signs in to the other.
  */
 @Injectable()
 export class AdminAuthService {
@@ -178,7 +189,7 @@ export class AdminAuthService {
     let sentWith: string;
     try {
       // Each product's admins are emailed through its own email settings.
-      sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product }));
+      sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product, authenticatorOptional: !authenticatorRequired(user) }));
       this.logger.log({ userId: user.id, kind, sentWith }, sentWith === 'outbox' ? 'Admin password link NOT sent: no email provider is set up' : 'Admin password link emailed');
     } catch (error) {
       this.logger.error({ err: error, userId: user.id }, 'Could not email an admin password link');
@@ -271,15 +282,19 @@ export class AdminAuthService {
     await this.prisma.verificationCode.create({
       data: { userId: user.id, purpose: 'admin_mfa_challenge', target: user.email, codeHash: sha256(token), expiresAt: new Date(Date.now() + challengeLifetimeMs) },
     });
-    return { object: 'mfa_challenge' as const, challenge_token: token, mfa_setup_required: !user.totp?.confirmedAt, expires_in: challengeLifetimeMs / 1000 };
+    const setUp = Boolean(user.totp?.confirmedAt);
+    // `mfa_optional`: they may skip setting it up (`mfa/skip`) and turn it on later from their account.
+    return { object: 'mfa_challenge' as const, challenge_token: token, mfa_setup_required: !setUp, mfa_optional: !setUp && !authenticatorRequired(user), expires_in: challengeLifetimeMs / 1000 };
   }
 
   /** First sign-in only: creates the authenticator secret to scan. */
   async setup(token: string, realm: AdminRealm = 'admin') {
     const { user } = await this.challenge(token, realm);
-    if (user.totp?.confirmedAt) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'mfa_already_set_up', 'Your authenticator is already set up.');
-    }
+    if (user.totp?.confirmedAt) throw alreadySetUp();
+    return this.newSecret(user);
+  }
+
+  private async newSecret(user: User) {
     const secret = newTotpSecret();
     await this.prisma.totpCredential.upsert({
       where: { userId: user.id },
@@ -287,6 +302,46 @@ export class AdminAuthService {
       update: { secretEncrypted: this.encryption().encrypt(secret), lastUsedStep: null },
     });
     return { object: 'mfa_setup' as const, secret, otpauth_uri: this.totp(user, secret).toString() };
+  }
+
+  /**
+   * "Not now" on the first sign-in's authenticator step, for a team member who need not use one: signs them in
+   * without it. Refused for anyone who must (`mfa_required`) or already has one (a code is needed then).
+   */
+  async skipSetup(token: string, req: Request, res: Response, realm: AdminRealm = 'admin') {
+    const { user, record } = await this.challenge(token, realm);
+    if (user.totp?.confirmedAt) throw alreadySetUp();
+    if (authenticatorRequired(user)) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'mfa_required', 'Super admins must set up 2-step verification to sign in.');
+    }
+    // The challenge is used once, so two skips never make two sessions.
+    const claimed = await this.prisma.verificationCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
+    if (claimed.count === 0) throw invalidChallenge();
+    await this.prisma.user.update({ where: { id: user.id }, data: { failedSignIns: 0, lockedUntil: null, lastSignInAt: new Date() } });
+    await this.sessions.create(user.id, realm, req, res);
+    return { object: 'admin_session' as const, admin: this.present(user, false) };
+  }
+
+  /** From their account, signed in: a new authenticator secret to scan (until it is confirmed with a code). */
+  async startAuthenticator(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { totp: true } });
+    if (user.totp?.confirmedAt) throw alreadySetUp();
+    return this.newSecret(user);
+  }
+
+  /** Confirms the authenticator set up from their account with its first code: on from now, with recovery codes once. */
+  async confirmAuthenticator(userId: string, code: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { totp: true } });
+    if (user.totp?.confirmedAt) throw alreadySetUp();
+    if (!user.totp) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'mfa_setup_required', 'Start setting up your authenticator first.');
+    if (!(await this.useTotp(user, user.totp, code))) {
+      await this.recordFailure(user);
+      throw invalidCode();
+    }
+    const recoveryCodes = Array.from({ length: recoveryCodeCount }, recoveryCode);
+    await this.prisma.totpCredential.update({ where: { userId }, data: { confirmedAt: new Date(), recoveryCodeHashes: recoveryCodes.map(sha256) } });
+    await this.audit.record({ actorId: userId, action: 'admin.authenticator_set_up', targetType: 'user', targetId: userId, after: { email: user.email }, platform: this.settings(this.realmOf(user)).platform });
+    return { object: 'admin_authenticator' as const, authenticator: true, recovery_codes: recoveryCodes };
   }
 
   /** Step 2: authenticator code (or a recovery code). Starts the admin session. */
@@ -317,12 +372,12 @@ export class AdminAuthService {
     await this.prisma.verificationCode.update({ where: { id: record.id }, data: { consumedAt: new Date() } });
     await this.prisma.user.update({ where: { id: user.id }, data: { failedSignIns: 0, lockedUntil: null, lastSignInAt: new Date() } });
     await this.sessions.create(user.id, realm, req, res);
-    return { object: 'admin_session' as const, admin: this.present(user), ...(recoveryCodes ? { recovery_codes: recoveryCodes } : {}) };
+    return { object: 'admin_session' as const, admin: this.present(user, true), ...(recoveryCodes ? { recovery_codes: recoveryCodes } : {}) };
   }
 
   async describe(userId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    return { object: 'admin_session' as const, admin: this.present(user) };
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { totp: { select: { confirmedAt: true } } } });
+    return { object: 'admin_session' as const, admin: this.present(user, Boolean(user.totp?.confirmedAt)) };
   }
 
   /**
@@ -331,7 +386,10 @@ export class AdminAuthService {
    */
   async confirmCode(userId: string, code: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { totp: true } });
-    if (!user || !isAdminRealm(user.realm) || !user.totp?.confirmedAt) throw invalidCode();
+    if (!user || !isAdminRealm(user.realm)) throw invalidCode();
+    if (!user.totp?.confirmedAt) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'authenticator_not_set_up', 'Turn on 2-step verification first: open your account menu, choose Your account, and set up your authenticator app.');
+    }
     if (!(await this.useTotp(user, user.totp, code))) {
       await this.recordFailure(user);
       throw invalidCode();
@@ -350,8 +408,9 @@ export class AdminAuthService {
     return { object: 'admin_step_up' as const, step_up_until: until.toISOString() };
   }
 
-  private present(user: User) {
-    return { object: 'admin' as const, id: user.id, name: user.name, email: user.email, roles: user.adminRoles };
+  /** `authenticator`: whether they use one; `authenticator_required`: whether they must (else it is their choice). */
+  private present(user: User, authenticator: boolean) {
+    return { object: 'admin' as const, id: user.id, name: user.name, email: user.email, roles: user.adminRoles, authenticator, authenticator_required: authenticatorRequired(user) };
   }
 
   /** A sign-in challenge of this realm's admin: another realm's is as unknown as a made-up one. */

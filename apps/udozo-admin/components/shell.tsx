@@ -44,7 +44,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
-import { AccountMenu, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
+import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
 
 export type { Crumb };
@@ -184,7 +184,13 @@ function AccountArea() {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign("/signin");
       }}
-    />
+    >
+      <AppLink href="/account" className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-sm font-medium text-ink hover:bg-canvas">
+        <UserRound className="size-4" aria-hidden />
+        Your account
+        {admin.authenticator === false ? <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">2-step off</span> : null}
+      </AppLink>
+    </AccountMenu>
   );
 }
 

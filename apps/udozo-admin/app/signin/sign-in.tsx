@@ -9,6 +9,7 @@ import { UdozoWordmark } from "@/components/wordmark";
 import {
   useAdminForgotPasswordMutation,
   useAdminMfaSetupMutation,
+  useAdminMfaSkipMutation,
   useAdminMfaVerifyMutation,
   useAdminSessionQuery,
   useAdminSignInMutation,
@@ -39,13 +40,14 @@ type Step =
   | { kind: "email" }
   | { kind: "password" }
   | { kind: "emailed"; reason: "setup" | "reset" }
-  | { kind: "code"; challenge: string; setup: MfaSetup | null }
+  | { kind: "code"; challenge: string; setup: MfaSetup | null; optional: boolean }
   | { kind: "recovery"; codes: string[] };
 
 /**
  * Admin sign-in: the email first (an address in the API's ADMIN_SETUP_EMAILS with no account yet is set up and emailed
  * a link to choose its password), then the password (with Forgot password, which emails a reset link to those same
- * addresses only), then an authenticator code (set up on first sign-in), then the one-time view of recovery codes. The
+ * addresses only), then an authenticator code (set up on first sign-in), then the one-time view of recovery codes. Team
+ * members other than super admins may choose Not now at the set-up step and turn it on later from Your account. The
  * session is a cookie set by the API.
  */
 export function SignIn() {
@@ -66,6 +68,7 @@ export function SignIn() {
   const [signIn, signInState] = useAdminSignInMutation();
   const [setup, setupState] = useAdminMfaSetupMutation();
   const [verify, verifyState] = useAdminMfaVerifyMutation();
+  const [skip, skipState] = useAdminMfaSkipMutation();
 
   useEffect(() => {
     if (session.data && (step.kind === "email" || step.kind === "password")) router.replace(next);
@@ -121,7 +124,13 @@ export function SignIn() {
     if (!challenge) return;
     const secret = challenge.mfa_setup_required ? await setup({ challenge_token: challenge.challenge_token }).unwrap().catch(() => null) : null;
     if (challenge.mfa_setup_required && !secret) return;
-    setStep({ kind: "code", challenge: challenge.challenge_token, setup: secret });
+    setStep({ kind: "code", challenge: challenge.challenge_token, setup: secret, optional: Boolean(challenge.mfa_optional) });
+  }
+
+  async function notNow() {
+    if (step.kind !== "code") return;
+    const result = await skip({ challenge_token: step.challenge }).unwrap().catch(() => null);
+    if (result) router.replace(next);
   }
 
   async function verifyCode(value: string) {
@@ -245,7 +254,9 @@ export function SignIn() {
             <h1 className="text-3xl font-extrabold tracking-tight">{step.setup ? "Set up 2-step verification" : "Enter your code"}</h1>
             <p className="mt-1 text-muted">
               {step.setup
-                ? "Scan this with an authenticator app (such as Google Authenticator or 1Password), then enter the 6-digit code it shows."
+                ? step.optional
+                  ? "Recommended. Scan this with an authenticator app (such as Google Authenticator or 1Password), then enter the 6-digit code it shows. Or choose Not now and turn it on later from Your account."
+                  : "Scan this with an authenticator app (such as Google Authenticator or 1Password), then enter the 6-digit code it shows."
                 : useRecovery
                   ? "Enter one of your recovery codes. Each works only once."
                   : "Enter the 6-digit code from your authenticator app."}
@@ -260,7 +271,7 @@ export function SignIn() {
               </p>
             </div>
           ) : null}
-          {verifyState.error ? <Notice tone="red">{message(verifyState.error)}</Notice> : null}
+          {verifyState.error || skipState.error ? <Notice tone="red">{message(verifyState.error ?? skipState.error)}</Notice> : null}
           {useRecovery ? (
             <Field label="Recovery code" htmlFor="code" hint="One of the codes you saved when you set up 2-step verification, for example abcd-1234.">
               <Input
@@ -285,6 +296,11 @@ export function SignIn() {
           <Button type="submit" className="w-full" loading={verifyState.isLoading} icon={<ShieldCheck className="size-4" aria-hidden />}>
             Verify and sign in
           </Button>
+          {step.setup && step.optional ? (
+            <Button type="button" variant="secondary" className="w-full" loading={skipState.isLoading} onClick={() => void notNow()}>
+              Not now
+            </Button>
+          ) : null}
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm font-semibold">
             {step.setup ? null : (
               <button

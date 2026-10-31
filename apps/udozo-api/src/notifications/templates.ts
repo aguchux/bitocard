@@ -210,7 +210,7 @@ export function paymentMethodAddedEmail(to: string, what: string, usableFrom: Da
 }
 
 /** A set-password link for an admin (from the admin sign-in page: a first visit, or Forgot password). */
-export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number; product?: EmailProduct }): EmailMessage {
+export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number; product?: EmailProduct; authenticatorOptional?: boolean }): EmailMessage {
   const created = input.kind === 'create';
   const product = input.product ?? 'BitoCard';
   const subject = created ? `Set up your ${product} admin account` : `Reset your ${product} admin password`;
@@ -219,7 +219,9 @@ export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 
     [
       `Hello ${input.name},`,
       created
-        ? `Your ${product} admin account is ready. Choose your password with this link, then sign in and set up your authenticator app.`
+        ? input.authenticatorOptional
+          ? `Your ${product} admin account is ready. Choose your password with this link, then sign in. You can turn on 2-step verification with an authenticator app when you sign in, or later from your account.`
+          : `Your ${product} admin account is ready. Choose your password with this link, then sign in and set up your authenticator app.`
         : `Someone asked to reset the password of your ${product} admin account. Choose a new password with this link. You can also reset your authenticator app there if you no longer have it.`,
       `The link works once, for ${input.hours} hours: ${input.link}`,
       `If you were not expecting this, do not use the link and tell the ${product} team at once.`,
