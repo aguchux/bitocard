@@ -82,6 +82,12 @@ const protectedRoutes = [
   ['patch', `/v1/admin/supplier-products/${randomId}`, {}],
   ['put', '/v1/admin/integrations/reloadly/reseller-availability', {}],
   ['put', '/v1/admin/integrations/reloadly/reseller-access', { enabled: true }],
+  ['post', '/v1/admin/team', { name: 'New Admin', email: 'new@bitocard.com', roles: ['support'] }],
+  ['patch', `/v1/admin/team/${randomId}`, { roles: ['support'] }],
+  ['post', `/v1/admin/team/${randomId}/password-link`, {}],
+  ['post', `/v1/admin/team/${randomId}/authenticator/reset`, { reason: 'Lost phone' }],
+  ['post', `/v1/admin/team/${randomId}/suspend`, { reason: 'Left' }],
+  ['post', `/v1/admin/team/${randomId}/restore`, { reason: 'Back' }],
 ];
 
 describe('admin step-up window', () => {

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { CountriesModule } from '../countries/countries.module.js';
 import { TeamModule } from '../team/team.module.js';
 import { AdminAuthController, AfrippaAdminAuthController } from './admin-auth.controller.js';
+import { AdminTeamController } from './admin-team.controller.js';
+import { AdminTeamService } from './admin-team.service.js';
 import { AdminAuthService } from './admin-auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthGuard } from './auth.guard.js';
@@ -18,8 +20,8 @@ import { TwoStepService } from './two-step.service.js';
 
 @Module({
   imports: [TeamModule, CountriesModule],
-  controllers: [AuthController, GoogleController, AdminAuthController, AfrippaAdminAuthController, TwoStepController, AdminTwoStepController],
-  providers: [AuthService, AdminAuthService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
+  controllers: [AuthController, GoogleController, AdminAuthController, AfrippaAdminAuthController, AdminTeamController, TwoStepController, AdminTwoStepController],
+  providers: [AuthService, AdminAuthService, AdminTeamService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
   exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService, SignupVerificationService],
 })
 export class AuthModule {}

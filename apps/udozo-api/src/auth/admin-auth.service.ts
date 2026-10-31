@@ -153,16 +153,16 @@ export class AdminAuthService {
   /**
    * Emails an admin a one-time link to set their password. A new link replaces any earlier one; nothing changes on the
    * account until it is used. At most one a minute per admin (others are silently skipped), and a failed
-   * send is logged, never shown, so the answers stay the same.
+   * send is logged, never shown, so the answers stay the same. Says what happened, for the team page (sign-in ignores it).
    */
-  private async sendPasswordLink(user: User, kind: 'create' | 'reset') {
+  async sendPasswordLink(user: User, kind: 'create' | 'reset'): Promise<'sent' | 'outbox' | 'skipped' | 'failed'> {
     const last = await this.prisma.verificationCode.findFirst({
       where: { userId: user.id, purpose: 'admin_password_link', createdAt: { gt: new Date(Date.now() - passwordLinkGapMs) } },
       select: { id: true },
     });
     if (last) {
       this.logger.log({ userId: user.id }, 'Admin password link skipped: one a minute');
-      return;
+      return 'skipped';
     }
     const token = `${user.id}.${randomToken()}`;
     const hours = passwordLinkHours[kind];
@@ -175,15 +175,27 @@ export class AdminAuthService {
     const realm = this.realmOf(user);
     const { appUrl, product, platform } = this.settings(realm);
     const link = `${new URL('/set-password', appUrl).toString()}#token=${token}`;
+    let sentWith: string;
     try {
       // Each product's admins are emailed through its own email settings.
-      const sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product }));
+      sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product }));
       this.logger.log({ userId: user.id, kind, sentWith }, sentWith === 'outbox' ? 'Admin password link NOT sent: no email provider is set up' : 'Admin password link emailed');
     } catch (error) {
       this.logger.error({ err: error, userId: user.id }, 'Could not email an admin password link');
-      return;
+      return 'failed';
     }
     await this.audit.record({ actorId: null, action: 'admin.password_link_sent', targetType: 'user', targetId: user.id, after: { email: user.email, kind, expires_at: expiresAt.toISOString() }, platform });
+    return sentWith === 'outbox' ? 'outbox' : 'sent';
+  }
+
+  /** Whether an email may be an admin of the realm (its domain is on the realm's admin domains, environment only). */
+  isAdminDomain(email: string, realm: AdminRealm = 'admin') {
+    return this.allowedDomain(email.trim().toLowerCase(), realm);
+  }
+
+  /** The realm's admin domains, to say which are allowed. */
+  adminDomains(realm: AdminRealm = 'admin') {
+    return this.settings(realm).domains;
   }
 
   /** What the set-password page shows before the admin chooses a password. */

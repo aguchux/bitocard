@@ -157,6 +157,7 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
 /** Tag types shared by every endpoint module, so a change on one screen refreshes the others. */
 export const tagTypes = [
   'Session',
+  'AdminTeam',
   'Overview',
   'Invoice',
   'Reseller',

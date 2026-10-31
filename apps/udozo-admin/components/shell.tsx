@@ -40,6 +40,7 @@ import {
   TrendingUp,
   UserRound,
   Users,
+  UsersRound,
   Wallet,
 } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
@@ -158,6 +159,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Markets", href: "/settings/markets", icon: Globe2 },
       { label: "Integrations", href: "/settings/integrations", icon: PlugZap },
       { label: "pawaPay coverage", href: "/settings/pawapay", icon: Smartphone },
+      { label: "Team", href: "/settings/team", icon: UsersRound },
     ],
   },
 };
