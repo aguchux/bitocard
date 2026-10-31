@@ -148,12 +148,39 @@ describe('areas', () => {
       for (const area of [state, ...state.children]) {
         const [lat, lng] = [Number(area.latitude), Number(area.longitude)];
         assert.ok(lat >= 4 && lat <= 14 && lng >= 2.6 && lng <= 14.7, `${area.slug} is in Nigeria`);
-        assert.ok(Math.hypot(lat - Number(state.latitude), lng - Number(state.longitude)) < 2.5, `${area.slug} is near ${state.slug}`);
+        // Within 3 degrees of its state's capital: Niger State's Borgu, out west at New Bussa, is the farthest.
+        assert.ok(Math.hypot(lat - Number(state.latitude), lng - Number(state.longitude)) < 3, `${area.slug} is near ${state.slug}`);
       }
     }
     const lagos = states.find(s => s.slug === 'lagos');
     assert.ok(['ikeja', 'lekki', 'yaba', 'surulere', 'ikorodu'].every(slug => lagos.children.some(a => a.slug === slug)));
     assert.ok(states.find(s => s.slug === 'abuja').children.some(a => a.slug === 'gwarinpa'));
+  });
+
+  test("Nigeria in full: every local government area, the large towns and the big cities' neighbourhoods", async () => {
+    const states = await prisma.classifiedArea.findMany({ where: { country: 'NG', kind: 'state' }, include: { children: { orderBy: { position: 'asc' } } } });
+    const areas = states.flatMap(state => state.children);
+    assert.ok(areas.length >= 1100, `${areas.length} areas`);
+    const of = slug => states.find(s => s.slug === slug).children;
+    const has = (state, ...names) => names.forEach(name => assert.ok(of(state).some(a => a.name === name), `${state} has ${name}`));
+    has('lagos', 'Lekki Phase 1', 'Ikorodu', 'Ikotun', 'Ojodu', 'Chevron', 'Ago Palace', 'Ifako-Ijaiye', 'Kosofe');
+    has('abuja', 'Abuja Municipal (AMAC)', 'Apo', 'Kwali', 'Abaji', 'Katampe');
+    has('rivers', 'Trans-Amadi', 'Rumuokoro', 'Choba', 'Okrika', 'Khana');
+    has('oyo', 'Bodija', 'Ibadan North', 'Ogbomosho North', 'Saki');
+    has('kano', 'Fagge', 'Nassarawa', 'Kano Municipal', 'Sabon Gari');
+    has('ogun', 'Ibafo', 'Magboro', 'Sango-Ota', 'Ifo');
+    for (const state of states) {
+      assert.ok(state.children.length >= 7, `${state.slug} has its local government areas`);
+      const names = state.children.map(a => a.name.toLowerCase());
+      assert.equal(new Set(names).size, names.length, `${state.slug} names each area once`);
+      assert.deepEqual(state.children.map(a => a.position), [...state.children.map(a => a.position)].sort((x, y) => x - y));
+    }
+    // One spelling each: GeoNames' variants never sit beside the areas we already had.
+    for (const [state, kept, gone] of [['bayelsa', 'yenagoa', 'yenegoa'], ['ogun', 'sagamu', 'shagamu'], ['benue', 'otukpo', 'oturkpo'], ['benue', 'makurdi', 'markurdi'], ['lagos', 'shomolu', 'somolu'], ['imo', 'mbaitoli', 'mbatoli']]) {
+      assert.ok(of(state).some(a => a.slug === kept) && !of(state).some(a => a.slug === gone), `${state}: ${kept}, not ${gone}`);
+    }
+    assert.ok(!of('benue').some(a => ['bukuru', 'takum'].includes(a.slug)), "Plateau's and Taraba's towns stay in their own states");
+    assert.ok(!areas.some(a => /quart|quater/i.test(a.name)), 'no street-level quarters');
   });
 
   test('slugs are unique where they are looked up, and a state has no parent', async () => {

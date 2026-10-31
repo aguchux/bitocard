@@ -26,6 +26,18 @@ export default async function AreasPage({ params, searchParams }: Props) {
       <h1 className="text-2xl font-extrabold tracking-tight">Choose your area</h1>
       <p className="text-sm text-navy-600">We show listings in your area first, then nearby, then the rest of {market.name}.</p>
       <AreaPicker country={market.country} states={await areasOf(cc)} next={next} />
+      {/* GeoNames' data is CC BY 4.0: credited where its places are listed. */}
+      <p className="pb-6 text-xs text-navy-500">
+        Places from{" "}
+        <a href="https://www.geonames.org/" className="underline" rel="noopener" target="_blank">
+          GeoNames
+        </a>{" "}
+        (
+        <a href="https://creativecommons.org/licenses/by/4.0/" className="underline" rel="noopener license" target="_blank">
+          CC BY 4.0
+        </a>
+        ), with changes.
+      </p>
     </div>
   );
 }
