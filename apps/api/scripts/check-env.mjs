@@ -67,7 +67,11 @@ if (env.UPSTASH_REDIS_REST_URL) {
   try {
     const res = await fetch(`${env.UPSTASH_REDIS_REST_URL.replace(/\/$/, '')}/ping`, { headers: { authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN ?? ''}` }, signal: AbortSignal.timeout(10_000) });
     if (res.ok) say(true, 'Redis accepts its token');
-    else fail(`Redis refused (HTTP ${res.status}): check UPSTASH_REDIS_REST_TOKEN`);
+    else {
+      // Upstash's own reason (a limit reached, a paused database, a wrong token), never the token. 401 is the token.
+      const reason = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+      fail(`Redis refused (HTTP ${res.status}${reason ? `: ${reason}` : ''})${res.status === 401 ? ': check UPSTASH_REDIS_REST_TOKEN' : ''}`);
+    }
   } catch (error) {
     fail(`Redis: ${error.message}`);
   }

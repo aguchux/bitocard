@@ -19,7 +19,7 @@
     "push:keys": "node scripts/push-keys.mjs",
     "media:cors": "node scripts/media-cors.mjs",
     "brands:logos": "node scripts/brand-logos.mjs",
-    "vercel-build": "node scripts/vercel-build.mjs"
+    "deploy:prepare": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.1",

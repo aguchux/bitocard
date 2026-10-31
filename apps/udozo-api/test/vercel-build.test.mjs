@@ -37,3 +37,26 @@ test("the environment check reads Vercel's production setting and refuses BitoCa
   assert.match(plain.out, /APP_PRODUCT is bitocard/);
   assert.doesNotMatch(plain.out, /AFRIPPA/);
 });
+
+test("a Redis refusal shows Upstash's own reason, never the token", async () => {
+  const { createServer } = await import('node:http');
+  const server = createServer((req, res) => res.writeHead(400, { 'content-type': 'application/json' }).end('{"error":"ERR max requests limit exceeded"}'));
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { spawn } = await import('node:child_process');
+    const child = spawn(process.execPath, ['scripts/check-env.mjs'], {
+      cwd: new URL('..', import.meta.url),
+      env: { PATH: process.env.PATH, ...secure, UPSTASH_REDIS_REST_URL: `http://127.0.0.1:${server.address().port}`, UPSTASH_REDIS_REST_TOKEN: 'secret-token-value' },
+    });
+    let out = '';
+    child.stdout.on('data', chunk => (out += chunk));
+    child.stderr.on('data', chunk => (out += chunk));
+    const status = await new Promise(resolve => child.on('close', resolve));
+    assert.notEqual(status, 0);
+    assert.match(out, /Redis refused \(HTTP 400: \{"error":"ERR max requests limit exceeded"\}\)/);
+    assert.doesNotMatch(out, /secret-token-value/);
+    assert.doesNotMatch(out, /check UPSTASH_REDIS_REST_TOKEN/, 'a 400 is not a wrong token');
+  } finally {
+    server.close();
+  }
+});
