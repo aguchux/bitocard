@@ -41,8 +41,14 @@ test('Udozo sends and lists none of BitoCard’s own notices', () => {
 test("Udozo's integrations are the platform services and pawaPay, never BitoCard's suppliers or Afrippa's addresses", () => {
   const groups = groupsForProduct('bitocard', 'udozo');
   const ids = groups.map(group => group.id);
-  for (const id of ['reloadly', 'vtpass', 'didww', 'zendit', 'remita', 'esim_access', 'africas_talking', 'vpnresellers', 'telnyx', 'deepseek', 'support_ai']) assert.ok(!ids.includes(id), id);
-  for (const id of ['email', 'flutterwave', 'paystack', 'stripe', 'pawapay', 'file_storage', 'domains', 'store_hosts', 'anthropic', 'openai']) assert.ok(ids.includes(id), id);
+  for (const id of ['reloadly', 'vtpass', 'didww', 'zendit', 'remita', 'esim_access', 'africas_talking', 'vpnresellers', 'telnyx']) assert.ok(!ids.includes(id), id);
+  for (const id of ['email', 'flutterwave', 'paystack', 'stripe', 'pawapay', 'file_storage', 'domains', 'store_hosts', 'anthropic', 'openai', 'deepseek', 'support_ai']) assert.ok(ids.includes(id), id);
+  // Its AI runs Udozo's assistants: Claude, OpenAI and DeepSeek, and the models offered; never stores' bots or allowances.
+  const ai = groups.filter(group => ['anthropic', 'openai', 'deepseek', 'support_ai'].includes(group.id));
+  for (const group of ai) assert.doesNotMatch(`${group.name} ${group.description} ${JSON.stringify(group.fields)}`, /Premium|support bots|per store|BitoCard/, group.id);
+  assert.deepEqual(ai.find(group => group.id === 'support_ai').fields.map(field => field.key), ['AI_BITOCARD_MODELS']);
+  assert.match(ai.find(group => group.id === 'deepseek').description, /reads text only.*China/);
+  assert.ok(groupsForProduct('bitocard', 'bitocard').find(group => group.id === 'support_ai').fields.some(field => field.key === 'AI_MONTHLY_REPLIES'), "BitoCard's allowance unchanged");
   assert.ok(groups.every(group => group.section === 'platform'), 'pawaPay sits with the platform services');
   assert.ok(!groups.flatMap(group => group.fields.map(field => field.key)).some(key => key.startsWith('AFRIPPA_')));
   assert.ok(groupsForProduct('bitocard', 'bitocard').some(group => group.id === 'reloadly'), "BitoCard's own list unchanged");

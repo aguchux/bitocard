@@ -700,19 +700,39 @@ export const groupsFor = (platform: Platform) => integrationGroups.filter(group 
 
 /**
  * Udozo's integration groups: the platform services, and pawaPay for mobile money payments and payouts. Never BitoCard's
- * product suppliers, DeepSeek (shop assistants refuse it), BitoCard's store support assistants, or Afrippa's addresses.
+ * product suppliers or Afrippa's addresses. Its AI (Anthropic, OpenAI and DeepSeek) runs Udozo's assistants, never stores'
+ * support bots, so those groups say so, and the Support assistant group keeps only the models offered.
  */
-const notUdozoGroups: ReadonlySet<string> = new Set(['deepseek', 'support_ai']);
-const notUdozoFields: ReadonlySet<string> = new Set(['AFRIPPA_URL', 'AFRIPPA_VERIFY_URL']);
+const notUdozoFields: ReadonlySet<string> = new Set(['AFRIPPA_URL', 'AFRIPPA_VERIFY_URL', 'AI_MONTHLY_REPLIES']);
+
+/** Udozo's own words for its AI groups. */
+const udozoAiGroups: Record<string, Pick<IntegrationGroup, 'description'> & { name?: string; fieldHelp?: Record<string, { label?: string; help: string }> }> = {
+  anthropic: { description: 'Claude models for Udozo’s assistants (Anjio and any others). Test connection lists the models the key can use.' },
+  openai: { description: 'OpenAI models for Udozo’s assistants. Test connection lists the models the key can use.' },
+  deepseek: {
+    description: 'DeepSeek models for Udozo’s assistants. DeepSeek reads text only, so an assistant that helps sellers from their photos needs Claude or OpenAI. DeepSeek processes data in China. Test connection lists the models the key can use.',
+  },
+  support_ai: {
+    name: 'Assistant models',
+    description: 'The models Udozo’s assistants may run on. Only models of a provider whose API key is set are offered.',
+    fieldHelp: {
+      AI_BITOCARD_MODELS: { label: 'Models offered', help: 'provider:model, separated by commas, for example anthropic:claude-haiku-5-5, openai:gpt-5-mini, deepseek:deepseek-chat.' },
+    },
+  },
+};
 
 /** The groups a product's admin sees and sets: Udozo's instance (APP_PRODUCT) narrows BitoCard's platform groups to its own. */
 export const groupsForProduct = (platform: Platform, product: Product) => {
   const groups = groupsFor(platform);
   if (product !== 'udozo') return groups;
   return groups
-    .filter(group => (group.section !== 'suppliers' || group.id === 'pawapay') && !notUdozoGroups.has(group.id))
+    .filter(group => group.section !== 'suppliers' || group.id === 'pawapay')
     // pawaPay is a payment provider on Udozo (mobile money in and out), never a product supplier.
-    .map(group => ({ ...group, section: group.id === 'pawapay' ? ('platform' as const) : group.section, fields: group.fields.filter(item => !notUdozoFields.has(item.key)) }));
+    .map(group => {
+      const words = udozoAiGroups[group.id];
+      const fields = group.fields.filter(item => !notUdozoFields.has(item.key)).map(item => ({ ...item, ...words?.fieldHelp?.[item.key] }));
+      return { ...group, ...(words ? { name: words.name ?? group.name, description: words.description } : {}), section: group.id === 'pawapay' ? ('platform' as const) : group.section, fields };
+    });
 };
 
 /** Settings only Afrippa uses (its crypto): read from Afrippa's values whoever reads them. */

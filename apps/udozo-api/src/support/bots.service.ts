@@ -196,10 +196,8 @@ export class BotsService {
       return;
     }
     if (scope === 'shop') {
-      // DeepSeek processes data in China: not offered for shop assistants until lawyers clear it.
-      if (input.provider === 'deepseek') throw invalid('ai_model_unavailable', 'Shop assistants run on Anthropic or OpenAI.', 'provider');
       if (input.funding !== 'bitocard') throw invalid('parameter_invalid', 'Shop assistants run on BitoCard’s AI.', 'funding');
-      if (roles.includes('sell') && !visionProviders.includes(input.provider)) throw invalid('model_no_vision', 'Helping sellers reads their photos: choose a model that reads images.', 'model');
+      if (roles.includes('sell') && !visionProviders.includes(input.provider)) throw invalid('model_no_vision', 'Helping sellers reads their photos: choose Claude or OpenAI (DeepSeek reads text only).', 'model');
     }
     if (input.funding === 'bitocard' && !this.ai.bitocardModels().some(item => item.provider === input.provider && item.model === input.model)) {
       throw invalid('ai_model_unavailable', 'This model is not offered on BitoCard’s AI. Choose another, or use your own key.', 'model');

@@ -18,6 +18,11 @@ export const commonLanguages: Array<{ code: string; name: string }> = [
   { code: "pt", name: "Portuguese" },
   { code: "ar", name: "Arabic" },
 ];
+
+/** The AI providers a shop assistant may run on, and those whose models read sellers' photos. */
+const shopProviders: BotProvider[] = ["anthropic", "openai", "deepseek"];
+const visionProviders: BotProvider[] = ["anthropic", "openai"];
+
 const languagePattern = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
 export const languageLabel = (code: string) => commonLanguages.find(item => item.code === code)?.name ?? code;
 
@@ -46,10 +51,9 @@ export function ShopAssistantForm({
   onSubmit: (input: BotInput) => void;
 }) {
   const id = useId();
-  // Shop assistants run on Anthropic or OpenAI (DeepSeek is not offered for them until lawyers clear it).
-  const models = Object.fromEntries((["anthropic", "openai"] as const).map(provider => [provider, context.ai.bitocard[provider] ?? []])) as Record<"anthropic" | "openai", string[]>;
+  const models = Object.fromEntries(shopProviders.map(provider => [provider, context.ai.bitocard[provider] ?? []])) as Record<BotProvider, string[]>;
   const [roles, setRoles] = useState<ShopBotRole[]>((initial?.roles.filter(role => role in shopRoleLabels) as ShopBotRole[] | undefined) ?? ["browse", "help"]);
-  const [provider, setProvider] = useState<"anthropic" | "openai">(initial?.provider === "openai" ? "openai" : "anthropic");
+  const [provider, setProvider] = useState<BotProvider>(initial?.provider ?? "anthropic");
   const [model, setModel] = useState(initial?.model ?? models[provider][0] ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [avatar, setAvatar] = useState(initial?.avatar_url ?? "");
@@ -59,8 +63,8 @@ export function ShopAssistantForm({
   const [greetings, setGreetings] = useState<Record<string, string>>(initial?.shop?.greetings ?? {});
   const [typed, setTyped] = useState("");
   const [limits, setLimits] = useState<ShopBotLimits>(initial?.shop?.limits ?? defaultLimits);
-  const valid = roles.length > 0 && name.trim().length >= 2 && model.trim().length >= 2 && languages.length > 0;
-  const noVision = roles.includes("sell") && !["anthropic", "openai"].includes(provider);
+  const noVision = roles.includes("sell") && !visionProviders.includes(provider);
+  const valid = roles.length > 0 && name.trim().length >= 2 && model.trim().length >= 2 && languages.length > 0 && !noVision;
 
   const toggleRole = (role: ShopBotRole) => setRoles(current => (current.includes(role) ? current.filter(item => item !== role) : [...current, role]));
   const addLanguage = (code: string) => {
@@ -115,21 +119,21 @@ export function ShopAssistantForm({
       </section>
       <section className="space-y-3">
         <h3 className="font-bold text-ink">2. AI agent</h3>
-        <p className="text-sm text-muted">Always on Udozo’s AI. DeepSeek is not offered for shop assistants (it processes data in China) until lawyers clear it.</p>
+        <p className="text-sm text-muted">Always on Udozo’s AI: Claude, OpenAI or DeepSeek, wherever its key is set in Settings &gt; Integrations. DeepSeek reads text only and processes data in China.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Provider" htmlFor={`${id}-provider`}>
             <Select
               id={`${id}-provider`}
               value={provider}
               onChange={event => {
-                const next = event.target.value as "anthropic" | "openai";
+                const next = event.target.value as BotProvider;
                 setProvider(next);
                 setModel(models[next][0] ?? "");
               }}
             >
-              {(["anthropic", "openai"] as const).map(item => (
+              {shopProviders.map(item => (
                 <option key={item} value={item} disabled={!models[item].length}>
-                  {providerLabels[item as BotProvider]}
+                  {providerLabels[item]}
                 </option>
               ))}
             </Select>
@@ -148,7 +152,7 @@ export function ShopAssistantForm({
             )}
           </Field>
         </div>
-        {noVision ? <Notice tone="amber">Helping sellers reads their photos: choose a model that reads images.</Notice> : null}
+        {noVision ? <Notice tone="amber">Helping sellers reads their photos, and DeepSeek reads text only: choose Claude or OpenAI, or leave out Sellers.</Notice> : null}
       </section>
       <section className="space-y-3">
         <h3 className="font-bold text-ink">3. Profile</h3>

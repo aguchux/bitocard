@@ -39,7 +39,9 @@ before(async () => {
       ...ai.env,
       ANTHROPIC_API_KEY: 'good-anthropic-bitocard',
       ANTHROPIC_PRICES: 'claude-sonnet-5-5 3 15 0.3; claude-haiku-5-5 1 5 0.1',
-      AI_BITOCARD_MODELS: 'anthropic:claude-sonnet-5-5, anthropic:claude-haiku-5-5',
+      DEEPSEEK_API_KEY: 'good-deepseek-udozo',
+      DEEPSEEK_PRICES: 'deepseek-chat 0.3 1.2 0.03',
+      AI_BITOCARD_MODELS: 'anthropic:claude-sonnet-5-5, anthropic:claude-haiku-5-5, deepseek:deepseek-chat',
       STORE_SERVER_SECRET: secret,
       SPACES_KEY: 'spaces-key',
       SPACES_SECRET: 'spaces-secret',
@@ -168,7 +170,7 @@ describe('managing shop assistants', () => {
 
   test('roles, models, languages and greetings are checked', async () => {
     const base = { scope: 'shop', name: 'Ada', roles: ['browse', 'help'], provider: 'anthropic', model: 'claude-haiku-5-5', funding: 'bitocard' };
-    assert.equal((await admin.post('/v1/admin/support/bots', { ...base, provider: 'deepseek', model: 'deepseek-chat' })).json.error.code, 'ai_model_unavailable');
+    assert.equal((await admin.post('/v1/admin/support/bots', { ...base, provider: 'openai', model: 'gpt-5-mini' })).json.error.code, 'ai_model_unavailable', 'only models offered, with a key set');
     assert.equal((await admin.post('/v1/admin/support/bots', { ...base, roles: ['chat'] })).json.error.param, 'roles');
     assert.equal((await admin.post('/v1/admin/support/bots', { ...base, languages: ['yo'], greetings: { fr: 'Bonjour' } })).json.error.param, 'greetings');
     assert.equal((await admin.post('/v1/admin/support/bots', { ...base, languages: ['yo'], greetings: { yo: 'x'.repeat(301) } })).json.error.param, 'greetings');
@@ -222,6 +224,30 @@ describe('managing shop assistants', () => {
     assert.equal(tried.json.reply, 'One Samsung near Ikeja.');
     assert.deepEqual(tried.json.cards[0].items.map(item => item.title), ['Samsung Galaxy A54, 128 GB']);
     assert.equal(await prisma.aiUsage.count({ where: { botId: anjio, kind: 'test' } }) > 0, true);
+  });
+
+  test('an assistant runs on DeepSeek too, but never helps sellers from their photos', async () => {
+    const base = { scope: 'shop', name: 'Deji', roles: ['browse', 'help'], provider: 'deepseek', model: 'deepseek-chat', funding: 'bitocard' };
+    const sell = await admin.post('/v1/admin/support/bots', { ...base, roles: ['browse', 'sell'] });
+    assert.deepEqual([sell.status, sell.json.error.code], [400, 'model_no_vision']);
+    const created = await admin.post('/v1/admin/support/bots', base);
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    assert.deepEqual([created.json.provider, created.json.model], ['deepseek', 'deepseek-chat']);
+    assert.equal((await admin.patch(`/v1/admin/support/bots/${created.json.id}`, { roles: ['browse', 'sell'] })).json.error.code, 'model_no_vision');
+
+    ai.state.script = [{ text: 'Phones are in Phones and tablets.' }];
+    const before = ai.state.calls.length;
+    const tried = await admin.post(`/v1/admin/support/bots/${created.json.id}/test`, { messages: [{ role: 'user', content: 'Where are phones?' }], country: 'NG', surface: 'browse' });
+    assert.equal(tried.status, 200, JSON.stringify(tried.json));
+    assert.equal(tried.json.reply, 'Phones are in Phones and tablets.');
+    const call = ai.state.calls.slice(before).find(item => item.path === '/chat/completions');
+    assert.ok(call, 'answered through DeepSeek’s API');
+    assert.equal(call.headers.authorization, 'Bearer good-deepseek-udozo');
+    assert.equal(call.body.model, 'deepseek-chat');
+    const usage = await prisma.aiUsage.findFirst({ where: { botId: created.json.id, kind: 'test' } });
+    assert.deepEqual([usage.provider, usage.model], ['deepseek', 'deepseek-chat']);
+    assert.ok(usage.costMicros > 0n, 'priced from DeepSeek’s prices');
+    assert.equal((await admin.delete(`/v1/admin/support/bots/${created.json.id}`)).status, 204);
   });
 });
 

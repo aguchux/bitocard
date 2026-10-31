@@ -638,8 +638,8 @@ const privacy: LegalDocument = {
       id: "ai",
       heading: "4. AI providers",
       body: [
-        "A shop assistant's answers are written by Anthropic or OpenAI. We send them your question and the conversation so far, Udozo's own information for your country, and the public details of the listings it looks up. Signed in, it can also look up your own listings, your Safe pay orders (never codes) and which of your chats are waiting for a reply (never their messages).",
-        "We send more only when you ask: a seller's own listing and its photos when they ask it to fill in a listing from its photos, and the latest messages of a chat when a seller asks it to suggest a reply. Before anything is sent, numbers that look like phone, card or account numbers, codes and passwords are hidden, and we never send your email address, phone number, delivery address or payment details.",
+        "A shop assistant's answers are written by Anthropic, OpenAI or DeepSeek, whichever runs that assistant. We send it your question and the conversation so far, Udozo's own information for your country, and the public details of the listings it looks up. Signed in, it can also look up your own listings, your Safe pay orders (never codes) and which of your chats are waiting for a reply (never their messages).",
+        "We send more only when you ask: a seller's own listing and its photos when they ask it to fill in a listing from its photos (only to Anthropic or OpenAI: DeepSeek is never sent photos), and the latest messages of a chat when a seller asks it to suggest a reply. Before anything is sent, numbers that look like phone, card or account numbers, codes and passwords are hidden, and we never send your email address, phone number, delivery address or payment details.",
       ],
     },
     {
@@ -672,7 +672,7 @@ const privacy: LegalDocument = {
             "The public: live listings, including in search engines and in previews when a link is shared.",
             "The other person in a chat: your first name and initial, your messages and offers. A seller sees a Safe pay buyer's delivery address once they have paid. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
             "Udozo's team, as their work needs.",
-            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS and the network in front of our API), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic and OpenAI (shop assistants, as section 4 says), Google (signing in to Seller HQ with Google), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
+            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS and the network in front of our API), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing in to Seller HQ with Google), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
             "Authorities, where the law requires it.",
           ],
         },
@@ -682,7 +682,7 @@ const privacy: LegalDocument = {
     {
       id: "where",
       heading: "7. Where it is stored",
-      body: ["Your data is stored in the United States. Where it leaves your country, we use the safeguards your country's law requires; these are being confirmed with lawyers in each market."],
+      body: ["Your data is stored in the United States. What a shop assistant run by DeepSeek is sent (section 4) is processed in China. Where it leaves your country, we use the safeguards your country's law requires; these are being confirmed with lawyers in each market."],
     },
     {
       id: "retention",
