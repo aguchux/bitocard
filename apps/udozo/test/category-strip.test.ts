@@ -5,7 +5,7 @@ import { CategoryStrip } from "@/components/category-strip";
 
 const categories = [
   { slug: "vehicles", name: "Vehicles", icon: "car" },
-  { slug: "jobs", name: "Jobs", icon: null },
+  { slug: "services", name: "Services", icon: null },
 ];
 
 describe("category strip", () => {
@@ -13,7 +13,7 @@ describe("category strip", () => {
 
   it("links every category", () => {
     expect(html).toContain('href="/ng/c/vehicles"');
-    expect(html).toContain('href="/ng/c/jobs"');
+    expect(html).toContain('href="/ng/c/services"');
     expect(html).toContain(">Vehicles<");
   });
 

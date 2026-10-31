@@ -42,7 +42,7 @@ export default async function OpenGraphImage() {
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05 }}>Buy and sell near you.</div>
             <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05, color: pink }}>Protected by Safe pay.</div>
-            <div style={{ display: "flex", marginTop: 26, fontSize: 28, fontWeight: 600, color: "#414f77" }}>Phones · Vehicles · Property · Electronics · Fashion · Jobs</div>
+            <div style={{ display: "flex", marginTop: 26, fontSize: 28, fontWeight: 600, color: "#414f77" }}>Phones · Electronics · Vehicles · Property · Fashion · Home</div>
           </div>
         </div>
       </div>

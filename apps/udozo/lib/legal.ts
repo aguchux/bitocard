@@ -122,7 +122,7 @@ const terms: LegalDocument = {
             "people, personal data, accounts, and anything else whose sale is illegal where you or the buyer are.",
           ],
         },
-        "Some categories, such as vehicles, property and jobs, have their own rules, shown when you post in them. If you are not sure, ask us before you post.",
+        "Some categories, such as vehicles, property and pets, have their own rules, shown when you post in them. If you are not sure, ask us before you post.",
       ],
     },
     {

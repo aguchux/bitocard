@@ -74,7 +74,7 @@ describe('categories', () => {
     const categories = await prisma.classifiedCategory.findMany({ include: { features: { include: { feature: true } }, countries: true } });
     const top = categories.filter(c => !c.parentId);
     const subs = categories.filter(c => c.parentId);
-    assert.equal(top.length, 16);
+    assert.equal(top.length, 14);
     assert.ok(subs.length >= 50);
     const ids = new Map(categories.map(c => [c.id, c]));
     for (const sub of subs) {
@@ -95,22 +95,25 @@ describe('categories', () => {
     assert.match(categories.find(c => c.slug === 'phones-tablets').safetyChecklist.join(' '), /IMEI/);
   });
 
-  test("the top categories and their order follow Nigeria's leading marketplace, each with its icon", async () => {
+  test("Udozo's own tree: its order and words, every category with an icon, and categories that are not Udozo's dropped", async () => {
     const categories = await prisma.classifiedCategory.findMany({ orderBy: { position: 'asc' } });
     const top = categories.filter(c => !c.parentId);
-    assert.deepEqual(top.map(c => c.slug), [
-      'vehicles', 'property', 'phones-tablets', 'electronics', 'home-garden', 'health-beauty', 'fashion', 'sports-leisure',
-      'seeking-work', 'services', 'jobs', 'babies-kids', 'animals-pets', 'agriculture-food', 'business-industrial', 'repair-construction',
+    assert.deepEqual(top.map(c => [c.slug, c.name]), [
+      ['phones-tablets', 'Phones and tablets'], ['electronics', 'Electronics'], ['vehicles', 'Vehicles'], ['property', 'Property'],
+      ['home-garden', 'Home and living'], ['fashion', 'Fashion'], ['health-beauty', 'Beauty and personal care'], ['babies-kids', 'Kids and baby'],
+      ['sports-leisure', 'Sports and hobbies'], ['animals-pets', 'Pets'], ['agriculture-food', 'Farm and food'], ['repair-construction', 'Building and tools'],
+      ['business-industrial', 'Wholesale and business'], ['services', 'Services'],
     ]);
-    assert.equal(top.find(c => c.slug === 'business-industrial').name, 'Commercial equipment and tools');
     for (const c of categories) assert.match(c.icon, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${c.slug} has a lucide icon name`);
     const bySlug = new Map(categories.map(c => [c.slug, c]));
-    assert.equal(bySlug.get('computers'), undefined, 'Computers joined Electronics');
+    for (const slug of ['computers', 'jobs', 'job-vacancies', 'seeking-work', 'cv-it', 'software', 'boats', 'reptiles', 'vitamins-supplements', 'medical-equipment', 'legal-financial', 'travel', 'watches']) {
+      assert.equal(bySlug.get(slug), undefined, `${slug} is not one of Udozo's`);
+    }
     for (const slug of ['laptops', 'desktops', 'computer-accessories', 'printers']) assert.equal(bySlug.get(slug).parentId, bySlug.get('electronics').id, `${slug} is under Electronics`);
-    assert.match(bySlug.get('laptops').safetyChecklist.join(' '), /charger/, "laptops keep Computers' checks");
-    assert.ok(categories.filter(c => c.parentId === bySlug.get('seeking-work').id).length >= 5, 'people seeking work choose their field');
-    assert.match(bySlug.get('seeking-work').safetyChecklist.join(' '), /Never pay an employer/);
-    assert.equal(bySlug.get('motorcycles').icon, 'motorbike');
+    assert.match(bySlug.get('laptops').safetyChecklist.join(' '), /charger/, "laptops keep the computer checks");
+    assert.equal(bySlug.get('livestock-poultry').parentId, bySlug.get('agriculture-food').id, 'livestock is farming');
+    assert.match(bySlug.get('livestock-poultry').safetyChecklist.join(' '), /vaccination/, 'with the animal checks');
+    assert.equal(bySlug.get('motorcycles').name, 'Motorbikes, scooters and kekes');
   });
 
   test('a category cannot be its own parent', async () => {
