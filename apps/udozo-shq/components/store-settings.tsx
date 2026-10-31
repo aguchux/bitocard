@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaidPlans } from "@/components/paid-plans";
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckCircle2, CreditCard, ExternalLink, Globe, XCircle } from "lucide-react";
 import {
@@ -132,6 +133,7 @@ export const errorCode = (error: unknown) => {
  * (`setup_fee_unpaid`) and a verified business. What is missing is shown with a link to fix it, before and after asking.
  */
 export function StoreLiveSwitch({ store, canManage }: { store: Store; canManage: boolean }) {
+  const paidPlans = usePaidPlans();
   const { membership } = useReseller();
   const [update, state] = useUpdateStoreMutation();
   const [confirmLive, setConfirmLive] = useState(false);
@@ -180,11 +182,17 @@ export function StoreLiveSwitch({ store, canManage }: { store: Store; canManage:
             <AppLink href={`/store/domains?store=${store.id}`} className="font-semibold text-brand-600 hover:underline">
               Buy or connect a domain
             </AppLink>
-            , or take Premium for a free one (
-            <AppLink href="/settings/plan" className="font-semibold text-brand-600 hover:underline">
-              Plans
-            </AppLink>
-            ).
+            {paidPlans ? (
+              <>
+                , or take Premium for a free one (
+                <AppLink href="/settings/plan" className="font-semibold text-brand-600 hover:underline">
+                  Plans
+                </AppLink>
+                ).
+              </>
+            ) : (
+              "."
+            )}
           </Notice>
         ) : null}
         {needsFee ? (

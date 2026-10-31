@@ -1,5 +1,6 @@
 "use client";
 
+import { PaidPlansNotice } from "@/components/paid-plans";
 import { useState } from "react";
 import { Globe, RotateCcw, Save, TriangleAlert } from "lucide-react";
 import { Badge, Button, Card, errorMessage, Field, formatMoney, Input, KeyValue, Notice, PageHeader, QueryView, Skeleton, Toggle } from "@bitocard/admin-ui";
@@ -176,6 +177,7 @@ export default function SetupFeesPage() {
         title="Setup fees"
         description="A one-time Seller HQ fee, taken from the seller's wallet or with their first Premium month. A store goes live only once it is paid. With one Premium month it pays for Premium's free domain."
       />
+      <PaidPlansNotice />
       {!editable ? <Notice tone="grey">Only finance admins can change setup fees.</Notice> : null}
       <QueryView query={fees} message={error => errorMessage(error, "Could not load the setup fees.")} loading={<Skeleton className="h-64 w-full" />}>
         {data => (

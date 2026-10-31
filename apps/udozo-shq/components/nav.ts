@@ -56,7 +56,10 @@ export const sections: ShqNavItem[] = [
   { key: "settings", label: "Settings", href: "/settings", icon: Settings },
 ];
 
-/** Each section's menu (the second column). A new Seller HQ page is a folder in `app/(console)` plus its entry here. */
+/**
+ * Each section's menu (the second column). A new Seller HQ page is a folder in `app/(console)` plus its entry here.
+ * Plans are listed only while Udozo charges sellers (`menusFor`).
+ */
 export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }> = {
   home: {
     title: "Home",
@@ -130,3 +133,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     ],
   },
 };
+
+/** The menus, without Plans while Udozo has no paid plans (every store has every feature). */
+export const menusFor = (paidPlans: boolean): typeof menus =>
+  paidPlans ? menus : { ...menus, settings: { ...menus.settings, items: menus.settings.items.filter(item => item.href !== "/settings/plan") } };

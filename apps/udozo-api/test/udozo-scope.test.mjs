@@ -13,8 +13,9 @@ import { groupsForProduct } from '../dist/integrations/definitions.js';
 test("Udozo's feature switches are the marketplace's, resale's and the shared ones it uses", () => {
   assert.deepEqual(
     [...switchKeysFor('udozo')].sort(),
-    ['classifieds', 'classifieds_assistant', 'classifieds_install_prompt', 'classifieds_resale', 'classifieds_safe_pay', 'custom_domains', 'customer_wallets', 'manual_reseller_approval', 'reseller_resale', 'reseller_two_step', 'shq_install_prompt'],
+    ['classifieds', 'classifieds_assistant', 'classifieds_install_prompt', 'classifieds_resale', 'classifieds_safe_pay', 'custom_domains', 'customer_wallets', 'manual_reseller_approval', 'paid_plans', 'reseller_resale', 'reseller_two_step', 'shq_install_prompt'],
   );
+  assert.ok(!switchKeysFor('bitocard').includes('paid_plans'), "Udozo's paid plans switch is never BitoCard's");
   for (const key of ['startup_allowance', 'welcome_bonus', 'reserved_accounts', 'own_integrations', 'own_payment_gateways', 'spin_rewards', 'store_template_topups']) {
     assert.ok(switchKeysFor('bitocard').includes(key), `${key} stays BitoCard's`);
   }

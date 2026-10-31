@@ -23,6 +23,8 @@ before(async () => {
   for (const source of ['open_exchange_rates', 'flutterwave']) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
+  // Udozo charges sellers only once an admin switches paid plans on (test/udozo-free-launch.test.mjs: off).
+  assert.equal((await admin.put('/v1/admin/switches/paid_plans', { enabled: true })).status, 200);
   // What the product seed does on Udozo's database: Premium includes one free domain per store.
   assert.equal((await admin.put('/v1/admin/plans/premium/limits/free_domains', { value: 1 })).status, 200);
 });

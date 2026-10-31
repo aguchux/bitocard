@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Check, Sparkles, Store } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, cn, ErrorState, errorMessage, formatDate, formatMoney, Notice, PageHeader, RefreshFailed, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
-import { type PlanDetail, type SetupFee, type StoreSubscription, useChangeStorePlanMutation, useResellerPlansQuery, useSetupFeeQuery, useStoreSubscriptionsQuery } from "@bitocard/api-client/reseller";
+import { type PlanDetail, type SetupFee, type StoreSubscription, useChangeStorePlanMutation, useResellerPlansQuery, useResellerSettingsQuery, useSetupFeeQuery, useStoreSubscriptionsQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { SetupFeeCard } from "@/components/setup-fee";
@@ -71,12 +71,24 @@ function PlanCard({ plan, store, onChoose, canChange }: { plan: PlanDetail; stor
 /** What the setup fee adds to a first paid month, when it is still due. */
 const feeNote = (fee: SetupFee | undefined) => (fee?.due && fee.currency ? ` Your one-time Seller HQ setup fee${fee.amount === null ? "" : ` of ${formatMoney(fee.amount, fee.currency)}`} is charged with it.` : "");
 
-/** Each store is on Startup or Premium; account-wide features follow the highest. `?store=` opens one store's plans. */
+/**
+ * Each store is on Startup or Premium; account-wide features follow the highest. `?store=` opens one store's plans.
+ * While Udozo has no paid plans, every store has every feature and there is nothing to choose.
+ */
 export default function PlanPage() {
+  const settings = useResellerSettingsQuery();
+  if (settings.data && !settings.data.features.paid_plans) return <EveryFeature />;
+  return <Suspense fallback={null}>{settings.data ? <Plans /> : null}</Suspense>;
+}
+
+function EveryFeature() {
   return (
-    <Suspense fallback={null}>
-      <Plans />
-    </Suspense>
+    <ShqShell section="settings" current="/settings/plan" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plans" }]}>
+      <PageHeader title="Plans" description="Every store has every Seller HQ feature, with no setup fee and no monthly charge." />
+      <Notice tone="green" title="Nothing to choose">
+        Your stores have everything Seller HQ offers: your own domains, your brand only on your store, store traffic, your team and chat with Udozo. You pay only for what you buy, such as domains.
+      </Notice>
+    </ShqShell>
   );
 }
 

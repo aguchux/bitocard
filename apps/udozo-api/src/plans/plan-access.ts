@@ -5,6 +5,21 @@ import { IntegrationsService } from '../integrations/integrations.service.js';
 import { freePlanCode, type PlanFeature, type PlanLimit, planFeatureCatalogue, planLimitCatalogue, planLimitValue } from './features.js';
 
 /**
+ * Whether Udozo charges sellers (its `paid_plans` switch, global, off by default): the setup fee and paid plans. Off,
+ * every store has every feature and the default limits (no free domains: nothing pays for them), and Seller HQ shows
+ * neither. BitoCard always has its plans.
+ */
+export async function paidPlansOn(prisma: PrismaService, product: string) {
+  if (product !== 'udozo') return true;
+  const row = await prisma.featureSwitch.findFirst({ where: { key: 'paid_plans', countryCode: null, resellerId: null }, select: { enabled: true } });
+  return row?.enabled ?? false;
+}
+
+/** The refusal for choosing a plan while Udozo has none (every store already has every feature). */
+export const plansUnavailable = () =>
+  new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plans_unavailable', 'Every store already has every feature, so there is no plan to choose.', 'plan');
+
+/**
  * Whether a reseller's plan includes a feature. BitoCard's own store accounts (`house`) have every feature, whatever
  * the plans say, so changing a plan never takes anything from bitocard.com.
  */
@@ -45,6 +60,16 @@ export class PlanAccessService {
     private readonly integrations: IntegrationsService,
   ) {}
 
+  /** Whether this instance charges for plans (always on BitoCard; Udozo's `paid_plans` switch). */
+  paidPlans() {
+    return paidPlansOn(this.prisma, String(this.integrations.config.APP_PRODUCT));
+  }
+
+  /** With paid plans off, a limit is its default for everyone: what a plan that sets nothing has. */
+  private async unpaidLimit(limit: PlanLimit) {
+    return (await this.paidPlans()) ? null : { value: planLimitValue({}, limit, this.fallback(limit)), planName: 'Udozo' };
+  }
+
   /** A limit's fallback setting (an integration setting), when the plan sets none. */
   private fallback(limit: PlanLimit) {
     const definition = planLimitCatalogue[limit];
@@ -55,6 +80,8 @@ export class PlanAccessService {
 
   /** How much of a limit the reseller's plan allows: a number, or null for unlimited (BitoCard's own accounts always). */
   async limit(resellerId: string, limit: PlanLimit) {
+    const unpaid = await this.unpaidLimit(limit);
+    if (unpaid) return unpaid;
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { house: true, plan: { select: { name: true, limits: true } } } });
     return { value: reseller.house ? null : planLimitValue(reseller.plan.limits, limit, this.fallback(limit)), planName: reseller.plan.name };
   }
@@ -74,18 +101,22 @@ export class PlanAccessService {
 
   /** Whether a store's own plan includes a feature. */
   async storeHas(storeId: string, feature: PlanFeature) {
+    if (!(await this.paidPlans())) return true;
     const { house, plan } = await this.storePlan(storeId);
     return house || plan.features.includes(feature);
   }
 
   /** Refuses (403 `plan_feature_required`) unless the store's own plan includes the feature. */
   async requireForStore(storeId: string, feature: PlanFeature) {
+    if (!(await this.paidPlans())) return;
     const { house, plan } = await this.storePlan(storeId);
     if (!house && !plan.features.includes(feature)) throw planFeatureRequired(feature, plan.name, 'store');
   }
 
   /** How much of a limit a store's own plan allows (null: unlimited). */
   async storeLimit(storeId: string, limit: PlanLimit) {
+    const unpaid = await this.unpaidLimit(limit);
+    if (unpaid) return unpaid;
     const { house, plan } = await this.storePlan(storeId);
     return { value: house ? null : planLimitValue(plan.limits, limit, this.fallback(limit)), planName: plan.name };
   }
@@ -112,12 +143,14 @@ export class PlanAccessService {
   }
 
   async has(resellerId: string, feature: PlanFeature) {
+    if (!(await this.paidPlans())) return true;
     const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { house: true, plan: { select: { features: true } } } });
     return Boolean(reseller && planIncludes(reseller, feature));
   }
 
   /** Refuses (403 `plan_feature_required`, `param` the feature) unless the reseller's plan includes the feature. */
   async require(resellerId: string, feature: PlanFeature) {
+    if (!(await this.paidPlans())) return;
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { house: true, plan: { select: { name: true, features: true } } } });
     if (!planIncludes(reseller, feature)) throw planFeatureRequired(feature, reseller.plan.name);
   }

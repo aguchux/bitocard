@@ -355,7 +355,7 @@ const safePay: LegalDocument = {
 const sellers: LegalDocument = {
   slug: "sellers",
   title: "Seller terms",
-  summary: "Seller HQ: the setup fee, Premium and its free domain, your wallet and invoices, your stores and domains, reselling suppliers' listings, strikes, payouts and closing.",
+  summary: "Seller HQ: every feature with no setup fee or monthly plan, your wallet and invoices, your stores and domains, reselling suppliers' listings, strikes, payouts and closing.",
   sections: [
     {
       id: "about",
@@ -396,36 +396,29 @@ const sellers: LegalDocument = {
     },
     {
       id: "setup-fee",
-      heading: "4. The Seller HQ setup fee",
-      body: [
-        "Where we switch it on, each seller account pays a one-time setup fee. It is US$10 today, charged from your wallet in your country's currency at our exchange rate on the day. We may change it, or set a market's own amount in its currency; Seller HQ shows the amount before you pay.",
-        "You pay it once, on its own or with your first Premium month. Your stores cannot go live until it is paid.",
-      ],
+      heading: "4. No setup fee",
+      body: ["Opening a seller account and taking your stores live is free: there is no setup fee."],
     },
     {
       id: "plans",
-      heading: "5. Plans",
+      heading: "5. Every feature, no monthly charge",
       body: [
         {
           list: [
-            "Each store has its own plan. Startup is free. Premium is US$5 a month per store today, charged from your wallet in your country's currency: a price we set for that currency, or else the US dollar price converted at our exchange rate on the day of each charge. Seller HQ shows the price and what each plan includes.",
-            "Moving a store to a higher plan is charged at once, less a credit for the unused part of its current month. Moving to a lower plan takes effect at the end of the paid month.",
-            "If your wallet cannot pay a store's renewal, we warn you and keep its plan for 7 days, then move that store to Startup. If you cancel, the plan lasts until the end of the month you paid for.",
-            "We may change prices, add plans or move features between them. We tell you in Seller HQ before a change affects you; a renewal is charged at the price on the day.",
+            "Every store has every Seller HQ feature: your own domains, your brand alone on your store's pages, store traffic, your team and chat with us. There is no plan to choose and no monthly charge.",
+            "If we introduce a setup fee or paid plans, we will tell you in Seller HQ and by email at least 30 days before anything is charged, with the prices and what would change. You can close your account before then.",
           ],
         },
       ],
     },
     {
-      id: "free-domain",
-      heading: "6. Premium's free domain",
+      id: "charges",
+      heading: "6. What you pay for",
       body: [
         {
           list: [
-            "Each store on Premium includes one free .com domain, bought for it through Seller HQ.",
-            "It is bought only within what that store's Premium collected: its paid month, plus the setup fee if you paid it with that month. For your first store, US$15 covers a .com. A later store's US$5 month alone may not. A domain that costs more is refused: choose another, or buy it as usual.",
-            "It renews free while the store keeps Premium. If the store leaves Premium, its renewals are paid from your wallet like any domain's.",
-            "You are its registrant and own it, as for any domain you buy (section 9).",
+            "You pay for what you buy in Seller HQ, such as domains (section 9), and our fee on your resale earnings (section 3).",
+            "We show every price before you confirm.",
           ],
         },
       ],
@@ -436,10 +429,10 @@ const sellers: LegalDocument = {
       body: [
         {
           list: [
-            "You have a wallet in your country's currency and one in US dollars, and can move money between them at the rate we show before you confirm. Your country's wallet pays Premium, domains and the setup fee; when it is short, we may use dollars you topped up to cover the difference.",
+            "You have a wallet in your country's currency and one in US dollars, and can move money between them at the rate we show before you confirm. Your country's wallet pays for domains and anything else you buy from us; when it is short, we may use dollars you topped up to cover the difference.",
             "Money you top up can only be spent on what you buy from Udozo and what you owe. It cannot be withdrawn or paid out.",
             "Each store has a monthly invoice, and your account one for what is not tied to a store, listing every charge. Each charge is taken from your wallet when it happens.",
-            "When your wallet cannot cover a usage charge, the rest is owed to us, up to your credit limit. It starts at US$10. Once you have paid a full month's invoice in full and owe nothing, you can raise it a step at a time in Seller HQ, up to US$100. An invoice unpaid after its due date lowers it a step. At the limit, usage we would charge for, such as buying or renewing domains, stops until you pay; plan renewals follow their own 7-day grace. Your next top-ups pay what you owe first.",
+            "When your wallet cannot cover a usage charge, the rest is owed to us, up to your credit limit. It starts at US$10. Once you have paid a full month's invoice in full and owe nothing, you can raise it a step at a time in Seller HQ, up to US$100. An invoice unpaid after its due date lowers it a step. At the limit, usage we would charge for, such as buying or renewing domains, stops until you pay. Your next top-ups pay what you owe first.",
             "If we credit your wallet by mistake, or a payment we credited is reversed, we may correct your balance. Your balance is not a bank account and earns no interest.",
           ],
         },
@@ -464,9 +457,9 @@ const sellers: LegalDocument = {
       body: [
         {
           list: [
-            "You can run any number of stores, each with its own name, address, design and plan. These terms apply to all of them.",
+            "You can run any number of stores, each with its own name, address and design. These terms apply to all of them.",
             "Each store starts as a test store on its own address on udozo.com (for example yourstore.udozo.com). That address is for testing only: orders there are practice, and no real money moves. You do not own it, and it ends when the store is closed. We may refuse or change a name that is misleading, offensive, infringes someone's rights or is reserved.",
-            "A store goes live only on its own domain, once your business check has passed and the setup fee is paid. Once live, its udozo.com address sends visitors to the domain. If the store loses its last working domain (expired, suspended or disconnected), it goes back to test mode and we tell you.",
+            "A store goes live only on its own domain, once your business check has passed. Once live, its udozo.com address sends visitors to the domain. If the store loses its last working domain (expired, suspended or disconnected), it goes back to test mode and we tell you.",
             "You can connect a domain you already own. You must own or control it, and you remain responsible for it.",
             "You can buy a domain through Seller HQ. We buy it from our registrar partner in your name and contact details: you are its registrant and own it, under the registrar's terms and the rules of its ending. Give true contact details; the registrar may email you to confirm them, and may suspend the domain if you do not.",
             "We show the first year's price and the renewal price together before you buy. A domain is not refundable once registered.",

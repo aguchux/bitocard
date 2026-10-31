@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 export const metadata: Metadata = {
   metadataBase: new URL("https://shq.udozo.com"),
   title: { default: "Udozo Seller HQ", template: "%s | Udozo Seller HQ" },
-  description: "Udozo's Seller HQ: stores, resale listings, orders, domains, Premium, wallet and payouts.",
+  description: "Udozo's Seller HQ: stores, resale listings, orders, domains, wallet and payouts.",
   robots: { index: false, follow: false },
 };
 

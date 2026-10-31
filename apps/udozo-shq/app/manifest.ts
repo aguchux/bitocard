@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Udozo Seller HQ",
     short_name: "Seller HQ",
-    description: "Udozo's Seller HQ: stores, resale listings, orders, domains, Premium, wallet and payouts.",
+    description: "Udozo's Seller HQ: stores, resale listings, orders, domains, wallet and payouts.",
     start_url: "/",
     scope: "/",
     display: "standalone",

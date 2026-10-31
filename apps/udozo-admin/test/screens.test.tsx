@@ -88,6 +88,8 @@ beforeEach(() => {
     }
     if (path === "/v1/admin/theme/preview") return ok({ object: "theme_preview", token: "tok.sig", expires_at: "2026-10-30T01:00:00.000Z" });
     if (path === "/v1/admin/theme/publish") return ok({ ...theme, published: theme.draft, version: 2 });
+    // Udozo launches without paid plans: the switch is unset, so its default (off).
+    if (path === "/v1/admin/switches") return ok({ object: "list", data: [], definitions: { paid_plans: { scopes: ["global"], description: "Udozo charges sellers.", default: false } } });
     if (path === "/v1/admin/setup-fees") return ok({ object: "list", every_market: everyMarket, data: [savedFee, ghana] });
     if (path === "/v1/admin/setup-fees/WW") {
       everyMarket = { ...everyMarket, ...(body as object) };
@@ -190,6 +192,12 @@ describe("admin.udozo.com", () => {
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(sent.some(call => call.method === "POST" && call.path === "/v1/admin/theme/publish")).toBe(true), slow);
     expect(await screen.findByText(/Published\. Every Udozo app/, {}, slow)).toBeTruthy();
+  });
+
+  test("setup fees: while paid plans are off, admins are told sellers see none of it", async () => {
+    page(<SetupFeesPage />);
+    expect(await screen.findByText("Paid plans are off", {}, slow)).toBeTruthy();
+    expect(screen.getByText(/Sellers see no plans and no setup fee/)).toBeTruthy();
   });
 
   test("setup fees: the warning when the fee and a Premium month are below the dearest domain, and saving a market's fee", async () => {

@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { ArrowLeftRight, FlaskConical } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, ConsoleShell, type Crumb, NotificationBell } from "@bitocard/admin-ui/shell";
-import { menus, sections, type ShqSection } from "./nav";
+import { menusFor, sections, type ShqSection } from "./nav";
+import { usePaidPlans } from "./paid-plans";
 import { useReseller, useSignOut } from "./reseller";
 
 function ShqAccountMenu() {
@@ -68,6 +69,7 @@ function ShqBell() {
 
 /** The layout of every Seller HQ page: Udozo's rail, section menu, breadcrumbs, live/sandbox switch and account menu. */
 export function ShqShell({ section, current, crumbs, actions, children }: { section: ShqSection; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
+  const menus = menusFor(usePaidPlans());
   return (
     <ConsoleShell
       brand="Seller HQ"

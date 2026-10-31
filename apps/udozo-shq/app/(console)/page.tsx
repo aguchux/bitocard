@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaidPlans, walletPaysFor } from "@/components/paid-plans";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Circle, Clock, ShoppingBag, Store as StoreIcon, Wallet as WalletIcon, PiggyBank, X } from "lucide-react";
 import { useAccountVerificationQuery, useResaleOrdersQuery, useSetupFeeQuery, useStoresQuery, useWalletQuery } from "@bitocard/api-client/reseller";
@@ -97,6 +98,7 @@ export default function HomePage() {
   const verification = useAccountVerificationQuery();
   const stores = useStoresQuery();
   const setupFee = useSetupFeeQuery();
+  const paidPlans = usePaidPlans();
   const wallet = useWalletQuery(undefined, { skip: !seesWallet });
   const orders = useResaleOrdersQuery({ limit: 25 });
   const waiting = orders.data?.data.filter(order => openStatuses.has(order.status));
@@ -121,7 +123,7 @@ export default function HomePage() {
     },
     { id: "store", done: Boolean(store), title: "Create your store", detail: "A Resale shop with its design and colours, on a udozo.com address to test it.", href: store ? "/store" : "/store/new", action: "Create" },
     { id: "listings", done: live, title: "Add listings to sell", detail: "Choose suppliers' listings in your country and set your prices within their limits.", href: "/resale", action: "Browse" },
-    { id: "domain", done: live, title: "Give your store its own domain", detail: "A live store runs on its own domain. Premium includes one free; or buy or connect one.", href: "/store/domains", action: "Set up" },
+    { id: "domain", done: live, title: "Give your store its own domain", detail: paidPlans ? "A live store runs on its own domain. Premium includes one free; or buy or connect one." : "A live store runs on its own domain: buy one or connect your own.", href: "/store/domains", action: "Set up" },
     ...(setupFee.data?.charged ? [{ id: "setup_fee", done: !setupFee.data.due, title: "Pay the Seller HQ setup fee", detail: "Once, from your wallet, or with your first Premium month.", href: "/settings/plan", action: "Pay" }] : []),
     { id: "live", done: live, title: "Take your store live", detail: "Shoppers then pay real money on your own domain.", href: store ? `/store/${store.id}` : "/store", action: "Go live" },
   ];
@@ -140,7 +142,7 @@ export default function HomePage() {
               icon={<WalletIcon className="size-5" aria-hidden />}
               loading={wallet.isLoading}
               value={<Money minor={wallet.data?.available} currency={currency} loading={wallet.isLoading} />}
-              footer={<p className="text-xs text-muted">Pays for Premium, domains and the setup fee</p>}
+              footer={<p className="text-xs text-muted">Pays for {walletPaysFor(paidPlans)}</p>}
             />
             <StatCard
               label="Withdrawable earnings"

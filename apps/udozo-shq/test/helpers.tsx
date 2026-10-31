@@ -34,11 +34,15 @@ export const store = {
   created_at: "2026-10-19T00:00:00.000Z",
 };
 
+/** Seller HQ's settings with Udozo's paid plans on (the Premium and setup fee screens); `withoutPaidPlans` for launch. */
+export const settingsWithPaidPlans = { object: "settings", options: {}, features: { paid_plans: true } };
+export const withoutPaidPlans = { "/v1/settings": { object: "settings", options: {}, features: { paid_plans: false } } };
+
 const missing = () => Response.json({ error: { type: "not_found_error", code: "resource_missing", message: "Not found." } }, { status: 404 });
 
 /**
  * Replaces `fetch` with Udozo's API: `routes` answers `METHOD /path` (or `/path` for any method) with a body, or a
- * Response for errors. The session and the inbox are always there. Returns every request sent.
+ * Response for errors. The session, the inbox and the settings (paid plans on) are always there. Returns every request sent.
  */
 export function fakeApi(routes: Record<string, unknown | ((body: unknown) => unknown)>) {
   const sent: Sent[] = [];
@@ -47,7 +51,7 @@ export function fakeApi(routes: Record<string, unknown | ((body: unknown) => unk
     const url = new URL(input.url);
     const body = input.method === "GET" ? null : await input.json().catch(() => null);
     sent.push({ method: input.method, path: `${url.pathname}${url.search}`, body });
-    const all: Record<string, unknown> = { "/v1/auth/session": session, "/v1/notifications/unread-count": { object: "unread_count", count: 0 }, ...routes };
+    const all: Record<string, unknown> = { "/v1/auth/session": session, "/v1/notifications/unread-count": { object: "unread_count", count: 0 }, "/v1/settings": settingsWithPaidPlans, ...routes };
     const answer = all[`${input.method} ${url.pathname}`] ?? all[url.pathname];
     if (answer === undefined) return missing();
     const value = typeof answer === "function" ? (answer as (body: unknown) => unknown)(body) : answer;

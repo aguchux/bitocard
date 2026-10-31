@@ -1,5 +1,6 @@
 "use client";
 
+import { PaidPlansNotice } from "@/components/paid-plans";
 import { useState } from "react";
 import { EyeOff, Plus } from "lucide-react";
 import { Button, errorMessage, Notice, PageHeader, QueryView, Skeleton, Tabs } from "@bitocard/admin-ui";
@@ -31,6 +32,7 @@ export default function PlansPage() {
           ) : undefined
         }
       />
+      <PaidPlansNotice />
       {!editable ? <Notice tone="grey">Only finance admins can change plans.</Notice> : null}
       <QueryView query={settings} message={error => errorMessage(error, "Could not load the plans.")} loading={<Skeleton className="h-96 w-full" />}>
         {data => {

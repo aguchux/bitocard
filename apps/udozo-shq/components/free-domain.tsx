@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaidPlans } from "@/components/paid-plans";
 import { useState, type FormEvent } from "react";
 import { Gift, Search } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Dialog, errorMessage, formatMoney, Input, Notice, Skeleton } from "@bitocard/admin-ui";
@@ -65,7 +66,12 @@ function ClaimDialog({ store, offer, defaults, onClose, onClaimed }: { store: st
  * Premium's free domain for one store (Udozo): what it is owed and, while one is left, a search to choose it. Without
  * Premium it says how to get one; a store whose Premium collected nothing (given by Udozo, not billed) has none to spend.
  */
-export function FreeDomainCard({ store, live, contactDefaults, canManage, onClaimed }: { store: string; live: boolean; contactDefaults: Partial<DomainContact>; canManage: boolean; onClaimed?: (domain: StoreDomain) => void }) {
+export function FreeDomainCard(props: { store: string; live: boolean; contactDefaults: Partial<DomainContact>; canManage: boolean; onClaimed?: (domain: StoreDomain) => void }) {
+  // Without paid plans there is no Premium to include a domain.
+  return usePaidPlans() ? <PremiumDomain {...props} /> : null;
+}
+
+function PremiumDomain({ store, live, contactDefaults, canManage, onClaimed }: { store: string; live: boolean; contactDefaults: Partial<DomainContact>; canManage: boolean; onClaimed?: (domain: StoreDomain) => void }) {
   const free = useFreeDomainQuery(store);
   const [query, setQuery] = useState("");
   const [search, results] = useLazySearchDomainsQuery();

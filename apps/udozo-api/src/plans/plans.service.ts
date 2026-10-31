@@ -84,6 +84,8 @@ export class PlansService {
    * (null where it cannot be priced).
    */
   async publicList(currency?: string) {
+    // Udozo without paid plans offers none: every store has every feature.
+    if (!(await this.access.paidPlans())) return [];
     const plans = (await this.list()).filter(plan => plan.available);
     const code = currency?.trim().toUpperCase();
     return Promise.all(plans.map(async plan => presentPlanDetail(plan, code ? await this.localPrice(plan, code) : null, this.limitsOf(plan), this.config.APP_PRODUCT)));

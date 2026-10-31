@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { paidPlansOn, plansUnavailable } from '../plans/plan-access.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { SetupFeesService } from './setup-fees.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -139,6 +140,7 @@ export class StoreSubscriptionsService {
    */
   async change(resellerId: string, storeId: string, planCode: string, actorId: string | null) {
     await this.storeOf(resellerId, storeId);
+    if (!(await paidPlansOn(this.prisma, this.config.APP_PRODUCT))) throw plansUnavailable();
     const result = await this.claimed(storeId, () => this.changeClaimed(resellerId, storeId, planCode, actorId));
     if (result === busy) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_change_in_progress', 'This store’s plan is being changed already. Refresh in a moment.');
     return result;

@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaidPlans, walletPaysFor } from "@/components/paid-plans";
 import { Suspense, useId, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, CreditCard, ExternalLink, XCircle } from "lucide-react";
@@ -37,6 +38,7 @@ const paidWith: Record<TopUp["method"], string> = {
 const returnUrl = () => (window.location.protocol === "https:" ? `${window.location.origin}/wallet` : undefined);
 
 function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: boolean; sandbox: boolean }) {
+  const paidPlans = usePaidPlans();
   const id = useId();
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -76,7 +78,7 @@ function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: b
         <div>
           <h2 className="text-lg font-bold text-ink">{currency ? `Add money to your ${walletName(currency)}` : "Add money"}</h2>
           <p className="mt-0.5 text-sm text-muted">
-            Pay on a secure payment page with any method below. Your wallet is credited once the payment is confirmed. Top-ups pay for Premium, domains and the setup fee, and cannot be withdrawn.
+            Pay on a secure payment page with any method below. Your wallet is credited once the payment is confirmed. Top-ups pay for {walletPaysFor(paidPlans)}, and cannot be withdrawn.
           </p>
         </div>
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
@@ -145,6 +147,7 @@ export default function TopUpsPage() {
 }
 
 function TopUps() {
+  const paidPlans = usePaidPlans();
   const { membership, mode } = useReseller();
   const search = useSearchParams();
   const router = useRouter();
@@ -185,7 +188,7 @@ function TopUps() {
 
   return (
     <ShqShell section="wallet" current="/wallet/top-ups" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Top-ups" }]}>
-      <PageHeader title="Top-ups" description="Add money to your wallet to pay for Premium, domains and the setup fee." />
+      <PageHeader title="Top-ups" description={`Add money to your wallet to pay for ${walletPaysFor(paidPlans)}.`} />
       {!allowed ? (
         <Notice tone="grey" title="No access to top-ups">
           Only the owner, admins and finance members can top up the wallet.

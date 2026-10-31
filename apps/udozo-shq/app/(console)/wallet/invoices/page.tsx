@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaidPlans, walletPaysFor } from "@/components/paid-plans";
 import { ReceiptText } from "lucide-react";
 import { Card, CardHeader, type Column, DataTable, errorMessage, formatDate, formatMoney, Notice, PageHeader, StatCard, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
@@ -7,8 +8,9 @@ import { type Invoice, useCreditQuery, useInvoicesQuery, useStoresQuery } from "
 import { ShqShell } from "@/components/shq-shell";
 import { invoiceStatus, monthName } from "@/components/invoices";
 
-/** Monthly invoices per store and for the account (Premium, domains, the setup fee), and what is owed. Live only. */
+/** Monthly invoices per store and for the account (domains, and Premium and the setup fee where charged), and what is owed. Live only. */
 export default function InvoicesPage() {
+  const paidPlans = usePaidPlans();
   const invoices = useInvoicesQuery({ limit: 100 });
   const credit = useCreditQuery();
   const stores = useStoresQuery().data?.data ?? [];
@@ -37,7 +39,7 @@ export default function InvoicesPage() {
     <ShqShell section="wallet" current="/wallet/invoices" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Invoices" }]}>
       <PageHeader
         title="Invoices"
-        description="A monthly invoice for each store, and one for your account. Each charge (Premium, domains, the setup fee) is taken from your live wallet when it happens; anything your wallet could not cover is owed, and your next top-up pays it first."
+        description={`A monthly invoice for each store, and one for your account. Each charge (${walletPaysFor(paidPlans)}) is taken from your live wallet when it happens; anything your wallet could not cover is owed, and your next top-up pays it first.`}
       />
       {credit.error ? <Notice tone="red">{errorMessage(credit.error)}</Notice> : null}
       <div className="grid gap-4 sm:grid-cols-2">

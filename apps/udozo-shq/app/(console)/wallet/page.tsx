@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaidPlans, walletPaysFor } from "@/components/paid-plans";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -63,6 +64,7 @@ export default function WalletPage() {
 }
 
 function Wallets() {
+  const paidPlans = usePaidPlans();
   const { membership, mode } = useReseller();
   const search = useSearchParams();
   const router = useRouter();
@@ -90,7 +92,7 @@ function Wallets() {
         description={
           mode === "test"
             ? "Sandbox balances: test money only."
-            : "Your wallets: your country's currency and US dollars. Premium, domains and the setup fee are paid from your country wallet, topped up from the US dollar wallet when it runs short; resale earnings arrive in it."
+            : `Your wallets: your country's currency and US dollars. ${paidPlans ? "Premium, domains and the setup fee are" : "Domains are"} paid from your country wallet, topped up from the US dollar wallet when it runs short; resale earnings arrive in it.`
         }
         actions={
           <>
@@ -155,7 +157,7 @@ function Wallets() {
               value={money(data?.available)}
               icon={<WalletIcon aria-hidden />}
               loading={loading}
-              footer={<p className="text-xs text-muted">Top-up funds plus withdrawable earnings. Pays for Premium, domains and the setup fee.</p>}
+              footer={<p className="text-xs text-muted">Top-up funds plus withdrawable earnings. Pays for {walletPaysFor(paidPlans)}.</p>}
             />
             <StatCard
               label="Top-up funds"

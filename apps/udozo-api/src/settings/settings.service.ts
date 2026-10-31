@@ -129,6 +129,11 @@ export const switchDefinitions = {
     description:
       "bitocard.com asks shoppers to install it as an app (home screen, full screen), on root bitocard.com (the global setting) and on this market's country store: at most three times, on separate visits at least an hour apart, never once installed. Never on resellers' stores. Off: no prompt, and the browser's own install bar is held back too.",
   },
+  paid_plans: {
+    scopes: ['global'],
+    description:
+      "Udozo charges sellers: the Seller HQ setup fee, where finance sets one, and paid plans such as Premium, which Seller HQ then shows with what each includes. Off: there is no setup fee and no plan to choose; every store has every feature, and Seller HQ never mentions either.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
@@ -199,6 +204,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_resale',
   'reseller_resale',
   'store_template_resale_shop',
+  'paid_plans',
 ]);
 
 /**
