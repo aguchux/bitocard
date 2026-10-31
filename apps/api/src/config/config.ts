@@ -341,8 +341,9 @@ export const configSchema = z.object({
    */
   CRYPTO_ROUTES: z.enum(['closed', 'open']).default('closed'),
   /**
-   * The product this instance serves (docs/UDOZO_SPINOFF_PLAN.md): BitoCard's API (with Afrippa inside it), or Udozo's,
-   * which runs the same code on its own database and Redis. Environment only.
+   * The product this instance serves (docs/UDOZO_SPINOFF_PLAN.md): BitoCard's API, with Afrippa inside it. Udozo has its
+   * own copy of the API (apps/udozo-api, on Vercel); `udozo` here is for the shared tests only and refused in
+   * production. Environment only.
    */
   APP_PRODUCT: z.enum(['bitocard', 'udozo']).default('bitocard'),
   /**
@@ -401,6 +402,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.CRYPTO_ROUTES === 'open' && appEnv === 'production') {
     throw new Error('Invalid environment configuration: CRYPTO_ROUTES must be closed in production');
+  }
+  // BitoCard's code never serves Udozo in production: Udozo runs its own copy (apps/udozo-api).
+  if (config.APP_PRODUCT !== 'bitocard' && appEnv === 'production') {
+    throw new Error('Invalid environment configuration: APP_PRODUCT must be bitocard in production');
   }
   if (config.PRODUCT_ROUTES === 'all' && appEnv === 'production') {
     throw new Error('Invalid environment configuration: PRODUCT_ROUTES must be separate in production');

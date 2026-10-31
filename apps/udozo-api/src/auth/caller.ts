@@ -1,0 +1,131 @@
+import { applyDecorators, createParamDecorator, type ExecutionContext, HttpStatus, SetMetadata } from '@nestjs/common';
+import { ApiExtension } from '@nestjs/swagger';
+import type { Request } from 'express';
+import type { ApiKeyMode, Realm, ResellerRole } from '../generated/prisma/client.js';
+import { ApiError } from '../common/errors/api-error.js';
+
+/** Who is making a request: a signed-in person (session) or a reseller system (API key). */
+export type Caller =
+  | {
+      kind: 'session';
+      id: string;
+      realm: Realm;
+      userId: string;
+      sessionId: string;
+      /** The reseller the person is acting for, and their role in it (reseller realm only). */
+      resellerId: string | null;
+      role: ResellerRole | null;
+      adminRoles: string[];
+      /** Admin sessions: sensitive actions are allowed until then (after the authenticator code), else null. */
+      stepUpUntil: Date | null;
+      /** Reseller sessions still waiting for two-step sign-in: they may only finish it (or sign out). */
+      twoStepPending?: boolean;
+    }
+  | {
+      kind: 'api_key';
+      id: string;
+      realm: 'reseller';
+      /** Null for a docs "Try it" token, which acts like a key but is not one (see auth/docs-tokens.ts). */
+      apiKeyId: string | null;
+      /** Set for a docs "Try it" token: when it expires. */
+      docsTokenExpiresAt?: Date;
+      resellerId: string;
+      /** The store the key belongs to (a docs token: the store it was asked for, else the oldest). It sees only that
+       * store's orders, events and webhooks. Null only for a docs token of a reseller with no store yet. */
+      storeId: string | null;
+      mode: ApiKeyMode;
+      scopes: string[];
+      /** API features the reseller's plan switches off. */
+      planRestrictions: string[];
+    };
+
+export type CallerRequest = Request & { caller?: Caller };
+
+export const PUBLIC_ROUTE = 'auth:public';
+export const ROUTE_REALM = 'auth:realm';
+export const ROUTE_ROLES = 'auth:roles';
+export const ROUTE_SCOPES = 'auth:scopes';
+export const ROUTE_SESSION_ONLY = 'auth:session-only';
+export const ROUTE_ADMIN_ROLES = 'auth:admin-roles';
+export const ROUTE_CRON = 'auth:cron';
+export const ROUTE_STEP_UP = 'auth:step-up';
+export const ROUTE_TWO_STEP_PENDING = 'auth:two-step-pending';
+
+/** How long an admin's authenticator code opens sensitive actions for, on that session. */
+export const stepUpWindowMs = 5 * 60_000;
+
+/** The admins' realms: BitoCard's (admin.bitocard.com) and Afrippa's (admin.afrippa.com), each refusing the other. */
+export const adminRealms = ['admin', 'afrippa_admin'] as const satisfies readonly Realm[];
+export type AdminRealm = (typeof adminRealms)[number];
+export const isAdminRealm = (realm: Realm): realm is AdminRealm => (adminRealms as readonly Realm[]).includes(realm);
+
+/**
+ * The same rules, written into the OpenAPI document for the docs: `x-bitocard-auth` (`public`, `session` or, by default,
+ * `api_key` for routes that also accept keys), `x-bitocard-scopes` and `x-bitocard-roles`. A route's own value wins over its
+ * controller's, as in the guard.
+ */
+export const authExtension = 'x-bitocard-auth';
+
+/** No sign-in needed (a caller is still identified if credentials are sent). */
+export const Public = () => applyDecorators(SetMetadata(PUBLIC_ROUTE, true), ApiExtension(authExtension, 'public'));
+
+/**
+ * Scheduled jobs: no user or API key; the handler checks the cron secret itself (Vercel Cron sends it as a Bearer token,
+ * which the guard would otherwise read as an API key).
+ */
+export const CronOnly = () => SetMetadata(ROUTE_CRON, true);
+
+/** Which realm may call the route. Defaults to `reseller`; BitoCard's admin routes say `admin`, Afrippa's `afrippa_admin`. */
+export const RealmOnly = (realm: Realm) => SetMetadata(ROUTE_REALM, realm);
+
+/** Reseller staff roles allowed to call the route (sessions). Owners are always allowed. */
+export const Roles = (...roles: ResellerRole[]) => applyDecorators(SetMetadata(ROUTE_ROLES, roles), ApiExtension('x-bitocard-roles', roles));
+
+/** Admin roles allowed to call an admin route. super_admin is always allowed. */
+export const AdminRoles = (...roles: string[]) => SetMetadata(ROUTE_ADMIN_ROLES, roles);
+
+/**
+ * A sensitive or money admin action: allowed only inside the session's step-up window, opened for 5 minutes by the
+ * admin's authenticator code (`POST /v1/admin/auth/step-up`). Otherwise `step_up_required` (403), and the admin app asks
+ * for the code and tries again.
+ */
+export const StepUp = () => SetMetadata(ROUTE_STEP_UP, true);
+
+/** The same rule inside a handler, for actions sensitive only in some cases (a money decision, activating a reseller). */
+export function requireStepUp(caller: Caller) {
+  if (caller.kind === 'session' && isAdminRealm(caller.realm) && caller.stepUpUntil && caller.stepUpUntil > new Date()) return;
+  throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'step_up_required', 'Enter the code from your authenticator app to continue.');
+}
+
+/**
+ * A route a reseller session may call before it finishes two-step sign-in (reading the session, signing out, the two-step
+ * steps themselves). Every other route answers `mfa_required` (401) until then.
+ */
+export const AllowTwoStepPending = () => SetMetadata(ROUTE_TWO_STEP_PENDING, true);
+
+/** API key scopes required to call the route (API keys). */
+export const Scopes = (...scopes: string[]) => applyDecorators(SetMetadata(ROUTE_SCOPES, scopes), ApiExtension('x-bitocard-scopes', scopes));
+
+/** Only a signed-in person may call the route, never an API key (for example, managing API keys). */
+export const SessionOnly = () => applyDecorators(SetMetadata(ROUTE_SESSION_ONLY, true), ApiExtension(authExtension, 'session'));
+
+/** The reseller a caller acts for; people who belong to several resellers choose one with the BitoCard-Reseller header. */
+export function resellerOf(caller: Caller) {
+  if (!caller.resellerId) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'Choose a reseller account first.');
+  return caller.resellerId;
+}
+
+/** The store an API key (or docs token) is limited to; undefined for dashboard sessions, which see every store. */
+export function storeScopeOf(caller: Caller): string | undefined {
+  return caller.kind === 'api_key' && caller.storeId ? caller.storeId : undefined;
+}
+
+/** The signed-in person (never an API key) making the request. */
+export function personOf(caller: Caller) {
+  if (caller.kind !== 'session') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'session_required', 'Sign in to do this; API keys cannot.');
+  return caller.userId;
+}
+
+export const CurrentCaller = createParamDecorator((_data: unknown, context: ExecutionContext) => {
+  return context.switchToHttp().getRequest<CallerRequest>().caller ?? null;
+});

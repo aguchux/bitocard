@@ -81,10 +81,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           echo "${{ secrets.API_DROPLET_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
       - name: Copy the droplet's files
-        run: |
-          scp deploy/droplet/docker-compose.yml deploy/droplet/Caddyfile deploy/droplet/deploy.sh deploy/droplet/set-env.sh deploy/droplet/origin-cert.sh "deploy@$HOST:/opt/bitocard/"
-          # Udozo's API site (deploy.sh enables it once Udozo's environment and certificate are on the droplet).
-          scp -r deploy/droplet/sites "deploy@$HOST:/opt/bitocard/"
+        run: scp deploy/droplet/docker-compose.yml deploy/droplet/Caddyfile deploy/droplet/deploy.sh deploy/droplet/set-env.sh deploy/droplet/origin-cert.sh "deploy@$HOST:/opt/bitocard/"
       - name: Deploy ${{ env.IMAGE }}
         # The job's own token pulls the private image: sent on SSH's input (never on a command line), logged out after.
         run: |
@@ -97,12 +94,4 @@ jobs:
       - name: Smoke test api.bitocard.com
         run: node apps/api/scripts/smoke.mjs https://api.bitocard.com
         env:
-          EXPECT_COMMIT: ${{ inputs.image && '' || github.sha }}
-      # Udozo's API on the same droplet (docs/UDOZO_SPINOFF_PLAN.md, step 5), once the repository variable
-      # UDOZO_API_LIVE is true (after its environment, certificate and DNS are in place).
-      - name: Smoke test api.udozo.com
-        if: ${{ vars.UDOZO_API_LIVE == 'true' }}
-        run: node apps/api/scripts/smoke.mjs https://api.udozo.com
-        env:
-          SMOKE_PRODUCT: udozo
           EXPECT_COMMIT: ${{ inputs.image && '' || github.sha }}

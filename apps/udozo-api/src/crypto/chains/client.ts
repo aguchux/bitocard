@@ -1,0 +1,491 @@
+import { createHash } from 'node:crypto';
+import { hexToTron, tronToHex } from '../derive.js';
+
+/**
+ * Talking to blockchains through rented providers. A provider (Alchemy, TronGrid…) only gives an address and
+ * credentials; the protocol is the chain's own, so one client per protocol serves every provider: EVM JSON-RPC
+ * (Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism), TRON's node HTTP API (plus TronGrid's account history),
+ * Esplora REST, Bitcoin Core JSON-RPC and BlockCypher (Bitcoin, Litecoin, Dogecoin), and Solana JSON-RPC. Clients only
+ * read and never hold keys.
+ */
+/** A provider's failure: `definite` when it clearly refused (wrong credentials, unknown method), else unclear. */
+export class ChainError extends Error {
+  constructor(
+    message: string,
+    readonly definite = false,
+  ) {
+    super(message);
+  }
+}
+
+export type Chain = 'ETHEREUM' | 'BSC' | 'POLYGON' | 'ARBITRUM' | 'BASE' | 'OPTIMISM' | 'TRON' | 'SOLANA' | 'BITCOIN' | 'LITECOIN' | 'DOGECOIN';
+export const chains: readonly Chain[] = ['ETHEREUM', 'BSC', 'POLYGON', 'ARBITRUM', 'BASE', 'OPTIMISM', 'TRON', 'BITCOIN', 'LITECOIN', 'DOGECOIN', 'SOLANA'];
+export const chainNames: Record<Chain, string> = {
+  ETHEREUM: 'Ethereum',
+  BSC: 'BNB Chain',
+  POLYGON: 'Polygon',
+  ARBITRUM: 'Arbitrum One',
+  BASE: 'Base',
+  OPTIMISM: 'OP Mainnet',
+  TRON: 'TRON',
+  BITCOIN: 'Bitcoin',
+  LITECOIN: 'Litecoin',
+  DOGECOIN: 'Dogecoin',
+  SOLANA: 'Solana',
+};
+/** Which deposit address family each chain uses: every EVM network shares the customer's one EVM address. */
+export const chainFamily = {
+  ETHEREUM: 'evm',
+  BSC: 'evm',
+  POLYGON: 'evm',
+  ARBITRUM: 'evm',
+  BASE: 'evm',
+  OPTIMISM: 'evm',
+  TRON: 'tron',
+  BITCOIN: 'bitcoin',
+  LITECOIN: 'litecoin',
+  DOGECOIN: 'dogecoin',
+  SOLANA: 'solana',
+} as const satisfies Record<Chain, string>;
+
+/** Whether a chain is an EVM network (JSON-RPC, 0x addresses, ERC-20 style tokens). */
+export const isEvm = (chain: Chain) => chainFamily[chain] === 'evm';
+
+/** What a chain's tokens are called, for customers (TRC-20 on TRON, BEP-20 on BNB Chain, ERC-20 on the other EVM networks). */
+export const tokenStandard = (chain: Chain) => (chain === 'TRON' ? 'TRC-20' : chain === 'BSC' ? 'BEP-20' : chain === 'SOLANA' ? 'SPL' : 'ERC-20');
+
+/** A transfer into an address: `contract` is the token (null for the chain's own coin); `raw` in on-chain units. */
+export type Transfer = { hash: string; index: number; to: string; contract: string | null; raw: bigint; block: bigint | null };
+
+/** A transaction re-read from the chain: its block (null while unconfirmed), whether it succeeded, and its transfers. */
+export type Inspection = { block: bigint | null; ok: boolean; transfers: Transfer[] };
+
+export type Endpoint = { url: string; headers?: Record<string, string>; flavor?: 'alchemy' | 'trongrid' };
+
+/** Transaction hashes in one form (lower case: EVM, TRON and Bitcoin hashes are hex), so one is never recorded twice. */
+export const normaliseHash = (hash: string) => hash.toLowerCase();
+
+export interface ChainClient {
+  latestBlock(): Promise<bigint>;
+  /** Transfers into these addresses since a block (where the protocol can list them), else null. */
+  scan?(input: { addresses: string[]; contracts: string[]; native: boolean; fromBlock: bigint; toBlock: bigint }): Promise<Transfer[]>;
+  /** One transaction, or null when the chain does not know it. */
+  inspect(hash: string): Promise<Inspection | null>;
+  /** Whether `scan` can find the chain's own coin (not only tokens). */
+  readonly nativeScan: boolean;
+  /** Whether `scan` can list token transfers (EVM logs, TronGrid's account history). */
+  readonly tokenScan: boolean;
+  /** Which network the endpoint is on (EVM chain ID, Bitcoin genesis block or chain name), where it can say. */
+  network?(): Promise<string | null>;
+  /** The endpoint, for caching what it said (a digest: the address may hold a token). */
+  readonly key: string;
+}
+
+const keyOf = (endpoint: Endpoint) => createHash('sha256').update(`${endpoint.url}\n${JSON.stringify(endpoint.headers ?? {})}`).digest('hex');
+
+const timeoutMs = 15_000;
+
+async function request<T>(endpoint: Endpoint, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const url = path ? `${endpoint.url.replace(/\/+$/, '')}${path}` : endpoint.url;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
+      headers: { accept: 'application/json', ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}), ...endpoint.headers },
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
+      redirect: 'error',
+    });
+  } catch (error) {
+    throw new ChainError(`unreachable (${error instanceof Error ? error.name : 'error'})`);
+  }
+  const text = await res.text();
+  if (res.status === 401 || res.status === 403) throw new ChainError(`refused the credentials (HTTP ${res.status})`, true);
+  if (res.status === 404 && path) return null as T;
+  if (!res.ok) throw new ChainError(`HTTP ${res.status}`);
+  try {
+    return (text ? JSON.parse(text) : null) as T;
+  } catch {
+    // Esplora answers plain text for some calls (the tip height).
+    return text as T;
+  }
+}
+
+let rpcId = 0;
+async function rpc<T>(endpoint: Endpoint, method: string, params: unknown[]): Promise<T> {
+  const reply = await request<{ result?: T; error?: { code?: number; message?: string } }>(endpoint, '', { body: { jsonrpc: '2.0', id: (rpcId += 1), method, params } });
+  if (reply?.error) throw new ChainError(`${method}: ${reply.error.message ?? 'error'}`, reply.error.code === -32601);
+  return reply?.result as T;
+}
+
+const hexBig = (value: string | null | undefined) => (value ? BigInt(value) : null);
+const toHex = (value: bigint) => `0x${value.toString(16)}`;
+/** ERC-20 and TRC-20 Transfer(address,address,uint256). */
+export const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const topicAddress = (topic: string) => `0x${topic.slice(-40)}`.toLowerCase();
+const padAddress = (address: string) => `0x${address.toLowerCase().replace(/^0x/, '').padStart(64, '0')}`;
+
+type EvmLog = { transactionHash: string; logIndex: string; blockNumber: string | null; address: string; topics: string[]; data: string; removed?: boolean };
+
+/** Every EVM network over standard JSON-RPC (every EVM provider), with Alchemy's transfers API for plain coin deposits. */
+export class EvmClient implements ChainClient {
+  readonly tokenScan = true;
+  readonly key: string;
+  constructor(private readonly endpoint: Endpoint) {
+    this.key = keyOf(endpoint);
+  }
+
+  async network() {
+    const id = await rpc<string | null>(this.endpoint, 'eth_chainId', []);
+    return id ? BigInt(id).toString() : null;
+  }
+
+  get nativeScan() {
+    return this.endpoint.flavor === 'alchemy';
+  }
+
+  async latestBlock() {
+    return BigInt(await rpc<string>(this.endpoint, 'eth_blockNumber', []));
+  }
+
+  async scan(input: { addresses: string[]; contracts: string[]; native: boolean; fromBlock: bigint; toBlock: bigint }) {
+    const transfers: Transfer[] = [];
+    if (input.contracts.length) {
+      for (let i = 0; i < input.addresses.length; i += 500) {
+        const logs = await rpc<EvmLog[]>(this.endpoint, 'eth_getLogs', [
+          { fromBlock: toHex(input.fromBlock), toBlock: toHex(input.toBlock), address: input.contracts, topics: [transferTopic, null, input.addresses.slice(i, i + 500).map(padAddress)] },
+        ]);
+        for (const log of logs ?? []) {
+          if (log.removed || log.topics.length < 3) continue;
+          transfers.push({ hash: normaliseHash(log.transactionHash), index: Number(BigInt(log.logIndex)), to: topicAddress(log.topics[2]), contract: log.address.toLowerCase(), raw: BigInt(log.data === '0x' ? 0 : log.data), block: hexBig(log.blockNumber) });
+        }
+      }
+    }
+    if (input.native && this.nativeScan) {
+      for (const address of input.addresses) {
+        const reply = await rpc<{ transfers: Array<{ hash: string; blockNum: string; to: string; rawContract: { value: string | null } }> }>(this.endpoint, 'alchemy_getAssetTransfers', [
+          { fromBlock: toHex(input.fromBlock), toBlock: toHex(input.toBlock), toAddress: address, category: ['external'], excludeZeroValue: true, maxCount: '0x64' },
+        ]);
+        for (const item of reply?.transfers ?? []) {
+          transfers.push({ hash: normaliseHash(item.hash), index: 0, to: item.to.toLowerCase(), contract: null, raw: BigInt(item.rawContract.value ?? '0x0'), block: hexBig(item.blockNum) });
+        }
+      }
+    }
+    return transfers;
+  }
+
+  async inspect(hash: string): Promise<Inspection | null> {
+    const [tx, receipt] = await Promise.all([
+      rpc<{ hash?: string; to: string | null; value: string; blockNumber: string | null } | null>(this.endpoint, 'eth_getTransactionByHash', [hash]),
+      rpc<{ status: string; blockNumber: string; logs: EvmLog[] } | null>(this.endpoint, 'eth_getTransactionReceipt', [hash]),
+    ]);
+    if (!tx) return null;
+    // The hash as the chain gives it, so a notification naming it in another case is still the same transaction.
+    hash = normaliseHash(tx.hash ?? hash);
+    const transfers: Transfer[] = [];
+    const block = hexBig(receipt?.blockNumber ?? tx.blockNumber);
+    if (tx.to && BigInt(tx.value) > 0n) transfers.push({ hash, index: 0, to: tx.to.toLowerCase(), contract: null, raw: BigInt(tx.value), block });
+    (receipt?.logs ?? []).forEach((log, position) => {
+      if (log.topics[0]?.toLowerCase() !== transferTopic || log.topics.length < 3) return;
+      // Token transfers are numbered by their place among the transaction's logs, plus one so they never clash with the
+      // coin transfer at 0: unlike the block-wide log index, it stays the same if a reorg puts the transaction in another block.
+      transfers.push({ hash, index: position + 1, to: topicAddress(log.topics[2]), contract: log.address.toLowerCase(), raw: BigInt(log.data === '0x' ? 0 : log.data), block });
+    });
+    return { block, ok: receipt ? receipt.status === '0x1' : true, transfers };
+  }
+}
+
+/** TRON through its node HTTP API (every TRON provider); TronGrid's account history lists TRX and token deposits. */
+export class TronClient implements ChainClient {
+  readonly key: string;
+  constructor(private readonly endpoint: Endpoint) {
+    this.key = keyOf(endpoint);
+  }
+
+  /** Only TronGrid lists an account's token transfers; other TRON nodes read transactions by hash (webhooks). */
+  get tokenScan() {
+    return this.endpoint.flavor === 'trongrid';
+  }
+
+  /** Only TronGrid lists an account's TRX transfers too. */
+  get nativeScan() {
+    return this.endpoint.flavor === 'trongrid';
+  }
+
+  /** The genesis block's ID, which names the network (mainnet, Nile, Shasta). */
+  async network() {
+    const block = await request<{ blockID?: string }>(this.endpoint, '/wallet/getblockbynum', { body: { num: 0 } });
+    return typeof block?.blockID === 'string' ? block.blockID.toLowerCase() : null;
+  }
+
+  async latestBlock() {
+    const block = await request<{ block_header?: { raw_data?: { number?: number } } }>(this.endpoint, '/wallet/getnowblock', { body: {} });
+    const number = block?.block_header?.raw_data?.number;
+    if (number === undefined) throw new ChainError('no block in the reply');
+    return BigInt(number);
+  }
+
+  /** TronGrid only: each address's TRC-20 and TRX deposits (block numbers are read when each one is inspected). */
+  async scan(input: { addresses: string[]; contracts: string[]; native?: boolean }) {
+    if (this.endpoint.flavor !== 'trongrid') return [];
+    const transfers: Transfer[] = [];
+    if (input.native) {
+      for (const address of input.addresses) {
+        const query = new URLSearchParams({ only_to: 'true', limit: '50' });
+        const page = await request<{ data?: TronTransaction[] }>(this.endpoint, `/v1/accounts/${address}/transactions?${query.toString()}`);
+        for (const tx of page?.data ?? []) {
+          const coin = trxTransfer(tx);
+          if (coin && coin.to === address && tx.txID) transfers.push({ hash: normaliseHash(tx.txID), index: 0, to: address, contract: null, raw: coin.amount, block: null });
+        }
+      }
+    }
+    for (const address of input.addresses) {
+      for (const contract of input.contracts) {
+        const query = new URLSearchParams({ only_to: 'true', limit: '50', contract_address: contract });
+        const page = await request<{ data?: Array<{ transaction_id: string; to: string; value: string; token_info?: { address?: string } }> }>(this.endpoint, `/v1/accounts/${address}/transactions/trc20?${query.toString()}`);
+        for (const item of page?.data ?? []) {
+          if (item.to !== address) continue;
+          transfers.push({ hash: normaliseHash(item.transaction_id), index: -1, to: address, contract: item.token_info?.address ?? contract, raw: BigInt(item.value), block: null });
+        }
+      }
+    }
+    return transfers;
+  }
+
+  async inspect(hash: string): Promise<Inspection | null> {
+    const [info, tx] = await Promise.all([
+      request<{ id?: string; blockNumber?: number; receipt?: { result?: string }; log?: Array<{ address: string; topics: string[]; data: string }> }>(this.endpoint, '/wallet/gettransactioninfobyid', { body: { value: hash } }),
+      request<TronTransaction | null>(this.endpoint, '/wallet/gettransactionbyid', { body: { value: hash } }),
+    ]);
+    if (!info?.id) return null;
+    hash = normaliseHash(info.id);
+    const transfers: Transfer[] = [];
+    // A plain TRX transfer (TransferContract) is the transaction's coin transfer, at 0, as on EVM chains.
+    const coin = tx ? trxTransfer(tx) : null;
+    if (coin && coin.ok) transfers.push({ hash, index: 0, to: coin.to, contract: null, raw: coin.amount, block: info.blockNumber !== undefined ? BigInt(info.blockNumber) : null });
+    (info.log ?? []).forEach((log, position) => {
+      if (`0x${log.topics[0]}`.toLowerCase() !== transferTopic || log.topics.length < 3) return;
+      transfers.push({ hash, index: position + 1, to: hexToTron(log.topics[2].slice(-40)), contract: hexToTron(log.address), raw: BigInt(`0x${log.data || '0'}`), block: info.blockNumber !== undefined ? BigInt(info.blockNumber) : null });
+    });
+    // A transaction with no receipt result is a plain transfer that succeeded; contracts report SUCCESS or a failure.
+    return { block: info.blockNumber !== undefined ? BigInt(info.blockNumber) : null, ok: !info.receipt?.result || info.receipt.result === 'SUCCESS', transfers };
+  }
+}
+
+type TronTransaction = { txID?: string; ret?: Array<{ contractRet?: string }>; raw_data?: { contract?: Array<{ type?: string; parameter?: { value?: { amount?: number | string; to_address?: string } } }> } };
+
+/** A TRON transaction's TRX transfer (its first contract a TransferContract), in sun, to a T… address; else null. */
+function trxTransfer(tx: TronTransaction) {
+  const contract = tx.raw_data?.contract?.[0];
+  const value = contract?.parameter?.value;
+  if (contract?.type !== 'TransferContract' || value?.amount === undefined || !value.to_address) return null;
+  try {
+    return { to: hexToTron(value.to_address), amount: BigInt(value.amount), ok: !tx.ret?.[0]?.contractRet || tx.ret[0].contractRet === 'SUCCESS' };
+  } catch {
+    return null;
+  }
+}
+
+/** A Bitcoin amount from JSON (BTC as a decimal number) in satoshis, exactly. */
+const satoshis = (btc: number) => {
+  const [whole, fraction = ''] = btc.toFixed(8).split('.');
+  return BigInt(whole) * 100_000_000n + BigInt(fraction.padEnd(8, '0'));
+};
+
+type EsploraTx = { txid: string; status?: { confirmed?: boolean; block_height?: number }; vout: Array<{ scriptpubkey_address?: string; value: number }> };
+
+/** Bitcoin or Litecoin through an Esplora REST API (mempool.space, Blockstream, litecoinspace.org). */
+export class EsploraClient implements ChainClient {
+  readonly nativeScan = true;
+  readonly tokenScan = false;
+  readonly key: string;
+  constructor(private readonly endpoint: Endpoint) {
+    this.key = keyOf(endpoint);
+  }
+
+  /** The genesis block's hash. */
+  async network() {
+    const hash = await request<string | null>(this.endpoint, '/block-height/0');
+    return typeof hash === 'string' ? hash.trim().toLowerCase() : null;
+  }
+
+  async latestBlock() {
+    return BigInt(String(await request<string | number>(this.endpoint, '/blocks/tip/height')).trim());
+  }
+
+  private parse(tx: EsploraTx): Inspection {
+    const block = tx.status?.confirmed && tx.status.block_height !== undefined ? BigInt(tx.status.block_height) : null;
+    return { block, ok: true, transfers: tx.vout.flatMap((out, index) => (out.scriptpubkey_address ? [{ hash: normaliseHash(tx.txid), index, to: out.scriptpubkey_address, contract: null, raw: BigInt(out.value), block }] : [])) };
+  }
+
+  async scan(input: { addresses: string[] }) {
+    const transfers: Transfer[] = [];
+    for (const address of input.addresses) {
+      const txs = await request<EsploraTx[]>(this.endpoint, `/address/${address}/txs`);
+      for (const tx of txs ?? []) transfers.push(...this.parse(tx).transfers.filter(item => item.to === address));
+    }
+    return transfers;
+  }
+
+  async inspect(hash: string) {
+    const tx = await request<EsploraTx | null>(this.endpoint, `/tx/${hash}`);
+    return tx?.txid ? this.parse(tx) : null;
+  }
+}
+
+type BlockCypherTx = { hash: string; block_height?: number; outputs: Array<{ addresses?: string[] | null; value: number }> };
+
+/** Bitcoin, Litecoin or Dogecoin through BlockCypher's REST API (its token in the query). */
+export class BlockCypherClient implements ChainClient {
+  readonly nativeScan = true;
+  readonly tokenScan = false;
+  readonly key: string;
+  constructor(private readonly endpoint: Endpoint & { token?: string }) {
+    this.key = keyOf({ ...endpoint, url: `${endpoint.url}#${endpoint.token ?? ''}` });
+  }
+
+  /** The chain's name (BTC.main, BTC.test3, LTC.main, DOGE.main). */
+  async network() {
+    const chain = await request<{ name?: string }>(this.endpoint, this.path(''));
+    return chain?.name ?? null;
+  }
+
+  private path(path: string) {
+    return this.endpoint.token ? `${path}${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(this.endpoint.token)}` : path;
+  }
+
+  async latestBlock() {
+    const chain = await request<{ height?: number }>(this.endpoint, this.path(''));
+    if (chain?.height === undefined) throw new ChainError('no height in the reply');
+    return BigInt(chain.height);
+  }
+
+  private parse(tx: BlockCypherTx): Inspection {
+    const block = tx.block_height !== undefined && tx.block_height >= 0 ? BigInt(tx.block_height) : null;
+    return { block, ok: true, transfers: tx.outputs.flatMap((out, index) => (out.addresses?.length === 1 ? [{ hash: normaliseHash(tx.hash), index, to: out.addresses[0], contract: null, raw: BigInt(out.value), block }] : [])) };
+  }
+
+  async scan(input: { addresses: string[] }) {
+    const transfers: Transfer[] = [];
+    for (const address of input.addresses) {
+      const reply = await request<{ txs?: BlockCypherTx[] }>(this.endpoint, this.path(`/addrs/${address}/full?limit=50`));
+      for (const tx of reply?.txs ?? []) transfers.push(...this.parse(tx).transfers.filter(item => item.to === address));
+    }
+    return transfers;
+  }
+
+  async inspect(hash: string) {
+    const tx = await request<BlockCypherTx | null>(this.endpoint, this.path(`/txs/${hash}`));
+    return tx?.hash ? this.parse(tx) : null;
+  }
+}
+
+/** Bitcoin, Litecoin or Dogecoin through their Core JSON-RPC (QuickNode, GetBlock, Chainstack, Tatum): reads transactions by hash only. */
+export class BitcoinRpcClient implements ChainClient {
+  readonly nativeScan = false;
+  readonly tokenScan = false;
+  readonly key: string;
+  constructor(private readonly endpoint: Endpoint) {
+    this.key = keyOf(endpoint);
+  }
+
+  /** The genesis block's hash. */
+  async network() {
+    const hash = await rpc<string | null>(this.endpoint, 'getblockhash', [0]);
+    return hash ? hash.toLowerCase() : null;
+  }
+
+  async latestBlock() {
+    return BigInt(await rpc<number>(this.endpoint, 'getblockcount', []));
+  }
+
+  async inspect(hash: string): Promise<Inspection | null> {
+    const tx = await rpc<{ txid: string; confirmations?: number; vout: Array<{ n: number; value: number; scriptPubKey: { address?: string } }> } | null>(this.endpoint, 'getrawtransaction', [hash, true]).catch(error => {
+      if (error instanceof ChainError && /No such/i.test(error.message)) return null;
+      throw error;
+    });
+    if (!tx) return null;
+    const block = tx.confirmations ? (await this.latestBlock()) - BigInt(tx.confirmations) + 1n : null;
+    return { block, ok: true, transfers: tx.vout.flatMap(out => (out.scriptPubKey.address ? [{ hash: normaliseHash(tx.txid), index: out.n, to: out.scriptPubKey.address, contract: null, raw: satoshis(out.value), block }] : [])) };
+  }
+}
+
+/** Solana JSON-RPC: the latest slot (deposits come once Solana addresses are issued by the signer). */
+export class SolanaClient implements ChainClient {
+  readonly nativeScan = false;
+  readonly tokenScan = false;
+  readonly key: string;
+  constructor(private readonly endpoint: Endpoint) {
+    this.key = keyOf(endpoint);
+  }
+
+  async latestBlock() {
+    return BigInt(await rpc<number>(this.endpoint, 'getSlot', [{ commitment: 'finalized' }]));
+  }
+
+  async inspect() {
+    return null;
+  }
+}
+
+/** Addresses as each chain's clients report them, so ours compare equal (EVM lower case; TRON and Bitcoin as is). */
+export function normaliseAddress(chain: Chain, address: string) {
+  if (isEvm(chain)) return address.toLowerCase();
+  if (chain === 'TRON' && address.startsWith('0x')) return hexToTron(address);
+  return address;
+}
+
+/** A token contract as the chain's clients report it. */
+export function normaliseContract(chain: Chain, contract: string) {
+  if (isEvm(chain)) return contract.toLowerCase();
+  if (chain === 'TRON' && contract.startsWith('0x')) return hexToTron(contract);
+  return contract;
+}
+
+/**
+ * Each chain's main network as its endpoints identify it: EVM chain IDs, the genesis block (Bitcoin, Litecoin and
+ * Dogecoin through Esplora or Core RPC, TRON) or BlockCypher's chain name. A live endpoint must be on it; a sandbox one must not (test networks vary:
+ * Sepolia 11155111, BNB testnet 97, Bitcoin testnet3, testnet4, signet), so a pasted endpoint on the wrong network can
+ * never credit test coins to live wallets, or real coins to sandbox ones. Solana endpoints are not checked yet.
+ */
+const mainNetworks: Partial<Record<Chain, string[]>> = {
+  ETHEREUM: ['1'],
+  BSC: ['56'],
+  POLYGON: ['137'],
+  ARBITRUM: ['42161'],
+  BASE: ['8453'],
+  OPTIMISM: ['10'],
+  BITCOIN: ['000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f', 'BTC.main'],
+  LITECOIN: ['12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2', 'LTC.main'],
+  DOGECOIN: ['1a91e3dace36e2be3bf030a65679fe821aa1d6ef92e7c9902eb318182c355691', 'DOGE.main'],
+  // The genesis block ID of TRON's main network (Nile and Shasta have their own).
+  TRON: ['00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc'],
+};
+const networkTtlMs = 10 * 60_000;
+const networks = new Map<string, { network: string | null; at: number }>();
+
+/** Throws a definite ChainError when an endpoint is on the wrong network for the environment (cached ten minutes). */
+export async function checkNetwork(chain: Chain, client: ChainClient, environment: 'live' | 'sandbox') {
+  const main = mainNetworks[chain];
+  if (!main || !client.network) return;
+  const cacheKey = `${chain}:${client.key}`;
+  let known = networks.get(cacheKey);
+  if (!known || Date.now() - known.at > networkTtlMs) {
+    known = { network: await client.network(), at: Date.now() };
+    // Only a definite answer is remembered: an endpoint that could not say is asked again next time.
+    if (known.network !== null) networks.set(cacheKey, known);
+  }
+  // Live needs proof of the main network; a sandbox endpoint that cannot say is only refused when it is on it.
+  const onMain = known.network !== null && main.includes(known.network);
+  if (environment === 'live' && !onMain) {
+    throw new ChainError(known.network === null ? 'could not tell which network the endpoint is on' : `the endpoint is on a test network (${known.network}), not ${chainNames[chain]}’s main network: switch Sandbox on or paste the main network’s endpoint`, true);
+  }
+  if (environment === 'sandbox' && onMain) {
+    throw new ChainError(`the endpoint is on ${chainNames[chain]}’s main network: switch Sandbox off or paste the test network’s endpoint`, true);
+  }
+}
+
+/** Forgets what endpoints said about their network (tests). */
+export const forgetNetworks = () => networks.clear();
+
+export { tronToHex };

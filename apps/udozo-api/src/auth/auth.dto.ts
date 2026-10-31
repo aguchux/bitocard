@@ -1,0 +1,278 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { passwordLength } from './passwords.service.js';
+
+const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+const upperTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toUpperCase() : value);
+
+const passwordDoc = {
+  description: 'At least 10 characters. Passwords found in public data breaches are refused.',
+  minLength: passwordLength.min,
+  maxLength: passwordLength.max,
+  example: 'correct horse battery',
+};
+const signupPhoneDoc = {
+  description:
+    "The owner's mobile number, from the business country (with or without its country code). Kept for BitoCard's operations to reach you; it is not confirmed and does not sign in (add sign-in numbers in Settings > Profile). Ignored with an invitation.",
+  minLength: 5,
+  maxLength: 20,
+  example: '+2348031234567',
+};
+const codeDoc = { description: 'The 6-digit code that was sent to you.', pattern: '^\\d{6}$', example: '482913' };
+
+export class SignUpDto {
+  @ApiProperty({ description: 'Your full name.', minLength: 2, maxLength: 100, example: 'Ada Obi' })
+  @Transform(trim)
+  @IsString()
+  @Length(2, 100)
+  name: string;
+
+  @ApiProperty({ description: 'Email address; a 6-digit code is sent to confirm it.', format: 'email', maxLength: 254, example: 'ada@example.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+
+  @ApiProperty(passwordDoc)
+  @IsString()
+  @Length(passwordLength.min, passwordLength.max)
+  password: string;
+
+  @ApiPropertyOptional({ description: 'Business name shown on the reseller account. Defaults to your name.', minLength: 2, maxLength: 100, example: 'Ada Digital' })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(2, 100)
+  business_name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE. Not needed with an invitation.',
+    pattern: '^[A-Z]{2}$',
+    example: 'NG',
+  })
+  @ValidateIf((dto: SignUpDto) => !dto.invitation_token)
+  @Transform(upperTrim)
+  @IsString()
+  @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter country code' })
+  country?: string;
+
+  @ApiPropertyOptional({
+    description: 'From `POST /v1/auth/signup/email/verify`: the email is already confirmed, so no code is emailed afterwards. Must belong to `email`; used once.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(20, 100)
+  signup_token?: string;
+
+  @ApiPropertyOptional(signupPhoneDoc)
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(5, 20)
+  phone?: string;
+
+  @ApiPropertyOptional({ description: "Join a reseller's team from an invitation link, instead of creating a reseller account." })
+  @IsOptional()
+  @IsString()
+  @Length(20, 100)
+  invitation_token?: string;
+}
+
+/** A signed-in person opens their own reseller account (for example after leaving another reseller's team). */
+export class CreateResellerAccountDto {
+  @ApiProperty({ description: 'Business name shown on the reseller account.', minLength: 2, maxLength: 100, example: 'Ada Digital' })
+  @Transform(trim)
+  @IsString()
+  @Length(2, 100)
+  business_name: string;
+
+  @ApiProperty({ description: 'Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE.', pattern: '^[A-Z]{2}$', example: 'NG' })
+  @Transform(upperTrim)
+  @IsString()
+  @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter country code' })
+  country: string;
+
+  @ApiPropertyOptional(signupPhoneDoc)
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(5, 20)
+  phone?: string;
+}
+
+export class SignInDto {
+  @ApiProperty({
+    description: 'Email address, or a verified mobile number in international format.',
+    minLength: 3,
+    maxLength: 254,
+    example: 'ada@example.com',
+  })
+  @Transform(lowerTrim)
+  @IsString()
+  @Length(3, 254)
+  identifier: string;
+
+  @ApiProperty({ minLength: 1, maxLength: passwordLength.max, example: 'correct horse battery' })
+  @IsString()
+  @Length(1, passwordLength.max)
+  password: string;
+}
+
+export class CodeDto {
+  @ApiProperty(codeDoc)
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}
+
+export class SignupEmailDto {
+  @ApiProperty({ description: 'The email to sign up with; a 6-digit code is sent to it.', format: 'email', maxLength: 254, example: 'ada@example.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+}
+
+export class SignupEmailVerifyDto extends SignupEmailDto {
+  @ApiProperty(codeDoc)
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}
+
+export class ForgotPasswordDto {
+  @ApiProperty({ format: 'email', example: 'ada@example.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ format: 'email', example: 'ada@example.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  email: string;
+
+  @ApiProperty(codeDoc)
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+
+  @ApiProperty(passwordDoc)
+  @IsString()
+  @Length(passwordLength.min, passwordLength.max)
+  password: string;
+}
+
+export class ProfileDto {
+  @ApiProperty({ description: 'Your full name.', minLength: 2, maxLength: 100, example: 'Ada Obi' })
+  @Transform(trim)
+  @IsString()
+  @Length(2, 100)
+  name: string;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty({ description: 'Your current password.', minLength: 1, maxLength: passwordLength.max })
+  @IsString()
+  @Length(1, passwordLength.max)
+  current_password: string;
+
+  @ApiProperty(passwordDoc)
+  @IsString()
+  @Length(passwordLength.min, passwordLength.max)
+  new_password: string;
+}
+
+export class AddEmailDto {
+  @ApiProperty({ description: 'The address to add; a 6-digit code is sent to it.', format: 'email', maxLength: 254, example: 'ada@newmail.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+}
+
+export class PrimaryEmailDto {
+  @ApiProperty({ description: 'One of your confirmed addresses, to sign in with from now on.', format: 'email', maxLength: 254, example: 'ada@newmail.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+
+  @ApiPropertyOptional({ description: 'Your current password; required when your account has one.', minLength: 1, maxLength: passwordLength.max })
+  @IsOptional()
+  @IsString()
+  @Length(1, passwordLength.max)
+  password?: string;
+}
+
+export class PhoneDto {
+  @ApiProperty({
+    description: 'Mobile number in international format, or local format for your business country.',
+    minLength: 6,
+    maxLength: 20,
+    example: '+2348012345678',
+  })
+  @Transform(trim)
+  @IsString()
+  @Length(6, 20)
+  phone: string;
+}
+
+export class PrimaryPhoneDto extends PhoneDto {
+  @ApiPropertyOptional({ description: 'Your current password; required when your account has one.' })
+  @IsOptional() @IsString() @Length(1, passwordLength.max)
+  password?: string;
+}
+
+/** A "Try it" token for the API documentation. */
+export class DocsTokenDto {
+  @ApiProperty({ description: '`test` (sandbox, simulated fulfilment) or `live` (real money and real orders).', enum: ['test', 'live'], example: 'test' })
+  @IsIn(['test', 'live'])
+  mode: 'test' | 'live';
+
+  @ApiPropertyOptional({ description: 'Only the reading scopes: nothing can be changed. Staff who cannot create API keys always get read-only tokens.', default: false })
+  @IsOptional()
+  @IsBoolean()
+  read_only?: boolean;
+
+  @ApiPropertyOptional({ description: 'The store the token acts for (it sees only that store’s orders, events and webhooks). Defaults to your oldest published store, else your oldest.', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  store_id?: string;
+}
+
+const twoStepCodeDoc = {
+  description: 'The 6-digit code from your two-step method, or one of your recovery codes (`abcd-1234`).',
+  example: '123456',
+  maxLength: 9,
+};
+const twoStepCode = /^(\d{6}|[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4})$/;
+
+export class TwoStepCodeDto {
+  @ApiProperty(twoStepCodeDoc)
+  @Transform(trim)
+  @Matches(twoStepCode, { message: 'code must be 6 digits or a recovery code' })
+  code: string;
+}
+
+export class TwoStepSetupDto {
+  @ApiProperty({ description: 'How you will do the second step: an authenticator app, a code emailed to your primary address, or one texted to your primary mobile number.', enum: ['authenticator', 'email', 'sms'] })
+  @IsIn(['authenticator', 'email', 'sms'])
+  method: 'authenticator' | 'email' | 'sms';
+
+  @ApiPropertyOptional({ ...twoStepCodeDoc, description: 'Changing an existing method: a code from it (or a recovery code).' })
+  @IsOptional()
+  @Transform(trim)
+  @Matches(twoStepCode, { message: 'current_code must be 6 digits or a recovery code' })
+  current_code?: string;
+}
+
+export class TwoStepConfirmDto {
+  @ApiProperty({ description: 'The first 6-digit code from the method being set up.', example: '123456' })
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}

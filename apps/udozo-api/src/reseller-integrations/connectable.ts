@@ -1,0 +1,257 @@
+import type { AppConfig } from '../config/config.js';
+import { isTestKey, type Environment } from '../integrations/endpoints.js';
+import { ProviderError, providerRequest } from '../payments/provider-error.js';
+import { africasTalkingCheck } from '../suppliers/africas-talking.adapter.js';
+import { EsimAccessAdapter } from '../suppliers/esim-access.adapter.js';
+import { RemitaAdapter } from '../suppliers/remita.adapter.js';
+
+export type ConnectableKind = 'supplier' | 'payment_gateway';
+
+export type ConnectableField = {
+  /** The credential's name in the request body (`client_secret`). */
+  key: string;
+  label: string;
+  /** Write-only: encrypted at rest and never returned (only the last four characters). */
+  secret: boolean;
+  required: boolean;
+  help?: string;
+};
+
+/** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL' | 'PAYSTACK_API_URL'>;
+
+export type ConnectableIntegration = {
+  /** Matches the platform integration group's id, so admins find both in one place. */
+  id: string;
+  kind: ConnectableKind;
+  name: string;
+  description: string;
+  fields: ConnectableField[];
+  /**
+   * Suppliers that notify order updates: each live connection gets its own address (`/v1/webhooks/<id>/<connection>`).
+   * `manual`: the reseller enters it in the supplier's dashboard and saves the signature secret (`secretField`);
+   * `automatic`: BitoCard gives it to the supplier on every order. Without it, own orders rely on scheduled checks.
+   */
+  notifications?: { setup: 'manual'; secretField: string } | { setup: 'automatic' };
+  /**
+   * A harmless call proving the credentials work (a token, a balance), at the live or sandbox addresses given. Throws a
+   * ProviderError: `definite` when the provider refused the credentials, otherwise it could not be reached.
+   */
+  check: (values: Record<string, string>, urls: Urls, environment: Environment) => Promise<void>;
+  /** BitoCard's own credentials for it from the integration settings, in these fields' names (admins' Test connection). */
+  fromSettings: (config: AppConfig) => Record<string, string | undefined>;
+};
+
+const field = (key: string, label: string, options: Partial<ConnectableField> = {}): ConnectableField => ({ key, label, secret: false, required: true, ...options });
+const secret = (key: string, label: string, options: Partial<ConnectableField> = {}) => field(key, label, { secret: true, ...options });
+
+/** A provider that answered but said no: a refusal of the credentials. */
+const refused = (provider: string) => new ProviderError(provider, 'credentials refused', true);
+
+/**
+ * Integrations with a built BitoCard adapter that resellers can connect their own accounts to: each needs its fields
+ * (what the provider issues), a check, and how BitoCard's own settings map onto the fields. Admins switch on reseller
+ * access per integration, then offer it per country. The same checks test BitoCard's own credentials (live or sandbox).
+ */
+export const connectableIntegrations: ConnectableIntegration[] = [
+  {
+    id: 'reloadly',
+    kind: 'supplier',
+    name: 'Reloadly',
+    description: 'Gift cards, airtime and data from your own Reloadly account and prices.',
+    fields: [
+      field('client_id', 'Client ID', { help: 'Reloadly dashboard > Developers > API settings.' }),
+      secret('client_secret', 'Client secret'),
+      secret('webhook_secret', 'Webhook signature secret', { required: false, help: 'From Reloadly’s Developers > Webhooks, once BitoCard gives you a webhook address.' }),
+    ],
+    notifications: { setup: 'manual', secretField: 'webhook_secret' },
+    check: async (values, urls) => {
+      const token = await providerRequest<{ access_token?: string }>('reloadly', `${urls.RELOADLY_AUTH_URL}/oauth/token`, {
+        method: 'POST',
+        body: { client_id: values.client_id, client_secret: values.client_secret, grant_type: 'client_credentials', audience: urls.RELOADLY_TOPUPS_URL ?? 'https://topups.reloadly.com' },
+      });
+      if (!token?.access_token) throw refused('reloadly');
+    },
+    fromSettings: config => ({ client_id: config.RELOADLY_CLIENT_ID, client_secret: config.RELOADLY_CLIENT_SECRET }),
+  },
+  {
+    id: 'vtpass',
+    kind: 'supplier',
+    name: 'VTpass',
+    description: 'Nigerian pay-TV, electricity, airtime and data from your own VTpass account.',
+    fields: [
+      secret('api_key', 'API key'),
+      secret('public_key', 'Public key'),
+      secret('secret_key', 'Secret key'),
+      field('commissions', 'Airtime and data commissions (%)', {
+        required: false,
+        help: 'Your commission per service, for airtime and data: for example mtn 3; airtel 3.4; mtn-data 3 (etisalat is 9mobile). Services without one are not synced.',
+      }),
+    ],
+    check: async (values, urls) => {
+      const balance = await providerRequest<{ code?: number | string }>('vtpass', `${urls.VTPASS_API_URL}/balance`, {
+        headers: { 'api-key': values.api_key, 'public-key': values.public_key },
+      });
+      if (String(balance?.code) !== '1') throw refused('vtpass');
+    },
+    fromSettings: config => ({ api_key: config.VTPASS_API_KEY, public_key: config.VTPASS_PUBLIC_KEY, secret_key: config.VTPASS_SECRET_KEY, commissions: config.VTPASS_COMMISSIONS }),
+  },
+  {
+    id: 'didww',
+    kind: 'supplier',
+    name: 'DIDWW',
+    description: 'Virtual phone numbers from your own DIDWW account.',
+    fields: [secret('api_key', 'API key')],
+    notifications: { setup: 'automatic' },
+    check: async (values, urls) => {
+      await providerRequest('didww', `${urls.DIDWW_API_URL}/balance`, {
+        headers: { 'api-key': values.api_key, accept: 'application/vnd.api+json', 'x-didww-api-version': '2022-05-10' },
+      });
+    },
+    fromSettings: config => ({ api_key: config.DIDWW_API_KEY }),
+  },
+  {
+    id: 'zendit',
+    kind: 'supplier',
+    name: 'Zendit',
+    description: 'Gift cards, airtime, bundles and data from your own Zendit account and prices.',
+    fields: [secret('api_key', 'API key', { help: 'Zendit console > Developers > API settings. Test mode and production keys differ.' })],
+    check: async (values, urls) => {
+      await providerRequest('zendit', `${urls.ZENDIT_API_URL}/balance`, { headers: { authorization: `Bearer ${values.api_key}` } });
+    },
+    fromSettings: config => ({ api_key: config.ZENDIT_API_KEY }),
+  },
+  {
+    id: 'pawapay',
+    kind: 'supplier',
+    name: 'pawaPay',
+    description: 'Mobile money top-ups paid from your own pawaPay wallets.',
+    fields: [
+      secret('api_token', 'API token', { help: 'pawaPay dashboard > System configuration > API tokens. Sandbox and production tokens differ.' }),
+      field('payout_fee_percent', 'Payout fee (%)', { help: 'The payout fee in your pawaPay agreement, for example 1.5: your cost is the amount plus this fee.' }),
+    ],
+    check: async (values, urls) => {
+      await providerRequest('pawapay', `${urls.PAWAPAY_API_URL}/v2/active-conf?operationType=PAYOUT`, { headers: { authorization: `Bearer ${(values.api_token ?? '').trim().replace(/^bearer\s+/i, '')}` } });
+    },
+    fromSettings: config => ({ api_token: config.PAWAPAY_API_TOKEN, payout_fee_percent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
+  },
+  {
+    id: 'remita',
+    kind: 'supplier',
+    name: 'Remita',
+    description: 'Electricity, cable TV, airtime, data and internet subscriptions paid from your own Remita balance (Vending Bills).',
+    fields: [secret('secret_key', 'Secret key', { help: 'RemitaConnect > API keys: the Secret Key, with Vending subscribed and approved. Remita must whitelist BitoCard’s server addresses for production.' })],
+    check: async (values, urls) => {
+      await new RemitaAdapter({ secretKey: values.secret_key, baseUrl: urls.REMITA_API_URL }).check();
+    },
+    fromSettings: config => ({ secret_key: config.REMITA_SECRET_KEY }),
+  },
+  {
+    id: 'africas_talking',
+    kind: 'supplier',
+    name: 'Africa’s Talking',
+    description: 'Airtime and data bundles paid from your own Africa’s Talking wallet.',
+    fields: [
+      field('username', 'Username', { help: 'Your app’s username in the Africa’s Talking dashboard.' }),
+      secret('api_key', 'API key', { help: 'The app’s Settings > API Key.' }),
+      field('airtime_discount_percent', 'Airtime discounts (%)', { help: 'The airtime discounts on your account: one number for all (3), or per network, for example NG mtn 1.8; NG airtel 2; NG glo 3. Your cost is the amount less it.' }),
+      field('airtime_countries', 'Airtime countries', { required: false, help: 'Empty: Africa’s Talking’s published countries. Otherwise, for example, KE KES 10-10000 safaricom,airtel,telkom; one per line or separated by semicolons.' }),
+      field('data_product', 'Mobile Data product', { required: false, help: 'The product name made in your dashboard (Mobile Data > Products).' }),
+      field('data_plans', 'Data plans', { required: false, help: 'For example KE safaricom 1GB Month 299 250 (country, network, size, validity, price, your cost); one per line or separated by semicolons.' }),
+    ],
+    check: async (values, urls) => {
+      await africasTalkingCheck(urls.AFRICAS_TALKING_API_URL, values.username, values.api_key);
+    },
+    fromSettings: config => ({
+      username: config.AFRICAS_TALKING_USERNAME,
+      api_key: config.AFRICAS_TALKING_API_KEY,
+      airtime_discount_percent: config.AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT,
+      airtime_countries: config.AFRICAS_TALKING_AIRTIME_COUNTRIES,
+      data_product: config.AFRICAS_TALKING_DATA_PRODUCT,
+      data_plans: config.AFRICAS_TALKING_DATA_PLANS,
+    }),
+  },
+  {
+    id: 'esim_access',
+    kind: 'supplier',
+    name: 'eSIM Access',
+    description: 'eSIM data packages paid from your own eSIM Access balance.',
+    fields: [
+      field('access_code', 'Access code', { help: 'eSIM Access console > Developer: the AccessCode.' }),
+      secret('secret_key', 'Secret key', { help: 'eSIM Access console > Developer: the SecretKey, which signs every request.' }),
+    ],
+    // eSIM Access has no sandbox: both environments check the live account's balance.
+    check: async (values, urls) => {
+      await new EsimAccessAdapter({ accessCode: values.access_code, secretKey: values.secret_key, baseUrl: urls.ESIM_ACCESS_API_URL }).balance();
+    },
+    fromSettings: config => ({ access_code: config.ESIM_ACCESS_ACCESS_CODE, secret_key: config.ESIM_ACCESS_SECRET_KEY }),
+  },
+  {
+    id: 'flutterwave',
+    kind: 'payment_gateway',
+    name: 'Flutterwave',
+    description: 'Card, bank transfer and mobile money checkout, paid into your own Flutterwave account.',
+    fields: [secret('secret_key', 'Secret key'), secret('webhook_hash', 'Webhook secret hash', { required: false, help: 'From Flutterwave’s Settings > Webhooks.' })],
+    check: async (values, urls, environment) => {
+      // Flutterwave decides test or live by the key itself (FLWSECK_TEST-… for test), at the same address.
+      if (isTestKey('flutterwave', values.secret_key) !== (environment === 'sandbox')) {
+        throw new ProviderError('flutterwave', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
+      }
+      const result = await providerRequest<{ status?: string }>('flutterwave', `${urls.FLUTTERWAVE_API_URL}/balances`, { headers: { authorization: `Bearer ${values.secret_key}` } });
+      if (result?.status !== 'success') throw refused('flutterwave');
+    },
+    fromSettings: config => ({ secret_key: config.FLUTTERWAVE_SECRET_KEY }),
+  },
+  {
+    id: 'stripe',
+    kind: 'payment_gateway',
+    name: 'Stripe',
+    description: 'Card checkout on Stripe, paid into your own Stripe account.',
+    fields: [
+      secret('secret_key', 'Secret key', { help: 'Stripe dashboard > Developers > API keys. Test keys (sk_test_…) are for the sandbox, live keys (sk_live_…) for live.' }),
+      secret('webhook_secret', 'Webhook signing secret', { required: false, help: 'From Stripe’s Developers > Webhooks (whsec_…).' }),
+    ],
+    check: async (values, urls, environment) => {
+      // Stripe decides test or live by the key itself (sk_test_… or rk_test_… for test), at the same address.
+      if (isTestKey('stripe', values.secret_key) !== (environment === 'sandbox')) {
+        throw new ProviderError('stripe', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
+      }
+      await providerRequest('stripe', `${urls.STRIPE_API_URL}/v1/balance`, { headers: { authorization: `Bearer ${values.secret_key}` } });
+    },
+    fromSettings: config => ({ secret_key: config.STRIPE_SECRET_KEY, webhook_secret: config.STRIPE_WEBHOOK_SECRET }),
+  },
+  {
+    id: 'monnify',
+    kind: 'payment_gateway',
+    name: 'Monnify',
+    description: 'Nigerian card and bank transfer checkout, paid into your own Monnify account.',
+    fields: [field('api_key', 'API key'), secret('secret_key', 'Secret key'), field('contract_code', 'Contract code')],
+    check: async (values, urls) => {
+      const basic = Buffer.from(`${values.api_key}:${values.secret_key}`).toString('base64');
+      const login = await providerRequest<{ requestSuccessful?: boolean }>('monnify', `${urls.MONNIFY_API_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { authorization: `Basic ${basic}` },
+      });
+      if (!login?.requestSuccessful) throw refused('monnify');
+    },
+    fromSettings: config => ({ api_key: config.MONNIFY_API_KEY, secret_key: config.MONNIFY_SECRET_KEY, contract_code: config.MONNIFY_CONTRACT_CODE }),
+  },
+  {
+    id: 'paystack',
+    kind: 'payment_gateway',
+    name: 'Paystack',
+    description: 'Card, bank transfer, USSD and mobile money checkout in Nigeria, Ghana, Kenya and South Africa, paid into your own Paystack account.',
+    fields: [secret('secret_key', 'Secret key', { help: 'Paystack dashboard > Settings > API Keys & Webhooks. Test keys (sk_test_…) are for the sandbox, live keys (sk_live_…) for live.' })],
+    check: async (values, urls, environment) => {
+      // Paystack decides test or live by the key itself (sk_test_… for test), at the same address.
+      if (isTestKey('paystack', values.secret_key) !== (environment === 'sandbox')) {
+        throw new ProviderError('paystack', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
+      }
+      const result = await providerRequest<{ status?: boolean }>('paystack', `${urls.PAYSTACK_API_URL}/balance`, { headers: { authorization: `Bearer ${values.secret_key}` } });
+      if (result?.status !== true) throw refused('paystack');
+    },
+    fromSettings: config => ({ secret_key: config.PAYSTACK_SECRET_KEY }),
+  },
+];
+
+export const connectable = (id: string) => connectableIntegrations.find(item => item.id === id);

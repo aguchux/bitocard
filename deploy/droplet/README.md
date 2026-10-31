@@ -129,37 +129,6 @@ Vercel. By hand, on the droplet:
    fall back to: a broken droplet is fixed by rolling back an image (Day to day), or by a new droplet from this runbook.
 4. Webhook addresses given to suppliers and payment providers keep working: they name `api.bitocard.com`.
 
-## Udozo's API (api.udozo.com)
-
-Udozo (docs/UDOZO_SPINOFF_PLAN.md) runs the same image beside BitoCard's, as `api-udozo` and `scheduler-udozo` (the
-`udozo` profile in `docker-compose.yml`), with its own database, Redis and secrets. udozo.com's DNS is on Cloudflare
-too, so it sits behind Cloudflare and this firewall exactly as `api.bitocard.com` does.
-
-1. **Its own services first:** a Neon project (US) and an Upstash Redis database for Udozo, never BitoCard's.
-2. **Its environment:** as root once, `install -m 600 -o deploy -g deploy /dev/null /etc/udozo/api.env` (`setup.sh`
-   made the folder), then fill it from `udozo.env.example` with `set-env.sh <NAME> udozo` for each secret
-   (`DATABASE_URL`, `ENCRYPTION_KEY` (a new key: `openssl rand -base64 32`, kept safe), `CRON_SECRET`,
-   `STORE_SERVER_SECRET`, the Upstash pair, `ADMIN_SETUP_EMAILS`). The file's presence switches Udozo on at the next
-   deploy: both environments are checked and both databases migrated (Udozo's then gets its product seed) before either
-   instance is replaced.
-3. **Its certificate:** `sh /opt/bitocard/origin-cert.sh csr udozo`, then Cloudflare > udozo.com > SSL/TLS > Origin
-   Server > Create certificate with that CSR, hostname `api.udozo.com` only, and `origin-cert.sh install udozo`. Until
-   it is installed, Udozo's API runs but Caddy does not serve `api.udozo.com` (the deploy says so).
-4. **Cloudflare (udozo.com):** an A record `api` to the droplet's IPv4, **proxied**; SSL/TLS **Full (strict)**; Bot
-   Fight Mode off and the same WAF Skip rule for `http.host eq "api.udozo.com"`. The firewall already admits only
-   Cloudflare.
-5. **Deploy** (Actions > Deploy API, or the next push). It checks `api.udozo.com` through this droplet's Caddy serves
-   Udozo at the new commit, and that its database is not BitoCard's (`database_id` in `/health`).
-6. Set the repository variable `UDOZO_API_LIVE` to `true`: each deploy then smoke-tests `https://api.udozo.com` too.
-
-Memory: Udozo's API is capped at 512 MB (`UDOZO_API_MEMORY`, `UDOZO_API_HEAP_MB` in `.env`). With both products on the
-2 GB droplet that is close to full; resize to 4 GB before Udozo takes real traffic (Growing).
-
-```sh
-docker compose logs -f --tail=200 api-udozo
-docker compose up -d --force-recreate api-udozo scheduler-udozo   # after changing /etc/udozo/api.env
-```
-
 ## Growing
 
 Watch the droplet's Graphs. Grow when memory stays above about 85% (swap in use outside deploys), the API container

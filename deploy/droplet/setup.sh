@@ -42,9 +42,6 @@ install -d -m 755 -o deploy -g deploy /opt/bitocard
 # Secrets: readable by the deploy user (who runs the containers) and root only.
 install -d -m 700 -o deploy -g deploy /etc/bitocard /etc/bitocard/certs
 [ -f /etc/bitocard/api.env ] || install -m 600 -o deploy -g deploy /dev/null /etc/bitocard/api.env
-# Udozo's API (docs/UDOZO_SPINOFF_PLAN.md): its secrets beside BitoCard's. The file is made empty only when Udozo is set
-# up (README.md, Udozo), since its presence switches Udozo's API on at the next deploy.
-install -d -m 700 -o deploy -g deploy /etc/udozo
 
 if [ ! -f /swapfile ]; then
   echo "[setup] 2 GB swap"

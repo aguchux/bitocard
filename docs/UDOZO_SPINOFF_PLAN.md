@@ -18,7 +18,7 @@ Decided by the owner on 30 October 2026. **BitoCard Shop** (the B2C classifieds 
 1. **Brand:** Udozo, `udozo.com`.
 2. **Infrastructure:**
    - its own Postgres database (Neon, US) and Redis (Upstash);
-   - the same `apps/api` code deployed again as `api.udozo.com`, **on BitoCard's droplet** as a second compose stack;
+   - its own copy of the API, **`apps/udozo-api`**, deployed **on Vercel on its own** as `api.udozo.com` (changed on 31 October 2026 for total separation; it was first planned as the same `apps/api` code on BitoCard's droplet; Step 5b);
    - its own environment: `DATABASE_URL`, Redis, `ENCRYPTION_KEY`, `CRON_SECRET`, `STORE_SERVER_SECRET`, the admin settings.
 3. **Accounts:**
    - Udozo's own, in its own database: an email at BitoCard and at Udozo are two unrelated accounts, and there is no handoff between the products.
@@ -271,23 +271,32 @@ The code is moved to Udozo's apps (step 4), not deleted.
 - **Still to do:** Udozo's legal documents and the deployments (step 5). Seller HQ's Developers page keeps Udozo's scopes and events by hand, and its first-store guide is BitoCard's text.
 
 ### 5. Deploy and launch
-1. **The droplet:**
-   - `api-udozo` and `scheduler-udozo` in `deploy/droplet/docker-compose.yml`, from the same image, with secrets in `/etc/udozo/api.env`;
-   - a Caddy site for `api.udozo.com` (step 0 item 2);
-   - `deploy.sh` migrating and seeding both databases and waiting for both instances to be healthy;
-   - `deploy-api.yml` smoke-testing both hosts.
+1. **Udozo's API on Vercel** (replacing the droplet stack, 31 October 2026): `apps/udozo-api` as its own Vercel project, migrating and seeding Udozo's database in each production build, with Vercel Cron and Vercel Queues (see Step 5b).
 2. **Vercel projects:** udozo (stores' addresses added to it by the API), udozo-shq, udozo-admin and verify-udozo, each with affected-projects skipping and `VERCEL_DEEP_CLONE`.
 3. **Udozo's legal documents** (terms, Safe pay, reseller terms, privacy, cookies), accepted by version.
 4. **Browser checks** at 375 px, and a sandbox store on its subdomain taken live on a connected domain.
 5. **A pilot** in one market.
 
-**Step 5 status (30 October 2026): the droplet side is built** (in the repository; nothing is switched on until Udozo's environment is on the droplet):
+**Step 5 status (30 October 2026; removed on 31 October 2026, see Step 5b): the droplet side was built** (never switched on):
 - `api-udozo` and `scheduler-udozo` in `deploy/droplet/docker-compose.yml` (profile `udozo`, `APP_PRODUCT=udozo` fixed there, 512 MB), secrets in `/etc/udozo/api.env` (`udozo.env.example`), `set-env.sh <NAME> udozo`;
 - Caddy serves `api.udozo.com` (`sites/udozo.caddy`, Cloudflare origin certificate from `origin-cert.sh csr|install udozo`) once deploy.sh enables it;
 - `deploy.sh`: with `/etc/udozo/api.env` present, checks both environments and migrates both databases (Udozo's then seeded) before replacing either instance, then checks both hosts through Caddy serve their own product at the new commit, and refuses two instances on one database (`/health`'s `product` and `database_id`);
 - `deploy-api.yml` copies the site and smoke-tests `https://api.udozo.com` once `UDOZO_API_LIVE` is `true` (`SMOKE_PRODUCT=udozo`; `test/smoke-script.test.mjs` runs the smoke test against both products);
 - Udozo's instance defaults to its own addresses (`productDefaults` in `config.ts`: udozo.com, shq, verify, admin, `udozo.com` admins);
 - runbook: `deploy/droplet/README.md`, Udozo's API. **Still to do:** Vercel projects for Udozo's apps.
+
+**Step 5b (31 October 2026, the owner's decision: total separation): Udozo's own API.**
+- **Its own code:** `apps/udozo-api` (`@udozo/api`), a copy of `apps/api` taken at `cfe3b0dc`. From here each copy changes on its own: a fix to shared behaviour (auth, ledger, payments, KYC, webhooks) is made in both, deliberately. Each has its own migrations from that point; the rule that every migration runs on both databases ends.
+- **Each copy runs only as its product in production:** Udozo's defaults `APP_PRODUCT` to `udozo` and refuses `bitocard` in production; BitoCard's refuses `udozo` (`loadConfig`; `test/product-mode.test.mjs` in each). Until 5c strips them, each copy still carries the other product's code, hidden by `ProductRoutesGuard`, and Udozo's shared tests still run as BitoCard (`APP_PRODUCT: 'bitocard'` in its `test/helpers.mjs`).
+- **On Vercel:** `apps/udozo-api/vercel.json`: the NestJS preset; install and build from the repository root, then `npm run db:migrate:deploy -w @udozo/api` (migrates and seeds Udozo's database); `npx turbo-ignore`. Vercel Cron runs the 15 jobs Udozo runs (`test/vercel-crons.test.mjs` checks they match the job table less BitoCard's), and webhook deliveries go through Vercel Queues (`api/webhook-queue.mjs`, topic `webhook-deliveries`). It has its own `openapi.json` (Udozo's routes only; its `scripts/export-openapi.mjs` never writes SHQ's lists). Environment: `vercel.env.example`, as Production variables only, so preview builds never migrate Udozo's database.
+- **Off the droplet:** `api-udozo`, `scheduler-udozo`, `sites/udozo.caddy`, `/etc/udozo` and the `udozo` options of `set-env.sh` and `origin-cert.sh` are gone; `deploy.sh` and `deploy-api.yml` deploy BitoCard's API alone again.
+- **DNS:** `api.udozo.com` is a CNAME to Vercel (`cname.vercel-dns.com`), **DNS only** (not proxied), in udozo.com's Cloudflare zone, and the domain is added to the `udozo-api` project, which issues its certificate. There is no fixed outgoing address: Udozo uses no supplier that allowlists one.
+- **Still to do:** the Vercel project, its environment and domain; then 5c.
+
+**5c. Strip each copy:**
+- **Udozo's copy:** remove every `@ProductOnly('bitocard')` controller and route, BitoCard's jobs, modules, tests and integrations, then the services nothing calls; its tests run as Udozo.
+- **BitoCard's copy:** remove every `@ProductOnly('udozo')` controller and route, Udozo's jobs, product defaults, seed and tests.
+- **Then:** `APP_PRODUCT` and `ProductRoutesGuard` go from both.
 - **Legal documents drafted** (30 October 2026; item 3), drafts for lawyers' review on udozo.com: `/legal` and `/legal/<slug>` (`terms`, `safe-pay`, `sellers`, `privacy`, `cookies`; content in `apps/udozo/lib/legal.ts`, pages in `app/(global)/legal`), naming De-Golojan Technologies Ltd as owner and operator, `support@udozo.com` and `legal@udozo.com` (to be set up). Linked from udozo.com's footer and sitemap, stores' footers, sign-up and the identity check's consent, Seller HQ's sign-up and verify.udozo.com. **Accepted by version:** the API's `shopTermsVersion` is `2026-10-30`, equal to `legalVersion`, and `shopTermsPath` is `/legal/terms`, which the accept prompt links. Tests: `apps/udozo/test/legal.test.ts`. Still owed: lawyers' review per market (Safe pay licensing, the liability cap, the setup fee's refund terms, the controller split with sellers).
 
 ### 6. Later
@@ -314,5 +323,5 @@ Drop the Shop and resale tables from BitoCard's database once they are confirmed
 ## Owner's answers (30 October 2026)
 
 1. **The operating entity:** De-Golojan Technologies Ltd (Nigeria) owns and operates Udozo. Udozo's legal documents name it.
-2. **DNS:** udozo.com's DNS is on Cloudflare, with an A record for `api.udozo.com` to the droplet (proxied, as `api.bitocard.com` is). So the droplet stays behind Cloudflare, and Caddy serves `api.udozo.com` with a Cloudflare origin certificate for udozo.com. Vercel cannot issue a wildcard certificate without its own nameservers, so stores' sandbox addresses are made one by one as BitoCard's are: a DNS-only CNAME per store through Cloudflare's API (`StoreHostsService`, on Udozo's own Cloudflare settings) and the address added to Udozo's stores project, instead of a wildcard.
+2. **DNS:** udozo.com's DNS is on Cloudflare. Since 31 October 2026 `api.udozo.com` is a DNS-only CNAME to Vercel (Step 5b), no longer an A record to the droplet. Vercel cannot issue a wildcard certificate without its own nameservers, so stores' sandbox addresses are made one by one as BitoCard's are: a DNS-only CNAME per store through Cloudflare's API (`StoreHostsService`, on Udozo's own Cloudflare settings) and the address added to Udozo's stores project, instead of a wildcard.
 3. **Starting prices:** a US$10 Seller HQ setup fee for every market and Premium at US$5 a month, set by the product seed once (admins change them later). US$15 covers a .com in the first store's month; a later store's Premium (US$5 alone) does not, so its free domain answers `domain_not_covered` unless the price rises or the domain is cheaper. Domain endings: .com, as for BitoCard.

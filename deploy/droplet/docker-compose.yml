@@ -3,10 +3,6 @@
 # (.github/workflows/deploy-api.yml). Secrets are in /etc/bitocard/api.env, never in this repository.
 # Runbook: deploy/droplet/README.md.
 #
-# Udozo's API (api.udozo.com, docs/UDOZO_SPINOFF_PLAN.md) runs here too, from the same image with its own database,
-# Redis and secrets (/etc/udozo/api.env): `api-udozo` and `scheduler-udozo`, in the `udozo` profile, which deploy.sh
-# switches on (COMPOSE_PROFILES in .env) once that file exists.
-#
 # Memory is capped per container, so on a small droplet a runaway API restarts itself instead of the kernel killing
 # whatever it picks (Docker, SSH). The caps suit the 2 GB droplet; after a resize, raise them in /opt/bitocard/.env
 # (API_MEMORY, API_HEAP_MB; README.md, Growing) and run `docker compose up -d`.
@@ -55,43 +51,6 @@ services:
     restart: unless-stopped
     logging: *logging
 
-  api-udozo:
-    profiles: [udozo]
-    image: ${API_IMAGE:?API_IMAGE is set by deploy.sh}
-    env_file: /etc/udozo/api.env
-    environment:
-      APP_ENV: production
-      # Set here, never only in the env file: this instance must always be Udozo's.
-      APP_PRODUCT: udozo
-      PORT: "3001"
-      TRUST_PROXY: "1"
-      NODE_OPTIONS: --max-old-space-size=${UDOZO_API_HEAP_MB:-384}
-    mem_limit: ${UDOZO_API_MEMORY:-512m}
-    expose: ["3001"]
-    init: true
-    stop_grace_period: 30s
-    restart: unless-stopped
-    logging: *logging
-
-  scheduler-udozo:
-    profiles: [udozo]
-    image: ${API_IMAGE:?API_IMAGE is set by deploy.sh}
-    command: ["node", "scripts/scheduler.mjs"]
-    env_file: /etc/udozo/api.env
-    environment:
-      APP_PRODUCT: udozo
-      API_INTERNAL_URL: http://api-udozo:3001
-      NODE_OPTIONS: --max-old-space-size=48
-    mem_limit: 96m
-    healthcheck:
-      disable: true
-    init: true
-    depends_on:
-      api-udozo:
-        condition: service_healthy
-    restart: unless-stopped
-    logging: *logging
-
   caddy:
     image: caddy:2.10-alpine
     ports:
@@ -99,11 +58,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # Cloudflare's origin certificates: api.bitocard.com (origin.pem, origin.key) and, for Udozo, api.udozo.com
-      # (udozo-origin.pem, udozo-origin.key).
+      # Cloudflare's origin certificate for api.bitocard.com (origin.pem, origin.key).
       - /etc/bitocard/certs:/etc/caddy/certs:ro
-      # The sites deploy.sh enables (Udozo's).
-      - ./sites-enabled:/etc/caddy/sites-enabled:ro
       - caddy-data:/data
       - caddy-config:/config
     mem_limit: 96m

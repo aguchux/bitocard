@@ -1,0 +1,96 @@
+import { Controller, Get, Module, Query } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { AdminRoles, RealmOnly } from '../auth/caller.js';
+import type { LedgerMode, Platform } from '../generated/prisma/client.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { FxModule } from '../fx/fx.module.js';
+import { AdminOverviewService } from './overview.service.js';
+import { ProductOnly } from '../products/product.js';
+
+class OverviewQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365) days?: number;
+  @IsOptional() @IsIn(['test', 'live']) mode?: LedgerMode;
+}
+
+/** The admin dashboard. Admin only; never in the public API description. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@Controller('admin/overview')
+export class AdminOverviewController {
+  constructor(private readonly overview: AdminOverviewService) {}
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get()
+  get(@Query() query: OverviewQueryDto) {
+    return this.overview.overview({ days: query.days ?? 30, mode: query.mode ?? 'live' });
+  }
+}
+
+class ActivityQueryDto {
+  @IsOptional() @IsString() @Length(1, 40) target_type?: string;
+  @IsOptional() @IsUUID() actor_id?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsUUID() starting_after?: string;
+}
+
+/** A product's audit trail, newest first: BitoCard's admins read BitoCard's, Afrippa's admins Afrippa's. */
+async function auditTrail(prisma: PrismaService, platform: Platform, query: ActivityQueryDto) {
+    const limit = query.limit ?? 50;
+    const entries = await prisma.auditLog.findMany({
+      where: { platform, targetType: query.target_type, actorId: query.actor_id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(query.starting_after ? { cursor: { id: query.starting_after }, skip: 1 } : {}),
+    });
+    const actorIds = [...new Set(entries.map(entry => entry.actorId).filter((id): id is string => id !== null))];
+    const actors = new Map((await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true, email: true } })).map(user => [user.id, user]));
+    return {
+      object: 'list' as const,
+      data: entries.slice(0, limit).map(entry => ({
+        object: 'audit_entry' as const,
+        id: entry.id,
+        action: entry.action,
+        target_type: entry.targetType,
+        target_id: entry.targetId,
+        actor: entry.actorId ? (actors.get(entry.actorId) ?? { id: entry.actorId, name: null, email: null }) : null,
+        before: entry.before,
+        after: entry.after,
+        created_at: entry.createdAt.toISOString(),
+      })),
+      has_more: entries.length > limit,
+    };
+}
+
+/** Every BitoCard admin change (the audit trail), newest first. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@Controller('admin/activity')
+export class AdminActivityController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get()
+  list(@Query() query: ActivityQueryDto) {
+    return auditTrail(this.prisma, 'bitocard', query);
+  }
+}
+
+/** Every Afrippa admin change, newest first: Afrippa's own audit trail (docs/CRYPTO_SPINOFF_PLAN.md). */
+@ApiExcludeController()
+@RealmOnly('afrippa_admin')
+@Controller('afrippa/admin/activity')
+@ProductOnly('bitocard')
+export class AfrippaAdminActivityController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @AdminRoles('operations', 'support', 'finance')
+  @Get()
+  list(@Query() query: ActivityQueryDto) {
+    return auditTrail(this.prisma, 'afrippa', query);
+  }
+}
+
+@Module({ imports: [FxModule], controllers: [AdminOverviewController, AdminActivityController, AfrippaAdminActivityController], providers: [AdminOverviewService] })
+export class AdminModule {}

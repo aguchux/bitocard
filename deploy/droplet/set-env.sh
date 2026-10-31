@@ -1,17 +1,12 @@
 #!/bin/sh
-# Sets one variable in /etc/bitocard/api.env (or, with `udozo`, Udozo's /etc/udozo/api.env) without it appearing on
-# screen, in shell history or in a chat. From your own terminal (it asks for the value, hidden):
+# Sets one variable in /etc/bitocard/api.env without it appearing on screen, in shell history or in a chat.
+# From your own terminal (it asks for the value, hidden):
 #   ssh -t deploy@<droplet> sh /opt/bitocard/set-env.sh ENCRYPTION_KEY
-#   ssh -t deploy@<droplet> sh /opt/bitocard/set-env.sh DATABASE_URL udozo
-# Then `docker compose up -d --force-recreate api scheduler` (api-udozo scheduler-udozo), or the next deploy, uses it.
+# Then `docker compose up -d --force-recreate api scheduler` (or the next deploy) uses it.
 set -eu
 
-NAME="${1:?usage: set-env.sh <NAME> [udozo]}"
-case "${2:-bitocard}" in
-  bitocard) FILE=/etc/bitocard/api.env SERVICE=api PROFILE="" ;;
-  udozo) FILE=/etc/udozo/api.env SERVICE=api-udozo PROFILE="--profile udozo" ;;
-  *) echo "usage: set-env.sh <NAME> [udozo]" >&2; exit 2 ;;
-esac
+NAME="${1:?usage: set-env.sh <NAME>}"
+FILE=/etc/bitocard/api.env
 case "$NAME" in *[!A-Z0-9_]*) echo "Not a variable name: $NAME" >&2; exit 2 ;; esac
 
 printf '%s (hidden, then Enter): ' "$NAME"
@@ -50,5 +45,5 @@ echo "$NAME set (${#VALUE} characters)."
 image=$(docker images ghcr.io/aguchux/bitocard-api --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | head -1)
 if [ "$NAME" = ENCRYPTION_KEY ] && [ -n "$image" ] && [ -f /opt/bitocard/docker-compose.yml ]; then
   echo "Checking it against the database..."
-  API_IMAGE="$image" docker compose -f /opt/bitocard/docker-compose.yml $PROFILE run --rm --no-deps "$SERVICE" node scripts/check-env.mjs 2>&1 | grep '\[env\]' || true
+  API_IMAGE="$image" docker compose -f /opt/bitocard/docker-compose.yml run --rm --no-deps api node scripts/check-env.mjs 2>&1 | grep '\[env\]' || true
 fi

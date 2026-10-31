@@ -175,6 +175,12 @@ describe('names', () => {
     assert.equal(loadConfig({}).STOREFRONT_URL, 'https://bitocard.com', "BitoCard's unchanged");
   });
 
+  test("BitoCard's API refuses to run as Udozo in production (Udozo has its own, apps/udozo-api)", async () => {
+    const { loadConfig } = await import('../dist/config/config.js');
+    assert.throws(() => loadConfig({ APP_PRODUCT: 'udozo', APP_ENV: 'production' }), /APP_PRODUCT must be bitocard in production/);
+    assert.equal(loadConfig({ APP_ENV: 'production' }).APP_PRODUCT, 'bitocard');
+  });
+
   test('each instance says which product it is and fingerprints its own database in /health', async () => {
     const [ours, theirs] = await Promise.all([bitocard, udozo].map(async server => (await fetch(`${server.base}/health`)).json()));
     assert.deepEqual([ours.service, ours.product, theirs.service, theirs.product], ['bitocard-api', 'bitocard', 'udozo-api', 'udozo']);

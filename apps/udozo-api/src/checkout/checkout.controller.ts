@@ -1,0 +1,458 @@
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Public } from '../auth/caller.js';
+import { passwordLength } from '../auth/passwords.service.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { CustomersService } from '../customers/customers.service.js';
+import { HandoffService } from '../customers/handoff.service.js';
+import { StoreKey } from '../customers/store-key.js';
+import { IdentityService } from '../identity/identity.service.js';
+import { PageDto } from '../ledger/wallet.controller.js';
+import { paymentGateways } from '../payments/payment-providers.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { desktopNavFor, installPromptFor } from '../stores/stores.service.js';
+import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.service.js';
+import { EsimsService } from '../esims/esims.service.js';
+import { StoreSellers } from './store-sellers.js';
+import { ProductOnly } from '../products/product.js';
+
+const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toUpperCase() : value);
+
+class SignUpDto {
+  @Transform(trim) @IsString() @Length(2, 100)
+  name: string;
+
+  /** bitocard.com: the customer's country (a BitoCard market), fixed for good. Ignored on a reseller's store (theirs). */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
+
+  @Transform(lowerTrim) @IsEmail() @Length(3, 254)
+  email: string;
+
+  /** Optional at sign-up: kept unverified until the customer confirms it later (as `POST /phone` does). */
+  @IsOptional() @IsString() @Length(6, 25)
+  phone?: string;
+
+  @IsString() @Length(passwordLength.min, passwordLength.max)
+  password: string;
+}
+
+class SignInDto {
+  @Transform(lowerTrim) @IsEmail() @Length(3, 254)
+  email: string;
+
+  @IsString() @Length(1, passwordLength.max)
+  password: string;
+}
+
+class CodeDto {
+  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code' })
+  code: string;
+}
+
+class ProfilePhoneDto {
+  @IsString() @Length(6, 25)
+  phone: string;
+}
+
+class ForgotDto {
+  @Transform(lowerTrim) @IsEmail() @Length(3, 254)
+  email: string;
+}
+
+class ResetDto extends CodeDto {
+  @Transform(lowerTrim) @IsEmail() @Length(3, 254)
+  email: string;
+
+  @IsString() @Length(passwordLength.min, passwordLength.max)
+  password: string;
+}
+
+class ProfileDto {
+  @IsOptional() @Transform(trim) @IsString() @Length(2, 100)
+  name?: string;
+
+  /** Only for an account with no country yet (bitocard.com); a country once set never changes. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
+}
+
+class ChangePasswordDto {
+  @IsString() @Length(1, passwordLength.max)
+  current_password: string;
+
+  @IsString() @Length(passwordLength.min, passwordLength.max)
+  password: string;
+}
+
+class CheckoutListDto extends PageDto {
+  /** Only the orders in one group (`checkoutGroups`), paged on the server so every page is full. */
+  @IsOptional() @IsIn(Object.keys(checkoutGroups))
+  show?: CheckoutGroup;
+}
+
+class CountryQueryDto {
+  @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country: string;
+
+  /** The store's subdomain (how the store's server names it on cacheable reads; read by `StoreKey`). */
+  @IsOptional() @IsString() @Length(1, 63)
+  store?: string;
+}
+
+class RecipientDto {
+  @IsOptional() @IsString() @Length(4, 20)
+  phone?: string;
+
+  @IsOptional() @IsString() @Length(4, 40)
+  account_number?: string;
+
+  @IsOptional() @IsIn(['change', 'renew'])
+  transaction_type?: 'change' | 'renew';
+
+  @IsOptional() @Transform(lowerTrim) @IsEmail() @Length(3, 254)
+  email?: string;
+}
+
+class StartCheckoutDto {
+  @IsUUID()
+  product_id: string;
+
+  /** Minor units of the product's face currency. */
+  @IsInt() @Min(1) @Max(100_000_000_00)
+  face_value: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(10)
+  quantity?: number;
+
+  /**
+   * Ignored once the customer has a country (fixed at sign-up; a reseller's store is theirs): they always pay in its
+   * currency. An older bitocard.com account without one is fixed to this country.
+   */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
+
+  /** A gateway, or `wallet` (the only one while the store's wallets are on). */
+  @IsOptional() @IsIn([...Object.keys(paymentGateways), 'wallet'])
+  method?: string;
+
+  @IsOptional() @ValidateNested() @Type(() => RecipientDto)
+  recipient?: RecipientDto;
+
+  /** The store page the payment page returns the customer to (the checkout's ID is added). */
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
+  return_url: string;
+
+  /** Paying from the wallet: quote the price only (nothing is paid), for the customer to confirm. */
+  @IsOptional() @IsBoolean()
+  preview?: boolean;
+
+  /** Paying from the wallet: the quote the customer confirmed (from `preview`). */
+  @IsOptional() @IsUUID()
+  quote_id?: string;
+
+  /** Paying from the wallet: which one, `USD` or the customer's country's currency (the default). */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, { message: 'wallet_currency must be a 3-letter code' })
+  wallet_currency?: string;
+}
+
+class EsimTopUpDto {
+  @IsString() @Length(4, 64)
+  option_id: string;
+
+  /** The wallet that pays: the customer's country's currency (default) or `USD`. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  wallet_currency?: string;
+}
+
+class SimulateDto {
+  @IsIn(['succeeded', 'failed'])
+  outcome: 'succeeded' | 'failed';
+
+  /** Once paid, whether the sandbox order is delivered (default) or fails, which refunds the customer. */
+  @IsOptional() @IsIn(['completed', 'failed'])
+  order?: 'completed' | 'failed';
+}
+
+class VerificationDto {
+  @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country: string;
+
+  @Transform(trim) @IsString() @Length(1, 60)
+  first_name: string;
+
+  @Transform(trim) @IsString() @Length(1, 60)
+  last_name: string;
+
+  @IsOptional() @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
+  bvn?: string;
+
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
+  redirect_url: string;
+
+  @IsBoolean() @Equals(true, { message: 'consent must be true' })
+  consent: boolean;
+}
+
+class HandoffDto {
+  @IsString() @MaxLength(200)
+  to: string;
+}
+
+class HandoffExchangeDto {
+  @IsString() @MaxLength(200)
+  code: string;
+
+  @IsString() @MaxLength(200)
+  origin: string;
+}
+
+/**
+ * Customer accounts on hosted stores: bitocard.com, or a reseller's store named in `BitoCard-Store` (an account exists
+ * at one store only). Called by the store's server, never by browsers: it keeps the session token in its own cookie and
+ * sends it as `BitoCard-Customer-Session`. Not part of the public reseller API (resellers' own systems use their own
+ * customer accounts with quotes and orders).
+ */
+@ApiExcludeController()
+@Public()
+@Controller('store/account')
+export class CustomerAccountController {
+  constructor(
+    private readonly customers: CustomersService,
+    private readonly stores: StoreSellers,
+    private readonly identity: IdentityService,
+    private readonly handoffs: HandoffService,
+  ) {}
+
+  /** Returns the session token, so it is never stored for replay. */
+  @SkipIdempotency()
+  @Post('signup')
+  async signup(@StoreKey() store: string | null, @Body() body: SignUpDto) {
+    return this.customers.signup(await this.stores.accountStore(store), body);
+  }
+
+  @SkipIdempotency()
+  @Post('signin')
+  @HttpCode(HttpStatus.OK)
+  async signin(@StoreKey() store: string | null, @Body() body: SignInDto) {
+    return this.customers.signin(await this.stores.accountStore(store), body);
+  }
+
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.OK)
+  async forgot(@StoreKey() store: string | null, @Body() body: ForgotDto) {
+    return this.customers.forgotPassword(await this.stores.accountStore(store), body.email);
+  }
+
+  @SkipIdempotency()
+  @Post('password/reset')
+  @HttpCode(HttpStatus.OK)
+  async reset(@StoreKey() store: string | null, @Body() body: ResetDto) {
+    return this.customers.resetPassword(await this.stores.accountStore(store), body);
+  }
+
+  /**
+   * A one-time code (60 seconds) that signs this bitocard.com customer in on another of BitoCard's own sites: `to` is
+   * its origin (bitocard.com, a country store, shop.bitocard.com). Returns the code, so it is never stored for replay.
+   */
+  @UseGuards(CustomerGuard)
+  @SkipIdempotency()
+  @Post('handoff')
+  @HttpCode(HttpStatus.OK)
+  handoff(@CurrentCustomer() caller: CustomerCaller, @Body() body: HandoffDto) {
+    return this.handoffs.issue(caller.customer, body.to);
+  }
+
+  /** The other site's server exchanges the code, naming its own origin, for a session there. */
+  @SkipIdempotency()
+  @Post('handoff/exchange')
+  @HttpCode(HttpStatus.OK)
+  exchange(@Body() body: HandoffExchangeDto) {
+    return this.handoffs.exchange(body.code, body.origin);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Get()
+  me(@CurrentCustomer() caller: CustomerCaller) {
+    return this.customers.present(caller.customer);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('signout')
+  @HttpCode(HttpStatus.OK)
+  signout(@CurrentCustomer() caller: CustomerCaller) {
+    return this.customers.signout(caller.sessionId);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('profile')
+  @HttpCode(HttpStatus.OK)
+  profile(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfileDto) {
+    return this.customers.updateProfile(caller.customer, body);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('password/change')
+  @HttpCode(HttpStatus.OK)
+  changePassword(@CurrentCustomer() caller: CustomerCaller, @Body() body: ChangePasswordDto) {
+    return this.customers.changePassword(caller.customer, caller.sessionId, body);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('email/resend')
+  @HttpCode(HttpStatus.OK)
+  resend(@CurrentCustomer() caller: CustomerCaller) {
+    return this.customers.resendVerification(caller.customer);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('email/verify')
+  @HttpCode(HttpStatus.OK)
+  verifyEmail(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
+    return this.customers.verifyEmail(caller.customer, body.code);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('phone')
+  @HttpCode(HttpStatus.ACCEPTED)
+  addPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
+    return this.customers.addPhone(caller.customer, body.phone);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('phone/verify')
+  @HttpCode(HttpStatus.OK)
+  verifyPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
+    return this.customers.verifyPhone(caller.customer, body.code);
+  }
+
+  /** The customer's identity check for a market (BitoCard Verify across Africa, Didit elsewhere), where buying needs one. */
+  @UseGuards(CustomerGuard)
+  @Get('verification')
+  async verification(@CurrentCustomer() caller: CustomerCaller, @Query() query: CountryQueryDto) {
+    const store = caller.customer.store;
+    const mode = this.stores.mode(store);
+    const seller = await this.stores.sellerFor(caller.customer, query.country);
+    const verified = await this.identity.isCustomerVerified(seller.id, mode, caller.customer.id);
+    const latest = verified ? null : await this.identity.customerVerification(seller.id, mode, caller.customer.id).catch(() => null);
+    return { object: 'customer_verification_status' as const, country: seller.country, provider: await this.identity.providerFor(seller.country), verified, latest };
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('verification')
+  async startVerification(@CurrentCustomer() caller: CustomerCaller, @Body() body: VerificationDto) {
+    const store = caller.customer.store;
+    const seller = await this.stores.seller(store, body.country);
+    return this.identity.startCustomerVerification(seller.id, this.stores.mode(store), caller.customer.id, { ...body, country: seller.country! }, { storeId: store.id });
+  }
+}
+
+/** Buying on a hosted store (bitocard.com or a reseller's): payment methods, checkouts and the customer's orders. */
+@ApiExcludeController()
+@Public()
+@Controller('store')
+@ProductOnly('bitocard')
+export class CheckoutController {
+  constructor(
+    private readonly checkout: CheckoutService,
+    private readonly stores: StoreSellers,
+    private readonly settings: SettingsService,
+    private readonly esims: EsimsService,
+  ) {}
+
+  /** The customer's own order behind one of their checkouts (eSIM pages). */
+  private async orderOf(caller: CustomerCaller, id: string) {
+    const order = await this.checkout.orderFor(caller.customer, id);
+    return { id: order.id, customerId: caller.customer.id };
+  }
+
+  @UseGuards(CustomerGuard)
+  @Get('checkouts/:id/esims')
+  async esimList(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return { object: 'list' as const, data: await this.esims.forOrder((await this.orderOf(caller, id)).id) };
+  }
+
+  @UseGuards(CustomerGuard)
+  @Get('checkouts/:id/esims/:esim/top-up-options')
+  async esimOptions(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('esim', ParseUUIDPipe) esim: string) {
+    return this.esims.customerOptions(await this.orderOf(caller, id), esim);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('checkouts/:id/esims/:esim/top-ups')
+  @HttpCode(HttpStatus.OK)
+  async esimTopUp(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('esim', ParseUUIDPipe) esim: string, @Body() body: EsimTopUpDto) {
+    return this.esims.customerTopUp(await this.orderOf(caller, id), esim, body);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('checkouts/:id/esims/:esim/cancel')
+  @HttpCode(HttpStatus.OK)
+  async esimCancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('esim', ParseUUIDPipe) esim: string) {
+    return this.esims.customerCancel(await this.orderOf(caller, id), esim);
+  }
+
+  /** How the store's customer account app looks (bitocard.com, or the store named): its desktop menu, and whether it asks shoppers to install the site as an app. */
+  @Get('app')
+  @Header('Cache-Control', 'public, max-age=60')
+  async app(@StoreKey() key: string | null) {
+    const store = await this.stores.resolve(key);
+    return {
+      object: 'store_app' as const,
+      desktop_nav: await desktopNavFor(this.settings, store),
+      install_prompt: await installPromptFor(this.settings, store),
+    };
+  }
+
+  /** The customer's figures for their account home: what they spent, their orders, and deliveries this month. */
+  @UseGuards(CustomerGuard)
+  @Get('account/summary')
+  summary(@CurrentCustomer() caller: CustomerCaller) {
+    return this.checkout.summary(caller.customer);
+  }
+
+  /** How customers in a country can pay (no sign-in needed, for showing on product pages). A reseller's store: its own. */
+  @Get('payment-methods')
+  async methods(@StoreKey() store: string | null, @Query() query: CountryQueryDto) {
+    return this.checkout.methodsFor(await this.stores.resolve(store), query.country);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('checkouts')
+  start(@CurrentCustomer() caller: CustomerCaller, @Body() body: StartCheckoutDto) {
+    return this.checkout.start(caller.customer, body);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Get('checkouts')
+  list(@CurrentCustomer() caller: CustomerCaller, @Query() page: CheckoutListDto) {
+    return this.checkout.list(caller.customer, page);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Get('checkouts/:id')
+  get(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.checkout.get(caller.customer, id);
+  }
+
+  /** The customer gave up on the payment page. */
+  @UseGuards(CustomerGuard)
+  @Post('checkouts/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.checkout.cancel(caller.customer, id);
+  }
+
+  /** Sandbox checkouts only (Settings > Integrations > Customer checkout > Sandbox). */
+  @UseGuards(CustomerGuard)
+  @Post('checkouts/:id/simulate')
+  @HttpCode(HttpStatus.OK)
+  simulate(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SimulateDto) {
+    return this.checkout.simulate(caller.customer, id, body.outcome, body.order);
+  }
+}

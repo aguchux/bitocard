@@ -30,6 +30,3 @@ api.bitocard.com {
 		format json
 	}
 }
-
-# Udozo's API (api.udozo.com), once deploy.sh enables it (sites/udozo.caddy). A pattern matching nothing is allowed.
-import sites-enabled/*.caddy

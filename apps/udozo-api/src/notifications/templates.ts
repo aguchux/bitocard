@@ -1,0 +1,687 @@
+import type { EmailMessage } from './email.service.js';
+
+const escape = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
+
+/** Whose email it is: BitoCard's, or Afrippa's (its admins' sign-in emails). */
+export type EmailProduct = 'BitoCard' | 'Afrippa' | 'Udozo';
+const footers: Record<EmailProduct, string> = { BitoCard: 'BitoCard, a Golojan Ltd venture.', Afrippa: 'Afrippa.', Udozo: 'Udozo.' };
+
+function layout(heading: string, paragraphs: string[], code?: string, product: EmailProduct = 'BitoCard') {
+  const footer = footers[product];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    code ? `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(code)}</p>` : '',
+    `<p style="font-size:13px;color:#5b6488">${escape(footer)}</p>`,
+    '</div>',
+  ].join('');
+  const text = [heading, '', ...paragraphs, ...(code ? ['', code] : []), '', footer].join('\n');
+  return { html, text };
+}
+
+export function signupCodeEmail(to: string, code: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard sign-up code`,
+    ...layout(
+      'Confirm your email',
+      ['Enter this code to confirm your email and continue creating your BitoCard reseller account. It expires in 30 minutes.', 'If you did not start signing up, you can ignore this email.'],
+      code,
+    ),
+  };
+}
+
+export function verificationEmail(to: string, code: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard verification code`,
+    ...layout('Confirm your email', ['Enter this code to confirm your email address. It expires in 30 minutes.'], code),
+  };
+}
+
+export function passwordResetEmail(to: string, code: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard password reset code`,
+    ...layout(
+      'Reset your password',
+      ['Enter this code to choose a new password. It expires in 30 minutes.', 'If you did not ask to reset your password, you can ignore this email.'],
+      code,
+    ),
+  };
+}
+
+export function emailAddCodeEmail(to: string, code: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard code to add this email`,
+    ...layout(
+      'Confirm this email address',
+      ['Enter this code to add this address to your BitoCard account. It expires in 30 minutes.', 'If you did not ask for this, you can ignore this email.'],
+      code,
+    ),
+  };
+}
+
+/** Sent to the primary address when another address is added, so an unexpected addition is noticed. */
+export function emailAddedEmail(to: string, added: string): EmailMessage {
+  return {
+    to,
+    subject: 'An email address was added to your BitoCard account',
+    ...layout('An email address was added', [
+      `${added} was added to your BitoCard account. It cannot be used to sign in unless you make it your primary email.`,
+      'If you did not do this, remove it in SHQ (Settings > Your profile), change your password and contact support@bitocard.com.',
+    ]),
+  };
+}
+
+/** Sent to the old address once the change is done, so an unexpected change is noticed. */
+export function emailChangedEmail(to: string, newEmail: string): EmailMessage {
+  return {
+    to,
+    subject: 'Your BitoCard sign-in email was changed',
+    ...layout('Your primary email was changed', [
+      `Your BitoCard account now signs in with ${newEmail}. This address no longer works for signing in.`,
+      'If you did not make this change, contact support@bitocard.com straight away.',
+    ]),
+  };
+}
+
+export function passwordChangedEmail(to: string, product: EmailProduct = 'BitoCard'): EmailMessage {
+  return {
+    to,
+    subject: `Your ${product} password was changed`,
+    ...layout(
+      'Your password was changed',
+      [
+        `Your ${product} password was just changed and your other sessions were signed out.`,
+        product === 'BitoCard' ? 'If you did not make this change, reset your password and contact support@bitocard.com.' : 'If you did not make this change, reset your password and tell the Afrippa team at once.',
+      ],
+      undefined,
+      product,
+    ),
+  };
+}
+
+/** A reseller's two-step code: signing in (or confirming a change), or setting up email as their method. */
+export function twoStepCodeEmail(to: string, code: string, purpose: 'sign_in' | 'setup'): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard ${purpose === 'setup' ? 'two-step set-up' : 'sign-in'} code`,
+    ...layout(
+      purpose === 'setup' ? 'Turn on two-step sign-in' : 'Your sign-in code',
+      [
+        purpose === 'setup'
+          ? 'Enter this code in SHQ to use emailed codes for two-step sign-in. It expires in 10 minutes.'
+          : 'Enter this code in SHQ to finish signing in. It expires in 10 minutes.',
+        'Never share it. BitoCard will never ask you for it. If you did not just sign in, change your password.',
+      ],
+      code,
+    ),
+  };
+}
+
+/** Sent when a person's two-step sign-in is turned on, changed, turned off or reset by BitoCard. */
+export function twoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 'disabled' | 'reset', method: string | null): EmailMessage {
+  const lines = {
+    enabled: `Two-step sign-in is now on for your BitoCard account (${method}). You will be asked for a code each time you sign in.`,
+    changed: `Your two-step sign-in method was changed to ${method}.`,
+    disabled: 'Two-step sign-in was turned off for your BitoCard account.',
+    reset: 'BitoCard support reset your two-step sign-in and signed you out everywhere. Set it up again at your next sign-in.',
+  } as const;
+  return {
+    to,
+    subject: change === 'disabled' ? 'Two-step sign-in was turned off' : change === 'reset' ? 'Your two-step sign-in was reset' : 'Two-step sign-in is on',
+    ...layout('Two-step sign-in', [lines[change], 'If this was not you, change your password and contact support@bitocard.com.']),
+  };
+}
+
+/** An Afrippa trader's two-step code (setting a method up, or signing in), in Afrippa's name. */
+export function traderTwoStepCodeEmail(to: string, code: string, purpose: 'sign_in' | 'setup' | 'confirm'): EmailMessage {
+  const text = {
+    setup: { subject: 'two-step set-up', title: 'Set up two-step sign-in', line: 'Enter this code on Afrippa to use emailed codes for two-step sign-in. It expires in 10 minutes.', ifNot: 'If you did not just sign in, change your password.' },
+    sign_in: { subject: 'sign-in', title: 'Your sign-in code', line: 'Enter this code on Afrippa to finish signing in. It expires in 10 minutes.', ifNot: 'If you did not just sign in, change your password.' },
+    confirm: { subject: 'confirmation', title: 'Confirm on Afrippa', line: 'Enter this code on Afrippa to confirm releasing coins or adding a payment method. It expires in 10 minutes.', ifNot: 'If you did not just ask for it, change your password now: someone may be signed in to your account.' },
+  }[purpose];
+  return {
+    to,
+    subject: `${code} is your Afrippa ${text.subject} code`,
+    ...layout(
+      text.title,
+      [text.line, `Never share it. Afrippa will never ask you for it. ${text.ifNot}`],
+      code,
+      'Afrippa',
+    ),
+  };
+}
+
+/** An Afrippa trader's two-step sign-in changed (set up, changed, or reset by Afrippa's operations). */
+export function traderTwoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 'reset', method: string | null): EmailMessage {
+  const lines = {
+    enabled: `Two-step sign-in is set up for your Afrippa account (${method}). You will be asked for a code each time you sign in.`,
+    changed: `Your two-step sign-in method was changed to ${method}.`,
+    reset: 'Afrippa reset your two-step sign-in and signed you out everywhere. Set it up again when you next sign in. Withdrawals wait 24 hours.',
+  } as const;
+  return {
+    to,
+    subject: change === 'reset' ? 'Your two-step sign-in was reset' : 'Your two-step sign-in changed',
+    ...layout('Two-step sign-in', [lines[change], 'If this was not you, change your password and tell the Afrippa team at once.'], undefined, 'Afrippa'),
+  };
+}
+
+/** An Afrippa trader signed in on a device they never used before: told at once, in case it was not them. */
+export function traderNewDeviceEmail(to: string, at: Date): EmailMessage {
+  return {
+    to,
+    subject: 'A new device signed in to your Afrippa account',
+    ...layout('New sign-in', [`Your Afrippa account was signed in on a device you have not used before, at ${at.toUTCString()}.`, 'If this was you, there is nothing to do. If not, change your password and tell the Afrippa team at once.'], undefined, 'Afrippa'),
+  };
+}
+
+/** An Afrippa trader added a payment method: told every time, as a stolen session could add its own. */
+export function paymentMethodAddedEmail(to: string, what: string, usableFrom: Date): EmailMessage {
+  return {
+    to,
+    subject: 'A payment method was added to your Afrippa account',
+    ...layout(
+      'Payment method added',
+      [
+        `${what} was added to your Afrippa account. Buyers can be shown it from ${usableFrom.toUTCString()}.`,
+        'If this was not you, remove it, change your password and tell the Afrippa team at once.',
+      ],
+      undefined,
+      'Afrippa',
+    ),
+  };
+}
+
+/** A set-password link for an admin (from the admin sign-in page: a first visit, or Forgot password). */
+export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number; product?: EmailProduct }): EmailMessage {
+  const created = input.kind === 'create';
+  const product = input.product ?? 'BitoCard';
+  const subject = created ? `Set up your ${product} admin account` : `Reset your ${product} admin password`;
+  const message = layout(
+    subject,
+    [
+      `Hello ${input.name},`,
+      created
+        ? `Your ${product} admin account is ready. Choose your password with this link, then sign in and set up your authenticator app.`
+        : `Someone asked to reset the password of your ${product} admin account. Choose a new password with this link. You can also reset your authenticator app there if you no longer have it.`,
+      `The link works once, for ${input.hours} hours: ${input.link}`,
+      `If you were not expecting this, do not use the link and tell the ${product} team at once.`,
+    ],
+    undefined,
+    product,
+  );
+  return {
+    to,
+    subject,
+    text: message.text,
+    html: message.html.replace(escape(input.link), `<a href="${escape(input.link)}">${escape(input.link)}</a>`),
+  };
+}
+
+export function invitationEmail(to: string, resellerName: string, role: string, link: string): EmailMessage {
+  const message = layout(`Join ${resellerName} on BitoCard`, [
+    `You have been invited to join ${resellerName} on BitoCard as ${role}.`,
+    `Accept the invitation within 7 days: ${link}`,
+    'If you were not expecting this, you can ignore this email.',
+  ]);
+  return {
+    to,
+    subject: `You are invited to join ${resellerName} on BitoCard`,
+    text: message.text,
+    html: message.html.replace(escape(link), `<a href="${escape(link)}">${escape(link)}</a>`),
+  };
+}
+
+/** Amount in minor units as a readable figure, for example NGN 15,000.00. */
+export function formatMoney(amount: bigint | number, currency: string) {
+  const value = Number(amount) / 100;
+  return `${currency} ${value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function conversionsPausedEmail(to: string, currency: string, reason: string): EmailMessage {
+  return {
+    to,
+    subject: `Alert: ${currency} conversions paused`,
+    ...layout(`${currency} conversions paused`, [reason, 'Check both rate sources, then resume conversions in the admin app.']),
+  };
+}
+
+export function bankAccountAddedEmail(to: string, bankName: string, last4: string): EmailMessage {
+  return {
+    to,
+    subject: 'A payout bank account was added to your BitoCard wallet',
+    ...layout('New payout bank account', [
+      `A bank account ending ${last4} at ${bankName} was added for withdrawals.`,
+      'Payouts to a new account start 24 hours after it is added.',
+      'If you did not add it, remove it from your dashboard and contact support straight away.',
+    ]),
+  };
+}
+
+export function payoutPaidEmail(to: string, amount: string, last4: string): EmailMessage {
+  return { to, subject: `Your withdrawal of ${amount} has been paid`, ...layout('Withdrawal paid', [`${amount} was sent to your bank account ending ${last4}.`]) };
+}
+
+export function payoutFailedEmail(to: string, amount: string, reason: string): EmailMessage {
+  return {
+    to,
+    subject: `Your withdrawal of ${amount} did not go through`,
+    ...layout('Withdrawal failed', [`Your withdrawal of ${amount} failed: ${reason}`, 'The money is back in your withdrawable earnings.']),
+  };
+}
+
+export function planRenewalFailedEmail(to: string, plan: string, amount: string, graceDays: number): EmailMessage {
+  return {
+    to,
+    subject: `We could not renew your ${plan} plan`,
+    ...layout(`Your ${plan} plan needs funds`, [
+      `We could not take ${amount} from your wallet to renew your ${plan} plan.`,
+      `Top up your wallet within ${graceDays} days to keep it; after that your account moves to the Startup plan.`,
+    ]),
+  };
+}
+
+/** A reseller's own integration changed: connected, waiting for review, approved, rejected, suspended or disconnected. */
+export function connectionEmail(
+  to: string,
+  integration: string,
+  event: 'connected' | 'pending' | 'approved' | 'rejected' | 'suspended' | 'disconnected',
+  note?: string,
+): EmailMessage {
+  const copy = {
+    connected: [`Your ${integration} account is connected`, `Your own ${integration} account is now connected to BitoCard.`],
+    pending: [`Your ${integration} account is waiting for review`, `Your own ${integration} account is connected. BitoCard reviews it before you can use it live; we will email you when it is done.`],
+    approved: [`Your ${integration} account is approved`, `Your own ${integration} account is approved and active on BitoCard.`],
+    rejected: [`Your ${integration} account was not approved`, `BitoCard did not approve your own ${integration} account, and its credentials were erased.`],
+    suspended: [`Your ${integration} account is suspended`, `BitoCard suspended your own ${integration} account on BitoCard. Contact support to have it reinstated.`],
+    disconnected: [`Your ${integration} account was disconnected`, `Your own ${integration} account was disconnected from BitoCard and its credentials were erased.`],
+  }[event];
+  const paragraphs = [copy[1], ...(note ? [`Reason: ${note}`] : []), 'If you did not expect this, contact BitoCard support and change the credentials with the provider.'];
+  return { to, subject: copy[0], ...layout(copy[0], paragraphs) };
+}
+
+export function planEndedEmail(to: string, plan: string): EmailMessage {
+  return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Startup plan. You can upgrade again at any time.']) };
+}
+
+export function webhookEndpointDisabledEmail(to: string, url: string, mode: string, link: string): EmailMessage {
+  const sandbox = mode === 'test' ? ' (sandbox)' : '';
+  return {
+    to,
+    subject: `We stopped sending webhooks to ${url}`,
+    ...layout(`Webhook endpoint disabled${sandbox}`, [
+      `Deliveries to ${url} have failed for 3 days, so we have disabled this endpoint.`,
+      'Fix the endpoint, then enable it again in your dashboard. Events from the last 30 days are available from GET /v1/events, and you can resend any delivery from its log.',
+      `Manage the endpoint: ${link}`,
+    ]),
+  };
+}
+
+export function resellerVerificationEmail(to: string, status: 'approved' | 'declined' | 'in_review' | 'expired' | 'in_progress', active: boolean, link: string): EmailMessage {
+  if (status === 'approved') {
+    return {
+      to,
+      subject: 'Your identity is verified',
+      ...layout('Identity verified', [
+        active ? 'Your identity check passed and your account is now live: you can top up your wallet and take live orders.' : 'Your identity check passed. Our team will finish reviewing your account and email you when it is live.',
+        `See your account: ${link}`,
+      ]),
+    };
+  }
+  return {
+    to,
+    subject: 'We could not verify your identity',
+    ...layout('Identity check not passed', [
+      'Your identity check did not pass. This can happen if the photo of your document or face was unclear, or the details did not match.',
+      `You can try again from your dashboard: ${link}`,
+    ]),
+  };
+}
+
+/** A delivered code or licence key, as emailed to the customer. */
+export type EmailedDelivery = { kind: 'gift_card' | 'licence_key'; code: string; pin?: string; details?: Record<string, string> };
+
+const detailLabels: Record<string, string> = { duration: 'Licence term', expires_at: 'Expires', redemption_url: 'Redeem at' };
+
+/**
+ * The codes or licence keys of an order, emailed to the reseller's customer (`recipient.email`) under the reseller's
+ * store name. Never names BitoCard's suppliers. Codes are secrets: this email is the one place they are sent, and
+ * nothing here is logged (the email service logs only the address and subject).
+ */
+export function deliveryEmail(
+  to: string,
+  input: { store: string; product: string; deliveries: EmailedDelivery[]; instructions?: string | null; sandbox: boolean; /** The order's access page. */ link?: string },
+): EmailMessage {
+  const what = input.deliveries[0]?.kind === 'licence_key' ? 'licence key' : 'gift card code';
+  const plural = input.deliveries.length > 1 ? `${what}s` : what;
+  const subject = `${input.sandbox ? '[Sandbox] ' : ''}Your ${input.product} ${plural} from ${input.store}`;
+  const intro = [
+    `Thank you for your order from ${input.store}. Here ${input.deliveries.length > 1 ? `are your ${input.deliveries.length} ${plural}` : `is your ${what}`} for ${input.product}.`,
+    'Keep this email safe: anyone with the code can use it.',
+    ...(input.sandbox ? ['This is a sandbox test order: the codes below are not real.'] : []),
+  ];
+  const rows = input.deliveries.map((delivery, index) => {
+    const label = `${what[0].toUpperCase()}${what.slice(1)}${input.deliveries.length > 1 ? ` ${index + 1}` : ''}`;
+    const extras = [
+      ...(delivery.pin ? [['PIN', delivery.pin] as const] : []),
+      ...Object.entries(delivery.details ?? {})
+        .filter(([key]) => detailLabels[key])
+        .map(([key, value]) => [detailLabels[key], value] as const),
+    ];
+    return { label, code: delivery.code, extras };
+  });
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(`Your ${input.product}`)}</h1>`,
+    ...intro.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    ...rows.map(
+      row =>
+        `<div style="border:1px solid #dfe3f0;border-radius:10px;padding:12px 14px;margin:10px 0">` +
+        `<p style="margin:0;font-size:12px;color:#5b6488">${escape(row.label)}</p>` +
+        `<p style="margin:4px 0 0;font-family:Consolas,monospace;font-size:18px;font-weight:bold;word-break:break-all">${escape(row.code)}</p>` +
+        row.extras.map(([name, value]) => `<p style="margin:4px 0 0;font-size:13px">${escape(name)}: <strong>${escape(value)}</strong></p>`).join('') +
+        '</div>',
+    ),
+    ...(input.instructions ? [`<p style="font-size:15px;line-height:1.5"><strong>How to redeem:</strong> ${escape(input.instructions)}</p>`] : []),
+    ...(input.link
+      ? [`<p style="font-size:15px;line-height:1.5">You can also see your order at any time on its page: <a href="${escape(input.link)}" style="color:#2477ff">view your order</a>. Keep the link private: it opens your order.</p>`]
+      : []),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  const text = [
+    `Your ${input.product}`,
+    '',
+    ...intro,
+    '',
+    ...rows.flatMap(row => [`${row.label}: ${row.code}`, ...row.extras.map(([name, value]) => `${name}: ${value}`), '']),
+    ...(input.instructions ? [`How to redeem: ${input.instructions}`, ''] : []),
+    ...(input.link ? [`See your order at any time (keep this link private): ${input.link}`, ''] : []),
+    `Sent for ${input.store}.`,
+  ].join('\n');
+  return { to, subject, text, html };
+}
+
+/** A storefront customer's code, under the store's name (never BitoCard's, unless the store is BitoCard's own). */
+export type NumberStage = 'expiring' | 'expired' | 'warning' | 'deleted';
+
+/**
+ * A virtual number's renewal reminders, to the customer under the store's name: 7 days before it expires, on the day
+ * (paused), the delete warning 7 days after, and when it is deleted (15 days after). The customer renews on the number's
+ * page (the order page linked here); the store pays for it from its wallet.
+ */
+export function numberReminderEmail(to: string, input: { store: string; number: string; stage: NumberStage; expiresAt: Date; deleteAt: Date; link?: string }): EmailMessage {
+  const day = (date: Date) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+  const content: Record<NumberStage, { subject: string; heading: string; paragraphs: string[] }> = {
+    expiring: {
+      subject: `Your number ${input.number} expires on ${day(input.expiresAt)}`,
+      heading: 'Your number expires soon',
+      paragraphs: [`Your number ${input.number} is paid up to ${day(input.expiresAt)}. Renew it on its page to keep it, or switch on automatic renewal there.`],
+    },
+    expired: {
+      subject: `Your number ${input.number} has expired`,
+      heading: 'Your number has expired',
+      paragraphs: [
+        `Your number ${input.number} expired on ${day(input.expiresAt)} and is paused: it no longer receives messages.`,
+        `Renew it on its page by ${day(input.deleteAt)} to keep it. After that it is deleted and cannot be recovered.`,
+      ],
+    },
+    warning: {
+      subject: `Your number ${input.number} will be deleted on ${day(input.deleteAt)}`,
+      heading: 'Your number will be deleted',
+      paragraphs: [`Your number ${input.number} is still paused. Unless you renew it on its page by ${day(input.deleteAt)}, it will be deleted for good and its messages with it.`],
+    },
+    deleted: {
+      subject: `Your number ${input.number} has been deleted`,
+      heading: 'Your number has been deleted',
+      paragraphs: [`Your number ${input.number} was not renewed, so it has been deleted and can no longer be used or recovered.`],
+    },
+  };
+  const { subject, heading, paragraphs } = content[input.stage];
+  const lines = [...paragraphs, ...(input.link && input.stage !== 'deleted' ? [`See your number: ${input.link}`] : [])];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    ...(input.link && input.stage !== 'deleted' ? [`<p style="font-size:15px"><a href="${escape(input.link)}" style="color:#2477ff">See your number</a></p>`] : []),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject, html, text: [heading, '', ...lines, '', `Sent for ${input.store}.`].join('\n') };
+}
+
+/** The code that opens an order's page, sent to the order's email under the store's name. */
+export function orderAccessCodeEmail(to: string, input: { store: string; product: string; code: string }): EmailMessage {
+  const paragraphs = [
+    `Enter this code to open your ${input.product} order from ${input.store}. It expires in 10 minutes.`,
+    'If you did not ask for it, someone may have your order link: you can ignore this email, and they cannot open your order without the code.',
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    '<h1 style="font-size:20px">Open your order</h1>',
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} is your ${input.store} order code`,
+    html,
+    text: ['Open your order', '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
+  };
+}
+
+/** Sent when an order's codes are revealed on its page (at most once a day), so the customer notices if it was not them. */
+export function orderRevealedEmail(to: string, input: { store: string; product: string; at: Date }): EmailMessage {
+  const when = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(input.at);
+  const paragraphs = [
+    `The codes for your ${input.product} order from ${input.store} were shown on its page on ${when} (UTC).`,
+    `If that was not you, contact ${input.store} straight away: anyone who has a code can use it.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    '<h1 style="font-size:20px">Your codes were viewed</h1>',
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: `Your ${input.product} codes were viewed`, html, text: ['Your codes were viewed', '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
+}
+
+export function customerCodeEmail(to: string, input: { store: string; code: string; purpose: 'email_verification' | 'password_reset' }): EmailMessage {
+  const verify = input.purpose === 'email_verification';
+  const heading = verify ? 'Confirm your email' : 'Reset your password';
+  const paragraphs = verify
+    ? [`Enter this code to confirm your email for your ${input.store} account. It expires in 30 minutes.`, 'If you did not create an account, you can ignore this email.']
+    : [`Enter this code to choose a new password for your ${input.store} account. It expires in 30 minutes.`, 'If you did not ask to reset your password, you can ignore this email.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} is your ${input.store} ${verify ? 'verification' : 'password reset'} code`,
+    html,
+    text: [heading, '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
+  };
+}
+
+/** The code an admin enters to confirm their own manual top-up, naming exactly what it adds and to whom. */
+export function manualTopUpCodeEmail(to: string, input: { code: string; number: string; amount: string; target: string; source: 'received' | 'goodwill'; sandbox: boolean }): EmailMessage {
+  const heading = `Confirm manual top-up ${input.number}`;
+  const paragraphs = [
+    `Enter this code in the admin app to add ${input.amount}${input.sandbox ? ' (sandbox)' : ''} to the wallet of ${input.target}, as ${input.source === 'received' ? 'money received by BitoCard' : 'a goodwill credit from BitoCard'}. It expires in 10 minutes.`,
+    'Nothing moves until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-word">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} confirms ${input.number}: ${input.amount}${input.sandbox ? ' (sandbox)' : ''} top-up`,
+    html,
+    text: [heading, '', ...paragraphs, '', input.code, '', 'BitoCard, a Golojan Ltd venture.'].join('\n'),
+  };
+}
+
+/** The code an admin enters to confirm money sent to a supplier outside BitoCard (funding its float). */
+export function supplierFundingCodeEmail(to: string, input: { code: string; number: string; amount: string; supplier: string; sandbox: boolean }): EmailMessage {
+  return {
+    to,
+    subject: `${input.code} confirms ${input.number}: fund ${input.supplier}${input.sandbox ? ' (sandbox)' : ''}`,
+    ...layout(
+      `Confirm supplier funding ${input.number}`,
+      [
+        `Enter this code in the admin app to record ${input.amount} sent to ${input.supplier}${input.sandbox ? ' (sandbox)' : ''}. It expires in 10 minutes.`,
+        'Nothing is recorded until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
+      ],
+      input.code,
+    ),
+  };
+}
+
+/** The code that confirms a crypto withdrawal, naming exactly what it sends and where (under the store's name). */
+export function cryptoWithdrawalCodeEmail(to: string, input: { store: string; code: string; amount: string; asset: string; network: string; address: string }): EmailMessage {
+  const heading = 'Confirm your crypto withdrawal';
+  const paragraphs = [
+    `Enter this code to send ${input.amount} ${input.asset} on ${input.network} to ${input.address}. It expires in 30 minutes.`,
+    'Check the address carefully: crypto sent to the wrong address cannot be got back.',
+    `If you did not ask for this, do not share the code: change your ${input.store} password and contact the store.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-all">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} confirms your ${input.asset} withdrawal at ${input.store}`,
+    html,
+    text: [heading, '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
+  };
+}
+
+/** Tells a customer a withdrawal address was added to their account (usable after 24 hours). */
+export function cryptoAddressAddedEmail(to: string, input: { store: string; label: string; network: string; address: string; usableFrom: string }): EmailMessage {
+  const heading = 'A withdrawal address was added';
+  const paragraphs = [
+    `"${input.label}" (${input.network}, ${input.address}) was added to your ${input.store} crypto account.`,
+    `Withdrawals to it can start from ${input.usableFrom}.`,
+    `If this was not you, remove the address from your crypto settings, change your password and contact ${input.store} straight away.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-all">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: `A withdrawal address was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
+}
+
+/** Tells a customer a bank account was added for their payouts (payouts to it start after 24 hours). */
+export function customerBankAccountAddedEmail(to: string, input: { store: string; bank: string; last4: string; name: string; payoutsFrom: string }): EmailMessage {
+  const heading = 'A bank account was added';
+  const paragraphs = [
+    `${input.bank} account ending ${input.last4} (${input.name}) was added to your ${input.store} account for your payouts.`,
+    `Payouts to it can start from ${input.payoutsFrom}.`,
+    `If this was not you, remove it, change your password and contact ${input.store} straight away.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: `A bank account was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
+}
+/** BitoCard Verify's outcome for the person checked: approved, declined (with the reason) or asked to send items again. */
+export function verifyOutcomeEmail(to: string, input: { brand: string; outcome: 'approved' | 'declined' | 'resubmit'; reason?: string | null; note?: string | null; link?: string | null }): EmailMessage {
+  const heading = { approved: 'Your identity check is approved', declined: 'Your identity check was not approved', resubmit: 'Please send part of your identity check again' }[input.outcome];
+  const paragraphs = [
+    input.outcome === 'approved'
+      ? `Thank you: your identity is verified for ${input.brand}.`
+      : input.outcome === 'declined'
+        ? (input.reason ?? 'We could not verify your identity.')
+        : `We need a few items again before we can finish checking your identity for ${input.brand}.`,
+    ...(input.note ? [`Note from the reviewer: ${input.note}`] : []),
+    ...(input.link && input.outcome !== 'approved' ? [`Continue here: ${input.link}`] : []),
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent by BitoCard Verify for ${escape(input.brand)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', `Sent by BitoCard Verify for ${input.brand}.`].join('\n') };
+}
+
+/** A signed-out visitor is told the store replied in their chat (at most every 10 minutes), with the link back to it. */
+export function chatReplyEmail(to: string, input: { store: string; name: string; link: string }): EmailMessage {
+  const heading = `${input.store} replied to your chat`;
+  const paragraphs = [`Hi ${input.name}, ${input.store} answered your message. Open the store to read it and reply: the chat opens where you left it, on the same browser.`, 'Never send codes, PINs or passwords in a chat.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open the chat</a></p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', `Sent for ${input.store}.`].join('\n') };
+}
+
+/** BitoCard Shop: messages waiting unread in the person's chats (sent once per batch, after a short wait). */
+export function shopMessagesEmail(to: string, input: { name: string; chats: { title: string; from: string; unread: number }[]; link: string }): EmailMessage {
+  const count = input.chats.reduce((sum, chat) => sum + chat.unread, 0);
+  const heading = count === 1 ? 'You have a new message on BitoCard Shop' : `You have ${count} new messages on BitoCard Shop`;
+  const lines = input.chats.slice(0, 5).map(chat => `${chat.from} about "${chat.title}": ${chat.unread} new`);
+  const more = input.chats.length > 5 ? [`And ${input.chats.length - 5} more chats.`] : [];
+  const paragraphs = [`Hi ${input.name}, people are waiting for your reply.`, ...lines, ...more, 'Stay safe: keep the chat on BitoCard, meet in a public place, inspect before paying, and never pay in advance.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open your messages</a></p>`,
+    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    '</div>',
+  ].join('');
+  return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', 'BitoCard, a Golojan Ltd venture.'].join('\n') };
+}
+
+/**
+ * B2B reselling: a resale order's step or a new message, to its buyer (under the store's name), supplier or reseller.
+ * Never carries codes, the buyer's contact details or message text: the link opens the order, behind sign-in.
+ */
+export function resaleOrderEmail(to: string, input: { title: string; body: string; link: string; action: string; signature: string; sandbox: boolean }): EmailMessage {
+  const subject = `${input.sandbox ? '[Sandbox] ' : ''}${input.title}`;
+  const paragraphs = [input.body, 'Keep every message and payment on BitoCard. Never give a release code before you have checked the item, and never pay outside BitoCard.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(input.title)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">${escape(input.action)}</a></p>`,
+    `<p style="font-size:13px;color:#5b6488">${escape(input.signature)}</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject, html, text: [input.title, '', ...paragraphs, '', `${input.action}: ${input.link}`, '', input.signature].join('\n') };
+}

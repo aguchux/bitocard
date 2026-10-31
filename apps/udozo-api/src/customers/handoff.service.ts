@@ -1,0 +1,98 @@
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { houseStoreId } from '../checkout/house-ids.js';
+import { randomToken, sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { CustomersService, type CustomerWithStore } from './customers.service.js';
+
+/** A handoff code lasts this long: long enough for one redirect and the page that posts it. */
+export const handoffMs = 60_000;
+
+const refused = () => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'handoff_invalid', 'This sign-in link has expired or was already used. Sign in again.');
+
+/**
+ * Signing a bitocard.com customer in on another of BitoCard's own sites without their password: bitocard.com and its
+ * country stores (ng.bitocard.com…) share one account but each keeps its own session cookie.
+ * The site the customer is signed in on asks for a code for the other (`issue`, `to` one of BitoCard's own origins);
+ * the code travels in the address's fragment, so it never reaches a log or a Referer, and that site's server exchanges
+ * it once, within 60 seconds, for a new session there (`exchange`, naming its own origin). Only the code's hash is kept.
+ * Resellers' stores and their customers never take part.
+ */
+@Injectable()
+export class HandoffService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly integrations: IntegrationsService,
+    private readonly customers: CustomersService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
+
+  /**
+   * The origin, if it is one of the product's own sites a customer may be handed to. BitoCard: bitocard.com
+   * (`STOREFRONT_URL`) or a published country store under it (`<cc>.<host>`, same scheme and port); crypto and BitoCard
+   * Shop have left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md, docs/UDOZO_SPINOFF_PLAN.md) and are never targets. Udozo
+   * (`STOREFRONT_URL` is udozo.com there): udozo.com, any published store's address under it (`<store>.udozo.com`, the
+   * sandbox) and the active domains of published stores (their live addresses), so one Udozo account signs in on each.
+   */
+  async target(to: string) {
+    let url: URL;
+    try {
+      url = new URL(to);
+    } catch {
+      return null;
+    }
+    if (`${url.origin}` !== to.replace(/\/+$/, '')) return null;
+    const store = new URL(this.integrations.config.STOREFRONT_URL);
+    if (url.origin === store.origin) return url.origin;
+    const suffix = `.${store.host}`;
+    const udozo = this.config.APP_PRODUCT === 'udozo';
+    if (url.protocol === store.protocol && url.host.endsWith(suffix)) {
+      const subdomain = url.host.slice(0, -suffix.length);
+      // BitoCard: its two-letter country stores. Udozo: any of its published stores (their sandbox addresses).
+      if ((udozo ? /^[a-z0-9-]+$/ : /^[a-z]{2}$/).test(subdomain) && (await this.customers.sharedStore(subdomain))) return url.origin;
+    }
+    // Udozo's live stores are on their resellers' own domains (or their www), over https.
+    if (udozo && url.protocol === 'https:' && !url.port && (await this.storeDomain(url.hostname))) return url.origin;
+    return null;
+  }
+
+  /** An active domain of a published Udozo store whose reseller is not suspended, by its name or `www.` before it. */
+  private async storeDomain(hostname: string) {
+    const names = [hostname, ...(hostname.startsWith('www.') ? [hostname.slice(4)] : [])];
+    const domain = await this.prisma.storeDomain.findFirst({
+      where: { name: { in: names }, status: 'active', store: { status: 'published', reseller: { status: { not: 'suspended' } } } },
+      select: { id: true },
+    });
+    return domain !== null;
+  }
+
+  async issue(customer: CustomerWithStore, to: string) {
+    if (customer.storeId !== houseStoreId) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'handoff_unavailable', "Only BitoCard accounts can move between BitoCard's sites.");
+    const origin = await this.target(to);
+    if (!origin) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', "Choose one of BitoCard's own sites.", 'to');
+    const code = `bch_${randomToken()}`;
+    const now = Date.now();
+    const expiresAt = new Date(now + handoffMs);
+    await this.prisma.customerHandoff.create({ data: { customerId: customer.id, codeHash: sha256(code), toOrigin: origin, expiresAt } });
+    // Codes are spent or dead within a minute: anything an hour old is gone.
+    await this.prisma.customerHandoff.deleteMany({ where: { expiresAt: { lt: new Date(now - 60 * 60_000) } } });
+    return { object: 'customer_handoff' as const, code, to: origin, expires_at: expiresAt.toISOString() };
+  }
+
+  /** The code for a new session on `origin` (the exchanging site's own): once, before it expires, only there. */
+  async exchange(code: string, origin: string) {
+    const target = await this.target(origin);
+    if (!target || !code.startsWith('bch_')) throw refused();
+    const now = new Date();
+    const codeHash = sha256(code);
+    const claimed = await this.prisma.customerHandoff.updateMany({ where: { codeHash, usedAt: null, toOrigin: target, expiresAt: { gt: now } }, data: { usedAt: now } });
+    if (!claimed.count) throw refused();
+    const handoff = await this.prisma.customerHandoff.findUniqueOrThrow({ where: { codeHash }, include: { customer: true } });
+    const customer = handoff.customer;
+    if (customer.status !== 'active' || customer.storeId !== houseStoreId) throw refused();
+    await this.prisma.customer.update({ where: { id: customer.id }, data: { lastSignInAt: now } });
+    return { customer: await this.customers.present(customer), session: await this.customers.startSession(customer.id) };
+  }
+}

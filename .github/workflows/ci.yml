@@ -70,5 +70,8 @@ jobs:
       - name: API tests against Postgres and Redis
         run: npm run test:docker -w @bitocard/api
 
+      - name: Udozo's API tests against Postgres and Redis
+        run: npm run test:docker -w @udozo/api
+
       - name: Signer tests against Postgres (several instances at once)
         run: npm run test:docker -w @afrippa/signer

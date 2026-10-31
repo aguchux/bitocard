@@ -1,0 +1,73 @@
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service.js';
+import { numericCode, sameDigest, sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { CodePurpose } from '../generated/prisma/client.js';
+
+const lifetimeMs = 30 * 60 * 1000;
+const resendAfterMs = 60 * 1000;
+export const maxCodeAttempts = 5;
+export const maxCodesPerDay = 10;
+const dayMs = 24 * 60 * 60 * 1000;
+
+const digest = (userId: string, purpose: CodePurpose, code: string) => sha256(`${purpose}:${userId}:${code}`);
+
+/** Single-use 6-digit codes for email, SMS and password reset. Only a hash is stored; a new code replaces older ones. */
+@Injectable()
+export class CodesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** `lifetime` shortens how long the code works (30 minutes by default; two-step sign-in codes 10). */
+  async issue(userId: string, purpose: CodePurpose, target: string, lifetime = lifetimeMs) {
+    const latest = await this.prisma.verificationCode.findFirst({
+      where: { userId, purpose, consumedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
+    }
+    // A daily cap, so new codes (each with fresh attempts) cannot be requested without end to guess one.
+    const today = await this.prisma.verificationCode.count({ where: { userId, purpose, createdAt: { gt: new Date(Date.now() - dayMs) } } });
+    if (today >= maxCodesPerDay) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_daily_limit', 'Too many codes were sent today. Try again tomorrow.');
+    }
+    const code = numericCode();
+    await this.prisma.$transaction([
+      this.prisma.verificationCode.updateMany({ where: { userId, purpose, consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.verificationCode.create({
+        data: { userId, purpose, target, codeHash: digest(userId, purpose, code), expiresAt: new Date(Date.now() + lifetime) },
+      }),
+    ]);
+    return code;
+  }
+
+  /** Cancels outstanding codes, for example when sending one failed, so a new one can be requested at once. */
+  cancel(userId: string, purpose: CodePurpose) {
+    return this.prisma.verificationCode.updateMany({ where: { userId, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
+  }
+
+  /** Consumes the code if it matches; returns the target it was sent to. */
+  async consume(userId: string, purpose: CodePurpose, code: string) {
+    const record = await this.prisma.verificationCode.findFirst({
+      where: { userId, purpose, consumedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    const invalid = new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
+    if (!record) throw invalid;
+    if (record.expiresAt <= new Date()) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_expired', 'That code has expired. Ask for a new one.', 'code');
+    }
+    // Claim an attempt before comparing, in one statement, so parallel guesses can never get past the limit.
+    const attempt = await this.prisma.verificationCode.updateMany({
+      where: { id: record.id, consumedAt: null, attempts: { lt: maxCodeAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (attempt.count === 0) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
+    }
+    if (!sameDigest(record.codeHash, digest(userId, purpose, code))) throw invalid;
+    const consumed = await this.prisma.verificationCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
+    if (consumed.count === 0) throw invalid;
+    return record.target;
+  }
+}
