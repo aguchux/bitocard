@@ -7,6 +7,7 @@ import { DataTable } from './data';
 import { Badge, Notice, StatusBadge } from './status';
 import { Button, Card, CardHeader, Input, KeyValue, Toggle } from './primitives';
 import { formatDateTime, formatMoney, formatRelative } from '../format';
+import { productName } from '@bitocard/api-client';
 
 /** A hosted store's customer, as its owner sees them (the same shape in SHQ and the admin app). */
 export type StoreCustomerRow = {
@@ -63,6 +64,7 @@ export function StoreCustomersTable({
   onIdentityCheck,
   onOpen,
   hasMore,
+  catalogue = true,
 }: {
   customers: StoreCustomerRow[] | undefined;
   loading?: boolean;
@@ -75,6 +77,8 @@ export function StoreCustomersTable({
   /** Opens the customer's page. */
   onOpen?: (customer: StoreCustomerRow) => void;
   hasMore?: boolean;
+  /** BitoCard's catalogue purchases (digital products bought at the store); Udozo's apps leave them out. */
+  catalogue?: boolean;
 }) {
   return (
     <div>
@@ -106,7 +110,7 @@ export function StoreCustomersTable({
               </span>
             ),
           },
-          { key: 'purchases', header: 'Purchases', align: 'right', cell: customer => customer.purchases.toLocaleString('en-GB') },
+          ...(catalogue ? [{ key: 'purchases', header: 'Purchases', align: 'right' as const, cell: (customer: StoreCustomerRow) => customer.purchases.toLocaleString('en-GB') }] : []),
           {
             key: 'checked',
             header: 'Identity',
@@ -148,6 +152,7 @@ export function StoreCustomerView({
   orderLink,
   storeChecksOff,
   identityReview,
+  catalogue = true,
 }: {
   customer: StoreCustomerDetailView;
   /** Identity check and account status. */
@@ -165,6 +170,8 @@ export function StoreCustomerView({
   storeChecksOff?: boolean;
   /** A link to review the customer's ID check, shown only when the owner may review it (never documents otherwise). */
   identityReview?: ReactNode;
+  /** BitoCard's catalogue purchases and their disputes (digital products bought at the store); Udozo's apps leave them out. */
+  catalogue?: boolean;
 }) {
   // The API calls a suspended account `disabled`.
   const suspended = customer.status === 'disabled';
@@ -195,7 +202,7 @@ export function StoreCustomerView({
             open={confirming}
             onClose={() => setConfirming(false)}
             title={`Suspend ${customer.name}?`}
-            description="They are signed out everywhere and cannot sign in or buy until you unsuspend them. The orders and codes they bought stay theirs."
+            description={`They are signed out everywhere and cannot sign in or buy until you unsuspend them. ${catalogue ? 'The orders and codes they bought stay theirs.' : 'Their orders stay theirs.'}`}
             confirmLabel="Suspend"
             tone="danger"
             requireReason={false}
@@ -209,7 +216,7 @@ export function StoreCustomerView({
                 { label: 'Joined', value: formatDateTime(customer.created_at) },
                 { label: 'Last signed in', value: customer.last_sign_in_at ? formatRelative(customer.last_sign_in_at) : 'Never' },
                 { label: 'Signed in on', value: `${customer.signed_in_sessions} ${customer.signed_in_sessions === 1 ? 'device' : 'devices'}` },
-                { label: 'Disputes', value: customer.disputes.toLocaleString('en-GB') },
+                ...(catalogue ? [{ label: 'Disputes', value: customer.disputes.toLocaleString('en-GB') }] : []),
                 {
                   label: 'Wallet',
                   value: customer.wallet.length
@@ -236,7 +243,7 @@ export function StoreCustomerView({
         <Card>
           <CardHeader
             title="Identity check"
-            description={customer.identity_checked ? 'Passed BitoCard’s identity check.' : 'Not checked.'}
+            description={customer.identity_checked ? `Passed ${productName()}’s identity check.` : 'Not checked.'}
             actions={
               <span className="flex items-center gap-2 text-sm font-medium">
                 {customer.identity_check ? 'Asked' : 'Off'}
@@ -247,7 +254,9 @@ export function StoreCustomerView({
           <div className="space-y-3 p-5 sm:p-6 text-sm text-muted">
             <p>
               {customer.identity_check
-                ? 'Asked to verify their identity before buying where the market requires it for the product.'
+                ? catalogue
+                  ? 'Asked to verify their identity before buying where the market requires it for the product.'
+                  : 'Asked to verify their identity where the market requires it.'
                 : 'Not asked, whatever the market requires. This does not mark them as checked.'}
             </p>
             {storeChecksOff ? <Notice tone="grey">Identity checks are off for the whole store, so this customer is not asked either way.</Notice> : null}
@@ -255,6 +264,7 @@ export function StoreCustomerView({
           </div>
         </Card>
       </div>
+      {catalogue ? (
       <Card>
         <CardHeader title="Purchases" description="Paid purchases, newest first (the latest 50). Codes are only ever shown to the customer." />
         <DataTable
@@ -281,6 +291,7 @@ export function StoreCustomerView({
           ]}
         />
       </Card>
+      ) : null}
     </div>
   );
 }

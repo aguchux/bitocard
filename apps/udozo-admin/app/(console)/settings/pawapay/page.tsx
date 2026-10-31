@@ -193,7 +193,7 @@ function AddMarketDialog({ country, onClose }: { country: PawapayCountry; onClos
       open
       onClose={onClose}
       title={`Add ${country.name} as a market`}
-      description="Every product category starts off except software; switch them on in Markets once suppliers, tax and terms are ready."
+      description="The market starts with the marketplace off; switch it on in Feature switches once its payment methods, payouts and terms are ready."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>

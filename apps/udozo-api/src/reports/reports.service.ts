@@ -35,7 +35,7 @@ const labels: Record<ReportLine, string> = {
   retail_margin: "Retail margin on BitoCard's own stores",
   platform_fees: "Fees on resellers' own suppliers",
   domain_revenue: 'Domain sales',
-  classifieds_revenue: 'BitoCard Shop fees',
+  classifieds_revenue: 'Marketplace and resale fees',
   cost_of_sales: 'Cost of sales',
   processing_fees: 'Payment processing fees',
   chargebacks: 'Chargebacks',

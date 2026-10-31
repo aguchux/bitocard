@@ -1,5 +1,6 @@
 import type { AppConfig } from '../config/config.js';
 import type { Platform } from '../generated/prisma/client.js';
+import type { Product } from '../products/product.js';
 import { chainProviders, walletKeyFields } from '../crypto/chains/providers.js';
 import { screeners } from '../crypto/custody/screening.js';
 import { signerFields } from '../crypto/custody/signer.js';
@@ -696,6 +697,23 @@ export const integrationGroups: IntegrationGroup[] = groupsWithoutPlatforms.map(
 
 /** The integration groups a product's admin sees and sets. */
 export const groupsFor = (platform: Platform) => integrationGroups.filter(group => group.platforms.includes(platform));
+
+/**
+ * Udozo's integration groups: the platform services, and pawaPay for mobile money payments and payouts. Never BitoCard's
+ * product suppliers, DeepSeek (shop assistants refuse it), BitoCard's store support assistants, or Afrippa's addresses.
+ */
+const notUdozoGroups: ReadonlySet<string> = new Set(['deepseek', 'support_ai']);
+const notUdozoFields: ReadonlySet<string> = new Set(['AFRIPPA_URL', 'AFRIPPA_VERIFY_URL']);
+
+/** The groups a product's admin sees and sets: Udozo's instance (APP_PRODUCT) narrows BitoCard's platform groups to its own. */
+export const groupsForProduct = (platform: Platform, product: Product) => {
+  const groups = groupsFor(platform);
+  if (product !== 'udozo') return groups;
+  return groups
+    .filter(group => (group.section !== 'suppliers' || group.id === 'pawapay') && !notUdozoGroups.has(group.id))
+    // pawaPay is a payment provider on Udozo (mobile money in and out), never a product supplier.
+    .map(group => ({ ...group, section: group.id === 'pawapay' ? ('platform' as const) : group.section, fields: group.fields.filter(item => !notUdozoFields.has(item.key)) }));
+};
 
 /** Settings only Afrippa uses (its crypto): read from Afrippa's values whoever reads them. */
 export const afrippaOnlyKeys: ReadonlySet<string> = new Set(integrationGroups.filter(group => group.platforms.length === 1 && group.platforms[0] === 'afrippa').flatMap(group => group.fields.map(item => item.key)));

@@ -29,6 +29,7 @@ export default function UdozoAccountsPage() {
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
         <Card>
           <StoreCustomersTable
+            catalogue={false}
             customers={customers.data?.data}
             loading={customers.isLoading}
             error={customers.error ? errorMessage(customers.error) : null}

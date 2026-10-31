@@ -3,9 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownToLine, ArrowLeftRight, Banknote, CircleDollarSign, Clock, CreditCard, Gift, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
-import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, formatDateTime, formatMoney, formatRelative, humanise, LoadMore, Notice, PageHeader, RefreshFailed, StatCard, StatusBadge } from "@bitocard/admin-ui";
-import { type Chargeback, type WalletTransaction, useWalletChargebacksQuery, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
+import { ArrowDownToLine, ArrowLeftRight, Banknote, CircleDollarSign, Clock, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
+import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, formatDateTime, formatMoney, formatRelative, humanise, LoadMore, Notice, PageHeader, RefreshFailed, StatCard } from "@bitocard/admin-ui";
+import { type WalletTransaction, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { ConvertDialog, walletName, WalletSwitch } from "@/components/wallets";
@@ -70,9 +70,6 @@ function Wallets() {
   // The country wallet unless `?currency=USD` chose the US dollar one.
   const asked = search.get("currency")?.toUpperCase() || undefined;
   const wallet = useWalletQuery(asked, { skip: !allowed });
-  const chargebacks = useWalletChargebacksQuery(undefined, { skip: !allowed });
-  const chargebackRows = chargebacks.data?.data ?? [];
-  const holding = chargebackRows.some(row => row.payouts_on_hold);
   const data = wallet.data;
   const currency = data?.currency ?? "";
   const transactions = useWalletTransactionsInfiniteQuery(currency || undefined, { skip: !allowed || !currency });
@@ -209,83 +206,6 @@ function Wallets() {
           </div>
           )}
 
-          {chargebackRows.length ? (
-            <Card>
-              <CardHeader
-                title="Chargebacks"
-                description={
-                  holding
-                    ? "A cardholder disputed a card payment with their bank. Its amount is held from your wallet and withdrawals wait until the card network decides."
-                    : "Card payments cardholders disputed (chargebacks)."
-                }
-                className="pb-4"
-              />
-              <DataTable<Chargeback>
-                caption="Chargebacks"
-                rows={chargebackRows}
-                rowKey={row => row.id}
-                empty="No chargebacks."
-                columns={[
-                  {
-                    key: "dispute",
-                    header: "Chargeback",
-                    cell: row => (
-                      <span className="inline-flex items-center gap-2">
-                        <CreditCard className="size-4 text-muted" aria-hidden />
-                        <span title={formatDateTime(row.opened_at)}>{`Opened ${formatRelative(row.opened_at)}`}</span>
-                      </span>
-                    ),
-                  },
-                  { key: "amount", header: "Amount", align: "right", cell: row => <span className="font-semibold">{formatMoney(row.amount, row.currency)}</span> },
-                  {
-                    key: "held",
-                    header: "Your wallet",
-                    cell: row => (
-                      <span className="text-xs text-muted">
-                        {row.protected
-                          ? "Covered by chargeback protection"
-                          : row.status === "won"
-                            ? "Hold returned"
-                            : `${row.status === "lost" ? "Returned to the cardholder" : "Held"}: ${formatMoney(row.held, row.currency)}${row.shortfall ? ` (short ${formatMoney(row.shortfall, row.currency)})` : ""}`}
-                      </span>
-                    ),
-                    hideOnMobile: true,
-                  },
-                  {
-                    key: "status",
-                    header: "Status",
-                    cell: row => (
-                      <div className="space-y-0.5">
-                        <StatusBadge status={row.status} />
-                        {row.payouts_on_hold ? <p className="text-xs text-muted">Withdrawals wait</p> : null}
-                      </div>
-                    ),
-                  },
-                ]}
-              />
-            </Card>
-          ) : null}
-
-          {data?.startup_allowance ? (
-            <Card className="flex flex-wrap items-center gap-4 p-5 sm:p-6">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
-                <Gift className="size-5" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">
-                  Startup allowance:{" "}
-                  {data.startup_allowance.status === "revoked"
-                    ? "ended"
-                    : `${formatMoney(data.startup_allowance.remaining, "USD")} of ${formatMoney(data.startup_allowance.granted, "USD")} left`}
-                </p>
-                <p className="text-xs text-muted">
-                  Pays Udozo&apos;s wholesale cost on orders your customers pay through Udozo checkout. It is not cash: it cannot be spent directly, withdrawn or transferred, and it does not refill.
-                </p>
-              </div>
-              <StatusBadge status={data.startup_allowance.status} />
-            </Card>
-          ) : null}
-
           <Card>
             <CardHeader title="Transactions" description={`Every change to your ${currency ? walletName(currency) : "wallet"}, newest first.`} className="pb-4" />
             <DataTable<WalletTransaction>
@@ -314,16 +234,7 @@ function Wallets() {
                   key: "amount",
                   header: "Available",
                   align: "right",
-                  cell: row =>
-                    row.allowance_change ? (
-                      // Startup allowance entries change the allowance (US dollars), never the money available.
-                      <span className="inline-flex flex-col items-end">
-                        <Change amount={row.allowance_change} currency="USD" />
-                        <span className="text-xs text-muted">Startup allowance</span>
-                      </span>
-                    ) : (
-                      <Change amount={row.amount} currency={row.currency ?? currency} />
-                    ),
+                  cell: row => <Change amount={row.amount} currency={row.currency ?? currency} />,
                 },
                 { key: "reserved", header: "Reserved", align: "right", cell: row => <Change amount={row.reserved_change} currency={row.currency ?? currency} />, hideOnMobile: true },
                 { key: "held", header: "On hold", align: "right", cell: row => <Change amount={row.earnings_on_hold_change} currency={row.currency ?? currency} />, hideOnMobile: true },

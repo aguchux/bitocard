@@ -1,4 +1,4 @@
-import type { Product } from '../products/product.js';
+import { inProductWords, type Product } from '../products/product.js';
 /**
  * What plans can include, in the order they are shown, grouped, with the words resellers read. Admins switch each on
  * or off for every plan (`PlansService.setFeature`); the API refuses a feature the reseller's plan does not include
@@ -62,8 +62,25 @@ export const planLimits = Object.keys(planLimitCatalogue) as PlanLimit[];
 /** Limits only Udozo's plans have (docs/UDOZO_SPINOFF_PLAN.md): BitoCard's plans never show or set them. */
 const udozoLimits: ReadonlySet<PlanLimit> = new Set<PlanLimit>(['free_domains']);
 
+/**
+ * BitoCard's own features and limits, which Udozo's plans never show or set: suppliers and payment gateways of a
+ * reseller's own, selling abroad (Udozo's stores sell only in their reseller's country), chargeback protection (Udozo's
+ * shoppers pay from their Udozo wallet), store support assistants on BitoCard's AI, and the store limit (Udozo has none).
+ */
+const bitocardFeatures: ReadonlySet<PlanFeature> = new Set<PlanFeature>(['own_integrations', 'own_payment_gateways', 'multiple_stores', 'international_selling', 'chargeback_protection', 'ai_assistant']);
+const bitocardLimits: ReadonlySet<PlanLimit> = new Set<PlanLimit>(['stores', 'own_connections', 'ai_replies']);
+
 /** The limits a product's plans have. */
-export const planLimitsFor = (product: Product) => planLimits.filter(limit => product === 'udozo' || !udozoLimits.has(limit));
+export const planLimitsFor = (product: Product) => planLimits.filter(limit => (product === 'udozo' ? !bitocardLimits.has(limit) : !udozoLimits.has(limit)));
+
+/** The features a product's plans have. */
+export const planFeaturesFor = (product: Product) => planFeatures.filter(feature => product !== 'udozo' || !bitocardFeatures.has(feature));
+
+/** A feature's catalogue entry in the product's own words (Udozo's plans never say BitoCard). */
+export const planFeatureDetail = (feature: PlanFeature, product: Product) => {
+  const entry = planFeatureCatalogue[feature];
+  return { ...entry, name: inProductWords(entry.name, product), description: inProductWords(entry.description, product) };
+};
 
 export function isPlanLimit(value: string): value is PlanLimit {
   return (planLimits as readonly string[]).includes(value);

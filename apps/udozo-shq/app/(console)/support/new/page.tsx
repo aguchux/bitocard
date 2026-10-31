@@ -7,7 +7,6 @@ import { type TicketCategory, type TicketRequester, ticketCategories, useOpenTic
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function NewTicketForm() {
   const id = useId();
@@ -17,10 +16,8 @@ function NewTicketForm() {
   const [category, setCategory] = useState<TicketCategory>("technical");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
-  const [orderId, setOrderId] = useState("");
   const [customerReference, setCustomerReference] = useState("");
-  const orderOk = !orderId.trim() || uuid.test(orderId.trim());
-  const valid = subject.trim().length >= 3 && message.trim().length >= 3 && orderOk;
+  const valid = subject.trim().length >= 3 && message.trim().length >= 3;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -30,7 +27,6 @@ function NewTicketForm() {
       category,
       subject: subject.trim(),
       message: message.trim(),
-      ...(orderId.trim() ? { order_id: orderId.trim() } : {}),
       ...(requester === "customer" && customerReference.trim() ? { customer_reference: customerReference.trim() } : {}),
     })
       .unwrap()
@@ -67,9 +63,6 @@ function NewTicketForm() {
         </Field>
         <Field label="Your question" htmlFor={`${id}-message`}>
           <Textarea id={`${id}-message`} rows={6} maxLength={5000} value={message} onChange={event => setMessage(event.target.value)} />
-        </Field>
-        <Field label="Order ID (optional)" htmlFor={`${id}-order`} error={orderOk ? undefined : "That is not an order ID."}>
-          <Input id={`${id}-order`} autoComplete="off" value={orderId} onChange={event => setOrderId(event.target.value)} />
         </Field>
         {requester === "customer" ? (
           <Field label="Your customer reference (optional)" htmlFor={`${id}-customer`}>

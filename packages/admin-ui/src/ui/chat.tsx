@@ -4,11 +4,22 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, t
 import { Bot, FileText, Loader2, Paperclip, SendHorizontal, X } from 'lucide-react';
 import { chatFileAccept, formatFileSize, initials, prepareChatFile, startsRun } from '@bitocard/ui/chat';
 import { cn, formatDateTime } from '../format';
+import { productName } from '@bitocard/api-client';
 
 export type ChatPanelAttachment = { id: string; name: string; content_type: string; size: number; width: number | null; height: number | null };
 export type ChatPanelMessage = { id: string; author: string; author_name: string | null; author_avatar_url?: string | null; body: string; attachments?: ChatPanelAttachment[]; created_at: string };
 
-const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', afrippa: 'Afrippa', bot: 'Assistant', system: 'Update' };
+const roles: Record<string, string> = {
+  customer: 'Customer',
+  reseller: 'Store',
+  // The product's own team: BitoCard's, or Udozo's in Udozo's apps.
+  get bitocard() {
+    return productName();
+  },
+  afrippa: 'Afrippa',
+  bot: 'Assistant',
+  system: 'Update',
+};
 const time = (iso: string) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 /** A participant's face: the assistant's picture or icon, otherwise their initials on their side's colour. */

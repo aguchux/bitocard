@@ -1,4 +1,6 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { inProductWords } from '../products/product.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode, Notification, NotificationAudience, Prisma } from '../generated/prisma/client.js';
@@ -8,6 +10,7 @@ import {
   type AfrippaAdminNotificationType,
   type CustomerNotificationType,
   notificationTypes,
+  notificationTypesFor,
   type NotificationType,
   type PersonalNotificationType,
   type ResellerNotificationType,
@@ -50,6 +53,7 @@ export class InboxService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly push: PushService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /** To the reseller account's owner and the members whose role the type lists. */
@@ -128,6 +132,10 @@ export class InboxService {
 
   private async create(targets: Target[], type: NotificationType, content: NotificationContent) {
     if (targets.length === 0) return 0;
+    // Udozo never sends BitoCard's own notices, and writes the rest in its own name (its chat with resellers is /support/udozo).
+    if (!notificationTypesFor(this.config.APP_PRODUCT).includes(type)) return 0;
+    const words = (text: string) => inProductWords(text, this.config.APP_PRODUCT);
+    const link = this.config.APP_PRODUCT === 'udozo' && content.link === '/support/bitocard' ? '/support/udozo' : content.link;
     const created = await this.prisma.notification.createManyAndReturn({
       data: targets.map(target => ({
         audience: target.audience,
@@ -137,9 +145,9 @@ export class InboxService {
         storeId: target.storeId ?? null,
         type,
         severity: notificationTypes[type].severity,
-        title: content.title.slice(0, 200),
-        body: content.body.slice(0, 1000),
-        link: content.link ?? null,
+        title: words(content.title).slice(0, 200),
+        body: words(content.body).slice(0, 1000),
+        link: link ?? null,
         mode: content.mode ?? null,
         dedupeKey: `${type}:${content.subject}`.slice(0, 300),
       })),

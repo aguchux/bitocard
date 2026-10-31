@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AccountKind, LedgerMode } from '../generated/prisma/client.js';
 import { WalletService } from '../ledger/wallet.service.js';
@@ -38,6 +39,7 @@ export class ResellerReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallets: WalletService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /**
@@ -147,6 +149,19 @@ export class ResellerReportsService {
         GROUP BY 1`;
       const byDay = new Map<string, number>();
       for (const row of rows) byDay.set(dateKey(row.day), minor(-row.net));
+      return byDay;
+    }
+    // Udozo's resellers sell resale orders, never BitoCard's catalogue orders: those released (or partly refunded) by day.
+    if (this.config.APP_PRODUCT === 'udozo') {
+      const resale = await this.prisma.classifiedOrder.findMany({
+        where: { resellerId: input.resellerId, mode: input.mode, kind: 'resale', status: { in: ['released', 'partly_refunded'] }, currency, releasedAt: { gte: from, lt: input.to } },
+        select: { releasedAt: true, priceMinor: true },
+      });
+      const byDay = new Map<string, number>();
+      for (const order of resale) {
+        const key = dateKey(order.releasedAt!);
+        byDay.set(key, (byDay.get(key) ?? 0) + (input.metric === 'orders' ? 1 : minor(order.priceMinor)));
+      }
       return byDay;
     }
     const orders = await this.prisma.order.findMany({

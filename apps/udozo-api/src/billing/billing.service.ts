@@ -56,7 +56,7 @@ export class BillingService {
       const carrying = await this.prisma.storeSubscription.findFirst({ where: { resellerId, planCode: reseller.planCode }, orderBy: { renewsAt: 'asc' } });
       return {
         object: 'subscription' as const,
-        plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency), this.plans.limitsOf(reseller.plan)),
+        plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency), this.plans.limitsOf(reseller.plan), this.plans.product),
         renews_at: carrying?.renewsAt?.toISOString() ?? null,
         cancel_at_period_end: carrying?.cancelAtPeriodEnd ?? false,
         past_due_since: carrying?.pastDueSince?.toISOString() ?? null,
@@ -65,7 +65,7 @@ export class BillingService {
     return {
       object: 'subscription' as const,
       /** With `local_price`: what the plan costs a month in your currency. */
-      plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency), this.plans.limitsOf(reseller.plan)),
+      plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency), this.plans.limitsOf(reseller.plan), this.plans.product),
       /** Null when the plan is not billed (Startup, or set by BitoCard). */
       renews_at: reseller.planRenewsAt?.toISOString() ?? null,
       cancel_at_period_end: reseller.planCancelAtPeriodEnd,

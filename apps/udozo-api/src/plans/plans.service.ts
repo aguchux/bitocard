@@ -8,13 +8,15 @@ import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
 import { FxService } from '../fx/fx.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureCatalogue, planFeatureGroups, planFeatures, planLimitCatalogue, planLimitsFor } from './features.js';
+import { freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureDetail, planFeatureGroups, planFeatures, planFeaturesFor, planLimitCatalogue, planLimitsFor } from './features.js';
+import { inProductWords, type Product } from '../products/product.js';
 import { PlanAccessService } from './plan-access.js';
 
 export { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures, type PlanFeature } from './features.js';
 
-export function presentPlan(plan: Plan) {
-  return { object: 'plan' as const, code: plan.code, name: plan.name, price: { amount: plan.priceCents, currency: 'USD', interval: 'month' }, features: plan.features.filter(code => (planFeatures as readonly string[]).includes(code)) };
+export function presentPlan(plan: Plan, product: Product = 'bitocard') {
+  const offered: readonly string[] = planFeaturesFor(product);
+  return { object: 'plan' as const, code: plan.code, name: plan.name, price: { amount: plan.priceCents, currency: 'USD', interval: 'month' }, features: plan.features.filter(code => offered.includes(code)) };
 }
 
 /** What a reseller pays for a plan a month in one currency: the admin's fixed price, else the dollar price converted. */
@@ -27,11 +29,11 @@ export type PlanLimitValues = Record<PlanLimit, number | null>;
  * The plan as resellers see it: its description, its features in words, how much it allows (`limits`), and (when
  * asked) its price in their currency.
  */
-export function presentPlanDetail(plan: Plan, local: LocalPrice | null, limits: PlanLimitValues) {
+export function presentPlanDetail(plan: Plan, local: LocalPrice | null, limits: PlanLimitValues, product: Product = 'bitocard') {
   return {
-    ...presentPlan(plan),
-    description: plan.description,
-    feature_details: planFeatures.filter(code => plan.features.includes(code)).map(code => ({ code, ...planFeatureCatalogue[code] })),
+    ...presentPlan(plan, product),
+    description: inProductWords(plan.description, product),
+    feature_details: planFeaturesFor(product).filter(code => plan.features.includes(code)).map(code => ({ code, ...planFeatureDetail(code, product) })),
     limits,
     local_price: local ? { amount: Number(local.amount), currency: local.currency, fixed: local.fixed } : null,
   };
@@ -60,6 +62,11 @@ export class PlansService {
 
   /** Every limit's value for a plan: what it sets, else the default. */
   /** This product's limits (Udozo's plans have `free_domains`, BitoCard's never). */
+  /** The product this instance serves, for presenting plans in its own features and words. */
+  get product(): Product {
+    return this.config.APP_PRODUCT;
+  }
+
   private shownLimits() {
     return planLimitsFor(this.config.APP_PRODUCT);
   }
@@ -79,7 +86,7 @@ export class PlansService {
   async publicList(currency?: string) {
     const plans = (await this.list()).filter(plan => plan.available);
     const code = currency?.trim().toUpperCase();
-    return Promise.all(plans.map(async plan => presentPlanDetail(plan, code ? await this.localPrice(plan, code) : null, this.limitsOf(plan))));
+    return Promise.all(plans.map(async plan => presentPlanDetail(plan, code ? await this.localPrice(plan, code) : null, this.limitsOf(plan), this.config.APP_PRODUCT)));
   }
 
   /**
@@ -113,7 +120,7 @@ export class PlansService {
       object: 'plan_settings' as const,
       plans: await Promise.all(
         plans.map(async plan => ({
-          ...presentPlan(plan),
+          ...presentPlan(plan, this.config.APP_PRODUCT),
           description: plan.description,
           free: plan.code === freePlanCode,
           available: plan.available,
@@ -142,7 +149,7 @@ export class PlansService {
         })),
       ),
       groups: Object.entries(planFeatureGroups).map(([code, name]) => ({ code, name })),
-      features: planFeatures.map(code => ({ code, ...planFeatureCatalogue[code] })),
+      features: planFeaturesFor(this.config.APP_PRODUCT).map(code => ({ code, ...planFeatureDetail(code, this.config.APP_PRODUCT) })),
       limits: this.shownLimits().map(code => {
         const { scope, group, name, unit, description, max } = planLimitCatalogue[code];
         return { code, scope, group, name, unit, description, max, default: this.access.limitOf({ limits: {} }, code) };
@@ -193,7 +200,7 @@ export class PlansService {
         name: input.name.trim(),
         description: input.description?.trim() || null,
         priceCents: input.price_cents,
-        features: planFeatures.filter(feature => input.features?.includes(feature)),
+        features: planFeaturesFor(this.config.APP_PRODUCT).filter(feature => input.features?.includes(feature)),
         available: input.available ?? true,
         sortOrder: input.sort_order ?? (last._max.sortOrder ?? 0) + 10,
       },
@@ -244,7 +251,7 @@ export class PlansService {
           name: input.name?.trim() || undefined,
           description: input.description === undefined ? undefined : input.description?.trim() || null,
           priceCents: input.price_cents,
-          features: input.features ? planFeatures.filter(feature => input.features!.includes(feature)) : undefined,
+          features: input.features ? planFeaturesFor(this.config.APP_PRODUCT).filter(feature => input.features!.includes(feature)) : undefined,
           apiRestrictions: input.api_restrictions,
           available: input.available,
           sortOrder: input.sort_order,
@@ -255,7 +262,7 @@ export class PlansService {
     });
     await this.audit.record({ actorId, action: 'plan.updated', targetType: 'plan', targetId: code, before: auditable(before), after: auditable(after) });
     await this.tellPlan(after.code, after.name, before.features.filter(feature => !after.features.includes(feature)));
-    return { ...presentPlan(after), description: after.description, available: after.available, sort_order: after.sortOrder, usage_margin_bps: after.usageMarginBps, api_restrictions: after.apiRestrictions, local_prices: auditable(after).local_prices };
+    return { ...presentPlan(after, this.config.APP_PRODUCT), description: after.description, available: after.available, sort_order: after.sortOrder, usage_margin_bps: after.usageMarginBps, api_restrictions: after.apiRestrictions, local_prices: auditable(after).local_prices };
   }
 
   /**
@@ -263,7 +270,7 @@ export class PlansService {
    * using it is then refused, `plan_feature_required`), and are told when they lose it. Audited when anything changed.
    */
   async setFeature(actorId: string | null, code: string, feature: string, enabled: boolean) {
-    if (!isPlanFeature(feature)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan feature.');
+    if (!isPlanFeature(feature) || !planFeaturesFor(this.config.APP_PRODUCT).includes(feature)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan feature.');
     const plan = await this.prisma.plan.findUnique({ where: { code } });
     if (!plan) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
     if (enabled !== plan.features.includes(feature)) {
@@ -299,7 +306,7 @@ export class PlansService {
     const features = removed.filter(isPlanFeature);
     if (!features.length) return;
     const at = new Date().toISOString();
-    const names = features.map(feature => planFeatureCatalogue[feature].name);
+    const names = features.map(feature => planFeatureDetail(feature, this.config.APP_PRODUCT).name);
     const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
     for (let after: string | undefined; ; ) {
       const page = await this.prisma.reseller.findMany({ where: { planCode: code, house: false, platform: 'bitocard' }, select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(after ? { cursor: { id: after }, skip: 1 } : {}) });
@@ -347,7 +354,7 @@ export class PlansService {
       identity_waiver: reseller.identityWaivedAt
         ? { waived_at: reseller.identityWaivedAt.toISOString(), waived_by: waivedBy ? { id: waivedBy.id, name: waivedBy.name } : null, reason: reseller.identityWaiverReason }
         : null,
-      plan: presentPlan(reseller.plan),
+      plan: presentPlan(reseller.plan, this.config.APP_PRODUCT),
       /** `two_step`: the member's two-step sign-in method, or null when it is off. `phone`: their confirmed primary mobile number, or null. */
       members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role, two_step: m.user.mfaMethod, phone: m.user.phoneVerifiedAt ? m.user.phone : null })),
       stores: reseller.stores.map(s => ({ id: s.id, name: s.name, subdomain: s.subdomain, status: s.status })),

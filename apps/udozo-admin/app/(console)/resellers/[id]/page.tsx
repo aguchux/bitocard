@@ -28,7 +28,6 @@ import { can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
 import { ResellerSwitchesCard } from "@/components/reseller-switches";
 import { ResellerWalletsCard } from "@/components/reseller-wallets";
-import { CreditLimitCard } from "@/components/credit-limit";
 import { ResaleStandingCard } from "@/components/resale-standing";
 import {
   type ResellerStatus,
@@ -254,7 +253,6 @@ export default function ResellerPage() {
           </div>
 
           {reseller.country ? <ResellerWalletsCard resellerId={reseller.id} resellerName={reseller.name} /> : null}
-          <CreditLimitCard resellerId={reseller.id} />
 
           <ResellerSwitchesCard resellerId={reseller.id} features={reseller.features} />
           {reseller.country ? <ResaleStandingCard resellerId={reseller.id} /> : null}

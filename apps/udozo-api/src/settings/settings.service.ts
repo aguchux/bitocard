@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
-import type { Product } from '../products/product.js';
+import { inProductWords, type Product } from '../products/product.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -201,9 +201,19 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'store_template_resale_shop',
 ]);
 
+/**
+ * Udozo's switches: the marketplace's and B2B reselling's, plus the shared ones it uses (resellers' own domains, the
+ * Udozo wallet Safe pay is paid from, resellers' two-step sign-in, Seller HQ's install prompt and manual approval of
+ * resellers). Everything else is BitoCard's and never listed or set on Udozo: the startup allowance, the welcome bonus,
+ * reserved accounts, resellers' own suppliers and payment gateways (resellers never integrate on Udozo), spin and win,
+ * the digital-product store templates (every Udozo store is a resale shop), bitocard.com and its country stores. Unlisted,
+ * a switch keeps its default, which is off for every one of them.
+ */
+const udozoKeeps: ReadonlySet<SwitchKey> = new Set<SwitchKey>([...udozoSwitches].filter(key => key !== 'store_template_resale_shop').concat(['custom_domains', 'customer_wallets', 'reseller_two_step', 'shq_install_prompt', 'manual_reseller_approval']));
+
 /** The switches a product's admins and resellers see (Afrippa's never: its own admins set them). */
 export const switchKeysFor = (product: Product) =>
-  (Object.keys(switchDefinitions) as SwitchKey[]).filter(key => !afrippaSwitches.has(key) && (product === 'udozo' || !udozoSwitches.has(key)));
+  (Object.keys(switchDefinitions) as SwitchKey[]).filter(key => !afrippaSwitches.has(key) && (product === 'udozo' ? udozoKeeps.has(key) : !udozoSwitches.has(key)));
 
 /** The switches BitoCard's admins and resellers see. */
 export const bitocardSwitchKeys = switchKeysFor('bitocard');
@@ -358,7 +368,7 @@ export class SettingsService {
     return {
       object: 'list' as const,
       /** Each switch's scopes, description and `default` (its value where nothing is set). */
-      definitions: Object.fromEntries(this.shownSwitches().map(key => [key, { ...switchDefinitions[key], default: switchDefault(key) }])),
+      definitions: Object.fromEntries(this.shownSwitches().map(key => [key, { ...switchDefinitions[key], description: inProductWords(switchDefinitions[key].description, this.config.APP_PRODUCT), default: switchDefault(key) }])),
       data: rows.filter(row => shown.has(row.key)).map(row => ({
         object: 'switch' as const,
         key: row.key,

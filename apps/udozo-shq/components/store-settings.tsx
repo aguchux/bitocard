@@ -14,7 +14,6 @@ import {
   Input,
   KeyValue,
   Notice,
-  Select,
   StatusBadge,
 } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
@@ -232,7 +231,6 @@ export function StoreDetails({ store, canManage }: { store: Store; canManage: bo
   const [logo, setLogo] = useState(store.branding.logo_url ?? "");
   const [primary, setPrimary] = useState(store.branding.primary_color ?? defaultPrimary);
   const [accent, setAccent] = useState(store.branding.accent_color ?? defaultAccent);
-  const [desktopNav, setDesktopNav] = useState<"" | "rail" | "bottom">(store.desktop_nav ?? "");
   const [saved, setSaved] = useState(false);
   const [update, updateState] = useUpdateStoreMutation();
   const [publish, publishState] = usePublishStoreMutation();
@@ -247,7 +245,6 @@ export function StoreDetails({ store, canManage }: { store: Store; canManage: bo
   if ((logo.trim() || null) !== store.branding.logo_url) changes.logo_url = logo.trim() || null;
   if (primary !== (store.branding.primary_color ?? defaultPrimary)) changes.primary_color = primary;
   if (accent !== (store.branding.accent_color ?? defaultAccent)) changes.accent_color = accent;
-  if ((desktopNav || null) !== store.desktop_nav) changes.desktop_nav = desktopNav || null;
   const dirty = Object.keys(changes).length > 0;
   const valid = name.trim().length >= 2 && hex.test(primary) && hex.test(accent) && (!logo.trim() || logo.trim().startsWith("https://")) && addressReady;
 
@@ -343,13 +340,6 @@ export function StoreDetails({ store, canManage }: { store: Store; canManage: bo
               <ColourField id="edit-store-primary" label="Main colour" value={primary} onChange={setPrimary} disabled={!canManage} />
               <ColourField id="edit-store-accent" label="Accent colour" value={accent} onChange={setAccent} disabled={!canManage} />
             </div>
-            <Field label="Customer app menu on desktop" htmlFor="edit-store-desktop-nav" hint="Your customers' account app. Phones and tablets always use the bottom bar.">
-              <Select id="edit-store-desktop-nav" value={desktopNav} onChange={event => setDesktopNav(event.target.value as "" | "rail" | "bottom")} disabled={!canManage}>
-                <option value="">Follow Udozo</option>
-                <option value="rail">Side rail</option>
-                <option value="bottom">Bottom bar</option>
-              </Select>
-            </Field>
           </div>
           {canManage ? (
             <div className="flex flex-wrap gap-2">

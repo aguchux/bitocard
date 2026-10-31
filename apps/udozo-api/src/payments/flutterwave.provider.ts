@@ -32,7 +32,7 @@ export const reservedReference = /^bc_r[ac]_/;
  */
 export function accountNarration(name: string) {
   const clean = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 .&'-]/g, ' ').replace(/\s+/g, ' ').trim();
-  return (clean || 'BitoCard wallet').slice(0, 35).trim();
+  return (clean || 'Udozo wallet').slice(0, 35).trim();
 }
 
 /**
@@ -106,7 +106,7 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
         currency: input.currency,
         redirect_url: input.returnUrl,
         customer: { email: input.email, name: input.name },
-        customizations: { title: 'BitoCard', description: input.description },
+        customizations: { title: 'Udozo', description: input.description },
       },
     });
     if (!res.data?.link) throw new ProviderError(this.name, 'no payment link returned', false);

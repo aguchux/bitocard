@@ -18,7 +18,8 @@ import { checkPrices } from '../crypto/price-feed.js';
 import { screener } from '../crypto/custody/screening.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { connectable } from '../reseller-integrations/connectable.js';
-import { groupsFor, isPlatformKey, sharedKeys, type IntegrationField, type IntegrationGroup } from './definitions.js';
+import { inProductWords } from '../products/product.js';
+import { groupsForProduct, isPlatformKey, sharedKeys, type IntegrationField, type IntegrationGroup } from './definitions.js';
 import type { Platform } from '../generated/prisma/client.js';
 import { inSandbox, urlsFor } from './endpoints.js';
 import { IntegrationsService, schemaFor } from './integrations.service.js';
@@ -55,12 +56,12 @@ export class IntegrationsAdminService {
   async list(platform: Platform = 'bitocard') {
     await this.integrations.refresh(true);
     const access = await this.resellerAccess();
-    return { object: 'list' as const, data: groupsFor(platform).map(group => this.presentGroup(group, access, platform)) };
+    return { object: 'list' as const, data: groupsForProduct(platform, this.integrations.config.APP_PRODUCT).map(group => this.presentGroup(group, access, platform)) };
   }
 
   /** One of the product's own groups; another product's is as unknown as a made-up one. */
   private group(groupId: string, platform: Platform) {
-    const group = groupsFor(platform).find(item => item.id === groupId);
+    const group = groupsForProduct(platform, this.integrations.config.APP_PRODUCT).find(item => item.id === groupId);
     if (!group) throw notFound();
     return group;
   }
@@ -275,23 +276,28 @@ export class IntegrationsAdminService {
       object: 'integration' as const,
       id: group.id,
       name: group.name,
-      description: group.description,
+      description: this.words(group.description),
       /** Where to sign up with the provider and find the credentials. */
       links: linksFor(group.id),
       status: connected ? ('connected' as const) : started ? ('incomplete' as const) : ('not_connected' as const),
       section: group.section,
       /** False while the supplier's adapter is not built: its credentials are saved for later and not used yet. */
       adapter_ready: group.adapterReady,
-      webhook_url: group.webhookPath ? `${platform === 'afrippa' ? 'https://api.afrippa.com' : 'https://api.bitocard.com'}${group.webhookPath}` : null,
+      webhook_url: group.webhookPath ? `${platform === 'afrippa' ? 'https://api.afrippa.com' : this.integrations.config.APP_PRODUCT === 'udozo' ? 'https://api.udozo.com' : 'https://api.bitocard.com'}${group.webhookPath}` : null,
       /** The Sandbox switch: true while BitoCard's account uses the provider's sandbox (never live); null without one. */
       sandbox: sandboxField ? sandboxField.value === true : null,
       /** Whether Test connection can check these credentials (a built adapter with a check). */
       testable: group.section === 'blockchain' || ownTests.has(group.id) || Boolean(connectable(group.id)),
       /** Resellers' own accounts (BitoCard's only): `available` once BitoCard's adapter can take them, `enabled` when an admin allows it. */
-      reseller_access: platform === 'bitocard' ? { available: Boolean(connectable(group.id)), enabled: access.has(group.id) } : { available: false, enabled: false },
+      reseller_access: platform === 'bitocard' && this.integrations.config.APP_PRODUCT !== 'udozo' ? { available: Boolean(connectable(group.id)), enabled: access.has(group.id) } : { available: false, enabled: false },
       updated_at: updates.sort().at(-1) ?? null,
       fields,
     };
+  }
+
+  /** In the instance's own words: Udozo's admin never reads BitoCard (shared definitions are written in BitoCard's). */
+  private words(text: string) {
+    return inProductWords(text, this.integrations.config.APP_PRODUCT).replace(/api\.bitocard\.com/g, this.integrations.config.APP_PRODUCT === 'udozo' ? 'api.udozo.com' : 'api.bitocard.com');
   }
 
   private presentField(field: IntegrationField, product: Platform = 'bitocard') {
@@ -314,11 +320,11 @@ export class IntegrationsAdminService {
     const raw = stored?.value ?? (effective === undefined ? null : String(effective));
     return {
       key: field.key,
-      label: field.label,
+      label: this.words(field.label),
       kind: field.kind,
       secret: field.secret,
       required: field.required,
-      help: field.help ?? null,
+      help: field.help ? this.words(field.help) : null,
       source,
       /** Never set for secrets. */
       value: field.secret ? null : ((effective as string | number | boolean | undefined) ?? null),

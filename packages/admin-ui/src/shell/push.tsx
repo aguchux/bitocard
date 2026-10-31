@@ -12,6 +12,7 @@ import {
   useRemovePushDeviceMutation,
   useSetNotificationPreferenceMutation,
   useTestPushDeviceMutation,
+  productName,
 } from '@bitocard/api-client';
 import { errorMessage, formatRelative } from '../format';
 import { Button, Card, CardHeader, Skeleton, Toggle } from '../ui/primitives';
@@ -144,15 +145,15 @@ export function PushSettings({ realm, userId }: { realm: NotificationRealm; user
     <Card>
       <CardHeader
         title="Push notifications"
-        description="Get your notifications on this computer or phone even when BitoCard is closed. Each browser you turn them on in is listed below; signing out of it stops them."
+        description={`Get your notifications on this computer or phone even when ${productName()} is closed. Each browser you turn them on in is listed below; signing out of it stops them.`}
       />
       <div className="space-y-5 px-5 pb-5 sm:px-6">
         {settings.isLoading ? (
           <Skeleton className="h-10" />
         ) : !settings.data?.enabled ? (
-          <Notice tone="grey">Push notifications are not switched on for BitoCard yet.</Notice>
+          <Notice tone="grey">Push notifications are not switched on for {productName()} yet.</Notice>
         ) : !supported ? (
-          <Notice tone="grey">This browser cannot receive push notifications. On iPhone and iPad, add BitoCard to your Home Screen first, then open it from there.</Notice>
+          <Notice tone="grey">This browser cannot receive push notifications. On iPhone and iPad, add {productName()} to your Home Screen first, then open it from there.</Notice>
         ) : current ? (
           <Notice tone="green" title="On for this browser">{`${current.label} gets your notifications.`}</Notice>
         ) : (

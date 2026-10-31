@@ -63,6 +63,12 @@ export function apiFetch(path: string, init: RequestInit = {}) {
 }
 
 
+/**
+ * The product's name as its apps show it: Afrippa in Afrippa's admin, Udozo in Udozo's apps, else BitoCard. Shared
+ * screens name the product with it, never a written-in "BitoCard".
+ */
+export const productName = (): 'BitoCard' | 'Udozo' | 'Afrippa' => (adminProduct === 'afrippa' ? 'Afrippa' : apiProduct === 'udozo' ? 'Udozo' : 'BitoCard');
+
 /** Turns any failure into an ApiError, so screens show the API's own message. */
 export function toApiError(status: number | string, data: unknown): ApiError {
   const body = (data as { error?: { type?: string; code?: string; message?: string; param?: string; request_id?: string } } | undefined)?.error;
@@ -70,7 +76,7 @@ export function toApiError(status: number | string, data: unknown): ApiError {
     return { status: typeof status === 'number' ? status : 0, type: body.type ?? 'api_error', code: body.code, message: body.message, param: body.param, requestId: body.request_id };
   }
   // Afrippa's admin and Udozo's apps name their own product.
-  const product = adminProduct === 'afrippa' ? 'Afrippa' : apiProduct === 'udozo' ? 'Udozo' : 'BitoCard';
+  const product = productName();
   if (status === 'FETCH_ERROR') return { status: 0, type: 'network_error', code: 'network_error', message: `Could not reach ${product}. Check your connection and try again.` };
   if (status === 'TIMEOUT_ERROR') return { status: 0, type: 'network_error', code: 'timeout', message: `${product} took too long to answer. Try again.` };
   return { status: typeof status === 'number' ? status : 0, type: 'api_error', code: 'unexpected', message: 'Something went wrong. Try again.' };

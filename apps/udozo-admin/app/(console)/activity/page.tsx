@@ -5,7 +5,8 @@ import { Card, DataTable, Dialog, errorMessage, FilterSelect, formatDateTime, hu
 import { UdozoShell } from "@/components/shell";
 import { type AuditEntry, useActivityInfiniteQuery } from "@bitocard/api-client/admin";
 
-const targets = ["reseller", "order", "supplier", "product", "pricing_rule", "country", "switch", "plan", "currency", "tax_rate", "store"];
+/** What Udozo's admins change: the marketplace, resale, resellers and their stores, and the settings. */
+const targets = ["classified_listing", "classified_order", "classified_category", "classified_feature", "classified_area", "classified_report", "classified_conversation", "classified_prohibited_word", "resale_claim_phrase", "reseller", "store", "store_domain", "customer", "kyc_case", "support_ticket", "support_bot", "plan", "country", "switch", "theme"];
 
 const json = (value: unknown) => (value === null || value === undefined ? "—" : JSON.stringify(value, null, 2));
 

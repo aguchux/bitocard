@@ -293,6 +293,13 @@ The code is moved to Udozo's apps (step 4), not deleted.
 - **DNS:** `api.udozo.com` is a CNAME to Vercel (`cname.vercel-dns.com`), **DNS only** (not proxied), in udozo.com's Cloudflare zone, and the domain is added to the `udozo-api` project, which issues its certificate. There is no fixed outgoing address: Udozo uses no supplier that allowlists one.
 - **Still to do:** the Vercel project, its environment and domain; then 5c.
 
+**5b, part 2 (31 October 2026): Udozo's admin and Seller HQ show only Udozo.** The owner: Udozo is the classifieds marketplace and B2B reselling (the two BitoCard plans it came from), nothing else.
+- **Udozo's API** lists only Udozo's feature switches, plan features and limits, notifications and integrations, refusing the rest. Hidden switches keep their default, off for every BitoCard one. See AGENTS.md for the lists; `test/udozo-scope.test.mjs` pins them. It also speaks in Udozo's name: error messages, notifications, plan, switch and integration copy, payment page titles, and webhook addresses on `api.udozo.com`. Its resellers' growth chart counts resale orders.
+- **Shared screens** name the product (`productName()`); the customer screens leave catalogue purchases out on Udozo (`catalogue={false}`).
+- **Removed screens:**
+  - from the admin: bank-transfer accounts, chargebacks and the credit-limit card;
+  - from Seller HQ: the startup allowance and chargebacks on the wallet, the credit limit on invoices, the order ID on new tickets, and the desktop customer-menu choice.
+
 **5c. Strip each copy:**
 - **Udozo's copy:** remove every `@ProductOnly('bitocard')` controller and route, BitoCard's jobs, modules, tests and integrations, then the services nothing calls; its tests run as Udozo.
 - **BitoCard's copy:** remove every `@ProductOnly('udozo')` controller and route, Udozo's jobs, product defaults, seed and tests.

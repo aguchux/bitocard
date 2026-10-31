@@ -17,6 +17,7 @@ import { cn, formatDate, formatDateTime } from '../format';
 import { ActionDialog } from './action-dialog';
 import { Badge, Notice, StatusBadge } from './status';
 import { Button, Card, CardHeader, Field, Input, KeyValue, Select, Textarea } from './primitives';
+import { productName } from '@bitocard/api-client';
 
 /** Reads one document's file with the reviewer's session (the API streams it decrypted, never cached). */
 export type KycDocumentFetcher = (document: KycReviewDocument) => Promise<Blob>;
@@ -249,9 +250,9 @@ export function KycCaseView({ kase, fetchDocument, caseLink }: { kase: KycReview
                 ...(kase.store ? [{ label: 'Store', value: `${kase.store.name} (${kase.store.subdomain})` }] : []),
                 { label: kase.subject === 'reseller' ? 'Business' : 'Seller', value: kase.reseller.name },
                 { label: 'Country', value: kase.country },
-                { label: 'Reviewed by', value: kase.reviewer === 'reseller' ? 'The store’s business' : 'BitoCard' },
+                { label: 'Reviewed by', value: kase.reviewer === 'reseller' ? 'The store’s business' : productName() },
                 { label: 'Submitted', value: formatDateTime(kase.submitted_at) },
-                ...(kase.decided_at ? [{ label: 'Decided', value: `${formatDateTime(kase.decided_at)}${kase.decided_by ? ` by ${kase.decided_by.name} (${kase.decided_by.realm === 'admin' ? 'BitoCard' : 'the store’s business'})` : ''}` }] : []),
+                ...(kase.decided_at ? [{ label: 'Decided', value: `${formatDateTime(kase.decided_at)}${kase.decided_by ? ` by ${kase.decided_by.name} (${kase.decided_by.realm === 'admin' ? productName() : 'the store’s business'})` : ''}` }] : []),
               ]}
             />
           </div>

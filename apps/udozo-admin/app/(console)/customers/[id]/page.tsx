@@ -43,6 +43,7 @@ export default function UdozoAccountPage() {
         {data => (
           <div className="space-y-6">
           <StoreCustomerView
+            catalogue={false}
             customer={data}
             canChange={can(admin, "operations")}
             canUnlock={can(admin, "operations", "support")}

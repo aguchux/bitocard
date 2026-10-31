@@ -1,4 +1,5 @@
 import type { NotificationSeverity, ResellerRole } from '../generated/prisma/client.js';
+import type { Product } from '../products/product.js';
 
 type ResellerType = {
   realm: 'reseller';
@@ -244,6 +245,32 @@ export const notificationTypes = {
 } satisfies Record<string, ResellerType | AdminType | AfrippaAdminType | PersonalType | CustomerType>;
 
 export type NotificationType = keyof typeof notificationTypes;
+
+/**
+ * BitoCard's own notices, which Udozo never sends, lists or lets anyone set a preference for: digital-product orders,
+ * suppliers and resellers' own integrations, virtual numbers, eSIMs, VPN, gift card sales, catalogue disputes,
+ * chargebacks, the startup allowance, BitoCard's fees, store support assistants, reserved accounts, crypto and P2P.
+ */
+const bitocardNotificationTypes: ReadonlySet<string> = new Set([
+  'connection.approved', 'connection.rejected', 'connection.suspended', 'connection.reinstated', 'connection.sync_failed',
+  'supplier_notification.failed', 'order.needs_review', 'store.checkout_refused', 'number.expiring', 'number.renewal_failed',
+  'number.expired', 'number.deleted', 'dispute.opened', 'dispute.updated', 'support.bot_paused', 'support.knowledge_stale',
+  'chargeback.opened', 'chargeback.closed', 'kyc.customer_submitted', 'startup_allowance.granted', 'startup_allowance.revoked',
+  'fee.refunded', 'admin.connection.review', 'admin.order.needs_review', 'admin.supplier_notification.failed',
+  'admin.checkout.refund_stuck', 'admin.order.cost_mismatch', 'admin.dispute.escalated', 'admin.dispute.updated',
+  'admin.chargeback.opened', 'admin.reserved_account.unmatched_deposit', 'admin.tax.rate_unconfirmed', 'admin.vpn.attention',
+  'admin.vpn.credit_low', 'admin.esim.top_up_unclear', 'admin.supplier.funded', 'customer.order.completed',
+  'customer.order.failed', 'customer.order.refunded', 'customer.dispute.updated', 'customer.esim.low_data',
+  'customer.esim.expiring', 'customer.gift_card_sale.accepted', 'customer.gift_card_sale.declined',
+  'customer.security.payment_method_added', 'customer.security.new_device',
+]);
+const bitocardNotificationPrefixes = ['admin.crypto.', 'admin.afrippa.', 'customer.crypto.', 'customer.p2p.'];
+
+/** The notification types a product sends and lists (Udozo's leave out BitoCard's own, above). */
+export const notificationTypesFor = (product: Product): NotificationType[] =>
+  (Object.keys(notificationTypes) as NotificationType[]).filter(
+    type => product !== 'udozo' || (!bitocardNotificationTypes.has(type) && !bitocardNotificationPrefixes.some(prefix => type.startsWith(prefix))),
+  );
 export type ResellerNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'reseller' ? K : never }[NotificationType];
 export type AdminNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'admin' ? K : never }[NotificationType];
 export type AfrippaAdminNotificationType = { [K in NotificationType]: (typeof notificationTypes)[K]['realm'] extends 'afrippa_admin' ? K : never }[NotificationType];

@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { Lock, Send } from 'lucide-react';
 import { cn, formatDateTime, formatRelative } from '../format';
 import { Button, Field, Textarea, Toggle } from './primitives';
+import { productName } from '@bitocard/api-client';
 
 /** One message on a dispute, as the API returns it. */
 export type DisputeThreadMessage = {
@@ -35,14 +36,20 @@ export const disputeOutcomeLabels: Record<string, string> = {
   chargeback_accepted: 'Chargeback accepted',
 };
 
-export const disputeKindLabels: Record<string, string> = { customer: 'Customer', reseller: 'Reseller with BitoCard', chargeback: 'Chargeback' };
+export const disputeKindLabels: Record<string, string> = {
+  customer: 'Customer',
+  get reseller() {
+    return `Reseller with ${productName()}`;
+  },
+  chargeback: 'Chargeback',
+};
 export const disputeTopicLabels: Record<string, string> = { order: 'Order', payment: 'Payment', funding: 'Wallet funding', trade: 'Trade', other: 'Other' };
 
 /** Who wrote a message, as the reader sees it: "You" for their own side. */
 function authorLabel(message: DisputeThreadMessage, viewer: 'reseller' | 'admin') {
   // The admin's own side: BitoCard's team, or Afrippa's on admin.afrippa.com.
   const own = (viewer === 'reseller' && message.author === 'reseller') || (viewer === 'admin' && (message.author === 'bitocard' || message.author === 'afrippa'));
-  const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', afrippa: 'Afrippa', bot: 'Assistant', system: 'BitoCard' };
+  const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: productName(), afrippa: 'Afrippa', bot: 'Assistant', system: productName() };
   const role = roles[message.author] ?? message.author;
   if (message.author === 'system') return 'Update';
   return own ? `${message.author_name ?? role} (you)` : message.author_name ? `${message.author_name} · ${role}` : role;

@@ -90,7 +90,7 @@ export class StoreSubscriptionsService {
     return {
       object: 'store_subscription' as const,
       store: { id: storeId, name: storeName },
-      plan: presentPlanDetail(plan, await this.plans.localPrice(plan, currency), this.plans.limitsOf(plan)),
+      plan: presentPlanDetail(plan, await this.plans.localPrice(plan, currency), this.plans.limitsOf(plan), this.config.APP_PRODUCT),
       /** When the store's plan is next charged; null when it is not billed (Startup, or set by BitoCard). */
       renews_at: subscription?.renewsAt?.toISOString() ?? null,
       /** The plan ends at `renews_at` and the store goes back to Startup. */

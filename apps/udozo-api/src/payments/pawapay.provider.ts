@@ -198,7 +198,7 @@ export class PawapayPaymentsProvider implements CheckoutProvider {
         depositId,
         returnUrl: input.returnUrl,
         // Shown on the payer's statement: 4 to 22 letters, numbers or spaces.
-        customerMessage: 'BitoCard payment',
+        customerMessage: 'Udozo payment',
         amountDetails: { amount: amountOf(input.amount), currency: input.currency },
         country,
         reason: input.description.slice(0, 50),

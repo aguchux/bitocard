@@ -6,7 +6,8 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Device, Notification, NotificationAudience, Platform, Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
-import { notificationTypes, type NotificationType } from './inbox.js';
+import { inProductWords } from '../products/product.js';
+import { notificationTypes, notificationTypesFor, type NotificationType } from './inbox.js';
 
 /** After the first try: 1 minute, 5 minutes, 30 minutes; then it is given up (a push is only useful while fresh). */
 export const pushRetryMs = [60_000, 5 * 60_000, 30 * 60_000];
@@ -205,7 +206,7 @@ export class PushService {
         return {
           object: 'notification_preference' as const,
           type,
-          label: notificationTypes[type].label,
+          label: inProductWords(notificationTypes[type].label, this.integrations.config.APP_PRODUCT),
           severity: notificationTypes[type].severity,
           push: locked ? true : (chosen.get(type) ?? push),
           default: push,
@@ -228,7 +229,8 @@ export class PushService {
   }
 
   private async typesFor(caller: PushCaller): Promise<NotificationType[]> {
-    const all = Object.keys(notificationTypes) as NotificationType[];
+    // This product's own notices only (Udozo never lists BitoCard's).
+    const all = notificationTypesFor(this.integrations.config.APP_PRODUCT);
     if (caller.audience === 'customer' || !('userId' in caller.owner)) return all.filter(type => notificationTypes[type].realm === 'customer');
     if (caller.audience === 'admin') {
       const adminRoles = caller.adminRoles ?? [];

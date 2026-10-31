@@ -10,7 +10,7 @@ export function ResellerWalletsCard({ resellerId, resellerName }: { resellerId: 
   const wallets = wallet.data?.wallets ?? [];
   return (
     <Card>
-      <CardHeader title="Wallets" description="Live balances: their country's currency and US dollars. Orders are held from the country wallet." />
+      <CardHeader title="Wallets" description="Live balances: their country's currency and US dollars. Premium, domains and the setup fee are paid from the country wallet." />
       <div className="space-y-5 px-5 pb-5 sm:px-6">
         {wallet.isLoading ? (
           <Skeleton className="h-16 w-full" />

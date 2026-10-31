@@ -9,12 +9,17 @@ import { amountToMinor } from './pricing';
 import { Button, Field, Input, KeyValue, Select, Textarea } from './primitives';
 import { Badge, Notice, type Tone } from './status';
 import { ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod } from './confirm-code';
+import { productName } from '@bitocard/api-client';
 
 const resendAfterSeconds = 60;
 
 export const topUpSourceLabels: Record<ManualTopUpSource, string> = {
-  received: 'Money received by BitoCard',
-  goodwill: 'Goodwill credit (BitoCard pays)',
+  get received() {
+    return `Money received by ${productName()}`;
+  },
+  get goodwill() {
+    return `Goodwill credit (${productName()} pays)`;
+  },
 };
 
 const statusLabels: Record<ManualTopUp['status'], { label: string; tone: Tone }> = {
@@ -263,7 +268,7 @@ export function WalletTopUpDialog({
               </Select>
             </Field>
             {source === 'received' ? (
-              <Field label="Bank or payment reference" htmlFor={`${id}-reference`} error={touched ? problems.reference : undefined} hint="As it shows on BitoCard's bank statement.">
+              <Field label="Bank or payment reference" htmlFor={`${id}-reference`} error={touched ? problems.reference : undefined} hint={`As it shows on ${productName()}'s bank statement.`}>
                 <Input id={`${id}-reference`} autoComplete="off" value={reference} onChange={event => setReference(event.target.value)} maxLength={120} />
               </Field>
             ) : null}

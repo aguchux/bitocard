@@ -17,7 +17,7 @@ const reasons: Record<string, string> = {
 
 /** The business as Udozo Verify sees it. */
 function businessLabel(type: "unregistered" | "registered" | null, verified: boolean) {
-  if (type === "registered") return verified ? "Registered, verified: you can review your customers’ ID checks" : "Registered, not verified yet";
+  if (type === "registered") return verified ? "Registered, verified" : "Registered, not verified yet";
   if (type === "unregistered") return "Not registered: the owner’s own check";
   return "Not chosen yet";
 }

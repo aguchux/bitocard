@@ -1,5 +1,7 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Inject, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { APP_CONFIG, type AppConfig } from '../../config/config.js';
+import { inProductWords } from '../../products/product.js';
 import { ApiError, type ApiErrorBody, type ApiErrorType } from './api-error.js';
 
 const typeForStatus: Partial<Record<number, ApiErrorType>> = {
@@ -20,6 +22,8 @@ const typeForStatus: Partial<Record<number, ApiErrorType>> = {
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('ApiError');
 
+  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();
     const req = http.getRequest<Request>();
@@ -28,7 +32,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     if (status >= 500) this.logger.error({ err: exception, path: req.path }, 'Unhandled error');
     if (res.headersSent) return;
-    res.status(status).json({ error: { ...body, request_id: req.id } });
+    // In the product's own words: Udozo's errors never say BitoCard (shared code writes BitoCard's).
+    res.status(status).json({ error: { ...body, message: inProductWords(body.message, this.config.APP_PRODUCT), request_id: req.id } });
   }
 
   private describe(exception: unknown): { status: number; body: ApiErrorBody } {
