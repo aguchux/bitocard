@@ -39,7 +39,7 @@ export default async function VerificationPage() {
         ) : (
           <>
             {status?.ok && status.data.latest?.reason ? <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your last check did not pass: {reasonText(status.data.latest.reason)}.</p> : null}
-            <VerificationForm country={country} countryName={name} resume={status?.ok && status.data.latest?.status === "in_progress"} />
+            <VerificationForm country={country} countryName={name} firstName={customer.first_name} lastName={customer.last_name} resume={status?.ok && status.data.latest?.status === "in_progress"} />
           </>
         )}
       </section>

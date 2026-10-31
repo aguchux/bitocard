@@ -94,11 +94,12 @@ describe("Settings > Team", () => {
   test("invites staff with the roles chosen, and says the link was emailed", async () => {
     page();
     fireEvent.click(await screen.findByRole("button", { name: "Invite to the team" }, slow));
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Kemi Ade" } });
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Kemi" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Ade" } });
     fireEvent.change(screen.getByLabelText("Work email"), { target: { value: "kemi@udozo.com" } });
     fireEvent.click(screen.getByLabelText(/^Finance/));
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    await waitFor(() => expect(sent.find(item => item.method === "POST" && item.path === "/v1/admin/team")?.body).toEqual({ name: "Kemi Ade", email: "kemi@udozo.com", roles: ["support", "finance"] }), slow);
+    await waitFor(() => expect(sent.find(item => item.method === "POST" && item.path === "/v1/admin/team")?.body).toEqual({ first_name: "Kemi", last_name: "Ade", email: "kemi@udozo.com", roles: ["support", "finance"] }), slow);
     expect(await screen.findByText(/We emailed kemi@udozo.com a link to set their password/, {}, slow)).toBeTruthy();
   });
 

@@ -277,7 +277,7 @@ describe('set-password links', () => {
     assert.equal(described.status, 200);
     assert.deepEqual(
       { ...described.json, expires_at: typeof described.json.expires_at },
-      { object: 'admin_password_link', email, name: 'Link New', kind: 'create', authenticator_set_up: false, expires_at: 'string' },
+      { object: 'admin_password_link', email, name: 'Link New', first_name: 'Link', last_name: 'New', name_confirmed: false, kind: 'create', authenticator_set_up: false, expires_at: 'string' },
     );
     assert.ok(Date.parse(described.json.expires_at) - Date.now() > 71 * 3600_000, 'new admins get 72 hours');
 

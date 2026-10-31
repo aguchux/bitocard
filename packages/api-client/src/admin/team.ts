@@ -26,7 +26,8 @@ export type AdminTeam = { object: 'list'; data: AdminMember[]; roles: AdminRole[
 export const adminTeamApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     adminTeam: build.query<AdminTeam, void>({ query: () => '/v1/admin/team', providesTags: ['AdminTeam'] }),
-    inviteAdmin: build.mutation<AdminMember & { email_sent: AdminLinkSent }, { name: string; email: string; roles: AdminRole[] }>({
+    /** `name` on BitoCard's API; `first_name` and `last_name` (as on their ID) on Udozo's. */
+    inviteAdmin: build.mutation<AdminMember & { email_sent: AdminLinkSent }, ({ name: string } | { first_name: string; last_name: string }) & { email: string; roles: AdminRole[] }>({
       query: body => ({ url: '/v1/admin/team', method: 'POST', body }),
       invalidatesTags: ['AdminTeam', 'Activity'],
     }),

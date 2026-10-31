@@ -21,7 +21,7 @@ const form = (values: Record<string, string>) => {
   for (const [key, value] of Object.entries(values)) data.set(key, value);
   return data;
 };
-const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", email_verified: true, phone: "+2348031234567", phone_verified: true, phone_verification_available: true, country: "NG", currency: "NGN", created_at: "2026-10-30T00:00:00Z" };
+const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", first_name: "Ada", last_name: "Obi", name_confirmed: true, email_verified: true, phone: "+2348031234567", phone_verified: true, phone_verification_available: true, country: "NG", currency: "NGN", created_at: "2026-10-30T00:00:00Z" };
 const session = { customer, session: { token: "bcc_new" } };
 
 beforeEach(() => {
@@ -55,7 +55,7 @@ describe("signing up on udozo.com, one step at a time", () => {
     reply = () => Response.json({ object: "signup_phone_verification", phone: "+2348031234567" });
     expect(await actions.confirmSignupMobile({ email: "ada@example.com", token: "tok_0123456789abcdefghij", code: "654321" })).toEqual({ ok: true, phone: "+2348031234567" });
     reply = () => Response.json(session, { status: 201 });
-    await expect(actions.finishSignUp({ name: " Ada Obi ", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" })).rejects.toThrow("redirect:/sell");
+    await expect(actions.finishSignUp({ firstName: " Ada ", lastName: " Obi ", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" })).rejects.toThrow("redirect:/sell");
 
     expect(calls.map(call => `${call.method} ${call.url.replace("https://api.test", "")}`)).toEqual([
       "POST /v1/store/account/signup/email",
@@ -66,13 +66,13 @@ describe("signing up on udozo.com, one step at a time", () => {
     ]);
     expect(calls[0]!.body).toEqual({ email: "ada@example.com" });
     expect(calls[2]!.body).toEqual({ email: "ada@example.com", signup_token: "tok_0123456789abcdefghij", country: "NG", phone: "+2348031234567" });
-    expect(calls[4]!.body).toEqual({ name: "Ada Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", signup_token: "tok_0123456789abcdefghij" });
+    expect(calls[4]!.body).toEqual({ first_name: "Ada", last_name: "Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", signup_token: "tok_0123456789abcdefghij" });
     expect(calls.every(call => call.headers.get("bitocard-store") === null)).toBe(true);
   });
 
   test("keeps the session in this site's own udz_customer cookie: host-only, httpOnly, Lax, 30 days", async () => {
     reply = () => Response.json(session, { status: 201 });
-    await expect(actions.finishSignUp({ name: "Ada", email: "ada@example.com", country: "GH", phone: "+233241234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/" })).rejects.toThrow("redirect:/");
+    await expect(actions.finishSignUp({ firstName: "Ada", lastName: "Obi", email: "ada@example.com", country: "GH", phone: "+233241234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/" })).rejects.toThrow("redirect:/");
     const cookie = request.set.find(item => item.name === "udz_customer")!;
     expect(cookie.value).toBe("bcc_new");
     expect(cookie.options).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 2592000 });
@@ -82,7 +82,7 @@ describe("signing up on udozo.com, one step at a time", () => {
 
   test("an account still to confirm goes to /verify; a refusal says what and where, and keeps no session", async () => {
     reply = () => Response.json({ ...session, customer: { ...customer, phone_verified: false } }, { status: 201 });
-    await expect(actions.finishSignUp({ name: "Ada", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" })).rejects.toThrow("redirect:/verify?next=%2Fsell");
+    await expect(actions.finishSignUp({ firstName: "Ada", lastName: "Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" })).rejects.toThrow("redirect:/verify?next=%2Fsell");
     request.set.length = 0;
     reply = () => Response.json({ error: { code: "email_taken", message: "An account with this email already exists. Sign in instead.", param: "email" } }, { status: 409 });
     expect(await actions.sendSignupEmailCode("ada@example.com")).toEqual({ ok: false, error: "An account with this email already exists. Sign in instead.", code: "email_taken", field: "email" });
@@ -151,7 +151,7 @@ describe("signing in and out", () => {
 describe("the account's profile", () => {
   test("name, phone and password go to their endpoints; the check returns to this site's own page", async () => {
     reply = () => Response.json(customer);
-    expect(await actions.updateName({}, form({ name: "Ada O." }))).toEqual({ notice: "Saved." });
+    expect(await actions.updateName({}, form({ first_name: "Ada", last_name: "Obi-Okafor" }))).toEqual({ notice: "Saved." });
     reply = () => Response.json({ object: "notice", phone: "+2348031234567" });
     expect(await actions.addPhone({}, form({ phone: "+2348031234567" }))).toEqual({ notice: "We sent a code to +2348031234567." });
     reply = () => Response.json(customer);
@@ -160,6 +160,7 @@ describe("the account's profile", () => {
     await expect(actions.startVerification({}, form({ country: "NG", first_name: "Ada", last_name: "Obi", consent: "on" }))).rejects.toThrow("redirect:https://verify.udozo.com/s#t=x");
     expect(calls.map(call => call.url.replace("https://api.test", ""))).toEqual(["/v1/store/account/profile", "/v1/store/account/phone", "/v1/store/account/password/change", "/v1/store/account/verification"]);
     expect(calls[3]!.body).toEqual({ country: "NG", first_name: "Ada", last_name: "Obi", consent: true, redirect_url: "https://udozo.com/account/verification" });
+    expect(calls[0]!.body).toEqual({ first_name: "Ada", last_name: "Obi-Okafor" });
   });
 });
 

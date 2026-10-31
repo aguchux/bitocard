@@ -147,7 +147,8 @@ export function SignUpForm({ next, markets, market = null, email: initial = "", 
   const [email, setEmail] = useState(initial);
   const [code, setCode] = useState("");
   const [token, setToken] = useState<string | null>(null);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [country, setCountry] = useState<string | null>(market && markets.some(item => item.code === market) ? market : null);
   const [phone, setPhone] = useState<string | null>(null);
   const [mobileCode, setMobileCode] = useState("");
@@ -274,7 +275,11 @@ export function SignUpForm({ next, markets, market = null, email: initial = "", 
           className="space-y-4"
         >
           <FormMessage state={{ notice: `${cleanEmail} is confirmed.` }} />
-          <TextField label="Your name" name="name" autoComplete="name" required minLength={2} maxLength={100} autoFocus value={name} onChange={event => setName(event.target.value)} state={error} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField label="First name" name="first_name" autoComplete="given-name" required maxLength={60} autoFocus value={firstName} onChange={event => setFirstName(event.target.value)} state={error} />
+            <TextField label="Last name" name="last_name" autoComplete="family-name" required maxLength={60} value={lastName} onChange={event => setLastName(event.target.value)} state={error} />
+          </div>
+          <p className="text-xs text-navy-500">As they are on your ID: your identity check is matched against them.</p>
           <CountryField
             markets={markets}
             defaultValue={country}
@@ -337,7 +342,7 @@ export function SignUpForm({ next, markets, market = null, email: initial = "", 
             event.preventDefault();
             if (!token || !country || !mobile) return;
             run(
-              () => finishSignUp({ name, email: cleanEmail, country, phone: mobile.phone, password, token, next, ref: signupRef }),
+              () => finishSignUp({ firstName, lastName, email: cleanEmail, country, phone: mobile.phone, password, token, next, ref: signupRef }),
               () => undefined,
             );
           }}

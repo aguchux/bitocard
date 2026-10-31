@@ -14,7 +14,8 @@ export const metadata: Metadata = { title: "Profile" };
 const card = "grid gap-3 rounded-2xl border border-navy-200 bg-white p-4 sm:p-5";
 
 /**
- * The customer's profile: their name, the email they sign in with (read only), their country (fixed: chosen once by an
+ * The customer's profile: their first and last name (an older account is asked to confirm how its old name was
+ * split), the email they sign in with (read only), their country (fixed: chosen once by an
  * older account that has none), their mobile number (from that country, confirmed by a texted code), the password and
  * signing out. The identity check, for Safe pay sellers, is its own page.
  */
@@ -29,7 +30,12 @@ export default async function ProfilePage() {
         <h2 id="you" className="font-bold">
           You
         </h2>
-        <NameForm name={customer.name} />
+        {customer.name_confirmed ? null : (
+          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            Check your first and last name, as on your ID. We split the name you gave us before, so it may need putting right.
+          </p>
+        )}
+        <NameForm firstName={customer.first_name} lastName={customer.last_name} confirm={!customer.name_confirmed} />
         <p className="text-sm text-navy-600">
           You sign in with <strong className="text-navy-900">{customer.email}</strong>.
         </p>

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { NamePart, namedApart, renaming } from './names.js';
 import { passwordLength } from './passwords.service.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -22,12 +23,30 @@ const signupPhoneDoc = {
 };
 const codeDoc = { description: 'The 6-digit code that was sent to you.', pattern: '^\\d{6}$', example: '482913' };
 
+const firstNameDoc = { description: 'Your first name, as on your ID: letters, with spaces, hyphens or apostrophes inside.', minLength: 1, maxLength: 60, example: 'Ada' };
+const lastNameDoc = { description: 'Your last name (surname), as on your ID.', minLength: 1, maxLength: 60, example: 'Obi' };
+const oldNameDoc = {
+  description: 'Deprecated: your whole name, for older clients. It is split into a first name (the first word) and a last name (the rest) for you to confirm. Send `first_name` and `last_name` instead.',
+  minLength: 2,
+  maxLength: 100,
+  deprecated: true,
+};
+
 export class SignUpDto {
-  @ApiProperty({ description: 'Your full name.', minLength: 2, maxLength: 100, example: 'Ada Obi' })
+  @ApiProperty(firstNameDoc)
+  @NamePart('first_name', namedApart)
+  first_name?: string;
+
+  @ApiProperty(lastNameDoc)
+  @NamePart('last_name', namedApart)
+  last_name?: string;
+
+  @ApiPropertyOptional(oldNameDoc)
+  @IsOptional()
   @Transform(trim)
   @IsString()
   @Length(2, 100)
-  name: string;
+  name?: string;
 
   @ApiProperty({ description: 'Email address; a 6-digit code is sent to confirm it.', format: 'email', maxLength: 254, example: 'ada@example.com' })
   @Transform(lowerTrim)
@@ -206,11 +225,20 @@ export class ResetPasswordDto {
 }
 
 export class ProfileDto {
-  @ApiProperty({ description: 'Your full name.', minLength: 2, maxLength: 100, example: 'Ada Obi' })
+  @ApiPropertyOptional({ ...firstNameDoc, description: `${firstNameDoc.description} Send it with \`last_name\`: saving both confirms them.` })
+  @NamePart('first_name', renaming)
+  first_name?: string;
+
+  @ApiPropertyOptional(lastNameDoc)
+  @NamePart('last_name', renaming)
+  last_name?: string;
+
+  @ApiPropertyOptional(oldNameDoc)
+  @IsOptional()
   @Transform(trim)
   @IsString()
   @Length(2, 100)
-  name: string;
+  name?: string;
 }
 
 export class ChangePasswordDto {

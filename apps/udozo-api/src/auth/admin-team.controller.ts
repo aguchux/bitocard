@@ -1,16 +1,24 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail, IsString, Length } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail, IsOptional, IsString, Length } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from './caller.js';
 import { AdminTeamService } from './admin-team.service.js';
+import { NamePart, namedApart } from './names.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 
 class InviteAdminDto {
-  @Transform(trim) @IsString() @Length(2, 100)
-  name: string;
+  /** Their first and last name, as on their ID (or, from an older client, the whole `name`). */
+  @NamePart('first_name', namedApart)
+  first_name?: string;
+
+  @NamePart('last_name', namedApart)
+  last_name?: string;
+
+  @IsOptional() @Transform(trim) @IsString() @Length(2, 100)
+  name?: string;
 
   @Transform(lowerTrim) @IsEmail() @Length(3, 254)
   email: string;

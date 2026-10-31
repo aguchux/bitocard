@@ -14,7 +14,7 @@ const { cleanRef, inviteSignupPath, isInviteCode } = await import("@/lib/invite"
 type Call = { url: string; method: string; body: unknown };
 let calls: Call[];
 let reply: () => Response;
-const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", email_verified: true, phone: "+2348031234567", phone_verified: true, phone_verification_available: true, country: "NG", currency: "NGN", created_at: "2026-10-31T00:00:00Z" };
+const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", first_name: "Ada", last_name: "Obi", name_confirmed: true, email_verified: true, phone: "+2348031234567", phone_verified: true, phone_verification_available: true, country: "NG", currency: "NGN", created_at: "2026-10-31T00:00:00Z" };
 
 beforeEach(() => {
   vi.stubEnv("API_URL", "https://api.test");
@@ -58,7 +58,7 @@ describe("an invite link", () => {
 describe("sign-up keeps the code", () => {
   test("the account is made with the ref the link carried, and without a malformed one", async () => {
     reply = () => Response.json({ customer, session: { token: "bcc_new" } }, { status: 201 });
-    const input = { name: "Ada Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" };
+    const input = { firstName: "Ada", lastName: "Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" };
     await expect(actions.finishSignUp({ ...input, ref: "abc123def0" })).rejects.toThrow("redirect:/sell");
     expect(calls.at(-1)!.body).toMatchObject({ ref: "abc123def0" });
     await expect(actions.finishSignUp({ ...input, ref: "not a code!" })).rejects.toThrow("redirect:/sell");

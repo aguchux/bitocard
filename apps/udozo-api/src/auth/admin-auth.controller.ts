@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Patch, Post, Req, Res } from '@nestjs/common';
 import { ApiExcludeController, ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEmail, IsOptional, IsString, Length, Matches } from 'class-validator';
@@ -6,6 +6,7 @@ import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { AdminAuthService } from './admin-auth.service.js';
 import { type AdminRealm, type Caller, CurrentCaller, Public, RealmOnly } from './caller.js';
+import { NamePart, renaming } from './names.js';
 import { passwordLength } from './passwords.service.js';
 import { SessionsService } from './sessions.service.js';
 
@@ -55,17 +56,33 @@ class PasswordLinkDto {
   token: string;
 }
 
+class AdminProfileDto {
+  @NamePart('first_name', () => true)
+  first_name: string;
+
+  @NamePart('last_name', () => true)
+  last_name: string;
+}
+
 class CompletePasswordLinkDto extends PasswordLinkDto {
   @ApiProperty({ minLength: passwordLength.min, maxLength: passwordLength.max })
   @IsString()
   @Length(passwordLength.min, passwordLength.max)
   password: string;
 
-  @ApiProperty({ required: false, description: 'A new admin\'s name (first password only).' })
+  @ApiProperty({ required: false, description: 'Deprecated: a new admin\'s whole name. Send `first_name` and `last_name`.' })
   @IsOptional()
   @IsString()
   @Length(1, 100)
   name?: string;
+
+  @ApiProperty({ required: false, description: 'A new admin\'s first name, as on their ID (first password only, with `last_name`).' })
+  @NamePart('first_name', renaming)
+  first_name?: string;
+
+  @ApiProperty({ required: false, description: 'Their last name (surname).' })
+  @NamePart('last_name', renaming)
+  last_name?: string;
 
   @ApiProperty({ required: false, description: 'Also remove the authenticator, to set it up again at the next sign-in.' })
   @IsOptional()
@@ -168,7 +185,14 @@ abstract class AdminAuthRoutes {
   @Post('password-link/complete')
   @HttpCode(HttpStatus.OK)
   completePasswordLink(@Body() body: CompletePasswordLinkDto) {
-    return this.adminAuth.completePasswordLink(body.token, body.password, { resetAuthenticator: body.reset_authenticator, name: body.name }, this.realm);
+    return this.adminAuth.completePasswordLink(body.token, body.password, { resetAuthenticator: body.reset_authenticator, name: body.name, first_name: body.first_name, last_name: body.last_name }, this.realm);
+  }
+
+  /** Your account: the signed-in admin's first and last name, as on their ID. */
+  @Patch('profile')
+  updateProfile(@CurrentCaller() caller: Caller, @Body() body: AdminProfileDto) {
+    if (caller.kind !== 'session') throw new Error('Admin profile needs a session');
+    return this.adminAuth.updateProfile(caller.userId, body);
   }
 
   @Get('session')

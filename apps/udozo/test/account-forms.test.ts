@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SignInForm, SignUpForm } from "@/components/account/sign-in-up";
+import { NameForm, VerificationForm } from "@/components/account-forms";
 
 const markets = [
   { code: "NG", name: "Nigeria", currency: "NGN" },
@@ -14,6 +15,24 @@ describe("signing in", () => {
     expect(html).toMatch(/<input[^>]*type="email"[^>]*value="ada@example.com"/);
     expect(html).not.toContain('type="password"');
     expect(html).toContain("Continue");
+  });
+});
+
+describe("first and last name", () => {
+  it("the profile asks for both apart, as on the ID, and an older account confirms its split name", () => {
+    const html = renderToStaticMarkup(createElement(NameForm, { firstName: "Ada", lastName: "Obi Eze", confirm: true }));
+    expect(html).toMatch(/<input[^>]*name="first_name"[^>]*value="Ada"/);
+    expect(html).toMatch(/<input[^>]*name="last_name"[^>]*value="Obi Eze"/);
+    expect(html).toContain("As they are on your ID");
+    expect(html).toContain("Confirm my name");
+    // A one-word name: the last name is empty, to be filled in.
+    expect(renderToStaticMarkup(createElement(NameForm, { firstName: "Madonna", lastName: null }))).toMatch(/<input[^>]*name="last_name"[^>]*value=""/);
+  });
+
+  it("the identity check starts from the account's own names", () => {
+    const html = renderToStaticMarkup(createElement(VerificationForm, { country: "NG", countryName: "Nigeria", firstName: "Ada", lastName: "Obi" }));
+    expect(html).toMatch(/<input[^>]*name="first_name"[^>]*value="Ada"/);
+    expect(html).toMatch(/<input[^>]*name="last_name"[^>]*value="Obi"/);
   });
 });
 

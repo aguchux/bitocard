@@ -257,7 +257,7 @@ export class CustomerWalletsService {
       mode: context.mode,
       country: context.country,
       bvn: input.bvn,
-      holder: { name: verified?.verifiedName ?? customer.name, phone: input.phone },
+      holder: verified?.verifiedName ? { name: verified.verifiedName, phone: input.phone } : { firstName: customer.firstName, lastName: customer.lastName, name: customer.firstName ? null : customer.name, phone: input.phone },
     });
     return { object: 'list' as const, data: accounts.map(presentAccount) };
   }

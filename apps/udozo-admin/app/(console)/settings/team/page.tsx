@@ -44,12 +44,14 @@ function RolePicker({ value, onChange, roles }: { value: AdminRole[]; onChange: 
 }
 
 function InviteDialog({ open, onClose, roles, domains, onSent }: { open: boolean; onClose: () => void; roles: AdminRole[]; domains: string[]; onSent: (sent: AdminLinkSent, email: string) => void }) {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [chosen, setChosen] = useState<AdminRole[]>(["support"]);
   const [invite, state] = useInviteAdminMutation();
   const close = () => {
-    setName("");
+    setFirstName("");
+    setLastName("");
     setEmail("");
     setChosen(["support"]);
     state.reset();
@@ -68,9 +70,9 @@ function InviteDialog({ open, onClose, roles, domains, onSent }: { open: boolean
           </Button>
           <Button
             loading={state.isLoading}
-            disabled={name.trim().length < 2 || !email.trim() || chosen.length === 0}
+            disabled={!firstName.trim() || !lastName.trim() || !email.trim() || chosen.length === 0}
             onClick={async () => {
-              const made = await invite({ name: name.trim(), email: email.trim(), roles: chosen })
+              const made = await invite({ first_name: firstName.trim(), last_name: lastName.trim(), email: email.trim(), roles: chosen })
                 .unwrap()
                 .catch(() => null);
               if (!made) return;
@@ -85,9 +87,14 @@ function InviteDialog({ open, onClose, roles, domains, onSent }: { open: boolean
     >
       <div className="space-y-4">
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-        <Field label="Name" htmlFor="invite-name">
-          <Input id="invite-name" value={name} maxLength={100} onChange={event => setName(event.target.value)} autoFocus />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="First name" htmlFor="invite-first-name" hint="As on their ID.">
+            <Input id="invite-first-name" value={firstName} maxLength={60} onChange={event => setFirstName(event.target.value)} autoFocus />
+          </Field>
+          <Field label="Last name" htmlFor="invite-last-name">
+            <Input id="invite-last-name" value={lastName} maxLength={60} onChange={event => setLastName(event.target.value)} />
+          </Field>
+        </div>
         <Field label="Work email" htmlFor="invite-email" hint={domains.length ? `An address on ${domains.join(" or ")}.` : undefined}>
           <Input id="invite-email" type="email" value={email} maxLength={254} onChange={event => setEmail(event.target.value)} />
         </Field>

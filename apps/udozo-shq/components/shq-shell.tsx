@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeftRight, FlaskConical } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
-import { AccountMenu, ConsoleShell, type Crumb, NotificationBell } from "@bitocard/admin-ui/shell";
+import { AccountMenu, AppLink, ConsoleShell, type Crumb, NotificationBell } from "@bitocard/admin-ui/shell";
 import { menusFor, sections, type ShqSection } from "./nav";
 import { usePaidPlans } from "./paid-plans";
 import { useReseller, useSignOut } from "./reseller";
@@ -63,6 +63,20 @@ function SandboxBanner() {
   );
 }
 
+/** An older account, whose whole name was split in two, checks its first and last name (Settings > Your profile). */
+function NameCheckBanner() {
+  const { user } = useReseller();
+  if (user.name_confirmed !== false) return null;
+  return (
+    <div role="status" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+      <span>Please check your first and last name, as on your ID.</span>
+      <AppLink href="/settings/profile" className="font-semibold underline underline-offset-2">
+        Check my name
+      </AppLink>
+    </div>
+  );
+}
+
 function ShqBell() {
   return <NotificationBell realm="reseller" userId={useReseller().user.id} />;
 }
@@ -87,7 +101,12 @@ export function ShqShell({ section, current, crumbs, actions, children }: { sect
       }
       notifications={<ShqBell />}
       account={<ShqAccountMenu />}
-      banner={<SandboxBanner />}
+      banner={
+        <>
+          <SandboxBanner />
+          <NameCheckBanner />
+        </>
+      }
     >
       {children}
     </ConsoleShell>

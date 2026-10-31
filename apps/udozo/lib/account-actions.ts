@@ -51,9 +51,10 @@ export async function confirmSignupMobile(input: { email: string; token: string;
  * The last step: the account, made with the email (and the mobile, when its code was confirmed) already confirmed, then
  * signed in and on to `next`, or to the confirmation page for whatever is still to confirm.
  */
-export async function finishSignUp(input: { name: string; email: string; country: string; phone: string; password: string; token: string; next: string; ref?: string | null }): Promise<StepResult> {
+export async function finishSignUp(input: { firstName: string; lastName: string; email: string; country: string; phone: string; password: string; token: string; next: string; ref?: string | null }): Promise<StepResult> {
   const result = await customerApi<SessionReply>("POST", "/v1/store/account/signup", {
-    name: input.name.trim(),
+    first_name: input.firstName.trim(),
+    last_name: input.lastName.trim(),
     email: input.email.trim(),
     country: input.country,
     phone: input.phone,
@@ -132,10 +133,11 @@ export async function resetPassword(_state: FormState, form: FormData): Promise<
   redirect("/account");
 }
 
+/** The first and last name, as on the customer's ID: saving both confirms them. */
 export async function updateName(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { name: text(form, "name") });
+  const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { first_name: text(form, "first_name"), last_name: text(form, "last_name") });
   if (!result.ok) return failed(result);
-  // The header's menu shows the name too.
+  // The header's menu shows the name too, and the account's pages stop asking to check it.
   revalidatePath("/", "layout");
   return { notice: "Saved." };
 }

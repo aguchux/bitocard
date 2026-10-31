@@ -15,6 +15,7 @@ import { PasswordsService } from './passwords.service.js';
 import { SessionsService } from './sessions.service.js';
 import { claimTotpStep, newTotpSecret, totpFor, totpStep } from './totp.js';
 import { productOf } from '../products/product.js';
+import { nameData, namesGiven, namesOf } from './names.js';
 
 const challengeLifetimeMs = 5 * 60 * 1000;
 const maxChallengeAttempts = 5;
@@ -101,7 +102,7 @@ export class AdminAuthService {
    * Creates an admin (tests and `startSignIn`). Without a password the account cannot sign in until its owner sets one
    * with the emailed link.
    */
-  async createAdmin(input: { email: string; name: string; password?: string; roles: string[]; realm?: AdminRealm }) {
+  async createAdmin(input: { email: string; name?: string; first_name?: string; last_name?: string; password?: string; roles: string[]; realm?: AdminRealm }) {
     const realm = input.realm ?? 'admin';
     const email = input.email.trim().toLowerCase();
     if (!this.allowedDomain(email, realm)) throw new Error(`Admins must use one of: ${this.settings(realm).domains.join(', ')}`);
@@ -112,7 +113,8 @@ export class AdminAuthService {
       data: {
         realm,
         email,
-        name: input.name,
+        // Set apart when given (a team invitation); a name made from the address is split for them to confirm.
+        ...nameData(input),
         passwordHash: input.password === undefined ? null : await this.passwords.hash(input.password),
         adminRoles: input.roles,
         emailVerifiedAt: new Date(),
@@ -216,6 +218,7 @@ export class AdminAuthService {
       object: 'admin_password_link' as const,
       email: user.email,
       name: user.name,
+      ...namesOf(user),
       kind: user.passwordHash ? ('reset' as const) : ('create' as const),
       authenticator_set_up: Boolean(user.totp?.confirmedAt),
       expires_at: record.expiresAt.toISOString(),
@@ -227,18 +230,20 @@ export class AdminAuthService {
    * if they ask, removes their authenticator so they set it up again at their next sign-in. The link works once.
    * Admin accounts only; a reseller account with the same email is untouched.
    */
-  async completePasswordLink(token: string, password: string, options: { resetAuthenticator?: boolean; name?: string } = {}, realm: AdminRealm = 'admin') {
+  async completePasswordLink(token: string, password: string, options: { resetAuthenticator?: boolean; name?: string; first_name?: string; last_name?: string } = {}, realm: AdminRealm = 'admin') {
     const { user, record } = await this.passwordLink(token, realm);
     const { product, platform } = this.settings(realm);
     await this.passwords.assertAcceptable(password);
     const passwordHash = await this.passwords.hash(password);
     const resetAuthenticator = Boolean(options.resetAuthenticator && user.totp);
-    // A new admin confirms their name with their first password.
-    const name = !user.passwordHash && options.name?.trim() ? options.name.trim() : undefined;
+    // A new admin confirms their first and last name with their first password; on a reset, only someone whose name is
+    // not confirmed yet, and only with the two apart (an older client's whole name is ignored, as before).
+    const apart = Boolean(options.first_name || options.last_name);
+    const names = (!user.passwordHash && namesGiven(options)) || (user.passwordHash && !user.nameConfirmedAt && apart) ? nameData(options) : {};
     await this.prisma.$transaction(async tx => {
       const claimed = await tx.verificationCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
       if (claimed.count === 0) throw invalidLink(product);
-      await tx.user.update({ where: { id: user.id }, data: { passwordHash, failedSignIns: 0, lockedUntil: null, ...(name ? { name } : {}) } });
+      await tx.user.update({ where: { id: user.id }, data: { passwordHash, failedSignIns: 0, lockedUntil: null, ...names } });
       await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
       if (resetAuthenticator) await tx.totpCredential.deleteMany({ where: { userId: user.id } });
     });
@@ -410,7 +415,15 @@ export class AdminAuthService {
 
   /** `authenticator`: whether they use one; `authenticator_required`: whether they must (else it is their choice). */
   private present(user: User, authenticator: boolean) {
-    return { object: 'admin' as const, id: user.id, name: user.name, email: user.email, roles: user.adminRoles, authenticator, authenticator_required: authenticatorRequired(user) };
+    return { object: 'admin' as const, id: user.id, name: user.name, ...namesOf(user), email: user.email, roles: user.adminRoles, authenticator, authenticator_required: authenticatorRequired(user) };
+  }
+
+  /** The signed-in admin's first and last name (Your account): saving both confirms them. */
+  async updateProfile(userId: string, input: { first_name: string; last_name: string }) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const updated = await this.prisma.user.update({ where: { id: userId }, data: nameData(input) });
+    await this.audit.record({ actorId: userId, action: 'admin.name_changed', targetType: 'user', targetId: userId, before: { name: user.name }, after: { name: updated.name }, platform: this.settings(this.realmOf(user)).platform });
+    return this.describe(userId);
   }
 
   /** A sign-in challenge of this realm's admin: another realm's is as unknown as a made-up one. */

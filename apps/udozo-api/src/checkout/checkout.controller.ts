@@ -3,6 +3,7 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Public } from '../auth/caller.js';
+import { NamePart, namedApart, renaming } from '../auth/names.js';
 import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { AllowPhonePending, CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
@@ -24,8 +25,16 @@ const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? val
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toUpperCase() : value);
 
 class SignUpDto {
-  @Transform(trim) @IsString() @Length(2, 100)
-  name: string;
+  /** First and last name apart, as on the customer's ID. */
+  @NamePart('first_name', namedApart)
+  first_name?: string;
+
+  @NamePart('last_name', namedApart)
+  last_name?: string;
+
+  /** Older clients: the whole name, split into first word and the rest, left for the customer to confirm. */
+  @IsOptional() @Transform(trim) @IsString() @Length(2, 100)
+  name?: string;
 
   /** bitocard.com: the customer's country (a BitoCard market), fixed for good. Ignored on a reseller's store (theirs). */
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
@@ -109,6 +118,14 @@ class ResetDto extends CodeDto {
 }
 
 class ProfileDto {
+  /** Both together: saving them confirms them. */
+  @NamePart('first_name', renaming)
+  first_name?: string;
+
+  @NamePart('last_name', renaming)
+  last_name?: string;
+
+  /** Older clients: the whole name, split into first word and the rest. */
   @IsOptional() @Transform(trim) @IsString() @Length(2, 100)
   name?: string;
 

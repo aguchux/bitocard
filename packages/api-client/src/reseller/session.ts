@@ -4,7 +4,13 @@ import type { ResellerRole, ResellerStatus } from './common';
 export type User = {
   object: 'user';
   id: string;
+  /** The first and last name joined. */
   name: string;
+  /** Udozo's API: first and last name apart, as on the person's ID (`last_name` null for an older one-word name). */
+  first_name?: string;
+  last_name?: string | null;
+  /** Udozo's API: false until an older account (whose whole name was split) checks the two on their profile. */
+  name_confirmed?: boolean;
   email: string;
   email_verified: boolean;
   phone: string | null;
@@ -61,7 +67,8 @@ export type UserPhone = { object: 'user_phone'; phone: string; primary: boolean;
  * `country` and `business_name` open a reseller account (with the owner's `phone`, a mobile number of that country, kept
  * unconfirmed); `invitation_token` joins the inviting team instead.
  */
-export type SignUpInput = { name: string; email: string; password: string } & (
+/** BitoCard's API takes the whole `name`; Udozo's the first and last name apart. */
+export type SignUpInput = { email: string; password: string } & ({ name: string } | { first_name: string; last_name: string }) & (
   | { country: string; business_name?: string; phone?: string; signup_token?: string }
   | { invitation_token: string }
 );
@@ -106,7 +113,7 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     removeAdditionalPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, string>({ query: phone => ({ url: `/v1/auth/phones/${encodeURIComponent(phone)}`, method: 'DELETE' }), invalidatesTags: ['Session'] }),
     forgotPassword: build.mutation<Notice, { email: string }>({ query: body => ({ url: '/v1/auth/password/forgot', method: 'POST', body }) }),
     resetPassword: build.mutation<unknown, { email: string; code: string; password: string }>({ query: body => ({ url: '/v1/auth/password/reset', method: 'POST', body }) }),
-    updateProfile: build.mutation<Session, { name: string }>({ query: body => ({ url: '/v1/auth/profile', method: 'PATCH', body }), invalidatesTags: ['Session'] }),
+    updateProfile: build.mutation<Session, { name: string } | { first_name: string; last_name: string }>({ query: body => ({ url: '/v1/auth/profile', method: 'PATCH', body }), invalidatesTags: ['Session'] }),
     /** Needs the current password; signs out the person's other sessions. */
     changePassword: build.mutation<Notice, { current_password: string; new_password: string }>({ query: body => ({ url: '/v1/auth/password/change', method: 'POST', body }) }),
     /** Your addresses: the primary one (sign-in and notices) first. */

@@ -2,6 +2,7 @@ import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PasswordsService } from '../auth/passwords.service.js';
 import { normalisePhone } from '../auth/auth.service.js';
+import { nameData, namesGiven, namesOf } from '../auth/names.js';
 import { SignupVerificationService } from '../auth/signup-verification.service.js';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -36,6 +37,8 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     id: customer.id,
     email: customer.email,
     name: customer.name,
+    /** First and last name apart, as on their ID; `name_confirmed` false until an older account checks the split. */
+    ...namesOf(customer),
     email_verified: customer.emailVerifiedAt !== null,
     phone: customer.phone,
     phone_verified: customer.phoneVerifiedAt !== null,
@@ -218,7 +221,7 @@ export class CustomersService {
    * With `signup_token` (the step-by-step sign-up: `startSignupEmail` and on) the email is already confirmed, and the
    * number too when its texted code was confirmed for this sign-up, so no code is sent afterwards.
    */
-  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string; signup_token?: string; ref?: string }) {
+  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; first_name?: string; last_name?: string; name?: string; password: string; country?: string; phone?: string; signup_token?: string; ref?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
@@ -233,7 +236,7 @@ export class CustomersService {
         if (input.signup_token) ({ phoneConfirmed } = await this.signups.consume(tx, email, input.signup_token, phone, store.id));
         const confirmed = input.signup_token ? new Date() : null;
         return tx.customer.create({
-          data: { storeId: store.id, email, name: input.name.trim(), country, phone, passwordHash, emailVerifiedAt: confirmed, phoneVerifiedAt: phoneConfirmed ? confirmed : null, signupRef: input.ref ?? null },
+          data: { storeId: store.id, email, ...nameData(input), country, phone, passwordHash, emailVerifiedAt: confirmed, phoneVerifiedAt: phoneConfirmed ? confirmed : null, signupRef: input.ref ?? null },
         });
       });
     } catch (error) {
@@ -284,11 +287,11 @@ export class CustomersService {
   }
 
   /**
-   * Changes the name, and sets the country once for an account from before it was asked (bitocard.com only: a
+   * Changes the first and last name (which confirms them), and sets the country once for an account from before it was asked (bitocard.com only: a
    * reseller's store is the reseller's country). A country already set never changes (`country_locked`): the wallet
    * and its money are in that country's currency.
    */
-  async updateProfile(customer: CustomerWithStore, input: { name?: string; country?: string }) {
+  async updateProfile(customer: CustomerWithStore, input: { first_name?: string; last_name?: string; name?: string; country?: string }) {
     if (input.country !== undefined) {
       const code = await this.marketCode(input.country);
       if (customer.country !== code) {
@@ -297,7 +300,7 @@ export class CustomersService {
         if (set.count === 0) throw countryLocked();
       }
     }
-    const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: { name: input.name?.trim() }, include: { market: true } });
+    const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: namesGiven(input) ? nameData(input) : {}, include: { market: true } });
     return presentCustomer(updated);
   }
 

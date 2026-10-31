@@ -8546,6 +8546,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": null,
@@ -8649,6 +8652,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": "+2348031234567",
@@ -8863,6 +8869,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": "+2348031234567",
@@ -9026,6 +9035,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": "+2348031234567",
@@ -9285,6 +9297,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": "+2348031234567",
@@ -9504,6 +9519,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": "+2348031234567",
@@ -10553,6 +10571,9 @@
                     "object": "user",
                     "id": "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
                     "name": "Ada Obi",
+                    "first_name": "Ada",
+                    "last_name": "Obi",
+                    "name_confirmed": true,
                     "email": "ada@adadigital.ng",
                     "email_verified": true,
                     "phone": "+2348031234567",
@@ -30182,12 +30203,26 @@
       "SignUpDto": {
         "type": "object",
         "properties": {
+          "first_name": {
+            "type": "string",
+            "description": "Your first name, as on your ID: letters, with spaces, hyphens or apostrophes inside.",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Ada"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "Your last name (surname), as on your ID.",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Obi"
+          },
           "name": {
             "type": "string",
-            "description": "Your full name.",
+            "description": "Deprecated: your whole name, for older clients. It is split into a first name (the first word) and a last name (the rest) for you to confirm. Send `first_name` and `last_name` instead.",
             "minLength": 2,
             "maxLength": 100,
-            "example": "Ada Obi"
+            "deprecated": true
           },
           "email": {
             "type": "string",
@@ -30233,7 +30268,8 @@
           }
         },
         "required": [
-          "name",
+          "first_name",
+          "last_name",
           "email",
           "password"
         ]
@@ -30348,17 +30384,28 @@
       "ProfileDto": {
         "type": "object",
         "properties": {
+          "first_name": {
+            "type": "string",
+            "description": "Your first name, as on your ID: letters, with spaces, hyphens or apostrophes inside. Send it with `last_name`: saving both confirms them.",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Ada"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "Your last name (surname), as on your ID.",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Obi"
+          },
           "name": {
             "type": "string",
-            "description": "Your full name.",
+            "description": "Deprecated: your whole name, for older clients. It is split into a first name (the first word) and a last name (the rest) for you to confirm. Send `first_name` and `last_name` instead.",
             "minLength": 2,
             "maxLength": 100,
-            "example": "Ada Obi"
+            "deprecated": true
           }
-        },
-        "required": [
-          "name"
-        ]
+        }
       },
       "ChangePasswordDto": {
         "type": "object",
@@ -42685,6 +42732,9 @@
           "object",
           "id",
           "name",
+          "first_name",
+          "last_name",
+          "name_confirmed",
           "email",
           "email_verified",
           "phone",
@@ -42706,7 +42756,22 @@
           },
           "name": {
             "type": "string",
-            "description": "Their full name."
+            "description": "Their first and last name together."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "Their first name, as on their ID."
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their last name (surname), as on their ID. Null for an older account whose name was one word, until they add it."
+          },
+          "name_confirmed": {
+            "type": "boolean",
+            "description": "Whether they have confirmed their first and last name. Older accounts had their whole name split (the first word, then the rest) and are asked to check it."
           },
           "email": {
             "type": "string",

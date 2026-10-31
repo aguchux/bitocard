@@ -14,6 +14,7 @@ import { PasswordsService } from './passwords.service.js';
 import { presentMembership, presentUser } from './presenters.js';
 import { SessionsService } from './sessions.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
+import { nameData, namesGiven } from './names.js';
 import type { CreateResellerAccountDto, SignUpDto } from './auth.dto.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { TwoStepService } from './two-step.service.js';
@@ -96,6 +97,7 @@ export class AuthService {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
     }
     const passwordHash = await this.passwords.hash(input.password);
+    const personName = nameData(input);
 
     let user: User;
     let openedReseller: { id: string; name: string; country: string | null } | null = null;
@@ -103,7 +105,7 @@ export class AuthService {
       user = await this.prisma.$transaction(async tx => {
         if (invitation) {
           // Invited staff join the inviting reseller; the emailed link proves the address.
-          const created = await tx.user.create({ data: { realm: 'reseller', email: input.email, name: input.name, passwordHash, emailVerifiedAt: new Date() } });
+          const created = await tx.user.create({ data: { realm: 'reseller', email: input.email, ...nameData(input), passwordHash, emailVerifiedAt: new Date() } });
           await tx.resellerMember.create({ data: { resellerId: invitation.resellerId, userId: created.id, role: invitation.role } });
           await tx.invitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } });
           return created;
@@ -113,10 +115,10 @@ export class AuthService {
         if (phoneConfirmed && signupPhone && await this.phoneTaken(tx, signupPhone)) throw phoneInUse();
         const confirmedPhone = phoneConfirmed && signupPhone ? { phone: signupPhone, phoneVerifiedAt: new Date() } : {};
         const created = await tx.user.create({
-          data: { realm: 'reseller', email: input.email, name: input.name, passwordHash, emailVerifiedAt: input.signup_token ? new Date() : null, ...confirmedPhone },
+          data: { realm: 'reseller', email: input.email, ...personName, passwordHash, emailVerifiedAt: input.signup_token ? new Date() : null, ...confirmedPhone },
         });
         if (phoneConfirmed && signupPhone) await tx.userPhone.create({ data: { userId: created.id, realm: 'reseller', phone: signupPhone, verifiedAt: new Date() } });
-        const reseller = await tx.reseller.create({ data: { name: input.business_name ?? input.name, country: input.country, signupPhone } });
+        const reseller = await tx.reseller.create({ data: { name: input.business_name ?? personName.name, country: input.country, signupPhone } });
         await tx.resellerMember.create({ data: { resellerId: reseller.id, userId: created.id, role: 'owner' } });
         openedReseller = reseller;
         return created;
@@ -311,8 +313,9 @@ export class AuthService {
     await this.sessions.revokeAllForUser(user.id);
   }
 
-  async updateProfile(userId: string, name: string) {
-    await this.prisma.user.update({ where: { id: userId }, data: { name } });
+  /** The person's first and last name (saving both confirms them), or, from an older client, their whole name. */
+  async updateProfile(userId: string, input: { first_name?: string; last_name?: string; name?: string }) {
+    if (namesGiven(input)) await this.prisma.user.update({ where: { id: userId }, data: nameData(input) });
     return this.describe(userId);
   }
 

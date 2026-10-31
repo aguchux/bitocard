@@ -9,6 +9,7 @@ import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { originAllowed } from './auth.guard.js';
 import { SessionsService } from './sessions.service.js';
+import { googleNames } from './names.js';
 
 export const oauthCookie = 'bc_oauth_state';
 const stateLifetimeMs = 10 * 60 * 1000;
@@ -21,7 +22,7 @@ export class GoogleSignInError extends Error {
   }
 }
 
-export type GoogleClaims = JWTPayload & { email?: string; email_verified?: boolean; name?: string; nonce?: string };
+export type GoogleClaims = JWTPayload & { email?: string; email_verified?: boolean; name?: string; given_name?: string; family_name?: string; nonce?: string };
 
 /** Google's consent page for a round trip (authorization code with PKCE), with the product's own client. */
 export function googleAuthorizationUrl(config: Pick<AppConfig, 'GOOGLE_AUTH_URL'>, input: { clientId: string; redirectUri: string; state: string; nonce: string; codeVerifier: string }) {
@@ -208,10 +209,12 @@ export class GoogleService {
     // Signing in never creates an account: the person signs up first, on purpose.
     if (intent !== 'signup') throw new GoogleSignInError('google_account_not_found');
 
-    // A new person: Google has confirmed the email. Their reseller account is opened during onboarding.
+    // A new person: Google has confirmed the email. Their reseller account is opened during onboarding. Google's first
+    // and last name are kept, unconfirmed: they may not be as on the person's ID, so Seller HQ asks them to check.
+    const names = googleNames(claims, email);
     return this.prisma.$transaction(async tx => {
       const user = await tx.user.create({
-        data: { realm: 'reseller', email, emailVerifiedAt: new Date(), name: claims.name?.trim() || email.split('@')[0] },
+        data: { realm: 'reseller', email, emailVerifiedAt: new Date(), ...names },
       });
       await tx.oAuthAccount.create({ data: { userId: user.id, provider: 'google', providerUserId: sub, email } });
       return user.id;

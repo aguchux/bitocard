@@ -65,7 +65,8 @@ describe("Seller HQ sign-up", () => {
     expect(sent.find(item => item.path === "/v1/auth/signup/phone/verify")?.body).toEqual({ email: "kofi@example.com", signup_token: "signup-token-0000000000000", code: "654321" });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     await waitFor(() => expect(sent.some(item => item.path === "/v1/auth/signup")).toBe(true), slow);
-    expect(sent.find(item => item.path === "/v1/auth/signup")?.body).toMatchObject({ name: "Kofi Mensah", email: "kofi@example.com", country: "GH", business_name: "Kofi Digital", phone: "+233241234567", signup_token: "signup-token-0000000000000" });
+    expect(sent.find(item => item.path === "/v1/auth/signup")?.body).toMatchObject({ first_name: "Kofi", last_name: "Mensah", email: "kofi@example.com", country: "GH", business_name: "Kofi Digital", phone: "+233241234567", signup_token: "signup-token-0000000000000" });
+    expect(sent.find(item => item.path === "/v1/auth/signup")?.body).not.toHaveProperty("name");
   }, 20000);
 
   test("where the country cannot text, it says so and carries on with the number unconfirmed", async () => {

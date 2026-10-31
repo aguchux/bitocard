@@ -708,8 +708,8 @@ export class PaymentsService {
     mode: LedgerMode;
     country: { code: string; currency: string; reservedAccounts: boolean };
     bvn?: string;
-    /** Ghana: the holder's names (as verified, else as given) and phone number. */
-    holder?: { name: string; phone?: string };
+    /** Ghana: the holder's names (the verified name, else the account's first and last name) and phone number. */
+    holder?: { name?: string | null; firstName?: string | null; lastName?: string | null; phone?: string };
   }) {
     const { customer, mode, country } = input;
     if (!country.reservedAccounts) {
@@ -720,7 +720,8 @@ export class PaymentsService {
     if (mode === 'live' && country.code === 'NG' && !input.bvn) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your BVN: the bank needs it to open your account number. We do not keep it.', 'bvn');
     }
-    const holder = mode === 'live' && country.code === 'GH' ? { ...splitName(input.holder?.name ?? customer.name), phone: ghanaPhone(input.holder?.phone) } : undefined;
+    const names = input.holder?.name ? splitName(input.holder.name) : input.holder?.firstName ? { firstName: input.holder.firstName, lastName: input.holder.lastName || input.holder.firstName } : splitName(customer.name);
+    const holder = mode === 'live' && country.code === 'GH' ? { ...names, phone: ghanaPhone(input.holder?.phone) } : undefined;
     const providers = mode === 'test' ? this.providers.reservedAccounts(mode, country.code, country.currency) : this.providers.reservedAccounts(mode, country.code, country.currency).filter(provider => provider.name === 'flutterwave');
     if (providers.length === 0) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'Bank account numbers are unavailable right now. Top up with a card or mobile money instead.');
     const outcome = await this.openReservedAccounts(providers, {

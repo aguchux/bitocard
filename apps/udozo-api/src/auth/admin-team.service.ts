@@ -4,6 +4,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type User } from '../generated/prisma/client.js';
 import { AdminAuthService, adminRoles } from './admin-auth.service.js';
+import { namesOf } from './names.js';
 
 type AdminRole = (typeof adminRoles)[number];
 type Member = User & { totp: { confirmedAt: Date | null } | null };
@@ -19,6 +20,7 @@ function present(member: Member) {
     object: 'admin_member' as const,
     id: member.id,
     name: member.name,
+    ...namesOf(member),
     email: member.email,
     roles: member.adminRoles,
     status: member.status,
@@ -72,7 +74,7 @@ export class AdminTeamService {
     return this.prisma.user.count({ where: { realm: this.realm, status: 'active', adminRoles: { has: 'super_admin' }, id: { not: exceptId } } });
   }
 
-  async invite(actorId: string, input: { email: string; name: string; roles: string[] }) {
+  async invite(actorId: string, input: { email: string; name?: string; first_name?: string; last_name?: string; roles: string[] }) {
     const email = input.email.trim().toLowerCase();
     if (!this.auth.isAdminDomain(email, this.realm)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'admin_domain_not_allowed', `Admins use an address on ${this.auth.adminDomains(this.realm).join(' or ')}.`, 'email');
@@ -80,7 +82,7 @@ export class AdminTeamService {
     const roles = this.checkRoles(input.roles);
     let created: User;
     try {
-      created = await this.auth.createAdmin({ email, name: input.name.trim(), roles, realm: this.realm });
+      created = await this.auth.createAdmin({ email, name: input.name, first_name: input.first_name, last_name: input.last_name, roles, realm: this.realm });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'admin_exists', 'An admin already uses this email.', 'email');

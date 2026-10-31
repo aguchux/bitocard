@@ -154,26 +154,34 @@ function MobileNumber() {
   );
 }
 
-/** The name shown to your team and in emails. */
+/** The first and last name, as on your ID (shown to your team and in emails): saving them confirms them. */
 function NameForm({ onDone }: { onDone: () => void }) {
   const { user } = useReseller();
-  const [name, setName] = useState(user.name);
+  const [firstName, setFirstName] = useState(user.first_name ?? user.name);
+  const [lastName, setLastName] = useState(user.last_name ?? "");
   const [update, state] = useUpdateProfileMutation();
+  const unchanged = firstName.trim() === user.first_name && lastName.trim() === (user.last_name ?? "") && user.name_confirmed;
   return (
     <form
       onSubmit={async event => {
         event.preventDefault();
-        if (await update({ name: name.trim() }).unwrap().catch(() => null)) onDone();
+        if (await update({ first_name: firstName.trim(), last_name: lastName.trim() }).unwrap().catch(() => null)) onDone();
       }}
       className="space-y-3"
     >
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-      <Field label="Name" htmlFor="profile-name">
-        <Input id="profile-name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} minLength={2} maxLength={100} required />
-      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="First name" htmlFor="profile-first-name">
+          <Input id="profile-first-name" autoComplete="given-name" value={firstName} onChange={event => setFirstName(event.target.value)} maxLength={60} required />
+        </Field>
+        <Field label="Last name" htmlFor="profile-last-name">
+          <Input id="profile-last-name" autoComplete="family-name" value={lastName} onChange={event => setLastName(event.target.value)} maxLength={60} required />
+        </Field>
+      </div>
+      <p className="text-xs text-muted">As they are on your ID: your identity check is matched against them.</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" loading={state.isLoading} disabled={name.trim().length < 2 || name.trim() === user.name}>
-          Save name
+        <Button type="submit" loading={state.isLoading} disabled={!firstName.trim() || !lastName.trim() || unchanged}>
+          {user.name_confirmed === false ? "Confirm my name" : "Save name"}
         </Button>
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancel
@@ -435,7 +443,8 @@ function PasswordCard() {
 export default function ProfilePage() {
   const { user, membership } = useReseller();
   const [signOut, signingOut] = useSignOut();
-  const [editing, setEditing] = useState(false);
+  // An older account (its whole name split in two) is asked to check it: the form opens by itself.
+  const [editing, setEditing] = useState(user.name_confirmed === false);
 
   return (
     <ShqShell section="settings" current="/settings/profile" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Your profile" }]}>
@@ -455,10 +464,12 @@ export default function ProfilePage() {
           }
         />
         <div className="space-y-4 p-5 sm:p-6">
+          {user.name_confirmed === false ? <Notice tone="amber">Check your first and last name, as on your ID. We split the name you gave us before, so it may need putting right.</Notice> : null}
           {editing ? <NameForm onDone={() => setEditing(false)} /> : null}
           <KeyValue
             items={[
-              { label: "Name", value: user.name },
+              { label: "First name", value: user.first_name ?? user.name },
+              { label: "Last name", value: user.last_name ?? "Not given yet" },
               {
                 label: "Primary email",
                 value: (

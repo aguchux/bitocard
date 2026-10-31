@@ -24,7 +24,14 @@ export type Customer = {
   object: "customer";
   id: string;
   email: string;
+  /** The first and last name joined. */
   name: string;
+  /** First and last name apart, as on the customer's ID. */
+  first_name: string;
+  /** Null for an older account whose name was one word, until they add it. */
+  last_name: string | null;
+  /** False until an older account (whose whole name was split) checks the two on their profile. */
+  name_confirmed: boolean;
   email_verified: boolean;
   phone: string | null;
   phone_verified: boolean;

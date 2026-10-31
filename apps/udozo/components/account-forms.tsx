@@ -198,13 +198,18 @@ export function ResetForm({ email }: { email: string }) {
   );
 }
 
-export function NameForm({ name }: { name: string }) {
+/** The first and last name, as on the customer's ID; `confirm`: an older account checking the split of its old name. */
+export function NameForm({ firstName, lastName, confirm = false }: { firstName: string; lastName: string | null; confirm?: boolean }) {
   const [state, action, pending] = useActionState(updateName, empty);
   return (
     <form action={action} className="space-y-3">
       <FormMessage state={state} />
-      <TextField label="Your name" name="name" defaultValue={name} required minLength={2} maxLength={100} autoComplete="name" state={state} />
-      <Submit pending={pending}>Save</Submit>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField label="First name" name="first_name" defaultValue={firstName} required maxLength={60} autoComplete="given-name" state={state} />
+        <TextField label="Last name" name="last_name" defaultValue={lastName ?? ""} required maxLength={60} autoComplete="family-name" state={state} />
+      </div>
+      <p className="text-xs text-navy-500">As they are on your ID: your identity check is matched against them.</p>
+      <Submit pending={pending}>{confirm ? "Confirm my name" : "Save"}</Submit>
     </form>
   );
 }
@@ -234,7 +239,7 @@ export function PasswordForm() {
 }
 
 /** The identity check (Udozo Verify): a fresh link each time, since links work once. `resume`: a check is open. */
-export function VerificationForm({ country, countryName, resume }: { country: string; countryName: string; resume?: boolean }) {
+export function VerificationForm({ country, countryName, resume, firstName = "", lastName = "" }: { country: string; countryName: string; resume?: boolean; firstName?: string; lastName?: string | null }) {
   const [state, action, pending] = useActionState(startVerification, empty);
   const [consent, setConsent] = useState(false);
   return (
@@ -242,8 +247,8 @@ export function VerificationForm({ country, countryName, resume }: { country: st
       <input type="hidden" name="country" value={country} />
       <FormMessage state={state} />
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField label="First name" name="first_name" autoComplete="given-name" required state={state} />
-        <TextField label="Last name" name="last_name" autoComplete="family-name" required state={state} />
+        <TextField label="First name" name="first_name" autoComplete="given-name" defaultValue={firstName} required state={state} />
+        <TextField label="Last name" name="last_name" autoComplete="family-name" defaultValue={lastName ?? ""} required state={state} />
       </div>
       <p className="text-sm text-navy-600">{`We will take you to Udozo Verify to photograph an ID document from ${countryName}, take a selfie and make two short movements. It takes about five minutes. Your documents are stored encrypted and never made public.`}</p>
       <label className="flex items-start gap-3 text-sm text-navy-700">

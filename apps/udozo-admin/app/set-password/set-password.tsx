@@ -22,7 +22,8 @@ export function SetPassword() {
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [lookup, lookupState] = useAdminPasswordLinkMutation();
   const [complete, completeState] = useAdminCompletePasswordLinkMutation();
-  const [name, setName] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState<string | null>(null);
+  const [lastName, setLastName] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [resetAuthenticator, setResetAuthenticator] = useState(false);
@@ -49,8 +50,10 @@ export function SetPassword() {
       return;
     }
     setMismatch(false);
-    const chosenName = lookupState.data?.kind === "create" ? (name ?? lookupState.data.name).trim() : "";
-    const result = await complete({ token, password, reset_authenticator: resetAuthenticator, ...(chosenName ? { name: chosenName } : {}) }).unwrap().catch(() => null);
+    const link = lookupState.data;
+    // A new admin (or one whose name is not confirmed yet) sets their first and last name with the password.
+    const names = link && (link.kind === "create" || link.name_confirmed === false) ? { first_name: (firstName ?? link.first_name ?? "").trim(), last_name: (lastName ?? link.last_name ?? "").trim() } : null;
+    const result = await complete({ token, password, reset_authenticator: resetAuthenticator, ...(names?.first_name && names.last_name ? names : {}) }).unwrap().catch(() => null);
     if (result) setDone(result);
   }
 
@@ -104,10 +107,15 @@ export function SetPassword() {
       {mismatch ? <Notice tone="red">The two passwords do not match.</Notice> : null}
       {/* Lets password managers save the new password against the right account. */}
       <input type="email" name="username" autoComplete="username" value={link.email} readOnly hidden />
-      {creating ? (
-        <Field label="Your name" htmlFor="name" hint="Shown to other admins and in the activity log.">
-          <Input id="name" autoComplete="name" required maxLength={100} value={name ?? link.name} onChange={event => setName(event.target.value)} />
-        </Field>
+      {creating || link.name_confirmed === false ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="First name" htmlFor="first-name" hint="As on your ID. Shown to other admins and in the activity log.">
+            <Input id="first-name" autoComplete="given-name" required maxLength={60} value={firstName ?? link.first_name ?? ""} onChange={event => setFirstName(event.target.value)} />
+          </Field>
+          <Field label="Last name" htmlFor="last-name">
+            <Input id="last-name" autoComplete="family-name" required maxLength={60} value={lastName ?? link.last_name ?? ""} onChange={event => setLastName(event.target.value)} />
+          </Field>
+        </div>
       ) : null}
       <Field label="New password" htmlFor="password" hint="10 to 128 characters. Passwords found in public data breaches are refused.">
         <PasswordInput id="password" autoComplete="new-password" required minLength={10} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />

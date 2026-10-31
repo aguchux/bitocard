@@ -208,7 +208,8 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    const person = { name: `${firstName.trim()} ${lastName.trim()}`, email: cleanEmail, password };
+    // Apart, as on the owner's ID: their identity check is matched against them.
+    const person = { first_name: firstName.trim(), last_name: lastName.trim(), email: cleanEmail, password };
     const input: SignUpInput = invitation
       ? { ...person, invitation_token: invitation }
       : { ...person, country, business_name: business.trim(), ...(phone ? { phone } : {}), ...(confirmed ? { signup_token: confirmed.token } : {}) };

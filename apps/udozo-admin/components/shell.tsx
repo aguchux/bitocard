@@ -212,13 +212,27 @@ export function ModeSwitch() {
   );
 }
 
+/** An admin whose whole name was split in two (an older account) checks their first and last name on Your account. */
+function NameCheckBanner() {
+  const admin = useAdmin();
+  if (admin.name_confirmed !== false) return null;
+  return (
+    <div role="status" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+      <span>Please check your first and last name, as on your ID.</span>
+      <AppLink href="/account" className="font-semibold underline underline-offset-2">
+        Check my name
+      </AppLink>
+    </div>
+  );
+}
+
 /**
  * The layout of every page on admin.udozo.com: the shared console (rail, section menu, breadcrumbs, account menu) in
  * Udozo's name and mark, its inbox bell with push to the admin's browsers, and step-up prompts.
  */
 export function UdozoShell({ section, current, crumbs, actions, children }: { section: UdozoSection; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   return (
-    <ConsoleShell brand="Udozo" logo="/udozo-mark-light.png" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<InboxBell />} account={<AccountArea />}>
+    <ConsoleShell brand="Udozo" logo="/udozo-mark-light.png" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<InboxBell />} account={<AccountArea />} banner={<NameCheckBanner />}>
       {children}
       <StepUpPrompt />
     </ConsoleShell>

@@ -177,7 +177,7 @@ export class AuthController {
   @SessionOnly()
   @Patch('profile')
   updateProfile(@CurrentCaller() caller: Caller, @Body() body: ProfileDto) {
-    return this.auth.updateProfile(caller.kind === 'session' ? caller.userId : '', body.name);
+    return this.auth.updateProfile(caller.kind === 'session' ? caller.userId : '', body);
   }
 
   /** Change your password with the current one. Signs out your other sessions. */

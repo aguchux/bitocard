@@ -24,7 +24,10 @@ export type AdminRole = (typeof adminRoles)[number];
  * `authenticator`: whether they use an authenticator app; `authenticator_required`: whether they must (Udozo's team
  * members other than super admins choose). Both are absent from BitoCard's API, where every admin has one.
  */
-export type Admin = { object: 'admin'; id: string; name: string; email: string; roles: AdminRole[]; authenticator?: boolean; authenticator_required?: boolean };
+/** Udozo's API also names the admin apart (`first_name`, `last_name`, as on their ID) and says whether they confirmed it. */
+type NamedApart = { first_name?: string; last_name?: string | null; name_confirmed?: boolean };
+
+export type Admin = { object: 'admin'; id: string; name: string; email: string; roles: AdminRole[]; authenticator?: boolean; authenticator_required?: boolean } & NamedApart;
 /** `step_up_until`: sensitive and money actions are open on this session until then (after the authenticator code), else null. */
 export type AdminSession = { object: 'admin_session'; admin: Admin; recovery_codes?: string[]; step_up_until?: string | null };
 export type AdminStepUp = { object: 'admin_step_up'; step_up_until: string };
@@ -34,7 +37,7 @@ export type MfaChallenge = { object: 'mfa_challenge'; challenge_token: string; m
 export type AdminAuthenticatorOn = { object: 'admin_authenticator'; authenticator: true; recovery_codes: string[] };
 export type MfaSetup = { object: 'mfa_setup'; secret: string; otpauth_uri: string };
 /** An emailed set-password link (admin:create or admin:reset-password), before it is used. */
-export type AdminPasswordLink = { object: 'admin_password_link'; email: string; name: string; kind: 'create' | 'reset'; authenticator_set_up: boolean; expires_at: string };
+export type AdminPasswordLink = { object: 'admin_password_link'; email: string; name: string; kind: 'create' | 'reset'; authenticator_set_up: boolean; expires_at: string } & NamedApart;
 /** Sign-in step 1: `link_sent` when an address in ADMIN_SETUP_EMAILS was set up and emailed a set-password link. */
 export type AdminSignInStart = { object: 'admin_sign_in'; next: 'password' | 'link_sent' };
 export type AdminPasswordSet = { object: 'admin_password_set'; email: string; authenticator_reset: boolean };

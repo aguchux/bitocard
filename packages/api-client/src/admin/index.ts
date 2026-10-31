@@ -86,8 +86,14 @@ export const adminApi = bitocardApi.injectEndpoints({
     adminSignInStart: build.mutation<AdminSignInStart, { email: string }>({ query: body => ({ url: '/v1/admin/auth/start', method: 'POST', body }) }),
     adminForgotPassword: build.mutation<{ object: 'admin_password_reset_requested' }, { email: string }>({ query: body => ({ url: '/v1/admin/auth/password/forgot', method: 'POST', body }) }),
     adminPasswordLink: build.mutation<AdminPasswordLink, { token: string }>({ query: body => ({ url: '/v1/admin/auth/password-link', method: 'POST', body }) }),
-    adminCompletePasswordLink: build.mutation<AdminPasswordSet, { token: string; password: string; reset_authenticator?: boolean; name?: string }>({
+    /** `name` on BitoCard's API; `first_name` and `last_name` on Udozo's. */
+    adminCompletePasswordLink: build.mutation<AdminPasswordSet, { token: string; password: string; reset_authenticator?: boolean; name?: string; first_name?: string; last_name?: string }>({
       query: body => ({ url: '/v1/admin/auth/password-link/complete', method: 'POST', body }),
+    }),
+    /** Udozo's API, Your account: the admin's first and last name, as on their ID (saving confirms them). */
+    adminUpdateProfile: build.mutation<AdminSession, { first_name: string; last_name: string }>({
+      query: body => ({ url: '/v1/admin/auth/profile', method: 'PATCH', body }),
+      invalidatesTags: ['Session', 'AdminTeam'],
     }),
     adminSignOut: build.mutation<void, void>({ query: () => ({ url: '/v1/admin/auth/signout', method: 'POST' }), invalidatesTags: ['Session'] }),
     /** Opens 5 minutes of sensitive and money actions on this session with the authenticator code. */
@@ -443,6 +449,7 @@ export const {
   useAdminForgotPasswordMutation,
   useAdminPasswordLinkMutation,
   useAdminCompletePasswordLinkMutation,
+  useAdminUpdateProfileMutation,
   useOverviewQuery,
   useActivityInfiniteQuery,
   useResellersQuery,

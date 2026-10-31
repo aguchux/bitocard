@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { ShieldCheck } from "lucide-react";
-import { Badge, Button, Card, CodeInput, errorMessage, Notice, PageHeader } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CodeInput, errorMessage, Field, Input, Notice, PageHeader } from "@bitocard/admin-ui";
 import { useAdmin } from "@bitocard/admin-ui/shell";
-import { type MfaSetup, useAdminAuthenticatorConfirmMutation, useAdminAuthenticatorSetupMutation } from "@bitocard/api-client/admin";
+import { type MfaSetup, useAdminAuthenticatorConfirmMutation, useAdminAuthenticatorSetupMutation, useAdminUpdateProfileMutation } from "@bitocard/api-client/admin";
 import { UdozoShell } from "@/components/shell";
 import { roleInfo } from "@/components/team";
 
@@ -106,7 +106,46 @@ function TwoStep() {
   );
 }
 
-/** The signed-in admin's own account: who they are, their roles and their 2-step verification. */
+/** The admin's first and last name, as on their ID; an older account (its whole name split in two) confirms them. */
+function NameCard() {
+  const admin = useAdmin();
+  const [firstName, setFirstName] = useState(admin.first_name ?? admin.name);
+  const [lastName, setLastName] = useState(admin.last_name ?? "");
+  const [save, state] = useAdminUpdateProfileMutation();
+  const [saved, setSaved] = useState(false);
+  const unconfirmed = admin.name_confirmed === false;
+  const unchanged = !unconfirmed && firstName.trim() === admin.first_name && lastName.trim() === (admin.last_name ?? "");
+  return (
+    <Card className="space-y-3 p-5">
+      <h2 className="text-lg font-bold text-ink">Your name</h2>
+      {unconfirmed ? <Notice tone="amber">Check your first and last name, as on your ID. We split the name you had before, so it may need putting right.</Notice> : null}
+      {saved ? <Notice tone="green">Saved.</Notice> : null}
+      {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      <form
+        className="space-y-3"
+        onSubmit={async event => {
+          event.preventDefault();
+          setSaved(false);
+          if (await save({ first_name: firstName.trim(), last_name: lastName.trim() }).unwrap().catch(() => null)) setSaved(true);
+        }}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="First name" htmlFor="account-first-name">
+            <Input id="account-first-name" autoComplete="given-name" required maxLength={60} value={firstName} onChange={event => setFirstName(event.target.value)} />
+          </Field>
+          <Field label="Last name" htmlFor="account-last-name">
+            <Input id="account-last-name" autoComplete="family-name" required maxLength={60} value={lastName} onChange={event => setLastName(event.target.value)} />
+          </Field>
+        </div>
+        <Button type="submit" loading={state.isLoading} disabled={!firstName.trim() || !lastName.trim() || unchanged}>
+          {unconfirmed ? "Confirm my name" : "Save name"}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/** The signed-in admin's own account: who they are, their name, their roles and their 2-step verification. */
 export default function AccountPage() {
   const admin = useAdmin();
   return (
@@ -125,6 +164,7 @@ export default function AccountPage() {
           </div>
           <p className="text-xs text-subtle">A super admin changes your roles in Settings &gt; Team.</p>
         </Card>
+        <NameCard />
         <TwoStep />
       </div>
     </UdozoShell>

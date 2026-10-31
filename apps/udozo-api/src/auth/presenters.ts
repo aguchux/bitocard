@@ -1,4 +1,5 @@
 import type { Reseller, ResellerMember, User } from '../generated/prisma/client.js';
+import { namesOf } from './names.js';
 
 /** Public JSON shapes. Field names are snake_case and every object says what it is. */
 export function presentUser(user: User) {
@@ -6,6 +7,7 @@ export function presentUser(user: User) {
     object: 'user' as const,
     id: user.id,
     name: user.name,
+    ...namesOf(user),
     email: user.email,
     email_verified: user.emailVerifiedAt !== null,
     phone: user.phone,

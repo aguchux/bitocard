@@ -68,7 +68,13 @@ model User {
   phones          UserPhone[]
   /// Argon2id. Null for Google-only accounts.
   passwordHash    String?     @map("password_hash")
+  /// The first and last name joined, for showing and emails. Kept in step with the two below.
   name            String
+  /// First and last name apart, matched against identity documents (`src/auth/names.ts`). Older accounts were split by
+  /// migration (first word, then the rest) and confirm them on their profile (`name_confirmed_at`, set by sign-up too).
+  firstName       String?     @map("first_name")
+  lastName        String?     @map("last_name")
+  nameConfirmedAt DateTime?   @map("name_confirmed_at")
   status          UserStatus  @default(active)
   /// Admin roles (super_admin, operations, finance, support). Reseller staff roles live on ResellerMember.
   adminRoles      String[]    @default([]) @map("admin_roles")
@@ -2620,7 +2626,13 @@ model Customer {
   storeId                   String                    @map("store_id") @db.Uuid
   /// Stored lower-case.
   email                     String
+  /// The first and last name joined, for showing and emails. Kept in step with the two below.
   name                      String
+  /// First and last name apart, matched against identity documents (`src/auth/names.ts`). Older accounts were split by
+  /// migration (first word, then the rest) and confirm them on their profile (`name_confirmed_at`, set by sign-up too).
+  firstName                 String?                   @map("first_name")
+  lastName                  String?                   @map("last_name")
+  nameConfirmedAt           DateTime?                 @map("name_confirmed_at")
   /// Argon2id. Null for an Afrippa trader who signed up with Google, until they set one with Forgot password.
   passwordHash              String?                   @map("password_hash")
   /// Afrippa's traders who signed up with Google: the Google account's subject (one account per store). Never set by
