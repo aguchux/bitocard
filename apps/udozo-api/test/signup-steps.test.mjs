@@ -45,7 +45,7 @@ describe('udozo.com: one step at a time', () => {
   test('email and its code, name and country, mobile and its code, then the password: confirmed from the start', async () => {
     const browser = site();
     const email = unique();
-    assert.deepEqual((await browser.post('/v1/store/account/signin/lookup', { email })).json, { object: 'account_lookup', email, exists: false });
+    assert.deepEqual((await browser.post('/v1/store/account/signin/lookup', { email })).json, { object: 'account_lookup', email, exists: false, password: false });
 
     assert.equal((await browser.post('/v1/store/account/signup/email', { email })).status, 202);
     const confirmed = await browser.post('/v1/store/account/signup/email/verify', { email, code: await lastEmailCode(server.app, email) });

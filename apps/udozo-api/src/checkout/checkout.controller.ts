@@ -7,6 +7,7 @@ import { NamePart, namedApart, renaming } from '../auth/names.js';
 import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { AllowPhonePending, CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { CustomerGoogleService } from '../customers/customer-google.service.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { HandoffService } from '../customers/handoff.service.js';
 import { StoreKey } from '../customers/store-key.js';
@@ -84,6 +85,23 @@ class SignupPhoneDto extends AccountEmailDto {
 class SignupPhoneCodeDto extends SignupEmailCodeDto {
   @IsString() @Length(20, 100)
   signup_token: string;
+}
+
+class GoogleStartDto {
+  @IsIn(['signin', 'signup'])
+  intent: 'signin' | 'signup';
+}
+
+class GoogleFinishDto {
+  @IsString() @Length(20, 200)
+  state: string;
+
+  @IsString() @Length(1, 2000)
+  code: string;
+
+  /** The referral or invite code the sign-up link carried, kept on an account Google makes. */
+  @IsOptional() @Matches(/^[\w.~-]{1,64}$/, { message: 'ref must be a short code' })
+  ref?: string;
 }
 
 class SignInDto {
@@ -281,7 +299,29 @@ export class CustomerAccountController {
     private readonly stores: StoreSellers,
     private readonly identity: IdentityService,
     private readonly handoffs: HandoffService,
+    private readonly google: CustomerGoogleService,
   ) {}
+
+  /**
+   * Udozo: "Continue with Google", step 1 (udozo.com's server): Google's consent address and the one-time state to keep
+   * until Google returns. `signup` makes an account at the end; `signin` only signs one in.
+   */
+  @ProductOnly('udozo')
+  @SkipIdempotency()
+  @Post('google/start')
+  @HttpCode(HttpStatus.OK)
+  async googleStart(@StoreKey() store: string | null, @Body() body: GoogleStartDto) {
+    return this.google.start(await this.stores.accountStore(store), body.intent);
+  }
+
+  /** Step 2: the code Google returned with that state; the customer is signed in (`signed_up` when the account is new). */
+  @ProductOnly('udozo')
+  @SkipIdempotency()
+  @Post('google/finish')
+  @HttpCode(HttpStatus.OK)
+  async googleFinish(@StoreKey() store: string | null, @Body() body: GoogleFinishDto) {
+    return this.google.finish(await this.stores.accountStore(store), body);
+  }
 
   /**
    * Sign-in's first step: whether an account at this store's accounts uses the email (then the password; otherwise sign

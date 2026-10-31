@@ -173,6 +173,19 @@ export class AuthService {
     return this.signupVerification.verifyPhone(input.email, input.signup_token, input.code);
   }
 
+  /**
+   * Seller HQ's onboarding (a Google sign-up, or someone without a business yet): a sign-up token for the person's own,
+   * already confirmed email, so their mobile is texted a code and confirmed before their reseller account opens.
+   */
+  async onboardingToken(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.emailVerifiedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_unverified', 'Confirm your email first.');
+    if (await this.prisma.resellerMember.findFirst({ where: { userId, role: 'owner' } })) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_owner', 'You already own a reseller account.');
+    }
+    return this.signupVerification.issue(user.email);
+  }
+
   /** A signed-in person with a confirmed email opens their own reseller account; one owned account per person. */
   async createResellerAccount(userId: string, input: CreateResellerAccountDto) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
@@ -186,6 +199,15 @@ export class AuthService {
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
       if (await tx.resellerMember.findFirst({ where: { userId, role: 'owner' } })) {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_owner', 'You already own a reseller account.');
+      }
+      // Onboarding's token (`onboardingToken`): the mobile confirmed with its texted code becomes a sign-in number.
+      if (input.signup_token) {
+        const { phoneConfirmed } = await this.signupVerification.consume(tx, user.email, input.signup_token, signupPhone);
+        if (phoneConfirmed && signupPhone) {
+          if (await this.phoneTaken(tx, signupPhone)) throw phoneInUse();
+          if (!user.phone) await tx.user.update({ where: { id: userId }, data: { phone: signupPhone, phoneVerifiedAt: new Date() } });
+          await tx.userPhone.create({ data: { userId, realm: 'reseller', phone: signupPhone, verifiedAt: new Date() } });
+        }
       }
       const reseller = await tx.reseller.create({ data: { name: input.business_name, country: input.country, signupPhone } });
       await tx.resellerMember.create({ data: { resellerId: reseller.id, userId, role: 'owner' } });

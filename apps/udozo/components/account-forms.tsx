@@ -5,6 +5,7 @@ import { useActionState, useId, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle2, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import {
   changePassword,
+  finishProfile,
   type FormState,
   forgotPassword,
   resendCode,
@@ -210,6 +211,26 @@ export function NameForm({ firstName, lastName, confirm = false }: { firstName: 
       </div>
       <p className="text-xs text-navy-500">As they are on your ID: your identity check is matched against them.</p>
       <Submit pending={pending}>{confirm ? "Confirm my name" : "Save"}</Submit>
+    </form>
+  );
+}
+
+/** Onboarding a Google sign-up: its first and last name (Google's, to check) and its country. */
+export function ProfileStartForm({ next, firstName, lastName, markets }: { next: string; firstName: string; lastName: string | null; markets: Market[] }) {
+  const [state, action, pending] = useActionState(finishProfile, empty);
+  return (
+    <form action={action} className="space-y-4">
+      <input type="hidden" name="next" value={next} />
+      <FormMessage state={state} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField label="First name" name="first_name" defaultValue={firstName} required maxLength={60} autoComplete="given-name" autoFocus state={state} />
+        <TextField label="Last name" name="last_name" defaultValue={lastName ?? ""} required maxLength={60} autoComplete="family-name" state={state} />
+      </div>
+      <p className="text-xs text-navy-500">As they are on your ID: your identity check is matched against them.</p>
+      <CountryField markets={markets} state={state} />
+      <Submit pending={pending} className="w-full">
+        Continue
+      </Submit>
     </form>
   );
 }

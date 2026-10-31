@@ -176,7 +176,8 @@ export class GoogleService {
   /** One of BitoCard's own round trips (never Afrippa's), used once. */
   private async takeState(state: string) {
     const record = await this.prisma.oAuthState.findUnique({ where: { id: sha256(state) } });
-    if (!record || record.platform !== 'bitocard') return null;
+    // A store customer's round trip (udozo.com's, `customer:<store>`) is never Seller HQ's.
+    if (!record || record.platform !== 'bitocard' || record.returnTo.startsWith('customer:')) return null;
     await this.prisma.oAuthState.delete({ where: { id: record.id } }).catch(() => undefined);
     return record.expiresAt > new Date() ? record : null;
   }

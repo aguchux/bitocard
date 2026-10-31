@@ -14,14 +14,15 @@ const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim()
 const failed = (result: { message: string; param: string | null }): FormState => ({ error: result.message, field: result.param });
 
 /** What a sign-in or sign-up step answers: on (with what it learned), or the API's refusal. */
-export type StepResult = { ok: true; exists?: boolean; token?: string; phone?: string } | { ok: false; error: string; code: string | null; field: string | null };
+export type StepResult = { ok: true; exists?: boolean; password?: boolean; token?: string; phone?: string } | { ok: false; error: string; code: string | null; field: string | null };
 
 const refused = (result: { code: string | null; message: string; param: string | null }): StepResult => ({ ok: false, error: result.message, code: result.code, field: result.param });
 
 /** Sign-in's first step: whether an account uses the email (then the password; otherwise sign up with it). */
 export async function lookupEmail(email: string): Promise<StepResult> {
-  const result = await customerApi<{ exists: boolean }>("POST", "/v1/store/account/signin/lookup", { email: email.trim() });
-  return result.ok ? { ok: true, exists: result.data.exists } : refused(result);
+  const result = await customerApi<{ exists: boolean; password?: boolean }>("POST", "/v1/store/account/signin/lookup", { email: email.trim() });
+  // `password: false`: a Google sign-up, which signs in with Google.
+  return result.ok ? { ok: true, exists: result.data.exists, password: result.data.password !== false } : refused(result);
 }
 
 /** Sign-up, step 1: a code to an email no account uses yet (`email_taken` otherwise). */
@@ -140,6 +141,17 @@ export async function updateName(_state: FormState, form: FormData): Promise<For
   // The header's menu shows the name too, and the account's pages stop asking to check it.
   revalidatePath("/", "layout");
   return { notice: "Saved." };
+}
+
+/**
+ * Onboarding a Google sign-up (`/verify`): its first and last name, as on its ID, and its country, fixed for good. The
+ * mobile number comes next.
+ */
+export async function finishProfile(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { first_name: text(form, "first_name"), last_name: text(form, "last_name"), country: text(form, "country") });
+  if (!result.ok) return failed(result);
+  revalidatePath("/", "layout");
+  redirect(`/verify?next=${encodeURIComponent(safeNext(form.get("next")))}`);
 }
 
 /** Sets the country of an account from before it was asked (once: it never changes after). */

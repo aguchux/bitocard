@@ -607,6 +607,12 @@ export const dashboardDocs: DocsArea = {
       schema: 'Session',
       example: { ...sessionExample, user: { ...userExample, phone: null, phone_verified: false, created_at: '2026-10-06T09:12:44.000Z' }, memberships: [{ ...membershipExample, reseller: { ...membershipExample.reseller, status: 'pending' } }] },
     },
+    'POST /v1/auth/onboarding/signup-token': {
+      status: 200,
+      description: 'A sign-up token for your confirmed email: confirm your mobile with it, then open your reseller account with it.',
+      schema: 'SignupVerification',
+      example: { object: 'signup_verification', email: 'ada@adadigital.ng', signup_token: 'EXAMPLE-signup-token-not-real-3kQ9vX2', expires_at: '2026-10-06T10:12:44.000Z' },
+    },
     'POST /v1/auth/reseller-account': {
       status: 201,
       description: 'The reseller account is opened and you are its owner.',

@@ -17,6 +17,7 @@ import {
   type StepResult,
 } from "@/lib/account-actions";
 import type { Market } from "@/lib/countries";
+import { GoogleButton } from "./google-button";
 
 const phoneInput =
   "min-h-12 border border-navy-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 aria-[invalid=true]:border-brand-700";
@@ -66,7 +67,7 @@ function EmailChip({ email, onChange }: { email: string; onChange: () => void })
  * offer to create one with it.
  */
 export function SignInForm({ next, email: initial = "" }: { next: string; email?: string }) {
-  const [step, setStep] = useState<"email" | "password" | "missing">("email");
+  const [step, setStep] = useState<"email" | "password" | "google" | "missing">("email");
   const [email, setEmail] = useState(initial);
   const [looked, setLooked] = useState<StepResult | null>(null);
   const [looking, startLooking] = useTransition();
@@ -78,7 +79,7 @@ export function SignInForm({ next, email: initial = "" }: { next: string; email?
     startLooking(async () => {
       const result = await lookupEmail(email);
       setLooked(result);
-      if (result.ok) setStep(result.exists ? "password" : "missing");
+      if (result.ok) setStep(!result.exists ? "missing" : result.password === false ? "google" : "password");
     });
   }
 
@@ -97,6 +98,22 @@ export function SignInForm({ next, email: initial = "" }: { next: string; email?
           Forgot password?
         </Link>
       </form>
+    );
+  }
+
+  // An account made with Google has no password until Forgot password sets one.
+  if (step === "google") {
+    return (
+      <div className="space-y-4">
+        <EmailChip email={email.trim()} onChange={() => setStep("email")} />
+        <p role="status" className="text-sm text-navy-700">
+          This account signs in with Google.
+        </p>
+        <GoogleButton intent="signin" next={next} />
+        <Link href={`/forgot-password?email=${encodeURIComponent(email.trim())}`} className="block text-sm font-semibold text-brand-700 hover:underline">
+          Set a password instead
+        </Link>
+      </div>
     );
   }
 

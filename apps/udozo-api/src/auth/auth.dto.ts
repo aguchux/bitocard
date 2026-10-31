@@ -119,6 +119,17 @@ export class CreateResellerAccountDto {
   @IsString()
   @Length(5, 20)
   phone?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'From `POST /v1/auth/onboarding/signup-token` (Udozo): when `phone` was confirmed with its texted code under this token (`POST /v1/auth/signup/phone` and `…/verify`), it becomes your confirmed sign-in number.',
+    minLength: 20,
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @Length(20, 100)
+  signup_token?: string;
 }
 
 export class SignInLookupDto {

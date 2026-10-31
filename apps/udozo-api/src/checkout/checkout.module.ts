@@ -5,6 +5,7 @@ import { FeesModule } from '../fees/fees.module.js';
 import { FxModule } from '../fx/fx.module.js';
 import { EsimsModule } from '../esims/esims.module.js';
 import { CustomerGuard } from '../customers/customer-session.js';
+import { CustomerGoogleService } from '../customers/customer-google.service.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { HandoffService } from '../customers/handoff.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
@@ -25,7 +26,7 @@ import { StoreSellers } from './store-sellers.js';
 @Module({
   imports: [AuthModule, CatalogueModule, EsimsModule, FeesModule, FxModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule, StoresModule],
   controllers: [CustomerAccountController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController, AdminCountryStoresController],
-  providers: [CustomersService, HandoffService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
+  providers: [CustomersService, CustomerGoogleService, HandoffService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
   exports: [CheckoutService, HouseService, CustomersService, StoreSellers, CustomerWalletsService],
 })
 export class CheckoutModule {}

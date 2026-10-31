@@ -674,7 +674,7 @@ const privacy: LegalDocument = {
             "The public: live listings, including in search engines and in previews when a link is shared.",
             "The other person in a chat: your first name and initial, your messages and offers. A seller sees a Safe pay buyer's delivery address once they have paid. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
             "Udozo's team, as their work needs.",
-            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS and the network in front of our API), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing in to Seller HQ with Google), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
+            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS and the network in front of our API), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
             "Authorities, where the law requires it.",
           ],
         },
@@ -747,6 +747,7 @@ const cookies: LegalDocument = {
             rows: [
               ["udz_customer", "udozo.com, and each reseller's store on its own address", "Keeps you signed in. Each site keeps its own.", "30 days"],
               ["udz_assistant", "udozo.com", "Keeps your conversation with the shop assistant when you are not signed in", "30 days"],
+              ["udz_google", "udozo.com", "Checks that a \"Continue with Google\" sign-in is the one this browser started", "10 minutes"],
               ["udz_session", "Seller HQ (shq.udozo.com), shared across udozo.com addresses", "Keeps sellers and their team signed in", "30 days"],
               ["udz_admin_session", "Udozo's admin", "Keeps Udozo's team signed in", "12 hours"],
               ["udz_kyc", "verify.udozo.com", "Keeps your identity check open while you do it", "Two hours"],

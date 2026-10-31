@@ -177,8 +177,9 @@ export class CustomersService {
    */
   async lookup(store: Store, rawEmail: string) {
     const email = rawEmail.trim().toLowerCase();
-    const customer = await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email } }, select: { id: true } });
-    return { object: 'account_lookup' as const, email, exists: Boolean(customer) };
+    const customer = await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email } }, select: { id: true, passwordHash: true } });
+    // `password` false: a Google sign-up, which signs in with Google (or sets a password with Forgot password).
+    return { object: 'account_lookup' as const, email, exists: Boolean(customer), password: Boolean(customer?.passwordHash) };
   }
 
   /** Step-by-step sign-up, step 1: emails a code to an address no account at the store uses yet. */

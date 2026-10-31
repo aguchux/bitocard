@@ -94,7 +94,10 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     /** Creates the person and, without an invitation, their reseller account (they own it); signs them in. A code is emailed to confirm the address. */
     signUp: build.mutation<Session, SignUpInput>({ query: body => ({ url: '/v1/auth/signup', method: 'POST', body }), invalidatesTags: ['Session'] }),
     /** A signed-in person with a confirmed email opens their own reseller account (one owned account each). */
-    createResellerAccount: build.mutation<Session, { business_name: string; country: string; phone?: string }>({
+    /** Udozo: onboarding's sign-up token for the signed-in person's confirmed email, to confirm their mobile with. */
+    onboardingSignupToken: build.mutation<SignupVerification, void>({ query: () => ({ url: '/v1/auth/onboarding/signup-token', method: 'POST' }) }),
+    /** With `signup_token` (Udozo's onboarding), a `phone` confirmed under it becomes a sign-in number. */
+    createResellerAccount: build.mutation<Session, { business_name: string; country: string; phone?: string; signup_token?: string }>({
       query: body => ({ url: '/v1/auth/reseller-account', method: 'POST', body }),
       invalidatesTags: ['Session'],
     }),
@@ -156,6 +159,7 @@ export const {
   useStartSignupEmailMutation,
   useVerifySignupEmailMutation,
   useSignInLookupMutation,
+  useOnboardingSignupTokenMutation,
   useStartSignupPhoneMutation,
   useVerifySignupPhoneMutation,
   useCreateResellerAccountMutation,

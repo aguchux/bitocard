@@ -42,11 +42,12 @@ export type Customer = {
 };
 
 /**
- * Still to confirm before using the account: the emailed code, then the mobile number texted at sign-up (where the
- * country can text: Udozo's API refuses everything else until it is confirmed, `phone_not_verified`).
+ * Still to do before using the account: the emailed code; for a Google sign-up, its name and country; then the mobile
+ * number's texted code (where the country can text: Udozo's API refuses everything else until then, `profile_incomplete`
+ * or `phone_not_verified`).
  */
-export const confirmationPending = (customer: Pick<Customer, "email_verified" | "phone_verified" | "phone_verification_available">) =>
-  !customer.email_verified || (customer.phone_verification_available && !customer.phone_verified);
+export const confirmationPending = (customer: Pick<Customer, "email_verified" | "phone_verified" | "phone_verification_available" | "country">) =>
+  !customer.email_verified || !customer.country || (customer.phone_verification_available && !customer.phone_verified);
 
 export type CustomerResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
 

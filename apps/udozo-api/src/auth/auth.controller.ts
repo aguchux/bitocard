@@ -8,6 +8,7 @@ import { AllowTwoStepPending, type Caller, CurrentCaller, Public, SessionOnly } 
 import { DocsTokensService } from './docs-tokens.service.js';
 import { SessionsService } from './sessions.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
+import { ProductOnly } from '../products/product.js';
 
 /**
  * Reseller sign-in for the dashboard. These endpoints set or read the session cookie, so they skip idempotency keys:
@@ -90,6 +91,19 @@ export class AuthController {
     summary: 'Open a reseller account for the signed-in person',
     description: 'For a person who joined through an invitation, or left a team, and now wants their own business. Needs a confirmed email; one owned account per person.',
   })
+  @ApiOperation({
+    summary: 'Start onboarding: a sign-up token for your confirmed email',
+    description:
+      'Udozo. For a signed-in person with a confirmed email (a Google sign-up, for example) who owns no reseller account yet: use the token with `POST /v1/auth/signup/phone` and `…/verify` to confirm your mobile, then with `POST /v1/auth/reseller-account` (one hour, once).',
+  })
+  @ProductOnly('udozo')
+  @SessionOnly()
+  @Post('onboarding/signup-token')
+  @HttpCode(HttpStatus.OK)
+  onboardingToken(@CurrentCaller() caller: Caller) {
+    return this.auth.onboardingToken(caller.kind === 'session' ? caller.userId : '');
+  }
+
   @SessionOnly()
   @Post('reseller-account')
   createResellerAccount(@CurrentCaller() caller: Caller, @Body() body: CreateResellerAccountDto) {

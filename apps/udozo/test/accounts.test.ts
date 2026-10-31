@@ -94,11 +94,14 @@ describe("signing up on udozo.com, one step at a time", () => {
 
 describe("signing in, the email first", () => {
   test("asks whether an account uses the email", async () => {
-    reply = () => Response.json({ object: "account_lookup", email: "ada@example.com", exists: true });
-    expect(await actions.lookupEmail(" ada@example.com ")).toEqual({ ok: true, exists: true });
-    reply = () => Response.json({ object: "account_lookup", email: "new@example.com", exists: false });
-    expect(await actions.lookupEmail("new@example.com")).toEqual({ ok: true, exists: false });
-    expect(calls.map(call => call.url.replace("https://api.test", ""))).toEqual(["/v1/store/account/signin/lookup", "/v1/store/account/signin/lookup"]);
+    reply = () => Response.json({ object: "account_lookup", email: "ada@example.com", exists: true, password: true });
+    expect(await actions.lookupEmail(" ada@example.com ")).toEqual({ ok: true, exists: true, password: true });
+    reply = () => Response.json({ object: "account_lookup", email: "new@example.com", exists: false, password: false });
+    expect(await actions.lookupEmail("new@example.com")).toEqual({ ok: true, exists: false, password: false });
+    // A Google sign-up has no password: sign-in offers Google.
+    reply = () => Response.json({ object: "account_lookup", email: "g@gmail.com", exists: true, password: false });
+    expect(await actions.lookupEmail("g@gmail.com")).toEqual({ ok: true, exists: true, password: false });
+    expect(calls.map(call => call.url.replace("https://api.test", ""))).toEqual(["/v1/store/account/signin/lookup", "/v1/store/account/signin/lookup", "/v1/store/account/signin/lookup"]);
     expect(calls[0]!.body).toEqual({ email: "ada@example.com" });
   });
 });

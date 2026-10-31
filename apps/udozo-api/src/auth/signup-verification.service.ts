@@ -78,6 +78,21 @@ export class SignupVerificationService {
     }
   }
 
+  /**
+   * A sign-up token for an email already confirmed another way (a signed-in person whose email Google, or an earlier
+   * code, confirmed): Seller HQ's onboarding texts and confirms the owner's mobile with it, then opens the reseller
+   * account with it, exactly as the step-by-step sign-up does. Earlier open ones for the email are closed.
+   */
+  async issue(email: string) {
+    const token = randomToken();
+    const expiresAt = new Date(Date.now() + signupTokenLifetimeMs);
+    await this.prisma.$transaction([
+      this.prisma.signupVerification.updateMany({ where: { email, storeId: null, consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.signupVerification.create({ data: { email, storeId: null, codeHash: sha256(randomToken()), verifiedAt: new Date(), tokenHash: sha256(token), expiresAt } }),
+    ]);
+    return { object: 'signup_verification' as const, email, signup_token: token, expires_at: expiresAt.toISOString() };
+  }
+
   /** Checks the code and returns the sign-up token (shown once). */
   async verify(email: string, code: string, storeId: string | null = null) {
     const record = await this.prisma.signupVerification.findFirst({ where: { email, storeId, consumedAt: null, verifiedAt: null }, orderBy: { createdAt: 'desc' } });

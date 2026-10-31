@@ -8623,9 +8623,92 @@
         "x-bitocard-auth": "public"
       }
     },
-    "/v1/auth/reseller-account": {
+    "/v1/auth/onboarding/signup-token": {
       "post": {
         "description": "For a person who joined through an invitation, or left a team, and now wants their own business. Needs a confirmed email; one owned account per person.",
+        "operationId": "AuthController_onboardingToken",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "A sign-up token for your confirmed email: confirm your mobile with it, then open your reseller account with it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupVerification"
+                },
+                "example": {
+                  "object": "signup_verification",
+                  "email": "ada@adadigital.ng",
+                  "signup_token": "EXAMPLE-signup-token-not-real-3kQ9vX2",
+                  "expires_at": "2026-10-06T10:12:44.000Z"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Open a reseller account for the signed-in person",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/reseller-account": {
+      "post": {
         "operationId": "AuthController_createResellerAccount",
         "parameters": [],
         "requestBody": {
@@ -8758,7 +8841,6 @@
             }
           }
         },
-        "summary": "Open a reseller account for the signed-in person",
         "tags": [
           "Authentication"
         ],
@@ -30296,6 +30378,12 @@
             "minLength": 5,
             "maxLength": 20,
             "example": "+2348031234567"
+          },
+          "signup_token": {
+            "type": "string",
+            "description": "From `POST /v1/auth/onboarding/signup-token` (Udozo): when `phone` was confirmed with its texted code under this token (`POST /v1/auth/signup/phone` and `…/verify`), it becomes your confirmed sign-in number.",
+            "minLength": 20,
+            "maxLength": 100
           }
         },
         "required": [

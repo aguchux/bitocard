@@ -19,7 +19,7 @@ export const twoStepPendingFor = (session: CustomerCaller) => session.customer.s
  * Only where the country can text: elsewhere the number stays unconfirmed and nothing waits for it.
  */
 export const phonePendingFor = (session: CustomerCaller, product: string) =>
-  product === 'udozo' && session.customer.store.platform !== 'afrippa' && !session.customer.phoneVerifiedAt && Boolean(session.customer.market?.smsProvider);
+  product === 'udozo' && session.customer.store.platform !== 'afrippa' && (!session.customer.country || (!session.customer.phoneVerifiedAt && Boolean(session.customer.market?.smsProvider)));
 
 const ROUTE_PHONE_PENDING = 'customer:phone-pending';
 /** A customer route that takes a session whose mobile number is still to be confirmed (the account's own steps). */
@@ -65,6 +65,8 @@ export class CustomerGuard implements CanActivate {
       throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'mfa_required', 'Finish signing in with your two-step code.');
     }
     if (!allowPhonePending && phonePendingFor(session, this.customers.product)) {
+      // A Google sign-up chooses its country (then its mobile) on udozo.com before anything else.
+      if (!session.customer.country) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'profile_incomplete', 'Finish setting up your account: choose your country.', 'country');
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'phone_not_verified', 'Confirm your mobile number to continue.', 'phone');
     }
     req.customer = session;
