@@ -178,6 +178,7 @@ describe('names', () => {
     const own = loadConfig({ APP_PRODUCT: 'udozo' });
     assert.deepEqual([own.STOREFRONT_URL, own.SHOP_URL, own.DASHBOARD_URL, own.VERIFY_URL, own.ADMIN_APP_URL, own.ADMIN_EMAIL_DOMAINS], ['https://udozo.com', 'https://udozo.com', 'https://shq.udozo.com', 'https://verify.udozo.com', 'https://admin.udozo.com', ['udozo.com']]);
     assert.equal(loadConfig({ APP_PRODUCT: 'udozo', STOREFRONT_URL: 'https://staging.udozo.com' }).STOREFRONT_URL, 'https://staging.udozo.com', 'its environment wins');
+    assert.deepEqual([own.EMAIL_FROM, own.WEB_PUSH_SUBJECT, own.GOOGLE_REDIRECT_URI, own.PAYMENT_RETURN_URL, own.ALERT_EMAIL, own.SPACES_ROOT, own.KYC_SPACES_ROOT], ['Udozo <no-reply@udozo.com>', 'mailto:support@udozo.com', 'https://api.udozo.com/v1/auth/google/callback', 'https://shq.udozo.com/wallet', 'alerts@udozo.com', 'udozo', 'udozo'], "Udozo's sender, links and folders, never BitoCard's");
     assert.equal(loadConfig({}).APP_PRODUCT, 'udozo', "Udozo's own copy of the API is Udozo unless told otherwise");
     assert.equal(loadConfig({}).STOREFRONT_URL, 'https://udozo.com');
     assert.equal(loadConfig({ APP_PRODUCT: 'bitocard' }).STOREFRONT_URL, 'https://bitocard.com', "BitoCard's shared defaults, for the shared tests");

@@ -1,4 +1,5 @@
-// Checks a deployment's environment before anything runs on it (deploy/droplet/deploy.sh runs it first): the database
+// Checks Udozo's environment before anything runs on it (scripts/vercel-build.mjs runs it in every production build,
+// before migrations, so a bad setting fails the build instead of the running API): the database
 // answers, ENCRYPTION_KEY is the key the stored secrets were sealed with, Redis accepts its token, and production's
 // safety settings hold. A wrong ENCRYPTION_KEY would make every stored service key unreadable and seal new ones with the
 // wrong key, so it fails the deploy before the API starts. Prints names and counts only, never a value.
@@ -15,13 +16,14 @@ const fail = message => {
 };
 
 for (const name of ['DATABASE_URL', 'ENCRYPTION_KEY', 'CRON_SECRET']) if (!env[name]) fail(`${name} is not set`);
-if (env.APP_ENV === 'production') {
+// APP_ENV, else Vercel's own VERCEL_ENV (as the API reads it, config.ts).
+if ((env.APP_ENV ?? env.VERCEL_ENV) === 'production') {
+  if ((env.APP_PRODUCT ?? 'udozo') !== 'udozo') fail(`APP_PRODUCT is ${env.APP_PRODUCT}: this is Udozo's API`);
   if (env.COOKIE_SECURE === 'off') fail('COOKIE_SECURE is off: session cookies would travel over plain HTTP');
   if (env.WEBHOOK_ALLOW_PRIVATE_URLS === 'on') fail('WEBHOOK_ALLOW_PRIVATE_URLS is on');
   if (/(^|,)\s*http:\/\//.test(env.ALLOWED_ORIGINS ?? '')) fail('ALLOWED_ORIGINS lists plain http:// origins (local development) in production');
   if ((env.CRON_SECRET ?? '').length < 32) fail('CRON_SECRET is shorter than 32 characters');
   if (env.STORE_SERVER_SECRET === undefined) say(true, 'STORE_SERVER_SECRET unset: signed-out shoppers share the store server’s rate limit');
-  if (env.AFRIPPA_SERVER_SECRET === undefined) say(true, 'AFRIPPA_SERVER_SECRET unset: Afrippa’s routes stay closed');
 }
 
 const key = Buffer.from(env.ENCRYPTION_KEY ?? '', 'base64');
@@ -74,7 +76,7 @@ if (env.UPSTASH_REDIS_REST_URL) {
 }
 
 if (problems.length) {
-  console.log(`[env] ${problems.length} problem${problems.length === 1 ? '' : 's'}: nothing deployed.`);
+  console.log(`[env] ${problems.length} problem${problems.length === 1 ? '' : 's'}: the build stops, nothing is deployed.`);
   process.exit(1);
 }
 console.log('[env] all checks passed');

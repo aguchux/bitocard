@@ -382,6 +382,15 @@ export const productDefaults: Record<'udozo', Record<string, string>> = {
     VERIFY_URL: 'https://verify.udozo.com',
     ADMIN_APP_URL: 'https://admin.udozo.com',
     ADMIN_EMAIL_DOMAINS: 'udozo.com',
+    // Emails and pushes in Udozo's name, payment pages back to Udozo's Seller HQ, Google back to Udozo's API, and its
+    // files under its own folders, never BitoCard's (a shared bucket keeps the two apart).
+    EMAIL_FROM: 'Udozo <no-reply@udozo.com>',
+    WEB_PUSH_SUBJECT: 'mailto:support@udozo.com',
+    GOOGLE_REDIRECT_URI: 'https://api.udozo.com/v1/auth/google/callback',
+    PAYMENT_RETURN_URL: 'https://shq.udozo.com/wallet',
+    ALERT_EMAIL: 'alerts@udozo.com',
+    SPACES_ROOT: 'udozo',
+    KYC_SPACES_ROOT: 'udozo',
   },
 };
 
