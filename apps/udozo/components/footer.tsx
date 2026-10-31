@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Udozo's footer: the Safe Trade Guide, Udozo's own legal documents (on udozo.com, `/legal`) and the credit. */
+/** Udozo's footer: Start selling (the sellers' landing page), the Safe Trade Guide, Udozo's own legal documents (on udozo.com, `/legal`) and the credit. */
 export function SiteFooter({ country }: { country?: { code: string; name: string } | null }) {
   return (
     <footer className="mt-12 border-t border-navy-200 bg-white">
@@ -10,6 +10,9 @@ export function SiteFooter({ country }: { country?: { code: string; name: string
           <p className="max-w-sm">Buy and sell near you. Safe pay holds the money until you have the item.</p>
         </div>
         <nav aria-label="Udozo links" className="flex flex-wrap gap-x-5 gap-y-2">
+          <Link href="/start-here" className="font-semibold text-brand-600 hover:underline">
+            Start selling
+          </Link>
           <Link href="/safe-trade" className="font-semibold text-navy-900 hover:underline">
             Safe Trade Guide
           </Link>
