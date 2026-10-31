@@ -40,6 +40,37 @@ class SignUpDto {
 
   @IsString() @Length(passwordLength.min, passwordLength.max)
   password: string;
+
+  /** From the step-by-step sign-up (`signup/email/verify`): the email, and the number if its texted code was confirmed, are already confirmed. */
+  @IsOptional() @IsString() @Length(20, 100)
+  signup_token?: string;
+}
+
+class AccountEmailDto {
+  @Transform(lowerTrim) @IsEmail() @Length(3, 254)
+  email: string;
+}
+
+class SignupEmailCodeDto extends AccountEmailDto {
+  @Transform(trim) @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}
+
+class SignupPhoneDto extends AccountEmailDto {
+  @IsString() @Length(20, 100)
+  signup_token: string;
+
+  /** udozo.com: the customer's country (a market), fixed for good. Ignored on a reseller's store (theirs). */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
+
+  @IsString() @Length(6, 25)
+  phone: string;
+}
+
+class SignupPhoneCodeDto extends SignupEmailCodeDto {
+  @IsString() @Length(20, 100)
+  signup_token: string;
 }
 
 class SignInDto {
@@ -230,6 +261,46 @@ export class CustomerAccountController {
     private readonly identity: IdentityService,
     private readonly handoffs: HandoffService,
   ) {}
+
+  /**
+   * Sign-in's first step: whether an account at this store's accounts uses the email (then the password; otherwise sign
+   * up). Sign-up already says whether an email is taken, so this tells nobody more.
+   */
+  @SkipIdempotency()
+  @Post('signin/lookup')
+  @HttpCode(HttpStatus.OK)
+  async lookup(@StoreKey() store: string | null, @Body() body: AccountEmailDto) {
+    return this.customers.lookup(await this.stores.accountStore(store), body.email);
+  }
+
+  /** Step-by-step sign-up, step 1: a code to an email no account uses yet (`email_taken` otherwise). */
+  @Post('signup/email')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async signupEmail(@StoreKey() store: string | null, @Body() body: AccountEmailDto) {
+    return this.customers.startSignupEmail(await this.stores.accountStore(store), body.email);
+  }
+
+  /** Step 2: the emailed code, for a one-hour sign-up token. Returns the token, so it is never stored for replay. */
+  @SkipIdempotency()
+  @Post('signup/email/verify')
+  @HttpCode(HttpStatus.OK)
+  async signupEmailVerify(@StoreKey() store: string | null, @Body() body: SignupEmailCodeDto) {
+    return this.customers.verifySignupEmail(await this.stores.accountStore(store), body);
+  }
+
+  /** Step 3, after the name and country: a code texted to the mobile (`phone_verification_unavailable` where the country cannot text). */
+  @Post('signup/phone')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async signupPhone(@StoreKey() store: string | null, @Body() body: SignupPhoneDto) {
+    return this.customers.startSignupPhone(await this.stores.accountStore(store), body);
+  }
+
+  @SkipIdempotency()
+  @Post('signup/phone/verify')
+  @HttpCode(HttpStatus.OK)
+  async signupPhoneVerify(@StoreKey() store: string | null, @Body() body: SignupPhoneCodeDto) {
+    return this.customers.verifySignupPhone(await this.stores.accountStore(store), body);
+  }
 
   /** Returns the session token, so it is never stored for replay. */
   @SkipIdempotency()

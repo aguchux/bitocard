@@ -102,6 +102,14 @@ export class CreateResellerAccountDto {
   phone?: string;
 }
 
+export class SignInLookupDto {
+  @ApiProperty({ description: 'Email address, or a confirmed mobile number in international format.', minLength: 3, maxLength: 254, example: 'ada@example.com' })
+  @Transform(trim)
+  @IsString()
+  @Length(3, 254)
+  identifier: string;
+}
+
 export class SignInDto {
   @ApiProperty({
     description: 'Email address, or a verified mobile number in international format.',

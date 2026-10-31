@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, SignupPhoneDto, SignupPhoneVerifyDto, PhoneDto, PrimaryEmailDto, PrimaryPhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, SignupPhoneDto, SignupPhoneVerifyDto, SignInLookupDto, PhoneDto, PrimaryEmailDto, PrimaryPhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { AllowTwoStepPending, type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { DocsTokensService } from './docs-tokens.service.js';
@@ -94,6 +94,18 @@ export class AuthController {
   @Post('reseller-account')
   createResellerAccount(@CurrentCaller() caller: Caller, @Body() body: CreateResellerAccountDto) {
     return this.auth.createResellerAccount(caller.kind === 'session' ? caller.userId : '', body);
+  }
+
+  /** Sign-in's first step: whether an account uses this email or mobile, and whether it has a password. */
+  @ApiOperation({
+    summary: 'Look up an account before signing in',
+    description: 'Says whether an account signs in with this email or confirmed mobile number (`exists`) and has a password (`password`; a Google-only account signs in with Google). Held to the strict sign-in limit per address.',
+  })
+  @Public()
+  @Post('signin/lookup')
+  @HttpCode(HttpStatus.OK)
+  lookupSignIn(@Body() body: SignInLookupDto) {
+    return this.auth.lookupSignIn(body.identifier);
   }
 
   /** Sign in with email or verified mobile number and password. */

@@ -19,12 +19,13 @@ import { Button, CodeInput, cn, errorMessage, Notice, PasswordToggleButton, Sele
 import { UdozoWordmark } from "@/components/wordmark";
 import { continueWithGoogle, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
-type Step = "details" | "verify" | "business" | "mobile" | "password";
+type Step = "details" | "verify" | "business" | "phone" | "mobile" | "password";
 
 const stepTitles: Record<Step, string> = {
-  details: "Your details",
+  details: "Your email",
   verify: "Confirm your email",
-  business: "Your business",
+  business: "You and your business",
+  phone: "Your mobile",
   mobile: "Confirm your mobile",
   password: "Choose a password",
 };
@@ -40,18 +41,18 @@ function Label({ htmlFor, children }: { htmlFor: string; children: ReactNode }) 
   );
 }
 
-function Progress({ steps, current }: { steps: Step[]; current: Step }) {
+function Progress({ steps, current, titles = stepTitles }: { steps: Step[]; current: Step; titles?: Record<Step, string> }) {
   const index = steps.indexOf(current);
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase">
-        Step {index + 1} of {steps.length} · {stepTitles[current]}
+        Step {index + 1} of {steps.length} · {titles[current]}
       </p>
       <ol className="flex gap-1.5" aria-label="Sign-up steps">
         {steps.map((step, i) => (
           <li key={step} className={cn("h-1.5 flex-1 rounded-full", i <= index ? "bg-brand-500" : "bg-line")} aria-current={step === current ? "step" : undefined}>
             <span className="sr-only">
-              {stepTitles[step]}
+              {titles[step]}
               {i < index ? " (done)" : ""}
             </span>
           </li>
@@ -62,11 +63,12 @@ function Progress({ steps, current }: { steps: Step[]; current: Step }) {
 }
 
 /**
- * Reseller sign-up, one step at a time: (1) first name, last name and email; (2) the code emailed to confirm it, before
- * any account exists; (3) business name, country and the owner's mobile number; (4) the 6-digit code texted to that
- * number (through the country's SMS provider), so it signs in from the start; (5) password, then the account is created
- * with both confirmed. Where the country has no SMS provider, step 4 is skipped and the number is kept unconfirmed.
- * With `?invitation=` it is details then password, and the account joins the inviting team (the link proves the
+ * Reseller sign-up, one step at a time: (1) the email, which must be free; (2) the code emailed to confirm it, before
+ * any account exists; (3) first and last name, business name and country; (4) the owner's mobile number; (5) the
+ * 6-digit code texted to it (through the country's SMS provider), so it signs in from the start; (6) password, then the
+ * account is created with both confirmed. Where the country has no SMS provider, step 5 is skipped and the number is
+ * kept unconfirmed. `?email=` (from sign-in's "Create a reseller account with it") fills the email in. With
+ * `?invitation=` it is name and email, then password, and the account joins the inviting team (the link proves the
  * email). udozo.com stays for shoppers and suppliers, so sellers sign up for Seller HQ only here.
  *
  * "Sign up with Google" is the only way to create an account with Google (signing in with an unknown Google account
@@ -82,7 +84,8 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
   const authError = search.get("auth_error");
   // False once the country turns out to have no SMS provider: the number is then kept unconfirmed.
   const [textable, setTextable] = useState(true);
-  const steps: Step[] = invitation ? ["details", "password"] : ["details", "verify", "business", ...(textable ? (["mobile"] as Step[]) : []), "password"];
+  const steps: Step[] = invitation ? ["details", "password"] : ["details", "verify", "business", "phone", ...(textable ? (["mobile"] as Step[]) : []), "password"];
+  const titles = invitation ? { ...stepTitles, details: "Your details" } : stepTitles;
 
   const session = useSessionQuery();
   const countries = usePublicCountriesQuery(undefined, { skip: Boolean(invitation) });
@@ -91,7 +94,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
   const [notice, setNotice] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => search.get("email")?.trim().slice(0, 254) ?? "");
   const [code, setCode] = useState("");
   // The confirmed email and its sign-up token (one hour, once).
   const [confirmed, setConfirmed] = useState<{ email: string; token: string } | null>(null);
@@ -160,8 +163,8 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
     if (sent) setNotice("A new code is on its way.");
   }
 
-  /** After the business: text a code to the number, unless it is already confirmed or the country cannot text. */
-  async function submitBusiness(event: FormEvent) {
+  /** After the mobile number: text it a code, unless it is already confirmed or the country cannot text. */
+  async function submitPhone(event: FormEvent) {
     event.preventDefault();
     if (!phone || !confirmed || phoneConfirmed === phone) return go("password");
     const sent = await startPhone({ email: confirmed.email, signup_token: confirmed.token, country, phone })
@@ -217,11 +220,11 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
         if (errorCode === "signup_token_invalid") {
           setConfirmed(null);
           go("details", "Your email confirmation expired. Continue to get a new code.");
-        } else if (errorCode === "phone_in_use") {
+        } else if (errorCode === "phone_in_use" || param === "phone") {
           setPhoneConfirmed(null);
-          go("business");
-        } else if (param === "country" || param === "business_name" || param === "phone") go("business");
-        else if (param === "email" || param === "name") go("details");
+          go("phone");
+        } else if (param === "email" || (invitation && param === "name")) go("details");
+        else if (param === "country" || param === "business_name" || param === "name") go("business");
         return null;
       });
     // With an invitation, sign-up has already joined the team.
@@ -238,6 +241,19 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
 
   const error = startState.error ?? verifyState.error ?? startPhoneState.error ?? verifyPhoneState.error ?? signUpState.error;
   const errorCode = failure(error)?.code;
+  /** First and last name: with the email on an invitation, else with the business. */
+  const names = (autoFocus: boolean) => (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div>
+        <Label htmlFor="first-name">First name</Label>
+        <IconInput id="first-name" icon={User} autoComplete="given-name" required maxLength={50} autoFocus={autoFocus} value={firstName} onChange={event => setFirstName(event.target.value)} />
+      </div>
+      <div>
+        <Label htmlFor="last-name">Last name</Label>
+        <IconInput id="last-name" icon={User} autoComplete="family-name" required maxLength={50} value={lastName} onChange={event => setLastName(event.target.value)} />
+      </div>
+    </div>
+  );
   const back = (target: Step) => (
     <Button type="button" variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => go(target)}>
       Back
@@ -257,7 +273,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
       </p>
 
       <div className="mt-6 space-y-5">
-        <Progress steps={steps} current={step} />
+        <Progress steps={steps} current={step} titles={titles} />
 
         {authError && step === "details" ? <Notice tone="red">{googleErrors[authError] ?? "Google sign-up did not complete. Try again or use your email."}</Notice> : null}
         {notice ? <Notice tone={notice.startsWith("A new code") ? "green" : "amber"}>{notice}</Notice> : null}
@@ -283,16 +299,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
         {step === "details" ? (
           <>
             <form key="details" onSubmit={submitDetails} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="first-name">First name</Label>
-                  <IconInput id="first-name" icon={User} autoComplete="given-name" required maxLength={50} autoFocus value={firstName} onChange={event => setFirstName(event.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="last-name">Last name</Label>
-                  <IconInput id="last-name" icon={User} autoComplete="family-name" required maxLength={50} value={lastName} onChange={event => setLastName(event.target.value)} />
-                </div>
-              </div>
+              {invitation ? names(true) : null}
               <div>
                 <Label htmlFor="email">Email</Label>
                 <IconInput
@@ -302,13 +309,14 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
                   autoComplete="email"
                   required
                   maxLength={254}
+                  autoFocus={!invitation}
                   value={email}
                   onChange={event => setEmail(event.target.value)}
                   aria-invalid={failure(error)?.param === "email" || undefined}
                 />
                 {!invitation ? <p className="mt-1.5 text-xs text-muted">We will email you a 6-digit code to confirm it.</p> : null}
               </div>
-              <Button type="submit" className="min-h-12 w-full text-base" loading={startState.isLoading} disabled={!firstName.trim() || !lastName.trim() || !email.trim()}>
+              <Button type="submit" className="min-h-12 w-full text-base" loading={startState.isLoading} disabled={!email.trim() || (Boolean(invitation) && (!firstName.trim() || !lastName.trim()))}>
                 Continue
               </Button>
             </form>
@@ -322,7 +330,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
               Sign up with Google
             </Button>
             <p className="text-center text-xs text-muted">
-              {invitation ? "Use the Google account for the email the invitation was sent to." : "With Google, you name your business and choose its country next."}
+              {invitation ? "Use the Google account for the email the invitation was sent to." : "With Google, you name your business, choose its country and confirm your mobile next."}
             </p>
           </>
         ) : null}
@@ -353,13 +361,21 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
         ) : null}
 
         {step === "business" ? (
-          <form key="business" onSubmit={submitBusiness} className="space-y-4">
+          <form
+            key="business"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              go("phone");
+            }}
+            className="space-y-4"
+          >
             <Notice tone="green">
               <span className="break-all">{confirmed?.email}</span> is confirmed.
             </Notice>
+            {names(true)}
             <div>
               <Label htmlFor="business">Business name</Label>
-              <IconInput id="business" icon={Building2} autoComplete="organization" required minLength={2} maxLength={100} autoFocus value={business} onChange={event => setBusiness(event.target.value)} />
+              <IconInput id="business" icon={Building2} autoComplete="organization" required minLength={2} maxLength={100} value={business} onChange={event => setBusiness(event.target.value)} />
             </div>
             <div>
               <Label htmlFor="country">Business country</Label>
@@ -392,8 +408,17 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
               )}
               <p className="mt-1.5 text-xs text-muted">You sell in its currency. Sign-up is open in these countries for now.</p>
             </div>
+            <Button type="submit" className="min-h-12 w-full text-base" disabled={!firstName.trim() || !lastName.trim() || business.trim().length < 2 || !country}>
+              Continue
+            </Button>
+            {back("details")}
+          </form>
+        ) : null}
+
+        {step === "phone" && country ? (
+          <form key="phone" onSubmit={submitPhone} className="space-y-4">
             {country ? (
-              <div>
+              <div className="space-y-1.5">
                 <PhoneInput
                   key={country}
                   country={country}
@@ -408,10 +433,10 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
                 <p className="mt-1.5 text-xs text-muted">We will text it a 6-digit code to confirm it. You can then sign in with it too.</p>
               </div>
             ) : null}
-            <Button type="submit" className="min-h-12 w-full text-base" loading={startPhoneState.isLoading} disabled={business.trim().length < 2 || !country || !phone}>
-              Continue
+            <Button type="submit" className="min-h-12 w-full text-base" loading={startPhoneState.isLoading} disabled={!phone}>
+              {phone && phoneConfirmed === phone ? "Continue" : "Text me a code"}
             </Button>
-            {back("details")}
+            {back("business")}
           </form>
         ) : null}
 
@@ -432,7 +457,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
               Confirm mobile
             </Button>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Button type="button" variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => go("business")}>
+              <Button type="button" variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => go("phone")}>
                 Change number
               </Button>
               <Button type="button" variant="ghost" size="sm" loading={startPhoneState.isLoading} onClick={resendPhone}>
@@ -480,7 +505,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
             <Button type="submit" className="min-h-12 w-full text-base" loading={signUpState.isLoading || signUpState.isSuccess} disabled={password.length < 10}>
               {invitation ? "Create account and join" : "Create account"}
             </Button>
-            {back(invitation ? "details" : textable && phoneConfirmed !== phone ? "mobile" : "business")}
+            {back(invitation ? "details" : textable && phoneConfirmed !== phone ? "mobile" : "phone")}
           </form>
         ) : null}
 

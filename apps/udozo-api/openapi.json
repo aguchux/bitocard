@@ -8759,6 +8759,82 @@
         "x-bitocard-auth": "session"
       }
     },
+    "/v1/auth/signin/lookup": {
+      "post": {
+        "description": "Says whether an account signs in with this email or confirmed mobile number (`exists`) and has a password (`password`; a Google-only account signs in with Google). Held to the strict sign-in limit per address.",
+        "operationId": "AuthController_lookupSignIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInLookupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whether the account exists and has a password.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountLookup"
+                },
+                "example": {
+                  "object": "account_lookup",
+                  "exists": true,
+                  "password": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Look up an account before signing in",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
     "/v1/auth/signin": {
       "post": {
         "operationId": "AuthController_signIn",
@@ -30191,6 +30267,21 @@
           "country"
         ]
       },
+      "SignInLookupDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Email address, or a confirmed mobile number in international format.",
+            "minLength": 3,
+            "maxLength": 254,
+            "example": "ada@example.com"
+          }
+        },
+        "required": [
+          "identifier"
+        ]
+      },
       "SignInDto": {
         "type": "object",
         "properties": {
@@ -42922,6 +43013,32 @@
             "type": "string",
             "description": "When the token stops working.",
             "format": "date-time"
+          }
+        }
+      },
+      "AccountLookup": {
+        "type": "object",
+        "title": "AccountLookup",
+        "description": "Sign-in's first step: sign in with the password when `exists`, otherwise sign up.",
+        "required": [
+          "object",
+          "exists",
+          "password"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `account_lookup`.",
+            "const": "account_lookup"
+          },
+          "exists": {
+            "type": "boolean",
+            "description": "Whether an account signs in with this email or confirmed mobile number."
+          },
+          "password": {
+            "type": "boolean",
+            "description": "Whether it has a password; false for a Google-only account (sign in with Google)."
           }
         }
       },

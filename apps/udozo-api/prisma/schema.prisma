@@ -212,6 +212,8 @@ model VerificationCode {
 /// sign-up token. Only hashes are stored; rows are removed after a day.
 model SignupVerification {
   id         String    @id @default(uuid()) @db.Uuid
+  /// A store customer's sign-up at this store's accounts (udozo.com); null for Seller HQ's.
+  storeId    String?   @map("store_id") @db.Uuid
   email      String
   codeHash   String    @map("code_hash") @db.Char(64)
   attempts   Int       @default(0)
@@ -224,6 +226,7 @@ model SignupVerification {
   phones     SignupPhoneVerification[]
 
   @@index([email])
+  @@index([storeId, email])
   @@map("signup_verifications")
 }
 

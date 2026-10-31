@@ -29,23 +29,26 @@ function signUpRoutes(phone: unknown) {
   });
 }
 
-/** Details, the emailed code, then the business with its mobile number. */
+/** The email alone and its code, then names, business and country, then the mobile number. */
 async function upToBusiness() {
   render(
     <AdminProviders>
       <SignUp sellerTermsUrl="/legal/sellers" termsUrl="/legal/terms" privacyUrl="/legal/privacy" />
     </AdminProviders>,
   );
-  fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Kofi" } });
-  fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Mensah" } });
+  expect(screen.getByText(/Step 1 of 6/)).toBeTruthy();
+  expect(screen.queryByLabelText("First name")).toBeNull();
   fireEvent.change(screen.getByLabelText("Email"), { target: { value: "kofi@example.com" } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.change(await screen.findByLabelText("Digit 1 of 6", {}, slow), { target: { value: "123456" } });
-  fireEvent.change(await screen.findByLabelText("Business name", {}, slow), { target: { value: "Kofi Digital" } });
+  fireEvent.change(await screen.findByLabelText("First name", {}, slow), { target: { value: "Kofi" } });
+  fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Mensah" } });
+  fireEvent.change(screen.getByLabelText("Business name"), { target: { value: "Kofi Digital" } });
   await waitFor(() => expect(screen.getByRole("option", { name: "Ghana (GHS)" })).toBeTruthy(), slow);
   fireEvent.change(screen.getByLabelText("Business country"), { target: { value: "GH" } });
-  fireEvent.change(screen.getByLabelText("Your mobile number"), { target: { value: "024 123 4567" } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.change(await screen.findByLabelText("Your mobile number", {}, slow), { target: { value: "024 123 4567" } });
+  fireEvent.click(screen.getByRole("button", { name: "Text me a code" }));
 }
 
 afterEach(cleanup);
@@ -62,7 +65,7 @@ describe("Seller HQ sign-up", () => {
     expect(sent.find(item => item.path === "/v1/auth/signup/phone/verify")?.body).toEqual({ email: "kofi@example.com", signup_token: "signup-token-0000000000000", code: "654321" });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     await waitFor(() => expect(sent.some(item => item.path === "/v1/auth/signup")).toBe(true), slow);
-    expect(sent.find(item => item.path === "/v1/auth/signup")?.body).toMatchObject({ country: "GH", business_name: "Kofi Digital", phone: "+233241234567", signup_token: "signup-token-0000000000000" });
+    expect(sent.find(item => item.path === "/v1/auth/signup")?.body).toMatchObject({ name: "Kofi Mensah", email: "kofi@example.com", country: "GH", business_name: "Kofi Digital", phone: "+233241234567", signup_token: "signup-token-0000000000000" });
   }, 20000);
 
   test("where the country cannot text, it says so and carries on with the number unconfirmed", async () => {

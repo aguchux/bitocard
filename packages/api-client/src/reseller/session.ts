@@ -69,6 +69,8 @@ export type SignUpInput = { name: string; email: string; password: string } & (
 export type SignupVerification = { object: 'signup_verification'; email: string; signup_token: string; expires_at: string };
 /** The owner's mobile number confirmed for a sign-up (Udozo's API): sign up with the same token and `phone`. */
 export type SignupPhoneVerification = { object: 'signup_phone_verification'; phone: string; verified_at: string };
+/** Sign-in's first step (Udozo's API): whether an account signs in with the email or mobile, and has a password (false: Google only). */
+export type AccountLookup = { object: 'account_lookup'; exists: boolean; password: boolean };
 
 /** Sign-in and the signed-in person (`/v1/auth`), and the account the dashboard acts for (`/v1/account`). */
 export const resellerSessionApi = bitocardApi.injectEndpoints({
@@ -89,6 +91,8 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
       query: body => ({ url: '/v1/auth/reseller-account', method: 'POST', body }),
       invalidatesTags: ['Session'],
     }),
+    /** Sign-in's first step: the email or mobile alone, then the password when an account uses it. */
+    signInLookup: build.mutation<AccountLookup, { identifier: string }>({ query: body => ({ url: '/v1/auth/signin/lookup', method: 'POST', body }) }),
     signIn: build.mutation<Session, { identifier: string; password: string }>({ query: body => ({ url: '/v1/auth/signin', method: 'POST', body }), invalidatesTags: ['Session'] }),
     signOut: build.mutation<void, void>({ query: () => ({ url: '/v1/auth/signout', method: 'POST' }) }),
     verifyEmail: build.mutation<Session, { code: string }>({ query: body => ({ url: '/v1/auth/email/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
@@ -144,6 +148,7 @@ export const {
   useSignUpMutation,
   useStartSignupEmailMutation,
   useVerifySignupEmailMutation,
+  useSignInLookupMutation,
   useStartSignupPhoneMutation,
   useVerifySignupPhoneMutation,
   useCreateResellerAccountMutation,

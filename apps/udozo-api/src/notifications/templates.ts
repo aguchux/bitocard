@@ -32,6 +32,19 @@ export function signupCodeEmail(to: string, code: string): EmailMessage {
   };
 }
 
+/** A store customer's sign-up (udozo.com): the email is confirmed before the account exists. */
+export function customerSignupCodeEmail(to: string, code: string, store: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your ${store} sign-up code`,
+    ...layout(
+      'Confirm your email',
+      [`Enter this code to confirm your email and continue creating your ${store} account. It expires in 30 minutes.`, 'If you did not start signing up, you can ignore this email.'],
+      code,
+    ),
+  };
+}
+
 export function verificationEmail(to: string, code: string): EmailMessage {
   return {
     to,

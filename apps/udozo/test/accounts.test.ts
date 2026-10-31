@@ -44,19 +44,35 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("signing up on udozo.com", () => {
-  test("posts the name, email, password and the chosen country (and the phone, when given), naming no store", async () => {
-    await expect(actions.signUp({}, form({ name: " Ada Obi ", email: "ada@example.com", password: "a long password", country: "NG", phone: "+2348031234567", next: "/sell" }))).rejects.toThrow("redirect:/verify?next=%2Fsell");
-    const call = calls[0]!;
-    expect(`${call.method} ${call.url}`).toBe("POST https://api.test/v1/store/account/signup");
-    expect(call.body).toEqual({ name: "Ada Obi", email: "ada@example.com", password: "a long password", country: "NG", phone: "+2348031234567" });
-    expect(call.headers.get("bitocard-store")).toBeNull();
+describe("signing up on udozo.com, one step at a time", () => {
+  test("the email and its code, the mobile and its code, then the account with the token, naming no store", async () => {
+    reply = () => Response.json({ object: "notice" }, { status: 202 });
+    expect(await actions.sendSignupEmailCode(" ada@example.com ")).toEqual({ ok: true });
+    reply = () => Response.json({ object: "signup_verification", signup_token: "tok_0123456789abcdefghij" });
+    expect(await actions.confirmSignupEmail("ada@example.com", "123456")).toEqual({ ok: true, token: "tok_0123456789abcdefghij" });
+    reply = () => Response.json({ object: "notice", phone: "+2348031234567" }, { status: 202 });
+    expect(await actions.sendSignupMobileCode({ email: "ada@example.com", token: "tok_0123456789abcdefghij", country: "NG", phone: "+2348031234567" })).toEqual({ ok: true, phone: "+2348031234567" });
+    reply = () => Response.json({ object: "signup_phone_verification", phone: "+2348031234567" });
+    expect(await actions.confirmSignupMobile({ email: "ada@example.com", token: "tok_0123456789abcdefghij", code: "654321" })).toEqual({ ok: true, phone: "+2348031234567" });
+    reply = () => Response.json(session, { status: 201 });
+    await expect(actions.finishSignUp({ name: " Ada Obi ", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" })).rejects.toThrow("redirect:/sell");
+
+    expect(calls.map(call => `${call.method} ${call.url.replace("https://api.test", "")}`)).toEqual([
+      "POST /v1/store/account/signup/email",
+      "POST /v1/store/account/signup/email/verify",
+      "POST /v1/store/account/signup/phone",
+      "POST /v1/store/account/signup/phone/verify",
+      "POST /v1/store/account/signup",
+    ]);
+    expect(calls[0]!.body).toEqual({ email: "ada@example.com" });
+    expect(calls[2]!.body).toEqual({ email: "ada@example.com", signup_token: "tok_0123456789abcdefghij", country: "NG", phone: "+2348031234567" });
+    expect(calls[4]!.body).toEqual({ name: "Ada Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", signup_token: "tok_0123456789abcdefghij" });
+    expect(calls.every(call => call.headers.get("bitocard-store") === null)).toBe(true);
   });
 
   test("keeps the session in this site's own udz_customer cookie: host-only, httpOnly, Lax, 30 days", async () => {
-    await expect(actions.signUp({}, form({ name: "Ada", email: "ada@example.com", password: "a long password", country: "GH" }))).rejects.toThrow("redirect:/verify?next=%2F");
-    expect(calls[0]!.body).toMatchObject({ country: "GH" });
-    expect((calls[0]!.body as Record<string, unknown>).phone).toBeUndefined();
+    reply = () => Response.json(session, { status: 201 });
+    await expect(actions.finishSignUp({ name: "Ada", email: "ada@example.com", country: "GH", phone: "+233241234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/" })).rejects.toThrow("redirect:/");
     const cookie = request.set.find(item => item.name === "udz_customer")!;
     expect(cookie.value).toBe("bcc_new");
     expect(cookie.options).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 2592000 });
@@ -64,12 +80,26 @@ describe("signing up on udozo.com", () => {
     expect(request.set.map(item => item.name)).toEqual(["udz_customer"]);
   });
 
-  test("no country, nothing leaves; the API's refusal names its field", async () => {
-    expect(await actions.signUp({}, form({ name: "Ada", email: "ada@example.com", password: "a long password", country: "" }))).toEqual({ error: "Choose your country.", field: "country" });
-    expect(calls).toHaveLength(0);
-    reply = () => Response.json({ error: { code: "email_taken", message: "An account already uses this email.", param: "email" } }, { status: 409 });
-    expect(await actions.signUp({}, form({ name: "Ada", email: "ada@example.com", password: "a long password", country: "NG" }))).toEqual({ error: "An account already uses this email.", field: "email" });
+  test("an account still to confirm goes to /verify; a refusal says what and where, and keeps no session", async () => {
+    reply = () => Response.json({ ...session, customer: { ...customer, phone_verified: false } }, { status: 201 });
+    await expect(actions.finishSignUp({ name: "Ada", email: "ada@example.com", country: "NG", phone: "+2348031234567", password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" })).rejects.toThrow("redirect:/verify?next=%2Fsell");
+    request.set.length = 0;
+    reply = () => Response.json({ error: { code: "email_taken", message: "An account with this email already exists. Sign in instead.", param: "email" } }, { status: 409 });
+    expect(await actions.sendSignupEmailCode("ada@example.com")).toEqual({ ok: false, error: "An account with this email already exists. Sign in instead.", code: "email_taken", field: "email" });
+    reply = () => Response.json({ error: { code: "phone_verification_unavailable", message: "Phone verification is not available in your country yet." } }, { status: 409 });
+    expect(await actions.sendSignupMobileCode({ email: "ada@example.com", token: "tok_0123456789abcdefghij", country: "KE", phone: "+254712345678" })).toMatchObject({ ok: false, code: "phone_verification_unavailable" });
     expect(request.set).toEqual([]);
+  });
+});
+
+describe("signing in, the email first", () => {
+  test("asks whether an account uses the email", async () => {
+    reply = () => Response.json({ object: "account_lookup", email: "ada@example.com", exists: true });
+    expect(await actions.lookupEmail(" ada@example.com ")).toEqual({ ok: true, exists: true });
+    reply = () => Response.json({ object: "account_lookup", email: "new@example.com", exists: false });
+    expect(await actions.lookupEmail("new@example.com")).toEqual({ ok: true, exists: false });
+    expect(calls.map(call => call.url.replace("https://api.test", ""))).toEqual(["/v1/store/account/signin/lookup", "/v1/store/account/signin/lookup"]);
+    expect(calls[0]!.body).toEqual({ email: "ada@example.com" });
   });
 });
 

@@ -20,6 +20,6 @@ import { TwoStepService } from './two-step.service.js';
   imports: [TeamModule, CountriesModule],
   controllers: [AuthController, GoogleController, AdminAuthController, AfrippaAdminAuthController, TwoStepController, AdminTwoStepController],
   providers: [AuthService, AdminAuthService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
-  exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService],
+  exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService, SignupVerificationService],
 })
 export class AuthModule {}

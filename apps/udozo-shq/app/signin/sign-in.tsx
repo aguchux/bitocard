@@ -2,9 +2,9 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, Mail } from "lucide-react";
+import { ArrowLeft, Lock, Mail } from "lucide-react";
 import { apiBaseUrl } from "@bitocard/api-client";
-import { useSessionQuery, useSignInMutation } from "@bitocard/api-client/reseller";
+import { useSessionQuery, useSignInLookupMutation, useSignInMutation } from "@bitocard/api-client/reseller";
 import { TwoStepSignIn } from "@/components/two-step";
 import { useSignOut } from "@/components/reseller";
 import { AppLink, goNext } from "@bitocard/admin-ui/shell";
@@ -75,8 +75,9 @@ export const googleErrors: Record<string, string> = {
 };
 
 /**
- * Seller HQ sign-in: email (or a confirmed mobile number) and password, or Google. New sellers sign up at /signup.
- * The session is a cookie set by the API.
+ * Seller HQ sign-in, one step at a time: the email (or a confirmed mobile number) first; an account uses it, then its
+ * password (or Google, for an account without one); none does, then an offer to sign up with it. Or Google straight
+ * away. The session is a cookie set by the API.
  */
 export function SignIn() {
   const router = useRouter();
@@ -85,6 +86,9 @@ export function SignIn() {
   const authError = search.get("auth_error");
   const session = useSessionQuery();
   const [identifier, setIdentifier] = useState("");
+  // The email or mobile's step, then what the lookup found: the password, Google only, or no account.
+  const [step, setStep] = useState<"identifier" | "password" | "google" | "missing">("identifier");
+  const [lookup, lookupState] = useSignInLookupMutation();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [signIn, signInState] = useSignInMutation();
@@ -96,6 +100,28 @@ export function SignIn() {
   useEffect(() => {
     if (session.data && !session.data.two_step?.pending) goNext(next, router);
   }, [session.data, next, router]);
+
+  async function findAccount(event: FormEvent) {
+    event.preventDefault();
+    const found = await lookup({ identifier: identifier.trim() })
+      .unwrap()
+      .catch(() => null);
+    if (!found) return;
+    signInState.reset();
+    setStep(!found.exists ? "missing" : found.password ? "password" : "google");
+  }
+
+  const cleanIdentifier = identifier.trim();
+  const isEmail = cleanIdentifier.includes("@");
+  const signUpHref = `/signup?${new URLSearchParams({ ...(isEmail ? { email: cleanIdentifier } : {}), ...(next === "/" ? {} : { next }) }).toString()}`;
+  const chip = (
+    <p className="flex min-h-14 items-center gap-2 rounded-lg bg-canvas px-4 text-base text-ink">
+      <span className="min-w-0 flex-1 truncate font-semibold">{cleanIdentifier}</span>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setStep("identifier")}>
+        Change
+      </Button>
+    </p>
+  );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -138,37 +164,79 @@ export function SignIn() {
           </Notice>
         ) : null}
 
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label htmlFor="identifier" className="mb-1.5 block text-sm font-semibold text-ink">
-              Email or mobile number
-            </label>
-            <IconInput id="identifier" icon={Mail} type="text" inputMode="email" autoComplete="username" required value={identifier} onChange={event => setIdentifier(event.target.value)} />
-          </div>
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="password" className="block text-sm font-semibold text-ink">
-                Password
+        {lookupState.error && step === "identifier" ? <Notice tone="red">{errorMessage(lookupState.error)}</Notice> : null}
+
+        {step === "identifier" ? (
+          <form onSubmit={findAccount} className="space-y-4">
+            <div>
+              <label htmlFor="identifier" className="mb-1.5 block text-sm font-semibold text-ink">
+                Email or mobile number
               </label>
-              <AppLink href={identifier.includes("@") ? `/forgot-password?email=${encodeURIComponent(identifier.trim())}` : "/forgot-password"} className="text-sm font-semibold text-brand-600 hover:underline">
-                Forgot password?
-              </AppLink>
+              <IconInput id="identifier" icon={Mail} type="text" inputMode="email" autoComplete="username" required autoFocus value={identifier} onChange={event => setIdentifier(event.target.value)} />
             </div>
-            <IconInput
-              id="password"
-              icon={Lock}
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              end={<PasswordToggleButton show={showPassword} onToggle={() => setShowPassword(value => !value)} className="text-subtle hover:text-ink" />}
-            />
+            <Button type="submit" className="min-h-12 w-full text-base" loading={lookupState.isLoading} disabled={!cleanIdentifier}>
+              Continue
+            </Button>
+          </form>
+        ) : null}
+
+        {step === "password" ? (
+          <form onSubmit={submit} className="space-y-4">
+            {chip}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-semibold text-ink">
+                  Password
+                </label>
+                <AppLink href={isEmail ? `/forgot-password?email=${encodeURIComponent(cleanIdentifier)}` : "/forgot-password"} className="text-sm font-semibold text-brand-600 hover:underline">
+                  Forgot password?
+                </AppLink>
+              </div>
+              <IconInput
+                id="password"
+                icon={Lock}
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                autoFocus
+                value={password}
+                onChange={event => setPassword(event.target.value)}
+                end={<PasswordToggleButton show={showPassword} onToggle={() => setShowPassword(value => !value)} className="text-subtle hover:text-ink" />}
+              />
+            </div>
+            <Button type="submit" className="min-h-12 w-full text-base" loading={signInState.isLoading}>
+              Sign in
+            </Button>
+          </form>
+        ) : null}
+
+        {step === "google" ? (
+          <div className="space-y-4">
+            {chip}
+            <Notice tone="amber">
+              This account signs in with Google. Or{" "}
+              <AppLink href={isEmail ? `/forgot-password?email=${encodeURIComponent(cleanIdentifier)}` : "/forgot-password"} className="font-semibold underline">
+                set a password
+              </AppLink>{" "}
+              to sign in with it too.
+            </Notice>
           </div>
-          <Button type="submit" className="min-h-12 w-full text-base" loading={signInState.isLoading}>
-            Sign in
-          </Button>
-        </form>
+        ) : null}
+
+        {step === "missing" ? (
+          <div className="space-y-4">
+            {chip}
+            <p role="status" className="text-sm text-muted">
+              No Udozo seller account uses this {isEmail ? "email" : "number"} yet.
+            </p>
+            <AppLink href={signUpHref} className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-brand-600 px-5 text-base font-semibold text-white hover:bg-brand-700">
+              {isEmail ? "Create a reseller account with it" : "Create a reseller account"}
+            </AppLink>
+            <Button type="button" variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => setStep("identifier")}>
+              Use another email or number
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-3 text-xs font-semibold tracking-wide text-subtle uppercase">
           <span className="h-px flex-1 bg-line" />

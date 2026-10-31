@@ -203,11 +203,27 @@ export class AuthService {
     });
   }
 
-  async signIn(identifier: string, password: string, req: Request, res: Response) {
+  /** The reseller person an email or confirmed mobile number signs in, or null. */
+  private signInUser(identifier: string) {
     const phone = identifier.startsWith('+') ? (parsePhoneNumberFromString(identifier)?.number ?? identifier) : null;
-    const user = await this.prisma.user.findFirst({
-      where: phone ? { realm: 'reseller', OR: [{ phone, phoneVerifiedAt: { not: null } }, { phones: { some: { phone } } }] } : { realm: 'reseller', email: identifier },
+    return this.prisma.user.findFirst({
+      where: phone ? { realm: 'reseller', OR: [{ phone, phoneVerifiedAt: { not: null } }, { phones: { some: { phone } } }] } : { realm: 'reseller', email: identifier.toLowerCase() },
     });
+  }
+
+  /**
+   * Sign-in's first step: whether an account signs in with this email or confirmed mobile (then the password; otherwise
+   * sign up), and whether it has a password (a Google-only account signs in with Google). Sign-up already says whether
+   * an email is taken, so this tells nobody more.
+   */
+  async lookupSignIn(identifier: string) {
+    const user = await this.signInUser(identifier.trim());
+    const exists = Boolean(user && user.status === 'active');
+    return { object: 'account_lookup' as const, exists, password: exists && Boolean(user?.passwordHash) };
+  }
+
+  async signIn(identifier: string, password: string, req: Request, res: Response) {
+    const user = await this.signInUser(identifier);
     const valid = await this.passwords.verify(user?.passwordHash ?? null, password);
     if (!user || user.status !== 'active') throw invalidCredentials();
 

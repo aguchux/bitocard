@@ -2,6 +2,7 @@ import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PasswordsService } from '../auth/passwords.service.js';
 import { normalisePhone } from '../auth/auth.service.js';
+import { SignupVerificationService } from '../auth/signup-verification.service.js';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -64,6 +65,8 @@ function violatedFields(error: Prisma.PrismaClientKnownRequestError): string[] {
 
 const digest = (customerId: string, purpose: CustomerCodePurpose, code: string) => sha256(`customer:${purpose}:${customerId}:${code}`);
 const signInFailed = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'invalid_credentials', 'The email or password is wrong.');
+const emailTaken = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_taken', 'An account with this email already exists. Sign in instead.', 'email');
+const phoneInUse = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
 const codeInvalid = () => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
 
 /**
@@ -83,6 +86,7 @@ export class CustomersService {
     private readonly email: EmailService,
     private readonly sms: SmsService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly signups: SignupVerificationService,
   ) {}
 
   /** Which product this instance serves (Udozo's customers confirm their mobile number at sign-up). */
@@ -165,21 +169,73 @@ export class CustomersService {
   }
 
   /**
+   * Whether an account uses this email at the store's accounts, for sign-in's first step (the email, then the password)
+   * and sign-up's (`email_taken`). Sign-up says the same, so this tells nobody more than it already could.
+   */
+  async lookup(store: Store, rawEmail: string) {
+    const email = rawEmail.trim().toLowerCase();
+    const customer = await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email } }, select: { id: true } });
+    return { object: 'account_lookup' as const, email, exists: Boolean(customer) };
+  }
+
+  /** Step-by-step sign-up, step 1: emails a code to an address no account at the store uses yet. */
+  async startSignupEmail(store: Store, rawEmail: string) {
+    const email = rawEmail.trim().toLowerCase();
+    if ((await this.lookup(store, email)).exists) throw emailTaken();
+    await this.signups.start(email, { storeId: store.id, storeName: store.name });
+    return { object: 'notice' as const, message: 'A code is on its way.' };
+  }
+
+  /** Step 2: the emailed code, exchanged for a one-hour sign-up token for this store's accounts. */
+  verifySignupEmail(store: Store, input: { email: string; code: string }) {
+    return this.signups.verify(input.email.trim().toLowerCase(), input.code, store.id);
+  }
+
+  /**
+   * Step 3, after the name and country: texts a code to the mobile number (of that country, used by no account at the
+   * store) through the country's SMS provider. `phone_verification_unavailable` where it has none: the number is then
+   * kept unconfirmed and nothing waits for it.
+   */
+  async startSignupPhone(store: Store & { reseller: { house: boolean } }, input: { email: string; signup_token: string; country?: string; phone: string }) {
+    const country = await this.signupCountry(store, input.country);
+    if (!country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Choose your country.', 'country');
+    const phone = normalisePhone(input.phone, country);
+    if (await this.prisma.customer.findFirst({ where: { storeId: store.id, phone }, select: { id: true } })) throw phoneInUse();
+    await this.signups.startPhone(input.email.trim().toLowerCase(), input.signup_token, country, phone, store.id);
+    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+  }
+
+  verifySignupPhone(store: Store, input: { email: string; signup_token: string; code: string }) {
+    return this.signups.verifyPhone(input.email.trim().toLowerCase(), input.signup_token, input.code, store.id);
+  }
+
+  /**
    * `phone`, when sent, is validated and normalised exactly as `addPhone` does (a mobile number from the account's own
    * country, in E.164), and stored unverified. On BitoCard no code is sent at sign-up: the customer confirms it later
    * from their account. On Udozo it is required, and texted a code at once through the country's SMS provider (where it
    * has one), which the customer enters after the emailed one before using the account (`phonePendingFor`).
+   *
+   * With `signup_token` (the step-by-step sign-up: `startSignupEmail` and on) the email is already confirmed, and the
+   * number too when its texted code was confirmed for this sign-up, so no code is sent afterwards.
    */
-  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string }) {
+  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string; signup_token?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
     const udozo = this.config.APP_PRODUCT === 'udozo' && store.platform !== 'afrippa';
     if (udozo && !input.phone) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your mobile number.', 'phone');
     const phone = input.phone ? normalisePhone(input.phone, country) : null;
+    const passwordHash = await this.passwords.hash(input.password);
     let customer: Customer;
+    let phoneConfirmed = false;
     try {
-      customer = await this.prisma.customer.create({ data: { storeId: store.id, email, name: input.name.trim(), country, phone, passwordHash: await this.passwords.hash(input.password) } });
+      customer = await this.prisma.$transaction(async tx => {
+        if (input.signup_token) ({ phoneConfirmed } = await this.signups.consume(tx, email, input.signup_token, phone, store.id));
+        const confirmed = input.signup_token ? new Date() : null;
+        return tx.customer.create({
+          data: { storeId: store.id, email, name: input.name.trim(), country, phone, passwordHash, emailVerifiedAt: confirmed, phoneVerifiedAt: phoneConfirmed ? confirmed : null },
+        });
+      });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         if (violatedFields(error).some(field => field.includes('phone'))) {
@@ -189,9 +245,9 @@ export class CustomersService {
       }
       throw error;
     }
-    await this.sendCode(customer, store, 'email_verification').catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not send the confirmation code'));
+    if (!customer.emailVerifiedAt) await this.sendCode(customer, store, 'email_verification').catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not send the confirmation code'));
     // A delivery problem (or a country that cannot text yet) must not lose the account: the code can be asked for again.
-    if (udozo && phone) await this.addPhone({ ...customer, store }, phone).catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not text the sign-up code'));
+    if (udozo && phone && !phoneConfirmed) await this.addPhone({ ...customer, store }, phone).catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not text the sign-up code'));
     return { customer: await this.present(customer), session: await this.startSession(customer.id) };
   }
 

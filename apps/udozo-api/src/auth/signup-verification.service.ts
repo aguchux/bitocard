@@ -4,7 +4,7 @@ import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.j
 import { ApiError } from '../common/errors/api-error.js';
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
-import { signupCodeEmail } from '../notifications/templates.js';
+import { customerSignupCodeEmail, signupCodeEmail } from '../notifications/templates.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { maxCodeAttempts, maxCodesPerDay } from './codes.service.js';
 
@@ -27,6 +27,9 @@ const tokenInvalid = () =>
  * creates the account with its email already confirmed. Then the owner's mobile number can be confirmed the same way,
  * by a texted code (`startPhone`, `verifyPhone`), so the account starts with it as a confirmed sign-in number. Only
  * hashes are stored; rows are removed after a day.
+ *
+ * Seller HQ's sign-ups have no store (`storeId` null). A store customer's (udozo.com) carries the store whose accounts
+ * it opens (`storeId`): its caller checks the email and number are free there, and a token works only for that store.
  */
 @Injectable()
 export class SignupVerificationService {
@@ -38,17 +41,21 @@ export class SignupVerificationService {
     private readonly sms: SmsService,
   ) {}
 
-  async start(email: string) {
-    // Taken as someone's primary address or as one of their other addresses.
-    const [primary, other] = await Promise.all([
-      this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } }),
-      this.prisma.userEmail.findUnique({ where: { realm_email: { realm: 'reseller', email } } }),
-    ]);
-    if (primary || other) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
+  /** Emails the code. `customer`: a store customer's sign-up (its caller has checked the email is free at the store). */
+  async start(email: string, customer?: { storeId: string; storeName: string }) {
+    const storeId = customer?.storeId ?? null;
+    if (!customer) {
+      // Taken as someone's primary address or as one of their other addresses.
+      const [primary, other] = await Promise.all([
+        this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } }),
+        this.prisma.userEmail.findUnique({ where: { realm_email: { realm: 'reseller', email } } }),
+      ]);
+      if (primary || other) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
+      }
     }
     await this.prisma.signupVerification.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - keepMs) } } });
-    const latest = await this.prisma.signupVerification.findFirst({ where: { email, consumedAt: null }, orderBy: { createdAt: 'desc' } });
+    const latest = await this.prisma.signupVerification.findFirst({ where: { email, storeId, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
     }
@@ -58,11 +65,11 @@ export class SignupVerificationService {
     }
     const code = numericCode();
     const [, created] = await this.prisma.$transaction([
-      this.prisma.signupVerification.updateMany({ where: { email, consumedAt: null }, data: { consumedAt: new Date() } }),
-      this.prisma.signupVerification.create({ data: { email, codeHash: digest(email, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
+      this.prisma.signupVerification.updateMany({ where: { email, storeId, consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.signupVerification.create({ data: { email, storeId, codeHash: digest(email, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
     ]);
     try {
-      await this.email.send(signupCodeEmail(email, code));
+      await this.email.send(customer ? customerSignupCodeEmail(email, code, customer.storeName) : signupCodeEmail(email, code));
     } catch (error) {
       // Lets the person ask again at once.
       await this.prisma.signupVerification.update({ where: { id: created.id }, data: { consumedAt: new Date() } });
@@ -72,8 +79,8 @@ export class SignupVerificationService {
   }
 
   /** Checks the code and returns the sign-up token (shown once). */
-  async verify(email: string, code: string) {
-    const record = await this.prisma.signupVerification.findFirst({ where: { email, consumedAt: null, verifiedAt: null }, orderBy: { createdAt: 'desc' } });
+  async verify(email: string, code: string, storeId: string | null = null) {
+    const record = await this.prisma.signupVerification.findFirst({ where: { email, storeId, consumedAt: null, verifiedAt: null }, orderBy: { createdAt: 'desc' } });
     const invalid = new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
     if (!record) throw invalid;
     if (record.expiresAt <= new Date()) {
@@ -102,10 +109,10 @@ export class SignupVerificationService {
    * Inside the sign-up transaction: uses up the token, which must belong to this email. With `phone`, says whether that
    * number was confirmed with a texted code during this sign-up (the confirmation is used up with it).
    */
-  async consume(tx: Prisma.TransactionClient, email: string, token: string, phone: string | null = null) {
+  async consume(tx: Prisma.TransactionClient, email: string, token: string, phone: string | null = null, storeId: string | null = null) {
     const record = await tx.signupVerification.findUnique({ where: { tokenHash: sha256(token) } });
     const used = await tx.signupVerification.updateMany({
-      where: { tokenHash: sha256(token), email, verifiedAt: { not: null }, consumedAt: null, expiresAt: { gt: new Date() } },
+      where: { tokenHash: sha256(token), email, storeId, verifiedAt: { not: null }, consumedAt: null, expiresAt: { gt: new Date() } },
       data: { consumedAt: new Date() },
     });
     if (used.count === 0 || !record) throw tokenInvalid();
@@ -118,9 +125,9 @@ export class SignupVerificationService {
   }
 
   /** The confirmed email's sign-up, still open (its token unused and unexpired). */
-  private async openSignup(email: string, token: string) {
+  private async openSignup(email: string, token: string, storeId: string | null) {
     const record = await this.prisma.signupVerification.findUnique({ where: { tokenHash: sha256(token) } });
-    if (!record || record.email !== email || !record.verifiedAt || record.consumedAt || record.expiresAt <= new Date()) throw tokenInvalid();
+    if (!record || record.email !== email || record.storeId !== storeId || !record.verifiedAt || record.consumedAt || record.expiresAt <= new Date()) throw tokenInvalid();
     return record;
   }
 
@@ -129,8 +136,8 @@ export class SignupVerificationService {
    * country's SMS provider. Only after the email is confirmed, so texts cannot be sent without a real inbox: one a
    * minute, five per sign-up and `maxCodesPerDay` a day per number. Hashed, 30 minutes, 5 attempts.
    */
-  async startPhone(email: string, token: string, country: string, phone: string) {
-    const signup = await this.openSignup(email, token);
+  async startPhone(email: string, token: string, country: string, phone: string, storeId: string | null = null) {
+    const signup = await this.openSignup(email, token, storeId);
     const latest = await this.prisma.signupPhoneVerification.findFirst({ where: { signupVerificationId: signup.id, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
@@ -162,8 +169,8 @@ export class SignupVerificationService {
   }
 
   /** Checks the texted code: the number is then confirmed for this sign-up, and signs in once the account is made. */
-  async verifyPhone(email: string, token: string, code: string) {
-    const signup = await this.openSignup(email, token);
+  async verifyPhone(email: string, token: string, code: string, storeId: string | null = null) {
+    const signup = await this.openSignup(email, token, storeId);
     const record = await this.prisma.signupPhoneVerification.findFirst({ where: { signupVerificationId: signup.id, consumedAt: null, verifiedAt: null }, orderBy: { createdAt: 'desc' } });
     const invalid = new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
     if (!record) throw invalid;

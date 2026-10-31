@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useActionState, useId, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle2, Eye, EyeOff, LoaderCircle } from "lucide-react";
-import { PhoneInput } from "@bitocard/ui/phone-input";
 import {
   changePassword,
   type FormState,
@@ -11,8 +10,6 @@ import {
   resendCode,
   resetPassword,
   setCountry,
-  signIn,
-  signUp,
   startVerification,
   updateName,
   verifyEmail,
@@ -105,22 +102,6 @@ export function Submit({ pending, children, className = "" }: { pending: boolean
   );
 }
 
-/** The email and password of the customer's Udozo account. */
-export function SignInForm({ next }: { next: string }) {
-  const [state, action, pending] = useActionState(signIn, empty);
-  return (
-    <form action={action} className="space-y-4">
-      <input type="hidden" name="next" value={next} />
-      <FormMessage state={state} />
-      <TextField label="Email" name="email" type="email" autoComplete="email" required state={state} />
-      <TextField label="Password" name="password" type="password" autoComplete="current-password" required state={state} />
-      <Submit pending={pending} className="w-full">
-        Sign in
-      </Submit>
-    </form>
-  );
-}
-
 /** The customer's country: fixed once chosen, so the hint says so. Their wallet, payouts and market follow it. */
 export function CountryField({ markets, defaultValue, state, onChange }: { markets: Market[]; defaultValue?: string | null; state?: FormState; onChange?: (code: string) => void }) {
   const id = useId();
@@ -152,54 +133,6 @@ export function CountryField({ markets, defaultValue, state, onChange }: { marke
         You buy and sell in its market, and your wallet and payouts are in its currency. It cannot be changed later.
       </p>
     </div>
-  );
-}
-
-/**
- * Sign-up on udozo.com: name, email, the country (from Udozo's markets, fixed for good), the mobile number (locked to
- * that country) and a password. The number is texted a code at once, entered after the emailed one on /verify.
- */
-export function SignUpForm({ next, markets, market = null }: { next: string; markets: Market[]; market?: string | null }) {
-  const [state, action, pending] = useActionState(signUp, empty);
-  const [country, setChosen] = useState<string | null>(market && markets.some(item => item.code === market) ? market : null);
-  return (
-    <form action={action} className="space-y-4">
-      <input type="hidden" name="next" value={next} />
-      <FormMessage state={state} />
-      <TextField label="Your name" name="name" autoComplete="name" required minLength={2} maxLength={100} state={state} />
-      <TextField label="Email" name="email" type="email" autoComplete="email" required state={state} hint="We send your codes and receipts here." />
-      <CountryField markets={markets} defaultValue={country} state={state} onChange={setChosen} />
-      {country ? (
-        <>
-          <PhoneInput
-            key={country}
-            country={country}
-            name="phone"
-            label="Mobile number"
-            required
-            className="space-y-1.5"
-            inputClassName="min-h-12 border border-navy-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 aria-[invalid=true]:border-brand-700"
-            errorClassName="text-brand-700"
-          />
-          <p className="text-xs text-navy-500">We text it a 6-digit code to confirm it.</p>
-        </>
-      ) : null}
-      <TextField label="Password" name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={128} state={state} hint={passwordHint} />
-      <p className="text-xs text-navy-500">
-        By creating an account you agree to Udozo&apos;s{" "}
-        <Link href="/legal/terms" target="_blank" className="font-semibold text-navy-900 underline">
-          terms of use
-        </Link>{" "}
-        and confirm you have read the{" "}
-        <Link href="/legal/privacy" target="_blank" className="font-semibold text-navy-900 underline">
-          privacy notice
-        </Link>
-        .
-      </p>
-      <Submit pending={pending} className="w-full">
-        Create account
-      </Submit>
-    </form>
   );
 }
 
@@ -333,14 +266,10 @@ export function AuthLinks({ next, page }: { next: string; page: "signin" | "sign
   return (
     <div className="mt-4 flex flex-wrap justify-between gap-3 text-sm">
       {page === "signin" ? (
-        <>
-          <Link href="/forgot-password" className="font-semibold text-brand-700 hover:underline">
-            Forgot password?
-          </Link>
-          <Link href={`/signup${query}`} className="font-bold text-brand-700 hover:underline">
-            Create an account
-          </Link>
-        </>
+        // "Forgot password?" is on the password step, with the email filled in.
+        <Link href={`/signup${query}`} className="font-bold text-brand-700 hover:underline">
+          New to Udozo? Create an account
+        </Link>
       ) : (
         <Link href={`/signin${query}`} className="font-semibold text-brand-700 hover:underline">
           Already have an account? Sign in
