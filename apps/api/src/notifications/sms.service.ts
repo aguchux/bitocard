@@ -44,10 +44,20 @@ export class SmsService {
     // The sandbox account (username `sandbox`) has its own address; an address set in Settings wins (tests use a fake).
     const base = config.AFRICASTALKING_API_URL ?? (config.AFRICASTALKING_USERNAME === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com');
     const url = `${base.replace(/\/+$/, '')}/version1/messaging`;
-    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', apiKey: config.AFRICASTALKING_API_KEY }, body, signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) throw new Error(`Africa's Talking HTTP ${response.status}`);
-    const result = await response.json() as { SMSMessageData?: { Recipients?: Array<{ statusCode?: number }> } };
-    if (!result.SMSMessageData?.Recipients?.some(recipient => recipient.statusCode === 100 || recipient.statusCode === 101)) throw new Error('Africa\'s Talking rejected the SMS');
+    // Africa's Talking answers in XML unless JSON is asked for.
+    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', apiKey: config.AFRICASTALKING_API_KEY }, body, signal: AbortSignal.timeout(10_000) });
+    const reply = await response.text();
+    if (!response.ok) throw new Error(`Africa's Talking HTTP ${response.status}: ${reply.slice(0, 200)}`);
+    let result: { SMSMessageData?: { Message?: string; Recipients?: Array<{ statusCode?: number; status?: string }> } };
+    try {
+      result = JSON.parse(reply) as typeof result;
+    } catch {
+      throw new Error(`Africa's Talking sent an unreadable reply: ${reply.slice(0, 200)}`);
+    }
+    const recipients = result.SMSMessageData?.Recipients ?? [];
+    if (!recipients.some(recipient => recipient.statusCode === 100 || recipient.statusCode === 101)) {
+      throw new Error(`Africa's Talking rejected the SMS: ${recipients.map(recipient => recipient.status).join(', ') || result.SMSMessageData?.Message || 'no recipients'}`);
+    }
     return 'africas_talking';
   }
 

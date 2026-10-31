@@ -49,13 +49,15 @@ test('Africa’s Talking uses its assigned country route and checks the recipien
   let call;
   globalThis.fetch = async (url, options) => {
     call = { url, options };
-    return { ok: true, json: async () => ({ SMSMessageData: { Recipients: [{ statusCode: 101 }] } }) };
+    return { ok: true, text: async () => JSON.stringify({ SMSMessageData: { Recipients: [{ statusCode: 101 }] } }) };
   };
   try {
     assert.equal(await service.sendForCountry('KE', { to: '+254711123456', text: 'Code 123456' }), 'africas_talking');
     assert.match(call.url, /api\.sandbox\.africastalking\.com\/version1\/messaging$/);
     assert.equal(call.options.body.get('to'), '+254711123456');
     assert.equal(call.options.headers.apiKey, 'test-key');
+    // Africa's Talking answers in XML unless JSON is asked for.
+    assert.equal(call.options.headers.accept, 'application/json');
   } finally {
     globalThis.fetch = original;
   }
@@ -100,13 +102,16 @@ test('Africa’s Talking’s address can be set (tests and sandbox), and a refus
   let status = 101;
   globalThis.fetch = async url => {
     urls.push(url);
-    return { ok: true, json: async () => ({ SMSMessageData: { Recipients: [{ statusCode: status }] } }) };
+    return { ok: true, text: async () => JSON.stringify({ SMSMessageData: { Recipients: [{ statusCode: status }] } }) };
   };
   try {
     assert.equal(await service.sendForCountry('KE', { to: '+254711123456', text: 'Code 123456' }), 'africas_talking');
     assert.equal(urls[0], 'https://sms.example.test/version1/messaging');
     status = 403;
-    await assert.rejects(service.sendForCountry('KE', { to: '+254711123456', text: 'Code 123456' }));
+    await assert.rejects(service.sendForCountry('KE', { to: '+254711123456', text: 'Code 123456' }), /rejected the SMS/);
+    // Its XML answer (sent when JSON is not asked for) is reported as such, never mistaken for a parsing bug.
+    globalThis.fetch = async () => ({ ok: true, text: async () => '<AfricasTalkingResponse><SMSMessageData/></AfricasTalkingResponse>' });
+    await assert.rejects(service.sendForCountry('KE', { to: '+254711123456', text: 'Code 123456' }), /unreadable reply: <AfricasTalkingResponse>/);
   } finally {
     globalThis.fetch = original;
   }
