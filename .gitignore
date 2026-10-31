@@ -33,6 +33,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# filled-in droplet secrets (the *.env.example templates stay)
+deploy/droplet/*.env
 
 # vercel
 .vercel
