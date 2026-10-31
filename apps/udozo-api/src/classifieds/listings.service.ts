@@ -261,8 +261,9 @@ export class ListingsService {
     if (listing.resale) await this.resale.requireSupplier(customer, country);
     const photos = listing.media.filter(item => item.kind === 'photo' && item.status === 'ready').length;
     if (photos < settings.minPhotos) throw invalid('photos_required', `Add at least ${settings.minPhotos} photos.`, 'photos');
-    if (listing.media.some(item => item.status === 'failed')) throw invalid('media_failed', 'Remove the photo or video that could not be used, or add it again.', 'photos');
-    if (listing.media.some(item => item.status === 'processing')) throw conflict('video_processing', 'Your video is still being prepared. Submit again in a minute.');
+    if (listing.media.some(item => item.kind === 'photo' && item.status === 'failed')) throw invalid('media_failed', 'Remove the photo that could not be used, or add it again.', 'photos');
+    // The video is optional: one still being prepared joins the listing once ready (pages show only ready media), and
+    // one that could not be used is never shown, so neither holds the listing back.
 
     const flags = await this.moderation.check(listing);
     const topCategory = listing.category!.parentId ?? listing.category!.id;

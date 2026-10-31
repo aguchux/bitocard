@@ -246,7 +246,8 @@ export function ListingForm({
   };
   const dragFrom = useRef<number | null>(null);
 
-  // ---- The video ----
+  // ---- The video (optional: one being prepared, or one that failed, never holds the ad back) ----
+  const sending = useRef<XMLHttpRequest | null>(null);
   const addVideo = async (file: File | undefined) => {
     if (!file) return;
     if (file.size > maxVideoBytes) return setVideo({ id: null, status: "failed", progress: 0, poster: null, error: "Videos can be at most 50 MB." });
@@ -257,6 +258,7 @@ export function ListingForm({
     const form = new FormData();
     form.set("file", file, file.name || "video.mp4");
     const request = new XMLHttpRequest();
+    sending.current = request;
     request.open("POST", link.data.url);
     request.upload.onprogress = event => event.lengthComputable && setVideo(current => (current ? { ...current, progress: Math.round((event.loaded / event.total) * 100) } : current));
     request.onerror = () => setVideo({ id: null, status: "failed", progress: 0, poster: null, error: "The video could not be sent. Check your connection and try again." });
@@ -272,6 +274,12 @@ export function ListingForm({
       setVideo({ id: json.id, status: "processing", progress: 100, poster: null, error: null });
     };
     request.send(form);
+  };
+  /** Stops sending the video: the ad is posted without it. */
+  const cancelVideo = () => {
+    sending.current?.abort();
+    sending.current = null;
+    setVideo(null);
   };
   // While the video is being prepared, check on it now and then.
   useEffect(() => {
@@ -478,7 +486,11 @@ export function ListingForm({
                   <button type="button" onClick={() => void dropVideo()} aria-label="Remove the video" className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-white/90 text-navy-900">
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
-                ) : null}
+                ) : (
+                  <button type="button" onClick={cancelVideo} aria-label="Stop sending the video" className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-white/90 text-navy-900">
+                    <X className="size-4" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             ) : (
               <label className="grid aspect-square cursor-pointer place-content-center justify-items-center gap-1 rounded-xl border-2 border-dashed border-slate-300 bg-white text-center text-xs font-semibold text-navy-900 hover:border-slate-400">
@@ -753,6 +765,11 @@ export function ListingForm({
             <p role="alert" className="text-sm font-semibold text-brand-700">
               {problem.message}
             </p>
+          ) : null}
+          {video?.status === "uploading" ? (
+            <p className="text-sm text-slate-600">The video is still sending: wait for it, or stop it to post your ad without one. The video is optional.</p>
+          ) : video?.status === "processing" ? (
+            <p className="text-sm text-slate-600">You can post now: your video joins the ad as soon as it is ready.</p>
           ) : null}
           <button
             type="button"

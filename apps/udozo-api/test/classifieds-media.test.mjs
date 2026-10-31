@@ -196,7 +196,8 @@ describe('the video', () => {
     const started = await shopper.upload(`/v1/classifieds/listings/${listing.id}/video`, mp4(), 'video/mp4', 'clip.mp4');
     assert.deepEqual([started.status, started.json.status], [202, 'processing'], JSON.stringify(started.json));
     assert.equal((await shopper.upload(`/v1/classifieds/listings/${listing.id}/video`, mp4(), 'video/mp4', 'clip.mp4')).json.error.code, 'video_exists');
-    assert.equal((await shopper.post(`/v1/classifieds/listings/${listing.id}/submit`)).json.error.code, 'video_processing');
+    // The video is optional: the listing goes for review while it is prepared, and it joins once ready.
+    assert.equal((await shopper.post(`/v1/classifieds/listings/${listing.id}/submit`)).json.status, 'pending_review');
 
     release();
     await waitFor(async () => (await shopper.get(`/v1/classifieds/me/listings/${listing.id}`)).json.video.status === 'ready', 'the video');
@@ -206,7 +207,7 @@ describe('the video', () => {
     assert.equal(video.duration_ms, 24000);
     assert.equal(objects.get(new URL(video.url).pathname.slice(1)).type, 'video/mp4');
     assert.ok(!objects.get(new URL(video.poster_url).pathname.slice(1)).body.includes(Buffer.from('GPSDATA')), "the poster's metadata is gone too");
-    assert.equal((await shopper.post(`/v1/classifieds/listings/${listing.id}/submit`)).json.status, 'pending_review');
+    assert.equal((await shopper.get(`/v1/classifieds/me/listings/${listing.id}`)).json.status, 'pending_review');
 
     media.transcoder = { transcode: async () => Promise.reject(new VideoRefused('Videos can be at most 60 seconds long.')) };
     const second = await completeDraft(shopper);
@@ -215,9 +216,9 @@ describe('the video', () => {
     await waitFor(async () => (await shopper.get(`/v1/classifieds/me/listings/${second.id}`)).json.video.status === 'failed', 'the refusal');
     const failed = (await shopper.get(`/v1/classifieds/me/listings/${second.id}`)).json.video;
     assert.equal(failed.failure_reason, 'Videos can be at most 60 seconds long.');
-    assert.equal((await shopper.post(`/v1/classifieds/listings/${second.id}/submit`)).json.error.code, 'media_failed');
-    assert.equal((await shopper.delete(`/v1/classifieds/listings/${second.id}/media/${failed.id}`)).status, 204);
+    // A video that could not be used never holds the listing back (and is never shown); the seller can still remove it.
     assert.equal((await shopper.post(`/v1/classifieds/listings/${second.id}/submit`)).json.status, 'pending_review');
+    assert.equal((await shopper.delete(`/v1/classifieds/listings/${second.id}/media/${failed.id}`)).status, 204);
   });
 
   test("sent by the seller's browser with an upload link: from any page, without cookies, only while the session lasts", async () => {
