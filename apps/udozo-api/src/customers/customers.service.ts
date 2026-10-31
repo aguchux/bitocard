@@ -218,7 +218,7 @@ export class CustomersService {
    * With `signup_token` (the step-by-step sign-up: `startSignupEmail` and on) the email is already confirmed, and the
    * number too when its texted code was confirmed for this sign-up, so no code is sent afterwards.
    */
-  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string; signup_token?: string }) {
+  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string; signup_token?: string; ref?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
@@ -233,7 +233,7 @@ export class CustomersService {
         if (input.signup_token) ({ phoneConfirmed } = await this.signups.consume(tx, email, input.signup_token, phone, store.id));
         const confirmed = input.signup_token ? new Date() : null;
         return tx.customer.create({
-          data: { storeId: store.id, email, name: input.name.trim(), country, phone, passwordHash, emailVerifiedAt: confirmed, phoneVerifiedAt: phoneConfirmed ? confirmed : null },
+          data: { storeId: store.id, email, name: input.name.trim(), country, phone, passwordHash, emailVerifiedAt: confirmed, phoneVerifiedAt: phoneConfirmed ? confirmed : null, signupRef: input.ref ?? null },
         });
       });
     } catch (error) {

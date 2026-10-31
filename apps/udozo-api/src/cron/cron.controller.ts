@@ -5,6 +5,7 @@ import { ListingMediaService } from '../classifieds/media.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
+import { MarketingService } from '../marketing/marketing.service.js';
 import { ResaleStoresService } from '../resale/resale-stores.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { DomainsService } from '../domains/domains.service.js';
@@ -100,6 +101,7 @@ export class CronController {
     safePay: SafePayService,
     resale: ResaleStoresService,
     resaleOrders: ResaleOrdersService,
+    marketing: MarketingService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -167,6 +169,8 @@ export class CronController {
       push: () => push.runDue(),
       /** Daily: delete in-app notifications older than 90 days (and their pushes). */
       'notifications-cleanup': () => inbox.purge(),
+      /** Udozo, daily: Marketing keeps no one it never brought on for long, and nothing but the contact of who asked to stop. */
+      marketing: () => marketing.purge(),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the

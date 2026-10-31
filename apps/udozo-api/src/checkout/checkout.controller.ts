@@ -44,6 +44,10 @@ class SignUpDto {
   /** From the step-by-step sign-up (`signup/email/verify`): the email, and the number if its texted code was confirmed, are already confirmed. */
   @IsOptional() @IsString() @Length(20, 100)
   signup_token?: string;
+
+  /** The referral or invite code on the sign-up link (`ref`), kept on the account so a campaign or invite can be traced. */
+  @IsOptional() @Matches(/^[\w.~-]{1,64}$/, { message: 'ref must be a short code' })
+  ref?: string;
 }
 
 class AccountEmailDto {

@@ -509,6 +509,7 @@ export * from './classifieds';
 export * from './shop-assistants';
 export * from './top-ups';
 export * from './team';
+export * from './marketing';
 export * from './vpn';
 export * from './domains';
 export * from './reports';

@@ -75,6 +75,10 @@
     {
       "path": "/v1/cron/classifieds",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/v1/cron/marketing",
+      "schedule": "20 4 * * *"
     }
   ]
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { confirmationPending, type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
+import { cleanRef } from "@/lib/invite";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
 export type FormState = { error?: string; field?: string | null; notice?: string };
@@ -50,7 +51,7 @@ export async function confirmSignupMobile(input: { email: string; token: string;
  * The last step: the account, made with the email (and the mobile, when its code was confirmed) already confirmed, then
  * signed in and on to `next`, or to the confirmation page for whatever is still to confirm.
  */
-export async function finishSignUp(input: { name: string; email: string; country: string; phone: string; password: string; token: string; next: string }): Promise<StepResult> {
+export async function finishSignUp(input: { name: string; email: string; country: string; phone: string; password: string; token: string; next: string; ref?: string | null }): Promise<StepResult> {
   const result = await customerApi<SessionReply>("POST", "/v1/store/account/signup", {
     name: input.name.trim(),
     email: input.email.trim(),
@@ -58,6 +59,8 @@ export async function finishSignUp(input: { name: string; email: string; country
     phone: input.phone,
     password: input.password,
     signup_token: input.token,
+    // The referral or invite code the sign-up link carried, kept on the account.
+    ...(cleanRef(input.ref) ? { ref: cleanRef(input.ref) } : {}),
   });
   if (!result.ok) return refused(result);
   await keepSession(result.data.session);

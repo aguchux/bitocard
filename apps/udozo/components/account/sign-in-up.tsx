@@ -142,7 +142,7 @@ const stepNumber: Record<SignUpStep, [number, string]> = {
  * texted to it; (4) the password, and the account is made with both confirmed. Where the country cannot text yet, the
  * number is kept unconfirmed and step 3 asks for no code.
  */
-export function SignUpForm({ next, markets, market = null, email: initial = "" }: { next: string; markets: Market[]; market?: string | null; email?: string }) {
+export function SignUpForm({ next, markets, market = null, email: initial = "", signupRef = null }: { next: string; markets: Market[]; market?: string | null; email?: string; signupRef?: string | null }) {
   const [step, setStep] = useState<SignUpStep>("email");
   const [email, setEmail] = useState(initial);
   const [code, setCode] = useState("");
@@ -337,7 +337,7 @@ export function SignUpForm({ next, markets, market = null, email: initial = "" }
             event.preventDefault();
             if (!token || !country || !mobile) return;
             run(
-              () => finishSignUp({ name, email: cleanEmail, country, phone: mobile.phone, password, token, next }),
+              () => finishSignUp({ name, email: cleanEmail, country, phone: mobile.phone, password, token, next, ref: signupRef }),
               () => undefined,
             );
           }}

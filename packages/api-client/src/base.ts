@@ -158,6 +158,7 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
 export const tagTypes = [
   'Session',
   'AdminTeam',
+  'Marketing',
   'Overview',
   'Invoice',
   'Reseller',

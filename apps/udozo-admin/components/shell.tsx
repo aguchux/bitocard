@@ -20,6 +20,7 @@ import {
   LifeBuoy,
   ListChecks,
   MapPin,
+  Megaphone,
   MessageSquareWarning,
   MessagesSquare,
   Package,
@@ -80,6 +81,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
     title: "Marketplace",
     items: [
       { label: "Moderation queue", href: "/classifieds", icon: ListChecks },
+      { label: "Marketing", href: "/classifieds/marketing", icon: Megaphone },
       { label: "Reports", href: "/classifieds/reports", icon: Flag },
       { label: "Listings", href: "/classifieds/listings", icon: Package },
       { label: "Sellers", href: "/classifieds/sellers", icon: Users },

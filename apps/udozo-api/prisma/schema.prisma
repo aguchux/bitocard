@@ -97,6 +97,9 @@ model User {
   devices                 Device[]
   notificationPreferences NotificationPreference[]
   emails                  UserEmail[]
+  marketingOwned          MarketingProspect[]     @relation("marketingOwner")
+  marketingCreated        MarketingProspect[]     @relation("marketingCreator")
+  marketingActivities     MarketingActivity[]
 
   @@unique([realm, email])
   @@unique([realm, phone])
@@ -2659,6 +2662,9 @@ model Customer {
   p2pBlocksReceived         P2pBlock[]                @relation("p2pBlocked")
   p2pReportsMade            P2pReport[]               @relation("p2pReporter")
   p2pReportsReceived        P2pReport[]               @relation("p2pReported")
+  marketingProspects        MarketingProspect[]
+  /// The referral or invite code the account signed up with (`ref` on the sign-up link), for Marketing and campaigns.
+  signupRef                 String?                   @map("signup_ref")
   /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
   /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
   /// secret, encrypted) until its first code.
@@ -2710,6 +2716,7 @@ model Customer {
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
   @@unique([storeId, phone])
+  @@index([signupRef])
   @@map("customers")
   resaleStoreReports        ResaleStoreReport[]
 }
@@ -5514,4 +5521,95 @@ model TraderDevice {
   @@unique([customerId, deviceHash])
   @@index([deviceHash])
   @@map("trader_devices")
+}
+
+/// Udozo's marketing (Marketplace > Marketing): a seller found on another marketplace (Jiji…), or anyone an admin
+/// invites by email, reached out to, invited, helped onboard, followed up and asked for feedback, one stage at a time,
+/// every step logged in `marketing_activities`. Any admin works them. Linked to their Udozo account once one signs up
+/// with their invite code, phone or email.
+model MarketingProspect {
+  id              String              @id @default(uuid()) @db.Uuid
+  /// The seller's or store's name as found ("Seller 0803…" when the list had none).
+  name            String
+  storeName       String?             @map("store_name")
+  /// E.164, the first the main one.
+  phones          String[]            @default([])
+  /// Stored lower-case.
+  email           String?
+  country         String              @default("NG") @db.Char(2)
+  location        String?
+  categories      String[]            @default([])
+  /// The adverts found: { url, title, price, category, location }, at most 50.
+  adverts         Json                @default("[]")
+  source          String              @default("Jiji")
+  /// What the list said about them (badges, years on the site).
+  sourceNotes     String?             @map("source_notes")
+  /// reach_out, invitation, onboarding, follow_up or feedback.
+  stage           String              @default("reach_out")
+  /// not_started, in_progress, waiting, done, skipped or failed.
+  stageStatus     String              @default("not_started") @map("stage_status")
+  /// Why a stage was skipped or failed, or the win or loss reason.
+  statusReason    String?             @map("status_reason")
+  /// signed_up, first_post, declined or no_response.
+  outcome         String?
+  ownerId         String?             @map("owner_id") @db.Uuid
+  nextAction      String?             @map("next_action")
+  nextActionAt    DateTime?           @map("next_action_at")
+  lastContactAt   DateTime?           @map("last_contact_at")
+  followUps       Int                 @default(0) @map("follow_ups")
+  /// The `ref` on their invite link (udozo.com/i/<code>).
+  inviteCode      String              @unique @map("invite_code")
+  invitedAt       DateTime?           @map("invited_at")
+  inviteEmailedAt DateTime?           @map("invite_emailed_at")
+  /// Opening the invite link: the first time, and how many times.
+  clickedAt       DateTime?           @map("clicked_at")
+  clicks          Int                 @default(0)
+  /// Asked not to be contacted again: no invite email goes to them.
+  doNotContact    Boolean             @default(false) @map("do_not_contact")
+  customerId      String?             @map("customer_id") @db.Uuid
+  linkedAt        DateTime?           @map("linked_at")
+  feedbackRating  Int?                @map("feedback_rating")
+  wouldRecommend  Boolean?            @map("would_recommend")
+  feedbackNotes   String?             @map("feedback_notes")
+  /// advocate or nurture.
+  advocacy        String?
+  notes           String?
+  createdById     String?             @map("created_by_id") @db.Uuid
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  owner           User?               @relation("marketingOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy       User?               @relation("marketingCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  customer        Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  activities      MarketingActivity[]
+
+  @@index([stage, stageStatus])
+  @@index([ownerId])
+  @@index([nextActionAt])
+  @@index([customerId])
+  @@index([phones], type: Gin)
+  @@index([email])
+  @@map("marketing_prospects")
+}
+
+/// One step with a seller: a message, call, invite, follow-up or note an admin logged, or a change (stage, owner, next
+/// action, feedback, the invite emailed or opened, the account linked, the import).
+model MarketingActivity {
+  id         String            @id @default(uuid()) @db.Uuid
+  prospectId String            @map("prospect_id") @db.Uuid
+  actorId    String?           @map("actor_id") @db.Uuid
+  kind       String
+  /// whatsapp, jiji_chat, call, sms, email, in_person or other.
+  channel    String?
+  template   String?
+  body       String?
+  replied    Boolean?
+  outcome    String?
+  stage      String?
+  status     String?
+  createdAt  DateTime          @default(now()) @map("created_at")
+  prospect   MarketingProspect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  actor      User?             @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([prospectId, createdAt])
+  @@map("marketing_activities")
 }

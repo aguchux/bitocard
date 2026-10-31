@@ -251,6 +251,36 @@ export function invitationEmail(to: string, resellerName: string, role: string, 
   };
 }
 
+/**
+ * Udozo's invitation to sell (Marketplace > Marketing): from the admin who sent it, with their own words when they wrote
+ * some, and the person's own invite link (udozo.com/i/<code>), which tracks the click and the sign-up.
+ */
+export function marketingInviteEmail(to: string, input: { name: string; from: string; link: string; message?: string | null }): EmailMessage {
+  const first = input.name.trim().split(/\s+/)[0] || 'there';
+  const message = layout(
+    'You are invited to sell on Udozo',
+    [
+      `Hi ${first},`,
+      ...(input.message?.trim()
+        ? input.message.trim().split(/\n{2,}/).map(paragraph => paragraph.replace(/\s*\n\s*/g, ' '))
+        : [
+            `${input.from} from Udozo here. Udozo is a marketplace where buyers near you find what you sell, and can pay safely with Safe pay: the money is held until they have the item.`,
+            'Signing up takes two minutes and listing is free. You can also open your own store on Seller HQ, at no cost.',
+          ]),
+      `Create your account: ${input.link}`,
+      'If you would rather we did not contact you again, reply to say so.',
+    ],
+    undefined,
+    'Udozo',
+  );
+  return {
+    to,
+    subject: `${input.from} invited you to sell on Udozo`,
+    text: message.text,
+    html: message.html.replace(escape(input.link), `<a href="${escape(input.link)}">${escape(input.link)}</a>`),
+  };
+}
+
 /** Amount in minor units as a readable figure, for example NGN 15,000.00. */
 export function formatMoney(amount: bigint | number, currency: string) {
   const value = Number(amount) / 100;
