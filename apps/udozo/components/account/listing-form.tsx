@@ -9,6 +9,7 @@ import {
   conditionLabels,
   contactLabels,
   descriptionBlocks,
+  regionWord,
   type ShopCategory,
   type ShopCondition,
   type ShopContact,
@@ -99,6 +100,7 @@ export function ListingForm({
   categories,
   states,
   currency,
+  country = "NG",
   phoneConfirmed,
   minPhotos,
   assistant = null,
@@ -108,6 +110,8 @@ export function ListingForm({
   categories: ShopTopCategory[];
   states: ShopState[];
   currency: string;
+  /** The market, for what it calls its states (Ghana's regions, Kenya's counties). */
+  country?: string;
   phoneConfirmed: boolean;
   minPhotos: number;
   assistant?: { name: string } | null;
@@ -372,6 +376,7 @@ export function ListingForm({
   const ready = photos.filter(photo => photo.status === "ready").length;
   const uploading = photos.filter(photo => photo.status === "uploading").length;
   const state = states.find(item => item.slug === stateSlug) ?? null;
+  const region = regionWord(country);
   const symbol = useMemo(() => {
     try {
       return new Intl.NumberFormat("en-GB", { style: "currency", currency, currencyDisplay: "narrowSymbol" }).formatToParts(0).find(part => part.type === "currency")?.value ?? currency;
@@ -643,7 +648,7 @@ export function ListingForm({
       <section className="grid gap-5">
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="grid gap-1.5 text-sm font-semibold">
-            State
+            {region.charAt(0).toUpperCase() + region.slice(1)}
             <select
               value={stateSlug}
               onChange={event => {
@@ -652,7 +657,7 @@ export function ListingForm({
               }}
               className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("area_id")}`}
             >
-              <option value="">Choose your state</option>
+              <option value="">{`Choose your ${region}`}</option>
               {states.map(item => (
                 <option key={item.slug} value={item.slug}>
                   {item.name}
@@ -671,7 +676,7 @@ export function ListingForm({
               }}
               className={`h-12 rounded-xl border bg-white px-3 text-base font-normal disabled:bg-slate-50 ${marks("area_id")}`}
             >
-              <option value="">{state ? "Choose the area" : "Choose a state first"}</option>
+              <option value="">{state ? "Choose the area" : `Choose a ${region} first`}</option>
               {state?.areas.map(area => (
                 <option key={area.id} value={area.id}>
                   {area.name}
@@ -684,7 +689,7 @@ export function ListingForm({
           label="Delivery"
           options={[
             { value: "none" as const, label: "No delivery" },
-            { value: "state" as const, label: state ? `Delivers in ${state.name}` : "Delivers in my state" },
+            { value: "state" as const, label: state ? `Delivers in ${state.name}` : `Delivers in my ${region}` },
             { value: "nationwide" as const, label: "Nationwide" },
           ]}
           value={delivery}
@@ -698,7 +703,7 @@ export function ListingForm({
         {delivery !== "none" ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-semibold">
-              {state ? `Delivery charge in ${state.name}` : "Delivery charge in your state"}
+              {state ? `Delivery charge in ${state.name}` : `Delivery charge in your ${region}`}
               <input value={feeState} onChange={event => setFeeState(event.target.value)} onBlur={() => save({ delivery_fee_state: feeState })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_state")}`} />
             </label>
             {delivery === "nationwide" ? (

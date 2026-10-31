@@ -8,5 +8,5 @@ export const metadata: Metadata = { title: "Post an ad" };
 export default async function PostAd() {
   const { customer, market } = await requireSeller("/sell");
   const [{ categories, states }, assistant, resale] = await Promise.all([sellReference(market.country), sellerAssistant(market.country), resaleAvailability()]);
-  return <ListingForm listing={null} categories={categories} states={states} currency={market.currency} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} />;
+  return <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} />;
 }

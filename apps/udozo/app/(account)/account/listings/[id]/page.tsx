@@ -63,7 +63,7 @@ export default async function ListingPage({ params }: Props) {
           </Link>
         </div>
       ) : (
-        <ListingForm listing={listing.data} categories={reference.categories} states={reference.states} currency={market.currency} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} />
+        <ListingForm listing={listing.data} categories={reference.categories} states={reference.states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} />
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { LocateFixed, Search } from "lucide-react";
-import type { ShopState } from "@bitocard/api-client/classifieds";
+import { regionWord, type ShopState } from "@bitocard/api-client/classifieds";
 import { areaHref, nearestArea } from "@/lib/places";
 
 /**
@@ -48,7 +48,7 @@ export function AreaPicker({ country, states, next }: { country: string; states:
       {locating === "unavailable" ? <p className="text-sm text-navy-600" role="status">We could not find where you are. Choose your area below.</p> : null}
       <label className="flex h-12 items-center gap-2.5 rounded-2xl border border-navy-200 bg-white px-3.5 focus-within:ring-2 focus-within:ring-brand-500">
         <Search className="size-5 text-navy-500" aria-hidden="true" />
-        <input value={words} onChange={event => setWords(event.target.value)} placeholder="Search for a state, city or area" aria-label="Search for a state, city or area" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none" />
+        <input value={words} onChange={event => setWords(event.target.value)} placeholder={`Search for a ${regionWord(country)}, city or area`} aria-label={`Search for a ${regionWord(country)}, city or area`} className="min-w-0 flex-1 bg-transparent text-[15px] outline-none" />
       </label>
       {shown.length ? (
         <ul className="grid gap-3 sm:grid-cols-2">
@@ -73,7 +73,7 @@ export function AreaPicker({ country, states, next }: { country: string; states:
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-navy-600">No state or area by that name.</p>
+        <p className="text-sm text-navy-600">{`No ${regionWord(country)} or area by that name.`}</p>
       )}
     </div>
   );

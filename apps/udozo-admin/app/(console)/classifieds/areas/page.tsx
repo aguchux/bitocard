@@ -6,6 +6,9 @@ import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
 import { type AdminClassifiedArea, type AdminClassifiedState, useClassifiedAreasQuery, useCreateClassifiedAreaMutation, useUpdateClassifiedAreaMutation } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
+import { regionWord } from "@bitocard/api-client/classifieds";
+
+const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 const coordinate = (value: string, limit: number) => {
   const number = Number(value.trim());
@@ -28,7 +31,7 @@ export default function ClassifiedAreasPage() {
     <UdozoShell section="marketplace" current="/classifieds/areas" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Areas" }]}>
       <PageHeader
         title="Areas"
-        description="States, then cities and areas. Results run local first, so each centre point decides which areas count as nearby. Renaming keeps the address, so links keep working."
+        description="States (Ghana’s regions, Kenya’s counties), then cities and areas. Results run local first, so each centre point decides which areas count as nearby. Renaming keeps the address, so links keep working."
         actions={<MarketFilter id="areas-market" value={country} onChange={setCountry} all={false} />}
       />
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -97,7 +100,7 @@ function AreaRow({ area, country, changes }: { area: AdminClassifiedArea; countr
   return (
     <form onSubmit={save} className="rounded-xl border border-line p-3">
       <div className="flex flex-wrap items-end gap-3">
-        <Field label={area.kind === "state" ? "State" : "City or area"} htmlFor={`${id}-name`}>
+        <Field label={area.kind === "state" ? capital(regionWord(country)) : "City or area"} htmlFor={`${id}-name`}>
           <Input id={`${id}-name`} disabled={!changes} value={name} onChange={event => setName(event.target.value)} className="w-48" />
         </Field>
         <Field label="Latitude" htmlFor={`${id}-lat`}>
@@ -157,7 +160,7 @@ function AddArea({ country, states }: { country: string; states: AdminClassified
       <form onSubmit={submit} className="space-y-3 px-5 pb-5 sm:px-6">
         <Field label="In" htmlFor={`${id}-state`}>
           <Select id={`${id}-state`} value={stateId} onChange={event => setStateId(event.target.value)}>
-            <option value="">A new state</option>
+            <option value="">{`A new ${regionWord(country)}`}</option>
             {states.map(state => (
               <option key={state.id} value={state.id}>
                 {state.name}

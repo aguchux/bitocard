@@ -320,7 +320,7 @@ export class SafePayService {
     let stateId: string | null = null;
     if (input.delivery_state_id) {
       const state = await this.prisma.classifiedArea.findFirst({ where: { id: input.delivery_state_id, country: listing.country, kind: 'state' }, select: { id: true } });
-      if (!state) throw invalid('parameter_invalid', 'Choose the state it goes to.', 'delivery_state_id');
+      if (!state) throw invalid('parameter_invalid', 'Choose where it goes.', 'delivery_state_id');
       stateId = state.id;
     }
     const fee = deliveryFee(listing, stateId);

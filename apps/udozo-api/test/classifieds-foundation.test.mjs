@@ -1,4 +1,5 @@
-// BitoCard Shop, phase 1 step 1: the seeded feature registry, categories, Nigerian areas, Safe pay settings and switches.
+// BitoCard Shop, phase 1 step 1: the seeded feature registry, categories, Nigerian, Ghanaian and Kenyan areas, Safe pay
+// settings and switches.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { after, before, describe, test } from 'node:test';
@@ -85,7 +86,8 @@ describe('categories', () => {
       assert.ok(sub.safetyChecklist.length > 0 || parent.safetyChecklist.length > 0, `${sub.slug} has a checklist`);
       for (const link of sub.features) if (link.filter) assert.ok(link.feature.filterable, `${sub.slug} filters only on filterable keys (${link.feature.key})`);
     }
-    for (const c of categories) assert.deepEqual(c.countries.map(row => [row.country, row.enabled]), [['NG', true]], `${c.slug} is open in Nigeria`);
+    // Open in Nigeria, then Ghana and Kenya as Nigeria has them.
+    for (const c of categories) assert.deepEqual(c.countries.map(row => [row.country, row.enabled]).sort(), [['GH', true], ['KE', true], ['NG', true]], `${c.slug} is open in Nigeria, Ghana and Kenya`);
     assert.deepEqual(top.filter(c => c.b2b).map(c => c.slug), ['business-industrial']);
 
     const phones = categories.find(c => c.slug === 'mobile-phones');
@@ -181,6 +183,63 @@ describe('areas', () => {
     }
     assert.ok(!of('benue').some(a => ['bukuru', 'takum'].includes(a.slug)), "Plateau's and Taraba's towns stay in their own states");
     assert.ok(!areas.some(a => /quart|quater/i.test(a.name)), 'no street-level quarters');
+  });
+
+  test("Ghana's 16 regions with their districts, and Kenya's 47 counties with their 290 constituencies", async () => {
+    const tree = async country => prisma.classifiedArea.findMany({ where: { country, kind: 'state' }, include: { children: { orderBy: { position: 'asc' } } } });
+    const markets = { GH: { states: 16, areas: 500, box: [4.5, 11.3, -3.4, 1.3], far: 2.2 }, KE: { states: 47, areas: 600, box: [-4.8, 5.1, 33.8, 42], far: 3 } };
+    const found = {};
+    for (const [country, rules] of Object.entries(markets)) {
+      const states = await tree(country);
+      found[country] = states;
+      assert.equal(states.length, rules.states, `${country} has its ${rules.states}`);
+      assert.ok(states.flatMap(s => s.children).length >= rules.areas, `${country} has areas in full`);
+      for (const state of states) {
+        assert.ok(state.children.length >= 3, `${state.slug} has areas`);
+        const names = state.children.map(a => a.name.toLowerCase());
+        assert.equal(new Set(names).size, names.length, `${state.slug} names each area once`);
+        for (const area of [state, ...state.children]) {
+          const [lat, lng] = [Number(area.latitude), Number(area.longitude)];
+          const [south, north, west, east] = rules.box;
+          assert.ok(lat >= south && lat <= north && lng >= west && lng <= east, `${area.slug} is in ${country}`);
+          assert.ok(Math.hypot(lat - Number(state.latitude), lng - Number(state.longitude)) < rules.far, `${area.slug} is near ${state.slug}`);
+        }
+      }
+    }
+    const of = (country, slug) => found[country].find(s => s.slug === slug).children;
+    const has = (country, state, ...names) => names.forEach(name => assert.ok(of(country, state).some(a => a.name === name), `${state} has ${name}`));
+    // The capital first, then the districts or constituencies, towns and neighbourhoods.
+    assert.equal(of('GH', 'greater-accra')[0].name, 'Accra');
+    assert.equal(of('KE', 'nairobi')[0].name, 'Nairobi CBD');
+    has('GH', 'greater-accra', 'East Legon', 'Osu', 'Madina', 'Spintex', 'Tema', 'Dansoman', 'Ga East', 'Ledzokuku', 'Adenta');
+    has('GH', 'ashanti', 'Kumasi', 'Adum', 'Bantama', 'Ejisu', 'Obuasi', 'Asokore Mampong', 'Kwadaso');
+    has('GH', 'central', 'Cape Coast', 'Kasoa', 'Winneba', 'Elmina');
+    has('GH', 'western', 'Sekondi-Takoradi', 'Tarkwa Nsuaem', 'Effia');
+    has('GH', 'northern', 'Tamale', 'Yendi', 'Savelugu');
+    has('GH', 'upper-west', 'Wa', 'Tumu');
+    has('GH', 'volta', 'Ho', 'Hohoe', 'Aflao');
+    has('KE', 'nairobi', 'Westlands', 'Kilimani', 'Kileleshwa', 'Lavington', 'Karen', 'South B', 'South C', 'Eastleigh', 'Embakasi East', "Lang'ata", 'Kibra', 'Roysambu', 'Umoja');
+    has('KE', 'kiambu', 'Thika', 'Ruiru', 'Juja', 'Kikuyu', 'Ruaka', 'Limuru', 'Kahawa Sukari');
+    has('KE', 'kajiado', 'Kitengela', 'Ongata Rongai', 'Ngong', 'Kajiado North');
+    has('KE', 'machakos', 'Syokimau', 'Athi River', 'Mlolongo', 'Mavoko');
+    has('KE', 'mombasa', 'Nyali', 'Bamburi', 'Likoni', 'Changamwe', 'Mvita');
+    has('KE', 'kisumu', 'Kisumu', 'Milimani', 'Kondele', 'Seme');
+    has('KE', 'nakuru', 'Nakuru', 'Naivasha', 'Nakuru Town East', 'Nakuru Town West');
+    has('KE', 'uasin-gishu', 'Eldoret', 'Langas', 'Kesses');
+    // Every constituency, even two placed at one town.
+    has('KE', 'nairobi', 'Embakasi North', 'Embakasi South', 'Embakasi Central', 'Embakasi West', 'Dagoretti North', 'Dagoretti South');
+    has('KE', 'kisumu', 'Kisumu East', 'Kisumu West', 'Kisumu Central');
+    has('KE', 'migori', 'Suna East', 'Suna West', 'Kuria East', 'Kuria West');
+    has('KE', 'kisii', 'Kitutu Chache North', 'Kitutu Chache South', 'Nyaribari Chache');
+    assert.ok(!of('KE', 'nairobi').some(a => a.slug === 'thika'), "Thika is Kiambu's, though GeoNames files it under Nairobi's old code");
+    assert.ok(!of('GH', 'greater-accra').some(a => a.slug === 'kasoa'), "Kasoa is in Central region");
+
+    // Like Nigeria, both markets have Safe pay and market settings, with no fees until finance sets them.
+    for (const country of ['GH', 'KE']) {
+      const settings = await prisma.classifiedSafePaySettings.findUniqueOrThrow({ where: { country } });
+      assert.deepEqual([settings.buyerFeeBps, settings.sellerFeeBps], [null, null]);
+      assert.ok(await prisma.classifiedMarketSettings.findUnique({ where: { country } }));
+    }
   });
 
   test('slugs are unique where they are looked up, and a state has no parent', async () => {

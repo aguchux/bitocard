@@ -564,6 +564,12 @@ export function placePath(country: string, place: { state: string; area?: string
   return `/${[country.toLowerCase(), place.state, place.area, place.category].filter(Boolean).join('/')}`;
 }
 
+/** What a market calls its top-level areas: Nigeria's states, Ghana's regions, Kenya's counties. */
+export function regionWord(country: string): 'state' | 'region' | 'county' {
+  const code = country.toUpperCase();
+  return code === 'GH' ? 'region' : code === 'KE' ? 'county' : 'state';
+}
+
 // ---- Money and words ----
 
 /** An amount in minor units as people read it: "₦520,000", with kobo only when there are any. */
