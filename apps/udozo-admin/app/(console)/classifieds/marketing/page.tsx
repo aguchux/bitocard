@@ -1,11 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { CalendarClock, MailPlus, MousePointerClick, Send, UserCheck, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, DataTable, errorMessage, FilterSelect, formatDate, formatNumber, Input, PageHeader, StatCard, Tabs, useDebouncedValue, type Column } from "@bitocard/admin-ui";
 import { AppLink, useAdmin } from "@bitocard/admin-ui/shell";
+import { flagEmoji } from "@bitocard/ui/phone";
 import { type MarketingFilters, type MarketingProspect, type MarketingStage, useMarketingProspectsQuery, useMarketingSummaryQuery } from "@bitocard/api-client/admin";
+import { useMarketOptions } from "@/components/classifieds";
 import { UdozoShell } from "@/components/shell";
 import { dialled, outcomeLabels, stageLabels, stageOrder, statusLabels } from "@/components/marketing/labels";
 
@@ -13,11 +15,22 @@ const pageSize = 50;
 
 /**
  * Marketplace > Marketing: bringing sellers onto Udozo (a Jiji list or anyone invited by email), one stage at a time:
- * reach out, invitation, onboarding, follow-up, feedback. Every admin role works it.
+ * reach out, invitation, onboarding, follow-up, feedback. Every admin role works it. `?country=` opens one market's.
  */
 export default function MarketingPage() {
+  return (
+    <Suspense>
+      <MarketingPipeline />
+    </Suspense>
+  );
+}
+
+function MarketingPipeline() {
   const router = useRouter();
   const admin = useAdmin();
+  const search = useSearchParams();
+  const markets = useMarketOptions();
+  const [country, setCountry] = useState(search.get("country")?.toUpperCase() ?? "");
   const [stage, setStage] = useState<"all" | MarketingStage>("all");
   const [status, setStatus] = useState("");
   const [owner, setOwner] = useState("");
@@ -27,6 +40,7 @@ export default function MarketingPage() {
   const [offset, setOffset] = useState(0);
   const q = useDebouncedValue(words.trim());
   const filters: MarketingFilters = {
+    country: country || undefined,
     stage: stage === "all" ? undefined : stage,
     status: (status || undefined) as MarketingFilters["status"],
     owner: owner || undefined,
@@ -49,7 +63,12 @@ export default function MarketingPage() {
       header: "Seller",
       cell: item => (
         <span className="block min-w-0">
-          <span className="block truncate font-semibold text-ink">{item.name}</span>
+          <span className="block truncate font-semibold text-ink">
+            <span title={item.country} aria-label={item.country}>
+              {flagEmoji(item.country)}
+            </span>{" "}
+            {item.name}
+          </span>
           <span className="block truncate text-xs text-muted">{[item.phones[0] ? dialled(item.phones[0]) : null, item.email, item.location].filter(Boolean).join(" · ")}</span>
         </span>
       ),
@@ -153,6 +172,16 @@ export default function MarketingPage() {
           <span className="sr-only">Search sellers</span>
           <Input type="search" placeholder="Name, store, phone, email or place" value={words} onChange={event => (setWords(event.target.value), reset())} />
         </label>
+        <FilterSelect
+          id="mk-country"
+          label="Country"
+          value={country}
+          onChange={value => (setCountry(value), reset())}
+          options={[
+            { value: "", label: "All countries" },
+            ...markets.map(item => ({ value: item.value, label: `${flagEmoji(item.value)} ${item.label} (${formatNumber(data?.countries?.find(row => row.country === item.value)?.total ?? 0)})` })),
+          ]}
+        />
         <FilterSelect id="mk-status" label="Status" value={status} onChange={value => (setStatus(value), reset())} options={[{ value: "", label: "Any" }, ...Object.entries(statusLabels).map(([value, item]) => ({ value, label: item.label }))]} />
         <FilterSelect
           id="mk-owner"

@@ -5,6 +5,7 @@ import { useId, useState, type FormEvent } from "react";
 import { Button, Card, CardHeader, errorMessage, Field, Input, Notice, PageHeader, Select, Textarea } from "@bitocard/admin-ui";
 import { useAdmin } from "@bitocard/admin-ui/shell";
 import { useCreateMarketingProspectMutation, useInviteByEmailMutation, useMarketingSummaryQuery } from "@bitocard/api-client/admin";
+import { MarketSelect } from "@/components/marketing/market";
 import { UdozoShell } from "@/components/shell";
 
 /**
@@ -22,6 +23,7 @@ export default function MarketingNewPage() {
   const [inviteName, setInviteName] = useState("");
   const [message, setMessage] = useState("");
   const [inviteOwner, setInviteOwner] = useState(admin?.id ?? "");
+  const [inviteCountry, setInviteCountry] = useState("NG");
   const [invite, inviting] = useInviteByEmailMutation();
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -34,6 +36,7 @@ export default function MarketingNewPage() {
   const [source, setSource] = useState("Jiji");
   const [notes, setNotes] = useState("");
   const [owner, setOwner] = useState("");
+  const [country, setCountry] = useState("NG");
   const [create, creating] = useCreateMarketingProspectMutation();
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -41,7 +44,7 @@ export default function MarketingNewPage() {
     event.preventDefault();
     setInviteError(null);
     try {
-      const sent = await invite({ email: inviteEmail.trim(), name: inviteName.trim() || undefined, message: message.trim() || undefined, owner_id: inviteOwner || undefined }).unwrap();
+      const sent = await invite({ email: inviteEmail.trim(), name: inviteName.trim() || undefined, message: message.trim() || undefined, owner_id: inviteOwner || undefined, country: inviteCountry }).unwrap();
       router.push(`/classifieds/marketing/${sent.id}`);
     } catch (problem) {
       setInviteError(errorMessage(problem));
@@ -62,6 +65,7 @@ export default function MarketingNewPage() {
         source: source.trim() || undefined,
         notes: notes.trim() || undefined,
         owner_id: owner || undefined,
+        country,
       }).unwrap();
       router.push(`/classifieds/marketing/${made.id}`);
     } catch (problem) {
@@ -97,6 +101,9 @@ export default function MarketingNewPage() {
             <Field label="Your message (optional)" htmlFor={`${id}-invite-message`} hint="Leave empty for Udozo's standard invitation. Their link is added at the end.">
               <Textarea id={`${id}-invite-message`} rows={4} maxLength={2000} value={message} onChange={event => setMessage(event.target.value)} />
             </Field>
+            <Field label="Country" htmlFor={`${id}-invite-country`} hint="Where they sell, to file them under that market.">
+              <MarketSelect id={`${id}-invite-country`} value={inviteCountry} onChange={setInviteCountry} />
+            </Field>
             <Field label="Who follows them up" htmlFor={`${id}-invite-owner`}>
               {ownerOptions(inviteOwner, setInviteOwner, `${id}-invite-owner`)}
             </Field>
@@ -119,6 +126,9 @@ export default function MarketingNewPage() {
             </Field>
             <Field label="Store name (optional)" htmlFor={`${id}-store`}>
               <Input id={`${id}-store`} maxLength={120} value={storeName} onChange={event => setStoreName(event.target.value)} />
+            </Field>
+            <Field label="Country" htmlFor={`${id}-country`} hint="Their numbers are read with its dialling code.">
+              <MarketSelect id={`${id}-country`} value={country} onChange={setCountry} />
             </Field>
             <Field label="Phone numbers" htmlFor={`${id}-phones`} hint="Separate two with a semicolon.">
               <Input id={`${id}-phones`} inputMode="tel" value={phones} onChange={event => setPhones(event.target.value)} placeholder="0803 123 4567" />

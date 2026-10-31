@@ -24,6 +24,7 @@ import {
 import { UdozoShell } from "@/components/shell";
 import { udozoOrigin } from "@/components/theme";
 import { activityLabels, channelLabels, dialled, nextStage, outcomeLabels, stageLabels, stageOrder, statusLabels } from "@/components/marketing/labels";
+import { MarketSelect, useMarketName } from "@/components/marketing/market";
 import { fillTemplate, templatesFor, whatsappMessage } from "@/components/marketing/templates";
 
 /** `datetime-local` value for a date, in the browser's own time. */
@@ -48,11 +49,12 @@ export default function MarketingProspectPage() {
 }
 
 function ProspectView({ prospect }: { prospect: MarketingProspectDetail }) {
+  const market = useMarketName(prospect.country);
   return (
     <>
       <PageHeader
         title={prospect.name}
-        description={[prospect.store_name, prospect.location, `From ${prospect.source}`].filter(Boolean).join(" · ")}
+        description={[prospect.store_name, prospect.location, market, `From ${prospect.source}`].filter(Boolean).join(" · ")}
         actions={
           <span className="flex flex-wrap gap-1.5">
             <Badge tone="pink" dot={false}>
@@ -432,11 +434,25 @@ function FeedbackCard({ prospect }: { prospect: MarketingProspectDetail }) {
 }
 
 function ContactCard({ prospect }: { prospect: MarketingProspectDetail }) {
+  const id = useId();
   const [update, updating] = useUpdateMarketingProspectMutation();
+  const [marketError, setMarketError] = useState<string | null>(null);
+  const move = async (country: string) => {
+    setMarketError(null);
+    try {
+      await update({ id: prospect.id, country }).unwrap();
+    } catch (problem) {
+      setMarketError(errorMessage(problem));
+    }
+  };
   return (
     <Card>
       <CardHeader title="Contact" description={prospect.source_notes ?? undefined} />
       <div className="grid gap-3 p-5 sm:px-6">
+        <Field label="Country" htmlFor={`${id}-country`} hint="The market they are filed under. Saved numbers keep the dialling code they have.">
+          <MarketSelect id={`${id}-country`} value={prospect.country} onChange={value => void move(value)} disabled={updating.isLoading} />
+        </Field>
+        {marketError ? <Notice tone="red">{marketError}</Notice> : null}
         {prospect.phones.map(phone => (
           <div key={phone} className="flex flex-wrap items-center justify-between gap-2">
             <span className="font-semibold text-ink">{dialled(phone)}</span>

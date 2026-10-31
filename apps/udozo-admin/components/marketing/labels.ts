@@ -1,4 +1,5 @@
 import type { Tone } from "@bitocard/admin-ui";
+import { formatInternational } from "@bitocard/ui/phone";
 import type { MarketingChannel, MarketingOutcome, MarketingStage, MarketingStatus } from "@bitocard/api-client/admin";
 
 /** Marketing's five stages, in order, with what each one is for. */
@@ -60,5 +61,5 @@ export const stageOrder: MarketingStage[] = ["reach_out", "invitation", "onboard
 /** The stage after this one (feedback is the last). */
 export const nextStage = (stage: MarketingStage): MarketingStage | null => stageOrder[stageOrder.indexOf(stage) + 1] ?? null;
 
-/** A phone in the form people dial in Nigeria (0803…), else as stored. */
-export const dialled = (phone: string) => (phone.startsWith("+234") ? `0${phone.slice(4)}` : phone);
+/** A phone with its country's dialling code, as WhatsApp and a call use it (`+233 24 123 4567`). */
+export const dialled = formatInternational;

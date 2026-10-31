@@ -12,6 +12,9 @@ export const dialCode = (country: string) => `+${getCountryCallingCode(country a
 /** The country's flag as emoji (regional indicator letters), for a compact prefix without an image. */
 export const flagEmoji = (country: string) => country.toUpperCase().replace(/./g, letter => String.fromCodePoint(0x1f1a5 + letter.charCodeAt(0)));
 
+/** A stored number (E.164) as people read it with its dialling code (`+234 803 123 4567`); as given if unreadable. */
+export const formatInternational = (e164: string) => parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
+
 /** What the person typed, formatted as a national number as they type (`0803 123 4567`). */
 export const formatNational = (input: string, country: string) => new AsYouType(country as CountryCode).input(input);
 

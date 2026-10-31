@@ -86,6 +86,40 @@ describe('importing a Jiji list', () => {
   });
 });
 
+describe('lists by market', () => {
+  test("a list is one market's: its numbers read as that country's, the pipeline filters by it, and a seller can be moved", async () => {
+    const accra = testMobile('GH');
+    const ghLocal = `0${accra.slice(4)}`;
+    // A Ghanaian number read as Nigeria's is not a mobile there.
+    const asNigeria = await support.post('/v1/admin/marketing/prospects/import', { rows: [{ name: 'Accra Phones', phone: ghLocal }] });
+    assert.deepEqual([asNigeria.json.country, asNigeria.json.created, asNigeria.json.skipped], ['NG', 0, [{ row: 0, reason: 'phone_invalid' }]]);
+    const asGhana = await support.post('/v1/admin/marketing/prospects/import', { rows: [{ name: 'Accra Phones', phone: ghLocal, category: 'Mobile Phones' }], country: 'gh' });
+    assert.equal(asGhana.status, 200, JSON.stringify(asGhana.json));
+    assert.deepEqual([asGhana.json.country, asGhana.json.created], ['GH', 1]);
+    const seller = await prisma.marketingProspect.findFirstOrThrow({ where: { phones: { has: accra } } });
+    assert.equal(seller.country, 'GH');
+
+    assert.equal((await support.post('/v1/admin/marketing/prospects/import', { rows: [{ name: 'X', phone: ghLocal }], country: 'ZZ' })).json.error.code, 'market_unavailable');
+    assert.equal((await support.post('/v1/admin/marketing/prospects', { name: 'Nowhere', email: unique(), country: 'ZZ' })).json.error.param, 'country');
+
+    const ghana = await support.get('/v1/admin/marketing/prospects?country=GH');
+    assert.ok(ghana.json.data.length >= 1);
+    assert.ok(ghana.json.data.every(item => item.country === 'GH'));
+    assert.ok(!(await support.get('/v1/admin/marketing/prospects?country=NG')).json.data.some(item => item.id === seller.id));
+    // Searching a Ghanaian number in Ghana's list finds them.
+    assert.ok((await support.get(`/v1/admin/marketing/prospects?country=GH&q=${ghLocal}`)).json.data.some(item => item.id === seller.id));
+    const summary = await support.get('/v1/admin/marketing/summary');
+    assert.ok(summary.json.countries.some(item => item.country === 'GH' && item.total >= 1));
+
+    // Filed under the wrong market: moved, and numbers sent with it are read as the new country's.
+    const nairobi = testMobile('KE');
+    const moved = await support.patch(`/v1/admin/marketing/prospects/${seller.id}`, { country: 'KE', phones: [`0${nairobi.slice(4)}`] });
+    assert.equal(moved.status, 200, JSON.stringify(moved.json));
+    assert.deepEqual([moved.json.country, moved.json.phones], ['KE', [nairobi]]);
+    assert.ok(moved.json.activities.some(item => item.body === 'Market changed from GH to KE.'));
+  });
+});
+
 describe('working a seller', () => {
   test('the pipeline lists, filters and counts; logging contact, stages, follow-ups, next actions and feedback are kept', async () => {
     const phone = testMobile('NG');

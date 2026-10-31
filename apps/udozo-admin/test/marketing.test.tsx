@@ -68,7 +68,9 @@ const summary = {
   due: { overdue: 0, today: 0 },
   unassigned: 1,
   owners: [{ id: "a1", name: "Lizzy Okafor" }, { id: "a2", name: "Stanley Eze" }],
+  countries: [{ country: "NG", total: 1 }],
 };
+const markets = { object: "list", data: [{ code: "NG", name: "Nigeria" }, { code: "GH", name: "Ghana" }, { code: "KE", name: "Kenya" }] };
 let sent: Array<{ method: string; path: string; body: unknown }>;
 
 beforeAll(() => {
@@ -94,7 +96,11 @@ beforeEach(() => {
     if (url.pathname === "/v1/admin/auth/session") return ok({ object: "admin_session", admin: { id: "a1", name: "Lizzy Okafor", email: "lizzy@udozo.com", roles: ["support"] }, step_up_until: null });
     if (url.pathname === "/v1/admin/notifications/unread-count") return ok({ object: "unread_count", count: 0 });
     if (url.pathname === "/v1/admin/marketing/summary") return ok(summary);
-    if (url.pathname === "/v1/admin/marketing/prospects/import") return ok({ object: "marketing_import", rows: (body as { rows: unknown[] }).rows.length, created: 2, merged: 0, skipped: [{ row: 3, reason: "no_contact" }] });
+    if (url.pathname === "/v1/admin/countries") return ok(markets);
+    if (url.pathname === "/v1/admin/marketing/prospects/import") {
+      const { rows, country } = body as { rows: unknown[]; country: string };
+      return ok({ object: "marketing_import", rows: rows.length, country, created: 2, merged: 0, skipped: [{ row: 3, reason: country === "GH" ? "phone_invalid" : "no_contact" }] });
+    }
     if (url.pathname === "/v1/admin/marketing/prospects") return ok({ object: "list", data: [prospect], total: 1, has_more: false });
     if (url.pathname === "/v1/admin/marketing/invites") return ok({ ...prospect, id: "p2", email: (body as { email: string }).email, account: null, activities: [], email_sent: "resend" });
     if (url.pathname.startsWith("/v1/admin/marketing/prospects/p1")) return ok({ ...prospect, account: null, activities: [{ object: "marketing_activity", id: "x1", kind: "imported", channel: null, template: null, body: "Imported from a Jiji list with 1 advert.", replied: null, outcome: null, stage: null, status: null, actor: null, created_at: "2026-10-31T00:00:00.000Z" }] });
@@ -154,6 +160,10 @@ describe("Marketplace > Marketing", () => {
     expect(await screen.findByText("The funnel", {}, slow)).toBeTruthy();
     fireEvent.click(rows[0]!);
     expect(push).toHaveBeenCalledWith("/classifieds/marketing/p1");
+    // One country's sellers at a time.
+    await screen.findByRole("option", { name: /Ghana/ }, slow);
+    fireEvent.change(screen.getByLabelText("Country"), { target: { value: "GH" } });
+    await waitFor(() => expect(sent.some(item => item.path.startsWith("/v1/admin/marketing/prospects?") && item.path.includes("country=GH"))).toBe(true), slow);
   });
 
   test("a list is imported in batches with its source and owner", async () => {
@@ -164,9 +174,21 @@ describe("Marketplace > Marketing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import 4 rows" }));
     expect(await screen.findByText(/2 sellers added, 0 already here updated, 1 rows skipped/, {}, slow)).toBeTruthy();
     const call = sent.find(item => item.path === "/v1/admin/marketing/prospects/import")!;
-    expect(call.body).toMatchObject({ source: "Jiji", owner_id: "a2" });
+    expect(call.body).toMatchObject({ source: "Jiji", owner_id: "a2", country: "NG" });
     expect((call.body as { rows: unknown[] }).rows).toHaveLength(4);
     expect(screen.getByText(/Row 5: no phone or email/)).toBeTruthy();
+  });
+
+  test("a list is filed under the country the admin chooses, its numbers read as that country's", async () => {
+    show(<ImportPage />);
+    fireEvent.change(await screen.findByLabelText("Or paste it", {}, slow), { target: { value: jiji } });
+    await screen.findByRole("option", { name: /Ghana/ }, slow);
+    expect((screen.getByLabelText("Country of the list") as HTMLSelectElement).value).toBe("NG");
+    fireEvent.change(screen.getByLabelText("Country of the list"), { target: { value: "GH" } });
+    fireEvent.click(screen.getByRole("button", { name: "Import 4 rows" }));
+    expect(await screen.findByText(/Row 5: no mobile number of Ghana we could read/, {}, slow)).toBeTruthy();
+    expect(sent.find(item => item.path === "/v1/admin/marketing/prospects/import")!.body).toMatchObject({ country: "GH" });
+    expect(screen.getByRole("link", { name: "Open the pipeline" }).getAttribute("href")).toBe("/classifieds/marketing?country=GH");
   });
 
   test("anyone can be invited by email, then opened in the pipeline", async () => {
@@ -174,7 +196,7 @@ describe("Marketplace > Marketing", () => {
     fireEvent.change(await screen.findByLabelText("Email", {}, slow), { target: { value: "chioma@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Send the invitation" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/classifieds/marketing/p2"), slow);
-    expect(sent.find(item => item.path === "/v1/admin/marketing/invites")!.body).toMatchObject({ email: "chioma@example.com" });
+    expect(sent.find(item => item.path === "/v1/admin/marketing/invites")!.body).toMatchObject({ email: "chioma@example.com", country: "NG" });
   });
 
   test("a seller's page offers WhatsApp with the message, their invite link and the timeline, and logs what was sent", async () => {
@@ -188,5 +210,10 @@ describe("Marketplace > Marketing", () => {
     expect(open.mock.calls[0]![0]).toMatch(/^https:\/\/wa\.me\/2349032391587\?text=Hello%20Alpha/);
     await waitFor(() => expect(sent.some(item => item.path === "/v1/admin/marketing/prospects/p1/activities")).toBe(true), slow);
     expect(sent.find(item => item.path === "/v1/admin/marketing/prospects/p1/activities")!.body).toMatchObject({ kind: "message", channel: "whatsapp", template: "reach_out" });
+    // The number with its country's dialling code, and the seller can be moved to another market.
+    expect(screen.getByText("+234 903 239 1587")).toBeTruthy();
+    await screen.findByRole("option", { name: /Kenya/ }, slow);
+    fireEvent.change(screen.getByLabelText("Country"), { target: { value: "KE" } });
+    await waitFor(() => expect(sent.find(item => item.method === "PATCH" && item.path === "/v1/admin/marketing/prospects/p1")?.body).toEqual({ country: "KE" }), slow);
   });
 });

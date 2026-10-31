@@ -35,6 +35,9 @@ class ListDto {
   @IsOptional() @IsString() @Length(1, 80)
   category?: string;
 
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
+
   @IsOptional() @Transform(trim) @IsString() @Length(1, 100)
   q?: string;
 
@@ -140,6 +143,9 @@ class UpdateDto {
 
   @IsOptional() @IsBoolean()
   do_not_contact?: boolean;
+
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
 }
 
 class LogDto {
@@ -227,6 +233,9 @@ class InviteAnyoneDto {
 
   @IsOptional() @IsUUID()
   owner_id?: string;
+
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
 }
 
 /** Marketplace > Marketing in Udozo's admin: every admin role works it (no `@AdminRoles`). */

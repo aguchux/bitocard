@@ -7,13 +7,15 @@ import { AppLink } from "@bitocard/admin-ui/shell";
 import { useImportMarketingProspectsMutation, useMarketingSummaryQuery } from "@bitocard/api-client/admin";
 import { UdozoShell } from "@/components/shell";
 import { batches, guessMapping, type ImportField, importFields, parseCsv, rowsFor, sellersIn } from "@/components/marketing/csv";
+import { MarketSelect, useMarketName } from "@/components/marketing/market";
 
-const skipReasons: Record<string, string> = { no_contact: "no phone or email", phone_invalid: "no Nigerian mobile number we could read", email_invalid: "an email we could not read" };
+const skipReasons = (market: string): Record<string, string> => ({ no_contact: "no phone or email", phone_invalid: `no mobile number of ${market} we could read`, email_invalid: "an email we could not read" });
 
 /**
  * Marketing > Import a list: a CSV of sellers (a Jiji export: advert link, title, price, category, location, seller
  * name, notes, phone), its columns matched to Marketing's fields, sent in batches. Rows with the same phone become one
- * seller with all their adverts; sellers already here get the new adverts.
+ * seller with all their adverts; sellers already here get the new adverts. A list is one market's (Nigeria unless the
+ * admin chooses another), so its numbers are read with that country's dialling code.
  */
 export default function MarketingImportPage() {
   const id = useId();
@@ -22,8 +24,10 @@ export default function MarketingImportPage() {
   const [mapping, setMapping] = useState<Record<ImportField, number | null> | null>(null);
   const [source, setSource] = useState("Jiji");
   const [owner, setOwner] = useState("");
+  const [country, setCountry] = useState("NG");
+  const marketName = useMarketName(country);
   const [progress, setProgress] = useState<{ done: number; of: number } | null>(null);
-  const [result, setResult] = useState<{ created: number; merged: number; skipped: Array<{ row: number; reason: string }> } | null>(null);
+  const [result, setResult] = useState<{ country: string; created: number; merged: number; skipped: Array<{ row: number; reason: string }> } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const summary = useMarketingSummaryQuery();
   const [importRows] = useImportMarketingProspectsMutation();
@@ -52,12 +56,12 @@ export default function MarketingImportPage() {
     try {
       for (const [index, part] of parts.entries()) {
         setProgress({ done: index, of: parts.length });
-        const reply = await importRows({ rows: part, source: source.trim() || "Jiji", owner_id: owner || undefined }).unwrap();
+        const reply = await importRows({ rows: part, source: source.trim() || "Jiji", owner_id: owner || undefined, country }).unwrap();
         total.created += reply.created;
         total.merged += reply.merged;
         total.skipped.push(...reply.skipped.map(item => ({ row: index * 100 + item.row + 2, reason: item.reason })));
       }
-      setResult(total);
+      setResult({ ...total, country });
     } catch (problem) {
       setError(`${errorMessage(problem)} ${total.created || total.merged ? `${formatNumber(total.created)} added and ${formatNumber(total.merged)} updated before it stopped; importing again only adds what is missing.` : ""}`);
     } finally {
@@ -143,6 +147,9 @@ export default function MarketingImportPage() {
         <Card>
           <CardHeader title="3. Import" />
           <div className="grid gap-4 p-5 sm:px-6">
+            <Field label="Country of the list" htmlFor={`${id}-country`} hint={`Numbers are read as ${marketName}'s, so WhatsApp and calls get its dialling code. Rows with numbers of another country are skipped.`}>
+              <MarketSelect id={`${id}-country`} value={country} onChange={value => (setCountry(value), setResult(null))} disabled={Boolean(progress)} />
+            </Field>
             <Field label="Where the list is from" htmlFor={`${id}-source`}>
               <Input id={`${id}-source`} value={source} maxLength={60} onChange={event => setSource(event.target.value)} />
             </Field>
@@ -161,7 +168,7 @@ export default function MarketingImportPage() {
               <Notice tone="green" title="Imported">
                 {formatNumber(result.created)} sellers added, {formatNumber(result.merged)} already here updated
                 {result.skipped.length ? `, ${formatNumber(result.skipped.length)} rows skipped` : ""}.{" "}
-                <AppLink href="/classifieds/marketing" className="font-semibold text-brand-600 hover:underline">
+                <AppLink href={`/classifieds/marketing?country=${result.country}`} className="font-semibold text-brand-600 hover:underline">
                   Open the pipeline
                 </AppLink>
               </Notice>
@@ -170,7 +177,7 @@ export default function MarketingImportPage() {
               <ul className="max-h-40 overflow-y-auto text-xs text-muted">
                 {result.skipped.slice(0, 50).map(item => (
                   <li key={item.row}>
-                    Row {item.row}: {skipReasons[item.reason] ?? item.reason}
+                    Row {item.row}: {skipReasons(marketName)[item.reason] ?? item.reason}
                   </li>
                 ))}
               </ul>

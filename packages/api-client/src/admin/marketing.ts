@@ -90,6 +90,8 @@ export type MarketingSummary = {
   due: { overdue: number; today: number };
   unassigned: number;
   owners: Array<{ id: string; name: string }>;
+  /** Sellers per market, most first. */
+  countries: Array<{ country: string; total: number }>;
 };
 
 export type MarketingFilters = Partial<{
@@ -100,6 +102,7 @@ export type MarketingFilters = Partial<{
   outcome: MarketingOutcome | 'none';
   linked: 'yes' | 'no';
   category: string;
+  country: string;
   q: string;
   limit: number;
   offset: number;
@@ -107,7 +110,7 @@ export type MarketingFilters = Partial<{
 
 /** One row of a list as the import maps it. */
 export type MarketingImportRow = Partial<Record<'name' | 'store_name' | 'phone' | 'email' | 'category' | 'location' | 'advert_url' | 'title' | 'price' | 'notes', string>>;
-export type MarketingImportResult = { object: 'marketing_import'; rows: number; created: number; merged: number; skipped: Array<{ row: number; reason: string }> };
+export type MarketingImportResult = { object: 'marketing_import'; rows: number; country: string; created: number; merged: number; skipped: Array<{ row: number; reason: string }> };
 
 export type MarketingPatch = Partial<{
   name: string;
@@ -122,6 +125,8 @@ export type MarketingPatch = Partial<{
   next_action_at: string | null;
   outcome: MarketingOutcome | null;
   do_not_contact: boolean;
+  /** Moves the seller to another market; numbers sent with it are read as that country's. */
+  country: string;
 }>;
 
 export type MarketingEmailSent = 'outbox' | 'resend' | 'mailersend' | string;
@@ -138,11 +143,12 @@ export const marketingApi = bitocardApi.injectEndpoints({
     marketingSummary: build.query<MarketingSummary, void>({ query: () => '/v1/admin/marketing/summary', providesTags: ['Marketing'] }),
     marketingProspects: build.query<{ object: 'list'; data: MarketingProspect[]; total: number; has_more: boolean }, MarketingFilters>({ query, providesTags: ['Marketing'] }),
     marketingProspect: build.query<MarketingProspectDetail, string>({ query: id => `/v1/admin/marketing/prospects/${id}`, providesTags: (_result, _error, id) => [{ type: 'Marketing', id }] }),
-    createMarketingProspect: build.mutation<MarketingProspectDetail, { name: string; store_name?: string; phones?: string[]; email?: string; location?: string; categories?: string[]; source?: string; notes?: string; owner_id?: string }>({
+    createMarketingProspect: build.mutation<MarketingProspectDetail, { name: string; store_name?: string; phones?: string[]; email?: string; location?: string; categories?: string[]; source?: string; notes?: string; owner_id?: string; country?: string }>({
       query: body => ({ url: '/v1/admin/marketing/prospects', method: 'POST', body }),
       invalidatesTags: ['Marketing'],
     }),
-    importMarketingProspects: build.mutation<MarketingImportResult, { rows: MarketingImportRow[]; owner_id?: string; source?: string }>({
+    /** One market's list (`country`, Nigeria by default): its numbers are read as that country's. */
+    importMarketingProspects: build.mutation<MarketingImportResult, { rows: MarketingImportRow[]; owner_id?: string; source?: string; country?: string }>({
       query: body => ({ url: '/v1/admin/marketing/prospects/import', method: 'POST', body }),
       invalidatesTags: ['Marketing'],
     }),
@@ -177,7 +183,7 @@ export const marketingApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Marketing'],
     }),
     /** Invites anyone by email to sign up and sell on Udozo; they are added to Marketing to track. */
-    inviteByEmail: build.mutation<MarketingProspectDetail & { email_sent: MarketingEmailSent }, { email: string; name?: string; message?: string; owner_id?: string }>({
+    inviteByEmail: build.mutation<MarketingProspectDetail & { email_sent: MarketingEmailSent }, { email: string; name?: string; message?: string; owner_id?: string; country?: string }>({
       query: body => ({ url: '/v1/admin/marketing/invites', method: 'POST', body }),
       invalidatesTags: ['Marketing'],
     }),

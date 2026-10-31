@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { AuditService } from '../audit/audit.service.js';
 import { normalisePhone } from '../auth/auth.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -13,7 +14,9 @@ import { marketingInviteEmail } from '../notifications/templates.js';
  * Udozo's marketing (Marketplace > Marketing, any admin role): sellers found on other marketplaces (a list from Jiji,
  * grouped by phone into one seller with every advert), or anyone invited by email, worked one stage at a time. Each
  * has an invite link, udozo.com/i/<code>, which records the click and carries the code to sign-up; the account it
- * makes (or one using their phone or email) is linked here, so every invitation's sign-up is tracked.
+ * makes (or one using their phone or email) is linked here, so every invitation's sign-up is tracked. Every seller is
+ * in one of Udozo's markets (`country`, Nigeria unless the list or the admin says otherwise): their numbers are read as
+ * that country's, so WhatsApp and calls carry its dialling code, and the pipeline filters by it.
  */
 
 export const stages = ['reach_out', 'invitation', 'onboarding', 'follow_up', 'feedback'] as const;
@@ -61,8 +64,8 @@ export function phonesOf(raw: string | null | undefined, country = 'NG') {
   return found;
 }
 
-/** The national form people dial ("0803 123 4567" style, without spaces). */
-const localPhone = (phone: string) => (phone.startsWith('+234') ? `0${phone.slice(4)}` : phone);
+/** The national form people dial in the number's own country ("08031234567", "0241234567"), without spaces. */
+const localPhone = (phone: string) => parsePhoneNumberFromString(phone)?.formatNational().replace(/\s/g, '') ?? phone;
 
 /** What a Jiji note says about the seller (badges, years), without the item's own condition after the bar. */
 const sellerNotes = (notes: string | null | undefined) => clean(notes?.split('|')[0]?.replace(/;\s*$/, ''), 300);
@@ -102,6 +105,7 @@ export type ProspectPatch = Partial<{
   next_action_at: string | null;
   outcome: Outcome | null;
   do_not_contact: boolean;
+  country: string;
 }>;
 
 @Injectable()
@@ -262,8 +266,9 @@ export class MarketingService {
 
   // -- Reading ---------------------------------------------------------------------------------------------------------
 
-  async list(adminId: string | null, filters: { stage?: string; status?: string; owner?: string; q?: string; due?: string; outcome?: string; linked?: string; category?: string; limit?: number; offset?: number }) {
+  async list(adminId: string | null, filters: { stage?: string; status?: string; owner?: string; q?: string; due?: string; outcome?: string; linked?: string; category?: string; country?: string; limit?: number; offset?: number }) {
     const and: Prisma.MarketingProspectWhereInput[] = [];
+    if (filters.country) and.push({ country: filters.country });
     if (filters.stage) and.push({ stage: filters.stage });
     if (filters.status) and.push({ stageStatus: filters.status });
     if (filters.outcome) and.push(filters.outcome === 'none' ? { outcome: null } : { outcome: filters.outcome });
@@ -278,7 +283,7 @@ export class MarketingService {
     else if (filters.due === 'none') and.push({ nextActionAt: null });
     const words = filters.q?.trim();
     if (words) {
-      const phones = /\d{7,}/.test(words.replace(/\D/g, '')) ? phonesOf(words) : [];
+      const phones = /\d{7,}/.test(words.replace(/\D/g, '')) ? phonesOf(words, filters.country ?? 'NG') : [];
       and.push({
         OR: [
           { name: { contains: words, mode: 'insensitive' } },
@@ -326,7 +331,7 @@ export class MarketingService {
     await this.autoLink(recent);
     const now = new Date();
     const count = (where: Prisma.MarketingProspectWhereInput) => this.prisma.marketingProspect.count({ where });
-    const [total, reached, invited, clicked, signedUp, posted, feedback, grouped, overdue, today, unassigned, owners] = await Promise.all([
+    const [total, reached, invited, clicked, signedUp, posted, feedback, grouped, overdue, today, unassigned, owners, byCountry] = await Promise.all([
       count({}),
       count({ lastContactAt: { not: null } }),
       count({ invitedAt: { not: null } }),
@@ -339,6 +344,7 @@ export class MarketingService {
       count({ nextActionAt: { gte: now, lte: endOfTodayLagos(now) } }),
       count({ ownerId: null }),
       this.prisma.user.findMany({ where: { realm: 'admin', status: 'active' }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.marketingProspect.groupBy({ by: ['country'], _count: { _all: true } }),
     ]);
     return {
       object: 'marketing_summary' as const,
@@ -352,6 +358,7 @@ export class MarketingService {
       due: { overdue, today },
       unassigned,
       owners,
+      countries: byCountry.map(row => ({ country: row.country, total: row._count._all })).sort((a, b) => b.total - a.total),
     };
   }
 
@@ -393,6 +400,14 @@ export class MarketingService {
     return or.length ? this.prisma.marketingProspect.findFirst({ where: { OR: or }, orderBy: { createdAt: 'asc' } }) : Promise.resolve(null);
   }
 
+  /** One of Udozo's markets (Nigeria when none is given). */
+  private async market(code: string | null | undefined) {
+    const country = (code ?? 'NG').toUpperCase();
+    const found = await this.prisma.country.findUnique({ where: { code: country }, select: { code: true } });
+    if (!found) throw invalid('market_unavailable', 'Choose one of Udozo’s markets.', 'country');
+    return found.code;
+  }
+
   private async assertOwner(ownerId: string | null | undefined) {
     if (!ownerId) return;
     const owner = await this.prisma.user.findFirst({ where: { id: ownerId, realm: 'admin' }, select: { id: true } });
@@ -408,7 +423,7 @@ export class MarketingService {
   }
 
   async create(actorId: string | null, input: { name: string; store_name?: string; phones?: string[]; email?: string; location?: string; categories?: string[]; source?: string; notes?: string; owner_id?: string; country?: string }) {
-    const country = input.country ?? 'NG';
+    const country = await this.market(input.country);
     const phones = (input.phones ?? []).flatMap(phone => phonesOf(phone, country));
     if ((input.phones ?? []).some(phone => phone.trim()) && !phones.length) throw invalid('phone_invalid', 'Enter a valid mobile number of the market.', 'phones');
     const email = clean(input.email?.toLowerCase(), 254);
@@ -439,10 +454,11 @@ export class MarketingService {
   /**
    * A list's rows (a Jiji export, mapped by the admin app), grouped by phone (else email) into one seller each with
    * every advert and category. A seller already here (any of the numbers, or the email) gets the new adverts instead
-   * of a second entry. Rows with no number or email that can be read are skipped, saying why.
+   * of a second entry. Rows with no number or email that can be read are skipped, saying why. The whole list is one
+   * market's (`country`, the admin's choice, Nigeria by default): its numbers are read as that country's.
    */
   async import(actorId: string | null, input: { rows: ImportRow[]; owner_id?: string; source?: string; country?: string }) {
-    const country = input.country ?? 'NG';
+    const country = await this.market(input.country);
     await this.assertOwner(input.owner_id);
     const groups = new Map<string, { phones: string[]; email: string | null; rows: ImportRow[] }>();
     const skipped: Array<{ row: number; reason: string }> = [];
@@ -517,8 +533,8 @@ export class MarketingService {
       );
       created += 1;
     }
-    await this.audit.record({ actorId, action: 'marketing.imported', targetType: 'marketing_import', targetId: actorId ?? 'admin', after: { rows: input.rows.length, created, merged, skipped: skipped.length, source } });
-    return { object: 'marketing_import' as const, rows: input.rows.length, created, merged, skipped };
+    await this.audit.record({ actorId, action: 'marketing.imported', targetType: 'marketing_import', targetId: actorId ?? 'admin', after: { rows: input.rows.length, created, merged, skipped: skipped.length, source, country } });
+    return { object: 'marketing_import' as const, rows: input.rows.length, country, created, merged, skipped };
   }
 
   // -- Working a seller ------------------------------------------------------------------------------------------------
@@ -526,6 +542,9 @@ export class MarketingService {
   async update(actorId: string | null, id: string, input: ProspectPatch) {
     const row = await this.load(id);
     const data: Prisma.MarketingProspectUncheckedUpdateInput = {};
+    // A seller filed under the wrong market: numbers sent with the change are read as the new country's.
+    const country = input.country !== undefined ? await this.market(input.country) : row.country;
+    if (country !== row.country) data.country = country;
     if (input.name !== undefined) data.name = clean(input.name, 120) ?? row.name;
     if (input.store_name !== undefined) data.storeName = clean(input.store_name, 120);
     if (input.location !== undefined) data.location = clean(input.location, 120);
@@ -533,7 +552,7 @@ export class MarketingService {
     if (input.categories !== undefined) data.categories = [...new Set(input.categories.map(item => clean(item, 80)).filter((item): item is string => Boolean(item)))].slice(0, 20);
     let phones = row.phones;
     if (input.phones !== undefined) {
-      phones = input.phones.flatMap(phone => phonesOf(phone, row.country));
+      phones = input.phones.flatMap(phone => phonesOf(phone, country));
       if (input.phones.some(phone => phone.trim()) && phones.length < input.phones.filter(phone => phone.trim()).length) throw invalid('phone_invalid', 'Enter valid mobile numbers of the market.', 'phones');
       data.phones = phones;
     }
@@ -568,6 +587,7 @@ export class MarketingService {
         await this.note(id, actorId, { kind: 'note', body: input.do_not_contact ? 'Asked not to be contacted again.' : 'May be contacted again.' }, tx);
       }
       if (input.outcome !== undefined && input.outcome !== row.outcome) await this.note(id, actorId, { kind: 'outcome', outcome: input.outcome }, tx);
+      if (country !== row.country) await this.note(id, actorId, { kind: 'note', body: `Market changed from ${row.country} to ${country}.` }, tx);
     });
     if (input.do_not_contact !== undefined && input.do_not_contact !== row.doNotContact) {
       await this.audit.record({ actorId, action: 'marketing.do_not_contact', targetType: 'marketing_prospect', targetId: id, before: { do_not_contact: row.doNotContact }, after: { do_not_contact: input.do_not_contact } });
@@ -702,12 +722,13 @@ export class MarketingService {
   }
 
   /** Invites anyone by email: the seller with that email, or a new one, gets their invitation. */
-  async inviteByEmail(actor: { id: string | null; name: string }, input: { email: string; name?: string; message?: string; owner_id?: string }) {
+  async inviteByEmail(actor: { id: string | null; name: string }, input: { email: string; name?: string; message?: string; owner_id?: string; country?: string }) {
     const email = clean(input.email.toLowerCase(), 254)!;
     let row = await this.prisma.marketingProspect.findFirst({ where: { email }, orderBy: { createdAt: 'asc' } });
     if (!row) {
+      const country = await this.market(input.country);
       await this.assertOwner(input.owner_id);
-      row = await this.insert(actor.id, { name: clean(input.name, 120) ?? email.split('@')[0]!, email, source: 'Email invite', ownerId: input.owner_id ?? actor.id }, 'Added to invite by email.');
+      row = await this.insert(actor.id, { name: clean(input.name, 120) ?? email.split('@')[0]!, email, country, source: 'Email invite', ownerId: input.owner_id ?? actor.id }, 'Added to invite by email.');
     }
     return this.emailInvite(actor, row.id, { message: input.message });
   }
