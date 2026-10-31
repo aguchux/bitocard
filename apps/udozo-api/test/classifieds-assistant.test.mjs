@@ -6,7 +6,7 @@
 // suggestions are checked before they are shown; the eval set scores cases; old threads are deleted.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, fakeService, lastEmailCode, resellerClient, startApp, testMobile } from './helpers.mjs';
 import { fakeAi } from './fakes.mjs';
 
 const { sanitiseAnswer, quoted } = await import('../dist/classifieds/assistant/sanitise.js');
@@ -110,7 +110,8 @@ const parseEvents = text =>
 async function customer(name) {
   const shopper = shopServer();
   const email = `assistant${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
+  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.

@@ -156,8 +156,8 @@ export function CountryField({ markets, defaultValue, state, onChange }: { marke
 }
 
 /**
- * Sign-up on udozo.com: name, email, the country (from Udozo's markets, fixed for good) and a password. The mobile
- * number is optional, locked to the chosen country, and kept unconfirmed until the customer confirms it in Profile.
+ * Sign-up on udozo.com: name, email, the country (from Udozo's markets, fixed for good), the mobile number (locked to
+ * that country) and a password. The number is texted a code at once, entered after the emailed one on /verify.
  */
 export function SignUpForm({ next, markets, market = null }: { next: string; markets: Market[]; market?: string | null }) {
   const [state, action, pending] = useActionState(signUp, empty);
@@ -175,12 +175,13 @@ export function SignUpForm({ next, markets, market = null }: { next: string; mar
             key={country}
             country={country}
             name="phone"
-            label="Mobile number (optional)"
+            label="Mobile number"
+            required
             className="space-y-1.5"
             inputClassName="min-h-12 border border-navy-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 aria-[invalid=true]:border-brand-700"
             errorClassName="text-brand-700"
           />
-          <p className="text-xs text-navy-500">Confirm it later from your account if you add it.</p>
+          <p className="text-xs text-navy-500">We text it a 6-digit code to confirm it.</p>
         </>
       ) : null}
       <TextField label="Password" name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={128} state={state} hint={passwordHint} />

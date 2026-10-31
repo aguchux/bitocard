@@ -85,6 +85,11 @@ export class CustomersService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
+  /** Which product this instance serves (Udozo's customers confirm their mobile number at sign-up). */
+  get product() {
+    return this.config.APP_PRODUCT;
+  }
+
   /** The customer signed in with this token, or null (ended, expired or suspended). */
   async resolve(token: string): Promise<{ customer: CustomerWithStore; sessionId: string; mfaVerifiedAt: Date | null; mfaReconfirmedAt: Date | null } | null> {
     const session = await this.prisma.customerSession.findUnique({ where: { tokenHash: sha256(token) }, include: { customer: { include: { store: { include: { reseller: { select: { house: true } } } }, market: true } } } });
@@ -161,13 +166,16 @@ export class CustomersService {
 
   /**
    * `phone`, when sent, is validated and normalised exactly as `addPhone` does (a mobile number from the account's own
-   * country, in E.164), but stored unverified: no code is sent at sign-up, so the customer confirms it later from
-   * their account, as any other number they add.
+   * country, in E.164), and stored unverified. On BitoCard no code is sent at sign-up: the customer confirms it later
+   * from their account. On Udozo it is required, and texted a code at once through the country's SMS provider (where it
+   * has one), which the customer enters after the emailed one before using the account (`phonePendingFor`).
    */
   async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
+    const udozo = this.config.APP_PRODUCT === 'udozo' && store.platform !== 'afrippa';
+    if (udozo && !input.phone) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your mobile number.', 'phone');
     const phone = input.phone ? normalisePhone(input.phone, country) : null;
     let customer: Customer;
     try {
@@ -182,6 +190,8 @@ export class CustomersService {
       throw error;
     }
     await this.sendCode(customer, store, 'email_verification').catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not send the confirmation code'));
+    // A delivery problem (or a country that cannot text yet) must not lose the account: the code can be asked for again.
+    if (udozo && phone) await this.addPhone({ ...customer, store }, phone).catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not text the sign-up code'));
     return { customer: await this.present(customer), session: await this.startSession(customer.id) };
   }
 

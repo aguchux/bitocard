@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let prisma;
@@ -55,7 +55,8 @@ let counter = 0;
 async function customer(name) {
   const shopper = storeServer();
   const email = `resale${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
+  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, shopper);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;

@@ -2,7 +2,7 @@
 // moderators only once reported), price offers, Show phone with its hourly limit, leads, notices and unread emails.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, fakeService, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, fakeService, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let prisma;
@@ -72,7 +72,8 @@ let counter = 0;
 async function customer(name = 'Kemi Adeyemi', { phone } = {}) {
   const shopper = storeServer();
   const email = `chat${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
+  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, shopper);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
@@ -298,6 +299,8 @@ describe('Show phone and leads', () => {
     assert.equal((await sellers[0].post(`/v1/classifieds/listings/${listings[0].id}/phone`)).json.error.param, 'listing_id');
     const noPhone = await customer('Lola Ige');
     const chatOnly = await live(noPhone, 'Haier 32 inch TV');
+    // Udozo's customers confirm a number at sign-up; one whose market cannot text (or an older account) has none.
+    await prisma.customer.update({ where: { id: noPhone.id }, data: { phone: null, phoneVerifiedAt: null } });
     assert.equal((await (await customer('Uche Eze')).post(`/v1/classifieds/listings/${chatOnly.id}/phone`)).json.error.code, 'phone_not_offered', 'no confirmed number, no phone');
     assert.equal((await storeServer().post(`/v1/classifieds/listings/${listings[0].id}/phone`)).status, 401, 'signed in only');
   });

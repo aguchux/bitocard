@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/footer";
 import { SiteHeader } from "@/components/header";
 import { accountCounts, marketOf } from "@/lib/account";
 import { markets } from "@/lib/api";
-import { currentCustomer } from "@/lib/customer";
+import { confirmationPending, currentCustomer } from "@/lib/customer";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const [customer, all] = await Promise.all([currentCustomer(), markets()]);
   const market = await marketOf(customer);
-  const counts = customer?.email_verified ? await accountCounts() : null;
+  const counts = customer && !confirmationPending(customer) ? await accountCounts() : null;
   return (
     <>
       <SiteHeader market={market ?? (all.showcase ? null : (all.data[0] ?? null))} customer={customer} showcase={all.showcase} />

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
+import { confirmationPending, type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
 export type FormState = { error?: string; field?: string | null; notice?: string };
@@ -14,8 +14,9 @@ const failed = (result: { message: string; param: string | null }): FormState =>
 
 /**
  * Creates a Udozo account on udozo.com (no store named: the API makes it udozo.com's, which works on every Udozo store).
- * The country is fixed for good: the wallet, payouts and the market the customer buys and sells in follow it. Then the
- * emailed code confirms the email.
+ * The country is fixed for good: the wallet, payouts and the market the customer buys and sells in follow it. The
+ * mobile number (of that country) is required and texted a code at once; then the emailed code and the texted one
+ * confirm both before the account is used.
  */
 export async function signUp(_state: FormState, form: FormData): Promise<FormState> {
   const country = text(form, "country");
@@ -25,7 +26,7 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
     email: text(form, "email"),
     password: String(form.get("password") ?? ""),
     country,
-    // Optional: the PhoneInput writes it in E.164 only once it is a valid number for the chosen country.
+    // The PhoneInput writes it in E.164 only once it is a valid number for the chosen country.
     phone: text(form, "phone") || undefined,
   });
   if (!result.ok) return failed(result);
@@ -39,7 +40,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
   const next = safeNext(form.get("next"));
-  redirect(result.data.customer.email_verified ? next : `/verify?next=${encodeURIComponent(next)}`);
+  redirect(confirmationPending(result.data.customer) ? `/verify?next=${encodeURIComponent(next)}` : next);
 }
 
 export async function signOut() {
@@ -49,11 +50,26 @@ export async function signOut() {
   redirect("/");
 }
 
-/** The 6-digit code emailed at sign-up, for accounts that have not confirmed their email yet. */
+/** The 6-digit code emailed at sign-up, for accounts that have not confirmed their email yet; then the mobile's, if still to do. */
 export async function verifyEmail(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<Customer>("POST", "/v1/store/account/email/verify", { code: text(form, "code") });
   if (!result.ok) return failed(result);
+  const next = safeNext(form.get("next"));
+  redirect(confirmationPending(result.data) ? `/verify?next=${encodeURIComponent(next)}` : next);
+}
+
+/** The 6-digit code texted to the mobile at sign-up (or to a number entered on the confirmation page). */
+export async function confirmMobile(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<Customer>("POST", "/v1/store/account/phone/verify", { code: text(form, "code") });
+  if (!result.ok) return failed(result);
+  revalidatePath("/", "layout");
   redirect(safeNext(form.get("next")));
+}
+
+/** Texts a new code: to the number on the account, or to another one typed in its place. */
+export async function textMobileCode(_state: FormState & { phone?: string }, form: FormData): Promise<FormState & { phone?: string }> {
+  const result = await customerApi<{ object: "notice"; phone: string }>("POST", "/v1/store/account/phone", { phone: text(form, "phone") });
+  return result.ok ? { notice: `We sent a new code to ${result.data.phone}.`, phone: result.data.phone } : failed(result);
 }
 
 export async function resendCode(): Promise<FormState> {

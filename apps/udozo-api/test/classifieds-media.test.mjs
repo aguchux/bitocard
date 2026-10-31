@@ -2,7 +2,7 @@
 // (re-encoded after the reply; here by a stand-in for ffmpeg), reordering, removing, and the job failing stuck videos.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, fakeService, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, fakeService, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let admin;
@@ -84,7 +84,8 @@ let counter = 0;
 async function seller() {
   const shopper = storeServer();
   const email = `media${(counter += 1)}-${Date.now()}@example.com`;
-  assert.equal((await shopper.post('/v1/store/account/signup', { name: 'Ada Bello', email, password: 'correct horse battery', country: 'NG' })).status, 201);
+  assert.equal((await shopper.post('/v1/store/account/signup', { name: 'Ada Bello', email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') })).status, 201);
+  await confirmMobile(server.app, shopper);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });

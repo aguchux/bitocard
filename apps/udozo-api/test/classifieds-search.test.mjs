@@ -3,7 +3,7 @@
 // page (live, or sold for 30 days, then gone), and suggestions as the buyer types.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let admin;
@@ -55,7 +55,8 @@ let counter = 0;
 async function customer(name) {
   const shopper = storeServer();
   const email = `search${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
+  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.
@@ -140,7 +141,8 @@ describe('search', () => {
     assert.equal(card.url, `https://udozo.com/ng/l/${made.ikeja.ref}-samsung-galaxy-a54-128-gb`);
     assert.deepEqual(card.price, { kind: 'fixed', amount: 28000000, currency: 'NGN' });
     assert.deepEqual([card.cover.url.endsWith('/0.jpg'), card.photo_count, card.area.name, card.area.state.name], [true, 4, 'Ikeja', 'Lagos']);
-    assert.deepEqual(card.seller, { name: 'Chinedu O.', badges: [] });
+    // Every Udozo seller confirmed their mobile at sign-up.
+    assert.deepEqual(card.seller, { name: 'Chinedu O.', badges: ['phone_confirmed'] });
     const amina = (await get('/v1/classifieds/listings?country=NG&q=tecno')).json.data[0];
     assert.deepEqual(amina.seller.badges, ['phone_confirmed']);
     assert.ok(!JSON.stringify(amina).includes('2348031234567'));

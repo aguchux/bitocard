@@ -1,7 +1,7 @@
 // BitoCard Shop, phase 1 step 2e: a buyer's saved listings: live, sold (for 30 days) or gone, with any price drop.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let prisma;
@@ -41,7 +41,8 @@ let counter = 0;
 async function customer() {
   const shopper = storeServer();
   const email = `fav${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name: 'Kemi Ade', email, password: 'correct horse battery', country: 'NG' });
+  const signup = await shopper.post('/v1/store/account/signup', { name: 'Kemi Ade', email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, shopper);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });

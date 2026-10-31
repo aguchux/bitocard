@@ -265,6 +265,26 @@ export async function lastSmsCode(app, to) {
   return message ? /\b(\d{6})\b/.exec(message.text)?.[1] ?? null : null;
 }
 
+// Udozo's customers give a mobile number at sign-up and confirm it before using the account.
+const mobilePrefixes = { NG: '+234803', GH: '+23324', KE: '+25471', ZA: '+2782', UG: '+25677', TZ: '+25575' };
+const mobileBase = Math.floor(Math.random() * 9_000_000);
+let mobileCounter = 0;
+
+/** A mobile number of the country, different every call (each store takes a number once). */
+export function testMobile(country = 'NG') {
+  const prefix = mobilePrefixes[country] ?? mobilePrefixes.NG;
+  return `${prefix}${String((mobileBase + (mobileCounter += 1)) % 10_000_000).padStart(7, '0')}`;
+}
+
+/** Confirms the mobile number a customer signed up with on Udozo, with the code texted at sign-up. */
+export async function confirmMobile(app, shopper) {
+  const me = await shopper.get('/v1/store/account');
+  if (me.status !== 200) throw new Error(`Could not read the account: ${JSON.stringify(me.json)}`);
+  if (!me.json.phone || me.json.phone_verified || !me.json.phone_verification_available) return;
+  const confirmed = await shopper.post('/v1/store/account/phone/verify', { code: await lastSmsCode(app, me.json.phone) });
+  if (confirmed.status !== 200) throw new Error(`Could not confirm the mobile number: ${JSON.stringify(confirmed.json)}`);
+}
+
 // Fixture endpoints for testing cross-cutting behaviour, declared without decorator syntax (plain JavaScript).
 class CreateThing {}
 IsString()(CreateThing.prototype, 'name');

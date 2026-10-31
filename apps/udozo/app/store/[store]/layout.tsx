@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { currentCustomer, safeNext, siteOrigin } from "@/lib/customer";
+import { confirmationPending, currentCustomer, safeNext, siteOrigin } from "@/lib/customer";
 import { signOut } from "@/lib/account-actions";
 import { requireStore, storeOrigin } from "@/lib/store";
 import { indexable, storePathHeader } from "@/lib/store-host";
@@ -47,9 +47,9 @@ export default async function StoreLayout({ children, params }: Props) {
           Test store: orders here are practice only, and no real money moves.
         </p>
       ) : null}
-      {customer && !customer.email_verified ? (
+      {customer && confirmationPending(customer) ? (
         <p role="status" className="bg-brand-50 px-4 py-1.5 text-center text-sm text-navy-900">
-          Confirm your email to buy.{" "}
+          {customer.email_verified ? "Confirm your mobile number to buy." : "Confirm your email to buy."}{" "}
           <a href={`${site}/verify`} className="font-semibold underline">
             Confirm it on Udozo
           </a>

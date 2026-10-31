@@ -21,7 +21,7 @@ const form = (values: Record<string, string>) => {
   for (const [key, value] of Object.entries(values)) data.set(key, value);
   return data;
 };
-const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", email_verified: true, phone: null, phone_verified: false, phone_verification_available: true, country: "NG", currency: "NGN", created_at: "2026-10-30T00:00:00Z" };
+const customer = { object: "customer", id: "c1", email: "ada@example.com", name: "Ada Obi", email_verified: true, phone: "+2348031234567", phone_verified: true, phone_verification_available: true, country: "NG", currency: "NGN", created_at: "2026-10-30T00:00:00Z" };
 const session = { customer, session: { token: "bcc_new" } };
 
 beforeEach(() => {
@@ -79,6 +79,24 @@ describe("signing in and out", () => {
     expect(request.cookies.get("udz_customer")).toBe("bcc_new");
     reply = () => Response.json({ ...session, customer: { ...customer, email_verified: false } });
     await expect(actions.signIn({}, form({ email: "ada@example.com", password: "pw", next: "//evil.com" }))).rejects.toThrow("redirect:/verify?next=%2F");
+    // The mobile texted at sign-up, still to confirm: to the code too.
+    reply = () => Response.json({ ...session, customer: { ...customer, phone_verified: false } });
+    await expect(actions.signIn({}, form({ email: "ada@example.com", password: "pw", next: "/account" }))).rejects.toThrow("redirect:/verify?next=%2Faccount");
+    // Where the country cannot text, nothing waits for it.
+    reply = () => Response.json({ ...session, customer: { ...customer, phone_verified: false, phone_verification_available: false } });
+    await expect(actions.signIn({}, form({ email: "ada@example.com", password: "pw", next: "/account" }))).rejects.toThrow("redirect:/account");
+  });
+
+  test("confirming the account: the emailed code, then the texted one, then on", async () => {
+    setRequest({ host: "udozo.com" }, { udz_customer: "bcc_s" });
+    reply = () => Response.json({ ...customer, phone_verified: false });
+    await expect(actions.verifyEmail({}, form({ code: "111111", next: "/sell" }))).rejects.toThrow("redirect:/verify?next=%2Fsell");
+    reply = () => Response.json(customer);
+    await expect(actions.confirmMobile({}, form({ code: "222222", next: "/sell" }))).rejects.toThrow("redirect:/sell");
+    reply = () => Response.json({ object: "notice", phone: "+2348039998877" });
+    expect(await actions.textMobileCode({}, form({ phone: "+2348039998877" }))).toEqual({ notice: "We sent a new code to +2348039998877.", phone: "+2348039998877" });
+    expect(calls.map(call => call.url.replace("https://api.test", ""))).toEqual(["/v1/store/account/email/verify", "/v1/store/account/phone/verify", "/v1/store/account/phone"]);
+    expect(calls[1]!.body).toEqual({ code: "222222" });
   });
 
   test("signing out ends the session at the API and drops the cookie", async () => {
@@ -120,6 +138,8 @@ describe("every account page", () => {
     await expect(requireCustomer("/account/wallet")).rejects.toThrow("redirect:/signin?next=%2Faccount%2Fwallet");
     setRequest({ host: "udozo.com" }, { udz_customer: "bcc_s" });
     reply = () => Response.json({ ...customer, email_verified: false });
+    await expect(requireCustomer("/account/wallet")).rejects.toThrow("redirect:/verify?next=%2Faccount%2Fwallet");
+    reply = () => Response.json({ ...customer, phone: null, phone_verified: false });
     await expect(requireCustomer("/account/wallet")).rejects.toThrow("redirect:/verify?next=%2Faccount%2Fwallet");
   });
 

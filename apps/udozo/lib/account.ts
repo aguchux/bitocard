@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import type { ShopAssistantProfile, ShopResaleAvailability, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
 import type { PlaceCounts } from "./account-places";
 import { apiUrl, markets } from "./api";
-import { type Customer, currentCustomer, customerApi, signInPath } from "./customer";
+import { confirmationPending, type Customer, currentCustomer, customerApi, signInPath } from "./customer";
 
 /** The badges for the account's places, or nothing to show while the API cannot be reached. */
 export async function accountCounts(): Promise<PlaceCounts> {
@@ -19,13 +19,13 @@ export async function marketOf(customer: Pick<Customer, "country"> | null) {
 }
 
 /**
- * The signed-in customer with a confirmed email, on every account page. Signed out, to sign in and back to `path`; an
- * unconfirmed email to its code first. Pages render alongside the layout, so each checks for itself.
+ * The signed-in customer with a confirmed email and mobile, on every account page. Signed out, to sign in and back to
+ * `path`; an unconfirmed email or mobile to its code first. Pages render alongside the layout, so each checks for itself.
  */
 export async function requireCustomer(path: string) {
   const customer = await currentCustomer();
   if (!customer) redirect(signInPath(path));
-  if (!customer.email_verified) redirect(`/verify?next=${encodeURIComponent(path)}`);
+  if (confirmationPending(customer)) redirect(`/verify?next=${encodeURIComponent(path)}`);
   return customer;
 }
 

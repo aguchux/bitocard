@@ -60,7 +60,7 @@ const terms: LegalDocument = {
       body: [
         {
           list: [
-            "You must be 18 or over. You need a confirmed email address.",
+            "You must be 18 or over. You need a confirmed email address, and a mobile number from your country, confirmed with a code we text you when you sign up (where we can text numbers in your country).",
             "One Udozo account works on udozo.com and on every reseller's store, with one wallet and one history of purchases. One person, one account: do not open accounts to get round a limit, a block or a suspension.",
             "Your country is fixed when you open your account. You buy and sell in your own country's market, in its currency. A reseller's store sells only to shoppers from its own country; others may look, but cannot buy there.",
             "Showing your phone number to buyers needs it confirmed with a code. Selling with Safe pay needs a passed identity check and a payout bank account in your verified name.",
@@ -372,7 +372,7 @@ const sellers: LegalDocument = {
       body: [
         {
           list: [
-            "You must be a business, or a person acting in the course of business, 18 or over, and based in a country where we accept sellers. Your country is fixed when you sign up, and you trade in its currency.",
+            "You must be a business, or a person acting in the course of business, 18 or over, and based in a country where we accept sellers. Your country is fixed when you sign up, and you trade in its currency. You give the owner's mobile number from that country, confirmed with a code we text it when you sign up (where we can text numbers there).",
             "Before your stores can take live orders, your business passes our business check on Udozo Verify (verify.udozo.com). If your business is unregistered, the owner's own identity check is the business check. If it is registered, you give us its registration certificate, proof of its address and a document naming its directors or owners. We may ask for more, refuse an account, or keep it in test mode.",
             "Everything you give us must be true, complete and yours to give. A false or borrowed document, or someone else's identity, ends your account, and we may report it.",
             "You may invite staff and give them roles. You are responsible for everything done in your account, by you, your team or anyone using your sign-in details or API keys. Keep them secret, and tell us at once if you think one has been misused.",
@@ -611,7 +611,7 @@ const privacy: LegalDocument = {
       body: [
         {
           list: [
-            "Your account: name, email address, country, password (only as a one-way hash), mobile number if you add one, when you signed in, failed sign-ins, and the codes we email or text you (only as hashes).",
+            "Your account: name, email address, country, password (only as a one-way hash), your mobile number (confirmed with a code we text you when you sign up, where we can text numbers in your country), when you signed in, failed sign-ins, and the codes we email or text you (only as hashes).",
             "Your listings: title, description, features, price and its changes, condition, category, the area you chose, photos and video, how you deliver, and how many people contacted you. Live listings are public, with your first name and the first letter of your last name and your badges. We remove the hidden details phones add to photos and videos, and keep a one-way fingerprint of each photo to spot photos copied from another listing.",
             "Chats: messages, photos (encrypted, in private storage, seen only by the two of you), offers, when each side read them, blocks, and how fast sellers reply. A moderator reads a chat only when one of you reports it, or when it matters to a Safe pay dispute, and each reading is recorded.",
             "Interest in listings: the listings you save, and that you asked to see a seller's phone number or started a chat.",

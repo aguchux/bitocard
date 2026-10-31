@@ -2,7 +2,7 @@
 // seller's photo, posting too fast), customers' reports, and the moderators' queue and decisions, audited.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let admin;
@@ -46,7 +46,8 @@ let counter = 0;
 async function customer() {
   const shopper = storeServer();
   const email = `moderation${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name: 'Tunde Bakare', email, password: 'correct horse battery', country: 'NG' });
+  const signup = await shopper.post('/v1/store/account/signup', { name: 'Tunde Bakare', email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.

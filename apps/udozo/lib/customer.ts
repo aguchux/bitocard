@@ -34,6 +34,13 @@ export type Customer = {
   created_at: string;
 };
 
+/**
+ * Still to confirm before using the account: the emailed code, then the mobile number texted at sign-up (where the
+ * country can text: Udozo's API refuses everything else until it is confirmed, `phone_not_verified`).
+ */
+export const confirmationPending = (customer: Pick<Customer, "email_verified" | "phone_verified" | "phone_verification_available">) =>
+  !customer.email_verified || (customer.phone_verification_available && !customer.phone_verified);
+
 export type CustomerResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
 
 /**

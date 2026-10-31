@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, fakeService, lastEmailCode, resellerClient, startApp, testMobile } from './helpers.mjs';
 import { responseChecker } from './openapi-docs.mjs';
 
 let server;
@@ -87,7 +87,8 @@ const phone = () => `+23480${String(50000000 + (counter += 1)).padStart(8, '0')}
 async function supplier(name) {
   const seller = shopper();
   const email = `rsup${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await seller.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
+  const signup = await seller.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
+  await confirmMobile(server.app, seller);
   assert.equal((await seller.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   await seller.post('/v1/classifieds/terms/accept', { version: (await seller.get('/v1/classifieds/terms')).json.version });
   seller.id = signup.json.customer.id;
@@ -128,11 +129,13 @@ async function shop(item, name = 'Gadget Hub') {
 async function buyer(store, { funds = 0, email, confirmedPhone = true, country = 'NG' } = {}) {
   const person = shopper(store.subdomain);
   const address = email ?? `rbuyer${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await person.post('/v1/store/account/signup', { name: 'Amaka Eze', email: address, password: 'correct horse battery', country });
+  const signup = await person.post('/v1/store/account/signup', { name: 'Amaka Eze', email: address, password: 'correct horse battery', country, phone: testMobile(country) });
+  await confirmMobile(server.app, person);
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await person.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, address) })).status, 200);
   person.id = signup.json.customer.id;
-  if (confirmedPhone) await prisma.customer.update({ where: { id: person.id }, data: { phone: phone(), phoneVerifiedAt: new Date() } });
+  // Without one (an older account): every signed-in route waits for it, buying included.
+  await prisma.customer.update({ where: { id: person.id }, data: confirmedPhone ? { phone: phone(), phoneVerifiedAt: new Date() } : { phone: null, phoneVerifiedAt: null } });
   if (funds) await fund(person, funds);
   return person;
 }
@@ -330,7 +333,8 @@ describe('who talks, who buys', () => {
     const body = { ref: item.ref, fulfilment: 'meet_up', expected_total: 30100000 };
 
     const noPhone = await buyer(reseller.store, { funds: 40000000, confirmedPhone: false });
-    assert.equal((await noPhone.post('/v1/store/resale/orders', body)).json.error.code, 'phone_required');
+    const unconfirmed = await noPhone.post('/v1/store/resale/orders', body);
+    assert.deepEqual([unconfirmed.status, unconfirmed.json.error.code], [403, 'phone_not_verified']);
     const poor = await buyer(reseller.store, { funds: 1000 });
     const low = await poor.post('/v1/store/resale/orders', body);
     assert.deepEqual([low.status, low.json.error.code], [402, 'wallet_balance_low']);

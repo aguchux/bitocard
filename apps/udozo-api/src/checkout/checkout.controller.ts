@@ -5,7 +5,7 @@ import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, I
 import { Public } from '../auth/caller.js';
 import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { AllowPhonePending, CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { HandoffService } from '../customers/handoff.service.js';
 import { StoreKey } from '../customers/store-key.js';
@@ -220,6 +220,8 @@ class HandoffExchangeDto {
  */
 @ApiExcludeController()
 @Public()
+// The account's own steps work before the mobile number is confirmed (Udozo), which is how it gets confirmed.
+@AllowPhonePending()
 @Controller('store/account')
 export class CustomerAccountController {
   constructor(

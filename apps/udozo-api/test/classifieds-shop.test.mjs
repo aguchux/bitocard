@@ -3,7 +3,7 @@
 // buyer already has with a listing.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let admin;
@@ -58,7 +58,8 @@ let counter = 0;
 async function customer(name, country = 'NG') {
   const shopper = storeServer();
   const email = `shopdir${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country });
+  const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country, phone: testMobile(country) });
+  await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   // The BitoCard Shop terms, accepted before posting or Safe pay.

@@ -2,7 +2,7 @@
 // its sign-in hands over to stores' sandbox addresses and their own domains. On BitoCard a reseller's store keeps its own.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { confirmMobile, lastEmailCode, resellerClient, startApp, testMobile } from './helpers.mjs';
 
 const houseStoreId = '00000000-0000-4000-8000-0000000000b2';
 let server;
@@ -43,7 +43,8 @@ function site(subdomain = null) {
 
 async function signUp(at, country = 'NG') {
   const email = `udz${(counter += 1)}-${Date.now()}@example.com`;
-  const made = await at.post('/v1/store/account/signup', { name: 'Amaka Eze', email, password: 'correct horse battery', country });
+  const made = await at.post('/v1/store/account/signup', { name: 'Amaka Eze', email, password: 'correct horse battery', country, phone: testMobile(country) });
+  await confirmMobile(server.app, at);
   assert.equal(made.status, 201, JSON.stringify(made.json));
   await at.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) });
   return { email, id: made.json.customer.id };
