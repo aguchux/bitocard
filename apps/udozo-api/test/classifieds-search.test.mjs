@@ -105,7 +105,7 @@ describe('search', () => {
 
   test('filters: category with its subcategories, price, condition and feature values', async () => {
     assert.equal((await get('/v1/classifieds/listings?country=NG&category=phones-tablets')).json.total, 5);
-    assert.equal((await get('/v1/classifieds/listings?country=NG&category=computers')).json.total, 1);
+    assert.equal((await get('/v1/classifieds/listings?country=NG&category=electronics')).json.total, 1, 'laptops are under Electronics');
     assert.deepEqual(titles(await get('/v1/classifieds/listings?country=NG&category=mobile-phones&condition=new')), ['iPhone 14 Pro, 256 GB']);
     const range = await get('/v1/classifieds/listings?country=NG&price_min=19000000&price_max=36500000&sort=price_asc');
     assert.deepEqual(titles(range), ['Tecno Camon 20, 256 GB', 'Samsung Galaxy A54, 128 GB', 'HP EliteBook 840 G5 laptop', 'iPhone 13, 128 GB, Midnight']);
