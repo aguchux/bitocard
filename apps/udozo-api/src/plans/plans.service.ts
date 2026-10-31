@@ -32,7 +32,7 @@ export type PlanLimitValues = Record<PlanLimit, number | null>;
 export function presentPlanDetail(plan: Plan, local: LocalPrice | null, limits: PlanLimitValues, product: Product = 'bitocard') {
   return {
     ...presentPlan(plan, product),
-    description: inProductWords(plan.description, product),
+    description: plan.description === null ? null : inProductWords(plan.description, product),
     feature_details: planFeaturesFor(product).filter(code => plan.features.includes(code)).map(code => ({ code, ...planFeatureDetail(code, product) })),
     limits,
     local_price: local ? { amount: Number(local.amount), currency: local.currency, fixed: local.fixed } : null,
