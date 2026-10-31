@@ -217,8 +217,9 @@ describe('delivery', () => {
     }
     const doc = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8'));
     assert.equal(doc.openapi, '3.1.0');
-    assert.deepEqual(Object.keys(doc.webhooks).sort(), [...eventTypesFor('bitocard')].sort(), "every BitoCard event type is documented (Udozo's in its own document)");
-    for (const type of eventTypesFor('bitocard')) {
+    // This copy's committed openapi.json is Udozo's own document (scripts/export-openapi.mjs).
+    assert.deepEqual(Object.keys(doc.webhooks).sort(), [...eventTypesFor('udozo')].sort(), "every Udozo event type is documented, and none of BitoCard's own");
+    for (const type of eventTypesFor('udozo')) {
       const post = doc.webhooks[type].post;
       assert.ok(post.description.includes('Does not fire'), `${type} says when it does not fire`);
       const example = post.requestBody.content['application/json'].example;

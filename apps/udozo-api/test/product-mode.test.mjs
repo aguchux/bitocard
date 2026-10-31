@@ -102,6 +102,12 @@ describe('routes', () => {
     }
   });
 
+  test("every Afrippa route belongs to BitoCard's instance, so Udozo's never serves one", () => {
+    const afrippa = ownedRoutes(udozo.app).filter(route => route.path.startsWith('/v1/afrippa/') || route.path === '/v1/afrippa');
+    assert.ok(afrippa.length > 40, `found ${afrippa.length} Afrippa routes`);
+    assert.deepEqual(afrippa.filter(route => route.owner !== 'bitocard').map(route => `${route.method} ${route.path} (${route.where})`), []);
+  });
+
   test('the shared routes and each product its own answer as before', async () => {
     for (const server of [bitocard, udozo]) assert.equal((await fetch(`${server.base}/v1/countries`)).status, 200);
     assert.equal((await fetch(`${udozo.base}/v1/classifieds/markets`)).status, 200);
