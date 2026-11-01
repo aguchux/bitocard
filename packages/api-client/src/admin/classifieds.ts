@@ -78,6 +78,30 @@ export type AdminClassifiedFeature = {
 export type ClassifiedFeatureInput = Partial<Pick<AdminClassifiedFeature, 'name' | 'icon' | 'unit' | 'choices' | 'default_value' | 'placeholder' | 'min' | 'max' | 'synonyms' | 'filterable' | 'enabled'>>;
 export type ClassifiedFeatureCreate = ClassifiedFeatureInput & { key: string; name: string; icon: string; data_type: ClassifiedFeatureDataType; suggestion?: string };
 /** Sellers asking for the same missing key, counted together. */
+/** Udozo's brand registry, as admins see a brand. */
+export type AdminClassifiedBrand = {
+  object: 'classified_brand';
+  id: string;
+  slug: string;
+  name: string;
+  aliases: string[];
+  /** What shows: the upload, else the bundled logo, else none (its initials on its colour). */
+  logo_url: string | null;
+  logo_source: 'uploaded' | 'bundled' | null;
+  bundled_logo_url: string | null;
+  uploaded_logo_url: string | null;
+  color: string | null;
+  enabled: boolean;
+  categories: Array<{ id: string; slug: string; name: string }>;
+  /** Live ads with it, everywhere. */
+  listings: number;
+  updated_at: string;
+};
+export type ClassifiedBrandInput = { name?: string; aliases?: string[]; color?: string | null; logo_url?: string | null; category_ids?: string[]; enabled?: boolean };
+export type ClassifiedBrandSaved = AdminClassifiedBrand & { listings_renamed: number; suggestions_answered: number };
+export type ClassifiedBrandsFilter = { q?: string; category?: string; logo?: 'missing' | 'bundled' | 'uploaded'; status?: 'enabled' | 'disabled'; offset?: number; limit?: number };
+export type ClassifiedBrandSuggestionGroup = { object: 'classified_brand_suggestion_group'; name_key: string; name: string; sellers: number; categories: Array<{ id: string; slug: string; name: string }>; first_at: string; last_at: string };
+
 export type ClassifiedFeatureSuggestionGroup = { object: 'classified_feature_suggestion_group'; name_key: string; name: string; sellers: number; categories: string[]; first_at: string; last_at: string };
 
 export type AdminClassifiedArea = {
@@ -477,6 +501,26 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: nameKey => ({ url: '/v1/admin/classifieds/feature-suggestions/dismiss', method: 'POST', body: { name_key: nameKey } }),
       invalidatesTags: [{ type: 'ClassifiedSettings', id: 'SUGGESTIONS' }, 'Activity'],
     }),
+    classifiedBrands: build.query<List<AdminClassifiedBrand> & { total: number; offset: number; limit: number }, ClassifiedBrandsFilter | void>({
+      query: filter => ({ url: '/v1/admin/classifieds/brands', params: params({ ...(filter ?? {}) }) }),
+      providesTags: [{ type: 'ClassifiedSettings', id: 'BRANDS' }],
+    }),
+    createClassifiedBrand: build.mutation<ClassifiedBrandSaved, ClassifiedBrandInput & { name: string }>({
+      query: body => ({ url: '/v1/admin/classifieds/brands', method: 'POST', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'BRANDS' }, { type: 'ClassifiedSettings', id: 'BRAND_SUGGESTIONS' }, 'Activity'],
+    }),
+    updateClassifiedBrand: build.mutation<ClassifiedBrandSaved, ClassifiedBrandInput & { slug: string }>({
+      query: ({ slug, ...body }) => ({ url: `/v1/admin/classifieds/brands/${encodeURIComponent(slug)}`, method: 'PATCH', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'BRANDS' }, { type: 'ClassifiedSettings', id: 'BRAND_SUGGESTIONS' }, 'Activity'],
+    }),
+    classifiedBrandSuggestions: build.query<List<ClassifiedBrandSuggestionGroup>, void>({
+      query: () => '/v1/admin/classifieds/brand-suggestions',
+      providesTags: [{ type: 'ClassifiedSettings', id: 'BRAND_SUGGESTIONS' }],
+    }),
+    dismissClassifiedBrandSuggestion: build.mutation<unknown, string>({
+      query: nameKey => ({ url: '/v1/admin/classifieds/brand-suggestions/dismiss', method: 'POST', body: { name_key: nameKey } }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'BRAND_SUGGESTIONS' }, 'Activity'],
+    }),
     classifiedAreas: build.query<List<AdminClassifiedState> & { country: string }, string>({
       query: country => ({ url: '/v1/admin/classifieds/areas', params: { country } }),
       providesTags: (_result, _error, country) => [{ type: 'ClassifiedSettings', id: `AREAS:${country}` }],
@@ -607,6 +651,11 @@ export const {
   useUpdateClassifiedFeatureMutation,
   useClassifiedFeatureSuggestionsQuery,
   useDismissClassifiedFeatureSuggestionMutation,
+  useClassifiedBrandsQuery,
+  useCreateClassifiedBrandMutation,
+  useUpdateClassifiedBrandMutation,
+  useClassifiedBrandSuggestionsQuery,
+  useDismissClassifiedBrandSuggestionMutation,
   useClassifiedAreasQuery,
   useCreateClassifiedAreaMutation,
   useUpdateClassifiedAreaMutation,
