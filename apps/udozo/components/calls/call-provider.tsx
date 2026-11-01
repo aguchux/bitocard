@@ -42,7 +42,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const created = new CallEngine({
       api: callApi,
-      microphone: () => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false }),
+      // No mediaDevices at all (an old browser, or a page not on https): this browser cannot call.
+      microphone: () => (navigator.mediaDevices?.getUserMedia ? navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false }) : Promise.reject(new TypeError("no microphone access"))),
       peer: config => new RTCPeerConnection(config),
       onView: setView,
       onRemote: stream => {
@@ -87,6 +88,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useRinger(view.phase === "incoming" ? "incoming" : view.phase === "ringing" ? "ringback" : null);
 
   const start = useCallback((target: CallTarget) => void engine.current?.call(target), []);
+  const retryMicrophone = useCallback(() => void engine.current?.retryMicrophone(), []);
   const busy = view.phase !== "idle" && view.phase !== "ended";
   const value = useMemo(() => ({ available, busy, start }), [available, busy, start]);
 
@@ -95,7 +97,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       {children}
       {/* The other side's voice. */}
       <audio ref={audio} autoPlay playsInline className="hidden" />
-      <CallPanel view={view} onAnswer={() => void engine.current?.answer()} onHangUp={() => void engine.current?.hangUp()} onMute={() => engine.current?.toggleMute()} onClose={() => engine.current?.dismiss()} />
+      <CallPanel view={view} onAnswer={() => void engine.current?.answer()} onHangUp={() => void engine.current?.hangUp()} onMute={() => engine.current?.toggleMute()} onClose={() => engine.current?.dismiss()} onRetry={retryMicrophone} />
     </CallsContext.Provider>
   );
 }

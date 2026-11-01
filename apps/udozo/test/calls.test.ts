@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
 import type { ShopCall, ShopViewer } from "@bitocard/api-client/classifieds";
-import { CallEngine, type CallDeps, type CallView, endedText } from "@/lib/call-engine";
+import { CallEngine, type CallDeps, type CallView, endedText, micProblem } from "@/lib/call-engine";
 import { callRoute } from "@/lib/calls";
 import { callLine, requestOutcome } from "@/lib/requests";
 
@@ -12,9 +12,19 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 
 const { ListingActions, requestState } = await import("@/components/listing-actions");
 const { CallProvider } = await import("@/components/calls/call-provider");
-const { CallPanel, callTime, statusText } = await import("@/components/calls/call-panel");
+const { CallPanel, callTime, micHelp, statusText } = await import("@/components/calls/call-panel");
 
 const id = "6f1c2e8a-1b2c-4d3e-8f90-1234567890ab";
+
+describe("the microphone on udozo.com", () => {
+  test("the site's own pages may use it (the shared headers block it; udozo.com's, sent last, win), never a frame from elsewhere", async () => {
+    const { default: config } = await import("../next.config");
+    const rules = await config.headers!();
+    const policies = rules.flatMap(rule => rule.headers).filter(header => header.key === "Permissions-Policy");
+    expect(policies.at(-1)?.value).toContain("microphone=(self)");
+    expect(policies.at(-1)?.value).toContain("camera=()");
+  });
+});
 
 describe("the call route", () => {
   const none = new URLSearchParams();
@@ -177,7 +187,63 @@ describe("the call engine", () => {
     expect(sent.find(item => item.path === `${id}/signals`)?.body).toEqual({ kind: "answer", payload: { type: "answer", sdp: "answer-sdp" } });
   });
 
-  test("a refusal, a missed call or no microphone end it with words for the side reading", async () => {
+  test("without the microphone the call waits to be allowed: calling starts once it is, a ringing call keeps ringing", async () => {
+    const refused = (name: string) => Object.assign(new Error(name), { name });
+    const caller = harness((method, path) => (path === "start" ? { ...call(), ice_servers: relay } : { ...call(), signals: [] }));
+    const deps = (caller.engine as unknown as { deps: CallDeps }).deps;
+    const allow = deps.microphone;
+    deps.microphone = async () => {
+      throw refused("NotAllowedError");
+    };
+    await caller.engine.call({ conversation_id: id });
+    expect(caller.engine.current).toMatchObject({ phase: "microphone", microphone: "blocked" });
+    expect(caller.engine.busy).toBe(true);
+    expect(caller.sent).toHaveLength(0);
+    deps.microphone = allow;
+    await caller.engine.retryMicrophone();
+    expect(caller.sent[0]).toMatchObject({ method: "POST", path: "start", body: { conversation_id: id } });
+    expect(caller.engine.current.phase).toBe("ringing");
+
+    // Cancelling before anything started asks Udozo nothing.
+    const cancelled = harness(() => ({}));
+    (cancelled.engine as unknown as { deps: CallDeps }).deps.microphone = async () => {
+      throw refused("NotFoundError");
+    };
+    await cancelled.engine.call({ listing_id: id });
+    expect(cancelled.engine.current.microphone).toBe("missing");
+    await cancelled.engine.hangUp();
+    expect(cancelled.engine.current.phase).toBe("idle");
+    expect(cancelled.sent).toHaveLength(0);
+
+    const seller = harness((method, path) => (path.endsWith("/answer") ? { ...call({ status: "answered", role: "callee" }), ice_servers: relay } : method === "GET" ? { ...call({ role: "callee" }), signals: [] } : { object: "ok" }));
+    const sellerDeps = (seller.engine as unknown as { deps: CallDeps }).deps;
+    const sellerAllow = sellerDeps.microphone;
+    sellerDeps.microphone = async () => {
+      throw refused("NotReadableError");
+    };
+    seller.engine.ring(call({ role: "callee" }));
+    await seller.engine.answer();
+    expect(seller.engine.current).toMatchObject({ phase: "microphone", microphone: "in_use" });
+    expect(seller.sent.some(item => item.path.endsWith("/end") || item.path.endsWith("/answer"))).toBe(false);
+    sellerDeps.microphone = sellerAllow;
+    await seller.engine.retryMicrophone();
+    expect(seller.sent.some(item => item.path === `${id}/answer`)).toBe(true);
+    expect(seller.peers[0]!.config.iceTransportPolicy).toBe("relay");
+
+    // Declining from the microphone step ends the ringing call as declined.
+    const decline = harness(() => ({ ...call({ status: "declined", role: "callee" }) }));
+    (decline.engine as unknown as { deps: CallDeps }).deps.microphone = async () => {
+      throw refused("NotAllowedError");
+    };
+    decline.engine.ring(call({ role: "callee" }));
+    await decline.engine.answer();
+    await decline.engine.hangUp();
+    expect(decline.sent.map(item => item.path)).toEqual([`${id}/end`]);
+    expect(decline.engine.current).toMatchObject({ phase: "ended", message: "Call declined." });
+    expect([micProblem(new TypeError("x")), micProblem({ name: "SecurityError" }), micProblem(null)]).toEqual(["unsupported", "blocked", "blocked"]);
+  });
+
+  test("a refusal or a missed call end it with words for the side reading", async () => {
     const offline = harness(() => new Error("The seller is not on Udozo right now."));
     await offline.engine.call({ listing_id: id });
     expect(offline.engine.current).toMatchObject({ phase: "ended", message: "The seller is not on Udozo right now." });
@@ -186,14 +252,6 @@ describe("the call engine", () => {
     await missed.engine.call({ conversation_id: id });
     await missed.tick();
     expect(missed.engine.current.message).toBe("No answer. Ask them to call you back, or chat with them.");
-
-    const deaf = harness(() => ({}));
-    (deaf.engine as unknown as { deps: CallDeps }).deps.microphone = async () => {
-      throw new Error("NotAllowedError");
-    };
-    await deaf.engine.call({ listing_id: id });
-    expect(deaf.engine.current.message).toMatch(/microphone/);
-    expect(deaf.sent).toHaveLength(0);
   });
 
   test("ended in each side's words", () => {
@@ -207,7 +265,25 @@ describe("the call engine", () => {
 
 describe("the call panel", () => {
   const view = (over: Partial<CallView>): CallView => ({ phase: "idle", call: null, message: null, muted: false, connectedAt: null, ...over });
-  const panel = (value: CallView) => renderToStaticMarkup(createElement(CallPanel, { view: value, onAnswer: () => undefined, onHangUp: () => undefined, onMute: () => undefined, onClose: () => undefined }));
+  const panel = (value: CallView) => renderToStaticMarkup(createElement(CallPanel, { view: value, onAnswer: () => undefined, onHangUp: () => undefined, onMute: () => undefined, onClose: () => undefined, onRetry: () => undefined }));
+
+  test("without the microphone: what is wrong, how to allow it, and Allow microphone or Try again", () => {
+    const blocked = panel(view({ phase: "microphone", microphone: "blocked" }));
+    expect(blocked).toContain("Allow your microphone to call");
+    expect(blocked).toContain("blocking the microphone for udozo.com");
+    expect(blocked).toContain("On iPhone or iPad:");
+    expect(blocked).toContain("Try again");
+    expect(blocked).toContain(">Cancel<");
+    const ringing = panel(view({ phase: "microphone", microphone: "blocked", call: call({ role: "callee", with: { name: "Zainab M." } }) }));
+    expect(ringing).toContain("allow your microphone to answer");
+    expect(ringing).toContain(">Decline<");
+
+    expect(micHelp("blocked", "prompt")).toMatchObject({ steps: false, action: "Allow microphone" });
+    expect(micHelp("blocked", "denied")).toMatchObject({ steps: true, action: "Try again" });
+    expect(micHelp("missing", null).text).toContain("could not find a microphone");
+    expect(micHelp("in_use", null).text).toContain("Another app is using your microphone");
+    expect(micHelp("unsupported", null).action).toBeNull();
+  });
 
   test("rings with Answer and Decline, names the caller by their public name, never a number", () => {
     const html = panel(view({ phase: "incoming", call: call({ role: "callee", with: { name: "Zainab M." } }) }));

@@ -1,8 +1,13 @@
 import type { ShopCall, ShopCallSignal, ShopIceServer } from "@bitocard/api-client/classifieds";
 
 /** What the call panel shows. */
-export type CallPhase = "idle" | "starting" | "ringing" | "incoming" | "connecting" | "connected" | "ended";
-export type CallView = { phase: CallPhase; call: ShopCall | null; message: string | null; muted: boolean; connectedAt: number | null };
+export type CallPhase = "idle" | "starting" | "microphone" | "ringing" | "incoming" | "connecting" | "connected" | "ended";
+/**
+ * Why the microphone could not be used: the browser or the person refused it (`blocked`), there is none (`missing`),
+ * another app holds it (`in_use`), or this browser cannot make calls (`unsupported`).
+ */
+export type MicProblem = "blocked" | "missing" | "in_use" | "unsupported";
+export type CallView = { phase: CallPhase; call: ShopCall | null; message: string | null; muted: boolean; connectedAt: number | null; microphone?: MicProblem | null };
 
 export type ApiAnswer<T> = { ok: true; data: T } | { ok: false; status: number; message: string };
 
@@ -23,13 +28,22 @@ type CallWithIce = ShopCall & { ice_servers: ShopIceServer[] };
 export type CallTarget = { listing_id: string } | { conversation_id: string };
 type Polled = ShopCall & { signals: ShopCallSignal[] };
 
-const idle: CallView = { phase: "idle", call: null, message: null, muted: false, connectedAt: null };
+const idle: CallView = { phase: "idle", call: null, message: null, muted: false, connectedAt: null, microphone: null };
 const over = new Set(["ended", "missed", "declined", "cancelled", "lost"]);
 /** Polling while connecting, then once connected (only to keep the call alive and hear it end). */
 const fastMs = 1000;
 const slowMs = 3000;
 /** How long the ended panel stays before it closes. */
 const endedMs = 4000;
+
+/** What went wrong with the microphone, from the browser's error. */
+export function micProblem(error: unknown): MicProblem {
+  const name = typeof error === "object" && error !== null && "name" in error ? String((error as { name: unknown }).name) : "";
+  if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "missing";
+  if (name === "NotReadableError" || name === "AbortError" || name === "TrackStartError") return "in_use";
+  if (name === "TypeError") return "unsupported";
+  return "blocked";
+}
 
 /** Why a call ended, in the words of the side reading it. */
 export function endedText(call: Pick<ShopCall, "status" | "role">) {
@@ -65,6 +79,8 @@ export class CallEngine {
   private remoteSet = false;
   private pending: RTCIceCandidateInit[] = [];
   private polling = false;
+  /** Who this side was calling, kept while it waits for the microphone so the call starts once it is allowed. */
+  private target: CallTarget | null = null;
 
   constructor(private readonly deps: CallDeps) {}
 
@@ -80,8 +96,10 @@ export class CallEngine {
   async call(target: CallTarget) {
     if (this.busy) return;
     this.reset();
+    this.target = target;
     this.set({ ...idle, phase: "starting" });
     if (!(await this.takeMicrophone())) return;
+    this.target = null;
     const started = await this.deps.api<CallWithIce>("POST", "start", target);
     if (!started.ok) return this.finish(started.message);
     this.ice = started.data.ice_servers;
@@ -99,12 +117,10 @@ export class CallEngine {
 
   async answer() {
     const call = this.view.call;
-    if (this.view.phase !== "incoming" || !call) return;
-    this.set({ ...this.view, phase: "connecting" });
-    if (!(await this.takeMicrophone())) {
-      await this.deps.api("POST", `${call.id}/end`);
-      return;
-    }
+    if ((this.view.phase !== "incoming" && this.view.phase !== "microphone") || call?.role !== "callee") return;
+    this.set({ ...this.view, phase: "connecting", microphone: null });
+    // Without the microphone the call keeps ringing while the person allows it (or declines).
+    if (!(await this.takeMicrophone())) return;
     const answered = await this.deps.api<CallWithIce>("POST", `${call.id}/answer`);
     if (!answered.ok) return this.finish(answered.message);
     this.ice = answered.data.ice_servers;
@@ -113,12 +129,27 @@ export class CallEngine {
     this.schedule(0);
   }
 
+  /** Tries the microphone again once the person has allowed it: starts the call they were making, or answers. */
+  async retryMicrophone() {
+    if (this.view.phase !== "microphone") return;
+    if (this.view.call) return this.answer();
+    const target = this.target;
+    this.set(idle);
+    if (target) await this.call(target);
+  }
+
   /** Declines a ringing call, cancels one still ringing out, or ends one in progress. */
   async hangUp() {
     const call = this.view.call;
     if (!this.busy) return;
+    // Still waiting for the microphone before calling: nothing was started.
+    if (this.view.phase === "microphone" && !call) {
+      this.target = null;
+      return this.set(idle);
+    }
+    const declining = this.view.phase === "incoming" || (this.view.phase === "microphone" && call?.role === "callee");
     if (call) await this.deps.api<ShopCall>("POST", `${call.id}/end`);
-    this.finish(this.view.phase === "incoming" ? "Call declined." : "Call ended.");
+    this.finish(declining ? "Call declined." : "Call ended.");
   }
 
   toggleMute() {
@@ -142,8 +173,9 @@ export class CallEngine {
     try {
       this.stream = await this.deps.microphone();
       return true;
-    } catch {
-      this.finish("Allow Udozo to use your microphone to make calls: your browser asks, or look in its site settings.");
+    } catch (error) {
+      // The call waits here: the panel says how to allow the microphone, then tries again.
+      this.set({ ...this.view, phase: "microphone", microphone: micProblem(error) });
       return false;
     }
   }
@@ -182,7 +214,7 @@ export class CallEngine {
     } finally {
       this.polling = false;
     }
-    if (this.busy) this.schedule(this.view.phase === "connected" ? slowMs : this.view.phase === "incoming" ? 2000 : fastMs);
+    if (this.busy) this.schedule(this.view.phase === "connected" ? slowMs : this.view.phase === "incoming" || this.view.phase === "microphone" ? 2000 : fastMs);
   }
 
   /** The connection, through the relay only, with this side's microphone. */
@@ -260,6 +292,7 @@ export class CallEngine {
     if (this.closer !== null) this.deps.cancel(this.closer);
     this.closer = null;
     this.after = undefined;
+    this.target = null;
     this.remoteSet = false;
     this.pending = [];
     this.ice = [];

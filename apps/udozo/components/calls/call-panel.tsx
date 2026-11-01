@@ -3,7 +3,66 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, ShieldCheck, X } from "lucide-react";
-import type { CallView } from "@/lib/call-engine";
+import type { CallView, MicProblem } from "@/lib/call-engine";
+
+/** What the browser says about the microphone for this site: "granted", "prompt", "denied", or unknown (null). */
+type MicPermission = "granted" | "prompt" | "denied" | null;
+
+/** What the microphone step says, by what went wrong and what the browser would do if asked again. */
+export function micHelp(problem: MicProblem, permission: MicPermission) {
+  switch (problem) {
+    case "missing":
+      return { text: "We could not find a microphone. Plug in a headset or microphone, then try again.", steps: false, action: "Try again" };
+    case "in_use":
+      return { text: "Another app is using your microphone. Close it (or end the call there), then try again.", steps: false, action: "Try again" };
+    case "unsupported":
+      return { text: "This browser cannot make calls. Open udozo.com in Chrome, Safari, Edge or Firefox to call.", steps: false, action: null };
+    default:
+      // Asking again shows the browser's own question, unless it has been told to block this site.
+      return permission === "prompt"
+        ? { text: "Udozo needs your microphone for the call. Press Allow microphone, then choose Allow when your browser asks.", steps: false, action: "Allow microphone" }
+        : { text: "Your browser is blocking the microphone for udozo.com. Allow it, then press Try again:", steps: true, action: "Try again" };
+  }
+}
+
+/** How to allow the microphone where the browser no longer asks. */
+const allowSteps = [
+  { where: "On a computer", how: "click the icon left of the web address (a lock or sliders), set Microphone to Allow." },
+  { where: "On iPhone or iPad", how: "tap aA in the address bar, then Website Settings, and set Microphone to Allow." },
+  { where: "On Android", how: "tap the icon left of the web address, then Permissions, and turn on Microphone." },
+];
+
+/**
+ * The browser's microphone permission for this site, kept up to date where the browser tells (Chrome, Edge, Safari;
+ * Firefox does not say, so null). Once it turns to granted, `onGranted` tries again by itself.
+ */
+function useMicPermission(active: boolean, onGranted: () => void) {
+  const [permission, setPermission] = useState<MicPermission>(null);
+  useEffect(() => {
+    if (!active || !navigator.permissions?.query) return;
+    let status: PermissionStatus | null = null;
+    let stopped = false;
+    const changed = () => {
+      if (!status || stopped) return;
+      setPermission(status.state);
+      if (status.state === "granted") onGranted();
+    };
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then(found => {
+        if (stopped) return;
+        status = found;
+        setPermission(found.state);
+        found.addEventListener("change", changed);
+      })
+      .catch(() => undefined);
+    return () => {
+      stopped = true;
+      status?.removeEventListener("change", changed);
+    };
+  }, [active, onGranted]);
+  return active ? permission : null;
+}
 
 const initials = (name: string) =>
   name
@@ -27,6 +86,8 @@ export function statusText(view: CallView, now: number) {
   switch (view.phase) {
     case "starting":
       return "Starting the call…";
+    case "microphone":
+      return view.call?.role === "callee" ? "Calling you: allow your microphone to answer" : "Allow your microphone to call";
     case "ringing":
       return "Ringing…";
     case "incoming":
@@ -45,18 +106,35 @@ export function statusText(view: CallView, now: number) {
 /**
  * The call, in a panel over the page (top centre on desktops, across the top on phones, clear of the chats) that stays while the
  * person browses: who it is with (their public name only), the listing, the state or the time, and Answer and Decline,
- * or Mute and End. Nobody's number is ever shown.
+ * or Mute and End. Nobody's number is ever shown. Without the microphone the call waits on a step saying how to allow
+ * it, with Allow microphone (or Try again), and goes on by itself once the browser says it is allowed.
  */
-export function CallPanel({ view, onAnswer, onHangUp, onMute, onClose }: { view: CallView; onAnswer: () => void; onHangUp: () => void; onMute: () => void; onClose: () => void }) {
+export function CallPanel({
+  view,
+  onAnswer,
+  onHangUp,
+  onMute,
+  onClose,
+  onRetry,
+}: {
+  view: CallView;
+  onAnswer: () => void;
+  onHangUp: () => void;
+  onMute: () => void;
+  onClose: () => void;
+  onRetry: () => void;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (view.phase !== "connected") return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [view.phase]);
+  const permission = useMicPermission(view.phase === "microphone" && view.microphone === "blocked", onRetry);
   if (view.phase === "idle") return null;
-  const name = view.call?.with.name ?? (view.phase === "starting" ? "The seller" : "");
+  const name = view.call?.with.name ?? (view.phase === "starting" || view.phase === "microphone" ? "Your call" : "");
   const round = "grid size-14 place-items-center rounded-full text-white disabled:opacity-60";
+  const help = view.phase === "microphone" ? micHelp(view.microphone ?? "blocked", permission) : null;
   return (
     <section
       role="dialog"
@@ -84,7 +162,35 @@ export function CallPanel({ view, onAnswer, onHangUp, onMute, onClose }: { view:
           </button>
         ) : null}
       </div>
-      {view.phase === "incoming" ? (
+      {help ? (
+        <div className="grid gap-3">
+          <div className="flex gap-3 rounded-2xl bg-white/10 p-3.5 text-sm">
+            <MicOff className="mt-0.5 size-5 shrink-0 text-amber-300" aria-hidden="true" />
+            <div className="grid gap-2">
+              <p>{help.text}</p>
+              {help.steps ? (
+                <ul className="grid gap-1.5 text-navy-100">
+                  {allowSteps.map(step => (
+                    <li key={step.where}>
+                      <strong className="text-white">{step.where}:</strong> {step.how}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex gap-2.5">
+            <button type="button" onClick={onHangUp} className="h-11 flex-1 rounded-2xl bg-white/15 px-4 text-sm font-bold hover:bg-white/25">
+              {view.call?.role === "callee" ? "Decline" : "Cancel"}
+            </button>
+            {help.action ? (
+              <button type="button" onClick={onRetry} className="flex h-11 flex-[2] items-center justify-center gap-2 rounded-2xl bg-mint-500 px-4 text-sm font-bold hover:bg-mint-700">
+                <Mic className="size-4" aria-hidden="true" /> {help.action}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : view.phase === "incoming" ? (
         <div className="flex justify-around">
           <button type="button" onClick={onHangUp} className={`${round} bg-red-600 hover:bg-red-500`} aria-label="Decline">
             <PhoneOff className="size-6" aria-hidden="true" />
