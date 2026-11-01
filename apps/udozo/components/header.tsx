@@ -20,7 +20,7 @@ import { SignInHere } from "./sign-in-here";
 export function UdozoWordmark({ href = "/" }: { href?: string }) {
   return (
     <Link href={href} className="mr-2 inline-flex min-h-11 shrink-0 items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]" aria-label="Udozo home">
-      <Image src="/udozo-mark.png" alt="" width={466} height={512} className="h-7 w-auto sm:h-8" priority />
+      <Image src="/udozo-mark.png" alt="" width={617} height={512} className="h-7 w-auto sm:h-8" priority />
       <span>Udozo</span>
     </Link>
   );
