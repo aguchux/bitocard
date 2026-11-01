@@ -7,6 +7,7 @@ import { reportReasonLabels, shopMoney, type ShopChat, type ShopMessage, type Sh
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl } from "@/lib/shop";
 import { answerOffer, blockChat, loadChat, makeOffer, reportChat, sendMessage } from "@/lib/shop-actions";
+import { useDismiss } from "../dropdown";
 import { SuggestReply } from "./assistant-help";
 
 const pollMs = 4000;
@@ -40,6 +41,8 @@ export function ChatThread({ initial, buy, assistant = null }: { initial: ShopCh
   const [menu, setMenu] = useState(false);
   const [report, setReport] = useState<{ reason: ShopReportReason; details: string; sent: boolean } | null>(null);
   const list = useRef<HTMLOListElement>(null);
+  const more = useRef<HTMLDivElement>(null);
+  useDismiss(more, menu, () => setMenu(false), () => more.current?.querySelector("button"));
   const last = messages.at(-1)?.id;
   const blocked = chat.blocked.by_me || chat.blocked.by_them;
   const currency = chat.listing.price.currency;
@@ -140,7 +143,7 @@ export function ChatThread({ initial, buy, assistant = null }: { initial: ShopCh
 
   return (
     <section aria-label={`Chat with ${chat.with.name}`} className="grid gap-3">
-      <div className="relative flex justify-end">
+      <div ref={more} className="relative flex justify-end">
         <button type="button" aria-label="More: report, block" aria-expanded={menu} onClick={() => setMenu(!menu)} className="grid size-10 place-items-center rounded-full hover:bg-slate-100">
           <EllipsisVertical className="size-5" aria-hidden="true" />
         </button>

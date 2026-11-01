@@ -54,6 +54,13 @@ describe("the header", () => {
     expect(html).toContain("Sign out");
   });
 
+  it("the profile button is the icon alone, with no Account text beside it", () => {
+    const summary = html.match(/<summary[^>]*aria-label="Account: Ngozi Okafor"[^>]*>([\s\S]*?)<\/summary>/)?.[1] ?? "";
+    expect(summary).toContain(">NO</span>");
+    expect(summary).not.toContain("Account");
+    expect(summary).not.toContain("<svg");
+  });
+
   it("signed out, the profile icon opens Sign in on phones; desktops get a Sign in button", () => {
     const out = renderToStaticMarkup(createElement(HeaderBar, { market, customer: null, showcase: false, categories }));
     expect(out).toContain('aria-label="Account menu"');

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
 import { Check, ChevronDown, Globe2 } from "lucide-react";
+import { Dropdown } from "./dropdown";
 import { Flag } from "./flag";
 
 export type MenuCountry = { country: string; name: string; listings: number };
@@ -23,36 +23,13 @@ const listingCount = (count: number) => `${count.toLocaleString("en-GB")} ${coun
 
 /**
  * The header's country switch: the flag (the code from tablets, the name from desktops) opening a dropdown of the open
- * markets, the current one ticked, then All countries. It closes on choosing, on Escape and on a click outside, since the
- * header stays across pages.
+ * markets, the current one ticked, then All countries. It closes on choosing, on Escape and on a click outside
+ * (`Dropdown`), since the header stays across pages.
  */
 export function CountryMenu({ current, countries }: { current: { country: string; name: string } | null; countries: MenuCountry[] }) {
-  const details = useRef<HTMLDetailsElement>(null);
-  const close = () => {
-    if (details.current) details.current.open = false;
-  };
-
-  useEffect(() => {
-    const outside = (event: PointerEvent) => {
-      if (details.current?.open && !details.current.contains(event.target as Node)) close();
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && details.current?.open) {
-        close();
-        details.current.querySelector("summary")?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, []);
-
   const row = "flex min-h-12 items-center gap-3 rounded-xl px-3 font-semibold hover:bg-navy-50";
   return (
-    <details ref={details} id={countryMenuId} className="relative">
+    <Dropdown id={countryMenuId}>
       <summary
         className="inline-flex min-h-11 shrink-0 cursor-pointer list-none items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-navy-900 hover:bg-navy-50 lg:border lg:border-navy-200 lg:bg-white lg:px-3 lg:hover:border-navy-300 [&::-webkit-details-marker]:hidden"
         aria-label={current ? `Country: ${current.name}. Change` : "Choose your country"}
@@ -74,7 +51,7 @@ export function CountryMenu({ current, countries }: { current: { country: string
         {countries.map(market => {
           const here = market.country === current?.country;
           return (
-            <Link key={market.country} href={`/${market.country.toLowerCase()}`} onClick={close} aria-current={here ? "page" : undefined} className={`${row} ${here ? "bg-navy-50" : ""}`}>
+            <Link key={market.country} href={`/${market.country.toLowerCase()}`} aria-current={here ? "page" : undefined} className={`${row} ${here ? "bg-navy-50" : ""}`}>
               <Flag country={market.country} className="h-5 w-7.5" />
               <span className="grid min-w-0 flex-1">
                 <span className="truncate">{market.name}</span>
@@ -84,12 +61,12 @@ export function CountryMenu({ current, countries }: { current: { country: string
             </Link>
           );
         })}
-        <Link href="/" onClick={close} aria-current={current ? undefined : "page"} className={`${row} mt-1 border-t border-navy-100 pt-1`}>
+        <Link href="/" aria-current={current ? undefined : "page"} className={`${row} mt-1 border-t border-navy-100 pt-1`}>
           <Globe2 className="size-5 text-navy-600" aria-hidden="true" />
           <span className="flex-1">All countries</span>
           {current ? null : <Check className="size-5 text-brand-700" aria-hidden="true" />}
         </Link>
       </nav>
-    </details>
+    </Dropdown>
   );
 }

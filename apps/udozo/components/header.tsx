@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronDown, Plus, ShieldCheck, UserRound } from "lucide-react";
+import { Plus, ShieldCheck, UserRound } from "lucide-react";
 import type { ShopMarket, ShopShowcase } from "@bitocard/api-client/classifieds";
 import { nameInitials } from "@bitocard/api-client/classifieds";
 import { signOut } from "@/lib/account-actions";
@@ -10,6 +10,7 @@ import type { Customer } from "@/lib/customer";
 import { categoriesOf } from "@/lib/reference";
 import type { MenuCategory } from "./category-menu";
 import { CountryMenu, type MenuCountry } from "./country-menu";
+import { Dropdown } from "./dropdown";
 import { Flag } from "./flag";
 import { type ContinueTo, HeaderSearch, SearchBlend } from "./header-search";
 import { SignInHere } from "./sign-in-here";
@@ -106,15 +107,16 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
 }
 
 /**
- * The account's profile icon (its initials; a person icon when signed out) and its menu: the account's places and
- * Sign out, or Sign in and Create an account. Signed out on desktops, Sign in is also a button beside it.
+ * The account's profile icon alone (its initials; a person icon when signed out) and its menu: the account's places and
+ * Sign out, or Sign in and Create an account. Signed out on desktops, Sign in is also a button beside it. It closes on
+ * a click outside, Escape or choosing a place (`Dropdown`).
  */
 function ProfileMenu({ customer }: { customer: Customer | null }) {
   const item = "flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-navy-50";
   return (
-    <details className="relative">
+    <Dropdown>
       <summary
-        className="inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl text-[15px] font-semibold text-navy-900 hover:bg-navy-50 lg:border lg:border-navy-200 lg:bg-white lg:px-3 lg:hover:border-navy-300 [&::-webkit-details-marker]:hidden"
+        className="inline-flex size-11 cursor-pointer list-none items-center justify-center rounded-full text-navy-900 hover:bg-navy-50 [&::-webkit-details-marker]:hidden"
         aria-label={customer ? `Account: ${customer.name}` : "Account menu"}
       >
         {customer ? (
@@ -126,8 +128,6 @@ function ProfileMenu({ customer }: { customer: Customer | null }) {
             <UserRound className="size-4.5" strokeWidth={2.4} />
           </span>
         )}
-        {customer ? <span className="hidden lg:inline">Account</span> : null}
-        <ChevronDown className="hidden size-4 lg:block" aria-hidden="true" />
       </summary>
       <nav aria-label="Account" className="absolute right-0 z-30 mt-2 grid max-h-[calc(100dvh-5.5rem)] w-64 gap-0.5 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
         {customer ? (
@@ -155,7 +155,7 @@ function ProfileMenu({ customer }: { customer: Customer | null }) {
           </form>
         ) : null}
       </nav>
-    </details>
+    </Dropdown>
   );
 }
 
