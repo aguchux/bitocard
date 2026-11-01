@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
 import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
-import { regionalAlternates } from "@/lib/seo";
+import { JsonLd } from "@/components/json-ld";
+import { siteOrigin } from "@/lib/customer";
+import { organizationJsonLd, regionalAlternates, websiteJsonLd } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const all = await markets();
@@ -33,6 +35,8 @@ export default async function GlobalHome() {
   const showcase = await shopApi<ShopShowcase>("/v1/classifieds/showcase");
   return (
     <>
+      <JsonLd data={organizationJsonLd(siteOrigin())} />
+      <JsonLd data={websiteJsonLd(siteOrigin())} />
       <section className="bg-navy-900 pt-5 pb-6">
         <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-4">
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">

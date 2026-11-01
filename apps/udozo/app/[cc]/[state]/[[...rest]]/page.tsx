@@ -11,7 +11,7 @@ import { siteOrigin } from "@/lib/customer";
 import { findCategory, findPlace } from "@/lib/places";
 import { areasOf, categoriesOf } from "@/lib/reference";
 import { indexFrom, isFiltered, readFilters, searchQuery } from "@/lib/search";
-import { breadcrumbJsonLd, noindexFollow } from "@/lib/seo";
+import { breadcrumbJsonLd, itemListJsonLd, noindexFollow } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string; state: string; rest?: string[] }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -109,6 +109,7 @@ export default async function PlacePage({ params, searchParams }: Props) {
         )}
       </div>
       <JsonLd data={breadcrumbJsonLd(trail, siteOrigin())} />
+      {result.ok && result.data.data.length ? <JsonLd data={itemListJsonLd(`${category?.name ?? "Things"} for sale in ${found.place.area?.name ?? found.place.state.name}`, result.data.data, siteOrigin(), cc)} /> : null}
     </>
   );
 }

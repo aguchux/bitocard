@@ -188,7 +188,8 @@ describe('sitemap data', () => {
     const refs = sitemap.json.listings.map(row => row.ref);
     assert.ok(refs.includes(made.phone.ref) && refs.includes(made.sold.ref), 'live and recently sold listings');
     assert.deepEqual([...refs].sort((a, b) => a - b), refs);
-    assert.ok(sitemap.json.listings.every(row => row.slug && row.updated_at));
+    assert.ok(sitemap.json.listings.every(row => row.slug && row.updated_at && typeof row.title === 'string' && Array.isArray(row.images) && row.images.length <= 5));
+    assert.equal(sitemap.json.listings.find(row => row.ref === made.phone.ref).title, made.phone.title, 'each listing names itself for the image sitemap');
     assert.equal(sitemap.json.next_after, null);
     const later = await get(`/v1/classifieds/sitemap?country=NG&after=${made.phone.ref}`);
     assert.ok(!later.json.listings.some(row => row.ref <= made.phone.ref));

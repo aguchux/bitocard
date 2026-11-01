@@ -137,7 +137,8 @@ export type ShopSitemap = {
   country: string;
   categories: Array<{ slug: string; listings: number }>;
   places: Array<{ state: string; area: string | null; listings: number }>;
-  listings: Array<{ ref: number; slug: string; updated_at: string }>;
+  /** Each listing with its title and up to five photos (Udozo's API; for the image sitemap). */
+  listings: Array<{ ref: number; slug: string; updated_at: string; title?: string; images?: string[] }>;
   next_after: number | null;
 };
 

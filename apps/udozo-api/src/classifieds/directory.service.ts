@@ -191,7 +191,8 @@ export class ShopDirectoryService {
 
   /**
    * What a country's sitemap lists: live listing counts per category (a top category counts its subcategories) and per
-   * state and area, and the listings themselves (live, or sold within the last 30 days), by number, a page at a time.
+   * state and area, and the listings themselves (live, or sold within the last 30 days), by number, a page at a time,
+   * each with its title and up to five ready photos (for the image sitemap).
    */
   async sitemap(country: string, after = 0) {
     const code = country.toUpperCase();
@@ -203,7 +204,7 @@ export class ShopDirectoryService {
       this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true } }),
       this.prisma.classifiedListing.findMany({
         where: { country: code, onShop: true, ref: { gt: BigInt(after) }, OR: [{ status: 'active' }, { status: 'sold', soldAt: { gt: new Date(Date.now() - soldVisibleMs) } }] },
-        select: { ref: true, slug: true, updatedAt: true },
+        select: { ref: true, slug: true, title: true, updatedAt: true, media: { where: { kind: 'photo', status: 'ready', url: { not: null } }, orderBy: { position: 'asc' }, take: 5, select: { url: true } } },
         orderBy: { ref: 'asc' },
         take: sitemapPage + 1,
       }),
@@ -230,7 +231,7 @@ export class ShopDirectoryService {
         }))
         .sort((a, b) => a.slug.localeCompare(b.slug)),
       places: [...[...states].map(([state, listings]) => ({ state, area: null, listings })), ...places].sort((a, b) => a.state.localeCompare(b.state) || (a.area ?? '').localeCompare(b.area ?? '')),
-      listings: page.map(row => ({ ref: Number(row.ref), slug: row.slug, updated_at: row.updatedAt.toISOString() })),
+      listings: page.map(row => ({ ref: Number(row.ref), slug: row.slug, title: row.title ?? '', updated_at: row.updatedAt.toISOString(), images: row.media.flatMap(media => (media.url ? [media.url] : [])) })),
       next_after: rows.length > sitemapPage ? Number(page.at(-1)!.ref) : null,
     };
   }

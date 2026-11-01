@@ -28,6 +28,12 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title, description },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
   formatDetection: { telephone: false, email: false, address: false },
+  appleWebApp: { capable: true, title: "Udozo", statusBarStyle: "default" },
+  // Search Console and Bing Webmaster Tools ownership, set in the environment once the sites are added there.
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
+    ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
+  },
 };
 
 /** The browser's bar follows the theme's primary colour. */

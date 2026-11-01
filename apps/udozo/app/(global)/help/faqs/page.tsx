@@ -3,6 +3,9 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { faqGroups } from "@/lib/help";
 
+import { JsonLd } from "@/components/json-ld";
+import { faqJsonLd } from "@/lib/seo";
+
 export const metadata: Metadata = {
   title: "FAQs",
   description: "Answers about buying and selling on Udozo, Safe pay, calls and contact requests, reselling on Seller HQ, and your account.",
@@ -13,6 +16,7 @@ export const metadata: Metadata = {
 export default function FaqsPage() {
   return (
     <div className="mx-auto grid max-w-3xl gap-6 px-4 pt-5 pb-10">
+      <JsonLd data={faqJsonLd(faqGroups)} />
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-sm text-navy-600">
         <Link href="/" className="hover:underline">
           Home

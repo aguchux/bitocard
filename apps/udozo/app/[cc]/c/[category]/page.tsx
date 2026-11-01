@@ -10,7 +10,7 @@ import { siteOrigin } from "@/lib/customer";
 import { findCategory } from "@/lib/places";
 import { categoriesOf } from "@/lib/reference";
 import { isFiltered, readFilters, searchQuery } from "@/lib/search";
-import { breadcrumbJsonLd, noindexFollow, regionalAlternates } from "@/lib/seo";
+import { breadcrumbJsonLd, itemListJsonLd, noindexFollow, regionalAlternates } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string; category: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -73,6 +73,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         )}
       </div>
       <JsonLd data={breadcrumbJsonLd(trail, siteOrigin())} />
+      {result.ok && result.data.data.length ? <JsonLd data={itemListJsonLd(`${found.category.name} for sale in ${market.name}`, result.data.data, siteOrigin(), cc)} /> : null}
     </>
   );
 }

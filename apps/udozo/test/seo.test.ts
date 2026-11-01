@@ -1,6 +1,9 @@
-import { describe, expect, test } from "vitest";
-import type { ShopListingPage, ShopMarket, ShopSitemap } from "@bitocard/api-client/classifieds";
-import { breadcrumbJsonLd, jsonLdText, listingJsonLd, regionalAlternates } from "@/lib/seo";
+import { readFileSync } from "node:fs";
+import { describe, expect, test, vi } from "vitest";
+import type { ShopListingCard, ShopListingPage, ShopMarket, ShopSitemap } from "@bitocard/api-client/classifieds";
+import { faqGroups } from "@/lib/help";
+import { ogClip, ogMoney, ogPhoto, photoType } from "@/lib/og";
+import { breadcrumbJsonLd, faqJsonLd, itemListJsonLd, jsonLdText, listingJsonLd, organizationJsonLd, productMetaTags, regionalAlternates, websiteJsonLd } from "@/lib/seo";
 import { countryEntries, sitemapIndex, urlset } from "@/lib/sitemap";
 
 const market = (country: string, name: string): ShopMarket => ({ object: "classified_market", country, name, currency: "NGN", listings: 1, safe_pay: false, install_prompt: false });
@@ -71,5 +74,104 @@ describe("sitemaps", () => {
     expect(locations).toEqual(["https://shop.bitocard.com/ng", "https://shop.bitocard.com/ng/c/mobile-phones", "https://shop.bitocard.com/ng/lagos", "https://shop.bitocard.com/ng/lagos/ikeja", "https://shop.bitocard.com/ng/l/100001-tv"]);
     expect(urlset([{ loc: "https://shop.bitocard.com/a?b=1&c=2", lastmod: "2026-10-25" }])).toContain("<loc>https://shop.bitocard.com/a?b=1&amp;c=2</loc><lastmod>2026-10-25</lastmod>");
     expect(sitemapIndex(["https://shop.bitocard.com/ng/sitemap.xml"])).toContain("<sitemap><loc>https://shop.bitocard.com/ng/sitemap.xml</loc></sitemap>");
+  });
+});
+
+describe("commerce listing data", () => {
+  const phone: ShopListingPage = {
+    ...listing,
+    features: [
+      { key: "brand", name: "Brand", icon: "tag", unit: null, value: "Apple" },
+      { key: "storage", name: "Storage", icon: "hard-drive", unit: "GB", value: 256 },
+      { key: "repaired", name: "Ever repaired", icon: "wrench", unit: null, value: false },
+      { key: "colour", name: "Colour", icon: "palette", unit: null, value: null },
+    ],
+  };
+
+  test("the Product names its brand only from the seller's features, its number, condition and every feature", () => {
+    const data = listingJsonLd(phone, "https://udozo.com", "ng") as Record<string, unknown>;
+    expect(data).toMatchObject({
+      "@id": "https://udozo.com/ng/l/100001-iphone-13-pro-256-gb#product",
+      sku: "100001",
+      productID: "udozo:100001",
+      brand: { "@type": "Brand", name: "Apple" },
+      itemCondition: "https://schema.org/UsedCondition",
+      category: "Phones & tablets > Mobile phones",
+    });
+    expect(data.additionalProperty).toEqual([
+      { "@type": "PropertyValue", name: "Condition", value: "Used" },
+      { "@type": "PropertyValue", name: "Brand", value: "Apple" },
+      { "@type": "PropertyValue", name: "Storage", value: "256", unitText: "GB" },
+      { "@type": "PropertyValue", name: "Ever repaired", value: "No" },
+    ]);
+    expect(listingJsonLd(listing, "https://udozo.com", "ng")).not.toHaveProperty("brand");
+  });
+
+  test("Open Graph product tags: price and currency, availability and condition", () => {
+    expect(productMetaTags(phone)).toEqual({ "product:availability": "in stock", "product:price:amount": "520000.00", "product:price:currency": "NGN", "product:condition": "used", "product:category": "Mobile phones" });
+    const sold = productMetaTags({ ...phone, status: "sold", price: { kind: "on_request", amount: null, currency: "NGN" }, condition: "new" });
+    expect(sold).toEqual({ "product:availability": "out of stock", "product:condition": "new", "product:category": "Mobile phones" });
+  });
+
+  test("category and place pages list their listings; the site names Udozo, its logo and its support lines; the FAQs are FAQPage", () => {
+    const card = { ref: 100001, slug: "tv", title: "Hisense TV" } as ShopListingCard;
+    expect(itemListJsonLd("TVs for sale in Nigeria", [card], "https://udozo.com", "ng")).toMatchObject({ "@type": "ItemList", numberOfItems: 1, itemListElement: [{ "@type": "ListItem", position: 1, url: "https://udozo.com/ng/l/100001-tv", name: "Hisense TV" }] });
+    const org = organizationJsonLd("https://udozo.com");
+    expect(org).toMatchObject({ "@type": "Organization", url: "https://udozo.com/", logo: { url: "https://udozo.com/udozo-logo.png" }, email: "support@udozo.com" });
+    expect(org.contactPoint[0]).toMatchObject({ telephone: "+447503040682", email: "support@udozo.com" });
+    expect(websiteJsonLd("https://udozo.com").publisher).toEqual({ "@id": "https://udozo.com/#organization" });
+    const faqs = faqJsonLd(faqGroups);
+    expect(faqs.mainEntity).toHaveLength(faqGroups.reduce((sum, group) => sum + group.faqs.length, 0));
+    expect(faqs.mainEntity[0]).toMatchObject({ "@type": "Question", acceptedAnswer: { "@type": "Answer" } });
+  });
+
+  test("listings in the sitemap carry their photos (https only, at most five) under Google's image extension", () => {
+    const page: ShopSitemap = { object: "classified_sitemap", country: "NG", categories: [], places: [], listings: [{ ref: 7, slug: "tv", title: "TV", updated_at: "2026-11-01T00:00:00.000Z", images: ["https://media.test/a.jpg?x=1&y=2", "http://insecure.test/b.jpg"] }], next_after: null };
+    const xml = urlset(countryEntries("https://udozo.com", "ng", [page]));
+    expect(xml).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
+    expect(xml).toContain("<url><loc>https://udozo.com/ng/l/7-tv</loc><lastmod>2026-11-01T00:00:00.000Z</lastmod><image:image><image:loc>https://media.test/a.jpg?x=1&amp;y=2</image:loc></image:image></url>");
+    expect(xml).not.toContain("insecure.test");
+    expect(urlset([{ loc: "https://udozo.com/x", images: Array.from({ length: 8 }, (_, i) => `https://media.test/${i}.jpg`) }]).match(/<image:image>/g)).toHaveLength(5);
+  });
+});
+
+describe("social preview cards", () => {
+  test("money by its code (Inter has no ₦ or ₵), text clipped at a word, and only JPEG and PNG photos drawn", () => {
+    expect(ogMoney(25000000, "NGN")).toBe("NGN 250,000");
+    expect(ogMoney(123456, "GHS")).toBe("GHS 1,234.56");
+    expect(ogClip("Samsung Galaxy A54 with box and charger", 24)).toBe("Samsung Galaxy A54…");
+    expect(ogClip("Short", 24)).toBe("Short");
+    expect(photoType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe("image/jpeg");
+    expect(photoType(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBe("image/png");
+    expect(photoType(new TextEncoder().encode("RIFF....WEBP"))).toBeNull();
+  });
+
+  test("a photo that cannot be read, or is not https, leaves the card without it", async () => {
+    expect(await ogPhoto("http://media.test/a.jpg")).toBeNull();
+    expect(await ogPhoto(null)).toBeNull();
+    const fetchMock = vi.fn(async () => new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await ogPhoto("https://media.test/a.jpg")).toMatch(/^data:image\/jpeg;base64,/);
+    fetchMock.mockImplementationOnce(async () => new Response("nope", { status: 404 }));
+    expect(await ogPhoto("https://media.test/b.jpg")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  test("every listing, category and market page has its own drawn card; the listing's names its photo and price", () => {
+    for (const path of ["../app/[cc]/l/[listing]/opengraph-image.tsx", "../app/[cc]/c/[category]/opengraph-image.tsx", "../app/[cc]/opengraph-image.tsx", "../app/opengraph-image.tsx"]) {
+      expect(readFileSync(new URL(path, import.meta.url), "utf8"), path).toMatch(/export const size = ogImageSize/);
+    }
+    const listingPage = readFileSync(new URL("../app/[cc]/l/[listing]/page.tsx", import.meta.url), "utf8");
+    expect(listingPage).toContain("other: productMetaTags(listing)");
+    expect(listingPage).not.toContain("images: [cover.url]");
+  });
+
+  test("the manifest names the language and offers shortcuts", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: { message: "down" } }, { status: 503 })));
+    const { default: manifest } = await import("@/app/manifest");
+    const data = await manifest();
+    vi.unstubAllGlobals();
+    expect(data.lang).toBe("en-GB");
+    expect(data.shortcuts?.map(item => item.url)).toEqual(["/sell", "/account/messages", "/account/listings"]);
   });
 });

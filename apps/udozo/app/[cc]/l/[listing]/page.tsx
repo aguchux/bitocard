@@ -30,7 +30,7 @@ import { ListingGrid } from "@/components/listing-card";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { buyButton } from "@/lib/buy";
-import { breadcrumbJsonLd, listingJsonLd } from "@/lib/seo";
+import { breadcrumbJsonLd, listingJsonLd, productMetaTags } from "@/lib/seo";
 import type { ShopViewer } from "@bitocard/api-client/classifieds";
 
 type Props = { params: Promise<{ cc: string; listing: string }> };
@@ -50,13 +50,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const price = shopPriceText(listing.price);
   const title = `${listing.title}, ${price}`;
   const description = `${listing.status === "sold" ? "Sold. " : ""}${listing.title} for ${price} in ${listing.area.name}, ${listing.area.state.name}. ${listing.condition ? `${conditionLabels[listing.condition]}. ` : ""}Chat with the seller on Udozo and pay with Safe pay.`;
-  const cover = listing.photos[0];
+  // The preview image is the listing's own card (`opengraph-image.tsx`: its photo, price and area), never the bare photo.
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type: "website", url: path, title, description, ...(cover ? { images: [{ url: cover.url, ...(cover.width && cover.height ? { width: cover.width, height: cover.height } : {}), alt: listing.title }] } : {}) },
-    twitter: { card: cover ? "summary_large_image" : "summary", title, description, ...(cover ? { images: [cover.url] } : {}) },
+    openGraph: { type: "website", url: path, title, description, siteName: "Udozo" },
+    twitter: { card: "summary_large_image", title, description },
+    other: productMetaTags(listing),
   };
 }
 

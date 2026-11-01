@@ -6,7 +6,7 @@ import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
 import { marketFor, markets, shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
-import { regionalAlternates } from "@/lib/seo";
+import { organizationJsonLd, regionalAlternates } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string }> };
 
@@ -59,7 +59,8 @@ export default async function CountryHome({ params }: Props) {
           )}
         </section>
       </div>
-      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `Udozo ${market.name}`, url: `${siteOrigin()}/${cc}`, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />
+      <JsonLd data={organizationJsonLd(siteOrigin())} />
+      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `Udozo ${market.name}`, url: `${siteOrigin()}/${cc}`, inLanguage: `en-${market.country}`, publisher: { "@id": `${siteOrigin()}/#organization` }, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />
     </>
   );
 }
