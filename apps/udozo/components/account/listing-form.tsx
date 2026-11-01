@@ -130,7 +130,7 @@ export function ListingForm({
   const [pickup, setPickup] = useState(listing?.pickup ?? true);
   const [feeState, setFeeState] = useState(listing?.delivery_fees.within_state ? fromMinor(listing.delivery_fees.within_state) : "");
   const [feeNation, setFeeNation] = useState(listing?.delivery_fees.nationwide ? fromMinor(listing.delivery_fees.nationwide) : "");
-  const [contact, setContact] = useState<ShopContact>(listing?.contact ?? "chat");
+  const [contact, setContact] = useState<ShopContact>(listing?.contact ?? "both");
   const [stateSlug, setStateSlug] = useState<string>(listing?.area?.state?.slug ?? "");
   const [areaId, setAreaId] = useState<string | null>(listing?.area?.id ?? null);
   const [description, setDescription] = useState(listing?.description ?? "");

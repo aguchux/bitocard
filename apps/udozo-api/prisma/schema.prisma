@@ -4494,7 +4494,7 @@ model ClassifiedListing {
   deliveryFeeStateMinor      BigInt       @default(0) @map("delivery_fee_state_minor")
   deliveryFeeNationwideMinor BigInt       @default(0) @map("delivery_fee_nationwide_minor")
   /// chat, phone or both.
-  contact      String                     @default("chat")
+  contact      String                     @default("both")
   /// draft, pending_review, active, sold, expired, rejected, removed (by BitoCard) or deleted (by the seller).
   status       String                     @default("draft")
   /// Why it waits for review (first_listings, flagged…), or why it was rejected or removed.

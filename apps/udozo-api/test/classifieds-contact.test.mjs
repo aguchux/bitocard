@@ -222,6 +222,13 @@ describe('calls', () => {
     assert.deepEqual([tested.json.ok, tested.json.message], [true, 'Calls will be relayed through 2 TURN addresses.']);
   });
 
+  test('a listing takes chat and calls unless the seller chooses otherwise', async () => {
+    const seller = await customer('Ada Okafor', { phone: '+2348031120019' });
+    const cat = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } });
+    const draft = await seller.post('/v1/classifieds/listings', { title: 'Samsung 43 inch TV', category_id: cat.id });
+    assert.equal(draft.json.contact, 'both', JSON.stringify(draft.json));
+  });
+
   test('ring an online seller, answer, swap connection details through the relay, then end', async () => {
     const seller = await customer('Obi Nnamdi', { phone: '+2348031120006' });
     const buyer = await customer('Zainab Musa');
