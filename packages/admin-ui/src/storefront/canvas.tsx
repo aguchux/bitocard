@@ -9,7 +9,7 @@ import type { StoreSectionType as SectionType } from "@bitocard/api-client/store
 import { cn } from "../format";
 import { Badge } from "../ui/status";
 import { type Breakpoint, gridPlacement, lgSpans, mdSpans } from "./grid";
-import { type EditorSection as Section, makeStoreRegistry, registryLabel, useSectionRegistry } from "./registry";
+import { type EditorSection as Section, makeStoreRegistry, registryLabel, SectionIcon, useSectionRegistry } from "./registry";
 
 export const sectionIcons: Record<SectionType, LucideIcon> = {
   hero: LayoutPanelTop,
@@ -91,7 +91,6 @@ function SectionCard({
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: section.id, disabled: !editable });
   const registry = useSectionRegistry(storeCards);
-  const Icon = registry.icon(section.type);
   const title = registry.title(section) || "Untitled";
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
@@ -130,7 +129,7 @@ function SectionCard({
           </button>
         ) : null}
         <span className="grid size-8 shrink-0 place-items-center rounded-md bg-brand-50 text-brand-600">
-          <Icon className="size-4" aria-hidden />
+          <SectionIcon registry={registry} type={section.type} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold uppercase tracking-wide text-subtle">{`${index + 1}. ${registryLabel(registry, section.type)}`}</p>

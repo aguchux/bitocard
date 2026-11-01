@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ComponentType } from "react";
+import { createContext, createElement, useContext, type ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { StoreSection } from "@bitocard/api-client/storefront";
 import { cleanForSave, type GridSection, newSection, sectionSummary, sectionTitle, sectionTypes } from "./grid";
@@ -40,4 +40,9 @@ export function makeStoreRegistry(icon: (type: StoreSection["type"]) => LucideIc
 
 export function useSectionRegistry(fallback: SectionRegistry): SectionRegistry {
   return useContext(RegistryContext) ?? fallback;
+}
+
+/** A section type's icon from the registry, drawn (decorative). */
+export function SectionIcon({ registry, type, className = "size-4" }: { registry: SectionRegistry; type: string; className?: string }) {
+  return createElement(registry.icon(type), { className, "aria-hidden": true });
 }

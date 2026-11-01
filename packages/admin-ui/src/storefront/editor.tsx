@@ -11,7 +11,7 @@ import { Badge, Notice } from "../ui/status";
 import { Canvas, sectionIcons } from "./canvas";
 import { addSection, type Breakpoint, duplicateSection, moveSection, removeSection, sectionIndexFromParam, setRows, setSpan, toggleHidden } from "./grid";
 import { type EditorSources, EditorSourcesProvider, Inspector, StoreSectionForm } from "./inspector";
-import { type EditorSection, makeStoreRegistry, type SectionRegistry, SectionRegistryProvider } from "./registry";
+import { type EditorSection, makeStoreRegistry, SectionIcon, type SectionRegistry, SectionRegistryProvider } from "./registry";
 
 /** bitocard.com's and resellers' store sections: the editor's default. */
 const storeRegistry = makeStoreRegistry(type => sectionIcons[type], StoreSectionForm);
@@ -297,12 +297,11 @@ export function SectionsEditor<S extends EditorSection = StoreSection>({ page, a
       <Dialog open={adding} onClose={() => setAdding(false)} title="Add a section" description="It goes at the end of the page; drag it where you want it.">
         <ul className="space-y-2">
           {offered.map(item => {
-            const Icon = registry.icon(item.type);
             return (
               <li key={item.type}>
                 <button type="button" onClick={() => add(item.type)} className="flex w-full items-start gap-3 rounded-xl border border-line p-3 text-left hover:border-brand-300 hover:bg-brand-50">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600">
-                    <Icon className="size-4" aria-hidden />
+                    <SectionIcon registry={registry as unknown as SectionRegistry} type={item.type} />
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-bold">{item.label}</span>
