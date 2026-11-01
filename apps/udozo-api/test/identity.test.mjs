@@ -144,6 +144,7 @@ describe('reseller identity checks', () => {
     assert.ok(notes.includes('Your identity check is being reviewed') && notes.includes('Your identity check was declined'));
     assert.ok((await admin.get('/v1/admin/notifications?limit=100')).json.data.some(item => item.type === 'admin.verification.review'));
     assert.equal(queue[0].provider_reference, second);
+    assert.equal(queue[0].customer, null, "a reseller owner's check names no customer");
     const support = await adminClient(server, ['support']);
     assert.equal((await support.post(`/v1/admin/verifications/${queue[0].id}/decide`, { decision: 'approved', reason: 'Checked by hand' })).status, 403);
     const decided = await admin.post(`/v1/admin/verifications/${queue[0].id}/decide`, { decision: 'approved', reason: 'Document checked in the Didit console', verified_name: 'Ada Obi' });

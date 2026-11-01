@@ -13,7 +13,7 @@ export default function AllVerificationsPage() {
   const [subject, setSubject] = useState<"all" | "reseller" | "customer">("all");
   return (
     <UdozoShell section="verifications" current="/verifications/all" crumbs={[{ label: "Identity", href: "/verifications" }, { label: "All checks" }]}>
-      <PageHeader title="All identity checks" description="Reseller owners (Didit) and customers (BVN in Nigeria, Didit elsewhere). Only outcomes are kept, never documents or BVNs." />
+      <PageHeader title="All identity checks" description="Every identity check of reseller owners and customers, by Udozo Verify (each market's choice; Africa's by default) or Didit. Udozo Verify keeps the documents privately for review; Didit's checks keep only the outcome." />
       <div className="flex flex-wrap justify-between gap-3">
         <Tabs
           label="Status"

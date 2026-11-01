@@ -27,6 +27,8 @@ const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];
 const reuseSessionMs = 24 * 3600 * 1000;
 /** Checks nobody finished are closed after this. */
 const expireAfterMs = 7 * 24 * 3600 * 1000;
+/** A customer's own id, as hosted stores send it for their checks. */
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such verification.');
@@ -584,7 +586,19 @@ export class IdentityService {
 
   // -- Admin -----------------------------------------------------------------------------------------------------
 
-  private presentAdmin(record: IdentityVerification & { reseller?: { name: string } }) {
+  /**
+   * The customers behind customer checks, by id: a hosted store's checks carry the customer's own id as their reference
+   * (a reseller's own systems send references of theirs, which match nobody), so admins see a name, not an id.
+   */
+  private async customersOf(records: IdentityVerification[]) {
+    const ids = [...new Set(records.flatMap(record => (record.subject === 'customer' && record.customerReference && uuidPattern.test(record.customerReference) ? [record.customerReference] : [])))];
+    if (!ids.length) return new Map<string, { id: string; name: string; email: string }>();
+    const rows = await this.prisma.customer.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true } });
+    return new Map(rows.map(row => [row.id, row]));
+  }
+
+  private presentAdmin(record: IdentityVerification & { reseller?: { name: string } }, customers: Map<string, { id: string; name: string; email: string }> = new Map()) {
+    const customer = record.subject === 'customer' && record.customerReference ? customers.get(record.customerReference) : undefined;
     return {
       object: 'verification' as const,
       id: record.id,
@@ -593,6 +607,8 @@ export class IdentityService {
       reseller_name: record.reseller?.name ?? null,
       mode: record.mode,
       customer_reference: record.customerReference,
+      /** The store customer checked, where the reference is one (hosted stores and Udozo itself); else null. */
+      customer: customer ? { id: customer.id, name: customer.name, email: customer.email } : null,
       method: record.method,
       provider: record.provider,
       provider_reference: record.providerReference,
@@ -619,13 +635,15 @@ export class IdentityService {
       take: limit + 1,
       ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
     });
-    return { object: 'list' as const, data: records.slice(0, limit).map(record => this.presentAdmin(record)), has_more: records.length > limit };
+    const page = records.slice(0, limit);
+    const customers = await this.customersOf(page);
+    return { object: 'list' as const, data: page.map(record => this.presentAdmin(record, customers)), has_more: records.length > limit };
   }
 
   async adminGet(id: string) {
     const record = await this.prisma.identityVerification.findUnique({ where: { id }, include: { reseller: { select: { name: true } } } });
     if (!record || record.resellerId === afrippaOperatorId) throw notFound();
-    return this.presentAdmin(record);
+    return this.presentAdmin(record, await this.customersOf([record]));
   }
 
   /** An admin's decision on a check the provider sent for review, after looking at it in the provider's console. */

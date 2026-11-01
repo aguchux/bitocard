@@ -179,6 +179,8 @@ export type Verification = {
   reseller_name: string | null;
   mode: Mode;
   customer_reference: string | null;
+  /** The store customer checked, where the reference is one (Udozo's API); null otherwise. */
+  customer?: { id: string; name: string; email: string } | null;
   method: 'document' | 'bvn';
   provider: string;
   provider_reference: string;

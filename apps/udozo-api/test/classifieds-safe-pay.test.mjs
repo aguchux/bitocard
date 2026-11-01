@@ -340,6 +340,11 @@ describe('Safe pay', () => {
       assert.deepEqual([refused.status, refused.json.error.code], [403, 'customer_verification_required']);
       await ready(seller);
       assert.equal((await seller.get('/v1/store/cash')).status, 200, 'checked, they are paid');
+      // Admins see the customer behind the check by name, never only their id.
+      const check = (await admin.get('/v1/admin/verifications?subject=customer&limit=100')).json.data.find(row => row.customer_reference === seller.id);
+      assert.deepEqual([check.customer.id, check.customer.name], [seller.id, seller.name]);
+      assert.match(check.customer.email, /@/);
+      assert.deepEqual((await admin.get(`/v1/admin/verifications/${check.id}`)).json.customer.id, seller.id);
     } finally {
       await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: null });
     }

@@ -6,9 +6,16 @@ import { ActionDialog, Button, Card, DataTable, errorMessage, Field, formatDateT
 import { can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
 import { useDecideVerificationMutation, useVerificationsInfiniteQuery, type Verification, type VerificationStatus } from "@bitocard/api-client/admin";
 
+/** Who ran a check, in words: the provider's internal key ("bitocard" is Udozo Verify) is never shown. */
+export const providerLabels: Record<string, string> = { bitocard: "Udozo Verify", didit: "Didit", flutterwave: "Flutterwave", sandbox: "Sandbox", test: "Sandbox" };
+export const providerLabel = (provider: string) => providerLabels[provider] ?? humanise(provider);
+/** A check run by Udozo Verify is decided from its case (documents, selfie and liveness), never from this list. */
+export const isVerifyCheck = (check: Pick<Verification, "provider">) => check.provider === "bitocard";
+
 /**
- * Identity checks, newest first. In the review queue, operations admins approve or decline each check after looking at
- * it in the provider's console; every decision is audited.
+ * Identity checks, newest first. Udozo Verify's open each case, where they are decided with the documents; other
+ * providers' checks in review are approved or declined here by operations after looking at them in the provider's
+ * console. Every decision is audited.
  */
 export function VerificationList({ status, subject }: { status?: VerificationStatus; subject?: "reseller" | "customer" }) {
   const admin = useAdmin();
@@ -35,7 +42,16 @@ export function VerificationList({ status, subject }: { status?: VerificationSta
             header: "Who",
             cell: check => (
               <span>
-                <span className="font-semibold">{check.subject === "reseller" ? (check.expected_name ?? "Business owner") : (check.customer_reference ?? "Customer")}</span>
+                {check.subject === "reseller" ? (
+                  <span className="font-semibold">{check.expected_name ?? "Business owner"}</span>
+                ) : check.customer ? (
+                  <AppLink href={`/customers/${check.customer.id}`} className="font-semibold underline-offset-2 hover:underline">
+                    {check.customer.name}
+                    <span className="block text-xs font-normal text-muted">{check.customer.email}</span>
+                  </AppLink>
+                ) : (
+                  <span className="font-semibold">{check.customer_reference ? `Their reference ${check.customer_reference}` : "Customer"}</span>
+                )}
                 <span className="block text-xs text-muted">
                   {check.subject === "reseller" ? "Reseller owner" : "Customer"} of{" "}
                   <AppLink href={`/resellers/${check.reseller_id}`} className="underline-offset-2 hover:underline">
@@ -45,7 +61,7 @@ export function VerificationList({ status, subject }: { status?: VerificationSta
               </span>
             ),
           },
-          { key: "method", header: "Method", cell: check => `${check.method === "bvn" ? "BVN" : "Document"} · ${check.provider}`, hideOnMobile: true },
+          { key: "method", header: "Method", cell: check => `${check.method === "bvn" ? "BVN" : "ID document"} · ${providerLabel(check.provider)}`, hideOnMobile: true },
           { key: "country", header: "Country", cell: check => check.country },
           { key: "status", header: "Status", cell: check => <StatusBadge status={check.status} /> },
           { key: "reason", header: "Reason", cell: check => <span className="text-sm text-muted">{check.reason ? humanise(check.reason) : "—"}</span>, hideOnMobile: true },
@@ -55,7 +71,11 @@ export function VerificationList({ status, subject }: { status?: VerificationSta
             header: "",
             align: "right",
             cell: check =>
-              operator && check.status === "in_review" ? (
+              isVerifyCheck(check) ? (
+                <AppLink href={`/verifications/verify/${check.provider_reference}`} className="text-sm font-semibold text-brand-700 hover:underline">
+                  {check.status === "in_review" ? "Review case" : "Open case"}
+                </AppLink>
+              ) : operator && check.status === "in_review" ? (
                 <span className="inline-flex gap-2">
                   <Button
                     size="sm"
