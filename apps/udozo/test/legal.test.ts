@@ -69,9 +69,9 @@ describe("Udozo's legal documents", () => {
 
   test("the cookie notice names every udz_ cookie and storage key Udozo's sites set", () => {
     const named = JSON.stringify(legalDocuments.find(doc => doc.slug === "cookies")!.sections);
-    const sources = [read("../lib/customer.ts"), read("../lib/assistant.ts"), read("../components/assistant.tsx"), read("../lib/microphone.ts"), read("../../verify/lib/brand.ts"), read("../../api/src/products/product.ts")].join("\n");
+    const sources = [read("../lib/customer.ts"), read("../lib/assistant.ts"), read("../components/assistant.tsx"), read("../lib/microphone.ts"), read("../lib/cookie-consent.ts"), read("../../verify/lib/brand.ts"), read("../../api/src/products/product.ts")].join("\n");
     const set = new Set([...sources.matchAll(/["'](udz_[a-z_]+)["']/g)].map(match => match[1]));
-    expect([...set].sort()).toEqual(["udz_admin_session", "udz_assistant", "udz_assistant_language", "udz_customer", "udz_kyc", "udz_microphone_prompt", "udz_session"]);
+    expect([...set].sort()).toEqual(["udz_admin_session", "udz_assistant", "udz_assistant_language", "udz_cookie_consent", "udz_customer", "udz_kyc", "udz_microphone_prompt", "udz_session"]);
     for (const name of set) expect(named, `${name} is in the cookie notice`).toContain(name);
     // Seller HQ's own browser storage, and the shared install reminders.
     const shq = [read("../../udozo-shq/components/reseller.tsx"), read("../../udozo-shq/app/(console)/page.tsx")].join("\n");

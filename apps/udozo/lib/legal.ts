@@ -742,13 +742,13 @@ const privacy: LegalDocument = {
 const cookies: LegalDocument = {
   slug: "cookies",
   title: "Cookie notice",
-  summary: "The few cookies and browser storage Udozo's sites use, all needed for them to work.",
+  summary: "The few cookies and browser storage Udozo's sites use, all needed for them to work, and your choice about optional cookies.",
   sections: [
     {
       id: "cookies",
       heading: "1. Cookies",
       body: [
-        "Udozo uses only cookies that are strictly necessary, so it asks for no consent. It uses no analytics, advertising or tracking cookies.",
+        "Udozo uses only cookies that are strictly necessary for its sites to work. It uses no analytics, advertising or tracking cookies today; if it ever adds optional ones, it will use them only after you agree (section 3).",
         {
           table: {
             head: ["Name", "Site", "What for", "Kept"],
@@ -759,6 +759,7 @@ const cookies: LegalDocument = {
               ["udz_session", "Seller HQ (shq.udozo.com), shared across udozo.com addresses", "Keeps sellers and their team signed in", "30 days"],
               ["udz_admin_session", "Udozo's admin", "Keeps Udozo's team signed in", "12 hours"],
               ["udz_kyc", "verify.udozo.com", "Keeps your identity check open while you do it", "Two hours"],
+              ["udz_cookie_consent", "udozo.com, and each reseller's store on its own address", "Remembers your cookie choice (Necessary only or Accept all) and when you made it", "12 months"],
             ],
           },
         },
@@ -785,6 +786,14 @@ const cookies: LegalDocument = {
           },
         },
         "The sites' service workers keep a page to show when you have no connection. You can clear all of this at any time in your browser's settings; signing out removes your session cookie.",
+      ],
+    },
+    {
+      id: "choices",
+      heading: "3. Your cookie choices",
+      body: [
+        "On your first visit each of Udozo's sites asks about cookies. Necessary only keeps to the cookies above; Accept all also allows optional cookies, such as analytics to see how Udozo is used. Udozo uses no optional cookies yet: if it adds any, this notice will name them first, and they will be used only where you chose Accept all.",
+        "Your choice is kept for 12 months in udz_cookie_consent, then you are asked again. You can change it at any time with Cookie settings at the foot of every page. Each reseller's store on its own address asks separately.",
       ],
     },
   ],

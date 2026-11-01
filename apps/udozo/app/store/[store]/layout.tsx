@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
+import { CookieSettingsButton } from "@/components/cookie-consent";
 import { confirmationPending, currentCustomer, safeNext, siteOrigin } from "@/lib/customer";
 import { signOut } from "@/lib/account-actions";
 import { requireStore, storeOrigin } from "@/lib/store";
@@ -108,6 +109,10 @@ export default async function StoreLayout({ children, params }: Props) {
             <a href={`${site}/legal/privacy`} className="hover:underline">
               Privacy
             </a>
+            <a href={`${site}/legal/cookies`} className="hover:underline">
+              Cookies
+            </a>
+            <CookieSettingsButton />
             <a href={site} className="hover:underline">
               Powered by Udozo
             </a>

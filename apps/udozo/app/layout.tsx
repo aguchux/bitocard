@@ -5,6 +5,7 @@ import { InstallSupport } from "@bitocard/ui/install-ui";
 import { installCaptureScript } from "@bitocard/ui/install";
 import { CallProvider } from "@/components/calls/call-provider";
 import { ChatDock } from "@/components/chat-dock";
+import { CookieConsent } from "@/components/cookie-consent";
 import { customerCookie, siteOrigin } from "@/lib/customer";
 import { storeHeader } from "@/lib/store-host";
 import { previewHeader, siteTheme, themeCss } from "@/lib/theme";
@@ -39,12 +40,13 @@ export async function generateViewport(): Promise<Viewport> {
  * Every page wears Udozo's theme, chosen by its admins (`/v1/theme`): its colours re-point the variables every utility
  * reads. `?theme_preview=<token>` on any address (the admins' preview link; the proxy passes it on) shows the draft.
  * A signed-in customer on udozo.com (never a reseller's store) can call and be called on every page (`CallProvider`), and
- * has their chats at hand (`ChatDock`).
+ * has their chats at hand (`ChatDock`). Every page asks for cookie consent until the visitor chooses (`CookieConsent`).
  */
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const list = await headers();
   const theme = await siteTheme(list.get(previewHeader));
-  const calls = !list.get(storeHeader) && (await cookies()).has(customerCookie);
+  const onStore = Boolean(list.get(storeHeader));
+  const calls = !onStore && (await cookies()).has(customerCookie);
   return (
     <html lang="en-GB" className={inter.variable} data-theme-preview={theme.preview ? "" : undefined}>
       <head>
@@ -66,6 +68,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           children
         )}
         <InstallSupport />
+        {/* A reseller's store has no legal pages of its own: its banner links udozo.com's cookie notice. */}
+        <CookieConsent noticeHref={onStore ? `${siteOrigin()}/legal/cookies` : "/legal/cookies"} />
       </body>
     </html>
   );

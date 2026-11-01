@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, ShieldCheck, Store } from "lucide-react";
 import type { ShopMarket, ShopTopCategory } from "@bitocard/api-client/classifieds";
+import { CookieSettingsButton } from "@/components/cookie-consent";
 import { Flag } from "@/components/flag";
 import { UdozoWordmark } from "@/components/header";
 import { ShopIcon } from "@/components/icon";
@@ -285,6 +286,10 @@ export default async function StartHerePage({ searchParams }: Props) {
             <Link href="/legal/privacy" className="hover:underline">
               Privacy
             </Link>
+            <Link href="/legal/cookies" className="hover:underline">
+              Cookies
+            </Link>
+            <CookieSettingsButton />
           </nav>
         </div>
       </footer>

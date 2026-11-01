@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookieSettingsButton } from "@/components/cookie-consent";
 
 /** Udozo's footer: Start selling (the sellers' landing page), the Safe Trade Guide, the FAQs and Contact us, Udozo's own legal documents (on udozo.com, `/legal`) and the credit. */
 export function SiteFooter({ country }: { country?: { code: string; name: string } | null }) {
@@ -40,6 +41,7 @@ export function SiteFooter({ country }: { country?: { code: string; name: string
           <Link href="/legal/cookies" className="hover:underline">
             Cookies
           </Link>
+          <CookieSettingsButton />
         </nav>
       </div>
       <p className="border-t border-navy-100 py-4 text-center text-xs text-navy-500">© {new Date().getFullYear()} Udozo</p>
