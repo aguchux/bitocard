@@ -3,7 +3,7 @@
  * (`SPACES_ROOT`): platform files under `platform/`, each reseller's under `resellers/<reseller id>/`, so a bucket is
  * easy to browse and a reseller's files are never mixed with BitoCard's or another reseller's.
  */
-export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'registry';
+export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'registry' | 'classified_brand';
 
 export type MediaPurpose = {
   label: string;
@@ -50,6 +50,8 @@ const purposeTable = {
   category_image: { label: 'Category image', realm: 'admin', target: 'category', folder: category => `platform/categories/${segment(category!)}/images`, maxBytes: 5 * MB, types: rasterTypes },
   storefront_image: { label: 'Storefront image', realm: 'admin', folder: () => 'platform/storefront/images', maxBytes: 5 * MB, types: rasterTypes },
   // udozo.com's home pages: banners, carousel slides and category tile photos.
+  // Udozo's brand registry: a brand's logo, shown in place of the one bundled with udozo.com.
+  classified_brand_logo: { label: 'Marketplace brand logo', realm: 'admin', target: 'classified_brand', folder: slug => `platform/classifieds/brands/${segment(slug!)}/logos`, maxBytes: 1 * MB, types: withSvg },
   home_image: { label: 'Home page image', realm: 'admin', folder: () => 'platform/home/images', maxBytes: 5 * MB, types: rasterTypes },
   store_logo: { label: 'Store logo', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/logos`, maxBytes: 1 * MB, types: rasterTypes },
   store_image: { label: 'Store image', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/images`, maxBytes: 5 * MB, types: rasterTypes },

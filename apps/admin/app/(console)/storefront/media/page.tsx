@@ -19,6 +19,7 @@ const purposeLabels: Record<MediaPurpose, string> = {
   category_image: "Category images",
   storefront_image: "Storefront images",
   home_image: "Home page images",
+  classified_brand_logo: "Marketplace brand logos",
   store_logo: "Reseller store logos",
   store_image: "Reseller store images",
   bot_avatar: "Store assistant avatar",

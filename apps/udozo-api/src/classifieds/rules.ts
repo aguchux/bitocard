@@ -87,6 +87,20 @@ export function checkDescription(value: string) {
   return text.length ? text : null;
 }
 
+/** The feature key the brand registry answers: its values are a registry brand's name where one matches. */
+export const brandFeatureKey = 'brand';
+
+/**
+ * How a brand is matched: lower case letters and digits only, accents dropped ("Mercedes Benz", "mercedes-benz" and
+ * "MERCEDES-BENZ" are one brand; "Lancôme" is "lancome"). `brandKeySql` is the same for a stored value, in SQL.
+ */
+export const brandKey = (name: string) =>
+  name
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
 export type RegistryFeature = { id: string; key: string; name: string; dataType: string; unit: string | null; choices: string[]; min: number | null; max: number | null; enabled: boolean };
 export type FeatureValue = { valueText: string | null; valueNumber: number | null };
 

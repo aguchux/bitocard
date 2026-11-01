@@ -2723,6 +2723,7 @@ model Customer {
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
   classifiedFeatureSuggestions ClassifiedFeatureSuggestion[]
+  classifiedBrandSuggestions ClassifiedBrandSuggestion[]
   handoffs                  CustomerHandoff[]
   assistantThreads          AssistantThread[]
   resaleRelationships       ResaleRelationship[]
@@ -4310,10 +4311,78 @@ model ClassifiedCategory {
   countries       ClassifiedCategoryCountry[]
   listings        ClassifiedListing[]
   featureSuggestions ClassifiedFeatureSuggestion[]
+  brands          ClassifiedBrandCategory[]
+  brandSuggestions ClassifiedBrandSuggestion[]
   resaleRules     ResaleRule[]
 
   @@index([parentId, position])
   @@map("classified_categories")
+}
+
+/// Udozo's brand registry: the brands sellers pick for the `brand` feature, each in the categories it sells in (in order),
+/// with the words sellers type for it and a logo (an admin's upload, else one bundled with udozo.com). A listing keeps the
+/// brand's name as its value, so a brand typed as an alias ("benz") is saved as the registry's name ("Mercedes-Benz").
+model ClassifiedBrand {
+  id          String                    @id @default(uuid()) @db.Uuid
+  /// Its address part and logo file name; never changes.
+  slug        String                    @unique
+  name        String
+  /// The name in lower case letters and digits only ("mercedesbenz"): two brands never share one.
+  nameKey     String                    @unique @map("name_key")
+  /// What sellers type instead (lower case): model lines, short names, other spellings.
+  aliases     String[]                  @default([])
+  /// The name's and aliases' keys, as `nameKey`, which values are matched on.
+  matchKeys   String[]                  @default([]) @map("match_keys")
+  /// A logo bundled with udozo.com (`/brand-logos/<logo_file>.svg`), from Simple Icons (CC0).
+  logoFile    String?                   @map("logo_file")
+  /// An admin's upload, shown in place of the bundled one.
+  logoUrl     String?                   @map("logo_url")
+  /// The brand's colour (`#RRGGBB`), behind its initials when it has no logo.
+  color       String?
+  enabled     Boolean                   @default(true)
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
+  categories  ClassifiedBrandCategory[]
+  suggestions ClassifiedBrandSuggestion[]
+
+  @@map("classified_brands")
+}
+
+/// The categories a brand sells in, its place among the category's brands (most bought first).
+model ClassifiedBrandCategory {
+  brandId    String             @map("brand_id") @db.Uuid
+  categoryId String             @map("category_id") @db.Uuid
+  position   Int                @default(0)
+  brand      ClassifiedBrand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  category   ClassifiedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([brandId, categoryId])
+  @@index([categoryId, position])
+  @@map("classified_brand_categories")
+}
+
+/// A brand a seller typed that the registry lacks: admins add it (the sellers' values then read as it) or dismiss it.
+model ClassifiedBrandSuggestion {
+  id          String              @id @default(uuid()) @db.Uuid
+  customerId  String              @map("customer_id") @db.Uuid
+  /// As the seller typed it.
+  name        String
+  /// As `ClassifiedBrand.nameKey`: suggestions of the same brand are counted together.
+  nameKey     String              @map("name_key")
+  categoryId  String?             @map("category_id") @db.Uuid
+  /// open, added or dismissed.
+  status      String              @default("open")
+  brandId     String?             @map("brand_id") @db.Uuid
+  decidedById String?             @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime?           @map("decided_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  category    ClassifiedCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand       ClassifiedBrand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  @@index([status, nameKey])
+  @@index([customerId, createdAt])
+  @@map("classified_brand_suggestions")
 }
 
 /// The feature keys a category suggests, in order, which are its filters, and its own default and placeholder.

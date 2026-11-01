@@ -5,10 +5,12 @@ import { PrismaService } from '../database/prisma.service.js';
 import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { ClassifiedBrandsService } from './brands.service.js';
 import { ModerationService, type ReviewFlag } from './moderation.service.js';
 import { ResaleService } from './resale.service.js';
 import { ShopTermsService } from './terms.service.js';
 import {
+  brandFeatureKey,
   checkDescription,
   checkFeatureValue,
   checkTitle,
@@ -113,6 +115,7 @@ export class ListingsService {
     private readonly moderation: ModerationService,
     private readonly terms: ShopTermsService,
     private readonly resale: ResaleService,
+    private readonly brands: ClassifiedBrandsService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -211,7 +214,15 @@ export class ListingsService {
     // A live listing whose words, category or price changed is checked again, and goes back to review if doubtful.
     const changed = ['title', 'description', 'categoryId', 'priceMinor'].some(key => key in data.fields) || data.features !== null;
     if (listing.status === 'active' && changed) await this.recheck(id);
-    return this.present(await this.own(customer, id));
+    const saved = await this.own(customer, id);
+    if (saved.status !== 'draft' && data.features) await this.noteBrand(customer.id, saved);
+    return this.present(saved);
+  }
+
+  /** A submitted listing's brand the registry lacks goes to admins as a suggestion (it is saved as typed all the same). */
+  private async noteBrand(customerId: string, listing: { categoryId: string | null; features: { valueText: string | null; feature: { key: string } }[] }) {
+    const brand = listing.features.find(value => value.feature.key === brandFeatureKey)?.valueText;
+    if (brand) await this.brands.note(customerId, brand, listing.categoryId);
   }
 
   /** Runs the checks on a live listing again (after an edit or a new photo): doubtful ones go back to review. */
@@ -290,6 +301,7 @@ export class ListingsService {
       if (!claimed.count) throw conflict('listing_not_draft', 'This listing was already submitted.');
       if (!(await tx.classifiedPriceHistory.count({ where: { listingId: id } })) && listing.priceMinor !== null) await this.recordPrice(tx, id, listing.priceMinor);
     });
+    await this.noteBrand(customer.id, listing);
     return this.present(await this.own(customer, id));
   }
 
@@ -411,6 +423,9 @@ export class ListingsService {
         if (!feature || !feature.enabled) throw invalid('feature_unknown', `There is no feature "${item.key}". Choose one from the list, or suggest it.`, `features[${index}].key`);
         return { featureId: feature.id, ...checkFeatureValue(feature, item.value, `features[${index}].value`) };
       });
+      // A brand reads as the registry writes it ("samsung" is Samsung, "benz" Mercedes-Benz); one it lacks stays as typed.
+      const brand = registry.find(row => row.key === brandFeatureKey);
+      for (const value of features) if (brand && value.featureId === brand.id && value.valueText) value.valueText = await this.brands.canonical(value.valueText);
     }
 
     // Where it is sold (BitoCard Shop, resellers' stores or both), its resale terms and its stock.

@@ -1,0 +1,550 @@
+{
+  "samsung": {
+    "icon": "samsung",
+    "hex": "1428A0"
+  },
+  "apple": {
+    "icon": "apple",
+    "hex": "000000"
+  },
+  "xiaomi": {
+    "icon": "xiaomi",
+    "hex": "FF6900"
+  },
+  "huawei": {
+    "icon": "huawei",
+    "hex": "FF0000"
+  },
+  "oppo": {
+    "icon": "oppo",
+    "hex": "2D683D"
+  },
+  "vivo": {
+    "icon": "vivo",
+    "hex": "415FFF"
+  },
+  "google": {
+    "icon": "google",
+    "hex": "4285F4"
+  },
+  "oneplus": {
+    "icon": "oneplus",
+    "hex": "F5010C"
+  },
+  "nokia": {
+    "icon": "nokia",
+    "hex": "005AFF"
+  },
+  "motorola": {
+    "icon": "motorola",
+    "hex": "E1140A"
+  },
+  "honor": {
+    "icon": "honor",
+    "hex": "000000"
+  },
+  "sony": {
+    "icon": "sony",
+    "hex": "FFFFFF"
+  },
+  "lg": {
+    "icon": "lg",
+    "hex": "A50034"
+  },
+  "blackberry": {
+    "icon": "blackberry",
+    "hex": "000000"
+  },
+  "asus": {
+    "icon": "asus",
+    "hex": "000000"
+  },
+  "lenovo": {
+    "icon": "lenovo",
+    "hex": "E2231A"
+  },
+  "fitbit": {
+    "icon": "fitbit",
+    "hex": "00B0B9"
+  },
+  "garmin": {
+    "icon": "garmin",
+    "hex": "000000"
+  },
+  "jbl": {
+    "icon": "jbl",
+    "hex": "FF3300"
+  },
+  "hp": {
+    "icon": "hp",
+    "hex": "0096D6"
+  },
+  "dell": {
+    "icon": "dell",
+    "hex": "007DB8"
+  },
+  "acer": {
+    "icon": "acer",
+    "hex": "83B81A"
+  },
+  "toshiba": {
+    "icon": "toshiba",
+    "hex": "FF0000"
+  },
+  "msi": {
+    "icon": "msi",
+    "hex": "FF0000"
+  },
+  "alienware": {
+    "icon": "alienware",
+    "hex": "541BAE"
+  },
+  "razer": {
+    "icon": "razer",
+    "hex": "00FF00"
+  },
+  "fujitsu": {
+    "icon": "fujitsu",
+    "hex": "FF0000"
+  },
+  "panasonic": {
+    "icon": "panasonic",
+    "hex": "0049AB"
+  },
+  "intel": {
+    "icon": "intel",
+    "hex": "0071C5"
+  },
+  "kingston": {
+    "icon": "kingstontechnology",
+    "hex": "000000"
+  },
+  "seagate": {
+    "icon": "seagate",
+    "hex": "6EBE49"
+  },
+  "corsair": {
+    "icon": "corsair",
+    "hex": "231F20"
+  },
+  "amd": {
+    "icon": "amd",
+    "hex": "ED1C24"
+  },
+  "nvidia": {
+    "icon": "nvidia",
+    "hex": "76B900"
+  },
+  "tp-link": {
+    "icon": "tplink",
+    "hex": "4ACBD6"
+  },
+  "redragon": {
+    "icon": "redragon",
+    "hex": "E60012"
+  },
+  "hyperx": {
+    "icon": "hyperx",
+    "hex": "E21836"
+  },
+  "steelseries": {
+    "icon": "steelseries",
+    "hex": "FF5200"
+  },
+  "epson": {
+    "icon": "epson",
+    "hex": "003399"
+  },
+  "kyocera": {
+    "icon": "kyocera",
+    "hex": "DF0522"
+  },
+  "fujifilm": {
+    "icon": "fujifilm",
+    "hex": "FB0020"
+  },
+  "airtel": {
+    "icon": "airtel",
+    "hex": "E40000"
+  },
+  "ubiquiti": {
+    "icon": "ubiquiti",
+    "hex": "0559C9"
+  },
+  "mikrotik": {
+    "icon": "mikrotik",
+    "hex": "293239"
+  },
+  "cisco": {
+    "icon": "cisco",
+    "hex": "1BA0D7"
+  },
+  "netgear": {
+    "icon": "netgear",
+    "hex": "2C262D"
+  },
+  "linksys": {
+    "icon": "linksys",
+    "hex": "000000"
+  },
+  "imou": {
+    "icon": "imou",
+    "hex": "E89313"
+  },
+  "arlo": {
+    "icon": "arlo",
+    "hex": "49B48A"
+  },
+  "bosch": {
+    "icon": "bosch",
+    "hex": "EA0016"
+  },
+  "yale": {
+    "icon": "yale",
+    "hex": "FFD900"
+  },
+  "bose": {
+    "icon": "bose",
+    "hex": "000000"
+  },
+  "beats": {
+    "icon": "beats",
+    "hex": "005571"
+  },
+  "sonos": {
+    "icon": "sonos",
+    "hex": "000000"
+  },
+  "denon": {
+    "icon": "denon",
+    "hex": "0B131A"
+  },
+  "sennheiser": {
+    "icon": "sennheiser",
+    "hex": "000000"
+  },
+  "audio-technica": {
+    "icon": "audiotechnica",
+    "hex": "000000"
+  },
+  "nikon": {
+    "icon": "nikon",
+    "hex": "FFE100"
+  },
+  "dji": {
+    "icon": "dji",
+    "hex": "000000"
+  },
+  "leica": {
+    "icon": "leica",
+    "hex": "E20612"
+  },
+  "insta360": {
+    "icon": "insta360",
+    "hex": "FFEE00"
+  },
+  "kodak": {
+    "icon": "kodak",
+    "hex": "ED0000"
+  },
+  "blackmagic-design": {
+    "icon": "blackmagicdesign",
+    "hex": "FFA200"
+  },
+  "godox": {
+    "icon": "godox",
+    "hex": "FF6600"
+  },
+  "valve": {
+    "icon": "valve",
+    "hex": "F74843"
+  },
+  "meta": {
+    "icon": "meta",
+    "hex": "0467DF"
+  },
+  "sega": {
+    "icon": "sega",
+    "hex": "0089CF"
+  },
+  "ikea": {
+    "icon": "ikea",
+    "hex": "0058A3"
+  },
+  "honda": {
+    "icon": "honda",
+    "hex": "E40521"
+  },
+  "caterpillar": {
+    "icon": "caterpillar",
+    "hex": "FFCD11"
+  },
+  "victron-energy": {
+    "icon": "victronenergy",
+    "hex": "0066B2"
+  },
+  "schneider-electric": {
+    "icon": "schneiderelectric",
+    "hex": "3DCD58"
+  },
+  "husqvarna": {
+    "icon": "husqvarna",
+    "hex": "273A60"
+  },
+  "abb": {
+    "icon": "abb",
+    "hex": "FF000F"
+  },
+  "siemens": {
+    "icon": "siemens",
+    "hex": "009999"
+  },
+  "havells": {
+    "icon": "havells",
+    "hex": "ED1C24"
+  },
+  "reebok": {
+    "icon": "reebok",
+    "hex": "E41D1B"
+  },
+  "adidas": {
+    "icon": "adidas",
+    "hex": "000000"
+  },
+  "nike": {
+    "icon": "nike",
+    "hex": "111111"
+  },
+  "under-armour": {
+    "icon": "underarmour",
+    "hex": "1D1D1D"
+  },
+  "puma": {
+    "icon": "puma",
+    "hex": "242B2F"
+  },
+  "new-balance": {
+    "icon": "newbalance",
+    "hex": "CF0A2C"
+  },
+  "zara": {
+    "icon": "zara",
+    "hex": "000000"
+  },
+  "h-and-m": {
+    "icon": "handm",
+    "hex": "E50010"
+  },
+  "dior": {
+    "icon": "dior",
+    "hex": "000000"
+  },
+  "the-north-face": {
+    "icon": "thenorthface",
+    "hex": "000000"
+  },
+  "fila": {
+    "icon": "fila",
+    "hex": "002D62"
+  },
+  "uniqlo": {
+    "icon": "uniqlo_ja",
+    "hex": "FF0000"
+  },
+  "jordan": {
+    "icon": "jordan",
+    "hex": "000000"
+  },
+  "bata": {
+    "icon": "bata",
+    "hex": "DD282E"
+  },
+  "coca-cola": {
+    "icon": "cocacola",
+    "hex": "D00013"
+  },
+  "jameson": {
+    "icon": "jameson",
+    "hex": "004027"
+  },
+  "john-deere": {
+    "icon": "johndeere",
+    "hex": "367C2B"
+  },
+  "mahindra": {
+    "icon": "mahindra",
+    "hex": "DD052B"
+  },
+  "jcb": {
+    "icon": "jcb",
+    "hex": "0B4EA2"
+  },
+  "toyota": {
+    "icon": "toyota",
+    "hex": "EB0A1E"
+  },
+  "unilever": {
+    "icon": "unilever",
+    "hex": "1F36C7"
+  },
+  "bmw": {
+    "icon": "bmw",
+    "hex": "0066B1"
+  },
+  "hyundai": {
+    "icon": "hyundai",
+    "hex": "002C5E"
+  },
+  "kia": {
+    "icon": "kia",
+    "hex": "05141F"
+  },
+  "nissan": {
+    "icon": "nissan",
+    "hex": "C3002F"
+  },
+  "ford": {
+    "icon": "ford",
+    "hex": "00274E"
+  },
+  "volkswagen": {
+    "icon": "volkswagen",
+    "hex": "151F5D"
+  },
+  "peugeot": {
+    "icon": "peugeot",
+    "hex": "000000"
+  },
+  "mazda": {
+    "icon": "mazda",
+    "hex": "101010"
+  },
+  "mitsubishi": {
+    "icon": "mitsubishi",
+    "hex": "E60012"
+  },
+  "suzuki": {
+    "icon": "suzuki",
+    "hex": "E30613"
+  },
+  "jeep": {
+    "icon": "jeep",
+    "hex": "000000"
+  },
+  "chevrolet": {
+    "icon": "chevrolet",
+    "hex": "CD9834"
+  },
+  "acura": {
+    "icon": "acura",
+    "hex": "000000"
+  },
+  "infiniti": {
+    "icon": "infiniti",
+    "hex": "020B24"
+  },
+  "audi": {
+    "icon": "audi",
+    "hex": "BB0A30"
+  },
+  "volvo": {
+    "icon": "volvo",
+    "hex": "003057"
+  },
+  "subaru": {
+    "icon": "subaru",
+    "hex": "013C74"
+  },
+  "porsche": {
+    "icon": "porsche",
+    "hex": "B12B28"
+  },
+  "renault": {
+    "icon": "renault",
+    "hex": "FFCC33"
+  },
+  "opel": {
+    "icon": "opel",
+    "hex": "F7FF14"
+  },
+  "fiat": {
+    "icon": "fiat",
+    "hex": "941711"
+  },
+  "chrysler": {
+    "icon": "chrysler",
+    "hex": "000000"
+  },
+  "cadillac": {
+    "icon": "cadillac",
+    "hex": "000000"
+  },
+  "tesla": {
+    "icon": "tesla",
+    "hex": "CC0000"
+  },
+  "skoda": {
+    "icon": "skoda",
+    "hex": "0E3A2F"
+  },
+  "maserati": {
+    "icon": "maserati",
+    "hex": "0C2340"
+  },
+  "bentley": {
+    "icon": "bentley",
+    "hex": "333333"
+  },
+  "rolls-royce": {
+    "icon": "rollsroyce",
+    "hex": "281432"
+  },
+  "ferrari": {
+    "icon": "ferrari",
+    "hex": "D40000"
+  },
+  "lamborghini": {
+    "icon": "lamborghini",
+    "hex": "B6A272"
+  },
+  "tata": {
+    "icon": "tata",
+    "hex": "486AAE"
+  },
+  "citroen": {
+    "icon": "citroen",
+    "hex": "DA291C"
+  },
+  "ducati": {
+    "icon": "ducati",
+    "hex": "CC0000"
+  },
+  "ktm": {
+    "icon": "ktm",
+    "hex": "FF6600"
+  },
+  "iveco": {
+    "icon": "iveco",
+    "hex": "1554FF"
+  },
+  "scania": {
+    "icon": "scania",
+    "hex": "041E42"
+  },
+  "man": {
+    "icon": "man",
+    "hex": "E40045"
+  },
+  "daf": {
+    "icon": "daf",
+    "hex": "00529B"
+  },
+  "hitachi": {
+    "icon": "hitachi",
+    "hex": "E60027"
+  },
+  "shell": {
+    "icon": "shell",
+    "hex": "FFD500"
+  }
+}
