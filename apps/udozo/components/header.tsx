@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Plus, ShieldCheck, UserRound } from "lucide-react";
+import { Plus, UserRound } from "lucide-react";
 import type { ShopMarket, ShopShowcase } from "@bitocard/api-client/classifieds";
 import { nameInitials } from "@bitocard/api-client/classifieds";
 import { signOut } from "@/lib/account-actions";
@@ -13,6 +13,7 @@ import { CountryMenu, type MenuCountry } from "./country-menu";
 import { Dropdown } from "./dropdown";
 import { Flag } from "./flag";
 import { type ContinueTo, HeaderSearch, SearchBlend } from "./header-search";
+import { HelpMenu } from "./help-menu";
 import { SignInHere } from "./sign-in-here";
 
 /** Udozo's lockup on white: the "u" mark, then the name. */
@@ -54,7 +55,7 @@ export async function SiteHeader({ market, customer, showcase }: { market: ShopM
 /**
  * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
  * and the search (with no market, "Continue to <their country>"), on its own full-width row on phones and tablets and
- * beside the lockup from desktops; on the right the one named link, **Safe pay**, the country (a dropdown of the open
+ * beside the lockup from desktops; on the right **Get help** (a menu: Safe pay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
  * markets from the second one), just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones).
  */
 export function HeaderBar({ market, customer, showcase, categories, countries = [], continueTo = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; countries?: MenuCountry[]; continueTo?: ContinueTo }) {
@@ -81,9 +82,7 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
           </Suspense>
         </div>
         <div className="-mr-2 ml-auto flex items-center gap-0.5 sm:mr-0 sm:gap-2">
-          <Link href="/safe-trade#safe-pay" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:bg-navy-50 sm:px-3">
-            <ShieldCheck className="size-5 text-mint-700" aria-hidden="true" /> Safe pay
-          </Link>
+          <HelpMenu />
           {country}
           <ProfileMenu customer={customer} />
           {customer ? null : (

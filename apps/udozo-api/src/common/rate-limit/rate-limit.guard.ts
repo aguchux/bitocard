@@ -58,12 +58,12 @@ function limiterFor(config: AppConfig, limit: number): Limiter {
 }
 
 /**
- * Sign-in, password, two-step and code routes (guessing targets, and senders of email and SMS), and visitors starting a chat: POSTs held to a strict limit per
+ * Sign-in, password, two-step and code routes (guessing targets, and senders of email and SMS), visitors starting a chat, and the Contact us form (it emails a receipt): POSTs held to a strict limit per
  * address (AUTH_RATE_LIMIT_PER_MINUTE). Unlike every other limit, a Redis outage does not switch it off: each instance
  * keeps counting in memory instead.
  */
 const sensitivePath =
-  /^\/v1\/(auth\/(signin(\/lookup)?|signup(\/(email|phone)(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|disable|recovery-codes))|(afrippa\/)?admin\/auth\/(start|signin|mfa\/(verify|skip)|authenticator\/confirm|password\/forgot|password-link(\/complete)?)|afrippa\/account\/(signup|signin|google\/(start|finish)|password\/(forgot|reset|change)|email\/(resend|verify)|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|recovery-codes))|store\/account\/(signup(\/(email|phone)(\/verify)?)?|signin(\/lookup)?|google\/(start|finish)|handoff\/exchange|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|(store|afrippa\/account)\/support\/visitor-chat|(afrippa\/)?kyc\/session)(\?|$)/;
+  /^\/v1\/(auth\/(signin(\/lookup)?|signup(\/(email|phone)(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|disable|recovery-codes))|(afrippa\/)?admin\/auth\/(start|signin|mfa\/(verify|skip)|authenticator\/confirm|password\/forgot|password-link(\/complete)?)|afrippa\/account\/(signup|signin|google\/(start|finish)|password\/(forgot|reset|change)|email\/(resend|verify)|phone(\/verify)?|two-step\/(setup(\/confirm)?|challenge|verify|recovery-codes))|store\/account\/(signup(\/(email|phone)(\/verify)?)?|signin(\/lookup)?|google\/(start|finish)|handoff\/exchange|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|(store|afrippa\/account)\/support\/visitor-chat|(afrippa\/)?kyc\/session|contact-messages)(\?|$)/;
 
 export const isSensitive = (method: string, url: string) => method === 'POST' && sensitivePath.test(url);
 

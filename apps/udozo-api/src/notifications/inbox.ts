@@ -147,6 +147,7 @@ export const notificationTypes = {
   'admin.support.ticket_created': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'New support ticket for BitoCard' },
   'admin.support.ticket_replied': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'Support ticket reply' },
   'admin.support.chat_waiting': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'Someone is waiting in chat' },
+  'admin.support.contact_message': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'New message from the Contact us form' },
   'admin.support.issue_closed': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'Engineering closed a ticket’s issue' },
   'admin.chargeback.opened': { realm: 'admin', roles: ['finance'], severity: 'warning', label: 'Chargeback opened' },
   'admin.payment.gateway_refused': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'A payment gateway refused to open a payment' },

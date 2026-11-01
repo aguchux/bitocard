@@ -46,6 +46,7 @@ import { BotsService } from '../support/bots.service.js';
 import { ChatsService } from '../support/chats.service.js';
 import { RepliesService } from '../support/replies.service.js';
 import { TicketsService } from '../support/tickets.service.js';
+import { ContactMessagesService } from '../support/contact-messages.service.js';
 import { ShopAssistantsService } from '../classifieds/assistant/shop-assistants.service.js';
 import { jobRunsFor } from '../products/jobs.js';
 
@@ -94,6 +95,7 @@ export class CronController {
     replies: RepliesService,
     chats: ChatsService,
     tickets: TicketsService,
+    contactMessages: ContactMessagesService,
     shopAssistants: ShopAssistantsService,
     invoices: InvoicesService,
     listings: ListingsService,
@@ -136,13 +138,15 @@ export class CronController {
       /**
        * Daily: assistants whose store changed since their knowledge base was updated (flagged, or updated by itself), shop
        * assistants' country knowledge brought up to date; chats ended over 12 months ago, tickets resolved over two years
-       * ago and shop assistant conversations quiet for 30 days deleted.
+       * ago, shop assistant conversations quiet for 30 days, and Contact us messages quiet for two years (spam after 30
+       * days) deleted.
        */
       support: async () => ({
         knowledge: await bots.checkStale(),
         shop_knowledge: await shopAssistants.refreshAll(),
         chats_deleted: await chats.purgeOld(),
         tickets_deleted: await tickets.purgeOld(),
+        contact_messages_deleted: await contactMessages.purgeOld(),
         assistant_threads_deleted: await shopAssistants.purgeOld(),
       }),
       /** Every 5 minutes: chats and tickets an assistant's answer after the reply never reached. */

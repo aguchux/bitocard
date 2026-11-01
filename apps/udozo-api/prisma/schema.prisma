@@ -2731,6 +2731,7 @@ model Customer {
   classifiedCallsMade       ClassifiedCall[]           @relation("ClassifiedCallsMade")
   classifiedCallsTaken      ClassifiedCall[]           @relation("ClassifiedCallsTaken")
   presence                  CustomerPresence?
+  contactMessages           ContactMessage[]
 
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
@@ -4928,6 +4929,54 @@ model CustomerPresence {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@map("customer_presence")
+}
+
+/// A message from udozo.com's Contact us form (`C-000123`), from anyone, signed in or not: what it is about, who sent it
+/// and how to reach them, worked by Udozo's support team in the admin app (status, assignee, replies emailed to the
+/// sender, staff notes). Deleted two years after the last activity, spam after 30 days.
+model ContactMessage {
+  id         String                @id @default(uuid()) @db.Uuid
+  number     Int                   @unique @default(autoincrement())
+  /// order, safe_pay, account, selling, reselling, report, partnership or other.
+  kind       String
+  name       String
+  email      String
+  phone      String?
+  body       String
+  /// The market the sender was on (a country code), when known.
+  country    String?
+  /// The sender's account, when they were signed in.
+  customerId String?               @map("customer_id") @db.Uuid
+  /// new (nobody has looked), open (being worked), waiting (replied, waiting for the sender), resolved or spam.
+  status     String                @default("new")
+  /// The admin working it (no foreign key: admins are never deleted).
+  assigneeId String?               @map("assignee_id") @db.Uuid
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+  repliedAt  DateTime?             @map("replied_at")
+  resolvedAt DateTime?             @map("resolved_at")
+  customer   Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  entries    ContactMessageEntry[]
+
+  @@index([status, createdAt])
+  @@index([email, createdAt])
+  @@map("contact_messages")
+}
+
+/// A step on a contact message: a reply emailed to the sender, or a note for the team only.
+model ContactMessageEntry {
+  id         String         @id @default(uuid()) @db.Uuid
+  messageId  String         @map("message_id") @db.Uuid
+  /// reply (emailed to the sender) or note (the team only).
+  kind       String
+  authorId   String?        @map("author_id") @db.Uuid
+  authorName String         @map("author_name")
+  body       String
+  createdAt  DateTime       @default(now()) @map("created_at")
+  message    ContactMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId, createdAt])
+  @@map("contact_message_entries")
 }
 
 /// A Safe pay order (`SP-000123`): the buyer's request at the listed or agreed price, the seller's acceptance, payment

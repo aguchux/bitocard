@@ -1,5 +1,5 @@
 // Udozo's header, mobile first: one bar of the Categories menu and the search (its own row on phones, beside the lockup
-// on desktops), one named link (Safe pay), and the country just left of the profile icon.
+// on desktops), the Get help menu (Safe pay, FAQs, Resell on Udozo, Contact us), and the country just left of the profile icon.
 import "./request";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -47,10 +47,11 @@ describe("the header", () => {
     expect(html.slice(country, profile)).not.toMatch(/<a /);
   });
 
-  it("has one named link, Safe pay, before the country; the profile menu holds only the account", () => {
+  it("has the Get help menu before the country, its open places as links; the profile menu holds only the account", () => {
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]).filter(href => !href.startsWith("/ng/c/") && href !== "/ng/search" && href !== "/ng/areas");
-    expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/account", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell"]);
-    expect(html.indexOf('href="/safe-trade#safe-pay"')).toBeLessThan(html.indexOf('title="Nigeria"'));
+    expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/help/faqs", "/start-here", "/help/contact", "/account", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell"]);
+    expect(html.indexOf('aria-label="Get help"')).toBeLessThan(html.indexOf('href="/safe-trade#safe-pay"'));
+    expect(html.indexOf('href="/help/contact"')).toBeLessThan(html.indexOf('title="Nigeria"'));
     expect(html).toContain("Sign out");
   });
 

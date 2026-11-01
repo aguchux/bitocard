@@ -159,6 +159,7 @@ export const tagTypes = [
   'Session',
   'AdminTeam',
   'Marketing',
+  'ContactMessages',
   'Overview',
   'Invoice',
   'Reseller',

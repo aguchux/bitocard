@@ -39,9 +39,20 @@ dialog.drawer[open] {
 dialog.drawer::backdrop {
   background: rgb(7 15 76 / 0.45);
 }
+/* The header's Get help menu: dropped from its button, its pointer joining the two. */
+@keyframes menu-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+details[open] > .menu-drop {
+  animation: menu-drop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 @media (prefers-reduced-motion: reduce) {
   dialog.sheet[open],
-  dialog.drawer[open] {
+  dialog.drawer[open],
+  details[open] > .menu-drop {
     animation: none;
   }
 }

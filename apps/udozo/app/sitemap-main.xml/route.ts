@@ -10,7 +10,7 @@ export const revalidate = 3600;
 export async function GET() {
   const origin = siteOrigin();
   const all = await markets();
-  const entries = [{ loc: `${origin}/start-here` }, { loc: `${origin}/safe-trade` }, { loc: `${origin}/legal` }, ...legalDocuments.map(doc => ({ loc: `${origin}/legal/${doc.slug}` }))];
+  const entries = [{ loc: `${origin}/start-here` }, { loc: `${origin}/safe-trade` }, { loc: `${origin}/help/faqs` }, { loc: `${origin}/help/contact` }, { loc: `${origin}/legal` }, ...legalDocuments.map(doc => ({ loc: `${origin}/legal/${doc.slug}` }))];
   if (all.showcase) {
     entries.unshift({ loc: `${origin}/` });
     const showcase = await shopApi<ShopShowcase>("/v1/classifieds/showcase", { revalidate: 3600 });

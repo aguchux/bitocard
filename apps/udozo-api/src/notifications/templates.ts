@@ -281,6 +281,31 @@ export function marketingInviteEmail(to: string, input: { name: string; from: st
   };
 }
 
+/** udozo.com's Contact us form: the sender is told their message arrived, under its reference. Never repeats what they wrote. */
+export function contactReceivedEmail(to: string, input: { name: string; reference: string }): EmailMessage {
+  const first = input.name.trim().split(/\s+/)[0] || 'there';
+  const message = layout(
+    `We have your message (${input.reference})`,
+    [
+      `Hi ${first}, thank you for writing to Udozo. Our support team will reply to this email address, usually within one working day.`,
+      `If you write again about the same thing, mention ${input.reference}.`,
+      'Udozo will never ask for your password, a code we texted you, or a Safe pay release code.',
+      'If you did not write to us, you can ignore this email.',
+    ],
+    undefined,
+    'Udozo',
+  );
+  return { to, subject: `We have your message (${input.reference})`, ...message };
+}
+
+/** Udozo's support team answering a Contact us message: their reply, by email. */
+export function contactReplyEmail(to: string, input: { name: string; reference: string; reply: string }): EmailMessage {
+  const first = input.name.trim().split(/\s+/)[0] || 'there';
+  const reply = input.reply.trim().split(/\n{2,}/).map(paragraph => paragraph.replace(/\s*\n\s*/g, ' '));
+  const message = layout(`Udozo support: ${input.reference}`, [`Hi ${first},`, ...reply, 'The Udozo support team', `To write again about this, use the Contact us page and mention ${input.reference}.`], undefined, 'Udozo');
+  return { to, subject: `Re: your message to Udozo (${input.reference})`, ...message };
+}
+
 /** Amount in minor units as a readable figure, for example NGN 15,000.00. */
 export function formatMoney(amount: bigint | number, currency: string) {
   const value = Number(amount) / 100;

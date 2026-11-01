@@ -15,12 +15,14 @@ import { EngineeringService } from './engineering.service.js';
 import { GithubWebhookController } from './github.controller.js';
 import { AdminTicketsController, CustomerTicketsController, TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
+import { AdminContactMessagesController, ContactMessagesController } from './contact-messages.controller.js';
+import { ContactMessagesService } from './contact-messages.service.js';
 
 /** Support: tickets now; chat and support bots come next (docs/BITOCARD_SUPPORT_ASSISTANT_PLAN.md). */
 @Module({
   imports: [CheckoutModule, SettingsModule],
-  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, VisitorChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, AfrippaBotsController, AfrippaKnowledgeTemplateController, AfrippaAiController, GithubWebhookController],
-  providers: [AfrippaAssistantRegistry, KycStorage, TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService],
-  exports: [AfrippaAssistantRegistry, TicketsService, ChatsService, AiService, BotsService, RepliesService],
+  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, VisitorChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, AfrippaBotsController, AfrippaKnowledgeTemplateController, AfrippaAiController, GithubWebhookController, ContactMessagesController, AdminContactMessagesController],
+  providers: [AfrippaAssistantRegistry, KycStorage, TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService, ContactMessagesService],
+  exports: [AfrippaAssistantRegistry, TicketsService, ChatsService, AiService, BotsService, RepliesService, ContactMessagesService],
 })
 export class SupportModule {}

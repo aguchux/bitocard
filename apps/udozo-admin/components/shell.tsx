@@ -19,6 +19,7 @@ import {
   Inbox,
   LifeBuoy,
   ListChecks,
+  Mail,
   MapPin,
   Megaphone,
   MessageSquareWarning,
@@ -142,6 +143,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
     items: [
       { label: "Tickets", href: "/support", icon: Inbox },
       { label: "Chats", href: "/support/chats", icon: MessagesSquare },
+      { label: "Contact us", href: "/support/contact", icon: Mail },
       { label: "Assistants", href: "/support/assistants", icon: Bot },
     ],
   },

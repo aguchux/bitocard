@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Udozo's footer: Start selling (the sellers' landing page), the Safe Trade Guide, Udozo's own legal documents (on udozo.com, `/legal`) and the credit. */
+/** Udozo's footer: Start selling (the sellers' landing page), the Safe Trade Guide, the FAQs and Contact us, Udozo's own legal documents (on udozo.com, `/legal`) and the credit. */
 export function SiteFooter({ country }: { country?: { code: string; name: string } | null }) {
   return (
     <footer className="mt-12 border-t border-navy-200 bg-white">
@@ -18,6 +18,12 @@ export function SiteFooter({ country }: { country?: { code: string; name: string
           </Link>
           <Link href="/safe-trade#safe-pay" className="hover:underline">
             Safe pay
+          </Link>
+          <Link href="/help/faqs" className="hover:underline">
+            FAQs
+          </Link>
+          <Link href="/help/contact" className="hover:underline">
+            Contact us
           </Link>
           <Link href="/legal/terms" className="hover:underline">
             Terms of use
