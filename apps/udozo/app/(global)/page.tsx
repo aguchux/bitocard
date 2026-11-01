@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
 import { Flag } from "@/components/flag";
 import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
-import { currentCustomer } from "@/lib/customer";
 import { regionalAlternates } from "@/lib/seo";
 import { Slider } from "@/components/slider";
 
@@ -24,7 +22,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * The global showcase, from the second country: the countries with their listings, and recent and trending listings
  * across them, never a price (the categories are in the header's menu). With one country open, its market is the home
- * page. Nothing is chosen by cookie or address: a signed-in customer only sees "Continue to <their country>".
+ * page. Nothing is chosen by cookie or address: a signed-in customer only sees "Continue to <their country>", in the
+ * header's bar.
  */
 export default async function GlobalHome() {
   const all = await markets();
@@ -37,8 +36,7 @@ export default async function GlobalHome() {
       </div>
     );
   }
-  const [showcase, customer] = await Promise.all([shopApi<ShopShowcase>("/v1/classifieds/showcase"), currentCustomer()]);
-  const own = all.data.find(market => market.country === customer?.country);
+  const showcase = await shopApi<ShopShowcase>("/v1/classifieds/showcase");
   return (
     <>
       <section className="bg-navy-900 pt-5 pb-6">
@@ -48,12 +46,6 @@ export default async function GlobalHome() {
             <br />
             <span className="text-brand-300">buy and sell near you, protected by Safe pay</span>
           </h1>
-          {own ? (
-            <Link href={`/${own.country.toLowerCase()}`} className="flex h-12 items-center gap-2.5 rounded-2xl bg-white px-4 font-bold text-navy-900 sm:max-w-sm">
-              <Flag country={own.country} /> Continue to {own.name}
-              <ArrowRight className="ml-auto size-5" aria-hidden="true" />
-            </Link>
-          ) : null}
         </div>
       </section>
       <div className="mx-auto grid max-w-[1400px] gap-8 px-4 sm:px-6 lg:px-8 pt-5">

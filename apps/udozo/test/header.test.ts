@@ -1,5 +1,5 @@
 // Udozo's header, mobile first: one bar of the Categories menu and the search (its own row on phones, beside the lockup
-// on desktops), the country just left of the profile icon, and the named links in the profile menu.
+// on desktops), one named link (Safe pay), and the country just left of the profile icon.
 import "./request";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -31,7 +31,6 @@ describe("the header", () => {
     expect(menu).toBeLessThan(search);
     // One bordered bar holds both: the search form follows the menu's drawer at once.
     expect(html).toContain('</dialog><form role="search" class="relative min-w-0 flex-1" action="/ng/search"');
-    // The named links are in the profile menu, not the bar.
     expect(html).not.toContain('aria-label="Udozo"');
   });
 
@@ -48,11 +47,11 @@ describe("the header", () => {
     expect(html.slice(country, profile)).not.toMatch(/<a /);
   });
 
-  it("keeps the named links in the profile menu, with the account's places", () => {
-    const menu = html.slice(html.indexOf('aria-label="Account"'));
-    expect(menu).toContain('href="/account/wallet"');
-    expect(menu).toContain('href="/ng/areas"');
-    expect(menu).toContain("Sign out");
+  it("has one named link, Safe pay, before the country; the profile menu holds only the account", () => {
+    const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]).filter(href => !href.startsWith("/ng/c/") && href !== "/ng/search");
+    expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/account", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell"]);
+    expect(html.indexOf('href="/safe-trade#safe-pay"')).toBeLessThan(html.indexOf('title="Nigeria"'));
+    expect(html).toContain("Sign out");
   });
 
   it("signed out, the profile icon opens Sign in on phones; desktops get a Sign in button", () => {
@@ -60,6 +59,7 @@ describe("the header", () => {
     expect(out).toContain('aria-label="Account menu"');
     expect(out).toMatch(/<details class="relative">/);
     expect(out).toMatch(/lg:inline-flex[^"]*"[^>]*>Sign in</);
+    expect(out).toContain('href="/signup"');
   });
 });
 
@@ -80,10 +80,19 @@ describe("the header's search", () => {
     expect(renderToStaticMarkup(createElement(HeaderSearch, props))).not.toMatch(/autofocus/i);
   });
 
-  it("without a country there is nothing to search: the Categories menu stands alone, labelled", () => {
-    const html = renderToStaticMarkup(createElement(SearchBlend, { ...props, country: null, prefix: "/c/", allHref: "/", place: null }));
-    expect(html).not.toContain('role="search"');
-    expect(html).toContain('<span class="text-[15px] font-bold ">Categories</span>');
+  it("without a country the bar's other half goes to a market: the customer's own, else choosing one", () => {
+    const own = renderToStaticMarkup(createElement(SearchBlend, { ...props, country: null, prefix: "/c/", allHref: "/", place: null, continueTo: { country: "NG", name: "Nigeria" } }));
+    expect(own).not.toContain('role="search"');
+    expect(own).toMatch(/aria-label="Categories"[\s\S]*<\/dialog><a class="[^"]*flex-1[^"]*" href="\/ng">.*Continue to Nigeria/);
+    const none = renderToStaticMarkup(createElement(SearchBlend, { ...props, country: null, prefix: "/c/", allHref: "/", place: null }));
+    expect(none).toContain('href="/#countries"');
+    expect(none).toContain("Choose your country");
+  });
+
+  it("the global header takes the signed-in customer to their own country", () => {
+    const html = renderToStaticMarkup(createElement(HeaderBar, { market: null, customer, showcase: true, categories, continueTo: { country: "NG", name: "Nigeria" } }));
+    expect(html).toContain("Continue to Nigeria");
+    expect(html).toContain('href="/safe-trade#safe-pay"');
   });
 });
 
@@ -92,7 +101,7 @@ describe("the Categories menu", () => {
 
   it("is the bar's navy left end, labelled from tablets up", () => {
     expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*aria-label="Categories"[^>]*class="[^"]*rounded-l-2xl bg-navy-900 text-white[^"]*"/);
-    expect(html).toContain('<span class="text-[15px] font-bold hidden sm:inline">Categories</span>');
+    expect(html).toContain('<span class="hidden text-[15px] font-bold sm:inline">Categories</span>');
   });
 
   it("lists every top category, with its subcategories behind a toggle", () => {

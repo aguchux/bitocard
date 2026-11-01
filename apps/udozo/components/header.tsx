@@ -1,17 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronDown, Plus, UserRound } from "lucide-react";
+import { ChevronDown, Plus, ShieldCheck, UserRound } from "lucide-react";
 import type { ShopMarket, ShopShowcase } from "@bitocard/api-client/classifieds";
 import { nameInitials } from "@bitocard/api-client/classifieds";
 import { signOut } from "@/lib/account-actions";
-import { shopApi } from "@/lib/api";
+import { markets, shopApi } from "@/lib/api";
 import type { Customer } from "@/lib/customer";
 import { categoriesOf } from "@/lib/reference";
-import { AskButton } from "./assistant";
 import type { MenuCategory } from "./category-menu";
 import { Flag } from "./flag";
-import { HeaderSearch, SearchBlend } from "./header-search";
+import { type ContinueTo, HeaderSearch, SearchBlend } from "./header-search";
 import { SignInHere } from "./sign-in-here";
 
 /** Udozo's lockup on white: the "u" mark, then the name. */
@@ -22,17 +21,6 @@ export function UdozoWordmark({ href = "/" }: { href?: string }) {
       <span>Udozo</span>
     </Link>
   );
-}
-
-/** The header's named places, in the profile menu: the market and its areas, Safe pay and the Safe Trade Guide. */
-function navLinks(market: ShopMarket | null) {
-  const home = market ? `/${market.country.toLowerCase()}` : "/";
-  return [
-    { href: home, label: market ? `Browse ${market.name}` : "Browse" },
-    ...(market ? [{ href: `${home}/areas`, label: "Areas" }] : []),
-    { href: "/safe-trade#safe-pay", label: "Safe pay" },
-    { href: "/safe-trade", label: "Safe Trade Guide" },
-  ];
 }
 
 /** The signed-in customer's own places, in the account menu. */
@@ -53,26 +41,27 @@ async function menuCategories(market: ShopMarket | null): Promise<MenuCategory[]
   return showcase.ok ? showcase.data.categories.map(category => ({ slug: category.slug, name: category.name, icon: category.icon })) : [];
 }
 
-/** Udozo's top bar, with the market's categories loaded for its menu. */
+/** Udozo's top bar, with the market's categories loaded for its menu (and, with no market, the customer's own to go to). */
 export async function SiteHeader({ market, customer, showcase }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean }) {
-  return <HeaderBar market={market} customer={customer} showcase={showcase} categories={await menuCategories(market)} />;
+  const [categories, all] = await Promise.all([menuCategories(market), market || !customer?.country ? null : markets()]);
+  const own = all?.data.find(item => item.country === customer?.country);
+  return <HeaderBar market={market} customer={customer} showcase={showcase} categories={categories} continueTo={own ? { country: own.country, name: own.name } : null} />;
 }
 
 /**
  * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
- * and the search, on its own full-width row on phones and tablets and beside the lockup from desktops; on the right the
- * country, just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones). The named links
- * live in the profile menu, so the bar has the room.
+ * and the search (with no market, "Continue to <their country>"), on its own full-width row on phones and tablets and
+ * beside the lockup from desktops; on the right the one named link, **Safe pay**, the country, just left of the
+ * account's profile icon, and **Sell** (`/sell`; a floating button on phones).
  */
-export function HeaderBar({ market, customer, showcase, categories }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[] }) {
+export function HeaderBar({ market, customer, showcase, categories, continueTo = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; continueTo?: ContinueTo }) {
   const home = market ? `/${market.country.toLowerCase()}` : "/";
-  const links = navLinks(market);
-  const search = { country: market?.country ?? null, categories, prefix: market ? `${home}/c/` : "/c/", allHref: market ? `${home}/search` : "/", place: market?.name ?? null };
+  const search = { country: market?.country ?? null, categories, prefix: market ? `${home}/c/` : "/c/", allHref: market ? `${home}/search` : "/", place: market?.name ?? null, continueTo };
   const sellClass = "hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex";
   const flag = market ? (
     <>
       <Flag country={market.country} /> <span className="hidden md:inline">{market.name}</span>
-      <span className="md:hidden">{market.country}</span>
+      <span className="hidden sm:inline md:hidden">{market.country}</span>
     </>
   ) : null;
   const country = market ? (
@@ -97,8 +86,11 @@ export function HeaderBar({ market, customer, showcase, categories }: { market: 
           </Suspense>
         </div>
         <div className="-mr-2 ml-auto flex items-center gap-0.5 sm:mr-0 sm:gap-2">
+          <Link href="/safe-trade#safe-pay" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:bg-navy-50 sm:px-3">
+            <ShieldCheck className="size-5 text-mint-700" aria-hidden="true" /> Safe pay
+          </Link>
           {country}
-          <ProfileMenu links={links} customer={customer} ask={Boolean(market)} />
+          <ProfileMenu customer={customer} />
           {customer ? null : (
             <SignInHere className="hidden min-h-11 items-center rounded-xl border border-navy-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-navy-300 lg:inline-flex">
               Sign in
@@ -121,9 +113,9 @@ export function HeaderBar({ market, customer, showcase, categories }: { market: 
 
 /**
  * The account's profile icon (its initials; a person icon when signed out) and its menu: the account's places and
- * Sign out, or Sign in, then the named links. Signed out on desktops, Sign in is also a button beside it.
+ * Sign out, or Sign in and Create an account. Signed out on desktops, Sign in is also a button beside it.
  */
-function ProfileMenu({ links, customer, ask }: { links: Array<{ href: string; label: string }>; customer: Customer | null; ask: boolean }) {
+function ProfileMenu({ customer }: { customer: Customer | null }) {
   const item = "flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-navy-50";
   return (
     <details className="relative">
@@ -154,17 +146,13 @@ function ProfileMenu({ links, customer, ask }: { links: Array<{ href: string; la
             ))}
           </>
         ) : (
-          <SignInHere className={item}>Sign in</SignInHere>
-        )}
-        <div>
-          <div className="my-1 border-t border-navy-100" />
-          {links.map(link => (
-            <Link key={link.href} href={link.href} className={item}>
-              {link.label}
+          <>
+            <SignInHere className={item}>Sign in</SignInHere>
+            <Link href="/signup" className={item}>
+              Create an account
             </Link>
-          ))}
-          {ask ? <AskButton className={`${item} w-full text-left`} /> : null}
-        </div>
+          </>
+        )}
         {customer ? (
           <form action={signOut} className="mt-1 border-t border-navy-100 pt-1">
             <button type="submit" className={`${item} w-full text-left`}>
