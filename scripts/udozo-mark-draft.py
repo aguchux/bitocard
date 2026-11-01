@@ -1,11 +1,12 @@
 """
 Udozo's placeholder mark (docs/UDOZO_SPINOFF_PLAN.md, step 4): a shopping cart whose basket is a bold lowercase "u", in
-navy, with its handle reaching out from the top of the left stem and two pink wheels below, in the default theme's navy
+navy, with its handle reaching out from the top of the left stem, a pink star in its bowl and two pink wheels below, in the default theme's navy
 and pink, until the brand's real artwork arrives. Replace assets/udozo/drafts/mark-placeholder.png with the master
 (keeping a navy and a pink, which scripts/brand-assets.py reads from the artwork) and run python scripts/brand-assets.py.
 Run from the repository root:
 python scripts/udozo-mark-draft.py
 """
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -43,6 +44,16 @@ def main():
     reach = 120
     draw.rectangle([P(reach + handle // 2), P(top), P(left + stem), P(top + handle)], fill=NAVY)
     draw.ellipse([P(reach), P(top), P(reach + handle), P(top + handle)], fill=NAVY)
+
+    # The star: a pink five-pointed star sitting in the bowl of the "u", point up, clear of its sides.
+    star_x, star_y = (left + right) / 2, centre_y + 10
+    outer = 100
+    points = []
+    for i in range(10):
+        r = outer if i % 2 == 0 else outer * 0.382
+        angle = math.radians(-90 + i * 36)
+        points.append((P(star_x + r * math.cos(angle)), P(star_y + r * math.sin(angle))))
+    draw.polygon(points, fill=PINK)
 
     # The wheels: two pink discs under the basket, clear of it.
     wheel = 66
