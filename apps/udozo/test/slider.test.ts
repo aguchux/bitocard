@@ -21,9 +21,9 @@ describe("slider", () => {
     expect(readFileSync(new URL("../components/slider.tsx", import.meta.url), "utf8")).toContain('behavior: "smooth"');
   });
 
-  it("the global page's countries use it", () => {
+  it("the global page leaves the countries to the header's menu, so its body is listings", () => {
     const page = readFileSync(new URL("../app/(global)/page.tsx", import.meta.url), "utf8");
-    expect(page).toContain('<Slider label="Countries">');
-    expect(page).not.toContain("grid-cols-2 gap-3 sm:grid-cols-4");
+    expect(page).not.toContain('<Slider label="Countries">');
+    expect(page).not.toContain("Choose your country");
   });
 });

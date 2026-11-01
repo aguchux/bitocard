@@ -9,6 +9,7 @@ import { markets, shopApi } from "@/lib/api";
 import type { Customer } from "@/lib/customer";
 import { categoriesOf } from "@/lib/reference";
 import type { MenuCategory } from "./category-menu";
+import { CountryMenu, type MenuCountry } from "./country-menu";
 import { Flag } from "./flag";
 import { type ContinueTo, HeaderSearch, SearchBlend } from "./header-search";
 import { SignInHere } from "./sign-in-here";
@@ -41,39 +42,32 @@ async function menuCategories(market: ShopMarket | null): Promise<MenuCategory[]
   return showcase.ok ? showcase.data.categories.map(category => ({ slug: category.slug, name: category.name, icon: category.icon })) : [];
 }
 
-/** Udozo's top bar, with the market's categories loaded for its menu (and, with no market, the customer's own to go to). */
+/** Udozo's top bar, with the market's categories for its menu, the open markets for the country menu, and (with no market) the customer's own to go to. */
 export async function SiteHeader({ market, customer, showcase }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean }) {
-  const [categories, all] = await Promise.all([menuCategories(market), market || !customer?.country ? null : markets()]);
-  const own = all?.data.find(item => item.country === customer?.country);
-  return <HeaderBar market={market} customer={customer} showcase={showcase} categories={categories} continueTo={own ? { country: own.country, name: own.name } : null} />;
+  const [categories, all] = await Promise.all([menuCategories(market), markets()]);
+  const own = market ? undefined : all.data.find(item => item.country === customer?.country);
+  const countries = all.data.map(item => ({ country: item.country, name: item.name, listings: item.listings }));
+  return <HeaderBar market={market} customer={customer} showcase={showcase} categories={categories} countries={countries} continueTo={own ? { country: own.country, name: own.name } : null} />;
 }
 
 /**
  * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
  * and the search (with no market, "Continue to <their country>"), on its own full-width row on phones and tablets and
- * beside the lockup from desktops; on the right the one named link, **Safe pay**, the country, just left of the
- * account's profile icon, and **Sell** (`/sell`; a floating button on phones).
+ * beside the lockup from desktops; on the right the one named link, **Safe pay**, the country (a dropdown of the open
+ * markets from the second one), just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones).
  */
-export function HeaderBar({ market, customer, showcase, categories, continueTo = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; continueTo?: ContinueTo }) {
+export function HeaderBar({ market, customer, showcase, categories, countries = [], continueTo = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; countries?: MenuCountry[]; continueTo?: ContinueTo }) {
   const home = market ? `/${market.country.toLowerCase()}` : "/";
   const search = { country: market?.country ?? null, categories, prefix: market ? `${home}/c/` : "/c/", allHref: market ? `${home}/search` : "/", place: market?.name ?? null, continueTo };
   const sellClass = "hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex";
-  const flag = market ? (
-    <>
+  // One market: nothing to switch to, so just its flag. From the second, the dropdown (on the global page too).
+  const country = showcase ? (
+    <CountryMenu current={market ? { country: market.country, name: market.name } : null} countries={countries} />
+  ) : market ? (
+    <span className="inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-[15px] font-semibold text-navy-900" title={market.name}>
       <Flag country={market.country} /> <span className="hidden md:inline">{market.name}</span>
       <span className="hidden sm:inline md:hidden">{market.country}</span>
-    </>
-  ) : null;
-  const country = market ? (
-    showcase ? (
-      <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-navy-900 hover:bg-navy-50" aria-label={`Country: ${market.name}. Change`}>
-        {flag} <ChevronDown className="size-4" aria-hidden="true" />
-      </Link>
-    ) : (
-      <span className="inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-[15px] font-semibold text-navy-900" title={market.name}>
-        {flag}
-      </span>
-    )
+    </span>
   ) : null;
 
   return (

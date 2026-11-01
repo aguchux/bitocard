@@ -85,7 +85,8 @@ describe("the header's search", () => {
     expect(own).not.toContain('role="search"');
     expect(own).toMatch(/aria-label="Categories"[\s\S]*<\/dialog><a class="[^"]*flex-1[^"]*" href="\/ng">.*Continue to Nigeria/);
     const none = renderToStaticMarkup(createElement(SearchBlend, { ...props, country: null, prefix: "/c/", allHref: "/", place: null }));
-    expect(none).toContain('href="/#countries"');
+    // It opens the header's country menu (the link's target without script).
+    expect(none).toContain('href="#country-menu"');
     expect(none).toContain("Choose your country");
   });
 
@@ -93,6 +94,39 @@ describe("the header's search", () => {
     const html = renderToStaticMarkup(createElement(HeaderBar, { market: null, customer, showcase: true, categories, continueTo: { country: "NG", name: "Nigeria" } }));
     expect(html).toContain("Continue to Nigeria");
     expect(html).toContain('href="/safe-trade#safe-pay"');
+  });
+});
+
+describe("the country menu", () => {
+  const countries = [
+    { country: "NG", name: "Nigeria", listings: 1200 },
+    { country: "GH", name: "Ghana", listings: 1 },
+  ];
+
+  it("from the second market, a dropdown of every market just left of the profile icon, the current one ticked", () => {
+    const html = renderToStaticMarkup(createElement(HeaderBar, { market, customer, showcase: true, categories, countries }));
+    const menu = html.indexOf('<details id="country-menu"');
+    expect(menu).toBeGreaterThan(html.indexOf('href="/safe-trade#safe-pay"'));
+    expect(menu).toBeLessThan(html.indexOf('aria-label="Account: Ngozi Okafor"'));
+    expect(html).toContain('aria-label="Country: Nigeria. Change"');
+    const list = html.slice(html.indexOf('<nav aria-label="Countries"'));
+    expect(list).toMatch(/<a aria-current="page" class="[^"]*" href="\/ng">/);
+    expect(list).toContain('href="/gh"');
+    expect(list).toContain("1,200 listings");
+    expect(list).toContain("1 listing<");
+    expect(list).toMatch(/href="\/">.*All countries/);
+  });
+
+  it("on the global page it is the globe, with All countries current", () => {
+    const html = renderToStaticMarkup(createElement(HeaderBar, { market: null, customer: null, showcase: true, categories, countries }));
+    expect(html).toContain('aria-label="Choose your country"');
+    expect(html).toMatch(/aria-current="page" class="[^"]*" href="\/">/);
+  });
+
+  it("with one market open there is nothing to switch to: just its flag", () => {
+    const html = renderToStaticMarkup(createElement(HeaderBar, { market, customer, showcase: false, categories, countries: countries.slice(0, 1) }));
+    expect(html).not.toContain('id="country-menu"');
+    expect(html).toContain('title="Nigeria"');
   });
 });
 

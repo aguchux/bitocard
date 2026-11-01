@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ArrowRight, Globe2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Globe2 } from "lucide-react";
 import { CategoryMenu, type MenuCategory } from "./category-menu";
+import { countryMenuId, openCountryMenu } from "./country-menu";
 import { Flag } from "./flag";
 import { SearchBar } from "./search-bar";
 import { useSearchPlace } from "./search-scope";
@@ -16,20 +17,36 @@ type Props = { country: string | null; categories: MenuCategory[]; prefix: strin
 /**
  * The header's one bar: the Categories menu as its navy left end, the search filling the rest, so the two read as a
  * single control. Without a country (the global page) there is nothing to search yet, so the rest of the bar takes the
- * shopper to a market: "Continue to <their country>" when signed in with one, else "Choose your country".
+ * shopper to a market: "Continue to <their country>" when signed in with one, else "Choose your country", which opens
+ * the header's country menu.
  */
 export function SearchBlend({ country, categories, prefix, allHref, place, continueTo = null, q = "", area, state, autoFocus }: Props & { q?: string; area?: string | null; state?: string | null; autoFocus?: boolean }) {
   const menu = <CategoryMenu categories={categories} prefix={prefix} allHref={allHref} place={place} />;
   const bar = "flex h-12 min-w-0 items-stretch rounded-2xl border-2 border-navy-900 bg-white";
+  const half = "flex min-w-0 flex-1 items-center gap-2.5 rounded-r-2xl px-3 text-[15px] font-bold text-navy-900 hover:bg-navy-50";
   if (!country) {
     return (
       <div className={bar}>
         {menu}
-        <Link href={continueTo ? `/${continueTo.country.toLowerCase()}` : "/#countries"} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-r-2xl px-3 text-[15px] font-bold text-navy-900 hover:bg-navy-50">
-          {continueTo ? <Flag country={continueTo.country} /> : <Globe2 className="size-5 shrink-0 text-navy-600" aria-hidden="true" />}
-          <span className="truncate">{continueTo ? `Continue to ${continueTo.name}` : "Choose your country"}</span>
-          <ArrowRight className="ml-auto size-5 shrink-0" aria-hidden="true" />
-        </Link>
+        {continueTo ? (
+          <Link href={`/${continueTo.country.toLowerCase()}`} className={half}>
+            <Flag country={continueTo.country} />
+            <span className="truncate">Continue to {continueTo.name}</span>
+            <ArrowRight className="ml-auto size-5 shrink-0" aria-hidden="true" />
+          </Link>
+        ) : (
+          <a
+            href={`#${countryMenuId}`}
+            onClick={event => {
+              if (openCountryMenu()) event.preventDefault();
+            }}
+            className={half}
+          >
+            <Globe2 className="size-5 shrink-0 text-navy-600" aria-hidden="true" />
+            <span className="truncate">Choose your country</span>
+            <ChevronDown className="ml-auto size-5 shrink-0" aria-hidden="true" />
+          </a>
+        )}
       </div>
     );
   }

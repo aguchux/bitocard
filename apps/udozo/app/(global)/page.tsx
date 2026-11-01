@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
-import { Flag } from "@/components/flag";
 import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
 import { regionalAlternates } from "@/lib/seo";
-import { Slider } from "@/components/slider";
-
-const listingCount = (count: number) => `${count.toLocaleString("en-GB")} ${count === 1 ? "listing" : "listings"}`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const all = await markets();
@@ -20,10 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The global showcase, from the second country: the countries with their listings, and recent and trending listings
- * across them, never a price (the categories are in the header's menu). With one country open, its market is the home
- * page. Nothing is chosen by cookie or address: a signed-in customer only sees "Continue to <their country>", in the
- * header's bar.
+ * The global showcase, from the second country: recent and trending listings across the countries, never a price (the
+ * categories and the countries are in the header's menus). With one country open, its market is the home page. Nothing
+ * is chosen by cookie or address: a signed-in customer only sees "Continue to <their country>", in the header's bar.
  */
 export default async function GlobalHome() {
   const all = await markets();
@@ -49,28 +43,6 @@ export default async function GlobalHome() {
         </div>
       </section>
       <div className="mx-auto grid max-w-[1400px] gap-8 px-4 sm:px-6 lg:px-8 pt-5">
-        <section aria-labelledby="countries">
-          <h2 id="countries" className="mb-3 text-base font-bold">
-            Choose your country
-          </h2>
-          <Slider label="Countries">
-            {all.data.map(market => (
-              <li key={market.country} className="w-44 sm:w-52">
-                <Link
-                  href={`/${market.country.toLowerCase()}`}
-                  title={market.name}
-                  className="flex h-full items-center gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 hover:border-navy-400"
-                >
-                  <Flag country={market.country} className="h-6 w-9" />
-                  <span className="grid min-w-0">
-                    <strong className="line-clamp-2 leading-snug">{market.name}</strong>
-                    <span className="text-xs text-navy-600">{listingCount(market.listings)}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </Slider>
-        </section>
         {showcase.ok ? (
           <>
             {showcase.data.trending.length ? (
