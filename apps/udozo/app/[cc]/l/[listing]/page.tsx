@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { BadgeCheck, MapPin, ShieldCheck } from "lucide-react";
 import {
+  brandFeatureKey,
   badgeLabels,
   categoryPath,
   conditionLabels,
@@ -20,6 +21,7 @@ import {
   type ShopListingPage,
   type ShopSearch,
 } from "@bitocard/api-client/classifieds";
+import { BrandLogo } from "@/components/brand-logo";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { Gallery } from "@/components/gallery";
 import { ShopIcon } from "@/components/icon";
@@ -171,9 +173,13 @@ export default async function ListingPage({ params }: Props) {
               <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {listing.features.map(feature => (
                   <div key={feature.key} className="flex items-center gap-2.5 rounded-xl border border-navy-200 bg-white p-2.5">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-navy-50 text-navy-700">
-                      <ShopIcon name={feature.icon} className="size-4.5" />
-                    </span>
+                    {feature.key === brandFeatureKey && listing.brand ? (
+                      <BrandLogo brand={listing.brand} size="lg" />
+                    ) : (
+                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-navy-50 text-navy-700">
+                        <ShopIcon name={feature.icon} className="size-4.5" />
+                      </span>
+                    )}
                     <span className="grid min-w-0">
                       <dt className="truncate text-xs text-navy-600">{feature.name}</dt>
                       <dd className="truncate text-sm font-bold">{featureValueText(feature)}</dd>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type {
+  ShopBrand,
   ShopChat,
   ShopContact,
   ShopCondition,
@@ -28,7 +29,7 @@ import type {
   ShopVideoUpload,
 } from "@bitocard/api-client/classifieds";
 import type { TermsStatus } from "@/components/terms-accept";
-import { apiUrl } from "./api";
+import { apiUrl, query, shopApi } from "./api";
 import { type CustomerResult, customerApi } from "./customer";
 import { toMinor, uuidPattern } from "./shop";
 
@@ -184,6 +185,18 @@ export async function suggestFeature(name: string, categoryId: string | null): P
   if (text.length < 2) return refused("Name the feature.", "name");
   if (categoryId && !id(categoryId)) return refused("No such category.");
   return answer(await customerApi("POST", "/v1/classifieds/feature-suggestions", { name: text, ...(categoryId ? { category_id: categoryId } : {}) }));
+}
+
+/**
+ * Brands for the listing form's brand field: the category's (most listed first) while nothing is typed, else those
+ * matching what was typed, the category's first. Public and cached a minute.
+ */
+export async function searchBrands(q: string, category: string | null): Promise<ShopResult<ShopBrand[]>> {
+  const words = q.trim().slice(0, 60);
+  if (category && !id(category)) return refused("No such category.");
+  if (!words && !category) return { ok: true, data: [] };
+  const result = await shopApi<{ data: ShopBrand[] }>(`/v1/classifieds/brands${query({ q: words || undefined, category: category ?? undefined, limit: words ? 12 : 24 })}`);
+  return result.ok ? { ok: true, data: result.data.data } : { ok: false, code: result.code, message: "Brands could not be loaded. Type the brand instead.", param: null, signIn: false };
 }
 
 // ---- Chats ----

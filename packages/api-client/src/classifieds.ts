@@ -42,6 +42,35 @@ export type ShopFeature = {
   filterable: boolean;
 };
 
+/** The feature key the brand registry answers (the listing form suggests brands, the filters show their logos). */
+export const brandFeatureKey = 'brand';
+
+/** A brand in Udozo's registry; `listings` (live ones in the country asked for) only when a country was given. */
+export type ShopBrand = { object: 'classified_brand'; slug: string; name: string; logo_url: string | null; color: string | null; listings?: number };
+
+/** A brand's initials where it has no logo: "Samsung" S, "Mercedes-Benz" MB, "LG" LG. */
+export function brandInitials(name: string) {
+  const words = name.replace(/[^\p{L}\p{N}\s-]/gu, '').split(/[\s-]+/).filter(Boolean);
+  if (words.length === 1) return words[0].length <= 3 && words[0] === words[0].toUpperCase() ? words[0] : words[0][0].toUpperCase();
+  return words.slice(0, 2).map(word => word[0].toUpperCase()).join('');
+}
+
+const brandTints = ['#1E3A8A', '#9D174D', '#065F46', '#7C2D12', '#4C1D95', '#155E75', '#3F6212', '#831843', '#1F2937', '#92400E'];
+
+/** The colour behind a brand's initials: its own, else one of Udozo's dark tints, always the same for the brand. */
+export function brandTint(brand: { slug: string; color: string | null }) {
+  if (brand.color) return brand.color;
+  let hash = 0;
+  for (const char of brand.slug) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return brandTints[hash % brandTints.length];
+}
+
+/** Light text on a dark colour, dark text on a light one. */
+export function brandInk(color: string) {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b > 160 ? '#111827' : '#FFFFFF';
+}
+
 export type ShopCategory = {
   object: 'classified_category';
   id: string;
@@ -110,6 +139,8 @@ export type ShopListingPage = {
   category: { slug: string; name: string; parent: { slug: string; name: string } | null; safety_checklist: string[] };
   area: ShopPlace;
   features: Array<{ key: string; name: string; icon: string; unit: string | null; value: string | number | boolean | null }>;
+  /** The brand feature's brand in Udozo's registry (its logo), when it is there. */
+  brand?: ShopBrand | null;
   photos: Array<{ url: string; width: number | null; height: number | null }>;
   video: { url: string; poster_url: string | null; duration_ms: number | null; width: number | null; height: number | null } | null;
   delivery: ShopDelivery;

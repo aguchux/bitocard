@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { SlidersHorizontal } from "lucide-react";
-import { conditionLabels, shopMoney, sortLabels, type ShopCategory, type ShopCondition, type ShopResult, type ShopSearch, type ShopSort, type ShopTier } from "@bitocard/api-client/classifieds";
+import { brandFeatureKey, conditionLabels, shopMoney, sortLabels, type ShopBrand, type ShopCategory, type ShopCondition, type ShopResult, type ShopSearch, type ShopSort, type ShopTier } from "@bitocard/api-client/classifieds";
 import { featureFilter, filterCount, filtersHref, maxOffset, perPage, type ShopFilters } from "@/lib/search";
+import { BrandLogo } from "./brand-logo";
 import { ListingRow } from "./listing-card";
 
 /** Where each tier sits from the buyer's place outwards. */
@@ -24,6 +25,40 @@ export function groupByTier(rows: ShopResult[]) {
 }
 
 const conditions: ShopCondition[] = ["new", "used", "untested", "parts"];
+/** Brands shown at once; the rest open under More brands. */
+const brandsShown = 12;
+
+/**
+ * The brand filter: the category's brands from Udozo's registry with their logos, chosen ones and those with the most
+ * listings first (with how many, when counted), the rest under More brands. Checkboxes, so the form works without script.
+ */
+function BrandFilter({ brands, chosen }: { brands: ShopBrand[]; chosen: string[] }) {
+  const picked = new Set(chosen.map(value => value.toLowerCase()));
+  const counted = brands.some(brand => brand.listings !== undefined);
+  const order = [...brands].sort((a, b) => Number(picked.has(b.name.toLowerCase())) - Number(picked.has(a.name.toLowerCase())) || (counted ? (b.listings ?? 0) - (a.listings ?? 0) : 0));
+  const first = order.slice(0, Math.max(brandsShown, order.filter(brand => picked.has(brand.name.toLowerCase())).length));
+  const rest = order.slice(first.length);
+  const chip = (brand: ShopBrand) => (
+    <label key={brand.slug} className="flex min-h-10 items-center gap-2 rounded-full border border-navy-200 bg-white py-1 pr-3 pl-1 text-sm has-checked:border-navy-900 has-checked:bg-navy-50 has-checked:font-semibold">
+      <input type="checkbox" name={`f.${brandFeatureKey}`} value={brand.name} defaultChecked={picked.has(brand.name.toLowerCase())} className="sr-only" />
+      <BrandLogo brand={brand} size="sm" />
+      <span className="min-w-0 truncate">{brand.name}</span>
+      {counted ? <span className="text-xs font-normal text-navy-500">{(brand.listings ?? 0).toLocaleString("en-GB")}</span> : null}
+    </label>
+  );
+  return (
+    <fieldset className="sm:col-span-2">
+      <legend className="mb-1.5 text-sm font-semibold">Brand</legend>
+      <div className="flex flex-wrap gap-2">{first.map(chip)}</div>
+      {rest.length ? (
+        <details className="mt-2">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center text-sm font-semibold text-brand-700 hover:underline [&::-webkit-details-marker]:hidden">More brands ({rest.length})</summary>
+          <div className="mt-2 flex flex-wrap gap-2">{rest.map(chip)}</div>
+        </details>
+      ) : null}
+    </fieldset>
+  );
+}
 const sorts: ShopSort[] = ["relevant", "newest", "price_asc", "price_desc"];
 const field = "h-11 w-full rounded-xl border border-navy-200 bg-white px-3 text-[15px] focus:border-navy-500 focus:ring-2 focus:ring-brand-500/30";
 
@@ -31,16 +66,17 @@ const field = "h-11 w-full rounded-xl border border-navy-200 bg-white px-3 text-
  * The filters, as a plain GET form that works without script: price, condition, the category's feature filters and the
  * sort. Words and the buyer's place are kept as they are.
  */
-function FiltersForm({ path, filters, category, currency }: { path: string; filters: ShopFilters; category: ShopCategory | null; currency: string }) {
+function FiltersForm({ path, filters, category, brands, currency }: { path: string; filters: ShopFilters; category: ShopCategory | null; brands: ShopBrand[]; currency: string }) {
   const count = filterCount(filters);
-  const filterable = (category?.features ?? []).filter(feature => feature.filter);
+  // With the registry's brands to show, the brand is a row of logos; otherwise a box to type it.
+  const filterable = (category?.features ?? []).filter(feature => feature.filter && !(brands.length && feature.key === brandFeatureKey));
   const symbol = shopMoney(0, currency).replace(/[\d.,\s]/g, "");
   return (
     <details className="group rounded-2xl border border-navy-200 bg-white" open={false}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         <SlidersHorizontal className="size-4" aria-hidden="true" /> Filters
         {count ? <span className="grid size-5 place-items-center rounded-full bg-brand-700 text-xs text-white">{count}</span> : null}
-        <span className="ml-auto text-xs font-medium text-navy-500 group-open:hidden">Price, condition{filterable.length ? ", features" : ""}</span>
+        <span className="ml-auto text-xs font-medium text-navy-500 group-open:hidden">Price, condition{brands.length ? ", brand" : ""}{filterable.length ? ", features" : ""}</span>
       </summary>
       <form action={path} method="get" className="grid gap-4 border-t border-navy-100 p-3.5 sm:grid-cols-2">
         {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
@@ -65,6 +101,7 @@ function FiltersForm({ path, filters, category, currency }: { path: string; filt
             ))}
           </div>
         </fieldset>
+        {brands.length ? <BrandFilter brands={brands} chosen={featureFilter(filters, brandFeatureKey)?.values ?? []} /> : null}
         {filterable.map(feature => {
           const current = featureFilter(filters, feature.key);
           if (feature.data_type === "number") {
@@ -146,6 +183,7 @@ export function Results({
   filters,
   path,
   category,
+  brands = [],
   place,
   currency,
 }: {
@@ -153,13 +191,15 @@ export function Results({
   filters: ShopFilters;
   path: string;
   category: ShopCategory | null;
+  /** The brand filter's brands (`brandFilters`); none shows no brand row of logos. */
+  brands?: ShopBrand[];
   place: { area?: string | null; state?: string | null; country: string };
   currency: string;
 }) {
   const pages = Math.min(Math.ceil(result.total / perPage), Math.floor(maxOffset / perPage) + 1);
   return (
     <div className="grid gap-4">
-      <FiltersForm path={path} filters={filters} category={category} currency={currency} />
+      <FiltersForm path={path} filters={filters} category={category} brands={brands} currency={currency} />
       <p className="text-sm text-navy-600" aria-live="polite">
         {result.total === 0 ? "No listings match yet." : `${result.total.toLocaleString("en-GB")} listing${result.total === 1 ? "" : "s"}`}
         {result.total ? ` · ${sortLabels[result.sort]}` : ""}

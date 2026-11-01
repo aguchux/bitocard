@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Bold, Camera, Check, ChevronLeft, Italic, List, ListOrdered, LoaderCircle, Search, Trash2, Video, X } from "lucide-react";
 import {
+  brandFeatureKey,
   conditionLabels,
   contactLabels,
   descriptionBlocks,
@@ -26,6 +27,7 @@ import { featureValue, fromMinor, toMinor, toggleList, wrapSelection } from "@/l
 import { TermsAccept } from "@/components/terms-accept";
 import { acceptShopTerms, createListing, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, shopTerms, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
 import { type DraftPick, FillFromPhotos, ImproveListing, SuggestPrice } from "./assistant-help";
+import { BrandField } from "./brand-field";
 import { ShopIcon } from "./icon";
 import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom } from "./resale-fields";
 
@@ -875,7 +877,9 @@ function CategoryPicker({ categories, value, invalid, onChange }: { categories: 
 }
 
 /** One feature's value field, as its registry entry says: a number with its unit, a choice, yes or no, or text. */
-function FeatureInput({ row, onChange }: { row: FeatureRow; onChange: (value: string | boolean) => void }) {
+function FeatureInput({ row, categoryId, onChange }: { row: FeatureRow; categoryId: string | null; onChange: (value: string | boolean) => void }) {
+  // The brand: chosen from Udozo's brand registry with their logos, or typed.
+  if (row.key === brandFeatureKey) return <BrandField value={typeof row.value === "string" ? row.value : ""} categoryId={categoryId} label={row.name} onChange={onChange} />;
   if (row.data_type === "boolean") {
     return (
       <label className="flex items-center gap-2 text-sm">
@@ -963,7 +967,7 @@ function FeaturesField({ suggested, rows, categoryId, onChange, invalid }: { sug
             <li key={row.key} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <ShopIcon name={row.icon} className="size-5 shrink-0 text-slate-500" />
               <span className="min-w-0 flex-1 text-sm font-semibold">{row.name}</span>
-              <FeatureInput row={row} onChange={value => onChange(rows.map(item => (item.key === row.key ? { ...item, value } : item)))} />
+              <FeatureInput row={row} categoryId={categoryId} onChange={value => onChange(rows.map(item => (item.key === row.key ? { ...item, value } : item)))} />
               <button type="button" onClick={() => onChange(rows.filter(item => item.key !== row.key))} aria-label={`Remove ${row.name}`} className="grid size-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100">
                 <X className="size-4" aria-hidden="true" />
               </button>
