@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountNav } from "@/components/account/nav";
+import { MicrophonePrompt } from "@/components/calls/microphone-prompt";
 import { SiteFooter } from "@/components/footer";
 import { SiteHeader } from "@/components/header";
 import { accountCounts, marketOf } from "@/lib/account";
@@ -11,7 +12,8 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * The seller's area (`/account/*`) and posting (`/sell`): Udozo's header in the customer's own market, then the
- * account's places beside the page (tabs above it on phones). Signed out, the pages send people to sign in themselves.
+ * account's places beside the page (tabs above it on phones), and the microphone prompt for calls. Signed out, the pages
+ * send people to sign in themselves.
  */
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const [customer, all] = await Promise.all([currentCustomer(), markets()]);
@@ -32,6 +34,8 @@ export default async function AccountLayout({ children }: { children: React.Reac
             </p>
           ) : null}
           {children}
+          {/* Signed in and confirmed: ask for the microphone where calls are set up and it is not allowed yet. */}
+          {counts ? <MicrophonePrompt /> : null}
         </main>
       </div>
       <SiteFooter />

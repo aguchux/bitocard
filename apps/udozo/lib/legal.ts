@@ -774,6 +774,7 @@ const cookies: LegalDocument = {
             head: ["Name", "Site", "What for", "Kept"],
             rows: [
               ["udz_assistant_language", "udozo.com", "The language you chose for the shop assistant", "Until you clear it"],
+              ["udz_microphone_prompt", "udozo.com", "Whether you allowed your microphone for calls, or when you chose Not now, so we do not ask again too soon", "Until you clear it"],
               ["assistant:draft:<listing>", "udozo.com", "Carries a message the shop assistant drafted into the listing's chat", "Until it is used, or the tab closes"],
               ["bc_install, bc_install_visit", "udozo.com, Seller HQ", "When you were last offered the site as an app, and that you were asked on this visit", "Until you clear it; for one visit"],
               ["udozo-shq-reseller, udozo-shq-mode", "Seller HQ", "Which seller account you work in, and live or test mode", "Until you clear it"],

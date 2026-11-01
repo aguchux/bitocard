@@ -26,7 +26,7 @@ export function micHelp(problem: MicProblem, permission: MicPermission) {
 }
 
 /** How to allow the microphone where the browser no longer asks. */
-const allowSteps = [
+export const allowSteps = [
   { where: "On a computer", how: "click the icon left of the web address (a lock or sliders), set Microphone to Allow." },
   { where: "On iPhone or iPad", how: "tap aA in the address bar, then Website Settings, and set Microphone to Allow." },
   { where: "On Android", how: "tap the icon left of the web address, then Permissions, and turn on Microphone." },
