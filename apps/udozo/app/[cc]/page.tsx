@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { MapPin } from "lucide-react";
 import type { ShopSearch } from "@bitocard/api-client/classifieds";
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
@@ -25,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** A country's market: the Safe pay promise with the area, and the newest listings (search and categories are in the header). */
+/** A country's market: the Safe pay promise and the newest listings (search, categories and Near me are in the header). */
 export default async function CountryHome({ params }: Props) {
   const { cc } = await params;
   const market = await marketFor(cc);
@@ -41,11 +40,6 @@ export default async function CountryHome({ params }: Props) {
             <br />
             <span className="text-brand-300">protected by Safe pay</span>
           </h1>
-          <Link href={`/${cc}/areas`} className="flex h-10 items-center gap-2 rounded-xl border border-navy-700 bg-navy-800 px-3 text-sm font-semibold text-white sm:max-w-sm">
-            <MapPin className="size-4.5 text-brand-300" aria-hidden="true" />
-            <span className="flex-1">Choose your area</span>
-            <span className="text-[13px] font-medium text-navy-200">Near you first</span>
-          </Link>
         </div>
       </section>
       <div className="mx-auto grid max-w-[1400px] gap-7 px-4 sm:px-6 lg:px-8 pt-4">

@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { MapPin } from "lucide-react";
 import type { ShopSearch } from "@bitocard/api-client/classifieds";
 import { Results } from "@/components/results";
 import { marketFor, shopApi } from "@/lib/api";
@@ -28,18 +26,9 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const filters = readFilters(await searchParams);
   const [result, states] = await Promise.all([shopApi<ShopSearch>(searchQuery(cc, filters)), areasOf(cc)]);
   const place = filters.state ? findPlace(states, filters.state, filters.area) : null;
-  const where = place ? (place.area ? `${place.area.name}, ${place.state.name}` : place.state.name) : null;
+  // The area is chosen with Near me in the header's search bar.
   return (
     <>
-      <section className="bg-navy-900 pt-5 pb-4">
-        <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-2.5">
-          <Link href={`/${cc}/areas?next=${encodeURIComponent(`/${cc}/search${filters.q ? `?q=${encodeURIComponent(filters.q)}` : ""}`)}`} className="flex h-10 items-center gap-2 rounded-xl border border-navy-700 bg-navy-800 px-3 text-sm font-semibold text-white sm:max-w-sm">
-            <MapPin className="size-4.5 text-brand-300" aria-hidden="true" />
-            <span className="flex-1">{where ?? "Choose your area"}</span>
-            <span className="text-[13px] font-medium text-navy-200">{where ? "Change" : "Near you first"}</span>
-          </Link>
-        </div>
-      </section>
       <div className="mx-auto grid max-w-[1400px] gap-4 px-4 sm:px-6 lg:px-8 pt-4">
         <h1 className="text-2xl font-extrabold tracking-tight">{filters.q ? `Results for “${filters.q}”` : `Everything in ${market.name}`}</h1>
         {result.ok ? (

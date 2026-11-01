@@ -48,7 +48,7 @@ describe("the header", () => {
   });
 
   it("has one named link, Safe pay, before the country; the profile menu holds only the account", () => {
-    const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]).filter(href => !href.startsWith("/ng/c/") && href !== "/ng/search");
+    const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]).filter(href => !href.startsWith("/ng/c/") && href !== "/ng/search" && href !== "/ng/areas");
     expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/account", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell"]);
     expect(html.indexOf('href="/safe-trade#safe-pay"')).toBeLessThan(html.indexOf('title="Nigeria"'));
     expect(html).toContain("Sign out");
@@ -85,6 +85,20 @@ describe("the header's search", () => {
     expect(renderToStaticMarkup(createElement(HeaderSearch, props))).toMatch(/autofocus/i);
     nav.path = "/ng";
     expect(renderToStaticMarkup(createElement(HeaderSearch, props))).not.toMatch(/autofocus/i);
+  });
+
+  it("ends the bar with Near me, choosing the area: back to the same search from the search page", () => {
+    nav.path = "/ng";
+    nav.params = new URLSearchParams();
+    const home = renderToStaticMarkup(createElement(HeaderSearch, props));
+    expect(home).toMatch(/<\/form><a aria-label="Near me: choose your area" class="[^"]*rounded-r-2xl[^"]*" href="\/ng\/areas">.*Near me<\/span><\/a><\/div>$/);
+    nav.path = "/ng/search";
+    nav.params = new URLSearchParams("q=iphone&state=lagos");
+    const search = renderToStaticMarkup(createElement(HeaderSearch, props));
+    expect(search).toContain(`href="/ng/areas?next=${encodeURIComponent("/ng/search?q=iphone")}"`.replaceAll("&", "&amp;"));
+    expect(search).toContain('aria-label="Near me: change your area"');
+    nav.path = "/ng";
+    nav.params = new URLSearchParams();
   });
 
   it("without a country the bar's other half goes to a market: the customer's own, else choosing one", () => {

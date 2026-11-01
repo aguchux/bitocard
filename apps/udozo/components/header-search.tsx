@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ArrowRight, ChevronDown, Globe2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Globe2, MapPin } from "lucide-react";
 import { CategoryMenu, type MenuCategory } from "./category-menu";
 import { countryMenuId, openCountryMenu } from "./country-menu";
 import { Flag } from "./flag";
@@ -16,11 +16,11 @@ type Props = { country: string | null; categories: MenuCategory[]; prefix: strin
 
 /**
  * The header's one bar: the Categories menu as its navy left end, the search filling the rest, so the two read as a
- * single control. Without a country (the global page) there is nothing to search yet, so the rest of the bar takes the
+ * single control, and **Near me** at its far right choosing the buyer's area (listings near them first). Without a country (the global page) there is nothing to search yet, so the rest of the bar takes the
  * shopper to a market: "Continue to <their country>" when signed in with one, else "Choose your country", which opens
  * the header's country menu.
  */
-export function SearchBlend({ country, categories, prefix, allHref, place, continueTo = null, q = "", area, state, autoFocus }: Props & { q?: string; area?: string | null; state?: string | null; autoFocus?: boolean }) {
+export function SearchBlend({ country, categories, prefix, allHref, place, continueTo = null, q = "", area, state, autoFocus, searching = false }: Props & { q?: string; area?: string | null; state?: string | null; autoFocus?: boolean; searching?: boolean }) {
   const menu = <CategoryMenu categories={categories} prefix={prefix} allHref={allHref} place={place} />;
   const bar = "flex h-12 min-w-0 items-stretch rounded-2xl border-2 border-navy-900 bg-white";
   const half = "flex min-w-0 flex-1 items-center gap-2.5 rounded-r-2xl px-3 text-[15px] font-bold text-navy-900 hover:bg-navy-50";
@@ -50,11 +50,22 @@ export function SearchBlend({ country, categories, prefix, allHref, place, conti
       </div>
     );
   }
+  const cc = country.toLowerCase();
+  // From the search page, choosing an area goes back to the same search; elsewhere to the area's own page.
+  const back = searching ? `?next=${encodeURIComponent(`/${cc}/search${q ? `?q=${encodeURIComponent(q)}` : ""}`)}` : "";
   return (
     <div className={`${bar} focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-500/30`}>
       {menu}
       {/* A new query (another page's) starts the field again. */}
       <SearchBar key={q} country={country} q={q} area={area} state={state} autoFocus={autoFocus} blended />
+      <Link
+        href={`/${cc}/areas${back}`}
+        aria-label={area || state ? "Near me: change your area" : "Near me: choose your area"}
+        className="flex shrink-0 items-center gap-1.5 rounded-r-2xl border-l border-navy-200 px-3 text-sm font-bold text-navy-900 hover:bg-navy-50"
+      >
+        <MapPin className="size-4.5 text-brand-700" aria-hidden="true" />
+        <span>Near me</span>
+      </Link>
     </div>
   );
 }
@@ -66,5 +77,5 @@ export function HeaderSearch(props: Props) {
   const scope = useSearchPlace();
   const q = params.get("q") ?? "";
   const searching = Boolean(props.country) && path === `/${props.country!.toLowerCase()}/search`;
-  return <SearchBlend {...props} q={q} area={scope.area ?? params.get("area")} state={scope.state ?? params.get("state")} autoFocus={searching && !q} />;
+  return <SearchBlend {...props} q={q} area={scope.area ?? params.get("area")} state={scope.state ?? params.get("state")} autoFocus={searching && !q} searching={searching} />;
 }
