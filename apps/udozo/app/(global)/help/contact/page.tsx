@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, CircleHelp, Mail, ShieldCheck } from "lucide-react";
+import { ChevronRight, CircleHelp, Mail, MessageCircle, Phone, ShieldCheck } from "lucide-react";
 import { ContactForm } from "@/components/help/contact-form";
 import { markets } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
-import { supportEmail } from "@/lib/help";
+import { supportEmail, supportPhone, supportWhatsApp } from "@/lib/help";
 
 export const metadata: Metadata = {
   title: "Contact us",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 /**
  * Contact us: the form to Udozo's support team (worked in Udozo's admin, Support > Contact us), and beside it the other
- * ways to get help: email, Safe pay and the FAQs. A signed-in customer's name and email start filled in.
+ * ways to get help: email, WhatsApp, a phone line, Safe pay and the FAQs. A signed-in customer's name and email start filled in.
  */
 export default async function ContactPage() {
   const [customer, all] = await Promise.all([currentCustomer(), markets()]);
@@ -57,6 +57,32 @@ export default async function ContactPage() {
                       {supportEmail}
                     </a>
                     . We usually reply within one working day.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <MessageCircle className="mt-0.5 size-6 shrink-0 text-mint-700" aria-hidden="true" />
+                <div>
+                  <h2 className="font-bold text-navy-900">WhatsApp</h2>
+                  <p className="text-sm text-navy-600">
+                    Message us on{" "}
+                    <a href={supportWhatsApp.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-navy-900 hover:underline">
+                      {supportWhatsApp.shown}
+                    </a>
+                    . Messages only: this number takes no calls.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Phone className="mt-0.5 size-6 shrink-0 text-brand-700" aria-hidden="true" />
+                <div>
+                  <h2 className="font-bold text-navy-900">Call us</h2>
+                  <p className="text-sm text-navy-600">
+                    Call{" "}
+                    <a href={supportPhone.href} className="font-semibold text-navy-900 hover:underline">
+                      {supportPhone.shown}
+                    </a>
+                    . It is a UK number, so calls from abroad cost international rates.
                   </p>
                 </div>
               </div>

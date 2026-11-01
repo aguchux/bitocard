@@ -32,8 +32,11 @@ export const contactKinds = [
 export type ContactKind = (typeof contactKinds)[number]["value"];
 export const isContactKind = (value: unknown): value is ContactKind => contactKinds.some(kind => kind.value === value);
 
-/** How to reach Udozo besides the form. Only channels Udozo runs: add WhatsApp, phone or social accounts here once they exist. */
+/** How to reach Udozo besides the form. Only channels Udozo runs: add social accounts here once they exist. */
 export const supportEmail = "support@udozo.com";
+/** Udozo's support lines: WhatsApp messages on one number, calls on another (UK numbers, E.164 and as shown). */
+export const supportWhatsApp = { e164: "+447440412759", shown: "+44 7440 412759", href: "https://wa.me/447440412759" };
+export const supportPhone = { e164: "+447503040682", shown: "+44 7503 040682", href: "tel:+447503040682" };
 
 export type Faq = { q: string; a: string };
 export type FaqGroup = { id: string; title: string; faqs: Faq[] };

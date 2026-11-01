@@ -74,6 +74,19 @@ describe("Contact us", () => {
     expect(html).toContain("Never send a password");
     expect(html).toContain("Send message");
   });
+
+  it("the page gives the email, WhatsApp on one number and calls on another", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ object: "list", data: [], showcase: false })));
+    const { default: ContactPage } = await import("@/app/(global)/help/contact/page");
+    const html = renderToStaticMarkup(await ContactPage());
+    vi.unstubAllGlobals();
+    expect(html).toContain('href="mailto:support@udozo.com"');
+    expect(html).toContain('href="https://wa.me/447440412759"');
+    expect(html).toContain("+44 7440 412759");
+    expect(html).toContain('href="tel:+447503040682"');
+    expect(html).toContain("+44 7503 040682");
+    expect(html).not.toContain("tel:+447440412759");
+  });
 });
 
 describe("the FAQs", () => {
