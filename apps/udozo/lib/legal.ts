@@ -52,6 +52,15 @@ const terms: LegalDocument = {
             "Paying directly is at your own risk. If you pay or are paid outside Safe pay, in cash, by transfer or any other way, we take no part in that payment and cannot get the money back.",
           ],
         },
+        "How listings are shown. Search results come in the order you choose (best match, newest or price), nearest to you first. On the home pages:",
+        {
+          list: [
+            "Sponsored listings are placed by Udozo's team, sometimes because a seller paid Udozo, and are always labelled Sponsored. Nothing else moves a listing up for payment.",
+            "Trending ranks recent listings by how many people contacted, saved and viewed them.",
+            "Trending deals are listings whose price came down, shown beside the lowest price they had in the 30 days before.",
+            "Top selling ranks listings by Safe pay sales completed in the last 30 days. Until enough have sold, the most contacted listings show instead, titled Popular, never as sales.",
+          ],
+        },
       ],
     },
     {
@@ -626,6 +635,7 @@ const privacy: LegalDocument = {
             "Sellers on Seller HQ: your business's details and checks, your team, your stores, what you publish on them, your wallets, invoices and payouts, your API keys (only as hashes) and webhooks, and for domains you buy, the registrant details you give.",
             "Devices: for Seller HQ and our team, the browsers where you turned on notifications (the browser's push address and keys, encrypted).",
             "Technical data: your IP address, used for rate limits and security, and the requests your browser makes, in our server logs.",
+            "Listing views: how many times each listing's page was opened, each day, shown to its seller and used to rank Trending. Nothing about who viewed it is kept: so one visitor counts once, a one-way code of their IP address, browser and the listing is held in memory for half an hour, then forgotten.",
           ],
         },
         'We do not collect your precise location: "Use my location" on udozo.com finds the nearest area in your browser, and your position is never sent to us. We use no analytics, advertising or tracking cookies.',
