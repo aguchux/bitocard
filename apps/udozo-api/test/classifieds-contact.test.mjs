@@ -213,6 +213,15 @@ describe('Request a call back', () => {
 });
 
 describe('calls', () => {
+  test('the Calls integration offers Test connection, which makes a short-lived credential', async () => {
+    const admin = await adminClient(server);
+    const listed = await admin.get('/v1/admin/integrations');
+    assert.equal(listed.json.data.find(group => group.id === 'calls')?.testable, true);
+    const tested = await admin.post('/v1/admin/integrations/calls/test');
+    assert.equal(tested.status, 200, JSON.stringify(tested.json));
+    assert.deepEqual([tested.json.ok, tested.json.message], [true, 'Calls will be relayed through 2 TURN addresses.']);
+  });
+
   test('ring an online seller, answer, swap connection details through the relay, then end', async () => {
     const seller = await customer('Obi Nnamdi', { phone: '+2348031120006' });
     const buyer = await customer('Zainab Musa');

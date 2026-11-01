@@ -33,7 +33,7 @@ type Submitted = string | number | boolean | null;
 
 const maxValueLength = 4000;
 /** Platform integrations with their own Test connection check (not a connectable adapter or a blockchain provider). */
-const ownTests = new Set(['domains', 'store_hosts']);
+const ownTests = new Set(['domains', 'store_hosts', 'calls']);
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such integration.');
 const invalidValue = (key: string, message: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'invalid_value', message, `values.${key}`);
 
