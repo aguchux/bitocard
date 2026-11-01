@@ -399,7 +399,8 @@ export type ShopStoreReport = {
 };
 export type ShopReleaseCode = { object: 'classified_release_code'; order_id: string; code: string; tries_left: number };
 /** What a seller still needs before accepting Safe pay orders. */
-export type ShopReadiness = { object: 'classified_safe_pay_readiness'; identity_checked: boolean; payout_account: boolean; ready: boolean; limited: boolean; strikes: number; strike_limit: number };
+/** `identity_required`: whether the market requires the identity check (Udozo's `customer_identity_check` switch); optional otherwise. */
+export type ShopReadiness = { object: 'classified_safe_pay_readiness'; identity_required?: boolean; identity_checked: boolean; payout_account: boolean; ready: boolean; limited: boolean; strikes: number; strike_limit: number };
 
 /**
  * Whether the customer can open listings to resellers (B2B reselling): resale open in their country (`reason` when not:
@@ -410,6 +411,8 @@ export type ShopResaleAvailability = {
   country: string;
   open: boolean;
   reason: 'switch_off' | 'not_set_up' | null;
+  /** Whether the market requires the identity check; optional otherwise. */
+  identity_required?: boolean;
   identity_checked: boolean;
   payout_account: boolean;
   ready: boolean;

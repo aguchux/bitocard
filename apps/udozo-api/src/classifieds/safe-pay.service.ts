@@ -192,7 +192,10 @@ export class SafePayService {
     return { country, mode, settings, house: seller };
   }
 
-  /** What a seller still needs before accepting Safe pay orders: their identity check and a payout bank account (live). */
+  /**
+   * What a seller still needs before accepting Safe pay orders (live): a payout bank account, and their identity check
+   * where the market's `customer_identity_check` switch requires it (optional otherwise).
+   */
   async readiness(customer: CustomerWithStore) {
     const { mode, house, country } = await this.open(customer);
     const [ready, standing] = await Promise.all([this.readinessOf(customer.id, mode, house.id, country), this.guards.standing(customer.id, country)]);
@@ -200,12 +203,13 @@ export class SafePayService {
   }
 
   private async readinessOf(customerId: string, mode: LedgerMode, houseId: string, country: string) {
-    if (mode === 'test') return { object: 'classified_safe_pay_readiness' as const, identity_checked: true, payout_account: true, ready: true };
+    const required = await this.settings.isOnForCountry('customer_identity_check', country);
+    if (mode === 'test') return { object: 'classified_safe_pay_readiness' as const, identity_required: required, identity_checked: true, payout_account: true, ready: true };
     const [checked, account] = await Promise.all([
       this.identity.isCustomerVerified(houseId, mode, customerId),
       this.prisma.customerBankAccount.findFirst({ where: { customerId, mode, country, removedAt: null }, select: { id: true } }),
     ]);
-    return { object: 'classified_safe_pay_readiness' as const, identity_checked: checked, payout_account: Boolean(account), ready: checked && Boolean(account) };
+    return { object: 'classified_safe_pay_readiness' as const, identity_required: required, identity_checked: checked, payout_account: Boolean(account), ready: (checked || !required) && Boolean(account) };
   }
 
   /** The price a buyer would pay: the listing's, or an offer they agreed in the last 7 days. */
@@ -442,8 +446,8 @@ export class SafePayService {
     await this.guards.requireNotLimited(customer.id, order.country, true);
     await this.guards.requireDifferentPeople(order.buyerId, customer.id);
     const ready = await this.readinessOf(customer.id, mode, house.id, order.country);
-    if (!ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
-    if (!ready.payout_account) throw conflict('seller_not_ready', 'Add a payout bank account in your verified name before accepting Safe pay orders.', 'payout_account');
+    if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
+    if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting Safe pay orders.`, 'payout_account');
     const claimed = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: 'requested', acceptBy: { gt: now } }, data: { status: 'awaiting_payment', acceptedAt: now, payBy: new Date(now.getTime() + settings.payHours * hourMs) } });
     if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
     const accepted = await this.reload(order.id);
@@ -625,8 +629,8 @@ export class SafePayService {
     await this.guards.requireNotLimited(order.sellerId, order.country, true);
     await this.guards.requireDifferentPeople(order.buyerId, order.sellerId);
     const ready = await this.readinessOf(order.sellerId, order.mode, houseId, order.country);
-    if (!ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
-    if (!ready.payout_account) throw conflict('seller_not_ready', 'Add a payout bank account in your verified name before accepting Safe pay orders.', 'payout_account');
+    if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
+    if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting Safe pay orders.`, 'payout_account');
     const total = totalOf(order);
     const entry = await this.ledger.prepare({
       mode: order.mode,

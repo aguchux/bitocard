@@ -149,7 +149,14 @@ describe('resale: BitoCard limits and the switch', () => {
     // A live Shop listing cannot be opened to resellers later either.
     const plain = await draft(seller, 'Samsung soundbar');
     assert.equal((await seller.post(`/v1/classifieds/listings/${plain.id}/submit`)).json.status, 'active');
-    assert.equal((await seller.patch(`/v1/classifieds/listings/${plain.id}`, resaleTerms)).json.error.code, 'supplier_not_ready');
+    const noAccount = (await seller.patch(`/v1/classifieds/listings/${plain.id}`, resaleTerms)).json.error;
+    assert.deepEqual([noAccount.code, noAccount.param], ['supplier_not_ready', 'payout_account'], 'the identity check is optional by default');
+    assert.equal((await seller.get('/v1/classifieds/me/resale')).json.identity_required, false);
+    // Where an admin requires the check, it is asked first.
+    assert.equal((await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: true })).status, 200);
+    assert.equal((await seller.patch(`/v1/classifieds/listings/${plain.id}`, resaleTerms)).json.error.param, 'identity');
+    assert.equal((await seller.get('/v1/classifieds/me/resale')).json.identity_required, true);
+    assert.equal((await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: null })).status, 200);
     await ready(seller);
     const opened = await seller.patch(`/v1/classifieds/listings/${plain.id}`, resaleTerms);
     assert.equal(opened.json.resale.enabled, true, JSON.stringify(opened.json));

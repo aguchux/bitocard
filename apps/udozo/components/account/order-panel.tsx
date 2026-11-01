@@ -73,11 +73,11 @@ export function OrderPanel({
           {order.kind === "resale" ? <p className="text-sm text-slate-600">The buyer has paid: their money is locked until you accept, then held by Udozo until they have the item. Accept only if you can hand it over or ship it in time.</p> : null}
           {readiness && !readiness.ready ? (
             <div className="grid gap-2">
-              <p className="text-sm text-slate-600">{readiness.limited ? `You cannot take Safe pay orders right now (${readiness.strikes} of ${readiness.strike_limit} strikes in 90 days). You can still chat and sell directly.` : "First Safe pay sale: two quick steps."}</p>
+              <p className="text-sm text-slate-600">{readiness.limited ? `You cannot take Safe pay orders right now (${readiness.strikes} of ${readiness.strike_limit} strikes in 90 days). You can still chat and sell directly.` : `First Safe pay sale: ${readiness.identity_required !== false ? "two quick steps" : "one quick step"}.`}</p>
               {!readiness.limited ? (
                 <ol className="grid gap-2">
-                  <SetupStep done={readiness.identity_checked} label={readiness.identity_checked ? "Identity check passed" : "Pass the identity check"} href="/account/verification" />
-                  <SetupStep done={readiness.payout_account} label={readiness.payout_account ? "Payout account added" : "Add a payout account in your verified name"} href="/account/payouts" />
+                  {readiness.identity_required !== false ? <SetupStep done={readiness.identity_checked} label={readiness.identity_checked ? "Identity check passed" : "Pass the identity check"} href="/account/verification" /> : null}
+                  <SetupStep done={readiness.payout_account} label={readiness.payout_account ? "Payout account added" : readiness.identity_required !== false ? "Add a payout account in your verified name" : "Add a payout account in your own name"} href="/account/payouts" />
                 </ol>
               ) : null}
             </div>

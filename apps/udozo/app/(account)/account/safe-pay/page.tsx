@@ -26,8 +26,9 @@ function Step({ n, done, title, note, children }: { n: number; done: boolean; ti
 }
 
 /**
- * Getting paid through Safe pay (the design canvas's SafePaySetup board): once, before the first Safe pay sale, the
- * identity check and a payout bank account in the verified name. Selling and chatting need neither.
+ * Getting paid through Safe pay (the design canvas's SafePaySetup board): once, before the first Safe pay sale, a
+ * payout bank account, and the identity check where the market requires it (`identity_required`; optional otherwise,
+ * the account then in the name on the customer's Udozo account). Selling and chatting need neither.
  */
 export default async function SafePaySetup() {
   await requireSeller("/account/safe-pay");
@@ -38,6 +39,8 @@ export default async function SafePaySetup() {
   ]);
   const ready = readiness.ok ? readiness.data : null;
   const saved = accounts.ok ? accounts.data.data : [];
+  // Older answers say nothing: then the check is required, as it was.
+  const required = ready?.identity_required !== false;
   return (
     <div className="grid max-w-2xl gap-5">
       <PageTitle title="Get paid with Safe pay" note="Once, before your first Safe pay sale. You can still sell and chat without it." post={false} />
@@ -52,14 +55,19 @@ export default async function SafePaySetup() {
       {ready?.ready ? <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">You are ready: accept Safe pay requests from Orders.</p> : null}
       {ready ? (
         <>
-          <Step n={1} done={ready.identity_checked} title="Identity check" note={ready.identity_checked ? "Passed." : "A quick check of your ID, once. Your payouts go only to an account in the name it confirms."}>
+          <Step
+            n={1}
+            done={ready.identity_checked}
+            title={required ? "Identity check" : "Identity check (optional)"}
+            note={ready.identity_checked ? "Passed." : required ? "A quick check of your ID, once. Your payouts go only to an account in the name it confirms." : "Not needed to get paid. A passed check shows buyers you are who you say you are."}
+          >
             {ready.identity_checked ? null : (
               <Link href="/account/verification" className="flex h-11 items-center justify-center rounded-xl bg-navy-900 font-bold text-white hover:bg-navy-700 sm:justify-self-start sm:px-6">
                 Start the identity check
               </Link>
             )}
           </Step>
-          <Step n={2} done={ready.payout_account} title="Payout account" note="A bank account in your verified name. New accounts can receive payouts after 24 hours.">
+          <Step n={2} done={ready.payout_account} title="Payout account" note={`A bank account in your ${ready.identity_checked || required ? "verified name" : "own name, as on your Udozo account"}. New accounts can receive payouts after 24 hours.`}>
             {saved.length ? (
               <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
                 {saved.map(account => (
@@ -75,9 +83,9 @@ export default async function SafePaySetup() {
                 ))}
               </ul>
             ) : null}
-            {ready.identity_checked && banks.ok ? (
+            {(ready.identity_checked || !required) && banks.ok ? (
               <PayoutAccountForm banks={banks.data.data} />
-            ) : !ready.identity_checked ? (
+            ) : !ready.identity_checked && required ? (
               <p className="text-sm text-slate-600">Add it once your identity check has passed.</p>
             ) : (
               <p className="text-sm text-slate-600">{banks.ok ? "" : banks.message}</p>

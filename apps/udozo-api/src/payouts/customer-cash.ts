@@ -12,14 +12,17 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ProductOnly } from '../products/product.js';
+import { SettingsModule } from '../settings/settings.module.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { CustomerPayoutsService } from './customer-payouts.service.js';
 import { PayoutsModule } from './payouts.module.js';
 
 /**
  * Who may pay out their withdrawable money (Safe pay sales, and a resale supplier's share) and in what: the store's
- * seller and mode, the market's currency, and, live, the name their identity check verified, which the bank account
- * must carry. An email confirmed and, live, the identity check; never whether the store is open now, so closing a
- * store never traps money (docs/UDOZO_SPINOFF_PLAN.md, step 3: moved out of the crypto code it began in).
+ * seller and mode, the market's currency, and, live, the name the bank account must carry: the one their identity check
+ * verified, else (where the market's `customer_identity_check` switch is off, so the check is optional) the name on
+ * their account. An email confirmed and, live where the switch requires it, the identity check; never whether the store
+ * is open now, so closing a store never traps money (docs/UDOZO_SPINOFF_PLAN.md, step 3: moved out of the crypto code it began in).
  */
 @Injectable()
 export class CustomerCashService {
@@ -27,6 +30,7 @@ export class CustomerCashService {
     private readonly prisma: PrismaService,
     private readonly stores: StoreSellers,
     private readonly identity: IdentityService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** The customer's mode, seller and market, without the checks (lists and removing an account). */
@@ -43,10 +47,14 @@ export class CustomerCashService {
   async requireCashOut(customer: CustomerWithStore) {
     if (!customer.emailVerifiedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
     const context = await this.context(customer);
-    if (context.mode === 'live' && !(await this.identity.isCustomerVerified(context.seller.id, context.mode, customer.id))) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before paying money out.');
+    let verifiedName: string | null = null;
+    if (context.mode === 'live') {
+      const required = await this.settings.isOnForCountry('customer_identity_check', context.country);
+      verifiedName = await this.identity.customerVerifiedName(context.seller.id, context.mode, customer.id);
+      if (required && !verifiedName) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before paying money out.');
+      // Optional check, not taken: the account must carry the name on their Udozo account.
+      verifiedName ??= customer.name;
     }
-    const verifiedName = context.mode === 'live' ? await this.identity.customerVerifiedName(context.seller.id, context.mode, customer.id) : null;
     return { customer, mode: context.mode, sellerId: context.seller.id, country: context.country, currency: context.currency, verifiedName };
   }
 }
@@ -159,7 +167,7 @@ export class AdminCustomerPayoutsController {
 }
 
 @Module({
-  imports: [CheckoutModule, IdentityModule, PayoutsModule],
+  imports: [CheckoutModule, IdentityModule, PayoutsModule, SettingsModule],
   controllers: [CustomerCashController, AdminCustomerPayoutsController],
   providers: [CustomerCashService],
 })

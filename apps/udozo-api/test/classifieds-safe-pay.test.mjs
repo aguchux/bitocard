@@ -143,9 +143,16 @@ describe('Safe pay', () => {
     assert.deepEqual([order.json.buyer_fee, order.json.total, order.json.seller_fee], [100000, 25100000, undefined], 'the buyer never sees the seller\'s fee');
     assert.equal((await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).json.error.code, 'order_exists');
 
+    // The identity check is optional until an admin switches customer_identity_check on: only the payout account is asked.
+    const optional = await seller.post(`/v1/classifieds/orders/${order.json.id}/accept`);
+    assert.deepEqual([optional.json.error.code, optional.json.error.param], ['seller_not_ready', 'payout_account']);
+    assert.match(optional.json.error.message, /in your own name/);
+    assert.deepEqual((await seller.get('/v1/classifieds/me/safe-pay')).json, { object: 'classified_safe_pay_readiness', identity_required: false, identity_checked: false, payout_account: false, ready: false, limited: false, strikes: 0, strike_limit: 3 });
+    assert.equal((await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: true })).status, 200);
     const notReady = await seller.post(`/v1/classifieds/orders/${order.json.id}/accept`);
     assert.deepEqual([notReady.json.error.code, notReady.json.error.param], ['seller_not_ready', 'identity']);
-    assert.deepEqual((await seller.get('/v1/classifieds/me/safe-pay')).json, { object: 'classified_safe_pay_readiness', identity_checked: false, payout_account: false, ready: false, limited: false, strikes: 0, strike_limit: 3 });
+    assert.deepEqual((await seller.get('/v1/classifieds/me/safe-pay')).json, { object: 'classified_safe_pay_readiness', identity_required: true, identity_checked: false, payout_account: false, ready: false, limited: false, strikes: 0, strike_limit: 3 });
+    assert.equal((await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: null })).status, 200);
     await ready(seller);
     assert.equal((await buyer.post(`/v1/classifieds/orders/${order.json.id}/accept`)).json.error.code, 'order_not_yours');
     const accepted = await seller.post(`/v1/classifieds/orders/${order.json.id}/accept`);
@@ -322,6 +329,20 @@ describe('Safe pay', () => {
     assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/accept`)).json.error.code, 'terms_not_accepted');
     await seller.post('/v1/classifieds/terms/accept', { version });
     assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/accept`)).json.status, 'awaiting_payment');
+  });
+
+  test('paying out needs the identity check only where customer_identity_check is on', async () => {
+    const seller = await customer('Optional Check');
+    assert.equal((await seller.get('/v1/store/cash')).status, 200, 'optional by default: no check asked');
+    assert.equal((await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: true })).status, 200);
+    try {
+      const refused = await seller.get('/v1/store/cash');
+      assert.deepEqual([refused.status, refused.json.error.code], [403, 'customer_verification_required']);
+      await ready(seller);
+      assert.equal((await seller.get('/v1/store/cash')).status, 200, 'checked, they are paid');
+    } finally {
+      await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: null });
+    }
   });
 
   test('admins list and read orders; each side lists its own', async () => {

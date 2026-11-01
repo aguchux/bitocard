@@ -51,6 +51,8 @@ export function ResaleFields({
   const sums = resaleSums(priceMinor, value.discountBps, value.markupMaxBps);
   const money = (minor: number) => shopMoney(minor, currency);
   const open = availability?.open ?? false;
+  // The identity check counts only where the market requires it (older answers say nothing: required).
+  const identityMissing = Boolean(availability && !availability.identity_checked && availability.identity_required !== false);
   const box = "size-5 shrink-0 accent-brand-700";
   return (
     <section aria-labelledby="sell-where" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4">
@@ -98,12 +100,12 @@ export function ResaleFields({
           {availability && !availability.ready && open ? (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Before posting:{" "}
-              {!availability.identity_checked ? (
+              {identityMissing ? (
                 <Link href="/account/verification" className="font-semibold underline">
                   finish your identity check
                 </Link>
               ) : null}
-              {!availability.identity_checked && !availability.payout_account ? " and " : null}
+              {identityMissing && !availability.payout_account ? " and " : null}
               {!availability.payout_account ? (
                 <Link href="/account/safe-pay" className="font-semibold underline">
                   add a payout bank account

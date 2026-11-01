@@ -165,6 +165,11 @@ export const switchDefinitions = {
     description:
       "B2B reselling for resellers: a verified reseller with a Resale shop store browses Udozo suppliers' resale listings in their country, adds them to the store at their own price within the supplier's limits, and works with suppliers in a chat with deals (docs/BITOCARD_B2B_RESELLING_PLAN.md). Needs classifieds_resale open in the country. Every plan.",
   },
+  customer_identity_check: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo customers must pass an identity check (live) before they accept Safe pay orders, open listings to resellers or pay money out, and payout accounts must carry the name it verified. Off (the default): the check is optional, offered but never required, and payout accounts must carry the name on the customer's Udozo account.",
+  },
   classifieds_install_prompt: {
     scopes: ['global', 'country'],
     description:
@@ -202,6 +207,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_assistant',
   'classifieds_install_prompt',
   'classifieds_resale',
+  'customer_identity_check',
   'reseller_resale',
   'store_template_resale_shop',
   'paid_plans',

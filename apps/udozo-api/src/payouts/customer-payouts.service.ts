@@ -171,13 +171,14 @@ export class CustomerPayoutsService {
       }
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The bank could not be reached. Try again shortly.');
     }
-    // Live payouts go only to an account in the name the identity check verified (never the name the customer typed).
+    // Live payouts go only to an account in the name the identity check verified, or, where the check is optional and was
+    // not taken, the name on the customer's account (`CustomerCashService.requireCashOut`).
     if (mode === 'live' && !accountNameMatches(accountName, [context.verifiedName])) {
       throw new ApiError(
         HttpStatus.BAD_REQUEST,
         'invalid_request_error',
         'account_name_mismatch',
-        `This account is in the name of ${accountName}. Payouts can only go to an account in your own verified name.`,
+        `This account is in the name of ${accountName}. Payouts can only go to an account in your own name.`,
         'account_number',
       );
     }

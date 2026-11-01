@@ -56,16 +56,20 @@ export class ResaleService {
     }
   }
 
-  /** What stops this customer opening listings to resellers, if anything (live: their identity check and a payout account). */
+  /**
+   * What stops this customer opening listings to resellers, if anything (live: a payout account, and their identity
+   * check where the market's `customer_identity_check` switch requires it).
+   */
   private async readiness(customer: CustomerWithStore, country: string) {
     const mode = this.stores.mode(customer.store);
-    if (mode === 'test') return { identity_checked: true, payout_account: true };
+    const required = await this.settings.isOnForCountry('customer_identity_check', country);
+    if (mode === 'test') return { identity_required: required, identity_checked: true, payout_account: true };
     const house = await this.stores.sellerFor(customer);
     const [checked, account] = await Promise.all([
       this.identity.isCustomerVerified(house.id, mode, customer.id),
       this.prisma.customerBankAccount.findFirst({ where: { customerId: customer.id, mode, country, removedAt: null }, select: { id: true } }),
     ]);
-    return { identity_checked: checked, payout_account: Boolean(account) };
+    return { identity_required: required, identity_checked: checked, payout_account: Boolean(account) };
   }
 
   /** Before a listing is opened to resellers: resale open in the country, and the supplier ready. */
@@ -73,8 +77,15 @@ export class ResaleService {
     const { open, reason } = await this.availability(country);
     if (!open) throw unavailable(reason === 'switch_off' ? 'Selling through resellers is not open in your country yet.' : 'Selling through resellers is not set up in your country yet.');
     const ready = await this.readiness(customer, country);
-    if (!ready.identity_checked || !ready.payout_account) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'supplier_not_ready', 'To let resellers sell your listings, finish your identity check and add a payout bank account first.', ready.identity_checked ? 'payout_account' : 'identity');
+    const identityMissing = ready.identity_required && !ready.identity_checked;
+    if (identityMissing || !ready.payout_account) {
+      throw new ApiError(
+        HttpStatus.CONFLICT,
+        'conflict_error',
+        'supplier_not_ready',
+        identityMissing ? 'To let resellers sell your listings, finish your identity check and add a payout bank account first.' : 'To let resellers sell your listings, add a payout bank account first.',
+        identityMissing ? 'identity' : 'payout_account',
+      );
     }
   }
 
@@ -87,7 +98,7 @@ export class ResaleService {
       open,
       reason,
       ...ready,
-      ready: open && ready.identity_checked && ready.payout_account,
+      ready: open && (ready.identity_checked || !ready.identity_required) && ready.payout_account,
       discount_min_bps: limits.discountMinBps,
       discount_max_bps: limits.discountMaxBps,
       markup_max_bps: limits.markupMaxBps,
