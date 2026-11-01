@@ -43,7 +43,7 @@ function BrandFilter({ brands, chosen }: { brands: ShopBrand[]; chosen: string[]
       <input type="checkbox" name={`f.${brandFeatureKey}`} value={brand.name} defaultChecked={picked.has(brand.name.toLowerCase())} className="sr-only" />
       <BrandLogo brand={brand} size="sm" />
       <span className="min-w-0 truncate">{brand.name}</span>
-      {counted ? <span className="text-xs font-normal text-navy-500">{(brand.listings ?? 0).toLocaleString("en-GB")}</span> : null}
+      {brand.listings ? <span className="text-xs font-normal text-navy-500">{brand.listings.toLocaleString("en-GB")}</span> : null}
     </label>
   );
   return (
