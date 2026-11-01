@@ -45,12 +45,15 @@ def main():
     draw.rectangle([P(reach + handle // 2), P(top), P(left + stem), P(top + handle)], fill=NAVY)
     draw.ellipse([P(reach), P(top), P(reach + handle), P(top + handle)], fill=NAVY)
 
-    # The star: a pink five-pointed star sitting in the bowl of the "u", point up, clear of its sides.
-    star_x, star_y = (left + right) / 2, centre_y + 10
-    outer = 100
+    # The star: a pink five-pointed star, point up, as large as the opening of the "u" allows with an even margin
+    # (about 36 on every side), centred on its outline in the opening (from the top of the stems to the bottom of the
+    # bowl): a point-up star reaches further above its centre than below, so the centre sits that much lower.
+    outer = 140
+    star_x = (left + right) / 2
+    star_y = (top + centre_y + inner) / 2 + outer * (1 - math.cos(math.radians(36))) / 2
     points = []
     for i in range(10):
-        r = outer if i % 2 == 0 else outer * 0.382
+        r = outer if i % 2 == 0 else outer * 0.42
         angle = math.radians(-90 + i * 36)
         points.append((P(star_x + r * math.cos(angle)), P(star_y + r * math.sin(angle))))
     draw.polygon(points, fill=PINK)
