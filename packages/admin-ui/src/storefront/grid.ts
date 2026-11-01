@@ -6,6 +6,8 @@
 import { categoryLabels, type SectionSpan, type StoreSection as Section, type StoreSectionType as SectionType } from '@bitocard/api-client/storefront';
 
 export type Breakpoint = 'lg' | 'md' | 'sm';
+/** What the grid needs of a section, whatever page it is on (a store's, or udozo.com's home pages'). */
+export type GridSection = { id: string; type: string; span: SectionSpan; hidden: boolean };
 export type SpanBreakpoint = 'lg' | 'md';
 
 /** Widths a section may take, in columns. */
@@ -50,7 +52,7 @@ export function uniqueId(taken: Iterable<string>, random: () => string = () => M
 }
 
 /** Moves the section at `from` to `to` (both clamped to the list). Returns the same list when nothing moves. */
-export function moveSection<S extends Section>(sections: S[], from: number, to: number): S[] {
+export function moveSection<S extends GridSection>(sections: S[], from: number, to: number): S[] {
   if (from < 0 || from >= sections.length) return sections;
   const target = Math.max(0, Math.min(sections.length - 1, to));
   if (target === from) return sections;
@@ -60,7 +62,7 @@ export function moveSection<S extends Section>(sections: S[], from: number, to: 
   return next;
 }
 
-const update = <S extends Section>(sections: S[], id: string, change: (section: S) => S) => {
+const update = <S extends GridSection>(sections: S[], id: string, change: (section: S) => S) => {
   const index = sections.findIndex(section => section.id === id);
   if (index < 0) return sections;
   const next = sections.slice();
@@ -71,13 +73,13 @@ const update = <S extends Section>(sections: S[], id: string, change: (section: 
 const allowed = (breakpoint: SpanBreakpoint, value: number) => (spanOptions[breakpoint] as readonly number[]).includes(value);
 
 /** Sets a section's width at one breakpoint; widths the grid does not allow are ignored. */
-export function setSpan<S extends Section>(sections: S[], id: string, breakpoint: SpanBreakpoint, value: number): S[] {
+export function setSpan<S extends GridSection>(sections: S[], id: string, breakpoint: SpanBreakpoint, value: number): S[] {
   if (!allowed(breakpoint, value)) return sections;
   return update(sections, id, section => ({ ...section, span: { ...section.span, [breakpoint]: value } }) as S);
 }
 
 /** Sets how many rows a section spans (1 or 2) on desktop and tablet. */
-export function setRows<S extends Section>(sections: S[], id: string, rows: number): S[] {
+export function setRows<S extends GridSection>(sections: S[], id: string, rows: number): S[] {
   if (rows !== 1 && rows !== 2) return sections;
   return update(sections, id, section => ({ ...section, span: { ...section.span, rows } }) as S);
 }
@@ -89,12 +91,12 @@ export function nextSpan(breakpoint: SpanBreakpoint, current: number): number {
   return options[(index + 1) % options.length];
 }
 
-export function toggleHidden<S extends Section>(sections: S[], id: string): S[] {
+export function toggleHidden<S extends GridSection>(sections: S[], id: string): S[] {
   return update(sections, id, section => ({ ...section, hidden: !section.hidden }));
 }
 
 /** Copies a section just after itself, with a new id. */
-export function duplicateSection<S extends Section>(sections: S[], id: string, makeId: (taken: string[]) => string = taken => uniqueId(taken)): S[] {
+export function duplicateSection<S extends GridSection>(sections: S[], id: string, makeId: (taken: string[]) => string = taken => uniqueId(taken)): S[] {
   const index = sections.findIndex(section => section.id === id);
   if (index < 0) return sections;
   const copy = structuredClone(sections[index]);
@@ -104,7 +106,7 @@ export function duplicateSection<S extends Section>(sections: S[], id: string, m
   return next;
 }
 
-export function removeSection<S extends Section>(sections: S[], id: string): S[] {
+export function removeSection<S extends GridSection>(sections: S[], id: string): S[] {
   const next = sections.filter(section => section.id !== id);
   return next.length === sections.length ? sections : next;
 }
@@ -143,9 +145,15 @@ export function newSection(type: SectionType, id: string): Section {
 }
 
 /** Adds a new section of a type at the end. */
-export function addSection<S extends Section>(sections: S[], type: S['type'], makeId: (taken: string[]) => string = taken => uniqueId(taken)): { sections: S[]; id: string } {
+export function addSection<S extends GridSection>(
+  sections: S[],
+  type: S['type'],
+  makeId: (taken: string[]) => string = taken => uniqueId(taken),
+  /** A new section of the type: the store sections' by default, else the page's own (its editor registry's). */
+  create: (type: S['type'], id: string) => S = (kind, id) => newSection(kind as SectionType, id) as unknown as S,
+): { sections: S[]; id: string } {
   const id = makeId(sections.map(section => section.id));
-  return { sections: [...sections, newSection(type, id) as S], id };
+  return { sections: [...sections, create(type, id)], id };
 }
 
 export type Placement = { id: string; index: number; columns: number; colSpan: number; rowSpan: number; hidden: boolean };
@@ -155,7 +163,7 @@ export type Placement = { id: string; index: number; columns: number; colSpan: n
  * row span (2 only on desktop and tablet). Hidden sections are left out unless `includeHidden` (the editor shows them
  * dimmed); `index` is always the section's position in the full list.
  */
-export function gridPlacement(sections: Section[], breakpoint: Breakpoint, { includeHidden = false }: { includeHidden?: boolean } = {}): Placement[] {
+export function gridPlacement(sections: GridSection[], breakpoint: Breakpoint, { includeHidden = false }: { includeHidden?: boolean } = {}): Placement[] {
   const columns = gridColumns[breakpoint];
   return sections.flatMap((section, index) => {
     if (section.hidden && !includeHidden) return [];

@@ -2,15 +2,19 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { CloudOff, ExternalLink, History, Monitor, Plus, Rocket, RotateCcw, Smartphone, Tablet } from "lucide-react";
-import type { StoreSection as Section, StoreSectionType as SectionType } from "@bitocard/api-client/storefront";
+import type { StoreSection } from "@bitocard/api-client/storefront";
 import { errorMessage, formatDateTime, formatRelative } from "../format";
 import { ActionDialog } from "../ui/action-dialog";
 import { Dialog, Tabs } from "../ui/data";
 import { Button, PageHeader } from "../ui/primitives";
 import { Badge, Notice } from "../ui/status";
 import { Canvas, sectionIcons } from "./canvas";
-import { addSection, type Breakpoint, cleanForSave, duplicateSection, moveSection, removeSection, sectionIndexFromParam, sectionTitle, sectionTypes, setRows, setSpan, toggleHidden } from "./grid";
-import { type EditorSources, EditorSourcesProvider, Inspector } from "./inspector";
+import { addSection, type Breakpoint, duplicateSection, moveSection, removeSection, sectionIndexFromParam, setRows, setSpan, toggleHidden } from "./grid";
+import { type EditorSources, EditorSourcesProvider, Inspector, StoreSectionForm } from "./inspector";
+import { type EditorSection, makeStoreRegistry, type SectionRegistry, SectionRegistryProvider } from "./registry";
+
+/** bitocard.com's and resellers' store sections: the editor's default. */
+const storeRegistry = makeStoreRegistry(type => sectionIcons[type], StoreSectionForm);
 
 const breakpoints: Array<{ value: Breakpoint; label: string; icon: typeof Monitor }> = [
   { value: "lg", label: "Desktop · 12 columns", icon: Monitor },
@@ -22,9 +26,9 @@ type SaveFailure = { message: string; index: number | null };
 type Confirm = "publish" | "unpublish" | "reset" | { restore: number } | { remove: string };
 
 /** What a home page editor works on: the admin app gives bitocard.com's page, SHQ a reseller store's. */
-export type HomeEditorPage = {
+export type HomeEditorPage<S extends EditorSection = StoreSection> = {
   /** The draft as loaded. */
-  draft: Section[];
+  draft: S[];
   updatedAt: string;
   /** Shoppers see a published version (else the default or the design's starting page). */
   live: boolean;
@@ -34,10 +38,12 @@ export type HomeEditorPage = {
   versions: Array<{ version: number; publishedAt: string; restorable?: boolean; note?: string }>;
 };
 
-export type HomeEditorProps = {
-  page: HomeEditorPage;
+export type HomeEditorProps<S extends EditorSection = StoreSection> = {
+  page: HomeEditorPage<S>;
   /** The section types this page offers, in the "Add section" menu's order. */
-  allowed: readonly SectionType[];
+  allowed: readonly NoInfer<S>["type"][];
+  /** The page's own sections (their defaults, cards and forms); the store sections' when not given. */
+  registry?: SectionRegistry;
   title: ReactNode;
   description: ReactNode;
   editable: boolean;
@@ -46,13 +52,13 @@ export type HomeEditorProps = {
   /** Words for this page: what publishing does, what "reset" starts from. */
   copy: { publish: string; reset: { label: string; description: string }; empty: string; viewOnly?: string; notLive: string };
   actions: {
-    saveDraft: (sections: Section[]) => Promise<unknown>;
+    saveDraft: (sections: NoInfer<S>[]) => Promise<unknown>;
     publish: () => Promise<unknown>;
     /** Taking the page offline (bitocard.com only). */
     unpublish?: () => Promise<unknown>;
     /** Each returns the new draft. */
-    reset: () => Promise<Section[]>;
-    restore: (version: number) => Promise<Section[]>;
+    reset: () => Promise<NoInfer<S>[]>;
+    restore: (version: number) => Promise<NoInfer<S>[]>;
     /** A preview address for the saved draft. */
     preview: () => Promise<string>;
   };
@@ -63,10 +69,12 @@ export type HomeEditorProps = {
 /**
  * The home page editor: a local working copy of the draft, saved automatically; the grid canvas (desktop, tablet,
  * phone) with drag and keyboard reordering; the selected section's settings; publish, versions, reset and preview.
- * Shared by bitocard.com's Storefront Manager and resellers' store design in SHQ.
+ * Shared by bitocard.com's Storefront Manager and resellers' store design in SHQ (`HomeEditor`, the store sections),
+ * and udozo.com's home pages, which bring their own sections (`registry`).
  */
-export function HomeEditor({ page, allowed, title, description, editable, previewable, sources, copy, actions, children }: HomeEditorProps) {
-  const [sections, setSections] = useState<Section[]>(page.draft);
+export function SectionsEditor<S extends EditorSection = StoreSection>({ page, allowed, registry: given, title, description, editable, previewable, sources, copy, actions, children }: HomeEditorProps<S>) {
+  const registry = (given ?? storeRegistry) as unknown as SectionRegistry<S>;
+  const [sections, setSections] = useState<S[]>(page.draft);
   const [selectedId, setSelectedId] = useState<string | null>(page.draft[0]?.id ?? null);
   const [breakpoint, setBreakpoint] = useState<Breakpoint>("lg");
   // Edits are counted: the draft is saved when the count moves past the last saved one, and a failed save is not
@@ -85,10 +93,10 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
 
   const dirty = edits !== savedEdits;
 
-  const save = async (content: Section[], at: number) => {
+  const save = async (content: S[], at: number) => {
     setSaving(true);
     try {
-      await actions.saveDraft(cleanForSave(content));
+      await actions.saveDraft(registry.clean ? registry.clean(content) : content);
       setSavedEdits(current => Math.max(current, at));
       setFailure(null);
       setFailedEdits(null);
@@ -110,7 +118,7 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, edits, dirty, saving, failedEdits, editable]);
 
-  const change = (next: Section[]) => {
+  const change = (next: S[]) => {
     setSections(next);
     setEdits(count => count + 1);
   };
@@ -123,7 +131,7 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
   };
 
   /** Replaces the working copy with what the API returned (restore and reset). */
-  const replace = (next: Section[]) => {
+  const replace = (next: S[]) => {
     const count = edits + 1;
     setSections(next);
     setEdits(count);
@@ -166,8 +174,8 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
     remove: (id: string) => setConfirm({ remove: id }),
   };
 
-  const add = (type: SectionType) => {
-    const result = addSection(sections, type);
+  const add = (type: S["type"]) => {
+    const result = addSection(sections, type, undefined, registry.newSection);
     change(result.sections);
     setSelectedId(result.id);
     setAdding(false);
@@ -178,9 +186,10 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
   const invalidIndex = failure?.index ?? null;
   const status = !editable ? "View only" : saving ? "Saving…" : failure ? `Couldn't save: ${failure.message}` : dirty ? "Unsaved changes" : `Saved ${formatRelative(page.updatedAt)}`;
   const removing = confirm && typeof confirm === "object" && "remove" in confirm ? sections.find(section => section.id === confirm.remove) : null;
-  const offered = sectionTypes.filter(item => allowed.includes(item.type));
+  const offered = registry.types.filter(item => allowed.includes(item.type));
 
   return (
+    <SectionRegistryProvider value={registry as unknown as SectionRegistry}>
     <EditorSourcesProvider value={sources}>
       <PageHeader
         title={
@@ -280,7 +289,7 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
             index={selectedIndex}
             error={failure && invalidIndex === selectedIndex ? failure.message : null}
             editable={editable}
-            onChange={next => change(sections.map(section => (section.id === next.id ? next : section)))}
+            onChange={next => change(sections.map(section => (section.id === next.id ? (next as S) : section)))}
           />
         </div>
       </div>
@@ -288,7 +297,7 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
       <Dialog open={adding} onClose={() => setAdding(false)} title="Add a section" description="It goes at the end of the page; drag it where you want it.">
         <ul className="space-y-2">
           {offered.map(item => {
-            const Icon = sectionIcons[item.type];
+            const Icon = registry.icon(item.type);
             return (
               <li key={item.type}>
                 <button type="button" onClick={() => add(item.type)} className="flex w-full items-start gap-3 rounded-xl border border-line p-3 text-left hover:border-brand-300 hover:bg-brand-50">
@@ -386,7 +395,7 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
       <ActionDialog
         open={Boolean(removing)}
         onClose={() => setConfirm(null)}
-        title={removing ? `Delete “${sectionTitle(removing) || "this section"}”?` : "Delete section"}
+        title={removing ? `Delete “${registry.title(removing) || "this section"}”?` : "Delete section"}
         description="It is removed from the draft. To keep it without showing it, hide it instead."
         confirmLabel="Delete"
         tone="danger"
@@ -398,5 +407,9 @@ export function HomeEditor({ page, allowed, title, description, editable, previe
         }}
       />
     </EditorSourcesProvider>
+    </SectionRegistryProvider>
   );
 }
+
+/** The editor for store sections (bitocard.com's Storefront Manager, resellers' stores); typed so even when loaded with `next/dynamic`. */
+export const HomeEditor = SectionsEditor as (props: HomeEditorProps<StoreSection>) => ReturnType<typeof SectionsEditor>;

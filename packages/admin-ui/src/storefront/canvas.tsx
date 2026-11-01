@@ -5,10 +5,11 @@ import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSe
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, Award, Copy, Eye, EyeOff, GripVertical, HelpCircle, LayoutPanelTop, ListChecks, Megaphone, Rows2, ShieldCheck, ShoppingBag, Sparkles, Trash2, Grid2x2, Zap, type LucideIcon } from "lucide-react";
-import type { StoreSection as Section, StoreSectionType as SectionType } from "@bitocard/api-client/storefront";
+import type { StoreSectionType as SectionType } from "@bitocard/api-client/storefront";
 import { cn } from "../format";
 import { Badge } from "../ui/status";
-import { type Breakpoint, gridPlacement, lgSpans, mdSpans, sectionSummary, sectionTitle, sectionTypeLabel } from "./grid";
+import { type Breakpoint, gridPlacement, lgSpans, mdSpans } from "./grid";
+import { type EditorSection as Section, makeStoreRegistry, registryLabel, useSectionRegistry } from "./registry";
 
 export const sectionIcons: Record<SectionType, LucideIcon> = {
   hero: LayoutPanelTop,
@@ -25,6 +26,9 @@ export const sectionIcons: Record<SectionType, LucideIcon> = {
   listing_grid: Grid2x2,
   resale_categories: LayoutPanelTop,
 };
+
+/** The store sections' cards, when no page gives its own registry (the canvas needs no forms). */
+const storeCards = makeStoreRegistry(type => sectionIcons[type], () => null);
 
 export type CanvasActions = {
   select: (id: string) => void;
@@ -86,8 +90,9 @@ function SectionCard({
   actions: CanvasActions;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: section.id, disabled: !editable });
-  const Icon = sectionIcons[section.type];
-  const title = sectionTitle(section) || "Untitled";
+  const registry = useSectionRegistry(storeCards);
+  const Icon = registry.icon(section.type);
+  const title = registry.title(section) || "Untitled";
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
@@ -128,13 +133,13 @@ function SectionCard({
           <Icon className="size-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold uppercase tracking-wide text-subtle">{`${index + 1}. ${sectionTypeLabel(section.type)}`}</p>
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-subtle">{`${index + 1}. ${registryLabel(registry, section.type)}`}</p>
           <button type="button" onClick={() => actions.select(section.id)} aria-pressed={selected} className="block max-w-full truncate text-left text-sm font-bold text-ink hover:text-brand-600">
             {title}
           </button>
         </div>
       </div>
-      <p className="line-clamp-2 text-xs text-muted">{sectionSummary(section)}</p>
+      <p className="line-clamp-2 text-xs text-muted">{registry.summary(section)}</p>
       <div className="flex flex-wrap gap-1">
         {section.hidden ? <Badge tone="grey">Hidden</Badge> : null}
         {invalid ? <Badge tone="red">Needs fixing</Badge> : null}

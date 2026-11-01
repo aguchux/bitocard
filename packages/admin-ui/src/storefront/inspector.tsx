@@ -1,9 +1,10 @@
 "use client";
 
-import { type StoreSection as Section } from "@bitocard/api-client/storefront";
+import { type StoreSection } from "@bitocard/api-client/storefront";
+import { LayoutPanelTop } from "lucide-react";
 import { Card, CardHeader } from "../ui/primitives";
 import { Notice } from "../ui/status";
-import { sectionTypeLabel } from "./grid";
+import { type EditorSection as Section, makeStoreRegistry, registryLabel, useSectionRegistry } from "./registry";
 import { type FormProps } from "./inspector-fields";
 import { HeroForm, ProductRailForm, CategoryGridForm, BrandGridForm, ProductSpotlightForm } from "./catalogue-forms";
 import { PromoForm, TrustBarForm, FeaturesForm, FaqForm } from "./content-forms";
@@ -11,7 +12,8 @@ import { QuickBuyForm, ListingRailForm, ListingGridForm, ResaleCategoriesForm } 
 
 export { EditorSourcesProvider, type EditorProduct, type EditorSources } from "./inspector-fields";
 
-function SectionForm({ section, onChange }: FormProps<Section>) {
+/** The store sections' forms (bitocard.com's Storefront Manager and resellers' stores). */
+export function StoreSectionForm({ section, onChange }: FormProps<StoreSection>) {
   switch (section.type) {
     case "hero":
       return <HeroForm section={section} onChange={onChange} />;
@@ -42,8 +44,12 @@ function SectionForm({ section, onChange }: FormProps<Section>) {
   }
 }
 
-/** The selected section's settings. Read-only admins see the values with every control disabled. */
+const storeForms = makeStoreRegistry(() => LayoutPanelTop, StoreSectionForm);
+
+/** The selected section's settings (the page's registry's form). Read-only admins see the values with every control disabled. */
 export function Inspector({ section, index, error, editable, onChange }: { section: Section | null; index: number; error: string | null; editable: boolean; onChange: (next: Section) => void }) {
+  const registry = useSectionRegistry(storeForms);
+  const Form = registry.Form;
   if (!section) {
     return (
       <Card className="p-5 text-sm text-muted">
@@ -54,10 +60,10 @@ export function Inspector({ section, index, error, editable, onChange }: { secti
   }
   return (
     <Card>
-      <CardHeader title={sectionTypeLabel(section.type)} description={`Section ${index + 1}${section.hidden ? " · hidden" : ""}${editable ? "" : " · view only"}`} />
+      <CardHeader title={registryLabel(registry, section.type)} description={`Section ${index + 1}${section.hidden ? " · hidden" : ""}${editable ? "" : " · view only"}`} />
       <fieldset disabled={!editable} className="min-w-0 space-y-4 p-5 sm:px-6">
         {error ? <Notice tone="red" title="This section cannot be saved">{error}</Notice> : null}
-        <SectionForm section={section} onChange={onChange} />
+        <Form section={section} onChange={onChange} />
       </fieldset>
     </Card>
   );
