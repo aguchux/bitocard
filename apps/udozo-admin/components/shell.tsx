@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import {
   Banknote,
+  LayoutTemplate,
   Bell,
   BookCheck,
   Bot,
@@ -61,7 +62,7 @@ export const sections: Array<NavItem<UdozoSection>> = [
   { key: "resellers", label: "Resellers", href: "/resellers", icon: Users },
   { key: "money", label: "Money", href: "/money/payouts", icon: Wallet },
   { key: "plans", label: "Plans & fees", href: "/plans", icon: Crown },
-  { key: "theme", label: "Theme", href: "/theme", icon: Paintbrush },
+  { key: "theme", label: "Site", href: "/home-pages", icon: Paintbrush },
   { key: "verifications", label: "Identity", href: "/verifications", icon: ShieldCheck },
   { key: "support", label: "Support", href: "/support", icon: LifeBuoy },
   { key: "reports", label: "Reports", href: "/reports", icon: TrendingUp },
@@ -129,7 +130,14 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Setup fees", href: "/plans/setup-fees", icon: ReceiptText },
     ],
   },
-  theme: { title: "Theme", items: [{ label: "Colour theme", href: "/theme", icon: Paintbrush }] },
+  theme: {
+    title: "Site",
+    items: [
+      { label: "Home pages", href: "/home-pages", icon: LayoutTemplate },
+      { label: "Sponsored", href: "/sponsored", icon: Megaphone },
+      { label: "Colour theme", href: "/theme", icon: Paintbrush },
+    ],
+  },
   verifications: {
     title: "Identity",
     items: [

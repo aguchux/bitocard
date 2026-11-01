@@ -196,7 +196,7 @@ export default function ThemePage() {
   const editable = can(admin, "operations");
   const settings = useThemeSettingsQuery();
   return (
-    <UdozoShell section="theme" current="/theme" crumbs={[{ label: "Theme", href: "/theme" }, { label: "Colour theme" }]}>
+    <UdozoShell section="theme" current="/theme" crumbs={[{ label: "Site", href: "/home-pages" }, { label: "Colour theme" }]}>
       <PageHeader
         title="Colour theme"
         description="The colours of every Udozo app and email. Save a draft, preview it on udozo.com, then publish."
