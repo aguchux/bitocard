@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
+import type { ClassifiedHome } from "@bitocard/api-client/home";
+import { HomeSections } from "@/components/home/home-sections";
 import { ListingGrid } from "@/components/listing-card";
-import { markets, shopApi } from "@/lib/api";
+import { type ApiResult, markets, shopApi } from "@/lib/api";
 import { JsonLd } from "@/components/json-ld";
 import { siteOrigin } from "@/lib/customer";
 import { chosenOpenMarket } from "@/lib/market-choice";
@@ -22,7 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * The home page. A shopper who chose a country in the header's menu (remembered in `udz_market`) goes straight to that
  * country's market, so they need not choose it again. Otherwise (All countries chosen, or nothing yet, as for search
  * engines) the global showcase, from the second country: recent and trending listings across the countries, never a
- * price, each saying its area and country. With one country open, its market is the home page.
+ * price, each saying its area and country, as Udozo's admins laid it out (Site › Home pages: the page across
+ * countries); the plain showcase while the API cannot give it. With one country open, its market is the home page.
  */
 export default async function GlobalHome() {
   const [all, choice] = await Promise.all([markets(), currentMarketChoice()]);
@@ -37,11 +40,20 @@ export default async function GlobalHome() {
       </div>
     );
   }
-  const showcase = await shopApi<ShopShowcase>("/v1/classifieds/showcase");
+  const home = await shopApi<ClassifiedHome>("/v1/classifieds/home?page=global");
   return (
     <>
       <JsonLd data={organizationJsonLd(siteOrigin())} />
       <JsonLd data={websiteJsonLd(siteOrigin())} />
+      {home.ok ? <HomeSections home={home.data} /> : <DefaultGlobalHome showcase={await shopApi<ShopShowcase>("/v1/classifieds/showcase")} />}
+    </>
+  );
+}
+
+/** The plain showcase: trending and recent listings across the countries, never a price. */
+function DefaultGlobalHome({ showcase }: { showcase: ApiResult<ShopShowcase> }) {
+  return (
+    <>
       <section className="bg-navy-900 pt-5 pb-6">
         <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-4">
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">

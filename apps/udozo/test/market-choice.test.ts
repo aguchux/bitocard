@@ -26,7 +26,8 @@ const card = (id: string, country: string, area: string) => ({
 });
 vi.mock("@/lib/api", () => ({
   markets: async () => ({ showcase: true, data: open }),
-  shopApi: async () => ({ ok: true, data: { trending: [card("1", "NG", "Ikeja")], recent: [card("2", "KE", "Westlands")] } }),
+  // No managed home page here (the API cannot give one), so the plain showcase shows.
+  shopApi: async (path: string) => (path.startsWith("/v1/classifieds/home") ? { ok: false, status: 0, code: null } : { ok: true, data: { trending: [card("1", "NG", "Ikeja")], recent: [card("2", "KE", "Westlands")] } }),
 }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {

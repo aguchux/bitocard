@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import type { ShopSearch } from "@bitocard/api-client/classifieds";
+import type { ShopMarket, ShopSearch } from "@bitocard/api-client/classifieds";
+import type { ClassifiedHome } from "@bitocard/api-client/home";
+import { firstListingSection, HomeSections } from "@/components/home/home-sections";
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
-import { marketFor, markets, shopApi } from "@/lib/api";
+import { type ApiResult, marketFor, markets, shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
-import { organizationJsonLd, regionalAlternates } from "@/lib/seo";
+import { itemListJsonLd, organizationJsonLd, regionalAlternates } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string }> };
 
@@ -24,13 +26,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** A country's market: the Safe pay promise and the newest listings (search, categories and Near me are in the header). */
+/**
+ * A country's home page as Udozo's admins laid it out (Site › Home pages: its layout and sections, filled by the API);
+ * the plain page (the Safe pay promise and the newest listings) while the API cannot give it. Search, categories and
+ * Near me are in the header.
+ */
 export default async function CountryHome({ params }: Props) {
   const { cc } = await params;
   const market = await marketFor(cc);
   // Pages render alongside the layout, so each checks the market itself.
   if (!market) notFound();
-  const recent = await shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&sort=newest&limit=12`);
+  const home = await shopApi<ClassifiedHome>(`/v1/classifieds/home?page=${market.country}`);
+  const list = home.ok ? firstListingSection(home.data) : null;
+  const recent = home.ok ? null : await shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&sort=newest&limit=12`);
+  return (
+    <>
+      {home.ok ? <HomeSections home={home.data} /> : <DefaultMarketHome market={market} cc={cc} recent={recent!} />}
+      {list ? <JsonLd data={itemListJsonLd(list.title, list.cards, siteOrigin(), market.country)} /> : null}
+      <JsonLd data={organizationJsonLd(siteOrigin())} />
+      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `Udozo ${market.name}`, url: `${siteOrigin()}/${cc}`, inLanguage: `en-${market.country}`, publisher: { "@id": `${siteOrigin()}/#organization` }, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />
+    </>
+  );
+}
+
+/** The plain market page: the Safe pay promise and the newest listings. */
+function DefaultMarketHome({ market, cc, recent }: { market: ShopMarket; cc: string; recent: ApiResult<ShopSearch> }) {
   return (
     <>
       <section className="bg-navy-900 pt-6 pb-6">
@@ -59,8 +79,6 @@ export default async function CountryHome({ params }: Props) {
           )}
         </section>
       </div>
-      <JsonLd data={organizationJsonLd(siteOrigin())} />
-      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `Udozo ${market.name}`, url: `${siteOrigin()}/${cc}`, inLanguage: `en-${market.country}`, publisher: { "@id": `${siteOrigin()}/#organization` }, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />
     </>
   );
 }

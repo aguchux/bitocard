@@ -32,6 +32,7 @@ import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { buyButton } from "@/lib/buy";
 import { breadcrumbJsonLd, listingJsonLd, productMetaTags } from "@/lib/seo";
 import type { ShopViewer } from "@bitocard/api-client/classifieds";
+import { ListingView } from "@/components/listing-view";
 
 type Props = { params: Promise<{ cc: string; listing: string }> };
 
@@ -135,6 +136,7 @@ export default async function ListingPage({ params }: Props) {
 
   return (
     <article className="mx-auto max-w-[1400px] pb-6 sm:px-6 sm:pt-4 lg:px-8">
+      {listing.status === "active" ? <ListingView listingRef={Number(listing.ref)} /> : null}
       <div className="hidden px-4 pt-3 sm:block sm:px-0 sm:pt-0">
         <Breadcrumbs trail={trail} />
       </div>

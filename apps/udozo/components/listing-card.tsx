@@ -6,7 +6,7 @@ import { Flag } from "./flag";
 
 type Card = ShopListingCard | ShopShowcaseCard;
 
-const hasPrice = (card: Card): card is ShopListingCard => "price" in card;
+const hasPrice = (card: Card): card is ShopListingCard => "price" in card && Boolean(card.price);
 
 function Cover({ card, className }: { card: Card; className: string }) {
   return (
@@ -45,12 +45,29 @@ export function countryName(code: string) {
  * A listing in a grid: photo, price (country pages only), title, place and when. Across countries (the showcase, with no
  * price) the place says its country too, with its flag: "Ikeja, Nigeria".
  */
-export function ListingTile({ card, now }: { card: Card; now?: number }) {
+export function ListingTile({ card, now, badge, was, className = "" }: { card: Card; now?: number; badge?: string; was?: number | null; className?: string }) {
   return (
-    <Link href={listingPath(card.country, card.ref, card.slug)} className="flex flex-col overflow-hidden rounded-2xl border border-navy-200 bg-white text-navy-900 hover:border-navy-400">
+    <Link href={listingPath(card.country, card.ref, card.slug)} className={`flex flex-col overflow-hidden rounded-2xl border border-navy-200 bg-white text-navy-900 hover:border-navy-400 ${className}`}>
       <Cover card={card} className="aspect-[4/3]" />
       <span className="flex min-w-0 flex-col gap-0.5 p-2.5 pb-3">
-        {hasPrice(card) ? <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong> : null}
+        {/* Visible text, first in the link, so it is part of its name too ("Sponsored: …"). */}
+        {badge ? (
+          <span className="w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold tracking-wide text-amber-900 uppercase">
+            {badge}
+            <span className="sr-only">: </span>
+          </span>
+        ) : null}
+        {hasPrice(card) ? (
+          <span className="flex flex-wrap items-baseline gap-x-1.5">
+            <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong>
+            {was && card.price.amount !== null && was > card.price.amount ? (
+              <s className="text-xs text-navy-500">
+                <span className="sr-only">was </span>
+                {shopPriceText({ ...card.price, amount: was })}
+              </s>
+            ) : null}
+          </span>
+        ) : null}
         <span className="line-clamp-2 text-[13px] leading-snug font-medium">{card.title}</span>
         {hasPrice(card) ? (
           <span className="truncate text-xs text-navy-600">
