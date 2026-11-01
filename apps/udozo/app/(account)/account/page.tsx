@@ -50,7 +50,8 @@ export default async function MyListings({ searchParams }: Props) {
         </p>
       ) : null}
 
-      <section aria-label="Your figures" className="grid grid-cols-4 gap-2 sm:max-w-xl">
+      {/* Two by two on phones, so a figure in the thousands keeps its room. */}
+      <section aria-label="Your figures" className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-4 sm:max-w-xl">
         {stats.map(stat => (
           <div key={stat.label} className="grid gap-0.5 rounded-xl border border-slate-200 bg-white px-2 py-2.5 sm:px-3">
             <strong className="text-lg font-extrabold">{stat.value.toLocaleString("en-GB")}</strong>

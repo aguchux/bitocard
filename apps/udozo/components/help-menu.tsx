@@ -15,7 +15,7 @@ const icons: Record<HelpIcon, typeof LifeBuoy> = { help: LifeBuoy, shield: Shiel
 export function HelpMenu() {
   const row = "flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5";
   return (
-    <Dropdown className="relative">
+    <Dropdown>
       <summary
         className="inline-flex min-h-11 shrink-0 cursor-pointer list-none items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:bg-navy-50 sm:px-3 [&::-webkit-details-marker]:hidden [[open]>&]:bg-navy-50 [[open]>&_.chevron]:rotate-180"
         aria-label="Get help"
@@ -24,9 +24,9 @@ export function HelpMenu() {
         <span className="hidden sm:inline">Get help</span>
         <ChevronDown className="chevron hidden size-4 transition-transform duration-200 sm:block" aria-hidden="true" />
       </summary>
-      <nav aria-label="Get help" className="menu-drop absolute right-0 z-30 mt-2.5 w-72 max-w-[calc(100vw-2rem)] origin-top-right sm:right-auto sm:left-1/2 sm:-translate-x-1/2">
-        {/* The pointer joining the menu to its button. */}
-        <span className="absolute -top-1.5 right-5 size-3 rotate-45 rounded-tl-[3px] border-t border-l border-navy-200 bg-white sm:right-auto sm:left-1/2 sm:-ml-1.5" aria-hidden="true" />
+      <nav aria-label="Get help" className="menu-drop absolute right-4 z-30 mt-2.5 w-72 max-w-[calc(100vw-2rem)] origin-top-right sm:right-auto sm:left-1/2 sm:-translate-x-1/2">
+        {/* The pointer joining the menu to its button, from tablets up (on phones the menu sits against the header's edge). */}
+        <span className="absolute -top-1.5 left-1/2 -ml-1.5 hidden size-3 rotate-45 rounded-tl-[3px] border-t border-l border-navy-200 bg-white sm:block" aria-hidden="true" />
         <ul className="relative grid max-h-[calc(100dvh-6rem)] gap-0.5 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
           {helpLinks.map(link => {
             const Icon = icons[link.icon];

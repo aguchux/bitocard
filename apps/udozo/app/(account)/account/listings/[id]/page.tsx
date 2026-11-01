@@ -37,7 +37,8 @@ export default async function ListingPage({ params }: Props) {
     <div className="grid gap-5">
       {figures ? (
         <section aria-label="How it is doing" className="grid gap-2">
-          <ul className="grid grid-cols-5 gap-2 sm:max-w-2xl">
+          {/* Three then two on phones, the five in a row from tablets up. */}
+          <ul className="grid grid-cols-3 gap-2 sm:max-w-2xl sm:grid-cols-5">
             {figures.map(item => (
               <li key={item.label} className="grid gap-0.5 rounded-xl border border-slate-200 bg-white px-2 py-2.5">
                 <strong className="text-base font-extrabold">{item.value.toLocaleString("en-GB")}</strong>

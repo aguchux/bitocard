@@ -36,8 +36,11 @@ export function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean | (
 /**
  * A `<details>` dropdown (its first child the `<summary>`, then the panel) that closes on an outside click, on Escape and
  * on choosing a link in it, since the header stays across pages.
+ *
+ * Positioned from tablets up only: on phones its panel is placed against the sticky header instead (`right-4` in the
+ * panel), so a menu opened from a button near the left never runs off the screen.
  */
-export function Dropdown({ id, className = "relative", children }: { id?: string; className?: string; children: ReactNode }) {
+export function Dropdown({ id, className = "sm:relative", children }: { id?: string; className?: string; children: ReactNode }) {
   const details = useRef<HTMLDetailsElement>(null);
   const close = () => {
     if (details.current) details.current.open = false;

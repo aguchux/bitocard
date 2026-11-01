@@ -52,7 +52,8 @@ export function ListingRow({ card, now }: { card: ShopResult | ShopListingCard; 
   return (
     <Link href={listingPath(card.country, card.ref, card.slug)} className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-2.5 text-navy-900 hover:border-navy-400">
       <Cover card={card} className="size-24 shrink-0 rounded-xl sm:size-28" />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
+      {/* `contain-inline-size`: the one-line highlights never make the card (and the page) wider than the screen. */}
+      <span className="flex min-w-0 flex-1 flex-col gap-1 contain-inline-size">
         <span className="flex flex-wrap items-baseline gap-x-2">
           <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong>
           {card.price.kind === "negotiable" ? <span className="text-xs font-semibold text-navy-500">Negotiable</span> : null}

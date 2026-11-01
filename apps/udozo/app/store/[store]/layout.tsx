@@ -65,13 +65,15 @@ export default async function StoreLayout({ children, params }: Props) {
             </span>
           </Link>
           <nav aria-label="Store" className="ml-auto flex shrink-0 items-center gap-1 text-sm font-semibold">
-            <Link href="/listings" className="inline-flex min-h-10 items-center rounded-lg px-3 hover:bg-slate-100">
-              Shop everything
+            {/* Short words on phones, so the store's name keeps its room. */}
+            <Link href="/listings" className="inline-flex min-h-10 items-center rounded-lg px-2.5 hover:bg-slate-100 sm:px-3">
+              Shop<span className="hidden sm:inline">&nbsp;everything</span>
             </Link>
             {customer ? (
               <>
-                <Link href="/account/purchases" className="inline-flex min-h-10 items-center rounded-lg px-3 hover:bg-slate-100">
-                  Your orders
+                <Link href="/account/purchases" className="inline-flex min-h-10 items-center rounded-lg px-2.5 hover:bg-slate-100 sm:px-3">
+                  <span className="sm:hidden">Orders</span>
+                  <span className="hidden sm:inline">Your orders</span>
                 </Link>
                 <form action={signOut} className="hidden sm:block">
                   <button type="submit" className="inline-flex min-h-10 items-center rounded-lg px-3 text-slate-600 hover:bg-slate-100">

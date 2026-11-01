@@ -76,7 +76,8 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
     <header className="sticky top-0 z-30 border-b border-navy-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-1.5 gap-y-2 px-4 pt-2.5 pb-3 sm:gap-x-2 sm:px-6 lg:h-[72px] lg:flex-nowrap lg:gap-x-4 lg:px-8 lg:py-0">
         <UdozoWordmark href={home} />
-        <div data-header-search className="order-last basis-full lg:order-none lg:max-w-3xl lg:flex-1 lg:basis-auto lg:pb-0">
+        {/* `min-w-0`: the bar takes the row's width, never its contents' (the search field, Near me), so it never widens the page. */}
+        <div data-header-search className="order-last min-w-0 basis-full lg:order-none lg:max-w-3xl lg:flex-1 lg:basis-auto lg:pb-0">
           <Suspense fallback={<SearchBlend {...search} />}>
             <HeaderSearch {...search} />
           </Suspense>
@@ -128,7 +129,7 @@ function ProfileMenu({ customer }: { customer: Customer | null }) {
           </span>
         )}
       </summary>
-      <nav aria-label="Account" className="absolute right-0 z-30 mt-2 grid max-h-[calc(100dvh-5.5rem)] w-64 gap-0.5 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
+      <nav aria-label="Account" className="absolute right-4 z-30 mt-2 grid max-h-[calc(100dvh-5.5rem)] w-64 max-w-[calc(100vw-2rem)] gap-0.5 sm:right-0 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
         {customer ? (
           <>
             <p className="truncate px-3 py-2 text-sm text-navy-500">{customer.email}</p>

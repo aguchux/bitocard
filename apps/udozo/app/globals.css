@@ -11,7 +11,15 @@
    with their own border or ring, or their bar's (the search bar), so no pink box is drawn inside a control. */
 @layer base {
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--color-page); color: var(--color-ink); }
+  /* Mobile first, never sideways: the page itself never scrolls left and right (on <html>, which the viewport follows:
+     the body's own clip does not reach it in Chrome). The rules below keep anything from needing it. */
+  html { overflow-x: clip; }
+  body { margin: 0; background: var(--color-page); color: var(--color-ink); overflow-wrap: break-word; }
+  /* A grid's items may be narrower than their content, so a long title or a line kept on one line (`truncate`) never
+     pushes a page wider than the phone. Flex items opt in with `min-w-0` where they hold such text. */
+  .grid > * { min-width: 0; }
+  /* Fields shrink with their row instead of keeping the browser's own 20-character width. */
+  :where(input, select, textarea) { min-width: 0; max-width: 100%; }
   :focus-visible { outline: 3px solid var(--color-brand-700); outline-offset: 3px; }
   :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
 }

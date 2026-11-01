@@ -65,9 +65,20 @@ describe("the header", () => {
   it("signed out, the profile icon opens Sign in on phones; desktops get a Sign in button", () => {
     const out = renderToStaticMarkup(createElement(HeaderBar, { market, customer: null, showcase: false, categories }));
     expect(out).toContain('aria-label="Account menu"');
-    expect(out).toMatch(/<details class="relative">/);
+    expect(out).toMatch(/<details class="sm:relative">/);
     expect(out).toMatch(/lg:inline-flex[^"]*"[^>]*>Sign in</);
     expect(out).toContain('href="/signup"');
+  });
+
+  it("never widens a phone's page: the bar takes its row's width and every menu opens against the header's edge", () => {
+    // The search's row shrinks to the screen (its field asking for no width of its own), whatever it holds.
+    expect(html).toMatch(/data-header-search="true" class="order-last min-w-0 basis-full/);
+    expect(html).toMatch(/<input type="search"[^>]*class="w-0 min-w-0 flex-1/);
+    // Help, country and account menus: positioned from tablets up, against the header (16px in) on phones.
+    expect(html.match(/<details class="sm:relative">/g)).toHaveLength(2);
+    for (const label of ["Get help", "Account"]) expect(html).toMatch(new RegExp(`<nav aria-label="${label}" class="[^"]*absolute right-4 `));
+    // The Get help pointer joins the menu to its button only where the menu hangs from it.
+    expect(html).toMatch(/<span class="absolute -top-1\.5 [^"]*hidden [^"]*sm:block"/);
   });
 });
 
@@ -93,6 +104,9 @@ describe("the header's search", () => {
     nav.params = new URLSearchParams();
     const home = renderToStaticMarkup(createElement(HeaderSearch, props));
     expect(home).toMatch(/<\/form><a aria-label="Near me: choose your area" class="[^"]*rounded-r-2xl[^"]*" href="\/ng\/areas">.*Near me<\/span><\/a><\/div>$/);
+    // On phones the pin alone (the words from tablets up), so the field keeps its room; the label still names it.
+    expect(home).toMatch(/class="flex w-12 shrink-0 [^"]*sm:w-auto sm:px-3"/);
+    expect(home).toContain('<span class="hidden sm:inline">Near me</span>');
     nav.path = "/ng/search";
     nav.params = new URLSearchParams("q=iphone&state=lagos");
     const search = renderToStaticMarkup(createElement(HeaderSearch, props));

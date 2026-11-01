@@ -46,7 +46,7 @@ export function CountryMenu({ current, countries }: { current: { country: string
         )}
         <ChevronDown className="size-4" aria-hidden="true" />
       </summary>
-      <nav aria-label="Countries" className="absolute right-0 z-30 mt-2 grid max-h-[calc(100dvh-5.5rem)] w-72 max-w-[calc(100vw-2rem)] gap-0.5 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
+      <nav aria-label="Countries" className="absolute right-4 z-30 sm:right-0 mt-2 grid max-h-[calc(100dvh-5.5rem)] w-72 max-w-[calc(100vw-2rem)] gap-0.5 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
         <p className="px-3 pt-1 pb-2 text-xs font-bold tracking-wide text-navy-500 uppercase">Choose your country</p>
         {countries.map(market => {
           const here = market.country === current?.country;

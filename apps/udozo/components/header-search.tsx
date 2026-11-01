@@ -16,7 +16,7 @@ type Props = { country: string | null; categories: MenuCategory[]; prefix: strin
 
 /**
  * The header's one bar: the Categories menu as its navy left end, the search filling the rest, so the two read as a
- * single control, and **Near me** at its far right choosing the buyer's area (listings near them first). Without a country (the global page) there is nothing to search yet, so the rest of the bar takes the
+ * single control, and **Near me** at its far right (its pin alone on phones) choosing the buyer's area (listings near them first). Without a country (the global page) there is nothing to search yet, so the rest of the bar takes the
  * shopper to a market: "Continue to <their country>" when signed in with one, else "Choose your country", which opens
  * the header's country menu.
  */
@@ -61,10 +61,11 @@ export function SearchBlend({ country, categories, prefix, allHref, place, conti
       <Link
         href={`/${cc}/areas${back}`}
         aria-label={area || state ? "Near me: change your area" : "Near me: choose your area"}
-        className="flex shrink-0 items-center gap-1.5 rounded-r-2xl border-l border-navy-200 px-3 text-sm font-bold text-navy-900 hover:bg-navy-50"
+        className="flex w-12 shrink-0 items-center justify-center gap-1.5 rounded-r-2xl border-l border-navy-200 text-sm font-bold text-navy-900 hover:bg-navy-50 sm:w-auto sm:px-3"
       >
-        <MapPin className="size-4.5 text-brand-700" aria-hidden="true" />
-        <span>Near me</span>
+        <MapPin className="size-5 text-brand-700 sm:size-4.5" aria-hidden="true" />
+        {/* The pin alone on phones, so the field keeps its room; its name is the link's label. */}
+        <span className="hidden sm:inline">Near me</span>
       </Link>
     </div>
   );

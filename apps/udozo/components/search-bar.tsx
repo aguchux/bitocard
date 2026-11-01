@@ -66,7 +66,8 @@ export function SearchBar({ country, q = "", area, state, autoFocus, blended = f
           enterKeyHint="search"
           maxLength={100}
           autoFocus={autoFocus}
-          className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-navy-900 outline-none placeholder:text-navy-500"
+          // `w-0`: the field fills what the bar leaves, never asking for the browser's 20 characters (which widened phones' pages).
+          className="w-0 min-w-0 flex-1 bg-transparent text-[15px] font-medium text-navy-900 outline-none placeholder:text-navy-500"
         />
         {assistant.available ? (
           <button
