@@ -4,6 +4,7 @@ import { useEffect, useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { shopMoney } from "@bitocard/api-client/classifieds";
+import { useConfirm } from "@/components/confirm-dialog";
 import { buyResale, quoteResale, type ResaleBuy, type ResaleQuote } from "@/lib/purchase-actions";
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
@@ -26,6 +27,7 @@ export function ResaleBuy({ item, signedIn, signInHref, stateName, accountOrigin
   const [error, setError] = useState<string | null>(null);
   const [form] = useState(nonce);
   const [pending, start] = useTransition();
+  const [confirm, confirmDialog] = useConfirm();
 
   const input = (): ResaleBuy => ({
     ref: item.ref,
@@ -63,17 +65,21 @@ export function ResaleBuy({ item, signedIn, signInHref, stateName, accountOrigin
     );
   }
 
-  const buy = () =>
+  const buy = async () => {
+    if (!quote) return;
+    if (fulfilment === "delivery" && address.trim().length < 10) {
+      setError("Give the full delivery address.");
+      return;
+    }
+    const total = shopMoney(quote.total, quote.currency);
+    const ok = await confirm({ title: `Pay ${total} from your wallet?`, body: "Your money is locked until the seller accepts, then held until you have the item. If they do not accept, it is unlocked.", action: `Pay ${total}`, tone: "money" });
+    if (!ok) return;
     start(async () => {
-      if (!quote) return;
-      if (fulfilment === "delivery" && address.trim().length < 10) {
-        setError("Give the full delivery address.");
-        return;
-      }
       const result = await buyResale(input(), quote.total, form);
       if (result.ok) router.push(`/account/purchases/${result.data.id}`);
       else setError(result.message);
     });
+  };
 
   const charges = quote?.delivery;
   return (
@@ -81,9 +87,10 @@ export function ResaleBuy({ item, signedIn, signInHref, stateName, accountOrigin
       className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4"
       onSubmit={event => {
         event.preventDefault();
-        buy();
+        void buy();
       }}
     >
+      {confirmDialog}
       <h2 className="font-bold">Buy it</h2>
       {item.available > 1 ? (
         <label className="grid gap-1.5 text-sm font-semibold" htmlFor={`${id}-qty`}>

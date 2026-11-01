@@ -1,18 +1,30 @@
 "use client";
 
-import { type ReactNode, useActionState } from "react";
+import { type ReactNode, startTransition, useActionState } from "react";
 import { Plus, Send, Trash2 } from "lucide-react";
 import { FormMessage, Submit, TextField } from "@/components/account-forms";
+import { type ConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import type { FormState } from "@/lib/account-actions";
 import { addPayoutAccount, type NonceFormState, payOut, removePayoutAccount, simulatePayout } from "@/lib/payout-actions";
 
 const selectClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-navy-900 focus:border-brand-500 focus:ring-2 focus:ring-pink-100 focus:outline-none";
 
-/** One button that changes something, with the API's reason beside it when it is refused. */
-function ActionButton({ action, fields, children, className, label }: { action: (state: FormState, form: FormData) => Promise<FormState>; fields: Record<string, string>; children: ReactNode; className: string; label?: string }) {
+/** One button that changes something (asking first with `question`), with the API's reason beside it when it is refused. */
+function ActionButton({ action, fields, children, className, label, question }: { action: (state: FormState, form: FormData) => Promise<FormState>; fields: Record<string, string>; children: ReactNode; className: string; label?: string; question?: ConfirmOptions }) {
   const [state, run, pending] = useActionState<FormState, FormData>(action, {});
+  const [confirm, confirmDialog] = useConfirm();
   return (
-    <form action={run} className="inline-flex flex-col items-start gap-1">
+    <form
+      action={run}
+      onSubmit={async event => {
+        if (!question) return;
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        if (await confirm(question)) startTransition(() => run(data));
+      }}
+      className="inline-flex flex-col items-start gap-1"
+    >
+      {confirmDialog}
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
@@ -47,7 +59,7 @@ export function PayoutAccountForm({ banks }: { banks: Array<{ code: string; name
           ))}
         </select>
       </label>
-      <TextField label="Account number" name="account_number" inputMode="numeric" autoComplete="off" required state={state} hint="It must be in your own name, as your identity check shows it." />
+      <TextField label="Account number" name="account_number" inputMode="numeric" autoComplete="off" required state={state} hint="It must be in your own name: the one your identity check shows, or else the one on your Udozo account." />
       <Submit pending={pending} className="w-full sm:w-auto">
         <Plus className="size-4" aria-hidden="true" /> Add bank account
       </Submit>
@@ -58,9 +70,24 @@ export function PayoutAccountForm({ banks }: { banks: Array<{ code: string; name
 /** Pays the money from the customer's sales into one of their bank accounts. */
 export function PayOutForm({ accounts, currency, available, nonce }: { accounts: Array<{ id: string; label: string; ready: boolean; from: string }>; currency: string; available: string; nonce: string }) {
   const [state, action, pending] = useActionState<NonceFormState, FormData>(payOut, {});
+  const [confirm, confirmDialog] = useConfirm();
   const usable = accounts.filter(item => item.ready);
   return (
-    <form action={action} className="space-y-4" aria-label="Pay out">
+    <form
+      action={action}
+      onSubmit={async event => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        const amount = String(data.get("amount") ?? "").trim();
+        const account = accounts.find(item => item.id === data.get("bank_account_id"));
+        if (!amount || !account) return startTransition(() => action(data));
+        const ok = await confirm({ title: `Pay out ${currency} ${amount}?`, body: `It goes to ${account.label}. A payout cannot be taken back once it is sent.`, action: "Pay out", tone: "money" });
+        if (ok) startTransition(() => action(data));
+      }}
+      className="space-y-4"
+      aria-label="Pay out"
+    >
+      {confirmDialog}
       {/* Sent as the Idempotency-Key, so a double tap pays out once. */}
       <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
       <FormMessage state={state} />
@@ -86,7 +113,7 @@ export function PayOutForm({ accounts, currency, available, nonce }: { accounts:
 
 export function RemovePayoutAccount({ id, label }: { id: string; label: string }) {
   return (
-    <ActionButton action={removePayoutAccount} fields={{ id }} label={`Remove ${label}`} className="inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700">
+    <ActionButton action={removePayoutAccount} fields={{ id }} label={`Remove ${label}`} question={{ title: `Remove ${label}?`, body: "Payouts can no longer go to it. Adding it again means waiting 24 hours before it can be paid.", action: "Remove account", tone: "danger" }} className="inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700">
       <Trash2 className="size-4" aria-hidden="true" />
     </ActionButton>
   );

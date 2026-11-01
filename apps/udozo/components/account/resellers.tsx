@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { resaleDealText, type ShopReseller, type ShopResaleDeal, type ShopResaleMessage } from "@bitocard/api-client/classifieds";
+import { useConfirm } from "@/components/confirm-dialog";
 import { decideResaleNote, endResaleDeal, loadResaleMessages, offerResaleDeal, sendResaleMessage, setAutoAccept, setResellerStopped } from "@/lib/shop-actions";
 
 const pollMs = 4000;
@@ -119,8 +120,18 @@ export function ResellerDeals({ reseller }: { reseller: ShopReseller }) {
   const [form, setForm] = useState({ listingId: "", discount: "", floor: "", endsOn: "" });
   const [open, setOpen] = useState(false);
   const listings = [...new Map((reseller.listings ?? []).map(item => [item.listing.id, item.listing])).values()];
+  const [confirm, confirmDialog] = useConfirm();
 
   const end = async (deal: ShopResaleDeal) => {
+    const running = deal.status === "active";
+    const ok = await confirm({
+      title: running ? "End this deal?" : "Withdraw this deal?",
+      body: running ? `${reseller.reseller.name} goes back to your listings' own discount at once.` : `${reseller.reseller.name} can no longer accept it.`,
+      action: running ? "End deal" : "Withdraw deal",
+      dismiss: "Keep it",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(deal.id);
     setError(null);
     const result = await endResaleDeal(reseller.id, deal.id);
@@ -140,6 +151,7 @@ export function ResellerDeals({ reseller }: { reseller: ShopReseller }) {
 
   return (
     <div className="grid gap-3">
+      {confirmDialog}
       {reseller.deals.length ? (
         <ul className="grid gap-2">
           {reseller.deals.map(deal => (
@@ -204,38 +216,35 @@ export function ResellerDeals({ reseller }: { reseller: ShopReseller }) {
 
 /** A reseller's note waiting for (or after) the supplier's decision: Approve exactly this text, Refuse with a reason, Withdraw. */
 export function NoteDecision({ relationshipId, item }: { relationshipId: string; item: NonNullable<ShopReseller["listings"]>[number] }) {
-  const [reason, setReason] = useState("");
-  const [refusing, setRefusing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
   const note = item.note!;
   const decide = async (decision: "approve" | "refuse" | "withdraw") => {
+    const answer = await confirm(
+      decision === "approve"
+        ? { title: "Approve this note?", body: "Exactly this text shows with your listing on their store until you withdraw it.", action: "Approve note", tone: "money" }
+        : decision === "refuse"
+          ? { title: "Refuse this note?", body: "It never shows on their store.", action: "Refuse note", tone: "danger", reason: { label: "Why (they will see this)", required: true, maxLength: 300 } }
+          : { title: "Withdraw your approval?", body: "The note leaves their store at once.", action: "Withdraw approval", dismiss: "Keep it", tone: "danger" },
+    );
+    if (!answer) return;
     setBusy(true);
     setError(null);
-    const result = await decideResaleNote(relationshipId, item.id, decision, { note: note.text, reason });
+    const result = await decideResaleNote(relationshipId, item.id, decision, { note: note.text, reason: answer.reason });
     if (!result.ok) setError(result.message);
     setBusy(false);
-    setRefusing(false);
   };
   return (
     <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3">
+      {confirmDialog}
       <p className="text-xs text-slate-500">On “{item.listing.title}”</p>
       <blockquote className="rounded-lg bg-slate-50 px-3 py-2 text-sm">“{note.text}”</blockquote>
       {note.status === "pending" ? (
-        refusing ? (
-          <div className="grid gap-2">
-            <input value={reason} maxLength={300} onChange={event => setReason(event.target.value)} placeholder="Why (they will see this)" aria-label="Why you refuse it" className={field} />
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className={primary} disabled={busy} onClick={() => void decide("refuse")}>Refuse</button>
-              <button type="button" className={secondary} onClick={() => setRefusing(false)}>Back</button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={primary} disabled={busy} onClick={() => void decide("approve")}>Approve</button>
-            <button type="button" className={secondary} disabled={busy} onClick={() => setRefusing(true)}>Refuse</button>
-          </div>
-        )
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={primary} disabled={busy} onClick={() => void decide("approve")}>Approve</button>
+          <button type="button" className={secondary} disabled={busy} onClick={() => void decide("refuse")}>Refuse</button>
+        </div>
       ) : note.status === "approved" ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800">Approved: shown on their store</span>
@@ -251,31 +260,29 @@ export function NoteDecision({ relationshipId, item }: { relationshipId: string;
 
 /** Stop this reseller selling your listings on every store of theirs, after a confirmation; or let them again. */
 export function StopReselling({ reseller }: { reseller: ShopReseller }) {
-  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
   const toggle = async (stopped: boolean) => {
+    const ok = await confirm(
+      stopped
+        ? { title: `Stop ${reseller.reseller.name} reselling your listings?`, body: "Your listings come off every store of theirs at once, your deals with them end and the chat closes.", action: "Stop them", tone: "danger" }
+        : { title: `Let ${reseller.reseller.name} resell again?`, body: "They can add your listings to their stores again.", action: "Let them resell" },
+    );
+    if (!ok) return;
     setBusy(true);
     setError(null);
     const result = await setResellerStopped(reseller.id, stopped);
     if (!result.ok) setError(result.message);
     setBusy(false);
-    setConfirming(false);
   };
   return (
     <div className="grid gap-2">
+      {confirmDialog}
       {reseller.stopped ? (
         <button type="button" className={`${secondary} w-fit`} disabled={busy} onClick={() => void toggle(false)}>Let them resell again</button>
-      ) : confirming ? (
-        <div className="grid gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-          <p>Your listings come off every store of {reseller.reseller.name} at once, your deals with them end and the chat closes.</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={primary} disabled={busy} onClick={() => void toggle(true)}>Stop them</button>
-            <button type="button" className={secondary} onClick={() => setConfirming(false)}>Cancel</button>
-          </div>
-        </div>
       ) : (
-        <button type="button" className={`${secondary} w-fit text-brand-700`} onClick={() => setConfirming(true)}>Stop them reselling my listings</button>
+        <button type="button" className={`${secondary} w-fit text-brand-700`} disabled={busy} onClick={() => void toggle(true)}>Stop them reselling my listings</button>
       )}
       {error ? <p className="text-sm text-brand-700">{error}</p> : null}
     </div>

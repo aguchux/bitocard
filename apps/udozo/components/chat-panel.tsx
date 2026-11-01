@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { shopMoney, type ShopChat, type ShopMessage } from "@bitocard/api-client/classifieds";
+import { offerQuestion, useConfirm } from "@/components/confirm-dialog";
 import { answerOffer, loadChat, makeOffer, sendMessage, startChat } from "@/lib/listing-actions";
 
 const quick = ["Is it still available?", "What is your last price?", "Where can we meet?"];
@@ -62,6 +63,7 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath,
   const [offer, setOffer] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
   const list = useRef<HTMLOListElement>(null);
   const last = messages.at(-1)?.id;
 
@@ -126,6 +128,8 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath,
   };
 
   const onAnswer = async (id: string, action: "accept" | "decline" | "withdraw") => {
+    const offer = messages.find(message => message.id === id)?.offer;
+    if (offer && !(await confirm(offerQuestion(action, shopMoney(offer.price.amount, offer.price.currency), "The seller")))) return;
     setBusy(true);
     setError(null);
     const result = await answerOffer(id, action);
@@ -140,6 +144,7 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath,
   const blocked = chat?.blocked.by_me || chat?.blocked.by_them;
   return (
     <section aria-label="Chat with the seller" className="grid gap-3 rounded-2xl border border-navy-200 bg-navy-50 p-3">
+      {confirmDialog}
       {messages.length ? (
         <ol ref={list} className="grid max-h-96 gap-2 overflow-y-auto pr-1" aria-live="polite">
           {messages.map(message => (

@@ -7,6 +7,7 @@ import { Camera, Check, LoaderCircle, ShieldCheck, Truck } from "lucide-react";
 import { disputeReasonLabels, shopMoney, type ShopCourier, type ShopDispute, type ShopDisputeMessage, type ShopDisputeReason, type ShopOrder, type ShopReadiness, type ShopShipmentStatus, shipmentLabels } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl, type OrderAction } from "@/lib/shop";
+import { useConfirm } from "@/components/confirm-dialog";
 import { TermsAccept, termsCode } from "@/components/terms-accept";
 import { acceptShopTerms, disputeMessage, enterReleaseCode, openDispute, orderStep, releaseCode, shipmentUpdate, shopTerms } from "@/lib/shop-actions";
 
@@ -40,6 +41,7 @@ export function OrderPanel({
   couriers?: ShopCourier[];
 }) {
   const router = useRouter();
+  const [confirm, confirmDialog] = useConfirm();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [code, setCode] = useState<{ value: string; tries: number } | null>(null);
@@ -65,6 +67,7 @@ export function OrderPanel({
 
   return (
     <div className="grid gap-4">
+      {confirmDialog}
       {has("accept") ? (
         <section aria-labelledby="answer" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
           <h2 id="answer" className="font-bold">
@@ -86,15 +89,38 @@ export function OrderPanel({
             <button
               type="button"
               disabled={pending}
-              onClick={() => {
-                const why = window.prompt(order.kind === "resale" ? "Decline the order? The buyer gets their money back. You can say why (optional)." : "Decline the request? You can say why (optional).");
-                if (why !== null) step("decline", { reason: why });
+              onClick={async () => {
+                const answer = await confirm({
+                  title: order.kind === "resale" ? "Decline this order?" : "Decline this request?",
+                  body: order.kind === "resale" ? "The buyer gets their money back straight away." : `${order.with.name} is told you declined.`,
+                  action: order.kind === "resale" ? "Decline order" : "Decline request",
+                  dismiss: "Keep it",
+                  tone: "danger",
+                  reason: { label: "Tell them why", placeholder: "Sold already, or the price was a mistake", maxLength: 300 },
+                });
+                if (answer) step("decline", { reason: answer.reason });
               }}
               className={secondary}
             >
               Decline
             </button>
-            <button type="button" disabled={pending || (readiness ? !readiness.ready : false)} onClick={() => step("accept")} className={green}>
+            <button
+              type="button"
+              disabled={pending || (readiness ? !readiness.ready : false)}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: order.kind === "resale" ? "Accept this order?" : "Accept this request?",
+                  body:
+                    order.kind === "resale"
+                      ? "The buyer's money moves into Safe pay and the hand-over time starts. Accept only if you can hand it over or ship it in time."
+                      : `${order.with.name} can then pay with Safe pay. Accept only if you can hand it over in time.`,
+                  action: order.kind === "resale" ? "Accept order" : "Accept request",
+                  tone: "money",
+                });
+                if (ok) step("accept");
+              }}
+              className={green}
+            >
               Accept
             </button>
           </div>
@@ -114,7 +140,20 @@ export function OrderPanel({
               Add funds
             </a>
           ) : null}
-          <button type="button" disabled={pending || Boolean(short)} onClick={() => step("pay", { nonce: nonce() })} className={green}>
+          <button
+            type="button"
+            disabled={pending || Boolean(short)}
+            onClick={async () => {
+              const ok = await confirm({
+                title: `Pay ${shopMoney(total, order.currency)} from your wallet?`,
+                body: `Udozo holds it with Safe pay until you have the item and release it to ${order.with.name}.`,
+                action: `Pay ${shopMoney(total, order.currency)}`,
+                tone: "money",
+              });
+              if (ok) step("pay", { nonce: nonce() });
+            }}
+            className={green}
+          >
             <ShieldCheck className="size-5" aria-hidden="true" />
             Pay {shopMoney(total, order.currency)}
           </button>
@@ -202,8 +241,9 @@ export function OrderPanel({
           <button
             type="button"
             disabled={pending}
-            onClick={() => {
-              if (window.confirm("Mark it delivered? Only once the courier has handed it to the buyer.")) run(() => shipmentUpdate(order.id, "delivered").then(result => (result.ok ? result : { ok: false, message: result.message })));
+            onClick={async () => {
+              const ok = await confirm({ title: "Mark it delivered?", body: "Only once the courier has handed it to the buyer: their time to confirm it arrived starts now.", action: "Mark delivered" });
+              if (ok) run(() => shipmentUpdate(order.id, "delivered").then(result => (result.ok ? result : { ok: false, message: result.message })));
             }}
             className={green}
           >
@@ -217,8 +257,15 @@ export function OrderPanel({
         <button
           type="button"
           disabled={pending}
-          onClick={() => {
-            if (window.confirm(`It arrived as described? ${order.with.name} is paid at once.`)) step("received");
+          onClick={async () => {
+            const ok = await confirm({
+              title: "Did it arrive as described?",
+              body: `${order.with.name} is paid at once, and this cannot be undone. If something is wrong, report a problem instead.`,
+              action: "Release the payment",
+              dismiss: "Not yet",
+              tone: "money",
+            });
+            if (ok) step("received");
           }}
           className={green}
         >
@@ -267,16 +314,18 @@ export function OrderPanel({
         <button
           type="button"
           disabled={pending}
-          onClick={() => {
-            const question =
+          onClick={async () => {
+            const body =
               order.status === "paid"
                 ? order.role === "buyer"
-                  ? "Cancel the order? You are refunded in full, fee included."
-                  : "Cancel the order? The buyer is refunded in full, and it counts against you."
+                  ? "You are refunded in full, fee included."
+                  : "The buyer is refunded in full, and it counts against you."
                 : order.status === "locked"
-                  ? "Cancel the order? Your money is unlocked straight away."
-                  : "Cancel this request?";
-            if (window.confirm(question)) step("cancel");
+                  ? "Your money is unlocked straight away."
+                  : `${order.with.name} is told it is cancelled.`;
+            const request = order.status === "requested";
+            const ok = await confirm({ title: request ? "Cancel this request?" : "Cancel the order?", body, action: request ? "Cancel request" : "Cancel order", dismiss: "Keep it", tone: "danger" });
+            if (ok) step("cancel");
           }}
           className="justify-self-start text-sm font-semibold text-slate-600 hover:text-navy-900 hover:underline"
         >

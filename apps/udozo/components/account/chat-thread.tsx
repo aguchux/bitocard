@@ -7,6 +7,7 @@ import { reportReasonLabels, shopMoney, type ShopChat, type ShopMessage, type Sh
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl } from "@/lib/shop";
 import { answerOffer, blockChat, loadChat, makeOffer, reportChat, sendMessage } from "@/lib/shop-actions";
+import { offerQuestion, useConfirm } from "../confirm-dialog";
 import { useDismiss } from "../dropdown";
 import { SuggestReply } from "./assistant-help";
 
@@ -41,6 +42,7 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
   const [sendingPhoto, setSendingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
   const [report, setReport] = useState<{ reason: ShopReportReason; details: string; sent: boolean } | null>(null);
   const list = useRef<HTMLOListElement>(null);
   const more = useRef<HTMLDivElement>(null);
@@ -120,6 +122,8 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
   };
 
   const answer = async (id: string, action: "accept" | "decline" | "withdraw") => {
+    const offer = messages.find(message => message.id === id)?.offer;
+    if (offer && !(await confirm(offerQuestion(action, shopMoney(offer.price.amount, offer.price.currency), chat.with.name)))) return;
     setBusy(true);
     setError(null);
     const result = await answerOffer(id, action);
@@ -130,7 +134,7 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
 
   const toggleBlock = async () => {
     setMenu(false);
-    if (!chat.blocked.by_me && !window.confirm(`Block ${chat.with.name}? Neither of you can write here until you unblock them, and open offers are withdrawn.`)) return;
+    if (!chat.blocked.by_me && !(await confirm({ title: `Block ${chat.with.name}?`, body: "Neither of you can write here until you unblock them, and open offers are withdrawn.", action: "Block", tone: "danger" }))) return;
     const result = await blockChat(chat.id, !chat.blocked.by_me);
     if (!result.ok) setError(result.message);
     else await refresh();
@@ -145,6 +149,7 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
 
   return (
     <section aria-label={`Chat with ${chat.with.name}`} className={fill ? "flex h-full min-h-0 flex-col gap-2" : "grid gap-3"}>
+      {confirmDialog}
       <div ref={more} className="relative flex justify-end">
         <button type="button" aria-label="More: report, block" aria-expanded={menu} onClick={() => setMenu(!menu)} className="grid size-10 place-items-center rounded-full hover:bg-slate-100">
           <EllipsisVertical className="size-5" aria-hidden="true" />

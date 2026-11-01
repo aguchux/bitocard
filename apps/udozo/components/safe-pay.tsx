@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { shopMoney, type ShopSafePayQuote } from "@bitocard/api-client/classifieds";
@@ -121,8 +122,11 @@ export function SafePayOrderActions({ orderId, canPay, canCancel, addFundsHref, 
   const [low, setLow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [key] = useState(nonce);
+  const [confirm, confirmDialog] = useConfirm();
 
   const pay = async () => {
+    const ok = await confirm({ title: `Pay ${shopMoney(total, currency)} from your wallet?`, body: "Udozo holds it with Safe pay until you have the item and release it to the seller.", action: `Pay ${shopMoney(total, currency)}`, tone: "money" });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     const result = await paySafePay(orderId, key);
@@ -134,7 +138,8 @@ export function SafePayOrderActions({ orderId, canPay, canCancel, addFundsHref, 
     setBusy(false);
   };
   const cancel = async () => {
-    if (!window.confirm("Cancel this Safe pay request?")) return;
+    const ok = await confirm({ title: "Cancel this Safe pay request?", body: "The seller is told it is cancelled. You can ask again later.", action: "Cancel request", dismiss: "Keep it", tone: "danger" });
+    if (!ok) return;
     setBusy(true);
     const result = await cancelSafePay(orderId);
     if (result.ok) router.refresh();
@@ -144,6 +149,7 @@ export function SafePayOrderActions({ orderId, canPay, canCancel, addFundsHref, 
 
   return (
     <div className="grid gap-3">
+      {confirmDialog}
       {canPay ? (
         <button type="button" onClick={() => void pay()} disabled={busy} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
           <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Paying…" : `Pay ${shopMoney(total, currency)} from my wallet`}
