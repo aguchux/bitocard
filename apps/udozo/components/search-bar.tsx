@@ -9,9 +9,10 @@ import { useAssistant } from "./assistant";
 /**
  * The Shop's search: a GET form to the country's `/search` (it works without script), with suggestions as the buyer
  * types (categories, then titles of live listings like it), read from this site's own `/api/suggest`. Where the
- * country's assistant answers, Ask hands what was typed to it ("Describe what you want").
+ * country's assistant answers, Ask hands what was typed to it ("Describe what you want"). `blended`: inside the
+ * header's bar beside the Categories menu, which draws the border.
  */
-export function SearchBar({ country, q = "", area, state, autoFocus }: { country: string; q?: string; area?: string | null; state?: string | null; autoFocus?: boolean }) {
+export function SearchBar({ country, q = "", area, state, autoFocus, blended = false }: { country: string; q?: string; area?: string | null; state?: string | null; autoFocus?: boolean; blended?: boolean }) {
   const cc = country.toLowerCase();
   const [value, setValue] = useState(q);
   const [suggestions, setSuggestions] = useState<ShopSuggestions | null>(null);
@@ -39,8 +40,8 @@ export function SearchBar({ country, q = "", area, state, autoFocus }: { country
   const shown = open && value.trim().length >= 2 && suggestions && (suggestions.categories.length || suggestions.queries.length) ? suggestions : null;
 
   return (
-    <form ref={form} action={`/${cc}/search`} method="get" role="search" className="relative" onSubmit={() => setOpen(false)}>
-      <label className="flex h-12 items-center gap-2.5 rounded-2xl bg-white px-3.5 text-navy-600 focus-within:ring-2 focus-within:ring-brand-500">
+    <form ref={form} action={`/${cc}/search`} method="get" role="search" className={blended ? "relative min-w-0 flex-1" : "relative"} onSubmit={() => setOpen(false)}>
+      <label className={blended ? "flex h-full items-center gap-2 px-3 text-navy-600" : "flex h-12 items-center gap-2.5 rounded-2xl bg-white px-3.5 text-navy-600 focus-within:ring-2 focus-within:ring-brand-500"}>
         <Search className="size-5 shrink-0" aria-hidden="true" />
         <input
           type="search"
@@ -71,7 +72,7 @@ export function SearchBar({ country, q = "", area, state, autoFocus }: { country
           <button
             type="button"
             onClick={() => assistant.open({ question: value.trim() || undefined })}
-            className="flex h-9 shrink-0 items-center gap-1 rounded-xl bg-navy-50 px-2.5 text-sm font-semibold text-navy-900 hover:bg-navy-100"
+            className="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-navy-50 px-2.5 text-sm font-semibold text-navy-900 hover:bg-navy-100"
             aria-label={`Describe what you want to ${assistant.name}`}
           >
             <Sparkles className="size-4 text-brand-700" aria-hidden="true" /> <span className="hidden sm:inline">Ask {assistant.name}</span>

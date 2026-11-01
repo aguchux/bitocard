@@ -4,7 +4,6 @@ import Link from "next/link";
 import { MapPin } from "lucide-react";
 import type { ShopSearch } from "@bitocard/api-client/classifieds";
 import { Results } from "@/components/results";
-import { SearchBar } from "@/components/search-bar";
 import { marketFor, shopApi } from "@/lib/api";
 import { findPlace } from "@/lib/places";
 import { areasOf } from "@/lib/reference";
@@ -34,7 +33,6 @@ export default async function SearchPage({ params, searchParams }: Props) {
     <>
       <section className="bg-navy-900 pt-5 pb-4">
         <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-2.5">
-          <SearchBar country={market.country} q={filters.q} area={filters.area} state={filters.state} autoFocus={!filters.q} />
           <Link href={`/${cc}/areas?next=${encodeURIComponent(`/${cc}/search${filters.q ? `?q=${encodeURIComponent(filters.q)}` : ""}`)}`} className="flex h-10 items-center gap-2 rounded-xl border border-navy-700 bg-navy-800 px-3 text-sm font-semibold text-white sm:max-w-sm">
             <MapPin className="size-4.5 text-brand-300" aria-hidden="true" />
             <span className="flex-1">{where ?? "Choose your area"}</span>

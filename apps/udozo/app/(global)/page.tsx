@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
 import { Flag } from "@/components/flag";
-import { CategoryStrip } from "@/components/category-strip";
 import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
@@ -23,9 +22,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The global showcase, from the second country: the countries with their listings, the categories, and recent and
- * trending listings across them, never a price. With one country open, its market is the home page. Nothing is chosen
- * by cookie or address: a signed-in customer only sees "Continue to <their country>".
+ * The global showcase, from the second country: the countries with their listings, and recent and trending listings
+ * across them, never a price (the categories are in the header's menu). With one country open, its market is the home
+ * page. Nothing is chosen by cookie or address: a signed-in customer only sees "Continue to <their country>".
  */
 export default async function GlobalHome() {
   const all = await markets();
@@ -82,12 +81,6 @@ export default async function GlobalHome() {
         </section>
         {showcase.ok ? (
           <>
-            <section aria-labelledby="categories">
-              <h2 id="categories" className="mb-3 text-base font-bold">
-                Categories
-              </h2>
-              <CategoryStrip categories={showcase.data.categories} href={slug => `/c/${slug}`} />
-            </section>
             {showcase.data.trending.length ? (
               <section aria-labelledby="trending">
                 <h2 id="trending" className="mb-3 text-base font-bold">

@@ -2,14 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
-import { categoryPath, type ShopSearch } from "@bitocard/api-client/classifieds";
+import type { ShopSearch } from "@bitocard/api-client/classifieds";
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
-import { SearchBar } from "@/components/search-bar";
-import { CategoryStrip } from "@/components/category-strip";
 import { marketFor, markets, shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
-import { categoriesOf } from "@/lib/reference";
 import { regionalAlternates } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string }> };
@@ -28,13 +25,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** A country's market: search with the area, the Safe pay promise, categories, and the newest listings. */
+/** A country's market: the Safe pay promise with the area, and the newest listings (search and categories are in the header). */
 export default async function CountryHome({ params }: Props) {
   const { cc } = await params;
   const market = await marketFor(cc);
   // Pages render alongside the layout, so each checks the market itself.
   if (!market) notFound();
-  const [categories, recent] = await Promise.all([categoriesOf(cc), shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&sort=newest&limit=12`)]);
+  const recent = await shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&sort=newest&limit=12`);
   return (
     <>
       <section className="bg-navy-900 pt-6 pb-6">
@@ -44,7 +41,6 @@ export default async function CountryHome({ params }: Props) {
             <br />
             <span className="text-brand-300">protected by Safe pay</span>
           </h1>
-          <SearchBar country={market.country} />
           <Link href={`/${cc}/areas`} className="flex h-10 items-center gap-2 rounded-xl border border-navy-700 bg-navy-800 px-3 text-sm font-semibold text-white sm:max-w-sm">
             <MapPin className="size-4.5 text-brand-300" aria-hidden="true" />
             <span className="flex-1">Choose your area</span>
@@ -53,14 +49,6 @@ export default async function CountryHome({ params }: Props) {
         </div>
       </section>
       <div className="mx-auto grid max-w-[1400px] gap-7 px-4 sm:px-6 lg:px-8 pt-4">
-        {categories.length ? (
-          <section aria-labelledby="categories">
-            <h2 id="categories" className="mb-3 text-base font-bold">
-              Categories
-            </h2>
-            <CategoryStrip categories={categories} href={slug => categoryPath(cc, slug)} />
-          </section>
-        ) : null}
         <section aria-labelledby="recent">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 id="recent" className="text-base font-bold">

@@ -8,11 +8,11 @@ import { ShopIcon } from "./icon";
 export type MenuCategory = { slug: string; name: string; icon: string | null; children?: Array<{ slug: string; name: string; icon: string | null }> };
 
 /**
- * The header's categories, beside the lockup: a clear bordered button (the menu icon, and "Categories" from tablets up)
- * opening a drawer from the left with the market's top categories, each opening its subcategories. Rows are 48 px tall
+ * The header's categories: the navy left end of the header's bar (the menu icon, and "Categories" from tablets up, or
+ * always where it stands alone: `labelled`), opening a drawer from the left with the market's top categories, each opening its subcategories. Rows are 48 px tall
  * for thumbs; choosing one closes the drawer (the layout, and so the drawer, stays across pages).
  */
-export function CategoryMenu({ categories, prefix, allHref, place }: { categories: MenuCategory[]; prefix: string; allHref: string; place: string | null }) {
+export function CategoryMenu({ categories, prefix, allHref, place, labelled = false }: { categories: MenuCategory[]; prefix: string; allHref: string; place: string | null; labelled?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState<string | null>(null);
   const titleId = useId();
@@ -26,10 +26,10 @@ export function CategoryMenu({ categories, prefix, allHref, place }: { categorie
         onClick={() => dialog.current?.showModal()}
         aria-haspopup="dialog"
         aria-label="Categories"
-        className="inline-flex size-11 shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 sm:w-auto sm:px-3.5"
+        className={`-m-0.5 inline-flex shrink-0 items-center justify-center gap-2 rounded-l-2xl bg-navy-900 text-white hover:bg-navy-800 ${labelled ? "flex-1 rounded-r-2xl px-4" : "w-12 sm:w-auto sm:px-4"}`}
       >
         <Menu className="size-5.5" aria-hidden="true" strokeWidth={2.4} />
-        <span className="hidden text-[15px] font-bold sm:inline">Categories</span>
+        <span className={`text-[15px] font-bold ${labelled ? "" : "hidden sm:inline"}`}>Categories</span>
       </button>
       <dialog
         ref={dialog}

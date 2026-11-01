@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChevronDown, Plus, UserRound } from "lucide-react";
 import type { ShopMarket, ShopShowcase } from "@bitocard/api-client/classifieds";
 import { nameInitials } from "@bitocard/api-client/classifieds";
@@ -8,8 +9,9 @@ import { shopApi } from "@/lib/api";
 import type { Customer } from "@/lib/customer";
 import { categoriesOf } from "@/lib/reference";
 import { AskButton } from "./assistant";
-import { CategoryMenu, type MenuCategory } from "./category-menu";
+import type { MenuCategory } from "./category-menu";
 import { Flag } from "./flag";
+import { HeaderSearch, SearchBlend } from "./header-search";
 import { SignInHere } from "./sign-in-here";
 
 /** Udozo's lockup on white: the "u" mark, then the name. */
@@ -22,7 +24,7 @@ export function UdozoWordmark({ href = "/" }: { href?: string }) {
   );
 }
 
-/** The header's named places: the market and its areas, Safe pay and the Safe Trade Guide (categories have their own menu). */
+/** The header's named places, in the profile menu: the market and its areas, Safe pay and the Safe Trade Guide. */
 function navLinks(market: ShopMarket | null) {
   const home = market ? `/${market.country.toLowerCase()}` : "/";
   return [
@@ -42,8 +44,6 @@ const accountLinks = [
   { href: "/account/profile", label: "Profile" },
 ];
 
-const linkClass = "inline-flex min-h-11 items-center rounded-xl px-3 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:bg-navy-50";
-
 /** The categories the header's menu offers: the market's, with their subcategories, or the showcase's across countries. */
 async function menuCategories(market: ShopMarket | null): Promise<MenuCategory[]> {
   if (market) {
@@ -59,14 +59,15 @@ export async function SiteHeader({ market, customer, showcase }: { market: ShopM
 }
 
 /**
- * Udozo's top bar, mobile first: the lockup and, right of it, the **Categories** menu (a bordered menu button opening a
- * drawer); the named links on desktops; then on the right the country, just left of the account's profile icon (or
- * Sign in), and **Sell** (`/sell`). The profile menu also holds the named links below desktop width, so the bar has
- * room for the categories; phones get Sell as a floating button.
+ * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
+ * and the search, on its own full-width row on phones and tablets and beside the lockup from desktops; on the right the
+ * country, just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones). The named links
+ * live in the profile menu, so the bar has the room.
  */
 export function HeaderBar({ market, customer, showcase, categories }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[] }) {
   const home = market ? `/${market.country.toLowerCase()}` : "/";
   const links = navLinks(market);
+  const search = { country: market?.country ?? null, categories, prefix: market ? `${home}/c/` : "/c/", allHref: market ? `${home}/search` : "/", place: market?.name ?? null };
   const sellClass = "hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex";
   const flag = market ? (
     <>
@@ -88,22 +89,18 @@ export function HeaderBar({ market, customer, showcase, categories }: { market: 
 
   return (
     <header className="sticky top-0 z-30 border-b border-navy-100 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-1.5 px-4 sm:h-[72px] sm:gap-2 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-1.5 gap-y-2 px-4 pt-2.5 pb-3 sm:gap-x-2 sm:px-6 lg:h-[72px] lg:flex-nowrap lg:gap-x-4 lg:px-8 lg:py-0">
         <UdozoWordmark href={home} />
-        <CategoryMenu categories={categories} prefix={market ? `${home}/c/` : "/c/"} allHref={market ? `${home}/search` : "/"} place={market?.name ?? null} />
-        <nav aria-label="Udozo" className="ml-2 hidden items-center gap-0.5 xl:flex">
-          {links.map(link => (
-            <Link key={link.href} href={link.href} className={linkClass}>
-              {link.label}
-            </Link>
-          ))}
-          {market ? <AskButton className={linkClass} /> : null}
-        </nav>
+        <div data-header-search className="order-last basis-full lg:order-none lg:max-w-3xl lg:flex-1 lg:basis-auto lg:pb-0">
+          <Suspense fallback={<SearchBlend {...search} />}>
+            <HeaderSearch {...search} />
+          </Suspense>
+        </div>
         <div className="-mr-2 ml-auto flex items-center gap-0.5 sm:mr-0 sm:gap-2">
           {country}
           <ProfileMenu links={links} customer={customer} ask={Boolean(market)} />
           {customer ? null : (
-            <SignInHere className="hidden min-h-11 items-center rounded-xl border border-navy-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-navy-300 xl:inline-flex">
+            <SignInHere className="hidden min-h-11 items-center rounded-xl border border-navy-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-navy-300 lg:inline-flex">
               Sign in
             </SignInHere>
           )}
@@ -124,12 +121,12 @@ export function HeaderBar({ market, customer, showcase, categories }: { market: 
 
 /**
  * The account's profile icon (its initials; a person icon when signed out) and its menu: the account's places and
- * Sign out, or Sign in, plus the named links below desktop width. Signed out on desktops, Sign in is a button instead.
+ * Sign out, or Sign in, then the named links. Signed out on desktops, Sign in is also a button beside it.
  */
 function ProfileMenu({ links, customer, ask }: { links: Array<{ href: string; label: string }>; customer: Customer | null; ask: boolean }) {
   const item = "flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-navy-50";
   return (
-    <details className={`relative ${customer ? "" : "xl:hidden"}`}>
+    <details className="relative">
       <summary
         className="inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl text-[15px] font-semibold text-navy-900 hover:bg-navy-50 lg:border lg:border-navy-200 lg:bg-white lg:px-3 lg:hover:border-navy-300 [&::-webkit-details-marker]:hidden"
         aria-label={customer ? `Account: ${customer.name}` : "Account menu"}
@@ -143,7 +140,7 @@ function ProfileMenu({ links, customer, ask }: { links: Array<{ href: string; la
             <UserRound className="size-4.5" strokeWidth={2.4} />
           </span>
         )}
-        <span className="hidden lg:inline">{customer ? "Account" : "Menu"}</span>
+        {customer ? <span className="hidden lg:inline">Account</span> : null}
         <ChevronDown className="hidden size-4 lg:block" aria-hidden="true" />
       </summary>
       <nav aria-label="Account" className="absolute right-0 z-30 mt-2 grid max-h-[calc(100dvh-5.5rem)] w-64 gap-0.5 overflow-y-auto rounded-2xl border border-navy-200 bg-white p-2 text-[15px] text-navy-900 shadow-lg">
@@ -159,7 +156,7 @@ function ProfileMenu({ links, customer, ask }: { links: Array<{ href: string; la
         ) : (
           <SignInHere className={item}>Sign in</SignInHere>
         )}
-        <div className="xl:hidden">
+        <div>
           <div className="my-1 border-t border-navy-100" />
           {links.map(link => (
             <Link key={link.href} href={link.href} className={item}>

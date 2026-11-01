@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { SiteFooter } from "@/components/footer";
 import { AssistantProvider } from "@/components/assistant";
 import { SellButton, SiteHeader } from "@/components/header";
+import { SearchScopeProvider } from "@/components/search-scope";
 import { InstallPrompt } from "@bitocard/ui/install-ui";
 import { assistantFor } from "@/lib/assistant";
 import { marketFor, markets } from "@/lib/api";
@@ -19,8 +20,10 @@ export default async function CountryLayout({ children, params }: { children: Re
   const [customer, all, assistant] = await Promise.all([currentCustomer(), markets(), assistantFor(market.country)]);
   return (
     <AssistantProvider country={market.country} profile={assistant} signedIn={Boolean(customer)}>
-      <SiteHeader market={market} customer={customer} showcase={all.showcase} />
-      <main>{children}</main>
+      <SearchScopeProvider>
+        <SiteHeader market={market} customer={customer} showcase={all.showcase} />
+        <main>{children}</main>
+      </SearchScopeProvider>
       <SiteFooter country={{ code: market.country, name: market.name }} />
       <SellButton customer={customer} />
       <InstallPrompt enabled={market.install_prompt} appName="Udozo" />
