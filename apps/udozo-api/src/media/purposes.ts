@@ -49,6 +49,8 @@ const purposeTable = {
   category_icon: { label: 'Category icon', realm: 'admin', target: 'category', folder: category => `platform/categories/${segment(category!)}/icons`, maxBytes: 512 * KB, types: withSvg },
   category_image: { label: 'Category image', realm: 'admin', target: 'category', folder: category => `platform/categories/${segment(category!)}/images`, maxBytes: 5 * MB, types: rasterTypes },
   storefront_image: { label: 'Storefront image', realm: 'admin', folder: () => 'platform/storefront/images', maxBytes: 5 * MB, types: rasterTypes },
+  // udozo.com's home pages: banners, carousel slides and category tile photos.
+  home_image: { label: 'Home page image', realm: 'admin', folder: () => 'platform/home/images', maxBytes: 5 * MB, types: rasterTypes },
   store_logo: { label: 'Store logo', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/logos`, maxBytes: 1 * MB, types: rasterTypes },
   store_image: { label: 'Store image', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/images`, maxBytes: 5 * MB, types: rasterTypes },
   bot_avatar: { label: 'Assistant avatar', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/bots/avatars`, maxBytes: 1 * MB, types: rasterTypes },

@@ -19,6 +19,8 @@ export type MediaPurpose =
   | 'category_icon'
   | 'category_image'
   | 'storefront_image'
+  /** Udozo's admins: the home pages' banners, slides and category tile photos. */
+  | 'home_image'
   | 'store_logo'
   | 'store_image'
   | 'bot_avatar'

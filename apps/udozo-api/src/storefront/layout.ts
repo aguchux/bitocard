@@ -51,25 +51,25 @@ export const categorySynonyms: Record<ProductCategory, string[]> = {
 const categories = Object.keys(categoryLabels) as [ProductCategory, ...ProductCategory[]];
 
 /** A link: a path on the storefront, or an HTTPS address. */
-const href = z
+export const href = z
   .string()
   .trim()
   .max(500)
   .refine(value => value.startsWith('/') ? !value.startsWith('//') : /^https:\/\/[^\s]+$/.test(value), 'Use a path such as /catalogs/esim or an https:// address.');
-const imageUrl = z.string().trim().max(1000).regex(/^https:\/\/[^\s]+$/, 'Use an https:// image address.');
-const text = (max: number) => z.string().trim().max(max);
+export const imageUrl = z.string().trim().max(1000).regex(/^https:\/\/[^\s]+$/, 'Use an https:// image address.');
+export const text = (max: number) => z.string().trim().max(max);
 
 /**
  * Where a section sits on the grid: desktop has 12 columns, tablet 6, phones 1 (every section full width, in order).
  * `rows: 2` lets a tall section (a product rail) sit beside two stacked short ones (promos), as the grid packs densely.
  */
-const span = z.object({
+export const span = z.object({
   lg: z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(8), z.literal(9), z.literal(12)]),
   md: z.union([z.literal(3), z.literal(6)]),
   rows: z.union([z.literal(1), z.literal(2)]).default(1),
 });
 
-const base = {
+export const base = {
   id: z.string().trim().min(1).max(60),
   span,
   /** Kept in the layout but not shown. */
@@ -152,7 +152,7 @@ const promo = z.object({
 
 export const sectionIcons = ['lock', 'bolt', 'card', 'globe', 'shield', 'support', 'gift', 'phone', 'coin', 'chart', 'clock', 'star'] as const;
 
-const trustBar = z.object({
+export const trustBar = z.object({
   ...base,
   type: z.literal('trust_bar'),
   items: z

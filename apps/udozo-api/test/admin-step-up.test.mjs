@@ -45,6 +45,7 @@ const protectedRoutes = [
   ['put', '/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 100 }],
   ['put', '/v1/admin/classifieds/resale-settings/NG', { reseller_fee_bps: 100 }],
   ['post', '/v1/admin/theme/publish', {}],
+  ['post', '/v1/admin/classifieds/home/NG/publish', {}],
   ['put', '/v1/admin/setup-fees/NG', { enabled: false, amount: 0 }],
   ['delete', '/v1/admin/setup-fees/NG'],
   ['post', `/v1/admin/classifieds/orders/${randomId}/payout-review`, { decision: 'approve', note: 'ok' }],

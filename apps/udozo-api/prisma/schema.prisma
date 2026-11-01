@@ -2428,6 +2428,8 @@ model Brand {
 
 /// A storefront page laid out by admins (the home page first): a draft they edit and the published version visitors
 /// see. Sections are validated JSON (`src/storefront/layout.ts`). Unpublished means the site shows its coming-soon page.
+/// Udozo's home pages (keys `home:global` and `home:<CC>`) keep `{ layout, sections }` in `draft`, `published` and each
+/// version's `sections` instead (`src/classifieds/home/`), so restoring a version brings its layout back.
 model StorefrontPage {
   key           String                  @id
   draft         Json
@@ -4545,9 +4547,13 @@ model ClassifiedListing {
   resaleListings ResaleListing[]
   resaleDeals  ResaleDeal[]
 
+  sponsoredPlacements ClassifiedSponsoredPlacement[]
+  viewDays            ClassifiedListingViewDay[]
+
   @@index([customerId, status])
   @@index([country, status, stateId, areaId])
   @@index([categoryId, status])
+  @@index([country, status, publishedAt])
   @@index([status, expiresAt])
   @@map("classified_listings")
 }
@@ -4606,6 +4612,7 @@ model ClassifiedPriceHistory {
   listing    ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId, from])
+  @@index([from])
   @@map("classified_price_history")
 }
 
@@ -4731,7 +4738,7 @@ model ClassifiedFavourite {
 
   @@id([customerId, listingId])
   @@index([customerId, createdAt])
-  @@index([listingId])
+  @@index([listingId, createdAt])
   @@map("classified_favourites")
 }
 
@@ -5099,6 +5106,7 @@ model ClassifiedOrder {
   @@index([sellerId, createdAt])
   @@index([listingId, status])
   @@index([status, updatedAt])
+  @@index([country, status, releasedAt])
   @@index([sellerId, payoutReview])
   @@map("classified_orders")
 }
@@ -5776,4 +5784,40 @@ model MarketingActivity {
 
   @@index([prospectId, createdAt])
   @@map("marketing_activities")
+}
+
+/// A listing Udozo's team placed on a home page (admin-placed; no seller pays yet): shown in the page's Sponsored
+/// rail, always labelled Sponsored, while live between `startsAt` and `endsAt` and not ended early (`endedAt`).
+model ClassifiedSponsoredPlacement {
+  id          String            @id @default(uuid()) @db.Uuid
+  listingId   String            @map("listing_id") @db.Uuid
+  /// The country whose home page shows it; null: the page across countries.
+  country     String?           @db.Char(2)
+  /// Lower first.
+  position    Int               @default(0)
+  startsAt    DateTime          @map("starts_at")
+  endsAt      DateTime          @map("ends_at")
+  endedAt     DateTime?         @map("ended_at")
+  note        String?
+  createdById String?           @map("created_by_id") @db.Uuid
+  updatedById String?           @map("updated_by_id") @db.Uuid
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  listing     ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([country, startsAt])
+  @@index([listingId])
+  @@map("classified_sponsored_placements")
+}
+
+/// A listing's page views on one UTC day (trending ranks by recent views); the listing's `views` keeps the total.
+model ClassifiedListingViewDay {
+  listingId String            @map("listing_id") @db.Uuid
+  day       DateTime          @db.Date
+  views     Int               @default(0)
+  listing   ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, day])
+  @@index([day])
+  @@map("classified_listing_view_days")
 }
