@@ -1,14 +1,11 @@
 """
-Udozo's mark (docs/UDOZO_SPINOFF_PLAN.md, step 4), drawn from the owner's sketch (1 November 2026): a bold navy "u"
-whose right stem rises to the top, a pink bar laid across the top of the left stem (reaching out past it on the left and
-most of the way over the opening), and two pink wheels sunk into the bottom of the "u", one at each lower corner. The
-bar and the wheels share the pink. Replace assets/udozo/drafts/mark-placeholder.png with the designer's master when it
-comes (keeping a navy and a pink, which scripts/brand-assets.py reads from the artwork) and run
-python scripts/brand-assets.py.
+Udozo's placeholder mark (docs/UDOZO_SPINOFF_PLAN.md, step 4): a shopping cart whose basket is a bold lowercase "u", in
+navy, with its handle reaching out from the top of the left stem and two pink wheels below, in the default theme's navy
+and pink, until the brand's real artwork arrives. Replace assets/udozo/drafts/mark-placeholder.png with the master
+(keeping a navy and a pink, which scripts/brand-assets.py reads from the artwork) and run python scripts/brand-assets.py.
 Run from the repository root:
 python scripts/udozo-mark-draft.py
 """
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -21,39 +18,38 @@ SIZE = 1024
 
 
 def P(v):
-    return round(v * K)
+    return v * K
 
 
 def main():
     im = Image.new("RGBA", (P(SIZE), P(SIZE)), CLEAR)
     draw = ImageDraw.Draw(im)
 
-    # The "u": two stems joined by a half ring.
-    stem = 140
-    left, right = 230, 890
-    top = 190
-    radius = (right - left) / 2
-    centre_x = (left + right) / 2
-    centre_y = 470
+    # The basket: a "u" (two stems joined by a half ring), slightly wider at the top as a cart's basket is.
+    stem = 150
+    left, right = 250, 890
+    top, bottom = 230, 760
+    radius = (right - left) // 2
+    centre_y = bottom - radius
+    draw.ellipse([P(left), P(centre_y - radius), P(right), P(bottom)], fill=NAVY)
     inner = radius - stem
-    draw.ellipse([P(left), P(centre_y - radius), P(right), P(centre_y + radius)], fill=NAVY)
     draw.ellipse([P(left + stem), P(centre_y - inner), P(right - stem), P(centre_y + inner)], fill=CLEAR)
     draw.rectangle([P(left), P(centre_y - radius), P(right), P(centre_y)], fill=CLEAR)
     draw.rectangle([P(left), P(top), P(left + stem), P(centre_y)], fill=NAVY)
     draw.rectangle([P(right - stem), P(top), P(right), P(centre_y)], fill=NAVY)
 
-    # The bar: across the top of the left stem, past it on the left and well over the opening, level with the right stem's top.
-    bar_height = 112
-    bar_left, bar_right = 140, 640
-    draw.rounded_rectangle([P(bar_left), P(top), P(bar_right), P(top + bar_height)], radius=P(22), fill=PINK)
+    # The handle: from the top of the left stem out to the left, rounded at its end.
+    handle = 120
+    reach = 120
+    draw.rectangle([P(reach + handle // 2), P(top), P(left + stem), P(top + handle)], fill=NAVY)
+    draw.ellipse([P(reach), P(top), P(reach + handle), P(top + handle)], fill=NAVY)
 
-    # The wheels: centred on the outside of the bottom curve at each lower corner, so half of each sinks into the "u".
-    wheel = 96
-    for side in (-1, 1):
-        angle = math.radians(42)
-        cx = centre_x + side * radius * math.sin(angle)
-        cy = centre_y + radius * math.cos(angle)
-        draw.ellipse([P(cx - wheel), P(cy - wheel), P(cx + wheel), P(cy + wheel)], fill=PINK)
+    # The wheels: two pink discs under the basket, clear of it.
+    wheel = 66
+    gap = 34
+    wheel_y = bottom + gap + wheel
+    for cx in (left + stem // 2 + 30, right - stem // 2 - 30):
+        draw.ellipse([P(cx - wheel), P(wheel_y - wheel), P(cx + wheel), P(wheel_y + wheel)], fill=PINK)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     im.resize((SIZE, SIZE), Image.LANCZOS).save(OUT, optimize=True)
