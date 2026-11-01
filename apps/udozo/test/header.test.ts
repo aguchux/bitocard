@@ -119,7 +119,8 @@ describe("the header's search", () => {
   it("without a country the bar's other half goes to a market: the customer's own, else choosing one", () => {
     const own = renderToStaticMarkup(createElement(SearchBlend, { ...props, country: null, prefix: "/c/", allHref: "/", place: null, continueTo: { country: "NG", name: "Nigeria" } }));
     expect(own).not.toContain('role="search"');
-    expect(own).toMatch(/aria-label="Categories"[\s\S]*<\/dialog><a class="[^"]*flex-1[^"]*" href="\/ng">.*Continue to Nigeria/);
+    // Going on chooses that country (remembered for the home page), as the country menu does.
+    expect(own).toMatch(/aria-label="Categories"[\s\S]*<\/dialog><a href="\/market\/ng" rel="nofollow" class="[^"]*flex-1[^"]*">.*Continue to Nigeria/);
     const none = renderToStaticMarkup(createElement(SearchBlend, { ...props, country: null, prefix: "/c/", allHref: "/", place: null }));
     // It opens the header's country menu (the link's target without script).
     expect(none).toContain('href="#country-menu"');
@@ -146,17 +147,18 @@ describe("the country menu", () => {
     expect(menu).toBeLessThan(html.indexOf('aria-label="Account: Ngozi Okafor"'));
     expect(html).toContain('aria-label="Country: Nigeria. Change"');
     const list = html.slice(html.indexOf('<nav aria-label="Countries"'));
-    expect(list).toMatch(/<a aria-current="page" class="[^"]*" href="\/ng">/);
-    expect(list).toContain('href="/gh"');
+    // Each choice goes through /market/<choice>, which remembers it.
+    expect(list).toMatch(/<a href="\/market\/ng" rel="nofollow" aria-current="page" class="[^"]*">/);
+    expect(list).toContain('href="/market/gh"');
     expect(list).toContain("1,200 listings");
     expect(list).toContain("1 listing<");
-    expect(list).toMatch(/href="\/">.*All countries/);
+    expect(list).toMatch(/href="\/market\/all"[^>]*>.*All countries/);
   });
 
   it("on the global page it is the globe, with All countries current", () => {
     const html = renderToStaticMarkup(createElement(HeaderBar, { market: null, customer: null, showcase: true, categories, countries }));
     expect(html).toContain('aria-label="Choose your country"');
-    expect(html).toMatch(/aria-current="page" class="[^"]*" href="\/">/);
+    expect(html).toMatch(/<a href="\/market\/all" rel="nofollow" aria-current="page"/);
   });
 
   it("with one market open there is nothing to switch to: just its flag", () => {

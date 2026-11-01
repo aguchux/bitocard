@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ArrowRight, ChevronDown, Globe2, MapPin } from "lucide-react";
 import { CategoryMenu, type MenuCategory } from "./category-menu";
+import { chooseMarketHref } from "@/lib/market-choice";
 import { countryMenuId, openCountryMenu } from "./country-menu";
 import { Flag } from "./flag";
 import { SearchBar } from "./search-bar";
@@ -29,11 +30,12 @@ export function SearchBlend({ country, categories, prefix, allHref, place, conti
       <div className={bar}>
         {menu}
         {continueTo ? (
-          <Link href={`/${continueTo.country.toLowerCase()}`} className={half}>
+          // Going on to their country chooses it, as the country menu does (remembered for the home page).
+          <a href={chooseMarketHref(continueTo.country)} rel="nofollow" className={half}>
             <Flag country={continueTo.country} />
             <span className="truncate">Continue to {continueTo.name}</span>
             <ArrowRight className="ml-auto size-5 shrink-0" aria-hidden="true" />
-          </Link>
+          </a>
         ) : (
           <a
             href={`#${countryMenuId}`}

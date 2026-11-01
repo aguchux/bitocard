@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { BadgeCheck, ImageIcon, Play, Truck } from "lucide-react";
 import { conditionLabels, listingPath, postedAgo, shopPriceText, type ShopListingCard, type ShopResult, type ShopShowcaseCard } from "@bitocard/api-client/classifieds";
+import { Flag } from "./flag";
 
 type Card = ShopListingCard | ShopShowcaseCard;
 
@@ -30,7 +31,20 @@ function Cover({ card, className }: { card: Card; className: string }) {
 
 const place = (card: Card) => `${card.area.name}, ${card.area.state.name}`;
 
-/** A listing in a grid: photo, price (country pages only), title, place and when. */
+const regions = new Intl.DisplayNames(["en-GB"], { type: "region" });
+/** A country's name in English ("Nigeria"), else its code. */
+export function countryName(code: string) {
+  try {
+    return regions.of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * A listing in a grid: photo, price (country pages only), title, place and when. Across countries (the showcase, with no
+ * price) the place says its country too, with its flag: "Ikeja, Nigeria".
+ */
 export function ListingTile({ card, now }: { card: Card; now?: number }) {
   return (
     <Link href={listingPath(card.country, card.ref, card.slug)} className="flex flex-col overflow-hidden rounded-2xl border border-navy-200 bg-white text-navy-900 hover:border-navy-400">
@@ -38,9 +52,21 @@ export function ListingTile({ card, now }: { card: Card; now?: number }) {
       <span className="flex min-w-0 flex-col gap-0.5 p-2.5 pb-3">
         {hasPrice(card) ? <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong> : null}
         <span className="line-clamp-2 text-[13px] leading-snug font-medium">{card.title}</span>
-        <span className="truncate text-xs text-navy-600">
-          {card.area.name} · {postedAgo(card.published_at, now)}
-        </span>
+        {hasPrice(card) ? (
+          <span className="truncate text-xs text-navy-600">
+            {card.area.name} · {postedAgo(card.published_at, now)}
+          </span>
+        ) : (
+          <>
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-navy-600">
+              <Flag country={card.country} className="h-3 w-4.5" />
+              {/* A long area shortens first, so the country always shows. */}
+              <span className="truncate">{card.area.name},</span>
+              <span className="-ml-1 shrink-0">{countryName(card.country)}</span>
+            </span>
+            <span className="text-xs text-navy-500">{postedAgo(card.published_at, now)}</span>
+          </>
+        )}
       </span>
     </Link>
   );

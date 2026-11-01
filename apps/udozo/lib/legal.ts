@@ -755,6 +755,7 @@ const cookies: LegalDocument = {
             rows: [
               ["udz_customer", "udozo.com, and each reseller's store on its own address", "Keeps you signed in. Each site keeps its own.", "30 days"],
               ["udz_assistant", "udozo.com", "Keeps your conversation with the shop assistant when you are not signed in", "30 days"],
+              ["udz_market", "udozo.com", "Remembers the country you chose in the header (or All countries), so udozo.com opens it next time. Set only when you choose", "12 months"],
               ["udz_google", "udozo.com", "Checks that a \"Continue with Google\" sign-in is the one this browser started", "10 minutes"],
               ["udz_session", "Seller HQ (shq.udozo.com), shared across udozo.com addresses", "Keeps sellers and their team signed in", "30 days"],
               ["udz_admin_session", "Udozo's admin", "Keeps Udozo's team signed in", "12 hours"],

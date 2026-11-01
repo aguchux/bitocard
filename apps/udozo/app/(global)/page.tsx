@@ -5,6 +5,8 @@ import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
 import { JsonLd } from "@/components/json-ld";
 import { siteOrigin } from "@/lib/customer";
+import { chosenOpenMarket } from "@/lib/market-choice";
+import { currentMarketChoice } from "@/lib/market-choice-server";
 import { organizationJsonLd, regionalAlternates, websiteJsonLd } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,12 +19,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The global showcase, from the second country: recent and trending listings across the countries, never a price (the
- * categories and the countries are in the header's menus). With one country open, its market is the home page. Nothing
- * is chosen by cookie or address: a signed-in customer only sees "Continue to <their country>", in the header's bar.
+ * The home page. A shopper who chose a country in the header's menu (remembered in `udz_market`) goes straight to that
+ * country's market, so they need not choose it again. Otherwise (All countries chosen, or nothing yet, as for search
+ * engines) the global showcase, from the second country: recent and trending listings across the countries, never a
+ * price, each saying its area and country. With one country open, its market is the home page.
  */
 export default async function GlobalHome() {
-  const all = await markets();
+  const [all, choice] = await Promise.all([markets(), currentMarketChoice()]);
+  const chosen = chosenOpenMarket(choice, all.data);
+  if (chosen) redirect(`/${chosen.country.toLowerCase()}`);
   if (!all.showcase) {
     if (all.data.length === 1) redirect(`/${all.data[0]!.country.toLowerCase()}`);
     return (

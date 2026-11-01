@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { Check, ChevronDown, Globe2 } from "lucide-react";
+import { chooseMarketHref } from "@/lib/market-choice";
 import { Dropdown } from "./dropdown";
 import { Flag } from "./flag";
 
@@ -24,7 +24,8 @@ const listingCount = (count: number) => `${count.toLocaleString("en-GB")} ${coun
 /**
  * The header's country switch: the flag (the code from tablets, the name from desktops) opening a dropdown of the open
  * markets, the current one ticked, then All countries. It closes on choosing, on Escape and on a click outside
- * (`Dropdown`), since the header stays across pages.
+ * (`Dropdown`), since the header stays across pages. Choosing is remembered (`/market/<choice>`, `udz_market`), so the
+ * home page opens the chosen country, or every country, next time: plain links, never prefetched, so only a choice sets it.
  */
 export function CountryMenu({ current, countries }: { current: { country: string; name: string } | null; countries: MenuCountry[] }) {
   const row = "flex min-h-12 items-center gap-3 rounded-xl px-3 font-semibold hover:bg-navy-50";
@@ -51,21 +52,21 @@ export function CountryMenu({ current, countries }: { current: { country: string
         {countries.map(market => {
           const here = market.country === current?.country;
           return (
-            <Link key={market.country} href={`/${market.country.toLowerCase()}`} aria-current={here ? "page" : undefined} className={`${row} ${here ? "bg-navy-50" : ""}`}>
+            <a key={market.country} href={chooseMarketHref(market.country)} rel="nofollow" aria-current={here ? "page" : undefined} className={`${row} ${here ? "bg-navy-50" : ""}`}>
               <Flag country={market.country} className="h-5 w-7.5" />
               <span className="grid min-w-0 flex-1">
                 <span className="truncate">{market.name}</span>
                 <span className="text-xs font-medium text-navy-500">{listingCount(market.listings)}</span>
               </span>
               {here ? <Check className="size-5 text-brand-700" aria-hidden="true" /> : null}
-            </Link>
+            </a>
           );
         })}
-        <Link href="/" aria-current={current ? undefined : "page"} className={`${row} mt-1 border-t border-navy-100 pt-1`}>
+        <a href={chooseMarketHref(null)} rel="nofollow" aria-current={current ? undefined : "page"} className={`${row} mt-1 border-t border-navy-100 pt-1`}>
           <Globe2 className="size-5 text-navy-600" aria-hidden="true" />
           <span className="flex-1">All countries</span>
           {current ? null : <Check className="size-5 text-brand-700" aria-hidden="true" />}
-        </Link>
+        </a>
       </nav>
     </Dropdown>
   );
