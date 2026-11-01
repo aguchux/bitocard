@@ -19,6 +19,8 @@ export type CallDeps = {
 };
 
 type CallWithIce = ShopCall & { ice_servers: ShopIceServer[] };
+/** Who to call: the seller of a listing, or the other side of a chat. */
+export type CallTarget = { listing_id: string } | { conversation_id: string };
 type Polled = ShopCall & { signals: ShopCallSignal[] };
 
 const idle: CallView = { phase: "idle", call: null, message: null, muted: false, connectedAt: null };
@@ -74,13 +76,13 @@ export class CallEngine {
     return this.view.phase !== "idle" && this.view.phase !== "ended";
   }
 
-  /** The buyer calls the seller of a listing. */
-  async call(listingId: string) {
+  /** Calls the seller of a listing, or the other side of a chat. */
+  async call(target: CallTarget) {
     if (this.busy) return;
     this.reset();
     this.set({ ...idle, phase: "starting" });
     if (!(await this.takeMicrophone())) return;
-    const started = await this.deps.api<CallWithIce>("POST", "start", { listing_id: listingId });
+    const started = await this.deps.api<CallWithIce>("POST", "start", target);
     if (!started.ok) return this.finish(started.message);
     this.ice = started.data.ice_servers;
     this.set({ ...this.view, phase: "ringing", call: started.data });

@@ -43,7 +43,7 @@ export function statusText(view: CallView, now: number) {
 }
 
 /**
- * The call, in a panel over the page (bottom right on desktops, across the bottom on phones) that stays while the
+ * The call, in a panel over the page (top centre on desktops, across the top on phones, clear of the chats) that stays while the
  * person browses: who it is with (their public name only), the listing, the state or the time, and Answer and Decline,
  * or Mute and End. Nobody's number is ever shown.
  */
@@ -61,7 +61,7 @@ export function CallPanel({ view, onAnswer, onHangUp, onMute, onClose }: { view:
     <section
       role="dialog"
       aria-label={view.phase === "incoming" ? `Incoming call from ${name}` : `Call with ${name}`}
-      className="fixed inset-x-3 bottom-3 z-50 grid gap-4 rounded-3xl bg-navy-900 p-5 text-white shadow-2xl sm:inset-x-auto sm:right-5 sm:bottom-5 sm:w-80"
+      className="fixed inset-x-3 top-3 z-50 grid gap-4 rounded-3xl bg-navy-900 p-5 text-white shadow-2xl sm:inset-x-auto sm:top-5 sm:left-1/2 sm:w-96 sm:-translate-x-1/2"
     >
       <div className="flex items-start gap-3">
         <span className={`grid size-12 shrink-0 place-items-center rounded-full bg-white/15 text-lg font-bold ${view.phase === "incoming" ? "animate-pulse" : ""}`} aria-hidden="true">

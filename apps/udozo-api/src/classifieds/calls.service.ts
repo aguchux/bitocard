@@ -7,10 +7,11 @@ import { IntegrationsService } from '../integrations/integrations.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { ContactRequestsService, listingPath } from './contact.service.js';
 import { publicName } from './search.service.js';
+import { onlineAmong } from './presence.js';
 import { CloudflareTurn, type IceServer } from './turn.js';
 
-/** Someone is online for this long after their last look at udozo.com (pages say so every few seconds). */
-export const onlineMs = 60_000;
+export { onlineMs } from './presence.js';
+
 /** Presence is written at most this often per person. */
 export const presenceWriteMs = 15_000;
 /** A call rings this long before it is missed. */
@@ -32,7 +33,7 @@ const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONF
 const unavailable = () => new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'calls_unavailable', 'Calls are not available just now. Chat with the seller, or ask them to call you back.');
 
 const callInclude = {
-  listing: { select: { id: true, title: true, country: true, ref: true, slug: true } },
+  listing: { select: { id: true, title: true, country: true, ref: true, slug: true, customerId: true } },
   caller: { select: { id: true, name: true, storeId: true } },
   callee: { select: { id: true, name: true, storeId: true } },
 } satisfies Prisma.ClassifiedCallInclude;
@@ -69,8 +70,7 @@ export class CallsService {
 
   /** Whether someone had udozo.com open in the last minute. */
   async online(customerId: string) {
-    const row = await this.prisma.customerPresence.findUnique({ where: { customerId } });
-    return Boolean(row && row.seenAt.getTime() > Date.now() - onlineMs);
+    return (await onlineAmong(this.prisma, [customerId])).has(customerId);
   }
 
   /** A page says the customer is here (written at most every 15 seconds) and hears of a call ringing for them. */
@@ -89,27 +89,51 @@ export class CallsService {
   async start(customer: CustomerWithStore, listingId: string) {
     const listing = await this.contacts.contactable(customer, listingId);
     if (listing.contact === 'chat') throw conflict('calls_not_offered', 'This seller takes messages only: chat with them here.');
+    return this.ring(customer, listing, listing.customerId, {
+      offline: ['seller_offline', 'The seller is not on Udozo right now. Ask them to call you back, or chat with them here.'],
+      busy: ['seller_busy', 'The seller is on another call. Try again in a few minutes, or chat with them here.'],
+    });
+  }
+
+  /**
+   * Either side of a chat calls the other (a seller calling back a buyer too). Never where either blocked the other,
+   * and a buyer never calls a seller who takes messages only.
+   */
+  async startInChat(customer: CustomerWithStore, chatId: string) {
+    const chat = await this.prisma.classifiedConversation.findUnique({ where: { id: chatId }, include: { listing: { select: { id: true, country: true, contact: true, status: true } } } });
+    if (!chat || (chat.buyerId !== customer.id && chat.sellerId !== customer.id)) throw notFound();
+    const buyer = chat.buyerId === customer.id;
+    if (chat.buyerBlockedAt || chat.sellerBlockedAt) throw conflict('conversation_blocked', 'You can no longer call in this chat.');
+    if (buyer && chat.listing.contact === 'chat') throw conflict('calls_not_offered', 'This seller takes messages only: chat with them here.');
+    const other = buyer ? 'seller' : 'buyer';
+    return this.ring(customer, chat.listing, buyer ? chat.sellerId : chat.buyerId, {
+      offline: [`${other}_offline`, `The ${other} is not on Udozo right now. Write to them here instead.`],
+      busy: [`${other}_busy`, `The ${other} is on another call. Try again in a few minutes.`],
+    });
+  }
+
+  private async ring(customer: CustomerWithStore, listing: { id: string; country: string }, calleeId: string, words: { offline: [string, string]; busy: [string, string] }) {
     if (!this.available()) throw unavailable();
-    await this.settle({ OR: [{ callerId: { in: [customer.id, listing.customerId] } }, { calleeId: { in: [customer.id, listing.customerId] } }], status: { in: live } });
-    if (!(await this.online(listing.customerId))) throw conflict('seller_offline', 'The seller is not on Udozo right now. Ask them to call you back, or chat with them here.');
+    await this.settle({ OR: [{ callerId: { in: [customer.id, calleeId] } }, { calleeId: { in: [customer.id, calleeId] } }], status: { in: live } });
+    if (!(await this.online(calleeId))) throw conflict(...words.offline);
     const recent = await this.prisma.classifiedCall.count({ where: { callerId: customer.id, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
     if (recent >= callsPerHour) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'call_limit', `You can make ${callsPerHour} calls an hour. Try again later, or chat with the seller here.`);
     const busy = (id: string) => this.prisma.classifiedCall.findFirst({ where: { status: { in: live }, OR: [{ callerId: id }, { calleeId: id }] }, select: { id: true } });
     if (await busy(customer.id)) throw conflict('call_in_progress', 'You are already in a call. End it first.');
-    if (await busy(listing.customerId)) throw conflict('seller_busy', 'The seller is on another call. Try again in a few minutes, or chat with them here.');
+    if (await busy(calleeId)) throw conflict(...words.busy);
     const iceServers = await this.iceServers();
     let call: CallRow;
     try {
-      call = await this.prisma.classifiedCall.create({ data: { listingId: listing.id, callerId: customer.id, calleeId: listing.customerId, country: listing.country }, include: callInclude });
+      call = await this.prisma.classifiedCall.create({ data: { listingId: listing.id, callerId: customer.id, calleeId, country: listing.country }, include: callInclude });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw conflict('seller_busy', 'The seller is on another call. Try again in a few minutes, or chat with them here.');
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw conflict(...words.busy);
       throw error;
     }
     await this.inbox.customer({ customerId: call.callee.id, storeId: call.callee.storeId }, 'customer.classifieds.call_incoming', {
       subject: call.id,
       title: `${publicName(call.caller.name)} is calling you`,
-      body: `About “${call.listing.title ?? 'your listing'}”. Open Udozo to answer.`,
-      link: '/account/requests',
+      body: `About “${call.listing.title ?? 'a listing'}”. Open Udozo to answer.`,
+      link: call.callee.id === call.listing.customerId ? '/account/requests' : listingPath(call.listing),
     });
     return { ...this.present(call, customer.id), ice_servers: iceServers };
   }
@@ -193,8 +217,8 @@ export class CallsService {
         await this.inbox.customer({ customerId: call.callee.id, storeId: call.callee.storeId }, 'customer.classifieds.call_missed', {
           subject: call.id,
           title: `You missed a call from ${publicName(call.caller.name)}`,
-          body: `About “${call.listing.title ?? 'your listing'}”. Reply in a chat, or stay on Udozo to take their next call.`,
-          link: '/account/requests',
+          body: `About “${call.listing.title ?? 'a listing'}”. Reply in a chat, or stay on Udozo to take their next call.`,
+          link: call.callee.id === call.listing.customerId ? '/account/requests' : '/account/messages',
         });
       }
     }

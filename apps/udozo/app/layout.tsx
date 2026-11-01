@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { InstallSupport } from "@bitocard/ui/install-ui";
 import { installCaptureScript } from "@bitocard/ui/install";
 import { CallProvider } from "@/components/calls/call-provider";
+import { ChatDock } from "@/components/chat-dock";
 import { customerCookie, siteOrigin } from "@/lib/customer";
 import { storeHeader } from "@/lib/store-host";
 import { previewHeader, siteTheme, themeCss } from "@/lib/theme";
@@ -37,7 +38,8 @@ export async function generateViewport(): Promise<Viewport> {
 /**
  * Every page wears Udozo's theme, chosen by its admins (`/v1/theme`): its colours re-point the variables every utility
  * reads. `?theme_preview=<token>` on any address (the admins' preview link; the proxy passes it on) shows the draft.
- * A signed-in customer on udozo.com (never a reseller's store) can call and be called on every page (`CallProvider`).
+ * A signed-in customer on udozo.com (never a reseller's store) can call and be called on every page (`CallProvider`), and
+ * has their chats at hand (`ChatDock`).
  */
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const list = await headers();
@@ -55,7 +57,14 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             Theme preview: what you see is the draft, not yet published.
           </p>
         ) : null}
-        {calls ? <CallProvider>{children}</CallProvider> : children}
+        {calls ? (
+          <CallProvider>
+            {children}
+            <ChatDock />
+          </CallProvider>
+        ) : (
+          children
+        )}
         <InstallSupport />
       </body>
     </html>

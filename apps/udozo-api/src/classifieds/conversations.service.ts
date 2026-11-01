@@ -16,7 +16,9 @@ import { addLead } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
 import { type ReportReason } from './moderation.service.js';
 import { invalid, isOnShop, maxPriceMinor, priceText } from './rules.js';
+import { onlineAmong } from './presence.js';
 import { publicName } from './search.service.js';
+import { callsConfigured } from './turn.js';
 import type { MediaUpload } from './media.service.js';
 
 const minuteMs = 60_000;
@@ -68,6 +70,7 @@ const listingSummary = {
     priceKind: true,
     priceMinor: true,
     customerId: true,
+    contact: true,
     media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { url: true } },
   },
 } satisfies Prisma.ClassifiedListingDefaultArgs;
@@ -117,8 +120,8 @@ export class ConversationsService {
       this.prisma.classifiedConversation.findMany({ where, include: chatInclude, orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }], take: filter.limit ?? 30, skip: filter.offset ?? 0 }),
       this.prisma.classifiedConversation.count({ where }),
     ]);
-    const unread = await this.unreadIn(customer.id, rows.map(row => row.id));
-    return { object: 'list' as const, data: rows.map(row => this.present(row, customer.id, unread.get(row.id) ?? 0)), total };
+    const [unread, online] = await Promise.all([this.unreadIn(customer.id, rows.map(row => row.id)), onlineAmong(this.prisma, rows.map(row => this.otherOf(row, customer.id)))]);
+    return { object: 'list' as const, data: rows.map(row => this.present(row, customer.id, unread.get(row.id) ?? 0, online)), total };
   }
 
   /** How many messages wait unread across the customer's chats (the badge). */
@@ -164,7 +167,8 @@ export class ConversationsService {
       await this.prisma.classifiedConversation.update({ where: { id: chat.id }, data: side === 'buyer' ? { buyerReadAt: new Date() } : { sellerReadAt: new Date() } });
     }
     const unread = page.before ? (await this.unreadIn(customer.id, [chat.id])).get(chat.id) ?? 0 : 0;
-    return { ...this.present(chat, customer.id, unread), messages: messages.map(message => this.presentMessage(message, customer.id)), has_more: hasMore };
+    const online = await onlineAmong(this.prisma, [this.otherOf(chat, customer.id)]);
+    return { ...this.present(chat, customer.id, unread, online), messages: messages.map(message => this.presentMessage(message, customer.id)), has_more: hasMore };
   }
 
   /** A photo sent in the chat, for either side. */
@@ -485,6 +489,10 @@ export class ConversationsService {
     return chat;
   }
 
+  private otherOf(chat: { buyerId: string; sellerId: string }, customerId: string) {
+    return chat.buyerId === customerId ? chat.sellerId : chat.buyerId;
+  }
+
   private sideOf(chat: { buyerId: string; sellerId: string }, customerId: string): Side | null {
     return chat.buyerId === customerId ? 'buyer' : chat.sellerId === customerId ? 'seller' : null;
   }
@@ -572,7 +580,7 @@ export class ConversationsService {
     };
   }
 
-  private present(chat: ChatRow, viewerId: string, unread: number) {
+  private present(chat: ChatRow, viewerId: string, unread: number, online = new Set<string>()) {
     const side = this.sideOf(chat, viewerId)!;
     const them = side === 'buyer' ? chat.seller : chat.buyer;
     const last = chat.messages[0];
@@ -582,7 +590,10 @@ export class ConversationsService {
       id: chat.id,
       role: side,
       listing: this.presentListing(chat.listing),
-      with: { name: publicName(them.name) },
+      // Whether they have Udozo open now, and whether a call can be made from this chat (never where either side
+      // blocked the other; a buyer never calls a seller who takes messages only).
+      with: { name: publicName(them.name), online: online.has(them.id) },
+      can_call: callsConfigured(this.integrations.config) && !chat.buyerBlockedAt && !chat.sellerBlockedAt && (side === 'seller' || chat.listing.contact !== 'chat'),
       last_message: last ? { kind: last.kind, body: last.kind === 'photo' && !last.body ? 'Photo' : last.body.slice(0, 140), from: last.senderId === null ? 'bitocard' : last.senderId === viewerId ? 'me' : 'them', created_at: last.createdAt.toISOString() } : null,
       unread,
       open_offer: offer ? this.presentOffer(offer, viewerId) : null,

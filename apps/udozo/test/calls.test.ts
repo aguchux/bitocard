@@ -21,6 +21,7 @@ describe("the call route", () => {
   test("passes only presence, starting, polling, answering, ending and connection details", () => {
     expect(callRoute("POST", ["presence"], {}, none)).toEqual({ method: "POST", path: "/v1/classifieds/presence" });
     expect(callRoute("POST", ["start"], { listing_id: id }, none)).toEqual({ method: "POST", path: `/v1/classifieds/listings/${id}/calls`, body: {} });
+    expect(callRoute("POST", ["start"], { conversation_id: id }, none)).toEqual({ method: "POST", path: `/v1/classifieds/conversations/${id}/calls`, body: {} });
     expect(callRoute("GET", [id], {}, new URLSearchParams("after=42"))).toEqual({ method: "GET", path: `/v1/classifieds/calls/${id}?after=42` });
     expect(callRoute("POST", [id, "answer"], {}, none)?.path).toBe(`/v1/classifieds/calls/${id}/answer`);
     expect(callRoute("POST", [id, "end"], {}, none)?.path).toBe(`/v1/classifieds/calls/${id}/end`);
@@ -120,7 +121,7 @@ describe("the call engine", () => {
       if (method === "GET") return { ...call({ status: status as ShopCall["status"] }), signals };
       return { object: "ok" };
     });
-    await engine.call(id);
+    await engine.call({ listing_id: id });
     expect(engine.current.phase).toBe("ringing");
     expect(sent[0]).toEqual({ method: "POST", path: "start", body: { listing_id: id } });
     await tick();
@@ -178,11 +179,11 @@ describe("the call engine", () => {
 
   test("a refusal, a missed call or no microphone end it with words for the side reading", async () => {
     const offline = harness(() => new Error("The seller is not on Udozo right now."));
-    await offline.engine.call(id);
+    await offline.engine.call({ listing_id: id });
     expect(offline.engine.current).toMatchObject({ phase: "ended", message: "The seller is not on Udozo right now." });
 
     const missed = harness((method, path) => (path === "start" ? { ...call(), ice_servers: relay } : { ...call({ status: "missed" }), signals: [] }));
-    await missed.engine.call(id);
+    await missed.engine.call({ conversation_id: id });
     await missed.tick();
     expect(missed.engine.current.message).toBe("No answer. Ask them to call you back, or chat with them.");
 
@@ -190,7 +191,7 @@ describe("the call engine", () => {
     (deaf.engine as unknown as { deps: CallDeps }).deps.microphone = async () => {
       throw new Error("NotAllowedError");
     };
-    await deaf.engine.call(id);
+    await deaf.engine.call({ listing_id: id });
     expect(deaf.engine.current.message).toMatch(/microphone/);
     expect(deaf.sent).toHaveLength(0);
   });

@@ -2,11 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ShopPresence } from "@bitocard/api-client/classifieds";
-import { type ApiAnswer, CallEngine, type CallView } from "@/lib/call-engine";
+import { type ApiAnswer, CallEngine, type CallTarget, type CallView } from "@/lib/call-engine";
 import { CallPanel } from "./call-panel";
 import { useRinger } from "./ringer";
 
-type Calls = { available: boolean; busy: boolean; start: (listingId: string) => void };
+type Calls = { available: boolean; busy: boolean; start: (target: CallTarget) => void };
 
 const CallsContext = createContext<Calls | null>(null);
 
@@ -86,7 +86,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   useRinger(view.phase === "incoming" ? "incoming" : view.phase === "ringing" ? "ringback" : null);
 
-  const start = useCallback((listingId: string) => void engine.current?.call(listingId), []);
+  const start = useCallback((target: CallTarget) => void engine.current?.call(target), []);
   const busy = view.phase !== "idle" && view.phase !== "ended";
   const value = useMemo(() => ({ available, busy, start }), [available, busy, start]);
 

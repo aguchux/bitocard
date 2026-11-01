@@ -236,11 +236,14 @@ export type ShopConversation = {
   id: string;
   role: 'buyer' | 'seller';
   listing: { id: string; ref: number; title: string | null; slug: string | null; status: string; country: string; price: ShopPrice; cover_url: string | null };
-  with: { name: string };
+  /** Their public name, and (Udozo) whether they have Udozo open now. */
+  with: { name: string; online?: boolean };
   last_message: { kind: string; body: string; from: 'me' | 'them' | 'bitocard'; created_at: string } | null;
   unread: number;
   open_offer: ShopOffer | null;
   blocked: { by_me: boolean; by_them: boolean };
+  /** Udozo: whether a call can be made from this chat (calls set up, nobody blocked, never a buyer to a messages-only seller). */
+  can_call?: boolean;
   last_message_at: string;
   created_at: string;
 };

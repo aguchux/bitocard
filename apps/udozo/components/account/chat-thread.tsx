@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- chat photos are private: read through this site with the customer's session. */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Camera, EllipsisVertical, LoaderCircle, Send, X } from "lucide-react";
 import { reportReasonLabels, shopMoney, type ShopChat, type ShopMessage, type ShopReportReason } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
@@ -28,9 +28,11 @@ function hoursLeft(iso: string) {
 /**
  * A chat about a listing in the seller's account (the design canvas's Chat board): Udozo's safety note first, messages and
  * photos, offers with their answers, and a menu to block or report the other person. New messages are fetched every
- * few seconds while the page is open and visible.
+ * few seconds while the page is open and visible. `fill`: the thread fills its box (a tab of the chat dock), the
+ * messages scrolling between the menu and the box to write in.
  */
-export function ChatThread({ initial, buy, assistant = null }: { initial: ShopChat; buy: { path: string } | null; assistant?: { name: string } | null }) {
+export function ChatThread({ initial, buy, assistant = null, fill = false }: { initial: ShopChat; buy: { path: string } | null; assistant?: { name: string } | null; fill?: boolean }) {
+  const messageId = useId();
   const [chat, setChat] = useState(initial);
   const [messages, setMessages] = useState(initial.messages);
   const [body, setBody] = useState("");
@@ -142,7 +144,7 @@ export function ChatThread({ initial, buy, assistant = null }: { initial: ShopCh
   };
 
   return (
-    <section aria-label={`Chat with ${chat.with.name}`} className="grid gap-3">
+    <section aria-label={`Chat with ${chat.with.name}`} className={fill ? "flex h-full min-h-0 flex-col gap-2" : "grid gap-3"}>
       <div ref={more} className="relative flex justify-end">
         <button type="button" aria-label="More: report, block" aria-expanded={menu} onClick={() => setMenu(!menu)} className="grid size-10 place-items-center rounded-full hover:bg-slate-100">
           <EllipsisVertical className="size-5" aria-hidden="true" />
@@ -200,8 +202,8 @@ export function ChatThread({ initial, buy, assistant = null }: { initial: ShopCh
         </div>
       ) : null}
 
-      <div className="grid gap-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
-        <ol ref={list} aria-live="polite" className="grid max-h-[60svh] min-h-64 content-start gap-2 overflow-y-auto pr-1">
+      <div className={fill ? "flex min-h-0 flex-1 flex-col gap-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70" : "grid gap-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70"}>
+        <ol ref={list} aria-live="polite" className={fill ? "grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1" : "grid max-h-[60svh] min-h-64 content-start gap-2 overflow-y-auto pr-1"}>
           {messages.map(message => (
             <li key={message.id} className={message.from === "me" ? "justify-self-end" : message.from === "bitocard" ? "justify-self-center" : "justify-self-start"}>
               {message.kind === "offer" && message.offer ? (
@@ -274,11 +276,11 @@ export function ChatThread({ initial, buy, assistant = null }: { initial: ShopCh
                 Offer
               </button>
             ) : null}
-            <label className="sr-only" htmlFor="chat-message">
+            <label className="sr-only" htmlFor={messageId}>
               Message
             </label>
             <textarea
-              id="chat-message"
+              id={messageId}
               value={body}
               onChange={event => setBody(event.target.value)}
               onKeyDown={event => {

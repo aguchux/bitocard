@@ -228,7 +228,7 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref, 
                 signedIn={signedIn}
                 label="Call seller"
                 icon={callIcon}
-                onClick={() => calls?.start(listing.id)}
+                onClick={() => calls?.start({ listing_id: listing.id })}
                 reason="call"
                 disabled={signedIn && (!online || Boolean(calls?.busy))}
                 title={online ? "A private call on Udozo: no numbers shared" : "The seller is not on Udozo right now"}

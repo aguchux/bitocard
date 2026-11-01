@@ -263,6 +263,41 @@ describe('calls', () => {
     assert.deepEqual((await seller.get('/v1/classifieds/me/calls')).json.data.map(row => [row.role, row.status]), [['callee', 'ended']]);
   });
 
+  test('a chat says who is online and whether a call can be made; either side calls the other from it', async () => {
+    const seller = await customer('Ngozi Eze', { phone: '+2348031120008' });
+    const buyer = await customer('Kola Ade');
+    const tv = await live(seller, 'TCL 43 inch TV');
+    const speaker = await live(seller, 'TCL speaker', { contact: 'chat' });
+    const chat = (await buyer.post('/v1/classifieds/conversations', { listing_id: tv.id, body: 'Still there?' })).json;
+    const quiet = (await buyer.post('/v1/classifieds/conversations', { listing_id: speaker.id, body: 'Still there?' })).json;
+
+    const before = (await buyer.get('/v1/classifieds/conversations')).json.data.find(row => row.id === chat.id);
+    assert.deepEqual([before.with.online, before.can_call], [false, true]);
+    await seller.post('/v1/classifieds/presence');
+    const listed = (await buyer.get('/v1/classifieds/conversations')).json.data;
+    assert.equal(listed.find(row => row.id === chat.id).with.online, true);
+    assert.equal(listed.find(row => row.id === quiet.id).can_call, false, 'a buyer never calls a seller who takes messages only');
+    assert.equal((await seller.get(`/v1/classifieds/conversations/${quiet.id}`)).json.can_call, true, 'the seller may call them back');
+    assert.equal((await buyer.post(`/v1/classifieds/conversations/${quiet.id}/calls`)).json.error.code, 'calls_not_offered');
+
+    const offline = await seller.post(`/v1/classifieds/conversations/${quiet.id}/calls`);
+    assert.deepEqual([offline.status, offline.json.error.code], [409, 'buyer_offline']);
+    await buyer.post('/v1/classifieds/presence');
+    const back = await seller.post(`/v1/classifieds/conversations/${quiet.id}/calls`);
+    assert.equal(back.status, 201, JSON.stringify(back.json));
+    assert.deepEqual([back.json.role, back.json.with.name], ['caller', 'Kola A.']);
+    const ringing = (await buyer.post('/v1/classifieds/presence')).json.incoming;
+    assert.deepEqual([ringing.id, ringing.role, ringing.with.name], [back.json.id, 'callee', 'Ngozi E.']);
+    const notice = await prisma.notification.findFirstOrThrow({ where: { customerId: buyer.id, type: 'customer.classifieds.call_incoming' } });
+    assert.match(notice.link, /^\/ng\/l\//, "the buyer's notice opens the listing");
+    await buyer.post(`/v1/classifieds/calls/${back.json.id}/end`);
+
+    assert.equal((await (await customer('Ife Obi')).post(`/v1/classifieds/conversations/${chat.id}/calls`)).status, 404, 'only the two sides');
+    await seller.post(`/v1/classifieds/conversations/${chat.id}/block`);
+    assert.equal((await buyer.post(`/v1/classifieds/conversations/${chat.id}/calls`)).json.error.code, 'conversation_blocked');
+    assert.equal((await buyer.get(`/v1/classifieds/conversations/${chat.id}`)).json.can_call, false);
+  });
+
   test('unanswered calls are missed (the seller told once), declined or cancelled; a quiet side ends a call', async () => {
     const seller = await customer('Sade Ojo', { phone: '+2348031120007' });
     const buyer = await customer('Uche Eze');

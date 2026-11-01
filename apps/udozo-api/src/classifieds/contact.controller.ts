@@ -109,6 +109,12 @@ export class ClassifiedContactController {
     return this.calls.start(caller.customer, id);
   }
 
+  /** Either side of a chat calls the other (both on udozo.com now). */
+  @Post('conversations/:id/calls')
+  startChatCall(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.calls.startInChat(caller.customer, id);
+  }
+
   @Get('me/calls')
   recentCalls(@CurrentCustomer() caller: CustomerCaller) {
     return this.calls.recent(caller.customer);

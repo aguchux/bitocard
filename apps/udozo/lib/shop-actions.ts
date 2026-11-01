@@ -5,6 +5,7 @@ import type {
   ShopChat,
   ShopContact,
   ShopCondition,
+  ShopConversation,
   ShopDelivery,
   ShopDispute,
   ShopDisputeMessage,
@@ -186,6 +187,11 @@ export async function suggestFeature(name: string, categoryId: string | null): P
 }
 
 // ---- Chats ----
+
+/** The customer's latest chats, buying and selling, with what is unread and who is online (the chat dock on every page). */
+export async function listChats(): Promise<ShopResult<{ data: ShopConversation[]; total: number }>> {
+  return answer(await customerApi<{ data: ShopConversation[]; total: number }>("GET", "/v1/classifieds/conversations?limit=20"));
+}
 
 export async function loadChat(chatId: string, after?: string): Promise<ShopResult<ShopChat>> {
   if (!id(chatId) || (after && !id(after))) return refused("No such chat.");

@@ -1,5 +1,8 @@
 import { ProviderError } from '../payments/provider-error.js';
 
+/** Whether calls can be made: the TURN key and its token are set. */
+export const callsConfigured = (config: { CLOUDFLARE_TURN_KEY_ID?: string; CLOUDFLARE_TURN_API_TOKEN?: string }) => Boolean(config.CLOUDFLARE_TURN_KEY_ID?.trim() && config.CLOUDFLARE_TURN_API_TOKEN?.trim());
+
 /** One entry of an RTCPeerConnection's `iceServers`. */
 export type IceServer = { urls: string[]; username?: string; credential?: string };
 
