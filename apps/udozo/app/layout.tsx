@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { InstallSupport } from "@bitocard/ui/install-ui";
 import { installCaptureScript } from "@bitocard/ui/install";
-import { siteOrigin } from "@/lib/customer";
+import { CallProvider } from "@/components/calls/call-provider";
+import { customerCookie, siteOrigin } from "@/lib/customer";
+import { storeHeader } from "@/lib/store-host";
 import { previewHeader, siteTheme, themeCss } from "@/lib/theme";
 import "./globals.css";
 
@@ -35,9 +37,12 @@ export async function generateViewport(): Promise<Viewport> {
 /**
  * Every page wears Udozo's theme, chosen by its admins (`/v1/theme`): its colours re-point the variables every utility
  * reads. `?theme_preview=<token>` on any address (the admins' preview link; the proxy passes it on) shows the draft.
+ * A signed-in customer on udozo.com (never a reseller's store) can call and be called on every page (`CallProvider`).
  */
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const theme = await siteTheme((await headers()).get(previewHeader));
+  const list = await headers();
+  const theme = await siteTheme(list.get(previewHeader));
+  const calls = !list.get(storeHeader) && (await cookies()).has(customerCookie);
   return (
     <html lang="en-GB" className={inter.variable} data-theme-preview={theme.preview ? "" : undefined}>
       <head>
@@ -50,7 +55,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             Theme preview: what you see is the draft, not yet published.
           </p>
         ) : null}
-        {children}
+        {calls ? <CallProvider>{children}</CallProvider> : children}
         <InstallSupport />
       </body>
     </html>

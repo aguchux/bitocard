@@ -4,7 +4,7 @@
  * or use Safe pay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
-export const legalVersion = "2026-10-30";
+export const legalVersion = "2026-11-01";
 /** Privacy and legal requests (to be set up). */
 export const legalContact = "legal@udozo.com";
 /** Help with an account, a listing or an order (to be set up). */
@@ -63,7 +63,7 @@ const terms: LegalDocument = {
             "You must be 18 or over. You need a confirmed email address, and a mobile number from your country, confirmed with a code we text you when you sign up (where we can text numbers in your country).",
             "One Udozo account works on udozo.com and on every reseller's store, with one wallet and one history of purchases. One person, one account: do not open accounts to get round a limit, a block or a suspension.",
             "Your country is fixed when you open your account. You buy and sell in your own country's market, in its currency. A reseller's store sells only to shoppers from its own country; others may look, but cannot buy there.",
-            "Showing your phone number to buyers needs it confirmed with a code. Selling with Safe pay needs a passed identity check and a payout bank account in your verified name.",
+            "Sharing your phone number with a buyer who asks for it needs it confirmed with a code. Selling with Safe pay needs a passed identity check and a payout bank account in your verified name.",
             "Keep your password and codes secret. Udozo never asks for them in a chat, a call or a message.",
           ],
         },
@@ -142,13 +142,16 @@ const terms: LegalDocument = {
     },
     {
       id: "chats",
-      heading: "8. Chats, offers and phone numbers",
+      heading: "8. Chats, offers, calls and contact details",
       body: [
         {
           list: [
             "Keep the conversation on Udozo. Chats protect both of you: we can see them if you report a problem. Be polite, honest and lawful. Do not send spam, links, threats or other people's personal details.",
             "Either side can offer a price in a chat. An offer lasts 48 hours unless it is accepted, declined, withdrawn or replaced first. An accepted offer is the price for Safe pay for 7 days. Accepting an offer says you will buy or sell at that price; it does not move any money.",
-            "If a seller allows it, a signed-in buyer can ask to see the seller's confirmed phone number. We limit how many numbers a buyer can see each hour, and tell the seller how many people asked. Use a number only for the listing.",
+            "Nobody's phone number or email is on a listing. Where a seller takes calls, a signed-in buyer can ask for the seller's contact details. If the seller shares them, that buyer sees the seller's confirmed phone number and email on every listing of the seller's, until the seller stops sharing. A seller who declines can be asked again after 7 days. We limit how many sellers a buyer can ask each hour.",
+            "A buyer can ask a seller to call them back. The seller is then given the buyer's name, confirmed mobile number and email with the listing, until the seller marks it done. We limit how many call backs a buyer can ask for each hour.",
+            "While a seller has Udozo open, a signed-in buyer can call them in the browser about a listing. The call is relayed by our provider, so neither of you sees the other's phone number or internet address, and we do not record it. We keep who called whom, about which listing, when and how it ended, and tell a seller about a call they missed.",
+            "Use anyone's details, or a call, only for the listing. Never ask for codes or payment in a call.",
             "You can block someone in a chat. They can then no longer write to you there.",
             "We keep chats for 12 months after their last message, longer while a report on them is open, then delete them with their photos.",
           ],
@@ -607,7 +610,9 @@ const privacy: LegalDocument = {
             "Your account: name, email address, country, password (only as a one-way hash), your mobile number (confirmed with a code we text you when you sign up, where we can text numbers in your country), when you signed in, failed sign-ins, and the codes we email or text you (only as hashes).",
             "Your listings: title, description, features, price and its changes, condition, category, the area you chose, photos and video, how you deliver, and how many people contacted you. Live listings are public, with your first name and the first letter of your last name and your badges. We remove the hidden details phones add to photos and videos, and keep a one-way fingerprint of each photo to spot photos copied from another listing.",
             "Chats: messages, photos (encrypted, in private storage, seen only by the two of you), offers, when each side read them, blocks, and how fast sellers reply. A moderator reads a chat only when one of you reports it, or when it matters to a Safe pay dispute, and each reading is recorded.",
-            "Interest in listings: the listings you save, and that you asked to see a seller's phone number or started a chat.",
+            "Interest in listings: the listings you save, and that you started a chat, asked for a seller's contact details or a call back, or called a seller.",
+            "Contact requests and call backs: who asked whom, about which listing, the note written (numbers and links hidden) and the answer. When a seller shares their contact, the buyers they shared it with.",
+            "Calls: who called whom, about which listing, when it rang, was answered and ended, and how. The connection details the two browsers swap are deleted when the call ends. Calls are not recorded. While you have udozo.com open signed in, when you last had it open, so buyers can see you are there.",
             "Reports and safety: reports you make or that are made about you, our checks and reviews of listings, strikes and any suspension, with its reason.",
             "Your wallet and payments: top-ups, purchases, refunds and payouts. You pay on our payment partner's page; we never receive your full card number, card security code or mobile money PIN.",
             "Safe pay orders: the item, price, both fees, the hand-over, the delivery address (encrypted, shown only to the seller once the buyer has paid), the release code (encrypted, shown only to the buyer), the seller's dispatch photos (encrypted, in private storage), the courier and tracking, the deadlines, and who ended the order and why.",
@@ -672,9 +677,9 @@ const privacy: LegalDocument = {
         {
           list: [
             "The public: live listings, including in search engines and in previews when a link is shared.",
-            "The other person in a chat: your first name and initial, your messages and offers. A seller sees a Safe pay buyer's delivery address once they have paid. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
+            "The other person in a chat: your first name and initial, your messages and offers. A seller sees a Safe pay buyer's delivery address once they have paid. A seller sees a buyer's name, confirmed mobile number and email when the buyer asks for a call back, and a buyer sees a seller's confirmed phone number and email once the seller shares them. Neither sees the other's number in a call. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
             "Udozo's team, as their work needs.",
-            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS and the network in front of our API), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
+            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS, the network in front of our API, and relaying calls between buyers and sellers: the call passes through it, encrypted, and is not recorded), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
             "Authorities, where the law requires it.",
           ],
         },
@@ -699,6 +704,8 @@ const privacy: LegalDocument = {
               ["Shop assistant conversations", "30 days after their last message, with the daily codes kept with them."],
               ["Safe pay and store orders, disputes, store reports and payouts", "As long as accounting and tax laws require, usually six years after the order."],
               ["Order chats on a reseller's store", "12 months after the order ends."],
+              ["Contact requests and call backs", "12 months after they are answered or cancelled. A shared contact stays shared until the seller stops sharing it or closes their account."],
+              ["Calls", "Who called whom and when: 90 days. The connection details: deleted when the call ends. When you last had udozo.com open: replaced each time."],
               ["Buyers' details on store orders", "Shown to the supplier and reseller until 30 days after the order ends."],
               ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years (to be confirmed with lawyers)."],
               ["Chats and questions with our team", "Chats 12 months after they end; questions two years after they are resolved."],

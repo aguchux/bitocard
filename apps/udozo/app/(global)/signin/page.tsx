@@ -10,7 +10,8 @@ export const metadata: Metadata = { title: "Sign in", robots: { index: false, fo
 
 const reasons: Record<string, string> = {
   chat: "Sign in to chat with the seller",
-  phone: "Sign in to see the seller's phone",
+  phone: "Sign in to contact the seller",
+  call: "Sign in to call the seller",
   save: "Sign in to save listings",
   buy: "Sign in to buy with Safe pay",
   report: "Sign in to report a listing",

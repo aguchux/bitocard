@@ -296,6 +296,10 @@ export const configSchema = z.object({
   GITHUB_TOKEN: z.string().optional(),
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
   GITHUB_API_URL: z.string().url().default('https://api.github.com'),
+  /** Udozo's browser calls: a Cloudflare TURN key and its API token, which make each call's short-lived relay credentials. */
+  CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
+  CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
+  CLOUDFLARE_TURN_API_URL: z.string().url().default('https://rtc.live.cloudflare.com'),
 
   // File storage (DigitalOcean Spaces, S3-compatible): logos, icons and images uploaded by admins and resellers.
   // Browsers upload straight to the bucket with signed links; uploads are refused until the key, secret and bucket are set.

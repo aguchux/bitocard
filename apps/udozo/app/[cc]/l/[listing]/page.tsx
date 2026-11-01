@@ -199,6 +199,7 @@ export default async function ListingPage({ params }: Props) {
               signedIn={Boolean(customer)}
               chat={chatResult?.ok ? chatResult.data : null}
               messagesHref={customer ? (viewer?.conversation_id ? `/account/messages/${viewer.conversation_id}` : "/account/messages") : null}
+              myPhone={customer?.phone_verified ? customer.phone : null}
             />
           )}
           {sold ? null : <AskAboutListing listingId={listing.id} title={listing.title} />}

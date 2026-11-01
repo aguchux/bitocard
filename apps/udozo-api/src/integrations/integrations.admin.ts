@@ -26,6 +26,7 @@ import { IntegrationsService, schemaFor } from './integrations.service.js';
 import { linksFor } from './links.js';
 import { aiProvider, type AiProviderName, aiProviderLabels } from '../support/ai/providers.js';
 import { GithubIssues } from '../support/github.js';
+import { CloudflareTurn } from '../classifieds/turn.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -77,6 +78,7 @@ export class IntegrationsAdminService {
     if (group.id === 'store_hosts') return this.testStoreHosts(adminId);
     if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id, platform);
     if (group.id === 'github') return this.testGithub(adminId, platform);
+    if (group.id === 'calls') return this.testCalls(adminId);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -124,6 +126,28 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'github', before: null, after: { environment: 'live', ok } });
     return { object: 'integration_test' as const, integration: 'github', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Udozo's call relay: a one-minute credential made with the TURN key. */
+  private async testCalls(adminId: string) {
+    await this.integrations.refresh(true);
+    const config = this.integrations.config;
+    const turn = new CloudflareTurn({ keyId: config.CLOUDFLARE_TURN_KEY_ID, token: config.CLOUDFLARE_TURN_API_TOKEN, baseUrl: config.CLOUDFLARE_TURN_API_URL });
+    let ok = false;
+    let message: string | null = null;
+    if (!turn.configured()) message = 'Set the TURN key ID and its API token first.';
+    else {
+      try {
+        const servers = await turn.iceServers(60);
+        message = `Calls will be relayed through ${servers[0]!.urls.length} TURN addresses.`;
+        ok = true;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.replace(/^cloudflare_turn: /, '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `Cloudflare refused the TURN key (${detail}).` : `Could not reach Cloudflare (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'calls', before: null, after: { environment: 'live', ok } });
+    return { object: 'integration_test' as const, integration: 'calls', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** An AI provider: its model list read with the product's own key. */

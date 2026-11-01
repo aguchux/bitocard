@@ -152,7 +152,64 @@ export type ShopViewer = {
   conversation_id: string | null;
   order: { id: string; number: string; status: ShopOrderStatus } | null;
   can_contact: boolean;
+  /** The seller's contact details once they shared them with this buyer, else the buyer's request (Udozo). */
+  contact?: ShopContactState | null;
+  /** A call back the buyer asked for about this listing (Udozo). */
+  callback?: { available: boolean; request: { id: string; status: ShopContactStatus; created_at: string } | null } | null;
+  /** The seller had Udozo open in the last minute, and whether calls can be made (Udozo). */
+  seller_online?: boolean;
+  calls?: boolean;
 };
+
+export type ShopContactStatus = 'pending' | 'accepted' | 'declined' | 'done' | 'dismissed' | 'cancelled';
+
+/** What the buyer has of a seller's contact details: shared (phone and email), or their latest request. */
+export type ShopContactState = {
+  available: boolean;
+  shared: { phone: string | null; email: string } | null;
+  request: { id: string; status: ShopContactStatus; ask_again_at: string | null } | null;
+};
+
+/**
+ * A request about a listing: `contact` (the seller's details) or `callback` (the seller phones the buyer). The seller
+ * sees a call back's requester in full while it waits; anything else only by their public name.
+ */
+export type ShopContactRequest = {
+  object: 'classified_contact_request';
+  id: string;
+  kind: 'contact' | 'callback';
+  status: ShopContactStatus;
+  role: 'buyer' | 'seller';
+  note: string | null;
+  listing: { id: string; title: string | null; path: string };
+  with: { name: string; phone: string | null; email: string | null };
+  ask_again_at: string | null;
+  answered_at: string | null;
+  created_at: string;
+};
+
+export type ShopContactShare = { object: 'classified_contact_share'; buyer: { id: string; name: string }; since: string };
+
+export type ShopCallStatus = 'ringing' | 'answered' | 'ended' | 'missed' | 'declined' | 'cancelled' | 'lost';
+
+/** A call in the browser between a buyer and a seller, the other side by their public name only. */
+export type ShopCall = {
+  object: 'classified_call';
+  id: string;
+  status: ShopCallStatus;
+  role: 'caller' | 'callee';
+  with: { name: string };
+  listing: { id: string; title: string | null; path: string };
+  ring_until: string | null;
+  answered_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+};
+
+/** The relay servers a call connects through (never peer to peer). */
+export type ShopIceServer = { urls: string[]; username?: string; credential?: string };
+export type ShopCallSignal = { id: string; kind: 'offer' | 'answer' | 'candidate'; payload: Record<string, unknown> };
+export type ShopPresence = { object: 'classified_presence'; calls: boolean; incoming: ShopCall | null };
 
 export type ShopOffer = {
   object: 'classified_offer';
@@ -189,7 +246,6 @@ export type ShopConversation = {
 };
 export type ShopChat = ShopConversation & { messages: ShopMessage[]; has_more: boolean };
 
-export type ShopPhone = { object: 'classified_phone'; listing_id: string; phone: string; first_time: boolean };
 
 export type ShopSafePayQuote = {
   object: 'classified_safe_pay_quote';

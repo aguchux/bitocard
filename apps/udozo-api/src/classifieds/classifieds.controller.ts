@@ -20,6 +20,8 @@ import { ModerationService, type ReportReason, reportReasons } from './moderatio
 import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ShopDirectoryService } from './directory.service.js';
+import { ContactRequestsService } from './contact.service.js';
+import { CallsService } from './calls.service.js';
 import { ShopTermsService } from './terms.service.js';
 import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
@@ -508,7 +510,7 @@ export class ClassifiedListingsController {
   }
 }
 
-/** BitoCard Shop's chats between buyers and sellers, offers, and Show phone (bitocard.com customers). */
+/** Udozo's chats between buyers and sellers, and offers. */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
@@ -519,19 +521,21 @@ export class ClassifiedChatsController {
     private readonly conversations: ConversationsService,
     private readonly leads: LeadsService,
     private readonly directory: ShopDirectoryService,
+    private readonly contacts: ContactRequestsService,
+    private readonly calls: CallsService,
   ) {}
 
-  /** What the signed-in buyer already has with a listing: saved, a chat, an open Safe pay request or order. */
+  /**
+   * What the signed-in buyer already has with a listing: saved, a chat, an open Safe pay request or order, the seller's
+   * contact details if shared with them (or their request), a call back asked for, and whether the seller can be called.
+   */
   @Get('listings/:id/viewer')
-  viewer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    return this.directory.viewer(caller.customer, id);
-  }
-
-  /** The seller's confirmed number (a few new listings an hour); each buyer counts once as a lead. */
-  @Post('listings/:id/phone')
-  @HttpCode(HttpStatus.OK)
-  phone(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    return this.leads.revealPhone(caller.customer, id);
+  async viewer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    const viewer = await this.directory.viewer(caller.customer, id);
+    if (viewer.own || !viewer.can_contact) return { ...viewer, contact: null, callback: null, seller_online: false, calls: false };
+    const listing = await this.directory.contactOf(id);
+    const [contact, online] = await Promise.all([this.contacts.forViewer(caller.customer, listing), this.calls.online(listing.customerId)]);
+    return { ...viewer, ...contact, seller_online: online, calls: listing.contact !== 'chat' && this.calls.available() };
   }
 
   /** Views, leads, phone reveals, chats and offers on one of the seller's listings. */

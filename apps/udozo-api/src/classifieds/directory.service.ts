@@ -258,4 +258,9 @@ export class ShopDirectoryService {
       can_contact: !own && listing.status === 'active' && customer.country === listing.country,
     };
   }
+
+  /** Who sells a listing and how they take contact (for the viewer's contact and call state). */
+  contactOf(listingId: string) {
+    return this.prisma.classifiedListing.findUniqueOrThrow({ where: { id: listingId }, select: { id: true, customerId: true, contact: true } });
+  }
 }

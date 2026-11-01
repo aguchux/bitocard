@@ -55,8 +55,8 @@ describe("Udozo's legal documents", () => {
     expect(text).toContain("support@udozo.com");
   });
 
-  test("the version people accept is the API's, and the API links the terms here", () => {
-    const api = read("../../api/src/classifieds/terms.service.ts");
+  test("the version people accept is Udozo's API's, and the API links the terms here", () => {
+    const api = read("../../udozo-api/src/classifieds/terms.service.ts");
     expect(api).toContain(`shopTermsVersion = '${legalVersion}'`);
     const path = api.match(/shopTermsPath = '([^']+)'/)?.[1];
     expect(path).toBe("/legal/terms");

@@ -1,6 +1,6 @@
 "use server";
 
-import type { ShopChat, ShopMessage, ShopOrder, ShopPhone, ShopReportReason } from "@bitocard/api-client/classifieds";
+import type { ShopChat, ShopContactRequest, ShopMessage, ShopOrder, ShopReportReason } from "@bitocard/api-client/classifieds";
 import type { TermsStatus } from "@/components/terms-accept";
 import { type CustomerResult, customerApi } from "@/lib/customer";
 
@@ -34,10 +34,26 @@ export async function saveListing(listingId: string, save: boolean): Promise<Act
   return result.ok ? { ok: true, data: { favourite: save } } : answer(result);
 }
 
-/** The seller's confirmed number (where the listing takes calls); each buyer counts once as a lead. */
-export async function showPhone(listingId: string): Promise<ActionResult<ShopPhone>> {
-  if (!uuid.test(listingId)) return refused("No such listing.");
-  return answer(await customerApi<ShopPhone>("POST", `/v1/classifieds/listings/${listingId}/phone`, {}));
+/**
+ * Asks the seller for their contact details (`contact`: shown to this buyer on all their listings once accepted) or to
+ * call back (`callback`: the buyer's name, confirmed mobile and email go to the seller). The form's nonce acts once.
+ */
+export async function requestContact(listingId: string, kind: "contact" | "callback", note: string, nonce?: string): Promise<ActionResult<ShopContactRequest>> {
+  if (!uuid.test(listingId) || !["contact", "callback"].includes(kind)) return refused("No such listing.");
+  const path = `/v1/classifieds/listings/${listingId}/${kind === "contact" ? "contact-requests" : "callbacks"}`;
+  return answer(await customerApi<ShopContactRequest>("POST", path, note.trim() ? { note: note.trim().slice(0, 300) } : {}, { idempotencyKey: nonce }));
+}
+
+/** The seller accepts or declines a contact request, marks a call back done or dismisses it; the buyer cancels. */
+export async function answerRequest(requestId: string, action: "accept" | "decline" | "done" | "dismiss" | "cancel"): Promise<ActionResult<ShopContactRequest>> {
+  if (!uuid.test(requestId) || !["accept", "decline", "done", "dismiss", "cancel"].includes(action)) return refused("No such request.");
+  return answer(await customerApi<ShopContactRequest>("POST", `/v1/classifieds/contact-requests/${requestId}/${action}`, {}));
+}
+
+/** The seller stops showing their contact details to a buyer. */
+export async function stopSharing(buyerId: string): Promise<ActionResult<unknown>> {
+  if (!uuid.test(buyerId)) return refused("No such buyer.");
+  return answer(await customerApi("DELETE", `/v1/classifieds/me/contact-shares/${buyerId}`));
 }
 
 /** Reports a listing to Udozo's moderators. */

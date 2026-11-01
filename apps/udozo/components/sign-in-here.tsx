@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-type Props = { reason?: "chat" | "phone" | "save" | "buy" | "report" | "sell"; className?: string; children: React.ReactNode; ariaLabel?: string };
+type Props = { reason?: "chat" | "phone" | "call" | "save" | "buy" | "report" | "sell"; className?: string; children: React.ReactNode; ariaLabel?: string };
 
 function Here({ reason, className, children, ariaLabel }: Props) {
   const path = usePathname();

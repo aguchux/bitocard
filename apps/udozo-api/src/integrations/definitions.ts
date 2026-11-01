@@ -166,6 +166,9 @@ const integrationKeyList = [
   'GITHUB_TOKEN',
   'GITHUB_WEBHOOK_SECRET',
   'GITHUB_API_URL',
+  'CLOUDFLARE_TURN_KEY_ID',
+  'CLOUDFLARE_TURN_API_TOKEN',
+  'CLOUDFLARE_TURN_API_URL',
   'DIDIT_API_KEY',
   'DIDIT_WORKFLOW_ID',
   'DIDIT_WEBHOOK_SECRET',
@@ -605,6 +608,17 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('CLOUDFLARE_ZONE_ID', 'Zone ID', { required: true, help: 'Cloudflare > bitocard.com (udozo.com on Udozo) > Overview, API section: the Zone ID.' }),
       field('STORE_HOST_TARGET', 'Record target', { required: false, help: 'Where each store’s CNAME points. Default: cname.vercel-dns.com' }),
       field('CLOUDFLARE_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://api.cloudflare.com/client/v4' }),
+    ],
+  },
+  {
+    id: 'calls',
+    name: 'Calls (Cloudflare TURN)',
+    description:
+      'Browser calls between buyers and sellers on udozo.com, relayed through Cloudflare’s TURN service so neither side ever sees the other’s phone number or internet address. Calls are not recorded. Call seller is offered only once the key and token are set. Test connection makes a short-lived credential.',
+    fields: [
+      field('CLOUDFLARE_TURN_KEY_ID', 'TURN key ID', { required: true, help: 'Cloudflare dashboard > Realtime > TURN Server > Create TURN key: its Turn Token ID.' }),
+      secret('CLOUDFLARE_TURN_API_TOKEN', 'TURN key API token', { help: 'Shown once when the TURN key is created (the key’s API token, not an account API token).' }),
+      field('CLOUDFLARE_TURN_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://rtc.live.cloudflare.com' }),
     ],
   },
   {

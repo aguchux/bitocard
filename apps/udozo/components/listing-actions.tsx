@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Flag as FlagIcon, Heart, MessageCircle, Phone, Share2, ShieldCheck, X } from "lucide-react";
+import { Check, Contact, Flag as FlagIcon, Heart, Mail, MessageCircle, Phone, PhoneCall, PhoneIncoming, Share2, ShieldCheck, X } from "lucide-react";
 import { reportReasonLabels, type ShopChat, type ShopReportReason, type ShopViewer } from "@bitocard/api-client/classifieds";
-import { reportListing, saveListing, showPhone } from "@/lib/listing-actions";
+import { reportListing, requestContact, saveListing } from "@/lib/listing-actions";
 import { useAssistantDraft } from "./assistant";
+import { useCalls } from "./calls/call-provider";
 import { ChatPanel } from "./chat-panel";
 import { SignInHere } from "./sign-in-here";
 
@@ -27,7 +28,7 @@ function Sheet({ dialog, title, children }: { dialog: React.RefObject<HTMLDialog
   );
 }
 
-const button = "flex h-12 items-center justify-center gap-2 rounded-2xl border border-navy-900 bg-white px-4 font-bold text-navy-900 hover:bg-navy-50 disabled:opacity-60";
+const button = "flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-navy-900 bg-white px-3 py-2 text-center text-sm leading-tight font-bold text-navy-900 hover:bg-navy-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 /** Save to favourites and share (WhatsApp, or the device's share sheet, or copying the link). */
 export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing, "id" | "title" | "url">; viewer: ShopViewer | null; signedIn: boolean }) {
@@ -74,39 +75,141 @@ export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing
   );
 }
 
+/** A request's state on its button: nothing yet, waiting, or declined until the buyer may ask again. */
+export function requestState(request: { status: string; ask_again_at?: string | null } | null | undefined, now = Date.now()) {
+  if (!request) return "none" as const;
+  if (request.status === "pending") return "pending" as const;
+  if (request.status === "declined" && request.ask_again_at && Date.parse(request.ask_again_at) > now) return "declined" as const;
+  return "none" as const;
+}
+
+/** The seller's contact details, once they shared them with this buyer: on every listing of theirs, to them alone. */
+export function SellerContact({ shared }: { shared: { phone: string | null; email: string } }) {
+  return (
+    <section aria-label="The seller's contact details" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4 text-navy-900">
+      <h2 className="flex items-center gap-2 text-sm font-bold text-mint-700">
+        <ShieldCheck className="size-4" aria-hidden="true" /> The seller shared their contact with you
+      </h2>
+      {shared.phone ? (
+        <a href={`tel:${shared.phone}`} className="flex min-h-11 items-center gap-2 font-bold hover:underline">
+          <Phone className="size-4 shrink-0" aria-hidden="true" /> {shared.phone}
+        </a>
+      ) : null}
+      <a href={`mailto:${shared.email}`} className="flex min-h-11 items-center gap-2 font-semibold break-all hover:underline">
+        <Mail className="size-4 shrink-0" aria-hidden="true" /> {shared.email}
+      </a>
+      <p className="text-xs text-navy-600">Only you see these. Never pay before you have seen the item, and never share codes sent to your phone.</p>
+    </section>
+  );
+}
+
+const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
+
+/** Asking for a call back or the seller's contact: what is shared, an optional note, then sent. */
+function RequestSheet({ dialog, kind, listingId, myPhone, onSent }: { dialog: React.RefObject<HTMLDialogElement | null>; kind: "contact" | "callback"; listingId: string; myPhone: string | null; onSent: (status: string) => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const [key] = useState(nonce);
+  const callback = kind === "callback";
+  const send = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    const result = await requestContact(listingId, kind, note, key);
+    setBusy(false);
+    if (!result.ok) return setError(result.message);
+    setSent(true);
+    onSent(result.data.status);
+  };
+  return (
+    <Sheet dialog={dialog} title={callback ? "Ask for a call back" : "Ask for the seller's contact"}>
+      {sent ? (
+        <p className="text-sm text-navy-700" role="status">
+          {callback ? "Sent. The seller has your number and can call you." : "Sent. If the seller accepts, their phone and email will show here."}
+        </p>
+      ) : (
+        <form onSubmit={event => void send(event)} className="grid gap-3">
+          <p className="text-sm text-navy-700">
+            {callback
+              ? `We send your name, your mobile number${myPhone ? ` ending ${myPhone.slice(-4)}` : ""} and your email to the seller with this listing, so they can call you. Nothing is shown on the page.`
+              : "If the seller accepts, you will see their phone number and email here, on every listing of theirs. They see only your first name and initial."}
+          </p>
+          <label className="grid gap-1.5 text-sm font-semibold">
+            {callback ? "When is a good time? (optional)" : "A note for the seller (optional)"}
+            <textarea value={note} onChange={event => setNote(event.target.value)} rows={2} maxLength={300} className="rounded-xl border border-navy-200 px-3 py-2 font-normal focus:border-navy-500" />
+          </label>
+          {error ? (
+            <p className="text-sm text-brand-700" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <button type="submit" disabled={busy} className="h-12 rounded-2xl bg-navy-900 font-bold text-white disabled:opacity-60">
+            {busy ? "Sending…" : callback ? "Ask them to call me" : "Send request"}
+          </button>
+        </form>
+      )}
+    </Sheet>
+  );
+}
+
+/** One way to get in touch: its button, or for a visitor the way to sign in first and come back. */
+function Action({ signedIn, label, icon, onClick, reason, disabled, title, expanded }: { signedIn: boolean; label: string; icon: React.ReactNode; onClick: () => void; reason: "chat" | "phone" | "call"; disabled?: boolean; title?: string; expanded?: boolean }) {
+  return signedIn ? (
+    <button type="button" onClick={onClick} disabled={disabled} title={title} aria-expanded={expanded} className={button}>
+      {icon} {label}
+    </button>
+  ) : (
+    <SignInHere reason={reason} className={button}>
+      {icon} {label}
+    </SignInHere>
+  );
+}
+
 /**
- * What a buyer can do on a listing: **Buy with Safe pay**, **Chat** in place, **Show phone**, and **Report**. A visitor is
- * asked to sign in first and comes back here.
+ * What a buyer can do on a listing: **Buy with Safe pay**, **Chat with seller** in place, **Call seller** in the browser
+ * while the seller is on Udozo (relayed: no numbers shared), **Request call back** (the buyer's details to the seller),
+ * **Request contact** (the seller's phone and email, shown here once they accept), and **Report**. Nobody's details are
+ * on the page for everyone. A visitor is asked to sign in first and comes back here.
  */
-export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }: { listing: Listing; viewer: ShopViewer | null; signedIn: boolean; chat: ShopChat | null; messagesHref: string | null }) {
+export function ListingActions({ listing, viewer, signedIn, chat, messagesHref, myPhone = null }: { listing: Listing; viewer: ShopViewer | null; signedIn: boolean; chat: ShopChat | null; messagesHref: string | null; myPhone?: string | null }) {
   const [chatOpen, setChatOpen] = useState(Boolean(chat));
   const draft = useAssistantDraft(listing.id, () => setChatOpen(true));
-  const [phone, setPhone] = useState<string | null>(null);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const calls = useCalls();
+  const [contactSent, setContactSent] = useState<string | null>(null);
+  const [callbackSent, setCallbackSent] = useState<string | null>(null);
   const [reason, setReason] = useState<ShopReportReason>("scam");
   const [details, setDetails] = useState("");
   const [reported, setReported] = useState<string | null>(null);
-  const phoneSheet = useRef<HTMLDialogElement>(null);
+  const contactSheet = useRef<HTMLDialogElement>(null);
+  const callbackSheet = useRef<HTMLDialogElement>(null);
   const reportSheet = useRef<HTMLDialogElement>(null);
 
   if (viewer?.own) return <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">This is your listing. Manage it in My listings.</p>;
   if (!listing.active) return null;
   const canContact = !viewer || viewer.can_contact;
-
-  const reveal = async () => {
-    phoneSheet.current?.showModal();
-    if (phone) return;
-    setPhoneError(null);
-    const result = await showPhone(listing.id);
-    if (result.ok) setPhone(result.data.phone);
-    else setPhoneError(result.message);
-  };
+  const shared = viewer?.contact?.shared ?? null;
+  const contact = contactSent === "pending" ? "pending" : requestState(viewer?.contact?.request);
+  const callback = callbackSent === "pending" ? "pending" : requestState(viewer?.callback?.request);
+  // Signed out, a listing that takes calls offers them all (each asks to sign in first).
+  const offersCall = signedIn ? Boolean(calls && viewer?.calls) : listing.phone;
+  const offersCallback = signedIn ? Boolean(viewer?.callback?.available) : listing.phone;
+  const offersContact = signedIn ? Boolean(viewer?.contact?.available) && !shared : listing.phone;
+  const online = Boolean(viewer?.seller_online);
 
   const report = async (event: React.FormEvent) => {
     event.preventDefault();
     const result = await reportListing(listing.id, reason, details);
     setReported(result.ok ? "Thank you. Our moderators will look at it." : result.message);
   };
+
+  const callIcon = (
+    <span className="relative shrink-0">
+      <PhoneCall className="size-5" aria-hidden="true" />
+      {online ? <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-mint-500 ring-2 ring-white" aria-hidden="true" /> : null}
+    </span>
+  );
 
   return (
     <div className="grid gap-3">
@@ -115,31 +218,56 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }
           <ShieldCheck className="size-5" aria-hidden="true" /> {listing.buyLabel}
         </a>
       ) : null}
+      {shared && canContact ? <SellerContact shared={shared} /> : null}
       {canContact ? (
-        <div className="grid grid-cols-2 gap-2.5">
-          {listing.chat ? (
-            signedIn ? (
-              <button type="button" onClick={() => setChatOpen(open => !open)} aria-expanded={chatOpen} className={button}>
-                <MessageCircle className="size-5" aria-hidden="true" /> Chat
-              </button>
-            ) : (
-              <SignInHere reason="chat" className={button}>
-                <MessageCircle className="size-5" aria-hidden="true" /> Chat
-              </SignInHere>
-            )
+        <>
+          <div className="grid grid-cols-2 gap-2.5">
+            {listing.chat ? <Action signedIn={signedIn} label="Chat with seller" icon={<MessageCircle className="size-5 shrink-0" aria-hidden="true" />} onClick={() => setChatOpen(open => !open)} reason="chat" expanded={chatOpen} /> : null}
+            {offersCall ? (
+              <Action
+                signedIn={signedIn}
+                label="Call seller"
+                icon={callIcon}
+                onClick={() => calls?.start(listing.id)}
+                reason="call"
+                disabled={signedIn && (!online || Boolean(calls?.busy))}
+                title={online ? "A private call on Udozo: no numbers shared" : "The seller is not on Udozo right now"}
+              />
+            ) : null}
+            {offersCallback ? (
+              <Action
+                signedIn={signedIn}
+                label={callback === "pending" ? "Call back asked" : "Request call back"}
+                icon={callback === "pending" ? <Check className="size-5 shrink-0" aria-hidden="true" /> : <PhoneIncoming className="size-5 shrink-0" aria-hidden="true" />}
+                onClick={() => callbackSheet.current?.showModal()}
+                reason="phone"
+                disabled={callback === "pending"}
+              />
+            ) : null}
+            {offersContact ? (
+              <Action
+                signedIn={signedIn}
+                label={contact === "pending" ? "Contact requested" : contact === "declined" ? "Request declined" : "Request contact"}
+                icon={contact === "pending" ? <Check className="size-5 shrink-0" aria-hidden="true" /> : <Contact className="size-5 shrink-0" aria-hidden="true" />}
+                onClick={() => contactSheet.current?.showModal()}
+                reason="phone"
+                disabled={contact !== "none"}
+              />
+            ) : null}
+          </div>
+          {signedIn && offersCall ? (
+            <p className="text-xs text-navy-600">
+              {online ? (
+                <>
+                  <span className="mr-1.5 inline-block size-2 rounded-full bg-mint-500" aria-hidden="true" />
+                  The seller is on Udozo now: call them privately, no numbers shared.
+                </>
+              ) : (
+                "The seller is not on Udozo right now: ask them to call you back, or chat."
+              )}
+            </p>
           ) : null}
-          {listing.phone ? (
-            signedIn ? (
-              <button type="button" onClick={() => void reveal()} className={button}>
-                <Phone className="size-5" aria-hidden="true" /> Show phone
-              </button>
-            ) : (
-              <SignInHere reason="phone" className={button}>
-                <Phone className="size-5" aria-hidden="true" /> Show phone
-              </SignInHere>
-            )
-          ) : null}
-        </div>
+        </>
       ) : (
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
@@ -156,27 +284,8 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }
         )}
       </div>
 
-      <Sheet dialog={phoneSheet} title="The seller's phone">
-        {phone ? (
-          <>
-            <a href={`tel:${phone}`} className="text-center text-2xl font-extrabold tracking-wide text-navy-900">
-              {phone}
-            </a>
-            <p className="text-sm text-navy-600">Say you saw it on Udozo. Never pay before you have seen the item, and never share codes sent to your phone.</p>
-            <a href={`tel:${phone}`} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-navy-900 font-bold text-white">
-              <Phone className="size-5" aria-hidden="true" /> Call
-            </a>
-          </>
-        ) : phoneError ? (
-          <p className="text-sm text-brand-700" role="alert">
-            {phoneError}
-          </p>
-        ) : (
-          <p className="text-sm text-navy-600" role="status">
-            Getting the number…
-          </p>
-        )}
-      </Sheet>
+      {signedIn ? <RequestSheet dialog={callbackSheet} kind="callback" listingId={listing.id} myPhone={myPhone} onSent={setCallbackSent} /> : null}
+      {signedIn ? <RequestSheet dialog={contactSheet} kind="contact" listingId={listing.id} myPhone={myPhone} onSent={setContactSent} /> : null}
 
       <Sheet dialog={reportSheet} title="Report this listing">
         {reported ? (

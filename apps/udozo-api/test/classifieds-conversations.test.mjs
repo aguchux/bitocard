@@ -1,5 +1,5 @@
 // BitoCard Shop, phase 1 step 3: chats between buyers and sellers (masked text, private photos, blocking, reports read by
-// moderators only once reported), price offers, Show phone with its hourly limit, leads, notices and unread emails.
+// moderators only once reported), price offers, leads, notices and unread emails.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, confirmMobile, fakeService, lastEmailCode, startApp, testMobile } from './helpers.mjs';
@@ -276,33 +276,11 @@ describe('offers', () => {
   });
 });
 
-describe('Show phone and leads', () => {
-  test('the seller\'s confirmed number, a few new listings an hour, each buyer one lead', async () => {
-    const sellers = [await customer('Kunle Ade', { phone: '+2348031110002' }), await customer('Sade Ojo', { phone: '+2348031110003' }), await customer('Obi Nnamdi', { phone: '+2348031110004' })];
-    const buyer = await customer('Zainab Musa');
-    const listings = [];
-    for (const [index, seller] of sellers.entries()) for (const n of [1, 2]) listings.push(await live(seller, `Hisense ${40 + index * 2 + n} inch TV`));
-
-    const shown = await buyer.post(`/v1/classifieds/listings/${listings[0].id}/phone`);
-    assert.deepEqual([shown.status, shown.json.phone, shown.json.first_time], [200, '+2348031110002', true]);
-    assert.equal((await buyer.post(`/v1/classifieds/listings/${listings[0].id}/phone`)).json.first_time, false, 'showing it again is free');
-    await buyer.post('/v1/classifieds/conversations', { listing_id: listings[0].id, body: 'I just called you' });
-    const stats = await sellers[0].get(`/v1/classifieds/me/listings/${listings[0].id}/stats`);
-    assert.deepEqual([stats.json.leads, stats.json.phone_reveals, stats.json.chats], [1, 1, 1], 'one buyer, one lead');
-    assert.equal((await buyer.get(`/v1/classifieds/me/listings/${listings[0].id}/stats`)).status, 404, 'sellers only');
-
-    for (const listing of listings.slice(1, 5)) assert.equal((await buyer.post(`/v1/classifieds/listings/${listing.id}/phone`)).status, 200);
-    const limited = await buyer.post(`/v1/classifieds/listings/${listings[5].id}/phone`);
-    assert.deepEqual([limited.status, limited.json.error.code], [429, 'phone_reveal_limit']);
-    assert.equal((await buyer.post(`/v1/classifieds/listings/${listings[1].id}/phone`)).status, 200, 'one already shown still shows');
-
-    assert.equal((await sellers[0].post(`/v1/classifieds/listings/${listings[0].id}/phone`)).json.error.param, 'listing_id');
-    const noPhone = await customer('Lola Ige');
-    const chatOnly = await live(noPhone, 'Haier 32 inch TV');
-    // Udozo's customers confirm a number at sign-up; one whose market cannot text (or an older account) has none.
-    await prisma.customer.update({ where: { id: noPhone.id }, data: { phone: null, phoneVerifiedAt: null } });
-    assert.equal((await (await customer('Uche Eze')).post(`/v1/classifieds/listings/${chatOnly.id}/phone`)).json.error.code, 'phone_not_offered', 'no confirmed number, no phone');
-    assert.equal((await storeServer().post(`/v1/classifieds/listings/${listings[0].id}/phone`)).status, 401, 'signed in only');
+describe('leads', () => {
+  test("Show phone is gone: a seller's number reaches a buyer only once the seller shares it (classifieds-contact)", async () => {
+    const seller = await customer('Kunle Ade', { phone: '+2348031110002' });
+    const tv = await live(seller, 'Hisense 42 inch TV');
+    assert.equal((await (await customer('Zainab Musa')).post(`/v1/classifieds/listings/${tv.id}/phone`)).status, 404);
   });
 
   test('response rate shows once a seller has had five chats', async () => {

@@ -5,6 +5,7 @@ import { ListingMediaService } from '../classifieds/media.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
+import { CallsService } from '../classifieds/calls.service.js';
 import { MarketingService } from '../marketing/marketing.service.js';
 import { ResaleStoresService } from '../resale/resale-stores.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
@@ -102,6 +103,7 @@ export class CronController {
     resale: ResaleStoresService,
     resaleOrders: ResaleOrdersService,
     marketing: MarketingService,
+    calls: CallsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -192,7 +194,8 @@ export class CronController {
        * Every 15 minutes: BitoCard Shop listings past their time expire, videos stuck processing fail, open offers past
        * their time expire, unread messages are emailed, chats a year old are deleted, and Safe pay orders past a deadline
        * lapse, are refunded (not handed over) or released (delivery not confirmed or disputed); resale deals past their
-       * end end, auto-listing rules add new listings, and resellers are told when a store listing stops selling.
+       * end end, auto-listing rules add new listings, and resellers are told when a store listing stops selling; calls
+       * that rang out are missed (the seller told) and calls past 90 days deleted.
        */
       classifieds: async () => ({
         safe_pay: await safePay.runDue(),
@@ -203,6 +206,7 @@ export class CronController {
         old_chats: await conversations.purgeOld(),
         resale: await resale.job(),
         old_resale_threads: await resaleOrders.purgeOldThreads(),
+        calls: await calls.job(),
       }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),

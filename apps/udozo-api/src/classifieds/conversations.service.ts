@@ -190,7 +190,7 @@ export class ConversationsService {
       await this.send(customer, existing.id, input.body);
       return this.get(customer, existing.id);
     }
-    if (listing.contact === 'phone') throw conflict('chat_not_offered', 'This seller takes calls only: use Show phone.');
+    if (listing.contact === 'phone') throw conflict('chat_not_offered', 'This seller takes calls only: call them, ask for a call back, or ask for their contact.');
     const text = cleanMessage(input.body);
     if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
     const started = await this.prisma.classifiedConversation.count({ where: { buyerId: customer.id, createdAt: { gt: new Date(Date.now() - 60 * minuteMs) } } });

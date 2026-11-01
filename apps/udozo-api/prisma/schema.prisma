@@ -2724,6 +2724,13 @@ model Customer {
   handoffs                  CustomerHandoff[]
   assistantThreads          AssistantThread[]
   resaleRelationships       ResaleRelationship[]
+  classifiedContactAsked    ClassifiedContactRequest[] @relation("ClassifiedContactAsked")
+  classifiedContactAskedOf  ClassifiedContactRequest[] @relation("ClassifiedContactAskedOf")
+  classifiedContactsShared  ClassifiedContactShare[]   @relation("ClassifiedContactsShared")
+  classifiedContactsGiven   ClassifiedContactShare[]   @relation("ClassifiedContactsGiven")
+  classifiedCallsMade       ClassifiedCall[]           @relation("ClassifiedCallsMade")
+  classifiedCallsTaken      ClassifiedCall[]           @relation("ClassifiedCallsTaken")
+  presence                  CustomerPresence?
 
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
@@ -4528,6 +4535,8 @@ model ClassifiedListing {
   priceHistory ClassifiedPriceHistory[]
   reports      ClassifiedReport[]
   favourites   ClassifiedFavourite[]
+  contactRequests ClassifiedContactRequest[]
+  calls        ClassifiedCall[]
   chats        ClassifiedConversation[]
   orders       ClassifiedOrder[]
   offers       ClassifiedOffer[]
@@ -4825,6 +4834,100 @@ model ClassifiedLead {
   @@id([listingId, buyerId, kind])
   @@index([buyerId, kind, firstAt])
   @@map("classified_leads")
+}
+
+/// A buyer's request to a seller about a listing. `contact`: the seller's contact details; accepted, the buyer sees the
+/// seller's confirmed phone and email on every listing of theirs (`ClassifiedContactShare`). `callback`: the seller is
+/// given the buyer's name, confirmed mobile and email with the listing, to phone them.
+model ClassifiedContactRequest {
+  id         String            @id @default(uuid()) @db.Uuid
+  /// contact or callback.
+  kind       String
+  listingId  String            @map("listing_id") @db.Uuid
+  buyerId    String            @map("buyer_id") @db.Uuid
+  sellerId   String            @map("seller_id") @db.Uuid
+  country    String            @db.Char(2)
+  /// pending, then accepted or declined (contact), done or dismissed (callback); cancelled by the buyer.
+  status     String            @default("pending")
+  /// The buyer's note (300 characters, links and long numbers hidden).
+  note       String?
+  answeredAt DateTime?         @map("answered_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  listing    ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer      Customer          @relation("ClassifiedContactAsked", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller     Customer          @relation("ClassifiedContactAskedOf", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, status, createdAt])
+  @@index([buyerId, kind, createdAt])
+  @@map("classified_contact_requests")
+}
+
+/// A seller's contact details shared with one buyer (an accepted request), shown on every listing of the seller's until
+/// the seller stops sharing them.
+model ClassifiedContactShare {
+  sellerId  String   @map("seller_id") @db.Uuid
+  buyerId   String   @map("buyer_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  seller    Customer @relation("ClassifiedContactsShared", fields: [sellerId], references: [id], onDelete: Cascade)
+  buyer     Customer @relation("ClassifiedContactsGiven", fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@id([sellerId, buyerId])
+  @@index([buyerId])
+  @@map("classified_contact_shares")
+}
+
+/// A call in the browser from a buyer to a seller about a listing, relayed (never peer to peer) so neither side sees the
+/// other's number or address. The two browsers exchange their connection details through `ClassifiedCallSignal`.
+model ClassifiedCall {
+  id           String                 @id @default(uuid()) @db.Uuid
+  listingId    String                 @map("listing_id") @db.Uuid
+  callerId     String                 @map("caller_id") @db.Uuid
+  calleeId     String                 @map("callee_id") @db.Uuid
+  country      String                 @db.Char(2)
+  /// ringing, answered, then ended; or missed, declined, cancelled (by the caller) or lost (a side went quiet).
+  status       String                 @default("ringing")
+  /// Each side's last look at the call: a side quiet for 30 seconds ends it.
+  callerSeenAt DateTime               @default(now()) @map("caller_seen_at")
+  calleeSeenAt DateTime?              @map("callee_seen_at")
+  answeredAt   DateTime?              @map("answered_at")
+  endedAt      DateTime?              @map("ended_at")
+  /// caller, callee or udozo (no answer, or a side went quiet).
+  endedBy      String?                @map("ended_by")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  listing      ClassifiedListing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  caller       Customer               @relation("ClassifiedCallsMade", fields: [callerId], references: [id], onDelete: Cascade)
+  callee       Customer               @relation("ClassifiedCallsTaken", fields: [calleeId], references: [id], onDelete: Cascade)
+  signals      ClassifiedCallSignal[]
+
+  @@index([calleeId, status])
+  @@index([callerId, status])
+  @@index([createdAt])
+  @@map("classified_calls")
+}
+
+/// One side's connection detail for a call (its offer, answer or a network candidate), read by the other side; deleted
+/// when the call ends.
+model ClassifiedCallSignal {
+  id        BigInt         @id @default(autoincrement())
+  callId    String         @map("call_id") @db.Uuid
+  fromId    String         @map("from_id") @db.Uuid
+  /// offer, answer or candidate.
+  kind      String
+  payload   Json
+  createdAt DateTime       @default(now()) @map("created_at")
+  call      ClassifiedCall @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@index([callId, id])
+  @@map("classified_call_signals")
+}
+
+/// When a customer last had udozo.com open (its pages say so every few seconds): online for 30 seconds after.
+model CustomerPresence {
+  customerId String   @id @map("customer_id") @db.Uuid
+  seenAt     DateTime @default(now()) @map("seen_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_presence")
 }
 
 /// A Safe pay order (`SP-000123`): the buyer's request at the listed or agreed price, the seller's acceptance, payment

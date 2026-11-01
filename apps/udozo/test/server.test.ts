@@ -4,7 +4,7 @@ import { request, setRequest } from "./request";
 import { customerApi, safeNext, shopperHeader, signInPath, siteOrigin } from "@/lib/customer";
 import { handoffTarget } from "@/lib/handoff";
 import { continueSignIn } from "@/lib/handoff-actions";
-import { acceptShopTerms, answerOffer, loadChat, makeOffer, requestSafePay, saveListing, shopTerms, showPhone, startChat } from "@/lib/listing-actions";
+import { acceptShopTerms, answerOffer, answerRequest, loadChat, makeOffer, requestContact, requestSafePay, saveListing, shopTerms, startChat, stopSharing } from "@/lib/listing-actions";
 import { apiUrl, marketFor } from "@/lib/api";
 import { GET as handoffGo } from "@/app/(global)/handoff/go/route";
 import { listingGone, proxy } from "@/proxy";
@@ -136,16 +136,28 @@ describe("listing actions", () => {
     reply = (url, method) => (method === "POST" || method === "DELETE" ? (method === "DELETE" ? new Response(null, { status: 204 }) : Response.json({ object: "ok", phone: "+2348031234567" })) : null);
     expect(await saveListing(listing, true)).toEqual({ ok: true, data: { favourite: true } });
     expect(await saveListing(listing, false)).toEqual({ ok: true, data: { favourite: false } });
-    expect((await showPhone(listing)).ok).toBe(true);
+    expect((await requestContact(listing, "contact", " Is it still there? ", "nonce-contact-1")).ok).toBe(true);
+    expect((await requestContact(listing, "callback", "")).ok).toBe(true);
+    expect((await answerRequest(listing, "accept")).ok).toBe(true);
+    expect((await stopSharing(listing)).ok).toBe(true);
     expect(calls.map(call => `${call.method} ${call.url.replace("https://api.test", "")}`)).toEqual([
       "POST /v1/classifieds/favourites",
       `DELETE /v1/classifieds/favourites/${listing}`,
-      `POST /v1/classifieds/listings/${listing}/phone`,
+      `POST /v1/classifieds/listings/${listing}/contact-requests`,
+      `POST /v1/classifieds/listings/${listing}/callbacks`,
+      `POST /v1/classifieds/contact-requests/${listing}/accept`,
+      `DELETE /v1/classifieds/me/contact-shares/${listing}`,
     ]);
-    expect(await showPhone("../admin")).toMatchObject({ ok: false });
+    expect(calls[2]!.body).toEqual({ note: "Is it still there?" });
+    expect(calls[2]!.headers.get("idempotency-key")).toBe("nonce-contact-1");
+    expect(calls[3]!.body).toEqual({});
+    expect(await requestContact("../admin", "contact", "")).toMatchObject({ ok: false });
+    expect(await requestContact(listing, "phone" as "contact", "")).toMatchObject({ ok: false });
+    expect(await answerRequest(listing, "delete" as "accept")).toMatchObject({ ok: false });
+    expect(await stopSharing("x")).toMatchObject({ ok: false });
     expect(await answerOffer(listing, "delete" as "accept")).toMatchObject({ ok: false });
     expect(await loadChat(listing, "x")).toMatchObject({ ok: false });
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(6);
   });
 
   test("offers in kobo from what was typed; the form's nonce is the idempotency key; an ended session asks to sign in", async () => {

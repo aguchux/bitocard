@@ -157,11 +157,13 @@ describe("listings and orders", () => {
 describe("the account's places", () => {
   const none = { unread: 0, resellers: { count: 0, waiting: 0 } };
 
-  test("listings, messages, orders, favourites, the wallet, Safe pay, payouts and the profile; Messages badged with its unread count", () => {
-    const places = accountPlaces({ ...none, unread: 3 });
-    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Orders", "Favourites", "Wallet", "Safe pay", "Payouts", "Profile"]);
+  test("listings, messages, requests, orders, favourites, the wallet, Safe pay, payouts and the profile; Messages badged with its unread count", () => {
+    const places = accountPlaces({ ...none, unread: 3, requests: 2 });
+    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Requests", "Orders", "Favourites", "Wallet", "Safe pay", "Payouts", "Profile"]);
     expect(places.find(place => place.label === "Messages")?.badge).toBe(3);
-    expect(places.map(place => place.href)).toEqual(["/account", "/account/messages", "/account/orders", "/account/favourites", "/account/wallet", "/account/safe-pay", "/account/payouts", "/account/profile"]);
+    expect(places.find(place => place.label === "Requests")?.badge).toBe(2);
+    expect(accountPlaces(none).find(place => place.label === "Requests")?.badge).toBeUndefined();
+    expect(places.map(place => place.href)).toEqual(["/account", "/account/messages", "/account/requests", "/account/orders", "/account/favourites", "/account/wallet", "/account/safe-pay", "/account/payouts", "/account/profile"]);
   });
 
   test("the current place follows the address: a listing, a chat or an order keeps its place; /account only for itself", () => {
@@ -170,6 +172,7 @@ describe("the account's places", () => {
     expect(currentPlace(places, `/account/listings/${listing}`)).toBe("/account");
     expect(currentPlace(places, `/account/messages/${listing}`)).toBe("/account/messages");
     expect(currentPlace(places, `/account/orders/${order}?x=1`)).toBe("/account/orders");
+    expect(currentPlace(places, "/account/requests")).toBe("/account/requests");
     expect(currentPlace(places, "/account/wallet/transactions")).toBe("/account/wallet");
     expect(currentPlace(places, "/account/verification")).toBe("/account/profile");
     expect(currentPlace(places, "/sell")).toBeNull();
@@ -179,7 +182,7 @@ describe("the account's places", () => {
   test("My Resellers shows once resellers carry the supplier's listings, badged with what waits there", () => {
     expect(accountPlaces(none).map(place => place.label)).not.toContain("My Resellers");
     const places = accountPlaces({ unread: 0, resellers: { count: 2, waiting: 3 } });
-    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Orders", "Favourites", "My Resellers", "Wallet", "Safe pay", "Payouts", "Profile"]);
+    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Requests", "Orders", "Favourites", "My Resellers", "Wallet", "Safe pay", "Payouts", "Profile"]);
     expect(places.find(place => place.label === "My Resellers")?.badge).toBe(3);
     expect(currentPlace(places, `/account/resellers/${listing}`)).toBe("/account/resellers");
   });
@@ -202,10 +205,10 @@ describe("the seller's links and market", () => {
   });
 
   test("the badges come from the unread counts; nothing to show while the API cannot be reached", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => reply({ unread: 4, resellers: 2, resellers_waiting: 1 })));
-    expect(await accountCounts()).toEqual({ unread: 4, resellers: { count: 2, waiting: 1 } });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => reply(url.includes("contact-requests") ? { pending: 5 } : { unread: 4, resellers: 2, resellers_waiting: 1 })));
+    expect(await accountCounts()).toEqual({ unread: 4, resellers: { count: 2, waiting: 1 }, requests: 5 });
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
-    expect(await accountCounts()).toEqual({ unread: 0, resellers: { count: 0, waiting: 0 } });
+    expect(await accountCounts()).toEqual({ unread: 0, resellers: { count: 0, waiting: 0 }, requests: 0 });
   });
 });
 

@@ -136,6 +136,6 @@ export function safeNext(value: FormDataEntryValue | string | null | undefined, 
 }
 
 /** Where a signed-out visitor goes to act, coming back to `next` afterwards. */
-export function signInPath(next: string, reason?: "chat" | "phone" | "save" | "buy" | "report" | "sell") {
+export function signInPath(next: string, reason?: "chat" | "phone" | "call" | "save" | "buy" | "report" | "sell") {
   return `/signin?next=${encodeURIComponent(safeNext(next))}${reason ? `&for=${reason}` : ""}`;
 }

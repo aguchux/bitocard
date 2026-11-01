@@ -18,6 +18,9 @@ import { ClassifiedReferenceService } from './reference.service.js';
 import { ListingSearchService } from './search.service.js';
 import { FavouritesService } from './favourites.service.js';
 import { ShopDirectoryService } from './directory.service.js';
+import { ContactRequestsService } from './contact.service.js';
+import { CallsService } from './calls.service.js';
+import { ClassifiedContactController } from './contact.controller.js';
 import { ShopTermsService } from './terms.service.js';
 import { ResaleService } from './resale.service.js';
 import { AdminRegistryController, ClassifiedRegistryService, ClassifiedSuggestionsController } from './registry.service.js';
@@ -25,8 +28,8 @@ import { AdminRegistryController, ClassifiedRegistryService, ClassifiedSuggestio
 /** BitoCard Shop (classifieds): docs/BITOCARD_CLASSIFIEDS_PLAN.md. */
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
-  controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails],
-  exports: [ShopEmails, ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, SafePayGuardsService, ListingSearchService],
+  controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedContactController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails, ContactRequestsService, CallsService],
+  exports: [ShopEmails, ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, SafePayGuardsService, ListingSearchService, ContactRequestsService, CallsService],
 })
 export class ClassifiedsModule {}

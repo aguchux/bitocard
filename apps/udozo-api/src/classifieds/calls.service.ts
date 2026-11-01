@@ -1,0 +1,267 @@
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ApiError } from '../common/errors/api-error.js';
+import type { CustomerWithStore } from '../customers/customers.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { Prisma } from '../generated/prisma/client.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { ContactRequestsService, listingPath } from './contact.service.js';
+import { publicName } from './search.service.js';
+import { CloudflareTurn, type IceServer } from './turn.js';
+
+/** Someone is online for this long after their last look at udozo.com (pages say so every few seconds). */
+export const onlineMs = 60_000;
+/** Presence is written at most this often per person. */
+export const presenceWriteMs = 15_000;
+/** A call rings this long before it is missed. */
+export const ringMs = 45_000;
+/** A side that has not looked at an answered call for this long has gone: the call ends. */
+export const quietMs = 30_000;
+/** A buyer starts at most this many calls an hour. */
+export const callsPerHour = 10;
+/** Connection details one call may carry (offers, answers, candidates). */
+export const maxSignals = 300;
+const maxSdp = 20_000;
+const maxCandidate = 1_000;
+/** Calls are kept (without their connection details) this long, for the seller's list of calls. */
+export const keepCallsMs = 90 * 86_400_000;
+
+const live = ['ringing', 'answered'];
+const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such call.');
+const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
+const unavailable = () => new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'calls_unavailable', 'Calls are not available just now. Chat with the seller, or ask them to call you back.');
+
+const callInclude = {
+  listing: { select: { id: true, title: true, country: true, ref: true, slug: true } },
+  caller: { select: { id: true, name: true, storeId: true } },
+  callee: { select: { id: true, name: true, storeId: true } },
+} satisfies Prisma.ClassifiedCallInclude;
+type CallRow = Prisma.ClassifiedCallGetPayload<{ include: typeof callInclude }>;
+
+export type SignalInput = { kind: 'offer' | 'answer' | 'candidate'; payload: unknown };
+
+/**
+ * Calls in the browser between a buyer and a seller while both are on udozo.com: the buyer rings, the seller's open
+ * pages ring (and a push says so), the seller answers or declines, and the two browsers swap their connection details
+ * here (polled: no sockets on Vercel). Audio goes through Cloudflare's TURN relay only, so neither side learns the
+ * other's phone number or internet address; nothing is recorded.
+ */
+@Injectable()
+export class CallsService {
+  private readonly logger = new Logger(CallsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly integrations: IntegrationsService,
+    private readonly inbox: InboxService,
+    private readonly contacts: ContactRequestsService,
+  ) {}
+
+  private turn() {
+    const config = this.integrations.config;
+    return new CloudflareTurn({ keyId: config.CLOUDFLARE_TURN_KEY_ID, token: config.CLOUDFLARE_TURN_API_TOKEN, baseUrl: config.CLOUDFLARE_TURN_API_URL });
+  }
+
+  /** Whether calls are offered at all (the relay is set up). */
+  available() {
+    return this.turn().configured();
+  }
+
+  /** Whether someone had udozo.com open in the last minute. */
+  async online(customerId: string) {
+    const row = await this.prisma.customerPresence.findUnique({ where: { customerId } });
+    return Boolean(row && row.seenAt.getTime() > Date.now() - onlineMs);
+  }
+
+  /** A page says the customer is here (written at most every 15 seconds) and hears of a call ringing for them. */
+  async presence(customer: CustomerWithStore) {
+    const now = new Date();
+    await this.prisma.$executeRaw`
+      INSERT INTO "customer_presence" ("customer_id", "seen_at") VALUES (${customer.id}::uuid, ${now})
+      ON CONFLICT ("customer_id") DO UPDATE SET "seen_at" = EXCLUDED."seen_at"
+      WHERE "customer_presence"."seen_at" < ${new Date(now.getTime() - presenceWriteMs)}`;
+    await this.settle({ calleeId: customer.id, status: 'ringing' });
+    const ringing = await this.prisma.classifiedCall.findFirst({ where: { calleeId: customer.id, status: 'ringing' }, include: callInclude, orderBy: { createdAt: 'desc' } });
+    return { object: 'classified_presence' as const, calls: this.available(), incoming: ringing ? this.present(ringing, customer.id) : null };
+  }
+
+  /** The buyer rings the seller of a listing, who must be on udozo.com now. */
+  async start(customer: CustomerWithStore, listingId: string) {
+    const listing = await this.contacts.contactable(customer, listingId);
+    if (listing.contact === 'chat') throw conflict('calls_not_offered', 'This seller takes messages only: chat with them here.');
+    if (!this.available()) throw unavailable();
+    await this.settle({ OR: [{ callerId: { in: [customer.id, listing.customerId] } }, { calleeId: { in: [customer.id, listing.customerId] } }], status: { in: live } });
+    if (!(await this.online(listing.customerId))) throw conflict('seller_offline', 'The seller is not on Udozo right now. Ask them to call you back, or chat with them here.');
+    const recent = await this.prisma.classifiedCall.count({ where: { callerId: customer.id, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
+    if (recent >= callsPerHour) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'call_limit', `You can make ${callsPerHour} calls an hour. Try again later, or chat with the seller here.`);
+    const busy = (id: string) => this.prisma.classifiedCall.findFirst({ where: { status: { in: live }, OR: [{ callerId: id }, { calleeId: id }] }, select: { id: true } });
+    if (await busy(customer.id)) throw conflict('call_in_progress', 'You are already in a call. End it first.');
+    if (await busy(listing.customerId)) throw conflict('seller_busy', 'The seller is on another call. Try again in a few minutes, or chat with them here.');
+    const iceServers = await this.iceServers();
+    let call: CallRow;
+    try {
+      call = await this.prisma.classifiedCall.create({ data: { listingId: listing.id, callerId: customer.id, calleeId: listing.customerId, country: listing.country }, include: callInclude });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw conflict('seller_busy', 'The seller is on another call. Try again in a few minutes, or chat with them here.');
+      throw error;
+    }
+    await this.inbox.customer({ customerId: call.callee.id, storeId: call.callee.storeId }, 'customer.classifieds.call_incoming', {
+      subject: call.id,
+      title: `${publicName(call.caller.name)} is calling you`,
+      body: `About “${call.listing.title ?? 'your listing'}”. Open Udozo to answer.`,
+      link: '/account/requests',
+    });
+    return { ...this.present(call, customer.id), ice_servers: iceServers };
+  }
+
+  /** The call, with the other side's connection details after `after` (polled by both sides). */
+  async get(customer: CustomerWithStore, id: string, after?: string) {
+    const call = await this.party(customer, id);
+    const field = call.callerId === customer.id ? 'callerSeenAt' : 'calleeSeenAt';
+    await this.prisma.classifiedCall.updateMany({ where: { id, status: { in: live } }, data: { [field]: new Date() } });
+    await this.settle({ id });
+    const fresh = await this.prisma.classifiedCall.findUniqueOrThrow({ where: { id }, include: callInclude });
+    let since: bigint | undefined;
+    if (after !== undefined) {
+      if (!/^\d{1,18}$/.test(after)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Give the last signal id you read.', 'after');
+      since = BigInt(after);
+    }
+    const signals = live.includes(fresh.status)
+      ? await this.prisma.classifiedCallSignal.findMany({ where: { callId: id, fromId: { not: customer.id }, ...(since !== undefined ? { id: { gt: since } } : {}) }, orderBy: { id: 'asc' }, take: 100 })
+      : [];
+    return { ...this.present(fresh, customer.id), signals: signals.map(signal => ({ id: signal.id.toString(), kind: signal.kind, payload: signal.payload })) };
+  }
+
+  /** The seller answers a ringing call (and gets the relay's credentials). */
+  async answer(customer: CustomerWithStore, id: string) {
+    const call = await this.party(customer, id);
+    if (call.calleeId !== customer.id) throw notFound();
+    await this.settle({ id });
+    const iceServers = await this.iceServers();
+    const now = new Date();
+    const claimed = await this.prisma.classifiedCall.updateMany({ where: { id, status: 'ringing' }, data: { status: 'answered', answeredAt: now, calleeSeenAt: now } });
+    if (!claimed.count) throw conflict('call_ended', 'The call has ended.');
+    return { ...this.present(await this.prisma.classifiedCall.findUniqueOrThrow({ where: { id }, include: callInclude }), customer.id), ice_servers: iceServers };
+  }
+
+  /** Either side ends it: the caller before an answer cancels, the seller declines, after an answer it ends. */
+  async end(customer: CustomerWithStore, id: string) {
+    const call = await this.party(customer, id);
+    const side = call.callerId === customer.id ? 'caller' : 'callee';
+    const now = new Date();
+    const status = call.status === 'answered' ? 'ended' : side === 'caller' ? 'cancelled' : 'declined';
+    await this.prisma.classifiedCall.updateMany({ where: { id, status: call.status === 'answered' ? 'answered' : 'ringing' }, data: { status, endedAt: now, endedBy: side } });
+    await this.prisma.classifiedCallSignal.deleteMany({ where: { callId: id } });
+    return this.present(await this.prisma.classifiedCall.findUniqueOrThrow({ where: { id }, include: callInclude }), customer.id);
+  }
+
+  /** One side's connection detail: its offer or answer, or a network candidate, for the other side to read. */
+  async signal(customer: CustomerWithStore, id: string, input: SignalInput) {
+    const call = await this.party(customer, id);
+    if (!live.includes(call.status)) throw conflict('call_ended', 'The call has ended.');
+    const payload = checkSignal(input);
+    const count = await this.prisma.classifiedCallSignal.count({ where: { callId: id } });
+    if (count >= maxSignals) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'too_many_signals', 'This call cannot take more connection details.');
+    const row = await this.prisma.classifiedCallSignal.create({ data: { callId: id, fromId: customer.id, kind: input.kind, payload: payload as Prisma.InputJsonValue } });
+    return { object: 'classified_call_signal' as const, id: row.id.toString(), kind: row.kind };
+  }
+
+  /** The seller's recent calls (and the buyer's own), newest first. */
+  async recent(customer: CustomerWithStore) {
+    const rows = await this.prisma.classifiedCall.findMany({ where: { OR: [{ calleeId: customer.id }, { callerId: customer.id }] }, include: callInclude, orderBy: { createdAt: 'desc' }, take: 30 });
+    return { object: 'list' as const, data: rows.map(row => this.present(row, customer.id)) };
+  }
+
+  /**
+   * Calls that ran out: ringing past its time is missed (the seller told), an answered call with a side gone quiet is
+   * lost. Each change is claimed once. Run by every look at a call, and by the `classifieds` job for the rest, which also
+   * deletes calls past 90 days.
+   */
+  async settle(where: Prisma.ClassifiedCallWhereInput = { status: { in: live } }) {
+    const now = Date.now();
+    const due = await this.prisma.classifiedCall.findMany({
+      where: { AND: [where, { OR: [{ status: 'ringing', createdAt: { lt: new Date(now - ringMs) } }, { status: 'answered', OR: [{ callerSeenAt: { lt: new Date(now - quietMs) } }, { calleeSeenAt: { lt: new Date(now - quietMs) } }] }] }] },
+      include: callInclude,
+      take: 200,
+    });
+    for (const call of due) {
+      const status = call.status === 'ringing' ? 'missed' : 'lost';
+      const claimed = await this.prisma.classifiedCall.updateMany({ where: { id: call.id, status: call.status }, data: { status, endedAt: new Date(), endedBy: 'udozo' } });
+      if (!claimed.count) continue;
+      await this.prisma.classifiedCallSignal.deleteMany({ where: { callId: call.id } });
+      if (status === 'missed') {
+        await this.inbox.customer({ customerId: call.callee.id, storeId: call.callee.storeId }, 'customer.classifieds.call_missed', {
+          subject: call.id,
+          title: `You missed a call from ${publicName(call.caller.name)}`,
+          body: `About “${call.listing.title ?? 'your listing'}”. Reply in a chat, or stay on Udozo to take their next call.`,
+          link: '/account/requests',
+        });
+      }
+    }
+    return due.length;
+  }
+
+  /** The job's work: settle what ran out, delete old calls and old answered requests. */
+  async job() {
+    const settled = await this.settle();
+    const { count } = await this.prisma.classifiedCall.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - keepCallsMs) }, status: { notIn: live } } });
+    return { settled, deleted: count, old_requests: await this.contacts.purgeOld() };
+  }
+
+  private async party(customer: CustomerWithStore, id: string) {
+    const call = await this.prisma.classifiedCall.findUnique({ where: { id } });
+    if (!call || (call.callerId !== customer.id && call.calleeId !== customer.id)) throw notFound();
+    return call;
+  }
+
+  private async iceServers(): Promise<IceServer[]> {
+    const turn = this.turn();
+    if (!turn.configured()) throw unavailable();
+    try {
+      return await turn.iceServers();
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Could not make call relay credentials');
+      throw unavailable();
+    }
+  }
+
+  /** A call as one side sees it: the other side by their public name only, never their number or address. */
+  present(row: CallRow, viewerId: string) {
+    const role = row.callerId === viewerId ? ('caller' as const) : ('callee' as const);
+    const other = role === 'caller' ? row.callee : row.caller;
+    return {
+      object: 'classified_call' as const,
+      id: row.id,
+      status: row.status,
+      role,
+      with: { name: publicName(other.name) },
+      listing: { id: row.listing.id, title: row.listing.title, path: listingPath(row.listing) },
+      ring_until: row.status === 'ringing' ? new Date(row.createdAt.getTime() + ringMs).toISOString() : null,
+      answered_at: row.answeredAt?.toISOString() ?? null,
+      ended_at: row.endedAt?.toISOString() ?? null,
+      created_at: row.createdAt.toISOString(),
+    };
+  }
+}
+
+const bad = (message: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', message, 'payload');
+
+/** Only the fields a browser's connection detail has, within their sizes. */
+export function checkSignal(input: SignalInput) {
+  const payload = (input.payload ?? null) as Record<string, unknown> | null;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw bad('Give the connection detail.');
+  if (input.kind === 'offer' || input.kind === 'answer') {
+    if (payload.type !== input.kind || typeof payload.sdp !== 'string' || !payload.sdp || payload.sdp.length > maxSdp) throw bad('Give the session description.');
+    return { type: input.kind, sdp: payload.sdp };
+  }
+  if (input.kind !== 'candidate') throw bad('Give an offer, an answer or a candidate.');
+  const candidate = payload.candidate;
+  if (candidate !== null && (typeof candidate !== 'string' || candidate.length > maxCandidate)) throw bad('Give the candidate.');
+  const mid = payload.sdpMid;
+  const line = payload.sdpMLineIndex;
+  const fragment = payload.usernameFragment;
+  if (mid !== undefined && mid !== null && (typeof mid !== 'string' || mid.length > 64)) throw bad('Give the candidate.');
+  if (line !== undefined && line !== null && (!Number.isInteger(line) || (line as number) < 0 || (line as number) > 64)) throw bad('Give the candidate.');
+  if (fragment !== undefined && fragment !== null && (typeof fragment !== 'string' || fragment.length > 256)) throw bad('Give the candidate.');
+  return { candidate, sdpMid: mid ?? null, sdpMLineIndex: line ?? null, ...(typeof fragment === 'string' ? { usernameFragment: fragment } : {}) };
+}

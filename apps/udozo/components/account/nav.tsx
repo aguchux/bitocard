@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Landmark, LayoutList, MessagesSquare, Plus, ReceiptText, ShieldCheck, Store, UserRound, WalletMinimal } from "lucide-react";
+import { Heart, Landmark, LayoutList, MessagesSquare, PhoneCall, Plus, ReceiptText, ShieldCheck, Store, UserRound, WalletMinimal } from "lucide-react";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { accountPlaces, currentPlace, type PlaceCounts } from "@/lib/account-places";
 
-const icons = { listings: LayoutList, messages: MessagesSquare, orders: ReceiptText, favourites: Heart, resellers: Store, wallet: WalletMinimal, "safe-pay": ShieldCheck, payouts: Landmark, profile: UserRound };
+const icons = { listings: LayoutList, messages: MessagesSquare, requests: PhoneCall, orders: ReceiptText, favourites: Heart, resellers: Store, wallet: WalletMinimal, "safe-pay": ShieldCheck, payouts: Landmark, profile: UserRound };
 
 /**
  * The account's places: underlined tabs across the top on phones and tablets, a list beside the page on desktop. The
