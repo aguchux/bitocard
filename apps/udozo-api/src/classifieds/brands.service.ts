@@ -136,6 +136,12 @@ export class ClassifiedBrandsService {
     return key ? ((await this.registry()).byKey.get(key) ?? null) : null;
   }
 
+  /** The registry's brand of a listing's value, as the public lists show one (its logo, its colour), or null. */
+  async lookup(value: string | null | undefined) {
+    const row = value ? await this.match(value) : null;
+    return row ? this.present(row) : null;
+  }
+
   /** A seller's value in the registry's words, or as typed when the registry lacks it. */
   async canonical(value: string) {
     return (await this.match(value))?.name ?? value;

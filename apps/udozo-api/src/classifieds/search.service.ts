@@ -4,7 +4,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
-import { conditions, featureValueOut, heldUnits, invalid, onShopWhere } from './rules.js';
+import { ClassifiedBrandsService } from './brands.service.js';
+import { brandFeatureKey, conditions, featureValueOut, heldUnits, invalid, onShopWhere } from './rules.js';
 
 /** Areas whose centres are this close count as nearby. */
 export const nearbyKm = 25;
@@ -81,6 +82,7 @@ export class ListingSearchService {
     private readonly prisma: PrismaService,
     private readonly listings: ListingsService,
     private readonly leads: LeadsService,
+    private readonly brands: ClassifiedBrandsService,
   ) {}
 
   private async features(filters: string[] | undefined) {
@@ -268,11 +270,12 @@ export class ListingSearchService {
     // A listing sold only through resellers' stores has no page on BitoCard Shop.
     if (!row || row.country !== code || !row.onShop || ['draft', 'pending_review'].includes(row.status)) throw notFound();
     if (row.status === 'sold' ? !row.soldAt || Date.now() - row.soldAt.getTime() > soldVisibleMs : row.status !== 'active') throw gone();
-    const [checked, active, responseRate, holding] = await Promise.all([
+    const [checked, active, responseRate, holding, brand] = await Promise.all([
       this.idChecked([row.customerId]),
       this.prisma.classifiedListing.count({ where: { customerId: row.customerId, ...onShopWhere } }),
       this.leads.responseRate(row.customerId),
       heldUnits(this.prisma, row.id),
+      this.brands.lookup(row.features.find(value => value.feature.key === brandFeatureKey)?.valueText),
     ]);
     const order = new Map(row.category!.features.map(link => [link.featureId, link.position]));
     const photos = row.media.filter(item => item.kind === 'photo');
@@ -299,6 +302,8 @@ export class ListingSearchService {
       features: row.features
         .sort((a, b) => (order.get(a.featureId) ?? 1000) - (order.get(b.featureId) ?? 1000) || a.feature.name.localeCompare(b.feature.name))
         .map(value => ({ key: value.feature.key, name: value.feature.name, icon: value.feature.icon, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) })),
+      /** The brand feature's registry brand (its logo and colour), when the registry has it. */
+      brand,
       photos: photos.map(item => ({ url: item.url, width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,

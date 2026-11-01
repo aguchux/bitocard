@@ -130,6 +130,10 @@ describe("listings' brands", () => {
     assert.equal(counts.Samsung, 1);
     assert.equal(counts.Apple, 1);
     assert.equal(counts.Tecno, 0);
+    // The listing's page names the registry's brand, with its logo.
+    const page = await visitor.get(`/v1/classifieds/listings/${made.galaxy.ref}?country=NG`);
+    assert.equal(page.json.brand.slug, 'samsung');
+    assert.match(page.json.brand.logo_url, /samsung\.svg$/);
     // The search filter finds it in any case.
     const filtered = await visitor.get('/v1/classifieds/listings?country=NG&category=mobile-phones&f=brand:samsung');
     assert.deepEqual(filtered.json.data.map(row => row.id), [made.galaxy.id]);
@@ -138,6 +142,7 @@ describe("listings' brands", () => {
   test("a brand the registry lacks is saved as typed and goes to admins as sellers' suggestion", async () => {
     made.odd = await live(made.seller, { title: 'Zenphone Max 5G', brand: 'Zenphone' });
     assert.equal(brandOf(made.odd), 'Zenphone');
+    assert.equal((await visitor.get(`/v1/classifieds/listings/${made.odd.ref}?country=NG`)).json.brand, null);
     const other = await customer('Bisi Adebayo');
     await live(other, { title: 'Zenphone Lite', brand: 'ZENPHONE' });
     const suggestions = await support.get('/v1/admin/classifieds/brand-suggestions');
