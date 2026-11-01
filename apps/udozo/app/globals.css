@@ -27,8 +27,21 @@ dialog.sheet[open] {
 dialog.sheet::backdrop {
   background: rgb(7 15 76 / 0.45);
 }
+/* The header's categories: a drawer slid in from the left, full height. */
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+dialog.drawer[open] {
+  animation: drawer-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.drawer::backdrop {
+  background: rgb(7 15 76 / 0.45);
+}
 @media (prefers-reduced-motion: reduce) {
-  dialog.sheet[open] {
+  dialog.sheet[open],
+  dialog.drawer[open] {
     animation: none;
   }
 }
