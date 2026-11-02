@@ -220,6 +220,13 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedResaleSet
         {saved.open ? <Badge tone="green">Resale is open here</Badge> : <Badge tone="amber">Resale is closed here</Badge>}
         {saved.reseller_fee_bps === null || saved.reseller_fee_cap === null ? <Badge tone="amber">Reseller fee not set</Badge> : null}
       </div>
+      {saved.open ? null : (
+        <Notice tone="amber">
+          {saved.reason === "switch_off"
+            ? "Sellers cannot let resellers sell their listings here until the Marketplace resale switch is on for this market (Settings › Feature switches)."
+            : "The resale switch is on, but sellers still cannot let resellers sell their listings: set Udozo's reseller fee and its cap below (0% is allowed) to open it."}
+        </Notice>
+      )}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-6">
           <Card>

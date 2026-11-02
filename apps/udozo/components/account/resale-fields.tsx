@@ -88,7 +88,11 @@ export function ResaleFields({
               Let resellers sell this
             </span>
             <span className="block text-slate-600">
-              {open ? "Resellers sell it on their own stores and earn a discount; you hand it to their buyer, paid through Safe pay." : "Selling through resellers is not open in your country yet."}
+              {open
+                ? "Resellers sell it on their own stores and earn a discount; you hand it to their buyer, paid through Safe pay."
+                : availability?.reason === "not_set_up"
+                  ? "Udozo is still setting up selling through resellers in your country. You can turn it on here once it opens."
+                  : "Selling through resellers is not open in your country yet."}
             </span>
           </span>
         </label>

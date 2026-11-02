@@ -375,6 +375,8 @@ export type ClassifiedResaleSettings = {
   updated_at: string | null;
   /** The `classifieds_resale` switch on and the reseller fee set: suppliers can open listings to resellers. */
   open: boolean;
+  /** Why it is closed: the switch off, or Udozo's reseller fee not set. */
+  reason?: 'switch_off' | 'not_set_up' | null;
 };
 export type ClassifiedResaleSettingsInput = Partial<Pick<ClassifiedResaleSettings, 'discount_min_bps' | 'discount_max_bps' | 'markup_max_bps' | 'accept_hours' | 'reseller_strike_limit'>> & {
   reseller_fee_bps?: number;

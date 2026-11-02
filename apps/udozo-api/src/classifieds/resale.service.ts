@@ -130,7 +130,8 @@ export class ResaleService {
 
   async adminSettings(country: string) {
     await this.requireCountry(country);
-    return { ...this.present(await this.limits(country)), open: (await this.availability(country)).open };
+    const { open, reason } = await this.availability(country);
+    return { ...this.present(await this.limits(country)), open, reason };
   }
 
   async updateSettings(

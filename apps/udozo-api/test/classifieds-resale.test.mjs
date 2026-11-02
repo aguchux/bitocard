@@ -124,13 +124,15 @@ describe('resale: BitoCard limits and the switch', () => {
 
     assert.equal((await admin.put('/v1/admin/switches/classifieds_resale', { country_code: 'NG', enabled: true })).status, 200);
     assert.equal((await seller.get('/v1/classifieds/me/resale')).json.reason, 'not_set_up', 'the reseller fee is not set yet');
+    // Admins are told why it is still closed.
+    assert.deepEqual(((json) => [json.open, json.reason])((await admin.get('/v1/admin/classifieds/resale-settings/NG')).json), [false, 'not_set_up']);
     const support = await adminClient(server, ['support']);
     assert.equal((await support.put('/v1/admin/classifieds/resale-settings/NG', { reseller_fee_bps: 300 })).status, 403, 'finance sets it');
     assert.equal((await admin.put('/v1/admin/classifieds/resale-settings/NG', { discount_min_bps: 6000 })).json.error.param, 'discount_min_bps', 'smallest above largest');
     assert.equal((await admin.put('/v1/admin/classifieds/resale-settings/NG', { markup_max_bps: 15000 })).json.error.param, 'markup_max_bps', 'never above the markup cap');
     const set = await admin.put('/v1/admin/classifieds/resale-settings/NG', { reseller_fee_bps: 300, reseller_fee_cap: 500000 });
     assert.equal(set.status, 200, JSON.stringify(set.json));
-    assert.deepEqual([set.json.open, set.json.reseller_fee_bps, set.json.reseller_fee_cap, set.json.markup_cap_bps], [true, 300, 500000, 10000]);
+    assert.deepEqual([set.json.open, set.json.reason, set.json.reseller_fee_bps, set.json.reseller_fee_cap, set.json.markup_cap_bps], [true, null, 300, 500000, 10000]);
     assert.ok(await prisma.auditLog.count({ where: { action: 'classifieds.resale_settings_changed' } }));
 
     const open = (await seller.get('/v1/classifieds/me/resale')).json;
