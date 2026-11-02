@@ -213,6 +213,8 @@ export type ResaleStoreSupplier = ResaleSupplierLine & {
 };
 export type ResaleCategoryTile = { slug: string; name: string; count: number; cover: ResalePhoto | null };
 export type ResaleStoreListingPage = { object: 'list'; data: ResaleStoreListing[]; total: number; offset: number; limit: number };
+/** What a store's sitemap lists: the categories it has on sale and each listing. */
+export type ResaleStoreSitemap = { object: 'resale_store_sitemap'; categories: string[]; listings: Array<{ ref: number; slug: string; updated_at: string; images: string[] }> };
 export type StoreSectionType = StoreSection['type'];
 
 /** A section as the home page returns it: with what it shows. */

@@ -100,6 +100,7 @@ describe("Udozo's legal documents", () => {
     const footer = render(createElement(SiteFooter));
     for (const slug of ["terms", "safe-pay", "sellers", "privacy", "cookies"]) expect(footer).toContain(`href="/legal/${slug}"`);
     expect(footer).not.toContain("legals.bitocard.com");
+    vi.stubGlobal("fetch", async () => Response.json({ object: "list", data: [], showcase: false }));
     const xml = await (await sitemapMain()).text();
     expect(xml).toContain("<loc>https://udozo.com/legal</loc>");
     for (const doc of legalDocuments) expect(xml).toContain(`<loc>https://udozo.com/legal/${doc.slug}</loc>`);

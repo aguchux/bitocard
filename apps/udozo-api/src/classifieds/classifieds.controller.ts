@@ -298,11 +298,18 @@ export class ClassifiedReferenceController {
     return this.directory.categoryCovers(query.country);
   }
 
-  /** What a country's sitemap lists: category and place counts, and its listings a page at a time. */
+  /** What a country's sitemap lists: its categories, places and categories in a place, and the files its listings come in. */
   @Get('sitemap')
   @Header('Cache-Control', 'public, max-age=300')
-  sitemap(@Query() query: SitemapDto) {
-    return this.directory.sitemap(query.country, query.after);
+  sitemap(@Query() query: CountryDto) {
+    return this.directory.sitemap(query.country);
+  }
+
+  /** One file of a country's sitemap listings. */
+  @Get('sitemap/listings')
+  @Header('Cache-Control', 'public, max-age=300')
+  sitemapListings(@Query() query: SitemapDto) {
+    return this.directory.sitemapListings(query.country, query.after);
   }
 
   /** Live listings in one country: words, category, price, condition and feature filters; local first from `area`. */

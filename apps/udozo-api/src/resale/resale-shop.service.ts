@@ -110,6 +110,16 @@ export class ResaleShopService implements OnModuleInit {
     return { object: 'list' as const, data: await this.cards(items.slice(offset, offset + limit)), total: items.length, offset, limit };
   }
 
+  /** What a store's sitemap lists: the categories it has on sale, and each listing with when it last changed and its photos. */
+  async sitemap(subdomain: string) {
+    const items = await this.onSale(await this.store(subdomain));
+    return {
+      object: 'resale_store_sitemap' as const,
+      categories: [...new Set(items.flatMap(item => (item.row.listing.category ? [item.row.listing.category.slug] : [])))].sort(),
+      listings: items.map(({ row: { listing } }) => ({ ref: Number(listing.ref), slug: listing.slug ?? 'listing', updated_at: listing.updatedAt.toISOString(), images: listing.media.flatMap(media => (media.url ? [media.url] : [])) })),
+    };
+  }
+
   /** One listing on sale here, as its supplier wrote it, with the store's price and how the buyer's payment is protected. */
   /**
    * The store's home page (Udozo): what its owner published in Seller HQ, else its design's starting page, with the

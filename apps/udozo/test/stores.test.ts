@@ -22,6 +22,7 @@ const { requireStore, requireShopper, storeHome } = await import("@/lib/store");
 const { buyResale } = await import("@/lib/purchase-actions");
 const { GET: storeSignIn } = await import("@/app/store/[store]/signin/route");
 const { GET: storeRobots } = await import("@/app/store/[store]/robots.txt/route");
+const { GET: storeSitemap } = await import("@/app/store/[store]/store-sitemap.xml/route");
 const { StoreSections } = await import("@/components/store/store-sections");
 
 type Call = { url: string; method: string; headers: Headers; body: unknown };
@@ -190,6 +191,28 @@ describe("on a store", () => {
     const text = await (await storeRobots()).text();
     expect(text).toContain("Allow: /");
     expect(text).toContain("Disallow: /account");
+    expect(text).toContain("Sitemap: https://gadgets.ng/sitemap.xml");
+  });
+
+  test("a store's sitemap: a live store on its domain lists its pages on its own address; a test store has none", async () => {
+    expect(storeRoute({ kind: "domain", domain: "gadgets.ng" }, { subdomain: "gadgets", checkout_mode: "live", domain: "gadgets.ng" }, "/sitemap.xml", "")).toEqual({ rewrite: "/store/gadgets/store-sitemap.xml" });
+    onStore();
+    reply = () => Response.json(store());
+    expect((await storeSitemap()).status).toBe(404);
+
+    onStore({}, "https://gadgets.ng");
+    reply = url =>
+      url.includes("/v1/store/resale/sitemap")
+        ? Response.json({ object: "resale_store_sitemap", categories: ["tvs"], listings: [{ ref: 12, slug: "hisense-tv", updated_at: "2026-11-01T00:00:00.000Z", images: ["https://media.test/a.jpg"] }] })
+        : Response.json(store({ checkout_mode: "live", domain: "gadgets.ng" }));
+    const xml = await (await storeSitemap()).text();
+    for (const loc of ["https://gadgets.ng/", "https://gadgets.ng/listings", "https://gadgets.ng/listings?category=tvs", "https://gadgets.ng/l/12-hisense-tv"]) expect(xml).toContain(`<loc>${loc}</loc>`);
+    expect(xml).not.toContain("udozo.com");
+    expect(xml).toContain("<image:loc>https://media.test/a.jpg</image:loc>");
+
+    onStore({}, "https://gadgets.ng");
+    reply = url => (url.includes("/v1/store/resale/sitemap") ? new Response("down", { status: 500 }) : Response.json(store({ checkout_mode: "live", domain: "gadgets.ng" })));
+    expect((await storeSitemap()).status).toBe(503);
   });
 });
 

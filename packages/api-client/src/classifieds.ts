@@ -163,12 +163,23 @@ export type ShopShowcase = {
   sections: Array<{ country: string; name: string; listings: number; cards: ShopShowcaseCard[] }> | null;
 };
 
+/** What a country's sitemap lists, each with its live listings and when they last changed. */
 export type ShopSitemap = {
   object: 'classified_sitemap';
   country: string;
-  categories: Array<{ slug: string; listings: number }>;
-  places: Array<{ state: string; area: string | null; listings: number }>;
-  /** Each listing with its title and up to five photos (Udozo's API; for the image sitemap). */
+  updated_at: string | null;
+  categories: Array<{ slug: string; listings: number; updated_at: string | null }>;
+  places: Array<{ state: string; area: string | null; listings: number; updated_at: string | null }>;
+  /** A category in a state or area, once it has enough listings there to be indexed. */
+  category_places: Array<{ state: string; area: string | null; category: string; listings: number; updated_at: string | null }>;
+  /** The files its listings come in: each starts after a listing number. */
+  listing_pages: Array<{ after: number; listings: number; updated_at: string }>;
+};
+
+/** One file of a country's listings, each with its title and up to five photos (for the image sitemap). */
+export type ShopSitemapListings = {
+  object: 'classified_sitemap_listings';
+  country: string;
   listings: Array<{ ref: number; slug: string; updated_at: string; title?: string; images?: string[] }>;
   next_after: number | null;
 };

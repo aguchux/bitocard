@@ -154,6 +154,11 @@ describe('a Resale shop’s pages', () => {
     assert.deepEqual(home.json.sections.find(section => section.type === 'hero').data.listings.length, 1);
     assert.deepEqual(home.json.sections.find(section => section.type === 'resale_categories').data.categories.map(item => [item.slug, item.count]), [['tvs', 1]]);
     assert.deepEqual((await get(`/v1/store/resale/categories?store=${store.subdomain}`)).json.data.length, 1);
+    const map = await get(`/v1/store/resale/sitemap?store=${store.subdomain}`);
+    assert.equal(map.status, 200, JSON.stringify(map.json));
+    assert.deepEqual(map.json.listings.map(row => row.ref), (await get(`/v1/store/resale/listings?store=${store.subdomain}`)).json.data.map(row => row.ref), 'what is on sale here, nothing else');
+    assert.ok(map.json.listings.every(row => row.slug && row.updated_at && Array.isArray(row.images)));
+    assert.equal(map.json.categories.length, 1);
 
     // The supplier stops the reseller: nothing of theirs is on sale any more.
     await seller.post(`/v1/classifieds/me/resellers/${relationship.id}/stop`);

@@ -87,6 +87,12 @@ export class ResaleShopController {
   categories(@Query() query: StoreDto) {
     return this.shop.categories(query.store);
   }
+
+  @Get('sitemap')
+  @Header('Cache-Control', 'public, max-age=300')
+  sitemap(@Query() query: StoreDto) {
+    return this.shop.sitemap(query.store);
+  }
 }
 
 /** The words a Resale shop's own text may not use (claims of owning, making or stocking what it resells). */

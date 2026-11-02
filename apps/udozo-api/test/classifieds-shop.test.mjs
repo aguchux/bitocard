@@ -175,25 +175,68 @@ describe('markets and the global showcase', () => {
 });
 
 describe('sitemap data', () => {
-  test("a country's categories and places with their counts, and its listings a page at a time", async () => {
+  test("a country's categories and places with their counts and newest change", async () => {
     const sitemap = await get('/v1/classifieds/sitemap?country=ng');
     assert.equal(sitemap.status, 200, JSON.stringify(sitemap.json));
     assert.equal(sitemap.cache, 'public, max-age=300');
     const count = slug => sitemap.json.categories.find(row => row.slug === slug)?.listings;
     assert.ok(count('mobile-phones') >= 1 && count('laptops') >= 1);
     assert.ok(count('phones-tablets') >= count('mobile-phones'), 'a top category counts its subcategories');
+    assert.ok(sitemap.json.categories.find(row => row.slug === 'mobile-phones').updated_at);
     const lagos = sitemap.json.places.find(row => row.state === 'lagos' && row.area === null);
     const ikeja = sitemap.json.places.find(row => row.state === 'lagos' && row.area === 'ikeja');
     assert.ok(lagos.listings >= ikeja.listings && ikeja.listings >= 1);
-    const refs = sitemap.json.listings.map(row => row.ref);
+    assert.ok(lagos.updated_at >= ikeja.updated_at && sitemap.json.updated_at >= lagos.updated_at);
+    assert.equal((await get('/v1/classifieds/sitemap?country=KE')).json.error.code, 'classifieds_unavailable');
+  });
+
+  test('every listing is in a file, a file at a time, live and recently sold', async () => {
+    const { json } = await get('/v1/classifieds/sitemap?country=NG');
+    const file = await get('/v1/classifieds/sitemap/listings?country=NG');
+    assert.equal(file.cache, 'public, max-age=300');
+    assert.deepEqual(json.listing_pages.map(page => [page.after, page.listings]), [[0, file.json.listings.length]]);
+    assert.equal(json.listing_pages[0].updated_at, file.json.listings.map(row => row.updated_at).sort().at(-1));
+    const refs = file.json.listings.map(row => row.ref);
     assert.ok(refs.includes(made.phone.ref) && refs.includes(made.sold.ref), 'live and recently sold listings');
     assert.deepEqual([...refs].sort((a, b) => a - b), refs);
-    assert.ok(sitemap.json.listings.every(row => row.slug && row.updated_at && typeof row.title === 'string' && Array.isArray(row.images) && row.images.length <= 5));
-    assert.equal(sitemap.json.listings.find(row => row.ref === made.phone.ref).title, made.phone.title, 'each listing names itself for the image sitemap');
-    assert.equal(sitemap.json.next_after, null);
-    const later = await get(`/v1/classifieds/sitemap?country=NG&after=${made.phone.ref}`);
+    assert.ok(file.json.listings.every(row => row.slug && row.updated_at && typeof row.title === 'string' && Array.isArray(row.images) && row.images.length <= 5));
+    assert.equal(file.json.listings.find(row => row.ref === made.phone.ref).title, made.phone.title, 'each listing names itself for the image sitemap');
+    assert.equal(file.json.next_after, null);
+    const later = await get(`/v1/classifieds/sitemap/listings?country=NG&after=${made.phone.ref}`);
     assert.ok(!later.json.listings.some(row => row.ref <= made.phone.ref));
-    assert.equal((await get('/v1/classifieds/sitemap?country=KE')).json.error.code, 'classifieds_unavailable');
+    assert.equal((await get('/v1/classifieds/sitemap/listings?country=KE')).json.error.code, 'classifieds_unavailable');
+  });
+
+  test('files start where the one before ended, so listings past any one file are still listed', async () => {
+    const { listingPages } = await import('../dist/classifieds/directory.service.js');
+    const updated_at = new Date('2026-11-01T00:00:00.000Z');
+    assert.deepEqual(listingPages([{ last_ref: 5000n, listings: 5000n, updated_at }, { last_ref: 10400n, listings: 5000n, updated_at }, { last_ref: 10900n, listings: 12n, updated_at }]).map(page => [page.after, page.listings]), [[0, 5000], [5000, 5000], [10400, 12]]);
+  });
+
+  test('a category in a place is listed once it has enough there to be indexed, never where an area of the state has its name', async () => {
+    const [phones, lagosArea, ikejaArea] = await Promise.all([
+      prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'mobile-phones' } }),
+      prisma.classifiedArea.findFirstOrThrow({ where: { country: 'NG', kind: 'state', slug: 'lagos' } }),
+      prisma.classifiedArea.findFirstOrThrow({ where: { country: 'NG', kind: 'area', slug: 'ikeja' } }),
+    ]);
+    const before = await get('/v1/classifieds/sitemap?country=NG');
+    const inIkeja = before.json.places.find(row => row.state === 'lagos' && row.area === 'ikeja').listings;
+    const owner = made.phone.customer_id ?? (await prisma.classifiedListing.findUniqueOrThrow({ where: { id: made.phone.id } })).customerId;
+    const added = Array.from({ length: 5 }, (_, index) => ({ customerId: owner, categoryId: phones.id, country: 'NG', currency: 'NGN', stateId: lagosArea.id, areaId: ikejaArea.id, title: `Sitemap phone ${index}`, slug: `sitemap-phone-${index}`, priceMinor: 1_000_000n, condition: 'used', status: 'active', publishedAt: new Date() }));
+    await prisma.classifiedListing.createMany({ data: added });
+    const clash = await prisma.classifiedArea.create({ data: { country: 'NG', parentId: lagosArea.id, kind: 'area', slug: 'phones-tablets', name: 'Phones Tablets', latitude: 6.5, longitude: 3.3 } });
+    try {
+      const { json } = await get('/v1/classifieds/sitemap?country=NG');
+      const pages = json.category_places.map(row => [row.state, row.area, row.category].join('/'));
+      assert.ok(pages.includes('lagos/ikeja/mobile-phones') && pages.includes('lagos//mobile-phones'));
+      assert.ok(pages.includes('lagos/ikeja/phones-tablets'), 'a top category counts its subcategories in a place');
+      assert.ok(!pages.includes('lagos//phones-tablets'), 'the area of that name wins the address');
+      assert.ok(json.category_places.every(row => row.listings >= 5 && row.updated_at));
+      assert.equal(json.places.find(row => row.state === 'lagos' && row.area === 'ikeja').listings, inIkeja + 5);
+    } finally {
+      await prisma.classifiedArea.delete({ where: { id: clash.id } });
+      await prisma.classifiedListing.deleteMany({ where: { slug: { startsWith: 'sitemap-phone-' } } });
+    }
   });
 });
 

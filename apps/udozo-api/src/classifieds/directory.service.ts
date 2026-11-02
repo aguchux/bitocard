@@ -10,8 +10,16 @@ import { ListingSearchService, soldVisibleMs } from './search.service.js';
 
 /** The global showcase opens with the second market (owner's decision: Nigeria first, without it). */
 export const showcaseFrom = 2;
-/** Listing addresses per sitemap page. */
+/** Listing addresses per sitemap file. */
 export const sitemapPage = 5000;
+/** A category in a place joins the sitemap from this many live listings there (udozo.com's `indexFrom`: thinner pages are `noindex`). */
+export const sitemapPlaceFrom = 5;
+
+type ListingPageRow = { last_ref: bigint | number; listings: bigint | number; updated_at: Date };
+
+/** Each file of a country's listings: the number it starts after (the last one of the file before), its size and its newest change. */
+export const listingPages = (rows: ListingPageRow[]) => rows.map((row, index) => ({ after: index ? Number(rows[index - 1]!.last_ref) : 0, listings: Number(row.listings), updated_at: row.updated_at.toISOString() }));
+
 const showcaseCards = 12;
 const sectionCards = 8;
 const trendingDays = 14;
@@ -190,47 +198,90 @@ export class ShopDirectoryService {
   }
 
   /**
-   * What a country's sitemap lists: live listing counts per category (a top category counts its subcategories) and per
-   * state and area, and the listings themselves (live, or sold within the last 30 days), by number, a page at a time,
-   * each with its title and up to five ready photos (for the image sitemap).
+   * What a country's sitemap lists, each with its count of live listings and when they last changed: its categories (a
+   * top category counts its subcategories), states and areas, a category in a state or area once it has enough there to
+   * be indexed, and the files its listings come in (`sitemapListings`).
    */
-  async sitemap(country: string, after = 0) {
+  async sitemap(country: string) {
     const code = country.toUpperCase();
     await this.listings.requireOpen(code);
-    const [categories, byCategory, byPlace, areas, rows] = await Promise.all([
+    const [categories, groups, areas, pages] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { enabled: true, countries: { some: { country: code, enabled: true } } }, select: { id: true, slug: true, parentId: true } }),
-      this.prisma.classifiedListing.groupBy({ by: ['categoryId'], where: { country: code, ...onShopWhere }, _count: { _all: true } }),
-      this.prisma.classifiedListing.groupBy({ by: ['stateId', 'areaId'], where: { country: code, ...onShopWhere }, _count: { _all: true } }),
-      this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true } }),
-      this.prisma.classifiedListing.findMany({
-        where: { country: code, onShop: true, ref: { gt: BigInt(after) }, OR: [{ status: 'active' }, { status: 'sold', soldAt: { gt: new Date(Date.now() - soldVisibleMs) } }] },
-        select: { ref: true, slug: true, title: true, updatedAt: true, media: { where: { kind: 'photo', status: 'ready', url: { not: null } }, orderBy: { position: 'asc' }, take: 5, select: { url: true } } },
-        orderBy: { ref: 'asc' },
-        take: sitemapPage + 1,
-      }),
+      this.prisma.classifiedListing.groupBy({ by: ['categoryId', 'stateId', 'areaId'], where: { country: code, ...onShopWhere }, _count: { _all: true }, _max: { updatedAt: true } }),
+      this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true, parentId: true } }),
+      this.prisma.$queryRaw<ListingPageRow[]>`
+        SELECT max("ref") AS last_ref, count(*) AS listings, max("updated_at") AS updated_at
+        FROM (
+          SELECT "ref", "updated_at", row_number() OVER (ORDER BY "ref") AS place
+          FROM "classified_listings"
+          WHERE "country" = ${code} AND "on_shop" AND ("status" = 'active' OR ("status" = 'sold' AND "sold_at" > ${new Date(Date.now() - soldVisibleMs)}::timestamptz))
+        ) listed
+        GROUP BY (place - 1) / ${sitemapPage}::bigint
+        ORDER BY 1`,
     ]);
-    const counted = new Map(byCategory.map(row => [row.categoryId, row._count._all]));
-    const slugOf = new Map(areas.map(area => [area.id, area.slug]));
-    const states = new Map<string, number>();
-    const places: { state: string; area: string | null; listings: number }[] = [];
-    for (const row of byPlace) {
-      const state = row.stateId ? slugOf.get(row.stateId) : undefined;
+    const categoryOf = new Map(categories.map(category => [category.id, category]));
+    const areaOf = new Map(areas.map(area => [area.id, area]));
+    const tally = new Map<string, { listings: number; updated: Date | null }>();
+    const add = (key: string, listings: number, updated: Date | null) => {
+      const seen = tally.get(key);
+      tally.set(key, { listings: (seen?.listings ?? 0) + listings, updated: seen?.updated && updated ? (seen.updated > updated ? seen.updated : updated) : (seen?.updated ?? updated) });
+    };
+    const placeKey = (state: string, area: string | null, category: string | null) => [state, area ?? '', category ?? ''].join('/');
+    for (const group of groups) {
+      const listings = group._count._all;
+      const updated = group._max.updatedAt;
+      const category = group.categoryId ? categoryOf.get(group.categoryId) : undefined;
+      const parent = category?.parentId ? categoryOf.get(category.parentId) : undefined;
+      const slugs = [category?.slug, parent?.slug].filter((slug): slug is string => Boolean(slug));
+      for (const slug of slugs) add(`category:${slug}`, listings, updated);
+      const state = group.stateId ? areaOf.get(group.stateId) : undefined;
       if (!state) continue;
-      states.set(state, (states.get(state) ?? 0) + row._count._all);
-      const area = row.areaId ? slugOf.get(row.areaId) : undefined;
-      if (area) places.push({ state, area, listings: row._count._all });
+      const area = group.areaId ? areaOf.get(group.areaId) : undefined;
+      const within = area?.parentId === state.id ? area.slug : null;
+      for (const slug of [null, ...slugs]) {
+        add(placeKey(state.slug, null, slug), listings, updated);
+        if (within) add(placeKey(state.slug, within, slug), listings, updated);
+      }
     }
-    const page = rows.slice(0, sitemapPage);
+    // An address's second part is an area of the state when one has that name, so that category has no page there.
+    const areaNames = new Set(areas.flatMap(area => (area.parentId ? [`${areaOf.get(area.parentId)?.slug}/${area.slug}`] : [])));
+    const places = [...tally].flatMap(([key, { listings, updated }]) => {
+      if (key.startsWith('category:')) return [];
+      const [state, area, category] = key.split('/') as [string, string, string];
+      return [{ state, area: area || null, category: category || null, listings, updated_at: updated?.toISOString() ?? null }];
+    });
+    const byPlace = (a: (typeof places)[number], b: (typeof places)[number]) => a.state.localeCompare(b.state) || (a.area ?? '').localeCompare(b.area ?? '') || (a.category ?? '').localeCompare(b.category ?? '');
+    const newest = [...tally.values()].reduce<Date | null>((latest, { updated }) => (updated && (!latest || updated > latest) ? updated : latest), null);
     return {
       object: 'classified_sitemap' as const,
       country: code,
+      updated_at: newest?.toISOString() ?? null,
       categories: categories
-        .map(category => ({
-          slug: category.slug,
-          listings: (counted.get(category.id) ?? 0) + categories.filter(child => child.parentId === category.id).reduce((sum, child) => sum + (counted.get(child.id) ?? 0), 0),
-        }))
+        .map(category => {
+          const seen = tally.get(`category:${category.slug}`);
+          return { slug: category.slug, listings: seen?.listings ?? 0, updated_at: seen?.updated?.toISOString() ?? null };
+        })
         .sort((a, b) => a.slug.localeCompare(b.slug)),
-      places: [...[...states].map(([state, listings]) => ({ state, area: null, listings })), ...places].sort((a, b) => a.state.localeCompare(b.state) || (a.area ?? '').localeCompare(b.area ?? '')),
+      places: places.filter(place => !place.category).map(({ state, area, listings, updated_at }) => ({ state, area, listings, updated_at })).sort((a, b) => a.state.localeCompare(b.state) || (a.area ?? '').localeCompare(b.area ?? '')),
+      category_places: places.filter(place => place.category && place.listings >= sitemapPlaceFrom && (place.area || !areaNames.has(`${place.state}/${place.category}`))).sort(byPlace),
+      listing_pages: listingPages(pages),
+    };
+  }
+
+  /** One file of a country's listings (live, or sold within the last 30 days), by number, each with its title and up to five ready photos (for the image sitemap). */
+  async sitemapListings(country: string, after = 0) {
+    const code = country.toUpperCase();
+    await this.listings.requireOpen(code);
+    const rows = await this.prisma.classifiedListing.findMany({
+      where: { country: code, onShop: true, ref: { gt: BigInt(after) }, OR: [{ status: 'active' }, { status: 'sold', soldAt: { gt: new Date(Date.now() - soldVisibleMs) } }] },
+      select: { ref: true, slug: true, title: true, updatedAt: true, media: { where: { kind: 'photo', status: 'ready', url: { not: null } }, orderBy: { position: 'asc' }, take: 5, select: { url: true } } },
+      orderBy: { ref: 'asc' },
+      take: sitemapPage + 1,
+    });
+    const page = rows.slice(0, sitemapPage);
+    return {
+      object: 'classified_sitemap_listings' as const,
+      country: code,
       listings: page.map(row => ({ ref: Number(row.ref), slug: row.slug, title: row.title ?? '', updated_at: row.updatedAt.toISOString(), images: row.media.flatMap(media => (media.url ? [media.url] : [])) })),
       next_after: rows.length > sitemapPage ? Number(page.at(-1)!.ref) : null,
     };

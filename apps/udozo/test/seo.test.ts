@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test, vi } from "vitest";
-import type { ShopListingCard, ShopListingPage, ShopMarket, ShopSitemap } from "@bitocard/api-client/classifieds";
+import type { ShopListingCard, ShopListingPage, ShopMarket, ShopSitemap, ShopSitemapListings } from "@bitocard/api-client/classifieds";
 import { faqGroups } from "@/lib/help";
 import { ogClip, ogMoney, ogPhoto, photoType } from "@/lib/og";
 import { breadcrumbJsonLd, faqJsonLd, itemListJsonLd, jsonLdText, listingJsonLd, organizationJsonLd, productMetaTags, regionalAlternates, websiteJsonLd } from "@/lib/seo";
-import { countryEntries, sitemapIndex, urlset } from "@/lib/sitemap";
+import { countryEntries, listingEntries, sitemapIndex, urlset } from "@/lib/sitemap";
 
 const market = (country: string, name: string): ShopMarket => ({ object: "classified_market", country, name, currency: "NGN", listings: 1, safe_pay: false, install_prompt: false });
 
@@ -54,24 +54,33 @@ describe("structured data", () => {
 });
 
 describe("sitemaps", () => {
-  test("a country's home, categories with listings, places with enough of them, and every listing", () => {
+  test("a country's home, categories with listings, and places and categories in a place with enough of them", () => {
     const page: ShopSitemap = {
       object: "classified_sitemap",
       country: "NG",
+      updated_at: "2026-10-25T10:00:00.000Z",
       categories: [
-        { slug: "mobile-phones", listings: 3 },
-        { slug: "boats", listings: 0 },
+        { slug: "mobile-phones", listings: 3, updated_at: "2026-10-24T10:00:00.000Z" },
+        { slug: "boats", listings: 0, updated_at: null },
       ],
       places: [
-        { state: "lagos", area: null, listings: 12 },
-        { state: "lagos", area: "ikeja", listings: 5 },
-        { state: "kano", area: null, listings: 2 },
+        { state: "lagos", area: null, listings: 12, updated_at: "2026-10-25T10:00:00.000Z" },
+        { state: "lagos", area: "ikeja", listings: 5, updated_at: "2026-10-23T10:00:00.000Z" },
+        { state: "kano", area: null, listings: 2, updated_at: "2026-10-22T10:00:00.000Z" },
       ],
-      listings: [{ ref: 100001, slug: "tv", updated_at: "2026-10-25T10:00:00.000Z" }],
-      next_after: null,
+      category_places: [
+        { state: "lagos", area: null, category: "mobile-phones", listings: 6, updated_at: "2026-10-21T10:00:00.000Z" },
+        { state: "lagos", area: "ikeja", category: "mobile-phones", listings: 5, updated_at: "2026-10-21T10:00:00.000Z" },
+        { state: "kano", area: null, category: "mobile-phones", listings: 4, updated_at: "2026-10-21T10:00:00.000Z" },
+      ],
+      listing_pages: [],
     };
-    const locations = countryEntries("https://shop.bitocard.com", "ng", [page]).map(entry => entry.loc);
-    expect(locations).toEqual(["https://shop.bitocard.com/ng", "https://shop.bitocard.com/ng/c/mobile-phones", "https://shop.bitocard.com/ng/lagos", "https://shop.bitocard.com/ng/lagos/ikeja", "https://shop.bitocard.com/ng/l/100001-tv"]);
+    const entries = countryEntries("https://shop.bitocard.com", "ng", page);
+    expect(entries.map(entry => entry.loc)).toEqual(["https://shop.bitocard.com/ng", "https://shop.bitocard.com/ng/c/mobile-phones", "https://shop.bitocard.com/ng/lagos", "https://shop.bitocard.com/ng/lagos/ikeja", "https://shop.bitocard.com/ng/lagos/mobile-phones", "https://shop.bitocard.com/ng/lagos/ikeja/mobile-phones"]);
+    expect(entries[0]!.lastmod).toBe("2026-10-25T10:00:00.000Z");
+    expect(entries[1]!.lastmod).toBe("2026-10-24T10:00:00.000Z");
+    const file: ShopSitemapListings = { object: "classified_sitemap_listings", country: "NG", listings: [{ ref: 100001, slug: "tv", updated_at: "2026-10-25T10:00:00.000Z" }], next_after: null };
+    expect(listingEntries("https://shop.bitocard.com", "ng", file).map(entry => entry.loc)).toEqual(["https://shop.bitocard.com/ng/l/100001-tv"]);
     expect(urlset([{ loc: "https://shop.bitocard.com/a?b=1&c=2", lastmod: "2026-10-25" }])).toContain("<loc>https://shop.bitocard.com/a?b=1&amp;c=2</loc><lastmod>2026-10-25</lastmod>");
     expect(sitemapIndex(["https://shop.bitocard.com/ng/sitemap.xml"])).toContain("<sitemap><loc>https://shop.bitocard.com/ng/sitemap.xml</loc></sitemap>");
   });
@@ -126,8 +135,8 @@ describe("commerce listing data", () => {
   });
 
   test("listings in the sitemap carry their photos (https only, at most five) under Google's image extension", () => {
-    const page: ShopSitemap = { object: "classified_sitemap", country: "NG", categories: [], places: [], listings: [{ ref: 7, slug: "tv", title: "TV", updated_at: "2026-11-01T00:00:00.000Z", images: ["https://media.test/a.jpg?x=1&y=2", "http://insecure.test/b.jpg"] }], next_after: null };
-    const xml = urlset(countryEntries("https://udozo.com", "ng", [page]));
+    const page: ShopSitemapListings = { object: "classified_sitemap_listings", country: "NG", listings: [{ ref: 7, slug: "tv", title: "TV", updated_at: "2026-11-01T00:00:00.000Z", images: ["https://media.test/a.jpg?x=1&y=2", "http://insecure.test/b.jpg"] }], next_after: null };
+    const xml = urlset(listingEntries("https://udozo.com", "ng", page));
     expect(xml).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
     expect(xml).toContain("<url><loc>https://udozo.com/ng/l/7-tv</loc><lastmod>2026-11-01T00:00:00.000Z</lastmod><image:image><image:loc>https://media.test/a.jpg?x=1&amp;y=2</image:loc></image:image></url>");
     expect(xml).not.toContain("insecure.test");

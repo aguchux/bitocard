@@ -184,7 +184,7 @@ describe('resale-only listings are never on BitoCard Shop', () => {
     const search = (await get('/v1/classifieds/listings?country=NG&q=panasonic%20wholesale')).json;
     assert.ok(!search.data.some(card => card.id === listing.id), 'not in search');
     assert.ok(!(await get('/v1/classifieds/search/suggest?country=NG&q=panasonic')).json.queries.some(title => /wholesale/i.test(title)), 'not suggested');
-    const sitemap = (await get('/v1/classifieds/sitemap?country=NG')).json;
+    const sitemap = (await get('/v1/classifieds/sitemap/listings?country=NG')).json;
     assert.ok(!sitemap.listings.some(row => row.ref === live.ref), 'not in the sitemap');
 
     assert.equal((await buyer.post('/v1/classifieds/conversations', { listing_id: listing.id, body: 'Hello' })).status, 404, 'no chat');

@@ -1,13 +1,17 @@
-import { markets } from "@/lib/api";
+import type { ShopMarkets, ShopSitemap } from "@bitocard/api-client/classifieds";
+import { shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
-import { sitemapIndex } from "@/lib/sitemap";
+import { countryFiles, sitemapIndex, sitemapResponse, sitemapUnavailable } from "@/lib/sitemap";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
-/** One sitemap index: the pages across countries, then a sitemap per open country. */
+/** One sitemap index, from live data: the pages across countries, then every file of every open country. */
 export async function GET() {
   const origin = siteOrigin();
-  const all = await markets();
-  const locations = [`${origin}/sitemap-main.xml`, ...all.data.map(market => `${origin}/${market.country.toLowerCase()}/sitemap.xml`)];
-  return new Response(sitemapIndex(locations), { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
+  const all = await shopApi<ShopMarkets>("/v1/classifieds/markets", { revalidate: 0 });
+  if (!all.ok) return sitemapUnavailable();
+  const countries = await Promise.all(all.data.data.map(market => shopApi<ShopSitemap>(`/v1/classifieds/sitemap?country=${market.country}`, { revalidate: 0 })));
+  const files = countries.flatMap(country => (country.ok ? countryFiles(origin, country.data.country.toLowerCase(), country.data) : []));
+  if (countries.some(country => !country.ok)) return sitemapUnavailable();
+  return sitemapResponse(sitemapIndex([`${origin}/sitemap-main.xml`, ...files]));
 }

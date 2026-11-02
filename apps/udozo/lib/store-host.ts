@@ -59,6 +59,8 @@ export function storeRoute(host: SiteHost, store: StoreRoute, path: string, sear
   if (host.kind === "subdomain" && store.checkout_mode === "live" && store.domain) return { redirect: `https://${store.domain}${path}${search}` };
   // Addresses Next.js writes itself (social images, icons) already name the store's folder: never twice.
   const own = `/store/${store.subdomain}`;
+  // A folder named `sitemap.xml` under `[store]` would be taken for Next's own metadata route and never reached.
+  if (path === "/sitemap.xml") return { rewrite: `${own}/store-sitemap.xml` };
   if (path === own || path.startsWith(`${own}/`)) return { rewrite: `${path}${search}` };
   return { rewrite: `${own}${path === "/" ? "" : path}${search}` };
 }

@@ -38,6 +38,7 @@ type GateReason = keyof typeof gateMessages;
 const listingSelect = {
   id: true,
   ref: true,
+  updatedAt: true,
   customerId: true,
   country: true,
   currency: true,
