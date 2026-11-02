@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import type {
   ShopBrand,
+  ShopModel,
+  ShopModelMatch,
   ShopChat,
   ShopContact,
   ShopCondition,
@@ -197,6 +199,28 @@ export async function searchBrands(q: string, category: string | null): Promise<
   if (!words && !category) return { ok: true, data: [] };
   const result = await shopApi<{ data: ShopBrand[] }>(`/v1/classifieds/brands${query({ q: words || undefined, category: category ?? undefined, limit: words ? 12 : 24 })}`);
   return result.ok ? { ok: true, data: result.data.data } : { ok: false, code: result.code, message: "Brands could not be loaded. Type the brand instead.", param: null, signIn: false };
+}
+
+/**
+ * Models for the listing form's model field: the brand's in the category (most listed first), or with no brand, any
+ * brand's matching what was typed. Public and cached a minute.
+ */
+export async function searchModels(q: string, brand: string, category: string): Promise<ShopResult<ShopModel[]>> {
+  const words = q.trim().slice(0, 60);
+  const named = brand.trim().slice(0, 60);
+  if (!id(category)) return refused("No such category.");
+  if (!words && !named) return { ok: true, data: [] };
+  const result = await shopApi<{ data: ShopModel[] }>(`/v1/classifieds/models${query({ category, brand: named || undefined, q: words || undefined, limit: 30 })}`);
+  return result.ok ? { ok: true, data: result.data.data } : { ok: false, code: result.code, message: "Models could not be loaded. Type the model instead.", param: null, signIn: false };
+}
+
+/** The brand and model a title names in a category, for the listing form to offer. */
+export async function detectModel(title: string, category: string): Promise<ShopResult<ShopModelMatch>> {
+  const words = title.trim().slice(0, 120);
+  if (!id(category)) return refused("No such category.");
+  if (!words) return { ok: true, data: { object: "classified_model_match", brand: null, model: null } };
+  const result = await shopApi<ShopModelMatch>(`/v1/classifieds/models/detect${query({ category, title: words })}`);
+  return result.ok ? { ok: true, data: result.data } : { ok: false, code: result.code, message: "Could not read the title.", param: null, signIn: false };
 }
 
 // ---- Chats ----

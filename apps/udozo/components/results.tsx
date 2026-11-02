@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SlidersHorizontal } from "lucide-react";
-import { brandFeatureKey, conditionLabels, shopMoney, sortLabels, type ShopBrand, type ShopCategory, type ShopCondition, type ShopResult, type ShopSearch, type ShopSort, type ShopTier } from "@bitocard/api-client/classifieds";
+import { brandFeatureKey, conditionLabels, modelFeatureKey, shopMoney, sortLabels, type ShopBrand, type ShopCategory, type ShopCondition, type ShopModel, type ShopResult, type ShopSearch, type ShopSort, type ShopTier } from "@bitocard/api-client/classifieds";
 import { featureFilter, filterCount, filtersHref, maxOffset, perPage, type ShopFilters } from "@/lib/search";
 import { BrandLogo } from "./brand-logo";
 import { ListingRow } from "./listing-card";
@@ -59,6 +59,34 @@ function BrandFilter({ brands, chosen }: { brands: ShopBrand[]; chosen: string[]
     </fieldset>
   );
 }
+
+/** The model filter, once a brand is chosen: its models with live listings, chosen ones and the most listed first, the rest under More models. */
+function ModelFilter({ models, chosen }: { models: ShopModel[]; chosen: string[] }) {
+  const picked = new Set(chosen.map(value => value.toLowerCase()));
+  const order = [...models].sort((a, b) => Number(picked.has(b.name.toLowerCase())) - Number(picked.has(a.name.toLowerCase())) || (b.listings ?? 0) - (a.listings ?? 0));
+  const first = order.slice(0, Math.max(brandsShown, order.filter(model => picked.has(model.name.toLowerCase())).length));
+  const rest = order.slice(first.length);
+  const chip = (model: ShopModel) => (
+    <label key={model.name} className="flex min-h-10 items-center gap-2 rounded-full border border-navy-200 bg-white px-3 py-1 text-sm has-checked:border-navy-900 has-checked:bg-navy-50 has-checked:font-semibold">
+      <input type="checkbox" name={`f.${modelFeatureKey}`} value={model.name} defaultChecked={picked.has(model.name.toLowerCase())} className="sr-only" />
+      <span className="min-w-0 truncate">{model.name}</span>
+      {model.listings ? <span className="text-xs font-normal text-navy-500">{model.listings.toLocaleString("en-GB")}</span> : null}
+    </label>
+  );
+  return (
+    <fieldset className="sm:col-span-2">
+      <legend className="mb-1.5 text-sm font-semibold">Model</legend>
+      <div className="flex flex-wrap gap-2">{first.map(chip)}</div>
+      {rest.length ? (
+        <details className="mt-2">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center text-sm font-semibold text-brand-700 hover:underline [&::-webkit-details-marker]:hidden">More models ({rest.length})</summary>
+          <div className="mt-2 flex flex-wrap gap-2">{rest.map(chip)}</div>
+        </details>
+      ) : null}
+    </fieldset>
+  );
+}
+
 const sorts: ShopSort[] = ["relevant", "newest", "price_asc", "price_desc"];
 const field = "h-11 w-full rounded-xl border border-navy-200 bg-white px-3 text-[15px] focus:border-navy-500 focus:ring-2 focus:ring-brand-500/30";
 
@@ -66,7 +94,7 @@ const field = "h-11 w-full rounded-xl border border-navy-200 bg-white px-3 text-
  * The filters, as a plain GET form that works without script: price, condition, the category's feature filters and the
  * sort. Words and the buyer's place are kept as they are.
  */
-function FiltersForm({ path, filters, category, brands, currency }: { path: string; filters: ShopFilters; category: ShopCategory | null; brands: ShopBrand[]; currency: string }) {
+function FiltersForm({ path, filters, category, brands, models, currency }: { path: string; filters: ShopFilters; category: ShopCategory | null; brands: ShopBrand[]; models: ShopModel[]; currency: string }) {
   const count = filterCount(filters);
   // With the registry's brands to show, the brand is a row of logos; otherwise a box to type it.
   const filterable = (category?.features ?? []).filter(feature => feature.filter && !(brands.length && feature.key === brandFeatureKey));
@@ -102,6 +130,7 @@ function FiltersForm({ path, filters, category, brands, currency }: { path: stri
           </div>
         </fieldset>
         {brands.length ? <BrandFilter brands={brands} chosen={featureFilter(filters, brandFeatureKey)?.values ?? []} /> : null}
+        {models.length ? <ModelFilter models={models} chosen={featureFilter(filters, modelFeatureKey)?.values ?? []} /> : null}
         {filterable.map(feature => {
           const current = featureFilter(filters, feature.key);
           if (feature.data_type === "number") {
@@ -184,6 +213,7 @@ export function Results({
   path,
   category,
   brands = [],
+  models = [],
   place,
   currency,
 }: {
@@ -193,13 +223,15 @@ export function Results({
   category: ShopCategory | null;
   /** The brand filter's brands (`brandFilters`); none shows no brand row of logos. */
   brands?: ShopBrand[];
+  /** The model filter's models (`modelFilters`), once one brand is chosen. */
+  models?: ShopModel[];
   place: { area?: string | null; state?: string | null; country: string };
   currency: string;
 }) {
   const pages = Math.min(Math.ceil(result.total / perPage), Math.floor(maxOffset / perPage) + 1);
   return (
     <div className="grid gap-4">
-      <FiltersForm path={path} filters={filters} category={category} brands={brands} currency={currency} />
+      <FiltersForm path={path} filters={filters} category={category} brands={brands} models={models} currency={currency} />
       <p className="text-sm text-navy-600" aria-live="polite">
         {result.total === 0 ? "No listings match yet." : `${result.total.toLocaleString("en-GB")} listing${result.total === 1 ? "" : "s"}`}
         {result.total ? ` · ${sortLabels[result.sort]}` : ""}

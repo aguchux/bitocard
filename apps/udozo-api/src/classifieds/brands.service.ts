@@ -99,7 +99,7 @@ class DismissBrandDto {
   name_key: string;
 }
 
-type Row = ClassifiedBrand & { categories: { categoryId: string; position: number; category: { id: string; slug: string; name: string } }[] };
+type Row = ClassifiedBrand & { categories: { categoryId: string; position: number; category: { id: string; slug: string; name: string } }[]; _count: { models: number } };
 
 /**
  * Udozo's brand registry: the brands sellers pick for the `brand` feature (each in the categories it sells in, with the
@@ -108,7 +108,7 @@ type Row = ClassifiedBrand & { categories: { categoryId: string; position: numbe
  */
 @Injectable()
 export class ClassifiedBrandsService {
-  private cache: { at: number; rows: ClassifiedBrand[]; byKey: Map<string, ClassifiedBrand> } | null = null;
+  private cache: { at: number; rows: ClassifiedBrand[]; byKey: Map<string, ClassifiedBrand>; byId: Map<string, ClassifiedBrand> } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -122,7 +122,7 @@ export class ClassifiedBrandsService {
     const rows = await this.prisma.classifiedBrand.findMany({ where: { enabled: true }, orderBy: { name: 'asc' } });
     const byKey = new Map<string, ClassifiedBrand>();
     for (const row of rows) for (const key of [row.nameKey, ...row.matchKeys]) if (!byKey.has(key)) byKey.set(key, row);
-    this.cache = { at: Date.now(), rows, byKey };
+    this.cache = { at: Date.now(), rows, byKey, byId: new Map(rows.map(row => [row.id, row])) };
     return this.cache;
   }
 
@@ -145,6 +145,17 @@ export class ClassifiedBrandsService {
   /** A seller's value in the registry's words, or as typed when the registry lacks it. */
   async canonical(value: string) {
     return (await this.match(value))?.name ?? value;
+  }
+
+  /** A registry brand by its id, as the public lists show one, or null when it is off. */
+  async card(id: string) {
+    const row = (await this.registry()).byId.get(id);
+    return row ? this.present(row) : null;
+  }
+
+  /** The brands these categories sell. */
+  async inCategories(ids: string[]) {
+    return (await this.prisma.classifiedBrandCategory.findMany({ where: { categoryId: { in: ids } }, select: { brandId: true } })).map(link => link.brandId);
   }
 
   /** Notes a brand the registry lacks, once per seller (it is saved on the listing all the same). Never throws. */
@@ -173,7 +184,7 @@ export class ClassifiedBrandsService {
   }
 
   /** The category and, for a top category, its subcategories. */
-  private async categoryIds(category: string) {
+  async categoryIds(category: string) {
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(category);
     const row = await this.prisma.classifiedCategory.findFirst({ where: uuid ? { id: category } : { slug: category }, include: { children: { select: { id: true } } } });
     if (!row) throw invalid('parameter_invalid', 'No such category.', 'category');
@@ -250,6 +261,7 @@ export class ClassifiedBrandsService {
       enabled: row.enabled,
       categories: [...row.categories].sort((a, b) => a.category.name.localeCompare(b.category.name)).map(link => presentCategory(link.category)),
       listings,
+      models: row._count.models,
       updated_at: row.updatedAt.toISOString(),
     };
   }
@@ -274,7 +286,7 @@ export class ClassifiedBrandsService {
     return counts;
   }
 
-  private include = { categories: { include: { category: { select: { id: true, slug: true, name: true } } } } } as const;
+  private include = { categories: { include: { category: { select: { id: true, slug: true, name: true } } } }, _count: { select: { models: true } } } as const;
 
   /** The registry a page at a time: by words, category, logo or status; with the categories and live ads of each. */
   async adminList(input: AdminBrandsQueryDto) {

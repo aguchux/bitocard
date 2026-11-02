@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState, type FormEvent } from "react";
+import { AppLink } from "@bitocard/admin-ui/shell";
 import { Badge, Button, Card, CardHeader, DataTable, errorMessage, Field, formatNumber, formatRelative, ImageField, Input, Notice, PageHeader, QueryView, Select, Skeleton, useDebouncedValue, type Column } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { BrandLogo } from "@/components/brand-logo";
@@ -12,8 +13,11 @@ import {
   useClassifiedBrandsQuery,
   useClassifiedBrandSuggestionsQuery,
   useClassifiedCategoriesQuery,
+  useClassifiedModelSuggestionsQuery,
   useCreateClassifiedBrandMutation,
+  useCreateClassifiedModelMutation,
   useDismissClassifiedBrandSuggestionMutation,
+  useDismissClassifiedModelSuggestionMutation,
   useUpdateClassifiedBrandMutation,
 } from "@bitocard/api-client/admin";
 
@@ -65,6 +69,15 @@ export default function ClassifiedBrandsPage() {
       cell: item => <span className="block max-w-64 text-sm text-muted">{item.categories.length > 3 ? `${item.categories.slice(0, 2).map(link => link.name).join(", ")} and ${item.categories.length - 2} more` : item.categories.map(link => link.name).join(", ") || "No category"}</span>,
     },
     { key: "ads", header: "Live ads", hideOnMobile: true, cell: item => formatNumber(item.listings) },
+    {
+      key: "models",
+      header: "Models",
+      cell: item => (
+        <AppLink href={`/classifieds/brands/${item.slug}`} className="text-sm font-semibold text-ink hover:underline">
+          {formatNumber(item.models)}
+        </AppLink>
+      ),
+    },
     {
       key: "logo",
       header: "Logo",
@@ -164,6 +177,7 @@ export default function ClassifiedBrandsPage() {
             </Card>
           )}
           <Suggestions changes={changes} onAdd={(name, categoryIds) => setEditing({ mode: "new", name, categoryIds })} />
+          <ModelSuggestions changes={changes} />
         </div>
       </div>
     </UdozoShell>
@@ -243,6 +257,11 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
           ) : (
             <p className="text-sm text-muted">Save the brand first, then upload its logo.</p>
           )}
+          {current ? (
+            <AppLink href={`/classifieds/brands/${current.slug}`} className="block text-sm font-semibold text-ink hover:underline">
+              {formatNumber(current.models)} {current.models === 1 ? "model" : "models"}: see and change them
+            </AppLink>
+          ) : null}
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold text-ink">
               Sold in <span className="font-normal text-muted">({chosen.size})</span>
@@ -339,6 +358,56 @@ function Suggestions({ changes, onAdd }: { changes: boolean; onAdd: (name: strin
               </ul>
             ) : (
               <p className="text-sm text-muted">No new brands waiting.</p>
+            )
+          }
+        </QueryView>
+      </div>
+    </Card>
+  );
+}
+
+function ModelSuggestions({ changes }: { changes: boolean }) {
+  const suggestions = useClassifiedModelSuggestionsQuery();
+  const [add, adding] = useCreateClassifiedModelMutation();
+  const [dismiss, dismissing] = useDismissClassifiedModelSuggestionMutation();
+  const error = adding.error ?? dismissing.error;
+  const learnFrom = suggestions.data?.learn_from ?? 3;
+  return (
+    <Card>
+      <CardHeader title={`New models from sellers${suggestions.data?.data.length ? ` (${suggestions.data.data.length})` : ""}`} description={`Models sellers typed that a brand's list lacks. One joins by itself once ${learnFrom} different sellers typed it; add it sooner, or dismiss it to keep it out.`} />
+      <div className="px-5 pb-5 sm:px-6">
+        {error ? <Notice tone="red">{errorMessage(error)}</Notice> : null}
+        <QueryView query={suggestions} loading={<Skeleton className="h-24 w-full" />}>
+          {data =>
+            data.data.length ? (
+              <ul className="divide-y divide-line">
+                {data.data.map(item => (
+                  <li key={`${item.brand.id}:${item.category.id}:${item.name_key}`} className="flex flex-wrap items-center gap-2 py-2.5">
+                    <span className="min-w-0 flex-1 text-sm">
+                      <span className="font-semibold text-ink">
+                        {item.brand.name} {item.name}
+                      </span>
+                      <span className="text-muted">
+                        {" "}
+                        · {item.sellers} {item.sellers === 1 ? "seller" : "sellers"} · {item.category.name}
+                      </span>
+                      <span className="block text-xs text-muted">Last typed {formatRelative(item.last_at)}</span>
+                    </span>
+                    {changes ? (
+                      <span className="flex gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => void dismiss({ brand_id: item.brand.id, category_id: item.category.id, name_key: item.name_key })}>
+                          Dismiss
+                        </Button>
+                        <Button size="sm" onClick={() => void add({ slug: item.brand.slug, name: item.name, category_id: item.category.id })}>
+                          Add
+                        </Button>
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">No new models waiting.</p>
             )
           }
         </QueryView>

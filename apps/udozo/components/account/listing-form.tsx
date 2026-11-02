@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Bold, Camera, Check, ChevronLeft, Italic, List, ListOrdered, LoaderCircle, Search, Trash2, Video, X } from "lucide-react";
 import {
   brandFeatureKey,
+  modelFeatureKey,
   conditionLabels,
   contactLabels,
   descriptionBlocks,
@@ -15,7 +16,10 @@ import {
   type ShopCondition,
   type ShopContact,
   type ShopDelivery,
+  type ShopBrand,
   type ShopFeature,
+  type ShopModel,
+  type ShopModelMatch,
   type ShopMyListing,
   type ShopPriceKind,
   type ShopResaleAvailability,
@@ -25,9 +29,11 @@ import {
 import { compressImage } from "@bitocard/ui/image";
 import { featureValue, fromMinor, toMinor, toggleList, wrapSelection } from "@/lib/shop";
 import { TermsAccept } from "@/components/terms-accept";
-import { acceptShopTerms, createListing, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, shopTerms, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
+import { acceptShopTerms, createListing, detectModel, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, shopTerms, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
 import { type DraftPick, FillFromPhotos, ImproveListing, SuggestPrice } from "./assistant-help";
-import { BrandField } from "./brand-field";
+import { BrandLogo } from "@/components/brand-logo";
+import { BrandField, brandMatchKey } from "./brand-field";
+import { ModelField } from "./model-field";
 import { ShopIcon } from "./icon";
 import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom } from "./resale-fields";
 
@@ -616,6 +622,7 @@ export function ListingForm({
         suggested={suggested}
         rows={features}
         categoryId={categoryId}
+        title={title}
         onChange={updateFeatures}
         invalid={problem?.param?.startsWith("features") ? problem.message : null}
       />
@@ -876,10 +883,21 @@ function CategoryPicker({ categories, value, invalid, onChange }: { categories: 
   );
 }
 
+/** The model's row sits straight after the brand's. */
+function withModelNext(rows: FeatureRow[]) {
+  const model = rows.find(row => row.key === modelFeatureKey);
+  const at = rows.findIndex(row => row.key === brandFeatureKey);
+  if (!model || at < 0) return rows;
+  const others = rows.filter(row => row !== model);
+  return [...others.slice(0, at + 1), model, ...others.slice(at + 1)];
+}
+
 /** One feature's value field, as its registry entry says: a number with its unit, a choice, yes or no, or text. */
-function FeatureInput({ row, categoryId, onChange }: { row: FeatureRow; categoryId: string | null; onChange: (value: string | boolean) => void }) {
+function FeatureInput({ row, categoryId, brand, onChange, onBrand, onModel }: { row: FeatureRow; categoryId: string | null; brand: string; onChange: (value: string | boolean) => void; onBrand: (brand: ShopBrand) => void; onModel: (model: ShopModel) => void }) {
   // The brand: chosen from Udozo's brand registry with their logos, or typed.
-  if (row.key === brandFeatureKey) return <BrandField value={typeof row.value === "string" ? row.value : ""} categoryId={categoryId} label={row.name} onChange={onChange} />;
+  if (row.key === brandFeatureKey) return <BrandField value={typeof row.value === "string" ? row.value : ""} categoryId={categoryId} label={row.name} onChange={onChange} onPick={onBrand} />;
+  // The model: chosen from the brand's in this category, or typed.
+  if (row.key === modelFeatureKey) return <ModelField value={typeof row.value === "string" ? row.value : ""} brand={brand} categoryId={categoryId} label={row.name} placeholder={row.placeholder} onChange={onChange} onPick={onModel} />;
   if (row.data_type === "boolean") {
     return (
       <label className="flex items-center gap-2 text-sm">
@@ -921,16 +939,74 @@ function FeatureInput({ row, categoryId, onChange }: { row: FeatureRow; category
 }
 
 /** Features as key and value pairs, the keys from the registry: the category's suggestions as chips, and a search. */
-function FeaturesField({ suggested, rows, categoryId, onChange, invalid }: { suggested: FeatureDef[]; rows: FeatureRow[]; categoryId: string | null; onChange: (rows: FeatureRow[]) => void; invalid: string | null }) {
+export function FeaturesField({ suggested, rows, categoryId, title, onChange, invalid }: { suggested: FeatureDef[]; rows: FeatureRow[]; categoryId: string | null; title: string; onChange: (rows: FeatureRow[]) => void; invalid: string | null }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ShopFeature[]>([]);
   const [asked, setAsked] = useState<string | null>(null);
   const keys = new Set(rows.map(row => row.key));
+  const text = (key: string) => {
+    const value = rows.find(row => row.key === key)?.value;
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const brandDef = suggested.find(def => def.key === brandFeatureKey);
+  const modelDef = suggested.find(def => def.key === modelFeatureKey);
+  const brand = text(brandFeatureKey);
+  const model = text(modelFeatureKey);
+  // The brand a model was chosen for: another brand's model is cleared, one the seller typed is left alone.
+  const [modelBrand, setModelBrand] = useState<string | null>(null);
+  const [match, setMatch] = useState<ShopModelMatch | null>(null);
+  const [declined, setDeclined] = useState<string | null>(null);
+
   const add = (def: FeatureDef) => {
     if (keys.has(def.key) || rows.length >= maxFeatures) return;
-    onChange([...rows, { ...def, value: def.data_type === "boolean" ? def.default_value === "true" : (def.default_value ?? "") }]);
+    onChange(withModelNext([...rows, { ...def, value: def.data_type === "boolean" ? def.default_value === "true" : (def.default_value ?? "") }]));
     setQ("");
     setResults([]);
+  };
+  const set = (list: FeatureRow[], def: FeatureDef | undefined, value: string) => {
+    if (!def) return list;
+    return list.some(row => row.key === def.key) ? list.map(row => (row.key === def.key ? { ...row, value } : row)) : list.length < maxFeatures ? [...list, { ...def, value }] : list;
+  };
+  const typeBrand = (value: string) => {
+    const stale = modelBrand !== null && brandMatchKey(value) !== brandMatchKey(modelBrand);
+    if (stale) setModelBrand(null);
+    onChange(rows.map(row => (row.key === brandFeatureKey ? { ...row, value } : row.key === modelFeatureKey && stale ? { ...row, value: "" } : row)));
+  };
+  // Choosing a brand asks for its model next, where the category does.
+  const pickBrand = (picked: ShopBrand) => {
+    const stale = modelBrand !== null && brandMatchKey(picked.name) !== brandMatchKey(modelBrand);
+    if (stale) setModelBrand(null);
+    const next = set(rows, brandDef, picked.name).map(row => (row.key === modelFeatureKey && stale ? { ...row, value: "" } : row));
+    onChange(withModelNext(next.some(row => row.key === modelFeatureKey) || !modelDef || next.length >= maxFeatures ? next : [...next, { ...modelDef, value: "" }]));
+  };
+  // A model chosen across brands brings its brand.
+  const pickModel = (picked: ShopModel) => {
+    setModelBrand(picked.brand?.name ?? brand);
+    onChange(withModelNext(set(set(rows, modelDef ?? rows.find(row => row.key === modelFeatureKey), picked.name), picked.brand && !brand ? brandDef : undefined, picked.brand?.name ?? "")));
+  };
+
+  // What the title names, offered while the brand or model is still empty.
+  const wanted = Boolean(categoryId && (brandDef || modelDef) && (!brand || !model));
+  useEffect(() => {
+    const words = title.trim();
+    if (!wanted || !categoryId || words.length < 3) return;
+    let current = true;
+    const wait = setTimeout(async () => {
+      const result = await detectModel(words, categoryId);
+      if (current && result.ok) setMatch(result.data);
+    }, 500);
+    return () => {
+      current = false;
+      clearTimeout(wait);
+    };
+  }, [title, categoryId, wanted]);
+  const offerBrand = match?.brand && brandDef && !brand ? match.brand : null;
+  const offerModel = match?.model && modelDef && !model && (!brand || !match.brand || brandMatchKey(brand) === brandMatchKey(match.brand.name)) ? match.model : null;
+  const offer = [offerBrand?.name ?? (offerModel ? brand : ""), offerModel].filter(Boolean).join(" ");
+  const offering = wanted && Boolean(offerBrand || offerModel) && offer !== declined;
+  const takeOffer = () => {
+    if (offerModel) setModelBrand(offerBrand?.name ?? brand);
+    onChange(withModelNext(set(offerBrand ? set(rows, brandDef, offerBrand.name) : rows, offerModel ? modelDef : undefined, offerModel ?? "")));
   };
   useEffect(() => {
     const words = q.trim();
@@ -961,13 +1037,34 @@ function FeaturesField({ suggested, rows, categoryId, onChange, invalid }: { sug
           ))}
         </div>
       ) : null}
+      {offering ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-navy-200 bg-navy-50 px-3 py-2.5">
+          {offerBrand ? <BrandLogo brand={offerBrand} size="sm" /> : null}
+          <p className="min-w-0 flex-1 text-sm">
+            From your title: <span className="font-semibold">{offer}</span>
+          </p>
+          <button type="button" onClick={takeOffer} className="h-8 rounded-full bg-navy-900 px-3 text-[13px] font-semibold text-white">
+            Use this
+          </button>
+          <button type="button" onClick={() => setDeclined(offer)} aria-label={`Not ${offer}`} className="grid size-8 place-items-center rounded-full text-slate-500 hover:bg-white">
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       {rows.length ? (
         <ul className="grid divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
           {rows.map(row => (
             <li key={row.key} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <ShopIcon name={row.icon} className="size-5 shrink-0 text-slate-500" />
               <span className="min-w-0 flex-1 text-sm font-semibold">{row.name}</span>
-              <FeatureInput row={row} categoryId={categoryId} onChange={value => onChange(rows.map(item => (item.key === row.key ? { ...item, value } : item)))} />
+              <FeatureInput
+                row={row}
+                categoryId={categoryId}
+                brand={brand}
+                onChange={value => (row.key === brandFeatureKey ? typeBrand(typeof value === "string" ? value : "") : onChange(rows.map(item => (item.key === row.key ? { ...item, value } : item))))}
+                onBrand={pickBrand}
+                onModel={pickModel}
+              />
               <button type="button" onClick={() => onChange(rows.filter(item => item.key !== row.key))} aria-label={`Remove ${row.name}`} className="grid size-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100">
                 <X className="size-4" aria-hidden="true" />
               </button>

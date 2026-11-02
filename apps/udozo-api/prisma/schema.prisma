@@ -2724,6 +2724,7 @@ model Customer {
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
   classifiedFeatureSuggestions ClassifiedFeatureSuggestion[]
   classifiedBrandSuggestions ClassifiedBrandSuggestion[]
+  classifiedModelSuggestions ClassifiedModelSuggestion[]
   handoffs                  CustomerHandoff[]
   assistantThreads          AssistantThread[]
   resaleRelationships       ResaleRelationship[]
@@ -4313,6 +4314,8 @@ model ClassifiedCategory {
   featureSuggestions ClassifiedFeatureSuggestion[]
   brands          ClassifiedBrandCategory[]
   brandSuggestions ClassifiedBrandSuggestion[]
+  models          ClassifiedBrandModel[]
+  modelSuggestions ClassifiedModelSuggestion[]
   resaleRules     ResaleRule[]
 
   @@index([parentId, position])
@@ -4344,6 +4347,8 @@ model ClassifiedBrand {
   updatedAt   DateTime                  @updatedAt @map("updated_at")
   categories  ClassifiedBrandCategory[]
   suggestions ClassifiedBrandSuggestion[]
+  models      ClassifiedBrandModel[]
+  modelSuggestions ClassifiedModelSuggestion[]
 
   @@map("classified_brands")
 }
@@ -4383,6 +4388,62 @@ model ClassifiedBrandSuggestion {
   @@index([status, nameKey])
   @@index([customerId, createdAt])
   @@map("classified_brand_suggestions")
+}
+
+/// A model of a brand in one category (Samsung's phones and its TVs are different lists), which sellers pick for the
+/// `model` feature; a model sold in two categories is a row in each.
+model ClassifiedBrandModel {
+  id          String                      @id @default(uuid()) @db.Uuid
+  brandId     String                      @map("brand_id") @db.Uuid
+  categoryId  String                      @map("category_id") @db.Uuid
+  name        String
+  /// As `ClassifiedBrand.nameKey`: two models of a brand in a category never share one.
+  nameKey     String                      @map("name_key")
+  /// What sellers type instead (lower case): "s23 ultra", "prado".
+  aliases     String[]                    @default([])
+  /// The name's and aliases' keys, which values are matched on.
+  matchKeys   String[]                    @default([]) @map("match_keys")
+  /// Sellers' first sight of the brand's list: most bought first, new ones last.
+  position    Int                         @default(0)
+  /// registry (seeded), admin, or sellers (typed by enough different sellers to join by itself).
+  source      String                      @default("registry")
+  /// Off, it is not offered; it also stops sellers' typing bringing it back.
+  enabled     Boolean                     @default(true)
+  createdAt   DateTime                    @default(now()) @map("created_at")
+  updatedAt   DateTime                    @updatedAt @map("updated_at")
+  brand       ClassifiedBrand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  category    ClassifiedCategory          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  suggestions ClassifiedModelSuggestion[]
+
+  @@unique([brandId, categoryId, nameKey])
+  @@index([categoryId, brandId, position])
+  @@map("classified_brand_models")
+}
+
+/// A model a seller typed that a registry brand lacks in that category. Enough different sellers and it joins the list;
+/// admins can add or dismiss it sooner.
+model ClassifiedModelSuggestion {
+  id          String                @id @default(uuid()) @db.Uuid
+  customerId  String                @map("customer_id") @db.Uuid
+  brandId     String                @map("brand_id") @db.Uuid
+  categoryId  String                @map("category_id") @db.Uuid
+  /// As the seller typed it.
+  name        String
+  nameKey     String                @map("name_key")
+  /// open, added or dismissed.
+  status      String                @default("open")
+  modelId     String?               @map("model_id") @db.Uuid
+  decidedById String?               @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime?             @map("decided_at")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  customer    Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  brand       ClassifiedBrand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  category    ClassifiedCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  model       ClassifiedBrandModel? @relation(fields: [modelId], references: [id], onDelete: SetNull)
+
+  @@index([status, brandId, categoryId, nameKey])
+  @@index([customerId, createdAt])
+  @@map("classified_model_suggestions")
 }
 
 /// The feature keys a category suggests, in order, which are its filters, and its own default and placeholder.

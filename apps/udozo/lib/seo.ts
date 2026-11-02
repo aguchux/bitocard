@@ -43,6 +43,7 @@ export function listingJsonLd(listing: ShopListingPage, origin: string, country:
         }
       : null;
   const brand = brandOf(listing);
+  const model = listing.features.find(item => item.key === "model" && typeof item.value === "string" && item.value.trim())?.value;
   // Every feature the seller gave, as people read them (up to 20), besides the condition.
   const properties = [
     ...(listing.condition ? [{ "@type": "PropertyValue", name: "Condition", value: conditionLabels[listing.condition] }] : []),
@@ -60,6 +61,7 @@ export function listingJsonLd(listing: ShopListingPage, origin: string, country:
     ...(listing.description ? { description: listing.description.replace(/[*_#>`]/g, "").replace(/\s+/g, " ").trim().slice(0, 500) } : {}),
     category: listing.category.parent ? `${listing.category.parent.name} > ${listing.category.name}` : listing.category.name,
     ...(brand ? { brand: { "@type": "Brand", name: brand } } : {}),
+    ...(model ? { model } : {}),
     ...(listing.condition ? { itemCondition: itemCondition[listing.condition] } : {}),
     ...(properties.length ? { additionalProperty: properties } : {}),
     ...(offer ? { offers: offer } : {}),

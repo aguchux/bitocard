@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { JsonLd } from "@/components/json-ld";
 import { Results } from "@/components/results";
 import { marketFor, markets, shopApi } from "@/lib/api";
-import { brandFilters } from "@/lib/brands";
+import { brandFilters, modelFilters } from "@/lib/brands";
 import { siteOrigin } from "@/lib/customer";
 import { findCategory } from "@/lib/places";
 import { categoriesOf } from "@/lib/reference";
@@ -40,7 +40,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const found = findCategory(await categoriesOf(cc), slug);
   if (!found) notFound();
   const filters = readFilters(await searchParams);
-  const [result, brands] = await Promise.all([shopApi<ShopSearch>(searchQuery(cc, filters, { category: slug })), brandFilters(found.category, found.children, market.country)]);
+  const [result, brands, models] = await Promise.all([shopApi<ShopSearch>(searchQuery(cc, filters, { category: slug })), brandFilters(found.category, found.children, market.country), modelFilters(found.category, filters, market.country)]);
   const path = categoryPath(cc, slug);
   const trail = [
     { name: market.name, path: `/${cc}` },
@@ -68,7 +68,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           </nav>
         ) : null}
         {result.ok ? (
-          <Results result={result.data} filters={filters} path={path} category={found.category} brands={brands} place={{ country: market.name }} currency={market.currency} />
+          <Results result={result.data} filters={filters} path={path} category={found.category} brands={brands} models={models} place={{ country: market.name }} currency={market.currency} />
         ) : (
           <p className="rounded-2xl border border-dashed border-navy-200 p-6 text-center text-sm text-navy-600">{result.status === 400 ? "Those filters do not work here. Clear them and try again." : "Listings could not be loaded just now. Try again shortly."}</p>
         )}

@@ -95,11 +95,32 @@ export type AdminClassifiedBrand = {
   categories: Array<{ id: string; slug: string; name: string }>;
   /** Live ads with it, everywhere. */
   listings: number;
+  /** Its models, in every category. */
+  models: number;
   updated_at: string;
 };
 export type ClassifiedBrandInput = { name?: string; aliases?: string[]; color?: string | null; logo_url?: string | null; category_ids?: string[]; enabled?: boolean };
 export type ClassifiedBrandSaved = AdminClassifiedBrand & { listings_renamed: number; suggestions_answered: number };
 export type ClassifiedBrandsFilter = { q?: string; category?: string; logo?: 'missing' | 'bundled' | 'uploaded'; status?: 'enabled' | 'disabled'; offset?: number; limit?: number };
+/** A brand's model in one category, as admins see it. */
+export type AdminClassifiedModel = {
+  object: 'classified_brand_model';
+  id: string;
+  name: string;
+  aliases: string[];
+  category: { id: string; slug: string; name: string };
+  position: number;
+  source: 'registry' | 'admin' | 'sellers';
+  enabled: boolean;
+  /** Live ads with it, everywhere. */
+  listings: number;
+  updated_at: string;
+};
+export type ClassifiedModelSaved = AdminClassifiedModel & { listings_renamed: number; suggestions_answered: number };
+export type ClassifiedModelsFilter = { slug: string; q?: string; category?: string; source?: AdminClassifiedModel['source']; status?: 'enabled' | 'disabled'; offset?: number; limit?: number };
+export type ClassifiedModelsPage = List<AdminClassifiedModel> & { total: number; offset: number; limit: number; brand: { slug: string; name: string }; categories: Array<{ id: string; slug: string; name: string; models: number }> };
+export type ClassifiedModelImportResult = { object: 'classified_model_import'; added: number; skipped: Array<{ name: string; reason: string }>; listings_renamed: number };
+export type ClassifiedModelSuggestionGroup = { object: 'classified_model_suggestion_group'; brand: { id: string; slug: string; name: string }; category: { id: string; slug: string; name: string }; name_key: string; name: string; sellers: number; last_at: string };
 export type ClassifiedBrandSuggestionGroup = { object: 'classified_brand_suggestion_group'; name_key: string; name: string; sellers: number; categories: Array<{ id: string; slug: string; name: string }>; first_at: string; last_at: string };
 
 export type ClassifiedFeatureSuggestionGroup = { object: 'classified_feature_suggestion_group'; name_key: string; name: string; sellers: number; categories: string[]; first_at: string; last_at: string };
@@ -523,6 +544,30 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: nameKey => ({ url: '/v1/admin/classifieds/brand-suggestions/dismiss', method: 'POST', body: { name_key: nameKey } }),
       invalidatesTags: [{ type: 'ClassifiedSettings', id: 'BRAND_SUGGESTIONS' }, 'Activity'],
     }),
+    classifiedModels: build.query<ClassifiedModelsPage, ClassifiedModelsFilter>({
+      query: ({ slug, ...filter }) => ({ url: `/v1/admin/classifieds/brands/${encodeURIComponent(slug)}/models`, params: params({ ...filter }) }),
+      providesTags: [{ type: 'ClassifiedSettings', id: 'MODELS' }],
+    }),
+    createClassifiedModel: build.mutation<ClassifiedModelSaved, { slug: string; name: string; aliases?: string[]; category_id: string }>({
+      query: ({ slug, ...body }) => ({ url: `/v1/admin/classifieds/brands/${encodeURIComponent(slug)}/models`, method: 'POST', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'MODELS' }, { type: 'ClassifiedSettings', id: 'MODEL_SUGGESTIONS' }, { type: 'ClassifiedSettings', id: 'BRANDS' }, 'Activity'],
+    }),
+    importClassifiedModels: build.mutation<ClassifiedModelImportResult, { slug: string; category_id: string; models: Array<{ name: string; aliases?: string[] }> }>({
+      query: ({ slug, ...body }) => ({ url: `/v1/admin/classifieds/brands/${encodeURIComponent(slug)}/models/import`, method: 'POST', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'MODELS' }, { type: 'ClassifiedSettings', id: 'MODEL_SUGGESTIONS' }, { type: 'ClassifiedSettings', id: 'BRANDS' }, 'Activity'],
+    }),
+    updateClassifiedModel: build.mutation<ClassifiedModelSaved, { id: string; name?: string; aliases?: string[]; enabled?: boolean }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/classifieds/models/${encodeURIComponent(id)}`, method: 'PATCH', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'MODELS' }, { type: 'ClassifiedSettings', id: 'MODEL_SUGGESTIONS' }, 'Activity'],
+    }),
+    classifiedModelSuggestions: build.query<List<ClassifiedModelSuggestionGroup> & { learn_from: number }, void>({
+      query: () => '/v1/admin/classifieds/model-suggestions',
+      providesTags: [{ type: 'ClassifiedSettings', id: 'MODEL_SUGGESTIONS' }],
+    }),
+    dismissClassifiedModelSuggestion: build.mutation<unknown, { brand_id: string; category_id: string; name_key: string }>({
+      query: body => ({ url: '/v1/admin/classifieds/model-suggestions/dismiss', method: 'POST', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'MODEL_SUGGESTIONS' }, 'Activity'],
+    }),
     classifiedAreas: build.query<List<AdminClassifiedState> & { country: string }, string>({
       query: country => ({ url: '/v1/admin/classifieds/areas', params: { country } }),
       providesTags: (_result, _error, country) => [{ type: 'ClassifiedSettings', id: `AREAS:${country}` }],
@@ -658,6 +703,12 @@ export const {
   useUpdateClassifiedBrandMutation,
   useClassifiedBrandSuggestionsQuery,
   useDismissClassifiedBrandSuggestionMutation,
+  useClassifiedModelsQuery,
+  useCreateClassifiedModelMutation,
+  useImportClassifiedModelsMutation,
+  useUpdateClassifiedModelMutation,
+  useClassifiedModelSuggestionsQuery,
+  useDismissClassifiedModelSuggestionMutation,
   useClassifiedAreasQuery,
   useCreateClassifiedAreaMutation,
   useUpdateClassifiedAreaMutation,

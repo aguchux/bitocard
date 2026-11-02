@@ -5,7 +5,7 @@ import { placePath, type ShopSearch } from "@bitocard/api-client/classifieds";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { JsonLd } from "@/components/json-ld";
 import { Results } from "@/components/results";
-import { brandFilters } from "@/lib/brands";
+import { brandFilters, modelFilters } from "@/lib/brands";
 import { SearchScope } from "@/components/search-scope";
 import { marketFor, shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
@@ -73,7 +73,7 @@ export default async function PlacePage({ params, searchParams }: Props) {
   const filters = readFilters(await searchParams);
   const category = found.category?.category ?? null;
   // The brand filter without counts: they would be the whole country's, not this place's.
-  const [result, brands] = await Promise.all([shopApi<ShopSearch>(searchQuery(cc, filters, { state, area: found.place.area?.slug, category: category?.slug })), brandFilters(category, found.category?.children ?? [])]);
+  const [result, brands, models] = await Promise.all([shopApi<ShopSearch>(searchQuery(cc, filters, { state, area: found.place.area?.slug, category: category?.slug })), brandFilters(category, found.category?.children ?? []), modelFilters(category, filters, market.country)]);
   const path = placePath(cc, { state, area: found.place.area?.slug, category: category?.slug });
   const trail = [
     { name: market.name, path: `/${cc}` },
@@ -105,7 +105,7 @@ export default async function PlacePage({ params, searchParams }: Props) {
           </nav>
         ) : null}
         {result.ok ? (
-          <Results result={result.data} filters={filters} path={path} category={category} brands={brands} place={{ area: found.place.area?.name, state: found.place.state.name, country: market.name }} currency={market.currency} />
+          <Results result={result.data} filters={filters} path={path} category={category} brands={brands} models={models} place={{ area: found.place.area?.name, state: found.place.state.name, country: market.name }} currency={market.currency} />
         ) : (
           <p className="rounded-2xl border border-dashed border-navy-200 p-6 text-center text-sm text-navy-600">Listings could not be loaded just now. Try again shortly.</p>
         )}

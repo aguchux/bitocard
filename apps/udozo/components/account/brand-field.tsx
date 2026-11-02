@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import type { ShopBrand } from "@bitocard/api-client/classifieds";
 import { BrandLogo } from "@/components/brand-logo";
 import { useDismiss } from "@/components/dropdown";
 import { searchBrands } from "@/lib/shop-actions";
 
-/** Letters and digits only, as the API matches brands ("mercedes benz" is Mercedes-Benz). */
+/** Letters and digits only, as the API matches brands and models ("mercedes benz" is Mercedes-Benz). */
 export const brandMatchKey = (name: string) =>
   name
     .normalize("NFKD")
@@ -16,18 +16,50 @@ export const brandMatchKey = (name: string) =>
     .replace(/[^a-z0-9]/g, "");
 
 /**
- * The brand field of the listing form: the category's brands with their logos as soon as it opens, those matching what
- * the seller types, and the brand as typed when it is not in the list yet (Udozo saves it and looks at adding it).
+ * A registry's field on the listing form: the list as soon as it opens, what matches as the seller types, and what they
+ * typed when the list lacks it. `listKey` says when the list changes (a new category, a new brand).
  */
-export function BrandField({ value, categoryId, label, onChange }: { value: string; categoryId: string | null; label: string; onChange: (value: string) => void }) {
+export function PickField<Item>({
+  value,
+  label,
+  placeholder,
+  listKey,
+  load,
+  nameOf,
+  keyOf,
+  icon,
+  hint,
+  leading,
+  freshHint,
+  onChange,
+  onPick,
+}: {
+  value: string;
+  label: string;
+  placeholder: string;
+  listKey: string;
+  load: (words: string) => Promise<Item[] | null>;
+  nameOf: (item: Item) => string;
+  keyOf: (item: Item) => string;
+  icon?: (item: Item) => ReactNode;
+  hint?: (item: Item) => string | undefined;
+  /** What sits at the field's start, given the list's entry matching what is typed. */
+  leading?: (exact: Item | null) => ReactNode;
+  freshHint: string;
+  onChange: (value: string) => void;
+  onPick: (item: Item) => void;
+}) {
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const loader = useRef(load);
   const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState<ShopBrand[]>([]);
+  const [options, setOptions] = useState<Item[]>([]);
   const [active, setActive] = useState(-1);
-  const [known, setKnown] = useState<ShopBrand | null>(null);
   useDismiss(box, open, () => setOpen(false), () => input.current);
+  useEffect(() => {
+    loader.current = load;
+  });
 
   const words = value.trim();
   useEffect(() => {
@@ -35,9 +67,9 @@ export function BrandField({ value, categoryId, label, onChange }: { value: stri
     let current = true;
     const wait = setTimeout(
       async () => {
-        const result = await searchBrands(words, categoryId);
-        if (current && result.ok) {
-          setOptions(result.data);
+        const items = await loader.current(words);
+        if (current && items) {
+          setOptions(items);
           setActive(-1);
         }
       },
@@ -47,25 +79,21 @@ export function BrandField({ value, categoryId, label, onChange }: { value: stri
       current = false;
       clearTimeout(wait);
     };
-  }, [open, words, categoryId]);
+  }, [open, words, listKey]);
 
-  const exact = options.find(brand => brandMatchKey(brand.name) === brandMatchKey(words));
-  const shown = known && brandMatchKey(known.name) === brandMatchKey(words) ? known : (exact ?? null);
+  const exact = options.find(item => brandMatchKey(nameOf(item)) === brandMatchKey(words)) ?? null;
   const fresh = words.length >= 1 && !exact;
   const total = options.length + (fresh ? 1 : 0);
 
-  const choose = (brand: ShopBrand | null) => {
-    if (brand) {
-      setKnown(brand);
-      onChange(brand.name);
-    }
+  const choose = (item: Item | null) => {
+    if (item) onPick(item);
     setOpen(false);
   };
 
   return (
     <div ref={box} className="relative w-44 sm:w-56">
       <span className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white pr-1 pl-1.5 focus-within:border-slate-400">
-        {shown ? <BrandLogo brand={shown} size="sm" /> : null}
+        {leading?.(exact)}
         <input
           ref={input}
           role="combobox"
@@ -75,7 +103,7 @@ export function BrandField({ value, categoryId, label, onChange }: { value: stri
           aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined}
           aria-label={label}
           value={value}
-          placeholder="Choose or type it"
+          placeholder={placeholder}
           autoComplete="off"
           onFocus={() => setOpen(true)}
           onChange={event => {
@@ -89,7 +117,7 @@ export function BrandField({ value, categoryId, label, onChange }: { value: stri
               if (total) setActive(index => (event.key === "ArrowDown" ? (index + 1) % total : (index - 1 + total) % total));
             } else if (event.key === "Enter" && open && active >= 0) {
               event.preventDefault();
-              choose(active < options.length ? options[active] : null);
+              choose(active < options.length ? options[active]! : null);
             }
           }}
           className="min-w-0 flex-1 bg-transparent pl-1 text-sm outline-none"
@@ -100,18 +128,21 @@ export function BrandField({ value, categoryId, label, onChange }: { value: stri
       </span>
       {open && total ? (
         <ul id={`${id}-list`} role="listbox" aria-label={`${label} suggestions`} className="absolute top-11 right-0 z-20 grid max-h-72 w-64 max-w-[calc(100vw-2rem)] gap-0.5 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-          {options.map((brand, index) => (
+          {options.map((item, index) => (
             <li
-              key={brand.slug}
+              key={keyOf(item)}
               id={`${id}-${index}`}
               role="option"
-              aria-selected={brandMatchKey(brand.name) === brandMatchKey(words)}
+              aria-selected={brandMatchKey(nameOf(item)) === brandMatchKey(words)}
               onPointerDown={event => event.preventDefault()}
-              onClick={() => choose(brand)}
+              onClick={() => choose(item)}
               className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm ${index === active ? "bg-slate-100" : "hover:bg-slate-50"}`}
             >
-              <BrandLogo brand={brand} size="sm" />
-              <span className="min-w-0 flex-1 truncate">{brand.name}</span>
+              {icon?.(item)}
+              <span className="min-w-0 flex-1 truncate">
+                {nameOf(item)}
+                {hint?.(item) ? <span className="block truncate text-xs text-slate-600">{hint(item)}</span> : null}
+              </span>
             </li>
           ))}
           {fresh ? (
@@ -125,12 +156,46 @@ export function BrandField({ value, categoryId, label, onChange }: { value: stri
             >
               <Plus className="size-4 shrink-0" aria-hidden="true" />
               <span className="min-w-0 flex-1">
-                Use “{words}”<span className="block text-xs font-normal text-slate-600">Not in the list yet: we will look at adding it.</span>
+                Use “{words}”<span className="block text-xs font-normal text-slate-600">{freshHint}</span>
               </span>
             </li>
           ) : null}
         </ul>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The brand field of the listing form: the category's brands with their logos as soon as it opens, those matching what
+ * the seller types, and the brand as typed when it is not in the list yet (Udozo saves it and looks at adding it).
+ */
+export function BrandField({ value, categoryId, label, onChange, onPick }: { value: string; categoryId: string | null; label: string; onChange: (value: string) => void; onPick?: (brand: ShopBrand) => void }) {
+  const [known, setKnown] = useState<ShopBrand | null>(null);
+  return (
+    <PickField<ShopBrand>
+      value={value}
+      label={label}
+      placeholder="Choose or type it"
+      listKey={categoryId ?? ""}
+      load={async words => {
+        const result = await searchBrands(words, categoryId);
+        return result.ok ? result.data : null;
+      }}
+      nameOf={brand => brand.name}
+      keyOf={brand => brand.slug}
+      icon={brand => <BrandLogo brand={brand} size="sm" />}
+      leading={exact => {
+        const shown = known && brandMatchKey(known.name) === brandMatchKey(value) ? known : exact;
+        return shown ? <BrandLogo brand={shown} size="sm" /> : null;
+      }}
+      freshHint="Not in the list yet: we will look at adding it."
+      onChange={onChange}
+      onPick={brand => {
+        setKnown(brand);
+        if (onPick) onPick(brand);
+        else onChange(brand.name);
+      }}
+    />
   );
 }

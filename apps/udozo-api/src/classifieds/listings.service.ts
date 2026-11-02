@@ -6,11 +6,13 @@ import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ClassifiedBrandsService } from './brands.service.js';
+import { ClassifiedModelsService } from './models.service.js';
 import { ModerationService, type ReviewFlag } from './moderation.service.js';
 import { ResaleService } from './resale.service.js';
 import { ShopTermsService } from './terms.service.js';
 import {
   brandFeatureKey,
+  modelFeatureKey,
   checkDescription,
   checkFeatureValue,
   checkTitle,
@@ -116,6 +118,7 @@ export class ListingsService {
     private readonly terms: ShopTermsService,
     private readonly resale: ResaleService,
     private readonly brands: ClassifiedBrandsService,
+    private readonly models: ClassifiedModelsService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -219,10 +222,12 @@ export class ListingsService {
     return this.present(saved);
   }
 
-  /** A submitted listing's brand the registry lacks goes to admins as a suggestion (it is saved as typed all the same). */
+  /** A submitted listing's brand or model the registry lacks is noted as a suggestion (it is saved as typed all the same). */
   private async noteBrand(customerId: string, listing: { categoryId: string | null; features: { valueText: string | null; feature: { key: string } }[] }) {
     const brand = listing.features.find(value => value.feature.key === brandFeatureKey)?.valueText;
+    const model = listing.features.find(value => value.feature.key === modelFeatureKey)?.valueText;
     if (brand) await this.brands.note(customerId, brand, listing.categoryId);
+    if (brand && model && listing.categoryId) await this.models.note(customerId, brand, listing.categoryId, model);
   }
 
   /** Runs the checks on a live listing again (after an edit or a new photo): doubtful ones go back to review. */
@@ -426,6 +431,11 @@ export class ListingsService {
       // A brand reads as the registry writes it ("samsung" is Samsung, "benz" Mercedes-Benz); one it lacks stays as typed.
       const brand = registry.find(row => row.key === brandFeatureKey);
       for (const value of features) if (brand && value.featureId === brand.id && value.valueText) value.valueText = await this.brands.canonical(value.valueText);
+      // A model too, among that brand's in the category ("s23 ultra" is Galaxy S23 Ultra); one it lacks stays as typed.
+      const model = registry.find(row => row.key === modelFeatureKey);
+      const brandValue = features.find(value => value.featureId === brand?.id)?.valueText;
+      const categoryId = fields.categoryId ?? current?.categoryId;
+      if (brandValue && categoryId) for (const value of features) if (value.featureId === model?.id && value.valueText) value.valueText = await this.models.canonical(brandValue, categoryId, value.valueText);
     }
 
     // Where it is sold (BitoCard Shop, resellers' stores or both), its resale terms and its stock.

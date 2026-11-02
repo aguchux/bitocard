@@ -44,9 +44,17 @@ export type ShopFeature = {
 
 /** The feature key the brand registry answers (the listing form suggests brands, the filters show their logos). */
 export const brandFeatureKey = 'brand';
+/** The feature key the brands' models answer (the listing form suggests the brand's models, the filters narrow by them). */
+export const modelFeatureKey = 'model';
 
 /** A brand in Udozo's registry; `listings` (live ones in the country asked for) only when a country was given. */
 export type ShopBrand = { object: 'classified_brand'; slug: string; name: string; logo_url: string | null; color: string | null; listings?: number };
+
+/** A brand's model in a category; `brand` when searched across brands, `listings` when a country was given. */
+export type ShopModel = { object: 'classified_model'; name: string; brand?: ShopBrand; listings?: number };
+
+/** The brand and model a listing's title names, for the form to offer; never saved unless the seller chooses it. */
+export type ShopModelMatch = { object: 'classified_model_match'; brand: ShopBrand | null; model: string | null };
 
 /** A brand's initials where it has no logo: "Samsung" S, "Mercedes-Benz" MB, "LG" LG. */
 export function brandInitials(name: string) {

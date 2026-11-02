@@ -94,6 +94,8 @@ export function checkDescription(value: string) {
 
 /** The feature key the brand registry answers: its values are a registry brand's name where one matches. */
 export const brandFeatureKey = 'brand';
+/** The feature key the brands' models answer: its values are a registry model's name where one matches. */
+export const modelFeatureKey = 'model';
 
 /**
  * How a brand is matched: lower case letters and digits only, accents dropped ("Mercedes Benz", "mercedes-benz" and
