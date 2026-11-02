@@ -89,7 +89,7 @@ const listingGroup = z
   })
   .superRefine((item, ctx) => {
     if ((item.by === 'category' || item.by === 'area' || item.by === 'condition') && !item.value) ctx.addIssue({ code: 'custom', message: 'Choose which one.', path: ['value'] });
-    if (item.by === 'condition' && item.value && !(conditions as readonly string[]).includes(item.value)) ctx.addIssue({ code: 'custom', message: 'Choose new, used, untested or for parts.', path: ['value'] });
+    if (item.by === 'condition' && item.value && !(conditions as readonly string[]).includes(item.value)) ctx.addIssue({ code: 'custom', message: 'Choose new, used, foreign used or for parts.', path: ['value'] });
   });
 
 /** One or two banners, each with an optional photo, linking to a category, a search or a page. */

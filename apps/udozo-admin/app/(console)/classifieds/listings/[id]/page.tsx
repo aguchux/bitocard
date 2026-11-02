@@ -6,11 +6,11 @@ import { ActionDialog, Badge, Button, Card, CardHeader, formatDateTime, formatNu
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
 import { type AdminClassifiedListing, useClassifiedListingQuery, useModerateClassifiedListingMutation } from "@bitocard/api-client/admin";
+import { conditionLabels } from "@bitocard/api-client/classifieds";
 import { flagLabels, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
 
 type Action = "approve" | "reject" | "remove";
 
-const conditionLabels: Record<string, string> = { new: "New", used: "Used", untested: "Untested", parts: "For parts" };
 const deliveryLabels: Record<string, string> = { none: "Pick-up only", state: "Delivers in the state", nationwide: "Delivers nationwide" };
 const contactLabels: Record<string, string> = { chat: "Chat only", phone: "Calls only", both: "Chat and calls" };
 

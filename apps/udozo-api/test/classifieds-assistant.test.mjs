@@ -226,6 +226,24 @@ describe('managing shop assistants', () => {
     assert.equal(await prisma.aiUsage.count({ where: { botId: anjio, kind: 'test' } }) > 0, true);
   });
 
+  test('the assistant reads a condition as people do: stored untested is Foreign used', async () => {
+    const samsung = await prisma.classifiedListing.findFirstOrThrow({ where: { title: 'Samsung Galaxy A54, 128 GB' } });
+    await prisma.classifiedListing.update({ where: { id: samsung.id }, data: { condition: 'untested' } });
+    try {
+      ai.state.script = [{ tool: { name: 'search_listings', arguments: { words: 'samsung', condition: ['untested'] } } }, { text: 'One foreign used Samsung.' }];
+      const tried = await admin.post(`/v1/admin/support/bots/${anjio}/test`, { messages: [{ role: 'user', content: 'Any foreign used Samsung phones?' }], country: 'NG', surface: 'browse' });
+      assert.equal(tried.status, 200, JSON.stringify(tried.json));
+      const sent = lastRequest();
+      const result = JSON.stringify(sent.messages.at(-1).content);
+      assert.match(result, /Foreign used/);
+      assert.doesNotMatch(result, /untested/i);
+      const search = sent.tools.find(item => item.name === 'search_listings');
+      assert.match(search.input_schema.properties.condition.description, /untested \(shown to people as Foreign used/);
+    } finally {
+      await prisma.classifiedListing.update({ where: { id: samsung.id }, data: { condition: samsung.condition } });
+    }
+  });
+
   test('an assistant runs on DeepSeek too, but never helps sellers from their photos', async () => {
     const base = { scope: 'shop', name: 'Deji', roles: ['browse', 'help'], provider: 'deepseek', model: 'deepseek-chat', funding: 'bitocard' };
     const sell = await admin.post('/v1/admin/support/bots', { ...base, roles: ['browse', 'sell'] });

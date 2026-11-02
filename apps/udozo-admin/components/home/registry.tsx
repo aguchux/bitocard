@@ -4,6 +4,7 @@ import { createContext, useContext, useId, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, BadgePercent, Globe2, ImageIcon, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, TrendingUp, X } from "lucide-react";
 import { Button, Field, ImageField, Input, Select, Textarea, Toggle } from "@bitocard/admin-ui";
 import { defineRegistry, StoreSectionForm } from "@bitocard/admin-ui/storefront";
+import { conditionLabels } from "@bitocard/api-client/classifieds";
 import type { StoreSection } from "@bitocard/api-client/storefront";
 import { homeLinkText, type HomeGroupKind, type HomeLink, type HomeSection, type HomeTileSize, type HomeTone } from "@bitocard/api-client/home";
 
@@ -22,7 +23,6 @@ const image = { realm: "admin", purpose: "home_image" } as const;
 const sizeLabels: Record<HomeTileSize, string> = { sm: "Small", wide: "Wide", tall: "Tall", lg: "Large" };
 const toneLabels: Record<HomeTone, string> = { navy: "Navy", brand: "Brand colour", light: "Light" };
 const groupLabels: Record<HomeGroupKind, string> = { newest: "The newest", trending: "Trending", category: "A category", area: "A state or area", condition: "A condition" };
-const conditionLabels: Record<string, string> = { new: "New", used: "Used", untested: "Untested", parts: "For parts" };
 const heroStyles = { search: "Search", carousel: "Carousel of slides", minimal: "Minimal" } as const;
 
 type Of<T extends HomeSection["type"]> = Extract<HomeSection, { type: T }>;

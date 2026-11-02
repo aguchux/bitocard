@@ -580,7 +580,8 @@ export type ShopWallet = { object: 'customer_wallet'; currency: string; balance:
 
 // ---- Labels ----
 
-export const conditionLabels: Record<ShopCondition, string> = { new: 'New', used: 'Used', untested: 'Untested', parts: 'For parts' };
+/** What people read. The stored value `untested` is shown as Foreign used (imported second-hand). */
+export const conditionLabels: Record<ShopCondition, string> = { new: 'New', used: 'Used', untested: 'Foreign used', parts: 'For parts' };
 export const deliveryLabels: Record<ShopDelivery, string> = { none: 'Collection only', state: 'Delivers in the state', nationwide: 'Delivers nationwide' };
 export const sortLabels: Record<ShopSort, string> = { relevant: 'Best match', newest: 'Newest', price_asc: 'Lowest price', price_desc: 'Highest price' };
 export const badgeLabels: Record<ShopBadge, string> = { phone_confirmed: 'Phone confirmed', id_checked: 'ID checked' };

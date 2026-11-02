@@ -8,7 +8,7 @@ import type { AiTool } from '../../support/ai/providers.js';
 import type { ShopRole } from '../../support/bots.service.js';
 import { cleanMessage } from '../conversations.service.js';
 import { minComparable } from '../moderation.service.js';
-import { conditions, featureValueOut, linkPattern, onShopWhere, priceText } from '../rules.js';
+import { conditionHelp, conditionName, conditions, featureValueOut, linkPattern, onShopWhere, priceText } from '../rules.js';
 import { safePayFee } from '../safe-pay.service.js';
 import { ListingSearchService, type SearchSort, searchSorts } from '../search.service.js';
 import { quoted } from './sanitise.js';
@@ -100,7 +100,7 @@ export class ShopAssistantTools {
             state: { ...text, description: 'A state slug.' },
             price_min: number,
             price_max: number,
-            condition: { type: 'array', items: { type: 'string', enum: [...conditions] } },
+            condition: { type: 'array', items: { type: 'string', enum: [...conditions] }, description: conditionHelp },
             features: { type: 'array', items: { type: 'object', properties: { key: text, value: text, min: number, max: number }, required: ['key'] }, description: 'Registry keys (search_features) with a value, or a min and max for numbers.' },
             id_checked_only: { type: 'boolean', description: 'Only sellers whose ID Udozo checked.' },
             safe_pay_ready_only: { type: 'boolean', description: 'Only sellers set up to take Safe pay.' },
@@ -109,7 +109,7 @@ export class ShopAssistantTools {
         ),
         tool('get_listing', 'One active listing: its features, description, condition, area, seller badges and checks.', { listing_id: uuid }, ['listing_id']),
         tool('compare_listings', 'Up to 4 active listings side by side.', { listing_ids: { type: 'array', items: uuid, maxItems: 4 } }, ['listing_ids']),
-        tool('price_range', 'The middle half of active and recently sold prices for comparable listings in this country over 90 days (needs enough of them).', { category: text, condition: { type: 'string', enum: [...conditions] }, features: { type: 'array', items: { type: 'object', properties: { key: text, value: text }, required: ['key', 'value'] } } }, ['category']),
+        tool('price_range', 'The middle half of active and recently sold prices for comparable listings in this country over 90 days (needs enough of them).', { category: text, condition: { type: 'string', enum: [...conditions], description: conditionHelp }, features: { type: 'array', items: { type: 'object', properties: { key: text, value: text }, required: ['key', 'value'] } } }, ['category']),
       );
     }
     if (buyer || can('help')) {
@@ -230,7 +230,7 @@ export class ShopAssistantTools {
       title: card.title,
       price: card.price.amount === null ? 'on request' : priceText(card.price.amount, card.price.currency),
       negotiable: card.price.kind === 'negotiable',
-      condition: card.condition,
+      condition: conditionName(card.condition),
       area: `${card.area.name}, ${card.area.state.name}`,
       highlights: card.highlights,
       seller_badges: card.seller.badges,
@@ -270,7 +270,7 @@ export class ShopAssistantTools {
       title: page.title,
       price: page.price.amount === null ? 'on request' : priceText(page.price.amount, page.price.currency),
       negotiable: page.price.kind === 'negotiable',
-      condition: page.condition,
+      condition: conditionName(page.condition),
       category: page.category.name,
       area: `${page.area.name}, ${page.area.state.name}`,
       features: Object.fromEntries(page.features.map(feature => [feature.name, feature.value === null ? null : `${feature.value}${feature.unit && typeof feature.value === 'number' ? ` ${feature.unit}` : ''}`])),
@@ -481,7 +481,7 @@ export class ShopAssistantTools {
           status: row.status,
           category: row.category?.name ?? null,
           price: row.priceMinor === null ? null : priceText(row.priceMinor, row.currency),
-          condition: row.condition,
+          condition: conditionName(row.condition),
           area: row.area?.name ?? null,
           photos: row.media.filter(item => item.kind === 'photo').length,
           video: row.media.some(item => item.kind === 'video'),

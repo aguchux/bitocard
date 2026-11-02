@@ -14,7 +14,7 @@ import { ChatsService } from '../../support/chats.service.js';
 import { knowledgeContext, shopSystemPrompt, type ShopSurface } from '../../support/prompt.js';
 import { redact } from '../../support/redact.js';
 import { cleanMessage } from '../conversations.service.js';
-import { checkDescription, checkFeatureValue, checkTitle, conditions, isOnShop, linkPattern } from '../rules.js';
+import { checkDescription, checkFeatureValue, checkTitle, conditionHelp, conditions, isOnShop, linkPattern } from '../rules.js';
 import { evalCases, type EvalOutcome, scoreCase } from './evals.js';
 import { answerLanguage, greetingFor, languageName } from './languages.js';
 import { quoted, sanitiseAnswer } from './sanitise.js';
@@ -465,7 +465,7 @@ export class ShopAssistantService {
       'Suggest this listing from its photos: a clear title (what it is, brand and model, key spec), the subcategory, the condition you can see, the features you can read from the photos (only keys from the list, only values you can see), and a short honest description in plain sentences (bullet points allowed, no links, no phone numbers, no claims you cannot see).',
       `Subcategories (slug: name): ${categories.map(item => `${item.slug}: ${item.parent?.name ?? ''} > ${item.name}`).join('; ')}`,
       `Feature keys (key: type${'[choices]'}): ${registry.map(item => `${item.key}: ${item.dataType}${item.choices.length ? `[${item.choices.join('|')}]` : ''}${item.unit ? ` (${item.unit})` : ''}`).join('; ')}`,
-      `Conditions: ${conditions.join(', ')}.`,
+      `Conditions: ${conditionHelp}`,
       listing.title ? quoted('The seller’s title so far', listing.title, 200) : '',
     ]
       .filter(Boolean)
@@ -473,7 +473,7 @@ export class ShopAssistantService {
     const done = await this.structured(bot, scope, prompt, {
       name: 'propose_listing',
       description: 'The suggested listing.',
-      parameters: { type: 'object', properties: { title: { type: 'string' }, category: { type: 'string' }, condition: { type: 'string', enum: [...conditions] }, features: { type: 'array', items: { type: 'object', properties: { key: { type: 'string' }, value: {} }, required: ['key', 'value'] } }, description: { type: 'string' } } },
+      parameters: { type: 'object', properties: { title: { type: 'string' }, category: { type: 'string' }, condition: { type: 'string', enum: [...conditions], description: conditionHelp }, features: { type: 'array', items: { type: 'object', properties: { key: { type: 'string' }, value: {} }, required: ['key', 'value'] } }, description: { type: 'string' } } },
     }, images);
     const args = done.args;
     if (!args) return { suggestion: null, usage: done.usage, calls: done.calls };

@@ -132,7 +132,7 @@ export class ListingSearchService {
     const q = input.q?.trim().slice(0, 100) || null;
     const sort: SearchSort = input.sort ?? (q ? 'relevant' : 'newest');
     if (input.price_min !== undefined && input.price_max !== undefined && input.price_min > input.price_max) throw invalid('parameter_invalid', 'The lowest price is above the highest.', 'price_min');
-    for (const condition of input.condition ?? []) if (!(conditions as readonly string[]).includes(condition)) throw invalid('parameter_invalid', 'Conditions are new, used, untested or parts.', 'condition');
+    for (const condition of input.condition ?? []) if (!(conditions as readonly string[]).includes(condition)) throw invalid('parameter_invalid', 'Conditions are new, used, untested (Foreign used) or parts.', 'condition');
 
     let categoryIds: string[] | null = null;
     if (input.category) {

@@ -10,6 +10,11 @@ import { ApiError } from '../common/errors/api-error.js';
 export const listingStatuses = ['draft', 'pending_review', 'active', 'sold', 'expired', 'rejected', 'removed', 'deleted'] as const;
 export type ListingStatus = (typeof listingStatuses)[number];
 export const conditions = ['new', 'used', 'untested', 'parts'] as const;
+/** What people read (`conditionLabels` in the client). The stored value `untested` is shown as Foreign used. */
+export const conditionNames: Record<string, string> = { new: 'New', used: 'Used', untested: 'Foreign used', parts: 'For parts' };
+export const conditionName = (condition: string | null) => (condition ? (conditionNames[condition] ?? condition) : null);
+/** For the assistants' tools, which take the stored values. */
+export const conditionHelp = 'new, used, untested (shown to people as Foreign used: imported second-hand) or parts (For parts).';
 export const priceKinds = ['fixed', 'negotiable', 'on_request'] as const;
 export const deliveries = ['none', 'state', 'nationwide'] as const;
 export const contacts = ['chat', 'phone', 'both'] as const;

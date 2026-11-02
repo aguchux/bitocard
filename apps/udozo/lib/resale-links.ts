@@ -1,3 +1,5 @@
+import { conditionLabels, type ShopCondition } from "@bitocard/api-client/classifieds";
+
 /** Addresses on a Resale shop (B2B reselling): a listing's page and its supplier's page. Pure, for pages and tests. */
 
 export const resaleListingPath = (item: { ref: number; slug: string }) => `/l/${item.ref}-${item.slug}`;
@@ -11,8 +13,7 @@ export function listingRef(param: string) {
   return match ? Number(match[1]) : null;
 }
 
-const conditionLabels: Record<string, string> = { new: "New", used: "Used", untested: "Untested", parts: "For parts" };
-export const resaleCondition = (condition: string | null) => (condition ? (conditionLabels[condition] ?? condition) : null);
+export const resaleCondition = (condition: string | null) => (condition ? (conditionLabels[condition as ShopCondition] ?? condition) : null);
 
 export const deliveryText = (delivery: "none" | "state" | "nationwide", area: { name: string; state: string | null } | null) =>
   delivery === "nationwide" ? "Delivery nationwide" : delivery === "state" ? `Delivery within ${area?.state ?? "the state"}` : `Meet-up in ${area?.name ?? "the supplier’s area"}`;

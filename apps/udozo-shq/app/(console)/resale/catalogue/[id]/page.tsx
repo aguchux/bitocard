@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MessagesSquare, Store } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Dialog, KeyValue, PageHeader, QueryView, Skeleton, errorMessage, formatBps, formatMoney, humanise } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, Dialog, KeyValue, PageHeader, QueryView, Skeleton, errorMessage, formatBps, formatMoney } from "@bitocard/admin-ui";
+import { conditionLabels } from "@bitocard/api-client/classifieds";
 import { useAddResaleListingMutation, useResaleAccountQuery, useResaleCatalogueListingQuery, useStartResaleSupplierMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -82,7 +83,7 @@ export default function ResaleCatalogueListingPage() {
                       { label: "Sell from", value: formatMoney(item.price_range.min, item.currency) },
                       { label: "Sell up to", value: formatMoney(item.price_range.max, item.currency) },
                       { label: "Left", value: String(item.available) },
-                      { label: "Condition", value: item.condition ? humanise(item.condition) : "—" },
+                      { label: "Condition", value: item.condition ? conditionLabels[item.condition] : "—" },
                       { label: "Delivery", value: item.delivery === "none" ? "Meet-up in their area" : item.delivery === "state" ? "Within their state" : "Nationwide" },
                     ]}
                   />
