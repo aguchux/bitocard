@@ -200,14 +200,15 @@ export class ShopDirectoryService {
   /**
    * What a country's sitemap lists, each with its count of live listings and when they last changed: its categories (a
    * top category counts its subcategories), states and areas, a category in a state or area once it has enough there to
-   * be indexed, and the files its listings come in (`sitemapListings`).
+   * be indexed, and the files its listings come in (`sitemapListings`). Places count as their pages do, so the two agree
+   * on what is indexed: a state's page also shows listings delivered nationwide, an area's only its own.
    */
   async sitemap(country: string) {
     const code = country.toUpperCase();
     await this.listings.requireOpen(code);
     const [categories, groups, areas, pages] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { enabled: true, countries: { some: { country: code, enabled: true } } }, select: { id: true, slug: true, parentId: true } }),
-      this.prisma.classifiedListing.groupBy({ by: ['categoryId', 'stateId', 'areaId'], where: { country: code, ...onShopWhere }, _count: { _all: true }, _max: { updatedAt: true } }),
+      this.prisma.classifiedListing.groupBy({ by: ['categoryId', 'stateId', 'areaId', 'delivery'], where: { country: code, ...onShopWhere }, _count: { _all: true }, _max: { updatedAt: true } }),
       this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true, parentId: true } }),
       this.prisma.$queryRaw<ListingPageRow[]>`
         SELECT max("ref") AS last_ref, count(*) AS listings, max("updated_at") AS updated_at
@@ -221,6 +222,7 @@ export class ShopDirectoryService {
     ]);
     const categoryOf = new Map(categories.map(category => [category.id, category]));
     const areaOf = new Map(areas.map(area => [area.id, area]));
+    const states = areas.filter(area => !area.parentId);
     const tally = new Map<string, { listings: number; updated: Date | null }>();
     const add = (key: string, listings: number, updated: Date | null) => {
       const seen = tally.get(key);
@@ -235,12 +237,12 @@ export class ShopDirectoryService {
       const slugs = [category?.slug, parent?.slug].filter((slug): slug is string => Boolean(slug));
       for (const slug of slugs) add(`category:${slug}`, listings, updated);
       const state = group.stateId ? areaOf.get(group.stateId) : undefined;
-      if (!state) continue;
       const area = group.areaId ? areaOf.get(group.areaId) : undefined;
-      const within = area?.parentId === state.id ? area.slug : null;
+      const within = state && area?.parentId === state.id ? area.slug : null;
+      const shownIn = group.delivery === 'nationwide' ? states : state ? [state] : [];
       for (const slug of [null, ...slugs]) {
-        add(placeKey(state.slug, null, slug), listings, updated);
-        if (within) add(placeKey(state.slug, within, slug), listings, updated);
+        for (const shown of shownIn) add(placeKey(shown.slug, null, slug), listings, updated);
+        if (state && within) add(placeKey(state.slug, within, slug), listings, updated);
       }
     }
     // An address's second part is an area of the state when one has that name, so that category has no page there.

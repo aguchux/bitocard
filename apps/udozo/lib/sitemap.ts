@@ -1,5 +1,6 @@
 import { categoryPath, listingPath, placePath, type ShopSitemap, type ShopSitemapListings } from "@bitocard/api-client/classifieds";
 import type { ResaleStoreSitemap } from "@bitocard/api-client/storefront";
+import { legalDocuments } from "./legal";
 import { resaleListingPath } from "./resale-links";
 import { indexFrom } from "./search";
 
@@ -31,17 +32,23 @@ export function sitemapIndex(locations: Array<string | SitemapEntry>) {
 }
 
 /**
- * A country's pages: its home, every category with live listings, and every state, area and category in a place with
- * enough of them to be indexed (thinner ones are `noindex`, so a sitemap never names them). Its listings are in their own
- * files (`listingEntries`), and `countryFiles` makes as many files as both need, so nothing is ever left out.
+ * A country's pages: its home, every category open there (an empty one is still an indexed page), and every state, area
+ * and category in a place with enough listings to be indexed (thinner ones are `noindex`, so a sitemap never names them).
+ * Its listings are separate (`listingEntries`), and past one file's limit `countryFiles` makes as many as both need.
  */
 export function countryEntries(origin: string, cc: string, sitemap: ShopSitemap) {
   const at = (path: string) => new URL(path, origin).href;
   const entries: SitemapEntry[] = [{ loc: at(`/${cc}`), lastmod: sitemap.updated_at }];
-  for (const category of sitemap.categories) if (category.listings > 0) entries.push({ loc: at(categoryPath(cc, category.slug)), lastmod: category.updated_at });
+  for (const category of sitemap.categories) entries.push({ loc: at(categoryPath(cc, category.slug)), lastmod: category.updated_at });
   for (const place of sitemap.places) if (place.listings >= indexFrom) entries.push({ loc: at(placePath(cc, { state: place.state, area: place.area })), lastmod: place.updated_at });
   for (const place of sitemap.category_places) if (place.listings >= indexFrom) entries.push({ loc: at(placePath(cc, place)), lastmod: place.updated_at });
   return entries;
+}
+
+/** The pages across countries: Start here (sellers' landing page), the Safe Trade Guide, the legal documents, and the showcase and its categories once it is on. */
+export function mainEntries(origin: string, showcaseCategories: string[] | null) {
+  const entries: SitemapEntry[] = [{ loc: `${origin}/start-here` }, { loc: `${origin}/safe-trade` }, { loc: `${origin}/help/faqs` }, { loc: `${origin}/help/contact` }, { loc: `${origin}/legal` }, ...legalDocuments.map(doc => ({ loc: `${origin}/legal/${doc.slug}` }))];
+  return showcaseCategories ? [{ loc: `${origin}/` }, ...entries, ...showcaseCategories.map(slug => ({ loc: `${origin}/c/${slug}` }))] : entries;
 }
 
 /** A file of a country's listings (live, or sold in the last 30 days). */

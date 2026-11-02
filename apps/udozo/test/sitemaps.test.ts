@@ -1,6 +1,6 @@
-// udozo.com's sitemaps, built from live data: the index names every file of every open country, a country's pages and
-// listings are split into as many files as they need, nothing is cut off, and a failing API answers 503 (never a shorter
-// sitemap, which would read as those pages being gone).
+// udozo.com's sitemaps, built from live data: the real pages themselves while they fit one file, then an index of every
+// country's files, nothing cut off, and a failing API answers 503 (never a shorter sitemap, which would read as those
+// pages being gone).
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -57,22 +57,41 @@ afterEach(() => {
 
 const request = (name: string) => file(new Request(`${site}/sitemaps/${name}`), { params: Promise.resolve({ file: name }) });
 
-describe("the sitemap index", () => {
-  test("names every file of every open country, with when each last changed", async () => {
+describe("the sitemap", () => {
+  const locations = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
+
+  test("is the real pages themselves while they fit in one file: every market's, then its listings", async () => {
     const response = await index();
     const xml = await response.text();
     expect(response.headers.get("cache-control")).toContain("s-maxage=3600");
-    expect([...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1])).toEqual([`${site}/sitemap-main.xml`, `${site}/sitemaps/ng-pages-0.xml`, `${site}/sitemaps/ng-listings-0.xml`, `${site}/sitemaps/ng-listings-104000.xml`, `${site}/sitemaps/gh-pages-0.xml`]);
-    expect(xml).toContain(`<loc>${site}/sitemaps/ng-listings-104000.xml</loc><lastmod>2026-11-01T09:00:00.000Z</lastmod>`);
+    expect(xml).toContain("<urlset");
+    expect(xml).not.toContain("<sitemapindex");
+    const found = locations(xml);
+    for (const path of ["/", "/start-here", "/legal/terms", "/c/electronics", "/ng", "/ng/c/mobile-phones", "/ng/lagos/ikeja/mobile-phones", "/gh", "/gh/c/mobile-phones", "/ng/l/104001-tv"]) expect(found).toContain(`${site}${path}`);
+    expect(found.filter(loc => loc!.includes("/sitemaps/"))).toEqual([]);
+    expect(xml).toContain("<image:loc>https://media.test/a.jpg</image:loc>");
+    expect(calls).toContain("/v1/classifieds/sitemap/listings?country=NG&after=104000");
   });
 
   test("a new market joins by itself", async () => {
     const before = open();
     reply = path => (path === "/v1/classifieds/markets" ? Response.json({ object: "list", showcase: true, data: [{ country: "NG" }, { country: "GH" }, { country: "KE" }] }) : path.endsWith("=KE") ? Response.json(sitemap({ country: "KE", listing_pages: [] })) : before(path));
-    expect(await (await index()).text()).toContain(`${site}/sitemaps/ke-pages-0.xml`);
+    expect(await (await index()).text()).toContain(`<loc>${site}/ke</loc>`);
   });
 
-  test("answers 503 and is never kept while the API cannot say, for any market", async () => {
+  test("past one file's limit it becomes an index of every file, with when each last changed", async () => {
+    const before = open();
+    reply = path =>
+      path === "/v1/classifieds/sitemap?country=NG"
+        ? Response.json(sitemap({ listing_pages: [{ after: 0, listings: 49_999, updated_at: "2026-10-30T00:00:00.000Z" }, { after: 104000, listings: 12, updated_at: "2026-11-01T09:00:00.000Z" }] }))
+        : before(path);
+    const xml = await (await index()).text();
+    expect(xml).toContain("<sitemapindex");
+    expect(locations(xml)).toEqual([`${site}/sitemap-main.xml`, `${site}/sitemaps/ng-pages-0.xml`, `${site}/sitemaps/ng-listings-0.xml`, `${site}/sitemaps/ng-listings-104000.xml`, `${site}/sitemaps/gh-pages-0.xml`]);
+    expect(xml).toContain(`<loc>${site}/sitemaps/ng-listings-104000.xml</loc><lastmod>2026-11-01T09:00:00.000Z</lastmod>`);
+  });
+
+  test("answers 503 and is never kept while the API cannot say, for any market or listing file", async () => {
     reply = () => new Response("down", { status: 502 });
     const down = await index();
     expect([down.status, down.headers.get("cache-control"), down.headers.get("retry-after")]).toEqual([503, "no-store", "600"]);
@@ -80,6 +99,10 @@ describe("the sitemap index", () => {
     reply = path => (path.endsWith("=GH") ? new Response("down", { status: 500 }) : before(path));
     expect((await index()).status).toBe(503);
     expect((await main()).status).toBe(200);
+    reply = path => (path.includes("after=104000") ? new Response("down", { status: 500 }) : before(path));
+    expect((await index()).status).toBe(503);
+    reply = path => (path === "/v1/classifieds/showcase" ? new Response("down", { status: 500 }) : before(path));
+    expect((await index()).status).toBe(503);
     reply = () => new Response("down", { status: 500 });
     expect((await main()).status).toBe(503);
   });

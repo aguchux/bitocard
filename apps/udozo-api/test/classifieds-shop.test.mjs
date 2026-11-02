@@ -238,6 +238,29 @@ describe('sitemap data', () => {
       await prisma.classifiedListing.deleteMany({ where: { slug: { startsWith: 'sitemap-phone-' } } });
     }
   });
+
+  test('a state counts listings delivered nationwide, as its page does, and its count is the one the page uses', async () => {
+    const [phones, lagos, ikeja] = await Promise.all([
+      prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'mobile-phones' } }),
+      prisma.classifiedArea.findFirstOrThrow({ where: { country: 'NG', kind: 'state', slug: 'lagos' } }),
+      prisma.classifiedArea.findFirstOrThrow({ where: { country: 'NG', kind: 'area', slug: 'ikeja' } }),
+    ]);
+    const before = (await get('/v1/classifieds/sitemap?country=NG')).json;
+    const owner = (await prisma.classifiedListing.findUniqueOrThrow({ where: { id: made.phone.id } })).customerId;
+    await prisma.classifiedListing.createMany({ data: Array.from({ length: 5 }, (_, index) => ({ customerId: owner, categoryId: phones.id, country: 'NG', currency: 'NGN', stateId: lagos.id, areaId: ikeja.id, title: `Nationwide phone ${index}`, slug: `nationwide-phone-${index}`, priceMinor: 1_000_000n, condition: 'used', status: 'active', delivery: 'nationwide', publishedAt: new Date() })) });
+    try {
+      const { json } = await get('/v1/classifieds/sitemap?country=NG');
+      const place = state => json.places.find(row => row.state === state && row.area === null);
+      const was = before.places.find(row => row.state === 'kano' && row.area === null)?.listings ?? 0;
+      assert.equal(place('kano').listings, was + 5, 'nothing is in Kano itself, but its page shows them');
+      assert.ok(json.category_places.some(row => row.state === 'kano' && row.area === null && row.category === 'mobile-phones'));
+      assert.ok(!json.places.some(row => row.state === 'kano' && row.area === 'ikeja'), 'an area counts only its own');
+      const page = (await get('/v1/classifieds/listings?country=NG&state=kano')).json.tiers;
+      assert.equal(place('kano').listings, page.area + page.nearby + page.state, "the page's own count");
+    } finally {
+      await prisma.classifiedListing.deleteMany({ where: { slug: { startsWith: 'nationwide-phone-' } } });
+    }
+  });
 });
 
 describe("category covers (bitocard.com's Shop band)", () => {

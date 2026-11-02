@@ -54,7 +54,7 @@ describe("structured data", () => {
 });
 
 describe("sitemaps", () => {
-  test("a country's home, categories with listings, and places and categories in a place with enough of them", () => {
+  test("a country's home, every category, and places and categories in a place with enough listings", () => {
     const page: ShopSitemap = {
       object: "classified_sitemap",
       country: "NG",
@@ -76,7 +76,7 @@ describe("sitemaps", () => {
       listing_pages: [],
     };
     const entries = countryEntries("https://shop.bitocard.com", "ng", page);
-    expect(entries.map(entry => entry.loc)).toEqual(["https://shop.bitocard.com/ng", "https://shop.bitocard.com/ng/c/mobile-phones", "https://shop.bitocard.com/ng/lagos", "https://shop.bitocard.com/ng/lagos/ikeja", "https://shop.bitocard.com/ng/lagos/mobile-phones", "https://shop.bitocard.com/ng/lagos/ikeja/mobile-phones"]);
+    expect(entries.map(entry => entry.loc)).toEqual(["https://shop.bitocard.com/ng", "https://shop.bitocard.com/ng/c/mobile-phones", "https://shop.bitocard.com/ng/c/boats", "https://shop.bitocard.com/ng/lagos", "https://shop.bitocard.com/ng/lagos/ikeja", "https://shop.bitocard.com/ng/lagos/mobile-phones", "https://shop.bitocard.com/ng/lagos/ikeja/mobile-phones"]);
     expect(entries[0]!.lastmod).toBe("2026-10-25T10:00:00.000Z");
     expect(entries[1]!.lastmod).toBe("2026-10-24T10:00:00.000Z");
     const file: ShopSitemapListings = { object: "classified_sitemap_listings", country: "NG", listings: [{ ref: 100001, slug: "tv", updated_at: "2026-10-25T10:00:00.000Z" }], next_after: null };
