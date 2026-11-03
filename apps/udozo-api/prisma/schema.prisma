@@ -5963,6 +5963,32 @@ model ClassifiedSponsoredPlacement {
   @@map("classified_sponsored_placements")
 }
 
+/// A banner ad Udozo's team places on udozo.com (`BannersService`): an image linking to a page, in one place
+/// (`position`, for example `account_rail`), for one market or all of them, switched on and off by admins.
+model ClassifiedBanner {
+  id          String    @id @default(uuid()) @db.Uuid
+  position    String    @db.VarChar(40)
+  /// A market's code; null: every market (a market's own banners win).
+  country     String?   @db.Char(2)
+  imageUrl    String    @map("image_url")
+  /// A page on udozo.com (`/…`) or an https address.
+  href        String
+  /// What the image says, for people who cannot see it.
+  alt         String    @db.VarChar(120)
+  /// The gate: off, it never shows.
+  enabled     Boolean   @default(true)
+  startsAt    DateTime? @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
+  note        String?
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([position, country])
+  @@map("classified_banners")
+}
+
 /// A listing's page views on one UTC day (trending ranks by recent views); the listing's `views` keeps the total.
 model ClassifiedListingViewDay {
   listingId String            @map("listing_id") @db.Uuid

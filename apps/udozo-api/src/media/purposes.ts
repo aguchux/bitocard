@@ -53,6 +53,8 @@ const purposeTable = {
   // Udozo's brand registry: a brand's logo, shown in place of the one bundled with udozo.com.
   classified_brand_logo: { label: 'Marketplace brand logo', realm: 'admin', target: 'classified_brand', folder: slug => `platform/classifieds/brands/${segment(slug!)}/logos`, maxBytes: 1 * MB, types: withSvg },
   home_image: { label: 'Home page image', realm: 'admin', folder: () => 'platform/home/images', maxBytes: 5 * MB, types: rasterTypes },
+  // udozo.com's banner ads (`BannersService`).
+  banner_image: { label: 'Banner ad image', realm: 'admin', folder: () => 'platform/banners/images', maxBytes: 2 * MB, types: rasterTypes },
   store_logo: { label: 'Store logo', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/logos`, maxBytes: 1 * MB, types: rasterTypes },
   store_image: { label: 'Store image', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/images`, maxBytes: 5 * MB, types: rasterTypes },
   bot_avatar: { label: 'Assistant avatar', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/bots/avatars`, maxBytes: 1 * MB, types: rasterTypes },
