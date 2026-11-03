@@ -64,7 +64,7 @@ function Listings() {
           <span className="sr-only">Search ads</span>
           <Input
             type="search"
-            placeholder="Title, number or email"
+            placeholder="Title, number, SKU or email"
             value={words}
             onChange={event => {
               setWords(event.target.value);

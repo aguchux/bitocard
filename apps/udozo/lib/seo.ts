@@ -55,7 +55,7 @@ export function listingJsonLd(listing: ShopListingPage, origin: string, country:
     "@id": `${url}#product`,
     name: listing.title,
     url,
-    sku: String(listing.ref),
+    sku: listing.sku ?? String(listing.ref),
     productID: `udozo:${listing.ref}`,
     ...(listing.photos.length ? { image: listing.photos.slice(0, 6).map(photo => photo.url) } : {}),
     ...(listing.description ? { description: listing.description.replace(/[*_#>`]/g, "").replace(/\s+/g, " ").trim().slice(0, 500) } : {}),

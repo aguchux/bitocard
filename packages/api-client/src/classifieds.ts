@@ -137,6 +137,8 @@ export type ShopListingPage = {
   object: 'classified_listing_page';
   id: string;
   ref: number;
+  /** Its category's prefix and number (PHN-000123). */
+  sku: string | null;
   status: 'active' | 'sold';
   title: string;
   slug: string;
@@ -541,6 +543,8 @@ export type ShopMyListing = {
   object: 'classified_listing';
   id: string;
   ref: number;
+  /** Its category's prefix and number (PHN-000123); null until it has a category. */
+  sku: string | null;
   status: ShopListingStatus;
   review_reason: string | null;
   review_flags: string[];

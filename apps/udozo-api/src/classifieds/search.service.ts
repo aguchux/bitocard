@@ -5,7 +5,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { ClassifiedBrandsService } from './brands.service.js';
-import { brandFeatureKey, conditions, featureValueOut, heldUnits, invalid, onShopWhere } from './rules.js';
+import { brandFeatureKey, conditions, featureValueOut, heldUnits, invalid, onShopWhere, readSku } from './rules.js';
 
 /** Areas whose centres are this close count as nearby. */
 export const nearbyKm = 25;
@@ -154,7 +154,9 @@ export class ListingSearchService {
       where.push(Prisma.sql`EXISTS (SELECT 1 FROM "classified_listing_features" lf WHERE lf."listing_id" = l."id" AND lf."feature_id" = ${filter.featureId}::uuid AND ${match})`);
     }
     const query = q ? Prisma.sql`websearch_to_tsquery('english', ${q})` : null;
-    if (q) where.push(Prisma.sql`(l."search" @@ ${query} OR word_similarity(lower(${q}), lower(l."title")) >= 0.45)`);
+    // A SKU typed in the search box (PHN-000123, phn123) finds that ad, whatever its words.
+    const sku = readSku(q);
+    if (q) where.push(Prisma.sql`(l."search" @@ ${query} OR word_similarity(lower(${q}), lower(l."title")) >= 0.45${sku ? Prisma.sql` OR l."sku" = ${sku}` : Prisma.empty})`);
 
     const distance =
       place.latitude !== null
@@ -168,7 +170,7 @@ export class ListingSearchService {
       WHEN ${place.areaId}::uuid IS NOT NULL AND ${distance} <= ${nearbyKm} THEN 1
       WHEN ${place.stateId}::uuid IS NOT NULL AND (l."state_id" = ${place.stateId}::uuid OR ${delivers}) THEN 2
       ELSE 3 END`;
-    const rank = query ? Prisma.sql`ts_rank_cd(coalesce(l."search", ''::tsvector), ${query}) + word_similarity(lower(${q}), lower(l."title"))` : Prisma.sql`0`;
+    const rank = query ? Prisma.sql`ts_rank_cd(coalesce(l."search", ''::tsvector), ${query}) + word_similarity(lower(${q}), lower(l."title"))${sku ? Prisma.sql` + CASE WHEN l."sku" = ${sku} THEN 10 ELSE 0 END` : Prisma.empty}` : Prisma.sql`0`;
     const order = {
       relevant: Prisma.sql`rank DESC, l."published_at" DESC`,
       newest: Prisma.sql`l."published_at" DESC`,
@@ -285,6 +287,7 @@ export class ListingSearchService {
       object: 'classified_listing_page' as const,
       id: row.id,
       ref: Number(row.ref),
+      sku: row.sku,
       status: row.status,
       title: row.title!,
       slug: row.slug!,

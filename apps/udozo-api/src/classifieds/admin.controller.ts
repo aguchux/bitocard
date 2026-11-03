@@ -14,7 +14,7 @@ import { ConversationsService } from './conversations.service.js';
 import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
-import { type ListingStatus, listingStatuses } from './rules.js';
+import { type ListingStatus, listingStatuses, readSku, skuPrefixPattern } from './rules.js';
 import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFaults, SafePayService } from './safe-pay.service.js';
 import { ResaleService } from './resale.service.js';
 import { ProductOnly } from '../products/product.js';
@@ -138,8 +138,12 @@ class CategoriesDto {
 }
 
 class CategoryDto {
-  @IsBoolean()
-  enabled: boolean;
+  @IsOptional() @IsBoolean()
+  enabled?: boolean;
+
+  /** Three capital letters starting the SKUs of its new listings; SKUs already given keep theirs. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, { message: 'A SKU prefix is three letters.' })
+  sku_prefix?: string;
 }
 
 class CategoryCountryDto {
@@ -231,7 +235,7 @@ export class ClassifiedsAdminService {
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.country ? { country: filter.country } : {}),
       ...(filter.customer_id ? { customerId: filter.customer_id } : {}),
-      ...(filter.q ? { OR: [{ title: { contains: filter.q, mode: 'insensitive' } }, ...(/^\d+$/.test(filter.q) ? [{ ref: BigInt(filter.q) }] : []), { customer: { email: { contains: filter.q, mode: 'insensitive' } } }] } : {}),
+      ...(filter.q ? { OR: [{ title: { contains: filter.q, mode: 'insensitive' } }, ...(/^\d+$/.test(filter.q) ? [{ ref: BigInt(filter.q) }] : []), ...(readSku(filter.q) ? [{ sku: readSku(filter.q)! }] : []), { customer: { email: { contains: filter.q, mode: 'insensitive' } } }] } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.classifiedListing.findMany({ where, include: adminInclude, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }], take: filter.limit ?? 50, skip: filter.offset ?? 0 }),
@@ -357,6 +361,7 @@ export class ClassifiedsAdminService {
       icon: row.icon,
       b2b: row.b2b,
       enabled: row.enabled,
+      sku_prefix: row.skuPrefix,
       open: row.countries[0]?.enabled ?? false,
       active_listings: live.get(row.id) ?? 0,
     });
@@ -369,13 +374,35 @@ export class ClassifiedsAdminService {
     return { object: 'list' as const, country, data };
   }
 
-  /** Switches a category off everywhere (or back on): no new listings in it; live ones stay until they end. */
-  async setCategory(actorId: string | null, id: string, enabled: boolean) {
+  /**
+   * Switches a category off everywhere (or back on): no new listings in it; live ones stay until they end. Or gives it
+   * another SKU prefix: its new listings' SKUs start with it, those given keep theirs, and a prefix any category has had
+   * stays that category's, so no other can take it and no SKU is ever given twice.
+   */
+  async setCategory(actorId: string | null, id: string, input: { enabled?: boolean; sku_prefix?: string }) {
     const row = await this.prisma.classifiedCategory.findUnique({ where: { id } });
     if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such category.');
-    await this.prisma.classifiedCategory.update({ where: { id }, data: { enabled } });
-    await this.audit.record({ actorId, action: 'classifieds.category_changed', targetType: 'classified_category', targetId: id, before: { enabled: row.enabled }, after: { enabled } });
-    return { object: 'classified_admin_category' as const, id, slug: row.slug, enabled };
+    if (input.enabled === undefined && input.sku_prefix === undefined) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Say what to change.', 'enabled');
+    const prefix = input.sku_prefix !== undefined && input.sku_prefix !== row.skuPrefix ? input.sku_prefix : undefined;
+    if (prefix !== undefined) {
+      if (!skuPrefixPattern.test(prefix)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A SKU prefix is three letters.', 'sku_prefix');
+      const holder = await this.prisma.classifiedCategorySkuPrefix.findUnique({ where: { prefix }, include: { category: { select: { name: true } } } });
+      if (holder && holder.categoryId !== id) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'sku_prefix_taken', `${prefix} is already ${holder.category.name}'s, now or before. Choose another.`, 'sku_prefix');
+    }
+    const enabled = input.enabled ?? row.enabled;
+    await this.prisma.$transaction(async tx => {
+      await tx.classifiedCategory.update({ where: { id }, data: { enabled, ...(prefix ? { skuPrefix: prefix } : {}) } });
+      if (prefix) await tx.classifiedCategorySkuPrefix.upsert({ where: { prefix }, create: { prefix, categoryId: id }, update: {} });
+    });
+    await this.audit.record({
+      actorId,
+      action: 'classifieds.category_changed',
+      targetType: 'classified_category',
+      targetId: id,
+      before: { enabled: row.enabled, ...(prefix ? { sku_prefix: row.skuPrefix } : {}) },
+      after: { enabled, ...(prefix ? { sku_prefix: prefix } : {}) },
+    });
+    return { object: 'classified_admin_category' as const, id, slug: row.slug, enabled, sku_prefix: prefix ?? row.skuPrefix };
   }
 
   /** Opens or closes a category in one country (a top category closes all of its subcategories there). */
@@ -524,7 +551,7 @@ export class AdminClassifiedsController {
   @Patch('categories/:id')
   @AdminRoles('operations')
   setCategory(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CategoryDto) {
-    return this.admin.setCategory(adminId(caller), id, body.enabled);
+    return this.admin.setCategory(adminId(caller), id, body);
   }
 
   @Put('categories/:id/countries/:country')

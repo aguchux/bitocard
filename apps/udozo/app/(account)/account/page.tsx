@@ -103,6 +103,7 @@ export default async function MyListings({ searchParams }: Props) {
                       <strong className="truncate text-sm leading-snug">{listing.title || "Untitled draft"}</strong>
                       <span className="text-[13px] font-bold">{listing.price.amount === null && listing.price.kind !== "on_request" ? "No price yet" : shopPriceText(listing.price)}</span>
                       <span className="text-xs text-slate-600">{listingMeta(listing)}</span>
+                      {listing.sku ? <span className="font-mono text-[11px] text-slate-500">SKU {listing.sku}</span> : null}
                     </span>
                   </Link>
                   <ListingButtons id={listing.id} actions={listingActions(listing)} publicHref={listingHref(listing.url)} improve={assistant && listing.status === "active" ? assistant.name : null} />

@@ -35,6 +35,12 @@ export default async function ListingPage({ params }: Props) {
   ] : null;
   return (
     <div className="grid gap-5">
+      {listing.data.sku ? (
+        <p className="text-sm text-slate-600">
+          SKU <span className="font-mono font-semibold text-slate-900">{listing.data.sku}</span>
+          <span className="block text-xs">Given by Udozo from its category. Buyers can search for it.</span>
+        </p>
+      ) : null}
       {figures ? (
         <section aria-label="How it is doing" className="grid gap-2">
           {/* Three then two on phones, the five in a row from tablets up. */}

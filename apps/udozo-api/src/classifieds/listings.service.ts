@@ -20,6 +20,7 @@ import {
   type contacts,
   type deliveries,
   featureValueOut,
+  formatSku,
   heldUnits,
   invalid,
   type ListingStatus,
@@ -177,7 +178,8 @@ export class ListingsService {
     const market = await this.prisma.country.findUniqueOrThrow({ where: { code: country } });
     const data = await this.changes(country, input, null);
     const created = await this.prisma.$transaction(async tx => {
-      const listing = await tx.classifiedListing.create({ data: { customerId: customer.id, country, currency: market.currency, ...data.fields } });
+      const sku = data.fields.categoryId ? await this.issueSku(tx, data.fields.categoryId) : null;
+      const listing = await tx.classifiedListing.create({ data: { customerId: customer.id, country, currency: market.currency, ...data.fields, sku } });
       if (data.features) await tx.classifiedListingFeature.createMany({ data: data.features.map(value => ({ listingId: listing.id, ...value })) });
       await this.refreshSearch(tx, listing.id);
       return listing;
@@ -205,7 +207,10 @@ export class ListingsService {
         const held = await heldUnits(tx, id);
         if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are paid for and waiting to be handed over: stock cannot go below that.`);
       }
-      await tx.classifiedListing.update({ where: { id }, data: data.fields });
+      // A listing in another category takes a SKU there, so its prefix is always its category's.
+      const moved = data.fields.categoryId !== undefined && data.fields.categoryId !== listing.categoryId;
+      const sku = moved ? (data.fields.categoryId ? await this.issueSku(tx, data.fields.categoryId) : null) : undefined;
+      await tx.classifiedListing.update({ where: { id }, data: { ...data.fields, ...(sku !== undefined ? { sku } : {}) } });
       if (data.features) {
         await tx.classifiedListingFeature.deleteMany({ where: { listingId: id } });
         await tx.classifiedListingFeature.createMany({ data: data.features.map(value => ({ listingId: id, ...value })) });
@@ -220,6 +225,14 @@ export class ListingsService {
     const saved = await this.own(customer, id);
     if (saved.status !== 'draft' && data.features) await this.noteBrand(customer.id, saved);
     return this.present(saved);
+  }
+
+  /** The category's next SKU (PHN-000123), its number claimed in one statement so two listings never share it. */
+  private async issueSku(tx: Prisma.TransactionClient, categoryId: string) {
+    const [row] = await tx.$queryRaw<Array<{ prefix: string; number: number }>>`
+      UPDATE "classified_categories" SET "sku_next" = "sku_next" + 1 WHERE "id" = ${categoryId}::uuid RETURNING "sku_prefix" AS "prefix", "sku_next" - 1 AS "number"`;
+    if (!row) throw invalid('parameter_invalid', 'Choose a category open in your country.', 'category_id');
+    return formatSku(row.prefix, row.number);
   }
 
   /** A submitted listing's brand or model the registry lacks is noted as a suggestion (it is saved as typed all the same). */
@@ -468,6 +481,7 @@ export class ListingsService {
       object: 'classified_listing' as const,
       id: listing.id,
       ref: Number(listing.ref),
+      sku: listing.sku,
       status: listing.status,
       review_reason: listing.reviewReason,
       review_flags: listing.reviewFlags,

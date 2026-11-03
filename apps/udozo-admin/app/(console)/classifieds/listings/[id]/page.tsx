@@ -34,7 +34,7 @@ export default function ClassifiedListingPage() {
           <>
             <PageHeader
               title={data.title ?? "Untitled draft"}
-              description={`#${data.ref} · ${data.country}`}
+              description={[`#${data.ref}`, data.sku ? `SKU ${data.sku}` : null, data.country].filter(Boolean).join(" · ")}
               actions={
                 decides ? (
                   <span className="flex flex-wrap gap-2">

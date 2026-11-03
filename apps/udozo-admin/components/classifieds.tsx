@@ -119,7 +119,7 @@ export function MarketFilter({ id, value, onChange, all = true }: { id: string; 
 }
 
 /** A listing's cover, title, number and place: links to its admin page. */
-export function ListingCell({ listing }: { listing: { id: string; ref: number; title: string | null; photos?: Array<{ url: string }>; cover_url?: string | null } }) {
+export function ListingCell({ listing }: { listing: { id: string; ref: number; sku?: string | null; title: string | null; photos?: Array<{ url: string }>; cover_url?: string | null } }) {
   const cover = listing.cover_url ?? listing.photos?.[0]?.url ?? null;
   return (
     <AppLink href={`/classifieds/listings/${listing.id}`} className="flex min-w-0 items-center gap-3 hover:underline">
@@ -127,7 +127,10 @@ export function ListingCell({ listing }: { listing: { id: string; ref: number; t
       {cover ? <img src={cover} alt="" className="size-11 shrink-0 rounded-lg border border-line bg-white object-cover" loading="lazy" /> : <span className="size-11 shrink-0 rounded-lg border border-line bg-canvas" aria-hidden />}
       <span className="min-w-0">
         <span className="block truncate font-semibold text-ink">{listing.title ?? "Untitled draft"}</span>
-        <span className="block text-xs text-muted">#{listing.ref}</span>
+        <span className="block text-xs text-muted">
+          #{listing.ref}
+          {listing.sku ? <span className="font-mono"> · {listing.sku}</span> : null}
+        </span>
       </span>
     </AppLink>
   );

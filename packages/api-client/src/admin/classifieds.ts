@@ -14,6 +14,8 @@ export type ClassifiedListing = {
   object: 'classified_listing';
   id: string;
   ref: number;
+  /** Its category's prefix and number (PHN-000123); null until it has a category. */
+  sku: string | null;
   status: ClassifiedListingStatus;
   review_reason: string | null;
   review_flags: ClassifiedReviewFlag[];
@@ -198,6 +200,8 @@ export type AdminClassifiedCategory = {
   b2b: boolean;
   /** Off: no new listings in it anywhere. */
   enabled: boolean;
+  /** Three letters starting its new listings' SKUs (PHN). */
+  sku_prefix: string;
   /** Open in the country asked for. */
   open: boolean;
   active_listings: number;
@@ -485,7 +489,7 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: country => ({ url: '/v1/admin/classifieds/categories', params: { country } }),
       providesTags: (_result, _error, country) => [{ type: 'ClassifiedCategory', id: country }],
     }),
-    /** Shown at once in every market's list; a refusal undoes it and reloads. */
+    /** Switches a category on or off; shown at once in every market's list; a refusal undoes it and reloads. */
     setClassifiedCategory: build.mutation<unknown, { id: string; enabled: boolean }>({
       query: ({ id, enabled }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}`, method: 'PATCH', body: { enabled } }),
       async onQueryStarted({ id, enabled }, { dispatch, getState, queryFulfilled }) {
@@ -494,6 +498,11 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
         await settleOptimistic(patches, queryFulfilled, () => dispatch(adminClassifiedsApi.util.invalidateTags(['ClassifiedCategory'])));
       },
       invalidatesTags: ['Activity'],
+    }),
+    /** A category's SKU prefix: its new listings' SKUs start with it; those given keep theirs. */
+    setClassifiedCategorySkuPrefix: build.mutation<{ object: 'classified_admin_category'; id: string; slug: string; enabled: boolean; sku_prefix: string }, { id: string; sku_prefix: string }>({
+      query: ({ id, sku_prefix }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}`, method: 'PATCH', body: { sku_prefix } }),
+      invalidatesTags: ['ClassifiedCategory', 'Activity'],
     }),
     /** Shown at once; a refusal undoes it and reloads the market's list. */
     setClassifiedCategoryCountry: build.mutation<unknown, { id: string; country: string; open: boolean }>({
@@ -692,6 +701,7 @@ export const {
   useClearClassifiedStrikesMutation,
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,
+  useSetClassifiedCategorySkuPrefixMutation,
   useSetClassifiedCategoryCountryMutation,
   useClassifiedFeaturesQuery,
   useCreateClassifiedFeatureMutation,

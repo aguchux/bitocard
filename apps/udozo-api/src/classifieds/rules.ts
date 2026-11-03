@@ -97,6 +97,18 @@ export const brandFeatureKey = 'brand';
 /** The feature key the brands' models answer: its values are a registry model's name where one matches. */
 export const modelFeatureKey = 'model';
 
+/** A category's SKU prefix: three capital letters. */
+export const skuPrefixPattern = /^[A-Z]{3}$/;
+
+/** A listing's SKU: its category's prefix and its number there, at least six digits (PHN-000123). */
+export const formatSku = (prefix: string, number: number | bigint) => `${prefix}-${String(number).padStart(6, '0')}`;
+
+/** What someone typed as a SKU ("phn-123", "PHN000123", "phn 123"), as the SKU it names; null when it is not one. */
+export function readSku(text: string | null | undefined) {
+  const match = /^\s*([A-Za-z]{3})[\s-]?0*(\d{1,12})\s*$/.exec(text ?? '');
+  return match ? formatSku(match[1]!.toUpperCase(), BigInt(match[2]!)) : null;
+}
+
 /**
  * How a brand is matched: lower case letters and digits only, accents dropped ("Mercedes Benz", "mercedes-benz" and
  * "MERCEDES-BENZ" are one brand; "Lancôme" is "lancome"). `brandKeySql` is the same for a stored value, in SQL.

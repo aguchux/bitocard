@@ -163,6 +163,11 @@ export default async function ListingPage({ params }: Props) {
               <span>· {postedAgo(listing.published_at)}</span>
               {listing.condition ? <span className="rounded-full bg-navy-50 px-2.5 py-0.5 text-xs font-semibold text-navy-700">{conditionLabels[listing.condition]}</span> : null}
               <span className="text-xs">{deliveryLabels[listing.delivery]}</span>
+              {listing.sku ? (
+                <span className="text-xs text-navy-500">
+                  SKU <span className="font-mono font-semibold text-navy-700">{listing.sku}</span>
+                </span>
+              ) : null}
             </p>
           </section>
           {listing.features.length ? (

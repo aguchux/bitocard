@@ -12,6 +12,7 @@ const listing: ShopListingPage = {
   object: "classified_listing_page",
   id: "l1",
   ref: 100001,
+  sku: "PHN-000042",
   status: "active",
   title: "iPhone 13 Pro, 256 GB",
   slug: "iphone-13-pro-256-gb",
@@ -101,12 +102,14 @@ describe("commerce listing data", () => {
     const data = listingJsonLd(phone, "https://udozo.com", "ng") as Record<string, unknown>;
     expect(data).toMatchObject({
       "@id": "https://udozo.com/ng/l/100001-iphone-13-pro-256-gb#product",
-      sku: "100001",
+      sku: "PHN-000042",
       productID: "udozo:100001",
       brand: { "@type": "Brand", name: "Apple" },
       itemCondition: "https://schema.org/UsedCondition",
       category: "Phones & tablets > Mobile phones",
     });
+    // Its SKU, else (an ad from before SKUs, with no category) its number.
+    expect((listingJsonLd({ ...phone, sku: null }, "https://udozo.com", "ng") as Record<string, unknown>).sku).toBe("100001");
     expect(data.additionalProperty).toEqual([
       { "@type": "PropertyValue", name: "Condition", value: "Used" },
       { "@type": "PropertyValue", name: "Brand", value: "Apple" },

@@ -4304,6 +4304,10 @@ model ClassifiedCategory {
   enabled         Boolean                     @default(true)
   /// What to inspect and test before paying (the Safe Trade Guide); subcategories without one use their parent's.
   safetyChecklist String[]                    @default([]) @map("safety_checklist")
+  /// Three capital letters starting every SKU of its listings (PHN-000123). Admins may change it; SKUs given keep theirs.
+  skuPrefix       String                      @unique @map("sku_prefix") @db.Char(3)
+  /// The number the next listing's SKU takes (claimed with an UPDATE … RETURNING, so two ads never share one).
+  skuNext         Int                         @default(1) @map("sku_next")
   createdAt       DateTime                    @default(now()) @map("created_at")
   updatedAt       DateTime                    @updatedAt @map("updated_at")
   parent          ClassifiedCategory?         @relation("ClassifiedCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
@@ -4317,9 +4321,21 @@ model ClassifiedCategory {
   models          ClassifiedBrandModel[]
   modelSuggestions ClassifiedModelSuggestion[]
   resaleRules     ResaleRule[]
+  skuPrefixes     ClassifiedCategorySkuPrefix[]
 
   @@index([parentId, position])
   @@map("classified_categories")
+}
+
+/// Every prefix a category has had: a prefix stays its category's for good, so SKUs are never repeated.
+model ClassifiedCategorySkuPrefix {
+  prefix     String             @id @db.Char(3)
+  categoryId String             @map("category_id") @db.Uuid
+  createdAt  DateTime           @default(now()) @map("created_at")
+  category   ClassifiedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@map("classified_category_sku_prefixes")
 }
 
 /// Udozo's brand registry: the brands sellers pick for the `brand` feature, each in the categories it sells in (in order),
@@ -4601,6 +4617,8 @@ model ClassifiedListing {
   id           String                     @id @default(uuid()) @db.Uuid
   /// The short number in its public address (`/ng/l/<ref>-<slug>`).
   ref          BigInt                     @unique @default(autoincrement())
+  /// Its category's prefix and number (PHN-000123), given once it has a category and again if it moves to another.
+  sku          String?                    @unique @db.VarChar(16)
   customerId   String                     @map("customer_id") @db.Uuid
   categoryId   String?                    @map("category_id") @db.Uuid
   country      String                     @db.Char(2)
