@@ -150,7 +150,8 @@ describe('the gate in front of Afrippa’s routes', () => {
 
 describe("Afrippa's visitors are rate limited one by one", () => {
   test("by the address Afrippa's server signs with its own secret, never one a store's server signed", async () => {
-    const limited = await startApp({ env: { CRYPTO_ROUTES: 'closed', AFRIPPA_SERVER_SECRET: secret, STORE_SERVER_SECRET: storeSecret, RATE_LIMIT_PER_MINUTE: '2' } });
+    // Counted on this instance: in Redis the caller's own address is shared with every other test running alongside.
+    const limited = await startApp({ env: { CRYPTO_ROUTES: 'closed', AFRIPPA_SERVER_SECRET: secret, STORE_SERVER_SECRET: storeSecret, RATE_LIMIT_PER_MINUTE: '2', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, database: 'pglite' });
     const visitor = (ip, key) => {
       const t = String(Math.floor(Date.now() / 1000));
       return { 'bitocard-client': `t=${t},ip=${ip},v1=${createHmac('sha256', key).update(`${t}.${ip}`).digest('hex')}` };
