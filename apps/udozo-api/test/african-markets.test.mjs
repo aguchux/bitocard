@@ -38,8 +38,16 @@ describe('the twelve markets', () => {
 
     const open = await fetch(`${server.base}/v1/countries`).then(res => res.json());
     assert.deepEqual(open.data.map(item => item.code).sort(), ['GH', 'KE', 'NG'], 'sign-up offers only the open markets');
+    // Off by themselves, so the marketplace being on everywhere (as it is in production) does not open them.
+    assert.equal((await admin.put('/v1/admin/switches/classifieds', { enabled: true })).status, 200);
     const markets = await fetch(`${server.base}/v1/classifieds/markets`).then(res => res.json());
+    assert.ok(markets.data.some(item => item.country === 'NG'));
     assert.ok(markets.data.every(item => !added.includes(item.country)), 'not a marketplace anywhere yet');
+    assert.equal((await admin.put('/v1/admin/switches/classifieds', { country_code: 'RW', enabled: true })).status, 200);
+    const opened = await fetch(`${server.base}/v1/classifieds/markets`).then(res => res.json());
+    assert.ok(opened.data.some(item => item.country === 'RW'), 'an admin opens one');
+    await admin.put('/v1/admin/switches/classifieds', { country_code: 'RW', enabled: false });
+    await admin.put('/v1/admin/switches/classifieds', { enabled: null });
   });
 
   test('each has every category as Nigeria has it, Safe pay and market settings', async () => {
