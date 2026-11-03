@@ -118,7 +118,7 @@ function Markets() {
               <IdentityProvider code={country.code} country={country.name} provider={country.identity_provider} editable={editable} />
             </SettingsPanel>
             <SettingsPanel id="phone" icon={Smartphone} title="Phone verification" description="Who sends the SMS codes that confirm mobile numbers.">
-              <SmsProvider code={country.code} provider={country.sms_provider ?? null} editable={editable} />
+              <SmsProvider code={country.code} provider={country.sms_provider ?? null} fallback={country.sms_fallback_provider ?? null} editable={editable} />
             </SettingsPanel>
           </div>
 

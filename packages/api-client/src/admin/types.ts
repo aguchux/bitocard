@@ -436,6 +436,8 @@ export type Country = {
   /** Who runs identity checks here: BitoCard Verify (Africa by default) or Didit. Missing on older API versions. */
   identity_provider?: IdentityProvider;
   sms_provider?: 'termii' | 'africas_talking' | null;
+  /** Udozo: the second SMS provider, taking a code the first could not send, and resends. Missing on BitoCard's API. */
+  sms_fallback_provider?: 'termii' | 'africas_talking' | null;
   /** Spin and win: spins per customer per day here (1 to 10). Missing on older API versions. */
   spin_daily_limit?: number;
   /** Customer Catcher public page: signed-out spins enabled here, and its first-visit allowance. */
