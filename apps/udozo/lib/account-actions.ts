@@ -18,6 +18,11 @@ export type StepResult = { ok: true; exists?: boolean; password?: boolean; token
 
 const refused = (result: { code: string | null; message: string; param: string | null }): StepResult => ({ ok: false, error: result.message, code: result.code, field: result.param });
 
+/** The sign-up page was opened: counted by Udozo for the day, nothing about the visitor kept (so no consent is needed). */
+export async function countSignupVisit(): Promise<void> {
+  await customerApi("POST", "/v1/signup-journeys/visits", { surface: "udozo" });
+}
+
 /** Sign-in's first step: whether an account uses the email (then the password; otherwise sign up with it). */
 export async function lookupEmail(email: string): Promise<StepResult> {
   const result = await customerApi<{ exists: boolean; password?: boolean }>("POST", "/v1/store/account/signin/lookup", { email: email.trim() });

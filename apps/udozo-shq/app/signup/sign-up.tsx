@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { apiFetch } from "@bitocard/api-client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Building2, Lock, Mail, User } from "lucide-react";
 import {
@@ -115,6 +116,14 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
   const [verifyPhone, verifyPhoneState] = useVerifySignupPhoneMutation();
   const [signUp, signUpState] = useSignUpMutation();
   const cleanEmail = email.trim().toLowerCase();
+
+  // Opening sign-up is counted by Udozo for the day (nothing about the visitor kept): the top of the sign-up funnel.
+  const counted = useRef(false);
+  useEffect(() => {
+    if (counted.current || invitation) return;
+    counted.current = true;
+    void apiFetch("/v1/signup-journeys/visits", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ surface: "shq" }) }).catch(() => undefined);
+  }, [invitation]);
 
   useEffect(() => {
     // Already signed in: nothing to create here.

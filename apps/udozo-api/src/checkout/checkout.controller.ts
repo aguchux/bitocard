@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { TrackSignup } from '../signups/track.js';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
@@ -317,6 +318,7 @@ export class CustomerAccountController {
   /** Step 2: the code Google returned with that state; the customer is signed in (`signed_up` when the account is new). */
   @ProductOnly('udozo')
   @SkipIdempotency()
+  @TrackSignup('udozo', 'google')
   @Post('google/finish')
   @HttpCode(HttpStatus.OK)
   async googleFinish(@StoreKey() store: string | null, @Body() body: GoogleFinishDto) {
@@ -328,6 +330,7 @@ export class CustomerAccountController {
    * up). Sign-up already says whether an email is taken, so this tells nobody more.
    */
   @SkipIdempotency()
+  @TrackSignup('udozo', 'signin_lookup')
   @Post('signin/lookup')
   @HttpCode(HttpStatus.OK)
   async lookup(@StoreKey() store: string | null, @Body() body: AccountEmailDto) {
@@ -335,6 +338,7 @@ export class CustomerAccountController {
   }
 
   /** Step-by-step sign-up, step 1: a code to an email no account uses yet (`email_taken` otherwise). */
+  @TrackSignup('udozo', 'email')
   @Post('signup/email')
   @HttpCode(HttpStatus.ACCEPTED)
   async signupEmail(@StoreKey() store: string | null, @Body() body: AccountEmailDto) {
@@ -343,6 +347,7 @@ export class CustomerAccountController {
 
   /** Step 2: the emailed code, for a one-hour sign-up token. Returns the token, so it is never stored for replay. */
   @SkipIdempotency()
+  @TrackSignup('udozo', 'email_verify')
   @Post('signup/email/verify')
   @HttpCode(HttpStatus.OK)
   async signupEmailVerify(@StoreKey() store: string | null, @Body() body: SignupEmailCodeDto) {
@@ -350,6 +355,7 @@ export class CustomerAccountController {
   }
 
   /** Step 3, after the name and country: a code texted to the mobile (`phone_verification_unavailable` where the country cannot text). */
+  @TrackSignup('udozo', 'phone')
   @Post('signup/phone')
   @HttpCode(HttpStatus.ACCEPTED)
   async signupPhone(@StoreKey() store: string | null, @Body() body: SignupPhoneDto) {
@@ -357,6 +363,7 @@ export class CustomerAccountController {
   }
 
   @SkipIdempotency()
+  @TrackSignup('udozo', 'phone_verify')
   @Post('signup/phone/verify')
   @HttpCode(HttpStatus.OK)
   async signupPhoneVerify(@StoreKey() store: string | null, @Body() body: SignupPhoneCodeDto) {
@@ -365,12 +372,14 @@ export class CustomerAccountController {
 
   /** Returns the session token, so it is never stored for replay. */
   @SkipIdempotency()
+  @TrackSignup('udozo', 'signup')
   @Post('signup')
   async signup(@StoreKey() store: string | null, @Body() body: SignUpDto) {
     return this.customers.signup(await this.stores.accountStore(store), body);
   }
 
   @SkipIdempotency()
+  @TrackSignup('udozo', 'signin')
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   async signin(@StoreKey() store: string | null, @Body() body: SignInDto) {
@@ -424,6 +433,7 @@ export class CustomerAccountController {
   }
 
   @UseGuards(CustomerGuard)
+  @TrackSignup('udozo', 'profile')
   @Post('profile')
   @HttpCode(HttpStatus.OK)
   profile(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfileDto) {
@@ -445,6 +455,7 @@ export class CustomerAccountController {
   }
 
   @UseGuards(CustomerGuard)
+  @TrackSignup('udozo', 'account_email_verify')
   @Post('email/verify')
   @HttpCode(HttpStatus.OK)
   verifyEmail(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
@@ -452,6 +463,7 @@ export class CustomerAccountController {
   }
 
   @UseGuards(CustomerGuard)
+  @TrackSignup('udozo', 'account_phone')
   @Post('phone')
   @HttpCode(HttpStatus.ACCEPTED)
   addPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
@@ -459,6 +471,7 @@ export class CustomerAccountController {
   }
 
   @UseGuards(CustomerGuard)
+  @TrackSignup('udozo', 'account_phone_verify')
   @Post('phone/verify')
   @HttpCode(HttpStatus.OK)
   verifyPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {

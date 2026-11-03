@@ -18,6 +18,8 @@ export const customerCookie = "udz_customer";
 const sessionHeader = "bitocard-customer-session";
 /** The shopper's address, signed (the API's `client-ip.ts`). */
 const clientHeader = "bitocard-client";
+/** The visitor's browser (the API names the device from it for sign-up journeys). */
+const agentHeader = "bitocard-client-agent";
 const thirtyDays = 60 * 60 * 24 * 30;
 
 export type Customer = {
@@ -81,7 +83,10 @@ type Options = { idempotencyKey?: string; headers?: Record<string, string> };
 export async function customerFetch(method: Method, path: string, body?: unknown, options: Options = {}): Promise<Response | null> {
   const token = (await cookies()).get(customerCookie)?.value;
   // On a reseller's store (the proxy named it), the API is told which: its Udozo account works there as on udozo.com.
-  const store = (await headers()).get(storeHeader);
+  const list = await headers();
+  const store = list.get(storeHeader);
+  // The visitor's browser, so Udozo's sign-up journeys can say which devices people get stuck on (never stored as is).
+  const agent = list.get("user-agent")?.slice(0, 500);
   const form = body instanceof FormData;
   try {
     return await fetch(apiUrl(path), {
@@ -92,6 +97,7 @@ export async function customerFetch(method: Method, path: string, body?: unknown
         ...(body !== undefined && !form ? { "content-type": "application/json" } : {}),
         ...(token ? { [sessionHeader]: token } : {}),
         ...(store ? { "bitocard-store": store } : {}),
+        ...(agent ? { [agentHeader]: agent } : {}),
         ...(await shopperHeader()),
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
         ...options.headers,

@@ -47,6 +47,7 @@ import { ChatsService } from '../support/chats.service.js';
 import { RepliesService } from '../support/replies.service.js';
 import { TicketsService } from '../support/tickets.service.js';
 import { ContactMessagesService } from '../support/contact-messages.service.js';
+import { SignupJourneysService } from '../signups/journeys.service.js';
 import { ShopAssistantsService } from '../classifieds/assistant/shop-assistants.service.js';
 import { jobRunsFor } from '../products/jobs.js';
 
@@ -106,6 +107,7 @@ export class CronController {
     resaleOrders: ResaleOrdersService,
     marketing: MarketingService,
     calls: CallsService,
+    signupJourneys: SignupJourneysService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -175,8 +177,11 @@ export class CronController {
       push: () => push.runDue(),
       /** Daily: delete in-app notifications older than 90 days (and their pushes). */
       'notifications-cleanup': () => inbox.purge(),
-      /** Udozo, daily: Marketing keeps no one it never brought on for long, and nothing but the contact of who asked to stop. */
-      marketing: () => marketing.purge(),
+      /**
+       * Udozo, daily: Marketing keeps no one it never brought on for long, and nothing but the contact of who asked to
+       * stop; sign-up journeys are rolled into daily counts and deleted 7 days after completing (30 days unfinished).
+       */
+      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the

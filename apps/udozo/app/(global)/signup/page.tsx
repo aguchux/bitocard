@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AuthLinks } from "@/components/account-forms";
 import { GoogleButton, OrDivider } from "@/components/account/google-button";
 import { SignUpForm } from "@/components/account/sign-in-up";
+import { SignupVisit } from "@/components/account/signup-visit";
 import { googleErrorText } from "@/lib/google";
 import { markets } from "@/lib/api";
 import { countries } from "@/lib/countries";
@@ -26,6 +27,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   const suggested = [params.country?.toUpperCase(), fromPath, open.data.length === 1 ? open.data[0]!.country : undefined].find(code => code && list.some(item => item.code === code)) ?? null;
   return (
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
+      <SignupVisit />
       <h1 className="text-2xl leading-tight font-extrabold">Create your Udozo account</h1>
       <p className="text-sm text-navy-600">Buy and sell near you, and pay safely with Safe pay. One account works on udozo.com and every Udozo store.</p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import type { AppConfig } from '../config/config.js';
@@ -10,6 +10,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { originAllowed } from './auth.guard.js';
 import { SessionsService } from './sessions.service.js';
 import { googleNames } from './names.js';
+import { deviceOf, SignupJourneysService } from '../signups/journeys.service.js';
 
 export const oauthCookie = 'bc_oauth_state';
 const stateLifetimeMs = 10 * 60 * 1000;
@@ -112,6 +113,7 @@ export class GoogleService {
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsService,
     private readonly integrations: IntegrationsService,
+    @Optional() private readonly journeys?: SignupJourneysService,
   ) {}
 
   /** Starts the flow and returns the Google URL to redirect to. */
@@ -154,19 +156,26 @@ export class GoogleService {
 
     const pending = query.state && cookieState === query.state ? await this.takeState(query.state) : null;
     const returnTo = pending?.returnTo ?? this.config.DASHBOARD_URL;
+    // Known once Google answers: the step is then kept in the person's sign-up journey (Udozo).
+    let email: string | null = null;
+    const device = deviceOf(req.headers);
     try {
       if (!pending) throw new GoogleSignInError('google_state_invalid');
       if (query.error) throw new GoogleSignInError('google_cancelled');
       if (!query.code) throw new GoogleSignInError('google_failed');
 
       const claims = await this.exchange(query.code, pending.codeVerifier, pending.nonce);
+      email = typeof claims.email === 'string' ? claims.email.toLowerCase() : null;
+      const existed = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email: email ?? '' } }, select: { id: true } });
       const userId = await this.resolveUser(claims, pending.intent, pending.linkUserId);
       await this.prisma.user.update({ where: { id: userId }, data: { lastSignInAt: new Date() } });
       await this.sessions.create(userId, 'reseller', req, res);
+      if (pending.intent !== 'link') await this.journeys?.record({ surface: 'shq', step: existed ? 'signin' : 'google', email, device });
       return returnTo;
     } catch (error) {
       const code = error instanceof GoogleSignInError ? error.code : 'google_failed';
       if (!(error instanceof GoogleSignInError)) this.logger.error({ err: error }, 'Google sign-in failed');
+      if (email && pending?.intent !== 'link') await this.journeys?.record({ surface: 'shq', step: 'google', email, device, error: code });
       const url = new URL(returnTo);
       url.searchParams.set('auth_error', code);
       return url.toString();

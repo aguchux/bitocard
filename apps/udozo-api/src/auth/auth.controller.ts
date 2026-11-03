@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Req, Res } from '@nestjs/common';
+import { TrackSignup } from '../signups/track.js';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
@@ -31,6 +32,7 @@ export class AuthController {
     description: 'Sends a 6-digit code (30 minutes, 5 attempts, one a minute). Refused with `email_in_use` if an account already uses the email.',
   })
   @Public()
+  @TrackSignup('shq', 'email')
   @Post('signup/email')
   @HttpCode(HttpStatus.ACCEPTED)
   async startSignupEmail(@Body() body: SignupEmailDto) {
@@ -44,6 +46,7 @@ export class AuthController {
     description: 'Returns `signup_token`, valid for one hour and once, to pass to `POST /v1/auth/signup` with the same email.',
   })
   @Public()
+  @TrackSignup('shq', 'email_verify')
   @Post('signup/email/verify')
   @HttpCode(HttpStatus.OK)
   verifySignupEmail(@Body() body: SignupEmailVerifyDto) {
@@ -57,6 +60,7 @@ export class AuthController {
       "After confirming the email. Texts a 6-digit code (30 minutes, 5 attempts, one a minute, five per sign-up) through the country's SMS provider. Refused with `phone_in_use` when it is already someone's sign-in number, and `phone_verification_unavailable` where the country has no SMS provider (sign up with the number unconfirmed).",
   })
   @Public()
+  @TrackSignup('shq', 'phone')
   @Post('signup/phone')
   @HttpCode(HttpStatus.ACCEPTED)
   startSignupPhone(@Body() body: SignupPhoneDto) {
@@ -69,6 +73,7 @@ export class AuthController {
     description: 'Pass the same `signup_token` and `phone` to `POST /v1/auth/signup`: the account is created with the number confirmed, as a sign-in number.',
   })
   @Public()
+  @TrackSignup('shq', 'phone_verify')
   @Post('signup/phone/verify')
   @HttpCode(HttpStatus.OK)
   verifySignupPhone(@Body() body: SignupPhoneVerifyDto) {
@@ -81,6 +86,7 @@ export class AuthController {
     description: 'With a `signup_token` (from confirming the email first) the email is already confirmed; otherwise a 6-digit code is emailed to confirm it.',
   })
   @Public()
+  @TrackSignup('shq', 'signup')
   @Post('signup')
   signUp(@Body() body: SignUpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.auth.signUp(body, req, res);
@@ -98,6 +104,7 @@ export class AuthController {
   })
   @ProductOnly('udozo')
   @SessionOnly()
+  @TrackSignup('shq', 'onboarding_token')
   @Post('onboarding/signup-token')
   @HttpCode(HttpStatus.OK)
   onboardingToken(@CurrentCaller() caller: Caller) {
@@ -105,6 +112,7 @@ export class AuthController {
   }
 
   @SessionOnly()
+  @TrackSignup('shq', 'onboarding')
   @Post('reseller-account')
   createResellerAccount(@CurrentCaller() caller: Caller, @Body() body: CreateResellerAccountDto) {
     return this.auth.createResellerAccount(caller.kind === 'session' ? caller.userId : '', body);
@@ -116,6 +124,7 @@ export class AuthController {
     description: 'Says whether an account signs in with this email or confirmed mobile number (`exists`) and has a password (`password`; a Google-only account signs in with Google). Held to the strict sign-in limit per address.',
   })
   @Public()
+  @TrackSignup('shq', 'signin_lookup')
   @Post('signin/lookup')
   @HttpCode(HttpStatus.OK)
   lookupSignIn(@Body() body: SignInLookupDto) {
@@ -125,6 +134,7 @@ export class AuthController {
   /** Sign in with email or verified mobile number and password. */
   @ApiOperation({ summary: 'Sign in with email or verified mobile number and password' })
   @Public()
+  @TrackSignup('shq', 'signin')
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   signIn(@Body() body: SignInDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {

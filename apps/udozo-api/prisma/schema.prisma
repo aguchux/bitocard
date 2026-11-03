@@ -5969,3 +5969,111 @@ model ClassifiedListingViewDay {
   @@index([day])
   @@map("classified_listing_view_days")
 }
+
+/// Udozo: one person's way through sign-up (udozo.com or Seller HQ), from the email they entered to an account they can
+/// use, so admins can see where people get stuck (Reports > Sign-up journeys). One open journey per surface and email
+/// (a partial unique index); each milestone's time is kept as it is first reached. Deleted 7 days after it completed,
+/// or 30 days after its last step if it never did (the daily `marketing` job).
+model SignupJourney {
+  id               String               @id @default(uuid()) @db.Uuid
+  /// udozo (udozo.com's customers) or shq (Seller HQ's resellers).
+  surface          String               @db.VarChar(10)
+  email            String               @db.VarChar(320)
+  /// email (the step-by-step wizard) or google.
+  method           String               @default("email") @db.VarChar(10)
+  country          String?              @db.Char(2)
+  /// The account once there is one (a customer's or a person's id).
+  accountId        String?              @map("account_id") @db.Uuid
+  /// "Chrome on Android", from the browser the first step came from.
+  device           String?              @db.VarChar(60)
+  emailEnteredAt   DateTime?            @map("email_entered_at")
+  emailVerifiedAt  DateTime?            @map("email_verified_at")
+  phoneEnteredAt   DateTime?            @map("phone_entered_at")
+  phoneVerifiedAt  DateTime?            @map("phone_verified_at")
+  /// The country cannot text: the mobile is kept unconfirmed, and nothing waits for it.
+  phoneSkipped     Boolean              @default(false) @map("phone_skipped")
+  accountCreatedAt DateTime?            @map("account_created_at")
+  signedInAt       DateTime?            @map("signed_in_at")
+  /// The account is usable: email and mobile confirmed, profile complete (and on Seller HQ, a business).
+  completedAt      DateTime?            @map("completed_at")
+  /// The last refusal: which step and why, for the stuck list.
+  lastErrorStep    String?              @map("last_error_step") @db.VarChar(30)
+  lastErrorCode    String?              @map("last_error_code") @db.VarChar(60)
+  refusals         Int                  @default(0)
+  eventCount       Int                  @default(0) @map("event_count")
+  startedAt        DateTime             @default(now()) @map("started_at")
+  lastEventAt      DateTime             @default(now()) @map("last_event_at")
+  events           SignupJourneyEvent[]
+
+  @@index([surface, startedAt])
+  @@index([surface, email])
+  @@index([completedAt])
+  @@index([lastEventAt])
+  @@map("signup_journeys")
+}
+
+/// One step a journey took: what was asked (`step`), whether it went through, and why not (the API's error code).
+model SignupJourneyEvent {
+  id        String        @id @default(uuid()) @db.Uuid
+  journeyId String        @map("journey_id") @db.Uuid
+  step      String        @db.VarChar(30)
+  /// ok or refused.
+  outcome   String        @db.VarChar(10)
+  code      String?       @db.VarChar(60)
+  param     String?       @db.VarChar(40)
+  device    String?       @db.VarChar(60)
+  createdAt DateTime      @default(now()) @map("created_at")
+  journey   SignupJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@index([journeyId, createdAt])
+  @@map("signup_journey_events")
+}
+
+/// Udozo: how many times a sign-up page was opened a day, counted only (nothing about the visitor).
+model SignupVisitDay {
+  surface String   @db.VarChar(10)
+  day     DateTime @db.Date
+  visits  Int      @default(0)
+
+  @@id([surface, day])
+  @@map("signup_visit_days")
+}
+
+/// Udozo: sign-up journeys counted by the day they started, once the journeys themselves are deleted (`purge` rolls each
+/// into its day before deleting it), so the funnel keeps its history without anyone's details.
+model SignupFunnelDay {
+  surface           String   @db.VarChar(10)
+  day               DateTime @db.Date
+  /// email or google.
+  method            String   @db.VarChar(10)
+  /// The journey's country, or "" when it never said.
+  country           String   @default("") @db.VarChar(2)
+  started           Int      @default(0)
+  emailEntered      Int      @default(0) @map("email_entered")
+  emailVerified     Int      @default(0) @map("email_verified")
+  phoneEntered      Int      @default(0) @map("phone_entered")
+  phoneVerified     Int      @default(0) @map("phone_verified")
+  accountCreated    Int      @default(0) @map("account_created")
+  completed         Int      @default(0)
+  /// Minutes from the first step to a usable account, summed over the completed ones (for the average).
+  minutesToComplete BigInt   @default(0) @map("minutes_to_complete")
+
+  @@id([surface, day, method, country])
+  @@map("signup_funnel_days")
+}
+
+/// Udozo: refusals of sign-up steps counted by day, step and code, kept once the journeys are deleted.
+model SignupBlockerDay {
+  surface  String   @db.VarChar(10)
+  day      DateTime @db.Date
+  step     String   @db.VarChar(30)
+  code     String   @db.VarChar(60)
+  /// The journey's country, or "".
+  country  String   @default("") @db.VarChar(2)
+  refusals Int      @default(0)
+  /// Journeys refused there at least once.
+  journeys Int      @default(0)
+
+  @@id([surface, day, step, code, country])
+  @@map("signup_blocker_days")
+}

@@ -43,6 +43,7 @@ import { IdempotencyInterceptor } from './common/idempotency/idempotency.interce
 import { SupportModule } from './support/support.module.js';
 import { ClassifiedsModule } from './classifieds/classifieds.module.js';
 import { MarketingModule } from './marketing/marketing.controller.js';
+import { SignupsModule } from './signups/signups.module.js';
 import { ResaleModule } from './resale/resale.module.js';
 import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
 import { DisputesModule } from './disputes/disputes.module.js';
@@ -118,6 +119,7 @@ export class AppModule {
         SupportModule,
         ClassifiedsModule,
         MarketingModule,
+        SignupsModule,
         ResaleModule,
         ShopAssistantModule,
         CryptoModule,

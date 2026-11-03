@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { googleAuthorizationUrl, googleClaims, GoogleSignInError } from '../auth/google.service.js';
@@ -6,6 +6,7 @@ import { googleNames } from '../auth/names.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Store } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
+import { SignupJourneysService } from '../signups/journeys.service.js';
 import { CustomersService } from './customers.service.js';
 
 const stateLifetimeMs = 10 * 60 * 1000;
@@ -47,7 +48,14 @@ export class CustomerGoogleService {
     private readonly prisma: PrismaService,
     private readonly customers: CustomersService,
     private readonly integrations: IntegrationsService,
+    @Optional() private readonly journeys?: SignupJourneysService,
   ) {}
+
+  /** A refusal once Google has named the email: kept as a step of the person's sign-up journey (the route cannot see the email). */
+  private async refuseFor(email: string, code: string) {
+    await this.journeys?.record({ surface: 'udozo', step: 'google', email, error: code });
+    return refused(code);
+  }
 
   private client() {
     const config = this.integrations.config;
@@ -93,8 +101,8 @@ export class CustomerGoogleService {
     if (customer && customer.status !== 'active') throw refused('account_disabled');
     if (!customer) {
       // Never linked through a matching email: they sign in with their password.
-      if (await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email } } })) throw refused('account_exists_sign_in_with_password');
-      if (record.intent !== 'signup') throw refused('google_account_not_found');
+      if (await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email } } })) throw await this.refuseFor(email, 'account_exists_sign_in_with_password');
+      if (record.intent !== 'signup') throw await this.refuseFor(email, 'google_account_not_found');
       try {
         customer = await this.prisma.customer.create({
           data: { storeId: store.id, email, ...googleNames(claims, email), emailVerifiedAt: new Date(), googleSubject: sub, passwordHash: null, signupRef: input.ref ?? null },
