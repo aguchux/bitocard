@@ -1,14 +1,14 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { FlaskConical } from 'lucide-react';
+import { FlaskConical, UserRound } from 'lucide-react';
 import { useAdminSignOutMutation } from '@bitocard/api-client/admin';
 import { cn, humanise } from '../format';
 import { AccountMenu, ConsoleShell, type Crumb } from './console-shell';
 import { menus, sections, type SectionKey } from './nav';
 import { NotificationBell } from './notifications';
 import { StepUpPrompt } from './step-up';
-import { useAdmin, useMode } from './session';
+import { AppLink, useAdmin, useMode } from './session';
 
 export type { Crumb };
 
@@ -27,7 +27,13 @@ function AdminAccountMenu() {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign('/signin');
       }}
-    />
+    >
+      <AppLink href="/account" className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-sm font-medium text-ink hover:bg-canvas">
+        <UserRound className="size-4" aria-hidden />
+        Your account
+        {admin.authenticator === false ? <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">2-step off</span> : null}
+      </AppLink>
+    </AccountMenu>
   );
 }
 

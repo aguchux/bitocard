@@ -429,7 +429,7 @@ export class AdminAuthService {
   /** A sign-in challenge of this realm's admin: another realm's is as unknown as a made-up one. */
   private async challenge(token: string, realm: AdminRealm) {
     const userId = token.split('.')[0];
-    if (!/^[0-9a-f-]{36}$/.test(userId)) throw invalidChallenge();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(userId)) throw invalidChallenge();
     const record = await this.prisma.verificationCode.findFirst({
       where: { userId, purpose: 'admin_mfa_challenge', consumedAt: null },
       orderBy: { createdAt: 'desc' },
