@@ -1,12 +1,12 @@
 import { bitocardApi } from '../base';
 import type { ShopListingCard } from '../classifieds';
-import type { HomeLayoutKey, HomeLook, HomeSection, HomeSectionType } from '../home';
+import type { HomeBlockType, HomeLayoutKey, HomeLook, HomeRow, HomeSection, HomeSectionType, HomeStoreCard, ResolvedHomeRow } from '../home';
 
 // udozo.com's home pages and their Sponsored placements (Udozo's API only: /v1/admin/classifieds/home and /sponsored).
 
 export type HomeLayoutInfo = { key: HomeLayoutKey; name: string; description: string; look: HomeLook };
 
-/** A home page as the editor works on it: the draft's layout and sections, what is live, and its versions. */
+/** A home page as the editor works on it: the draft's layout and rows, what is live, and its versions. */
 export type HomePage = {
   object: 'home_page';
   /** `global`, or the country's code. */
@@ -14,8 +14,12 @@ export type HomePage = {
   name: string;
   scope: 'global' | 'country';
   layout: HomeLayoutKey;
-  draft: HomeSection[];
+  /** The draft's rows of blocks. */
+  rows: HomeRow[];
   published_layout: HomeLayoutKey | null;
+  published_rows: HomeRow[] | null;
+  /** Every block of the draft as one list (the editor of before). */
+  draft: HomeSection[];
   published: HomeSection[] | null;
   unpublished_changes: boolean;
   live: boolean;
@@ -24,8 +28,12 @@ export type HomePage = {
   updated_at: string;
   versions: Array<{ version: number; published_at: string; layout: HomeLayoutKey | null }>;
   layouts: HomeLayoutInfo[];
+  blocks_allowed: HomeBlockType[];
   sections_allowed: HomeSectionType[];
 };
+
+/** Rows filled as visitors would see them, for the editor's cards (nothing saved). */
+export type ResolvedHomePage = { object: 'home_page_resolved'; page: string; rows: ResolvedHomeRow[] };
 
 export type HomePageSummary = { object: 'home_page_summary'; page: string; name: string; scope: 'global' | 'country'; layout: HomeLayoutKey; live: boolean; version: number; unpublished_changes: boolean };
 
@@ -61,6 +69,18 @@ export const adminUdozoHomeApi = bitocardApi.injectEndpoints({
       query: ({ page, sections }) => ({ url: `/v1/admin/classifieds/home/${page}/draft`, method: 'PUT', body: { sections } }),
       // The editor keeps its own working copy: only the list's "unpublished changes" needs reading again.
       invalidatesTags: [pagesTag],
+    }),
+    saveHomeRows: build.mutation<HomePage, { page: string; rows: HomeRow[] }>({
+      query: ({ page, rows }) => ({ url: `/v1/admin/classifieds/home/${page}/draft`, method: 'PUT', body: { rows } }),
+      invalidatesTags: [pagesTag],
+    }),
+    /** The rows filled as visitors would see them (never cached, nothing saved). */
+    resolveHomeRows: build.mutation<ResolvedHomePage, { page: string; rows: HomeRow[] }>({
+      query: ({ page, rows }) => ({ url: `/v1/admin/classifieds/home/${page}/resolve`, method: 'POST', body: { rows } }),
+    }),
+    /** Resellers' stores live on their own domain, to pick for a stores marquee on this page. */
+    homeStores: build.query<{ object: 'list'; data: HomeStoreCard[] }, { page: string; q?: string }>({
+      query: ({ page, q }) => ({ url: `/v1/admin/classifieds/home/${page}/stores`, params: q ? { q } : {} }),
     }),
     setHomeLayout: build.mutation<HomePage, { page: string; layout: HomeLayoutKey; replace: boolean }>({
       query: ({ page, ...body }) => ({ url: `/v1/admin/classifieds/home/${page}/layout`, method: 'POST', body }),
@@ -98,6 +118,9 @@ export const {
   useHomePagesQuery,
   useHomePageQuery,
   useSaveHomeDraftMutation,
+  useSaveHomeRowsMutation,
+  useResolveHomeRowsMutation,
+  useHomeStoresQuery,
   useSetHomeLayoutMutation,
   useHomePreviewMutation,
   usePublishHomeMutation,

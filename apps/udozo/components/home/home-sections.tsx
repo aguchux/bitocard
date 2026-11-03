@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, CreditCard, Gift, Globe2, Headphones, Lock, LineChart, Phone, ShieldCheck, Star, Timer, Zap, Coins, type LucideIcon } from "lucide-react";
 import type { ShopListingCard, ShopShowcaseCard } from "@bitocard/api-client/classifieds";
-import type { ClassifiedHome, HomeCard, HomeLook, HomeTile, ResolvedHomeSection } from "@bitocard/api-client/home";
+import type { ClassifiedHome, HomeCard, HomeLook, HomeTile, ResolvedHomeRow, ResolvedHomeSection } from "@bitocard/api-client/home";
 import type { TrustIcon } from "@bitocard/api-client/storefront";
 import { Flag } from "../flag";
 import { ShopIcon } from "../icon";
 import { ListingGrid, ListingTile } from "../listing-card";
 import { Slider } from "../slider";
+import { CategoryBannerBlock, ListingMarqueeBlock, MasonryGridBlock, StoreMarqueeBlock } from "./row-blocks";
 
 type Of<T extends ResolvedHomeSection["type"]> = Extract<ResolvedHomeSection, { type: T }>;
 type Card = ShopListingCard | ShopShowcaseCard;
@@ -42,6 +43,14 @@ export function showsSomething(section: ResolvedHomeSection) {
       return section.data.items.length > 0;
     case "country_tiles":
       return section.data.countries.length > 0;
+    case "listing_marquee":
+      return section.data.items.length > 0;
+    case "store_marquee":
+      return section.data.stores.length > 0;
+    case "masonry_grid":
+      return section.data.tiles.length > 0;
+    case "category_banner":
+      return section.data.category !== null;
     default:
       return true;
   }
@@ -250,7 +259,96 @@ function One({ section, look }: { section: ResolvedHomeSection; look: HomeLook }
       return <Countries section={section} look={look} />;
     case "trust_bar":
       return <Trust section={section} look={look} />;
+    case "listing_marquee":
+      return <ListingMarqueeBlock section={section} />;
+    case "store_marquee":
+      return <StoreMarqueeBlock section={section} look={look} />;
+    case "masonry_grid":
+      return <MasonryGridBlock section={section} look={look} />;
+    case "category_banner":
+      return <CategoryBannerBlock section={section} look={look} />;
   }
+}
+
+const rowBackgrounds: Record<ResolvedHomeRow["background"], string> = { none: "", soft: "bg-navy-50", navy: "bg-navy-900 text-white", brand: "bg-brand-700 text-white", image: "relative isolate text-white" };
+const rowSpacing: Record<ResolvedHomeRow["spacing"], string> = { tight: "py-2", normal: "py-4 sm:py-5", loose: "py-8 sm:py-12" };
+const container = "mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8";
+
+/** A block on its row's grid (12 columns on desktops, 6 on tablets, full width on phones), marked for the editor's preview. */
+function Block({ block, look, preview }: { block: ResolvedHomeSection; look: HomeLook; preview: boolean }) {
+  return (
+    <div data-home-block={preview ? block.id : undefined} className={`min-w-0 ${mdSpans[block.span.md] ?? "md:col-span-6"} ${lgSpans[block.span.lg] ?? "lg:col-span-12"}`}>
+      <One section={block} look={look} />
+    </div>
+  );
+}
+
+/**
+ * A row of the page: its own background (edge to edge), heading and "See all", then its blocks on the grid. A contained
+ * row keeps the page's width; a full one runs edge to edge. Text on navy, brand and photo backgrounds is white.
+ */
+function Row({ row, look, preview }: { row: ResolvedHomeRow; look: HomeLook; preview: boolean }) {
+  const blocks = row.blocks.filter(showsSomething);
+  if (!blocks.length) return null;
+  const id = `row-${row.id}`;
+  const coloured = row.background === "navy" || row.background === "brand" || row.background === "image";
+  return (
+    <section data-home-row={preview ? row.id : undefined} aria-labelledby={row.title ? id : undefined} className={`${rowBackgrounds[row.background]} ${row.background === "none" ? "" : rowSpacing[row.spacing]}`}>
+      {row.background === "image" && row.image ? (
+        <>
+          <img src={row.image} alt="" loading="lazy" className="absolute inset-0 -z-10 size-full object-cover" />
+          <span className="absolute inset-0 -z-10 bg-navy-900/65" aria-hidden="true" />
+        </>
+      ) : null}
+      <div className={`${row.width === "full" ? "w-full px-4 sm:px-6" : container} ${row.background === "none" ? rowSpacing[row.spacing] : ""} ${row.background === "image" ? "relative isolate" : ""}`}>
+        {row.title || row.view_all_href ? (
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <div className="grid min-w-0 gap-0.5">
+              {row.title ? (
+                <h2 id={id} className="text-lg font-extrabold sm:text-xl">
+                  {row.title}
+                </h2>
+              ) : null}
+              {row.subtitle ? <p className={`text-sm ${coloured ? "text-white/80" : "text-navy-600"}`}>{row.subtitle}</p> : null}
+            </div>
+            {row.view_all_href ? (
+              <Link href={row.view_all_href} className={`shrink-0 text-[13px] font-semibold hover:underline ${coloured ? "text-white" : "text-brand-700"}`}>
+                See all
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+        <div className={`grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 ${gaps[look.density]}`}>
+          {blocks.map(block => (
+            <Block key={block.id} block={block} look={look} preview={preview} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A home page laid out by Udozo's admins, row by row: a first row holding only a hero runs edge to edge (as the page
+ * always began), then each row with its background, heading and blocks. Blocks with nothing to show are left out, and
+ * rows left empty with them; the layout's look sets the hero's colour, the cards, corners and spacing. `preview` marks
+ * rows and blocks for the editor's click-to-edit (only on /home-preview).
+ */
+export function HomeRows({ home, rows, preview = false }: { home: ClassifiedHome; rows: ResolvedHomeRow[]; preview?: boolean }) {
+  const [first, ...rest] = rows.filter(row => !row.hidden);
+  const leadHero = first && first.blocks.length === 1 && first.blocks[0]!.type === "home_hero" ? (first.blocks[0] as Of<"home_hero">) : null;
+  return (
+    <div data-home-layout={home.layout} className="grid pb-4">
+      {leadHero ? (
+        <div data-home-row={preview ? first!.id : undefined} data-home-block={preview ? leadHero.id : undefined}>
+          <Hero section={leadHero} look={home.look} bleed />
+        </div>
+      ) : null}
+      {(leadHero ? rest : [first, ...rest]).filter(Boolean).map(row => (
+        <Row key={row!.id} row={row!} look={home.look} preview={preview} />
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -258,7 +356,8 @@ function One({ section, look }: { section: ResolvedHomeSection; look: HomeLook }
  * column on phones, 6 on tablets and 12 on desktops (each section's own width from tablets up). Sections with nothing to
  * show are left out; the layout's look sets the hero's colour, the cards, corners and spacing.
  */
-export function HomeSections({ home }: { home: ClassifiedHome }) {
+export function HomeSections({ home, preview = false }: { home: ClassifiedHome; preview?: boolean }) {
+  if (home.rows) return <HomeRows home={home} rows={home.rows} preview={preview} />;
   const shown = home.sections.filter(section => !section.hidden && showsSomething(section));
   const [first, ...rest] = shown;
   const leadHero = first?.type === "home_hero" ? first : null;

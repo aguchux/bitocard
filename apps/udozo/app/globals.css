@@ -65,6 +65,49 @@ details[open] > .menu-drop {
   }
 }
 
+/* Home pages' marquees (components/marquee.tsx): the track holds the items twice and moves by half its width, forever;
+   pausing on pointing, focus or the Pause button. Visitors who ask for reduced motion get a still row to scroll. */
+@keyframes marquee-run {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee .marquee-track {
+  animation: marquee-run var(--marquee-duration, 40s) linear infinite;
+}
+.marquee[data-direction="right"] .marquee-track {
+  animation-direction: reverse;
+}
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track,
+.marquee[data-paused="true"] .marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee .marquee-track {
+    animation: none;
+  }
+  .marquee .marquee-copy,
+  .marquee .marquee-control {
+    display: none;
+  }
+  .marquee .marquee-viewport {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+
+/* The home page editor's live preview: blocks outlined as the pointer passes, the one chosen in the editor marked. */
+[data-editor-preview] [data-home-block]:hover {
+  cursor: pointer;
+  outline: 2px dashed var(--color-brand-500);
+  outline-offset: 4px;
+}
+[data-editor-preview] [data-editor-focus] {
+  outline: 3px solid var(--color-brand-700);
+  outline-offset: 4px;
+}
+
 /* Resellers' stores (lib/store-theme.ts): flat and outline cards drop shadows; glass ones blur what is behind them. */
 [data-cards="flat"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl),
 [data-cards="outline"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl) { box-shadow: none; }
