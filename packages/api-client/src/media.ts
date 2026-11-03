@@ -103,12 +103,20 @@ export const { useMediaSettingsQuery, useMediaLibraryQuery, useDeleteMediaMutati
 type Dispatch = (action: unknown) => unknown;
 type Unwrappable<T> = { unwrap: () => Promise<T> };
 
-/** Raised when storage refuses the file itself (for example an expired link), in the API's error shape. */
+/**
+ * Raised when storage refuses the file itself (for example an expired link), in the API's error shape. No answer at all
+ * (`0`) is usually the bucket's CORS rule not allowing this site's address (`npm run media:cors`), not the connection.
+ */
 const storageError = (status: number): ApiError => ({
   status,
   type: 'api_error',
   code: 'upload_failed',
-  message: status === 403 ? 'The upload link was refused or has expired. Try again.' : 'The file could not be uploaded. Check your connection and try again.',
+  message:
+    status === 403
+      ? 'The upload link was refused or has expired. Try again.'
+      : status === 0
+        ? 'The file could not be sent to storage. If your connection is fine, storage does not accept uploads from this site yet: its CORS rule must allow this address.'
+        : 'The file could not be uploaded. Check your connection and try again.',
 });
 
 /**
