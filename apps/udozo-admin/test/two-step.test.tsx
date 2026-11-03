@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminGate, AdminProviders } from "@bitocard/admin-ui/shell";
 
 const replace = vi.fn();
@@ -91,9 +91,13 @@ describe("2-step verification for team members", () => {
     expect(await screen.findByText("Off", {}, slow)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Turn on 2-step verification" }));
     expect(await screen.findByText(/JBSWY3DPEHPK3PXP/, {}, slow)).toBeTruthy();
-    const boxes = (await screen.findAllByRole("textbox")) as HTMLInputElement[];
+    // The code's own six boxes (the page has other fields).
+    const boxes = within(await screen.findByRole("group", { name: "Code from your authenticator app" }, slow)).getAllByRole("textbox") as HTMLInputElement[];
     for (const [index, digit] of [..."246810"].entries()) fireEvent.change(boxes[index]!, { target: { value: digit } });
-    fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+    // Pressed only once the six digits are in (under load the button can still be off a moment).
+    const turnOn = screen.getByRole("button", { name: "Turn on" }) as HTMLButtonElement;
+    await waitFor(() => expect(turnOn.disabled).toBe(false), slow);
+    fireEvent.click(turnOn);
     expect(await screen.findByText("abcd-1234", {}, slow)).toBeTruthy();
     expect(sent.find(item => item.path === "/v1/admin/auth/authenticator/confirm")?.body).toEqual({ code: "246810" });
     expect(await screen.findByText("On", {}, slow)).toBeTruthy();
