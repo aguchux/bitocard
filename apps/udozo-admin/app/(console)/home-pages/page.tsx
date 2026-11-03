@@ -6,8 +6,8 @@ import { Suspense, useState } from "react";
 import { Check, Globe2, LayoutTemplate } from "lucide-react";
 import { ActionDialog, Badge, Card, CardHeader, cn, errorMessage, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
-import type { EditorSources } from "@bitocard/admin-ui/storefront";
-import type { HomeSection } from "@bitocard/api-client/home";
+import type { EditorRow, EditorSources } from "@bitocard/admin-ui/storefront";
+import type { HomeRow, HomeSection } from "@bitocard/api-client/home";
 import {
   type HomeLayoutInfo,
   type HomePage,
@@ -18,17 +18,22 @@ import {
   useHomePreviewMutation,
   usePublishHomeMutation,
   useResetHomeMutation,
+  useResolveHomeRowsMutation,
   useRestoreHomeMutation,
-  useSaveHomeDraftMutation,
+  useSaveHomeRowsMutation,
   useSetHomeLayoutMutation,
   useUnpublishHomeMutation,
 } from "@bitocard/api-client/admin";
-import { homeRegistry, HomeFormProvider } from "@/components/home/registry";
+import { homeRegistry, HomeFormProvider, HomeRowForm } from "@/components/home/registry";
+import { blankRow, BlockThumb } from "@/components/home/row-forms";
 import { homePreviewUrl } from "@/components/home/links";
 import { UdozoShell } from "@/components/shell";
 
 // The editor (drag and drop) loads on its own, after the page and its picker.
-const SectionsEditor = dynamic(() => import("@bitocard/admin-ui/storefront").then(module => module.SectionsEditor<HomeSection>), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> });
+const RowsEditor = dynamic(() => import("@bitocard/admin-ui/storefront").then(module => module.RowsEditor<HomeSection>), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> });
+
+const asEditorRows = (rows: HomeRow[]) => rows as unknown as EditorRow<HomeSection>[];
+const asHomeRows = (rows: EditorRow<HomeSection>[]) => rows as unknown as HomeRow[];
 
 /** Udozo's pages need no products or brands: the shared editor's catalogue lookups stay empty. */
 const sources: EditorSources = {
@@ -66,7 +71,7 @@ function LayoutChooser({ page, editable }: { page: HomePage; editable: boolean }
   const [replace, setReplace] = useState(true);
   return (
     <Card>
-      <CardHeader title="Layout" description="How the page looks, and the sections it starts with. The editor below changes the sections." />
+      <CardHeader title="Layout" description="How the page looks, and the rows it starts with. The editor below changes the rows and their blocks." />
       <ul className="grid gap-3 px-5 pb-5 sm:grid-cols-3 sm:px-6">
         {page.layouts.map(layout => {
           const chosen = page.layout === layout.key;
@@ -106,18 +111,18 @@ function LayoutChooser({ page, editable }: { page: HomePage; editable: boolean }
         onConfirm={async () => void (await setLayout({ page: page.page, layout: choosing!.key, replace }).unwrap())}
       >
         <fieldset className="space-y-2 text-sm">
-          <legend className="sr-only">The sections</legend>
+          <legend className="sr-only">The rows</legend>
           <label className="flex items-start gap-2">
             <input type="radio" name="sections" className="mt-1 accent-brand-600" checked={replace} onChange={() => setReplace(true)} />
             <span>
-              <span className="font-semibold">Start from its sections</span>
-              <span className="block text-muted">The draft’s sections are replaced by the layout’s own.</span>
+              <span className="font-semibold">Start from its rows</span>
+              <span className="block text-muted">The draft’s rows are replaced by the layout’s own.</span>
             </span>
           </label>
           <label className="flex items-start gap-2">
             <input type="radio" name="sections" className="mt-1 accent-brand-600" checked={!replace} onChange={() => setReplace(false)} />
             <span>
-              <span className="font-semibold">Keep my sections</span>
+              <span className="font-semibold">Keep my rows</span>
               <span className="block text-muted">Only the look changes.</span>
             </span>
           </label>
@@ -128,7 +133,8 @@ function LayoutChooser({ page, editable }: { page: HomePage; editable: boolean }
 }
 
 function Editor({ page, editable }: { page: HomePage; editable: boolean }) {
-  const [save] = useSaveHomeDraftMutation();
+  const [save] = useSaveHomeRowsMutation();
+  const [resolve] = useResolveHomeRowsMutation();
   const [publish] = usePublishHomeMutation();
   const [unpublish] = useUnpublishHomeMutation();
   const [reset] = useResetHomeMutation();
@@ -140,20 +146,23 @@ function Editor({ page, editable }: { page: HomePage; editable: boolean }) {
   const categories = useClassifiedCategoriesQuery(page.scope === "country" ? page.page : (markets[0]?.country ?? "NG"));
   const layoutName = (key: string | null) => page.layouts.find(layout => layout.key === key)?.name;
   return (
-    <HomeFormProvider value={{ scope: page.scope, markets, categories: (categories.data?.data ?? []).map(top => ({ slug: top.slug, name: top.name, children: top.children.map(child => ({ slug: child.slug, name: child.name })) })) }}>
-      <SectionsEditor
+    <HomeFormProvider value={{ page: page.page, scope: page.scope, markets, categories: (categories.data?.data ?? []).map(top => ({ slug: top.slug, name: top.name, children: top.children.map(child => ({ slug: child.slug, name: child.name })) })) }}>
+      <RowsEditor
         // A new layout (or a restored version) is a new working copy.
         key={`${page.page}-${page.layout}-${page.updated_at}`}
         page={{
-          draft: page.draft,
+          rows: asEditorRows(page.rows),
           updatedAt: page.updated_at,
           live: page.live,
           version: page.version || null,
           unpublishedChanges: page.unpublished_changes,
           versions: page.versions.map(item => ({ version: item.version, publishedAt: item.published_at, note: layoutName(item.layout) })),
         }}
-        allowed={page.sections_allowed}
+        allowed={page.blocks_allowed}
         registry={homeRegistry}
+        RowForm={HomeRowForm}
+        blankRow={blankRow}
+        Thumb={BlockThumb}
         title={`${page.name} home page`}
         description={page.scope === "global" ? "Shown on udozo.com when a visitor chose All countries (or nothing yet): never prices, each listing names its country." : `udozo.com/${page.page.toLowerCase()}: ${page.name}'s home page.`}
         editable={editable}
@@ -161,22 +170,26 @@ function Editor({ page, editable }: { page: HomePage; editable: boolean }) {
         sources={sources}
         copy={{
           publish: "Visitors see this page within a minute. Earlier versions stay in Versions, each with its layout.",
-          reset: { label: "Start from the layout", description: "The draft is replaced by the layout’s own sections. Visitors see no change until you publish." },
-          empty: "The page has no sections. Add one, or start from the layout.",
+          reset: { label: "Start from the layout", description: "The draft is replaced by the layout’s own rows. Visitors see no change until you publish." },
+          empty: "The page has no rows. Add one, or start from the layout.",
           viewOnly: "Only operations admins change home pages.",
           notLive: "Visitors see the layout’s starting page. Publish to show yours.",
         }}
         actions={{
-          saveDraft: sections => save({ page: page.page, sections }).unwrap(),
+          saveDraft: rows => save({ page: page.page, rows: asHomeRows(rows) }).unwrap(),
           publish: () => publish(page.page).unwrap(),
           unpublish: () => unpublish(page.page).unwrap(),
-          reset: async () => (await reset(page.page).unwrap()).draft,
-          restore: async version => (await restore({ page: page.page, version }).unwrap()).draft,
+          reset: async () => asEditorRows((await reset(page.page).unwrap()).rows),
+          restore: async version => asEditorRows((await restore({ page: page.page, version }).unwrap()).rows),
           preview: async () => homePreviewUrl(page.page, (await preview(page.page).unwrap()).token),
+          resolve: async rows => {
+            const filled = await resolve({ page: page.page, rows: asHomeRows(rows) }).unwrap();
+            return Object.fromEntries(filled.rows.flatMap(row => row.blocks.map(block => [block.id, block])));
+          },
         }}
       >
         <LayoutChooser page={page} editable={editable} />
-      </SectionsEditor>
+      </RowsEditor>
     </HomeFormProvider>
   );
 }
@@ -191,7 +204,7 @@ function HomePages() {
   const page = useHomePageQuery(current, { skip: !pages.data });
   return (
     <UdozoShell section="theme" current="/home-pages" crumbs={[{ label: "Site", href: "/home-pages" }, { label: "Home pages" }]}>
-      <PageHeader title="Home pages" description="udozo.com’s home page across countries and each country’s own: a layout, then its sections. Save is automatic; publish when ready." />
+      <PageHeader title="Home pages" description="udozo.com’s home page across countries and each country’s own: a layout, then rows of blocks, with the live page beside them. Save is automatic; publish when ready." />
       {!editable ? <Notice tone="grey">Only operations admins change home pages. You can look and preview.</Notice> : null}
       <div className="space-y-6">
         <QueryView query={pages} loading={<Skeleton className="h-11 w-full" />}>{data => <PagePicker pages={data.data} current={current} onPick={next => router.replace(`/home-pages?page=${next}`)} />}</QueryView>

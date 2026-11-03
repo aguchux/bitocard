@@ -1,20 +1,23 @@
 "use client";
 
 import { createContext, useContext, useId, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, BadgePercent, Globe2, ImageIcon, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgePercent, Globe2, ImageIcon, LayoutDashboard, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, Store, Tag, TrendingUp, X } from "lucide-react";
 import { Button, Field, ImageField, Input, Select, Textarea, Toggle } from "@bitocard/admin-ui";
-import { defineRegistry, StoreSectionForm } from "@bitocard/admin-ui/storefront";
+import { defineRegistry, type EditorRow, StoreSectionForm } from "@bitocard/admin-ui/storefront";
 import { conditionLabels } from "@bitocard/api-client/classifieds";
 import type { StoreSection } from "@bitocard/api-client/storefront";
 import { homeLinkText, type HomeGroupKind, type HomeLink, type HomeSection, type HomeTileSize, type HomeTone } from "@bitocard/api-client/home";
+import { CategoryBannerForm, ListingMarqueeForm, MasonryGridForm, RowSettingsForm, type RowFormKit, StoreMarqueeForm } from "./row-forms";
 
 /** What the forms choose from: the page's scope, the categories (with their subcategories) and the open markets. */
 export type HomeFormContext = {
+  /** The page edited: `global` or a country's code. */
+  page?: string;
   scope: "global" | "country";
   categories: Array<{ slug: string; name: string; children: Array<{ slug: string; name: string }> }>;
   markets: Array<{ country: string; name: string }>;
 };
-const FormContext = createContext<HomeFormContext>({ scope: "country", categories: [], markets: [] });
+const FormContext = createContext<HomeFormContext>({ page: "global", scope: "country", categories: [], markets: [] });
 export const HomeFormProvider = FormContext.Provider;
 const useForm = () => useContext(FormContext);
 
@@ -336,8 +339,40 @@ function CountryTilesForm({ section, onChange }: Props<"country_tiles">) {
   );
 }
 
+/** The shared fields, for the forms of the rows and the newer blocks (`row-forms.tsx`). */
+function useKit(): RowFormKit {
+  const { page = "global", scope } = useForm();
+  return { page, scope, TextField, NumberField, CategorySelect, LinkField };
+}
+
+/** A row's settings in the rows editor. */
+export function HomeRowForm({ row, onChange }: { row: EditorRow<HomeSection>; onChange: (next: EditorRow<HomeSection>) => void }) {
+  return <RowSettingsForm kit={useKit()} row={row} onChange={onChange} />;
+}
+
+function NewerBlockForm({ section, onChange }: { section: HomeSection; onChange: (next: HomeSection) => void }) {
+  const kit = useKit();
+  switch (section.type) {
+    case "listing_marquee":
+      return <ListingMarqueeForm kit={kit} section={section} onChange={onChange} />;
+    case "store_marquee":
+      return <StoreMarqueeForm kit={kit} section={section} onChange={onChange} />;
+    case "masonry_grid":
+      return <MasonryGridForm kit={kit} section={section} onChange={onChange} ItemList={ItemList as never} />;
+    case "category_banner":
+      return <CategoryBannerForm kit={kit} section={section} onChange={onChange} />;
+    default:
+      return null;
+  }
+}
+
 function HomeSectionForm({ section, onChange }: { section: HomeSection; onChange: (next: HomeSection) => void }) {
   switch (section.type) {
+    case "listing_marquee":
+    case "store_marquee":
+    case "masonry_grid":
+    case "category_banner":
+      return <NewerBlockForm section={section} onChange={onChange} />;
     case "home_hero":
       return <HeroForm section={section} onChange={onChange} />;
     case "category_masonry":
@@ -359,7 +394,21 @@ function HomeSectionForm({ section, onChange }: { section: HomeSection; onChange
   }
 }
 
-const icons = { home_hero: LayoutPanelTop, category_masonry: LayoutGrid, deals_rail: BadgePercent, sponsored_rail: Megaphone, top_selling_rail: TrendingUp, listing_group: Rows3, banner: ImageIcon, country_tiles: Globe2, trust_bar: ShieldCheck };
+const icons = {
+  home_hero: LayoutPanelTop,
+  category_masonry: LayoutGrid,
+  deals_rail: BadgePercent,
+  sponsored_rail: Megaphone,
+  top_selling_rail: TrendingUp,
+  listing_group: Rows3,
+  banner: ImageIcon,
+  country_tiles: Globe2,
+  trust_bar: ShieldCheck,
+  listing_marquee: Rows3,
+  store_marquee: Store,
+  masonry_grid: LayoutDashboard,
+  category_banner: Tag,
+};
 
 /** A new section of each type, valid as the API expects. */
 function newSection(type: HomeSection["type"], id: string): HomeSection {
@@ -383,6 +432,14 @@ function newSection(type: HomeSection["type"], id: string): HomeSection {
       return { ...base, type, title: "Shop by country", countries: [] };
     case "trust_bar":
       return { ...base, type, items: [{ icon: "shield", title: "Safe pay", body: "Udozo holds the money until you have the item." }] };
+    case "listing_marquee":
+      return { ...base, type, title: "", picks: [], fill: { by: "trending", value: null }, limit: 12, speed: "normal", direction: "left", cards: "standard" };
+    case "store_marquee":
+      return { ...base, type, title: "Shops on Udozo", picks: [], fill: "most_listings", limit: 12, speed: "normal", direction: "left" };
+    case "masonry_grid":
+      return { ...base, type, title: "", tiles: [{ kind: "image", image: "", title: "Sell what you no longer use", link: { kind: "href", href: "/sell" }, size: "wide" }] };
+    case "category_banner":
+      return { ...base, type, category: "phones-tablets", title: "", body: "", image: null, tone: "navy", style: "split", cta: "Shop now", showCount: true };
   }
 }
 
@@ -406,12 +463,24 @@ function summary(section: HomeSection): string {
       return section.countries.length ? section.countries.join(", ") : "Every open market";
     case "trust_bar":
       return `${section.items.length} item${section.items.length === 1 ? "" : "s"}`;
+    case "listing_marquee":
+      return [`${section.picks.length} picked`, section.fill.by === "none" ? "nothing more" : `then ${section.fill.by}${section.fill.value ? `: ${section.fill.value}` : ""}`, `up to ${section.limit}`, `${section.speed} speed`].join(" · ");
+    case "store_marquee":
+      return [`${section.picks.length} picked`, section.fill === "none" ? "nothing more" : `then ${section.fill === "most_listings" ? "most listings" : "newest"}`, `up to ${section.limit}`].join(" · ");
+    case "masonry_grid":
+      return `${section.tiles.length} tile${section.tiles.length === 1 ? "" : "s"}: ${section.tiles.map(tile => (tile.kind === "category" ? tile.slug || "—" : tile.kind === "listing" ? `listing ${tile.ref || "—"}` : tile.title || "photo")).join(", ")}`;
+    case "category_banner":
+      return [`Opens ${section.category || "—"}`, section.style === "overlay" ? "words on the photo" : "words beside the photo", section.image ? "its own photo" : "a listing's photo"].join(" · ");
   }
 }
 
 function title(section: HomeSection): string {
   if (section.type === "trust_bar") return section.items.map(item => item.title).join(" · ");
   if (section.type === "banner") return section.items[0]?.title ?? "";
+  if (section.type === "category_banner") return section.title || `Banner: ${section.category}`;
+  if (section.type === "listing_marquee") return section.title || "Moving listings";
+  if (section.type === "store_marquee") return section.title || "Moving stores";
+  if (section.type === "masonry_grid") return section.title || "Masonry grid";
   return section.title;
 }
 
@@ -427,6 +496,10 @@ export const homeRegistry = defineRegistry<HomeSection>({
     { type: "banner", label: "Banners", description: "One or two banners linking to a category, a search or a page." },
     { type: "country_tiles", label: "Countries", description: "Each open market, for the page across countries." },
     { type: "trust_bar", label: "Trust bar", description: "Up to four short reassurances, such as Safe pay." },
+    { type: "listing_marquee", label: "Moving listings", description: "Listings sliding past on their own: the ones you pick, topped up from trending, newest or a category." },
+    { type: "store_marquee", label: "Moving stores", description: "Resellers' stores live on their own domain, sliding past: picked, or those with most listings." },
+    { type: "masonry_grid", label: "Masonry grid", description: "Tiles of different sizes: categories, listings, or photos linking anywhere." },
+    { type: "category_banner", label: "Category banner", description: "A banner opening one category, with its name, a listing's photo and its count unless you set them." },
   ],
   newSection,
   summary,

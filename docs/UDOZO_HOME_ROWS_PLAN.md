@@ -268,3 +268,12 @@ On implementation, copy this plan to `docs/UDOZO_HOME_ROWS_PLAN.md`, with Part B
   - `npm run dev:admin` against the local API: build a page with each block, publish it, open the preview on udozo.com (`npm run dev` in `apps/udozo`).
   - Check phone width, and the marquee with reduced motion turned on.
 - Run `npm run check` for the touched workspaces before committing. Commit only own files, then push.
+
+## As built (3 November 2026)
+
+- Part A and Part B are built as planned, with these differences:
+  - `RowsEditor` is a new component beside `SectionsEditor` rather than sharing a refactored toolbar hook, so bitocard.com's and Seller HQ's editor are untouched.
+  - Rows have no presets: a new row starts with the block chosen, and blocks added to a row share its width evenly (up to four); widths stay adjustable per block.
+  - Blocks move between rows from their card's row menu; dragging works within a row, and rows drag among themselves.
+  - Stores marquees show only Resale shops live on their own domain (sandbox stores have no public address to send visitors to).
+  - Medical brands have no bundled logos yet (initials show).

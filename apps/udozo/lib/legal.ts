@@ -57,6 +57,7 @@ const terms: LegalDocument = {
           list: [
             "Sponsored listings are placed by Udozo's team, sometimes because a seller paid Udozo, and are always labelled Sponsored. Nothing else moves a listing up for payment.",
             "Trending ranks recent listings by how many people contacted, saved and viewed them.",
+            "Some rows show listings or stores Udozo's team picked by hand to show what is on Udozo. Nobody pays for these; a store or listing is only picked while it is live.",
             "Trending deals are listings whose price came down, shown beside the lowest price they had in the 30 days before.",
             "Top selling ranks listings by Safe pay sales completed in the last 30 days. Until enough have sold, the most contacted listings show instead, titled Popular, never as sales.",
           ],

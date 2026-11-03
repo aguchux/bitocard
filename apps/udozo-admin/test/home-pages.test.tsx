@@ -1,6 +1,7 @@
-// Site › Home pages and Sponsored: each home page (across countries, then each market) with its layout and its
-// sections in the shared editor, layouts changed with a choice to keep the sections, publishing and previews on
-// udozo.com; Sponsored placements placed, refused with the field named, and ended. Support looks, never changes.
+// Site › Home pages and Sponsored: each home page (across countries, then each market) with its layout and its rows
+// of blocks in the rows editor, each block showing what it will show, the live preview beside them (a click in it
+// chooses a block), listings and stores picked for marquees, layouts changed keeping the rows or not, publishing and
+// previews on udozo.com; Sponsored placements placed, refused with the field named, and ended. Support looks only.
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminGate, AdminProviders } from "@bitocard/admin-ui/shell";
@@ -22,16 +23,19 @@ const layouts = [
   { key: "explorer", name: "Explore the world", description: "Built around the countries.", look: { hero: "light", cards: "large", corners: "round", density: "airy" } },
 ];
 const span = { lg: 12, md: 6, rows: 1 };
+const row = (id: string, blocks: unknown[], extra: Record<string, unknown> = {}) => ({ id, hidden: false, title: "", subtitle: "", viewAll: null, background: "none", image: null, width: "contained", spacing: "normal", blocks, ...extra });
+const hero = { id: "h", type: "home_hero", span, hidden: false, style: "search", title: "Buy and sell near you", accent: "", subtitle: "", slides: [] };
+const sponsored = { id: "s", type: "sponsored_rail", span, hidden: false, title: "Sponsored", limit: 8 };
+const marquee = { id: "m", type: "listing_marquee", span, hidden: false, title: "", picks: [], fill: { by: "trending", value: null }, limit: 12, speed: "normal", direction: "left", cards: "standard" };
 const page = (layout = "marketplace") => ({
   object: "home_page",
   page: "NG",
   name: "Nigeria",
   scope: "country",
   layout,
-  draft: [
-    { id: "h", type: "home_hero", span, hidden: false, style: "search", title: "Buy and sell near you", accent: "", subtitle: "", slides: [] },
-    { id: "s", type: "sponsored_rail", span, hidden: false, title: "Sponsored", limit: 8 },
-  ],
+  rows: [row("r1", [hero], { width: "full" }), row("r2", [sponsored, marquee], { title: "Picked for you" })],
+  published_rows: null,
+  draft: [hero, sponsored, marquee],
   published_layout: null,
   published: null,
   unpublished_changes: true,
@@ -41,8 +45,10 @@ const page = (layout = "marketplace") => ({
   updated_at: "2026-11-01T10:00:00.000Z",
   versions: [],
   layouts,
-  sections_allowed: ["home_hero", "category_masonry", "deals_rail", "sponsored_rail", "top_selling_rail", "listing_group", "banner", "trust_bar"],
+  blocks_allowed: ["home_hero", "category_masonry", "deals_rail", "sponsored_rail", "top_selling_rail", "listing_group", "banner", "trust_bar", "listing_marquee", "store_marquee", "masonry_grid", "category_banner"],
+  sections_allowed: ["home_hero"],
 });
+const cover = (n: number) => ({ url: `https://media.test/${n}.jpg`, width: 800, height: 600 });
 const pages = { object: "list", data: [{ object: "home_page_summary", page: "global", name: "All countries", scope: "global", layout: "explorer", live: false, version: 0, unpublished_changes: true }, { object: "home_page_summary", page: "NG", name: "Nigeria", scope: "country", layout: "marketplace", live: true, version: 2, unpublished_changes: false }] };
 const placement = { object: "sponsored_placement", id: "p1", country: "NG", state: "active", position: 0, starts_at: "2026-11-01T00:00:00.000Z", ends_at: "2026-11-08T00:00:00.000Z", ended_at: null, note: null, listing: { ref: 100028, title: "Mercedes Benz pedal", country: "NG", live: true, card: null }, created_at: "2026-11-01T00:00:00.000Z", updated_at: "2026-11-01T00:00:00.000Z" };
 
@@ -78,6 +84,12 @@ beforeEach(() => {
     if (path === "/v1/admin/classifieds/home/NG") return ok(page());
     if (path === "/v1/admin/classifieds/home/NG/layout") return ok(page((body as { layout: string }).layout));
     if (path === "/v1/admin/classifieds/home/NG/draft") return ok(page());
+    if (path === "/v1/admin/classifieds/home/NG/resolve") {
+      const rows = (body as { rows: Array<{ id: string; blocks: Array<{ id: string; type: string }> }> }).rows;
+      return ok({ object: "home_page_resolved", page: "NG", rows: rows.map(item => ({ ...item, view_all_href: null, blocks: item.blocks.map(block => ({ ...block, data: block.type === "listing_marquee" ? { items: [{ id: "l1", title: "Galaxy A54", cover: cover(1) }, { id: "l2", title: "iPhone 13", cover: cover(2) }] } : block.type === "sponsored_rail" ? { items: [] } : { slides: [] } })) })) });
+    }
+    if (path === "/v1/admin/classifieds/listings") return ok({ object: "list", data: [{ id: "x1", ref: 100031, sku: "PHN-000031", title: "Tecno Camon 20", country: "NG", status: "active", photos: [], price: { kind: "fixed", amount: 9000000, currency: "NGN" } }], total: 1, has_more: false });
+    if (path === "/v1/admin/classifieds/home/NG/stores") return ok({ object: "list", data: [] });
     if (path === "/v1/admin/classifieds/home/NG/preview") return ok({ object: "home_preview", page: "NG", token: "123.sig", expires_at: "2026-11-01T11:00:00.000Z" });
     if (path === "/v1/admin/classifieds/home/NG/publish") return ok({ ...page(), live: true, version: 1, unpublished_changes: false });
     if (path === "/v1/admin/classifieds/sponsored" && input.method === "GET") return ok({ object: "list", data: [placement] });
@@ -104,31 +116,59 @@ const show = (element: React.ReactNode) =>
 const slow = { timeout: 15000 };
 
 describe("Home pages", () => {
-  test("each page with its badge, the three layouts, and the page's sections in the editor", slow, async () => {
+  test("each page with its badge, the three layouts, and its rows of blocks, each showing what it will show", slow, async () => {
     show(<HomePagesPage />);
     const picker = await screen.findByRole("navigation", { name: "Home pages" });
     expect(within(picker).getByRole("button", { name: /All countries/ })).toBeTruthy();
     expect(within(picker).getByRole("button", { name: /Nigeria/ }).getAttribute("aria-current")).toBe("page");
-    expect(await screen.findByRole("button", { name: /Classic marketplace/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Classic marketplace/ }).getAttribute("aria-pressed")).toBe("true");
-    // Udozo's own sections, from its registry.
-    expect(await screen.findByText("1. Hero", {}, { timeout: 10000 })).toBeTruthy();
-    expect(screen.getByText("2. Sponsored")).toBeTruthy();
-    expect(screen.getByText("Sponsored placements · up to 8")).toBeTruthy();
+    expect((await screen.findByRole("button", { name: /Classic marketplace/ })).getAttribute("aria-pressed")).toBe("true");
+    // Udozo's rows and blocks, from its registry.
+    const second = await screen.findByRole("region", { name: "Picked for you" }, { timeout: 10000 });
+    expect(within(second).getByText("Moving listings", { selector: "button" })).toBeTruthy();
+    // Each block shows what it will show (the draft filled as visitors would see it), or says it shows nothing.
+    expect(await within(second).findByRole("list", { name: "Listings it will show" }, { timeout: 10000 })).toBeTruthy();
+    expect(within(second).getByText(/Nothing to show here now/)).toBeTruthy();
+    // The live preview: udozo.com's preview of the saved draft.
+    const frame = (await screen.findByTitle("Live preview of the draft", {}, { timeout: 10000 })) as HTMLIFrameElement;
+    expect(frame.getAttribute("src")).toBe("https://udozo.test/home-preview?page=ng&token=123.sig");
   });
 
-  test("a layout chosen keeping the sections, or starting from its own", slow, async () => {
+  test("a row added with a moving listings block, a listing picked for it, saved as rows", slow, async () => {
+    show(<HomePagesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add row" }, { timeout: 10000 }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /Moving listings/ }));
+    fireEvent.change(await screen.findByPlaceholderText("Search live listings"), { target: { value: "tecno" } });
+    fireEvent.click(await screen.findByRole("button", { name: /Tecno Camon 20/ }, { timeout: 10000 }));
+    await waitFor(
+      () => {
+        const saved = sent.filter(item => item.path === "/v1/admin/classifieds/home/NG/draft").at(-1)?.body as { rows: Array<{ blocks: Array<{ type: string; picks?: string[] }> }> } | undefined;
+        expect(saved?.rows).toHaveLength(3);
+        expect(saved!.rows[2]!.blocks[0]).toMatchObject({ type: "listing_marquee", picks: ["100031"] });
+      },
+      { timeout: 10000 },
+    );
+  });
+
+  test("a click on a block in the live preview opens its form; a message from another site does nothing", slow, async () => {
+    show(<HomePagesPage />);
+    const frame = (await screen.findByTitle("Live preview of the draft", {}, { timeout: 10000 })) as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent("message", { origin: "https://evil.test", source: frame.contentWindow, data: { source: "udozo-preview", type: "select", row: "r2", block: "s" } }));
+    window.dispatchEvent(new MessageEvent("message", { origin: "https://udozo.test", source: frame.contentWindow, data: { source: "udozo-preview", type: "select", row: "r2", block: "s" } }));
+    expect(await screen.findByText(/Shows this page’s live placements/, {}, { timeout: 10000 })).toBeTruthy();
+  });
+
+  test("a layout chosen keeping the rows, or starting from its own", slow, async () => {
     show(<HomePagesPage />);
     fireEvent.click(await screen.findByRole("button", { name: /Deals first/ }));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByLabelText(/Keep my sections/));
+    fireEvent.click(within(dialog).getByLabelText(/Keep my rows/));
     fireEvent.click(within(dialog).getByRole("button", { name: "Use this layout" }));
     await waitFor(() => expect(sent.find(item => item.path === "/v1/admin/classifieds/home/NG/layout")?.body).toEqual({ layout: "deals", replace: false }));
   });
 
-  test("the preview opens udozo.com's page with the page's own link; publishing asks first", slow, async () => {
+  test("the preview opens udozo.com's page in a tab; publishing asks first", slow, async () => {
     show(<HomePagesPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Preview" }, { timeout: 10000 }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open preview" }, { timeout: 10000 }));
     await waitFor(() => expect(opened?.location.href).toBe("https://udozo.test/home-preview?page=ng&token=123.sig"));
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Publish" }));
@@ -140,6 +180,7 @@ describe("Home pages", () => {
     show(<HomePagesPage />);
     expect(await screen.findByText("Only operations admins change home pages. You can look and preview.")).toBeTruthy();
     expect((await screen.findByRole("button", { name: /Deals first/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Add row" })).toBeNull();
   });
 });
 
