@@ -122,6 +122,7 @@ const terms: LegalDocument = {
           list: [
             "weapons, ammunition, explosives and their parts, and anything designed to injure;",
             "illegal drugs, prescription-only and restricted medicines, and anything to make or take them;",
+            "used or opened single-use medical items (syringes, needles, catheters, test strips), and medical supplies past their expiry date;",
             "counterfeit, replica or fake goods, and anything that infringes someone else's trademark, copyright or other rights;",
             "stolen goods, or goods you cannot show you are entitled to sell;",
             "fake or copied money, cards or documents, stolen card or account details, and anything for fraud;",
@@ -132,6 +133,7 @@ const terms: LegalDocument = {
           ],
         },
         "Some categories, such as vehicles, property and pets, have their own rules, shown when you post in them. If you are not sure, ask us before you post.",
+        "Medical equipment and supplies are regulated. If you sell them, you must hold any licence or registration your country requires (for example from NAFDAC in Nigeria, the FDA in Ghana or the Pharmacy and Poisons Board in Kenya), list only products registered for sale there, give their registration number when asked, and sell sterile items only sealed and in date.",
       ],
     },
     {

@@ -75,7 +75,7 @@ describe('categories', () => {
     const categories = await prisma.classifiedCategory.findMany({ include: { features: { include: { feature: true } }, countries: true } });
     const top = categories.filter(c => !c.parentId);
     const subs = categories.filter(c => c.parentId);
-    assert.equal(top.length, 14);
+    assert.equal(top.length, 15);
     assert.ok(subs.length >= 50);
     const ids = new Map(categories.map(c => [c.id, c]));
     for (const sub of subs) {
@@ -103,13 +103,14 @@ describe('categories', () => {
     const top = categories.filter(c => !c.parentId);
     assert.deepEqual(top.map(c => [c.slug, c.name]), [
       ['phones-tablets', 'Phones and tablets'], ['electronics', 'Electronics'], ['vehicles', 'Vehicles'], ['property', 'Property'],
-      ['home-garden', 'Home and living'], ['fashion', 'Fashion'], ['health-beauty', 'Beauty and personal care'], ['babies-kids', 'Kids and baby'],
+      ['home-garden', 'Home and living'], ['fashion', 'Fashion'], ['health-beauty', 'Beauty and personal care'],
+      ['medical-equipment', 'Hospital and medical equipment'], ['babies-kids', 'Kids and baby'],
       ['sports-leisure', 'Sports and hobbies'], ['animals-pets', 'Pets'], ['agriculture-food', 'Farm and food'], ['repair-construction', 'Building and tools'],
       ['business-industrial', 'Wholesale and business'], ['services', 'Services'],
     ]);
     for (const c of categories) assert.match(c.icon, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${c.slug} has a lucide icon name`);
     const bySlug = new Map(categories.map(c => [c.slug, c]));
-    for (const slug of ['computers', 'jobs', 'job-vacancies', 'seeking-work', 'cv-it', 'software', 'boats', 'reptiles', 'vitamins-supplements', 'medical-equipment', 'legal-financial', 'travel', 'watches']) {
+    for (const slug of ['computers', 'jobs', 'job-vacancies', 'seeking-work', 'cv-it', 'software', 'boats', 'reptiles', 'vitamins-supplements', 'legal-financial', 'travel', 'watches']) {
       assert.equal(bySlug.get(slug), undefined, `${slug} is not one of Udozo's`);
     }
     for (const slug of ['laptops', 'desktops', 'computer-accessories', 'printers']) assert.equal(bySlug.get(slug).parentId, bySlug.get('electronics').id, `${slug} is under Electronics`);
