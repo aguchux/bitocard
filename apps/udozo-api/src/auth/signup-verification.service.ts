@@ -173,7 +173,8 @@ export class SignupVerificationService {
       }),
     ]);
     try {
-      await this.sms.sendForCountry(country, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+      // A resend in the same sign-up goes through the market's other provider first.
+      await this.sms.sendForCountry(country, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt: forSignup });
     } catch (error) {
       // Lets the person ask again at once (or carry on without it where the country has no SMS provider).
       await this.prisma.signupPhoneVerification.update({ where: { id: created.id }, data: { consumedAt: new Date() } });

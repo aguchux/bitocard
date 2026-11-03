@@ -86,6 +86,47 @@ describe("Udozo's customers confirm their mobile at sign-up", () => {
     assert.equal((await browser.get('/v1/store/wallet')).json.error?.code, 'phone_not_verified');
   });
 
+  test('a customer can confirm the mobile later: at sign-up, or on the confirm step', async () => {
+    // At sign-up: the number is kept unconfirmed, no code is texted, and the account is usable at once.
+    const browser = site();
+    const phone = testMobile('NG');
+    const made = await browser.post('/v1/store/account/signup', { ...account, email: unique(), country: 'NG', phone, phone_later: true });
+    assert.equal(made.status, 201, JSON.stringify(made.json));
+    assert.deepEqual([made.json.customer.phone, made.json.customer.phone_verified, made.json.customer.phone_deferred], [phone, false, true]);
+    assert.equal(await lastSmsCode(server.app, phone), null, 'no code is texted');
+    const customer = await prisma.customer.findFirstOrThrow({ where: { phone } });
+    assert.ok(customer.phoneDeferredAt);
+    // The account's own routes work; so does the rest (only the email, unconfirmed here, still waits).
+    await prisma.customer.update({ where: { id: customer.id }, data: { emailVerifiedAt: new Date() } });
+    assert.notEqual((await browser.get('/v1/classifieds/conversations/unread')).json?.error?.code, 'phone_not_verified');
+    // It can still be confirmed from the account.
+    assert.equal((await browser.post('/v1/store/account/phone', { phone })).status, 202);
+    const confirmed = await browser.post('/v1/store/account/phone/verify', { code: await lastSmsCode(server.app, phone) });
+    assert.deepEqual([confirmed.json.phone_verified, confirmed.json.phone_deferred], [true, true]);
+
+    // On the confirm step: a code was texted at sign-up, and did not come.
+    const other = site();
+    const email = unique();
+    assert.equal((await other.post('/v1/store/account/signup', { ...account, email, country: 'NG', phone: testMobile('NG') })).status, 201);
+    assert.equal((await other.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+    assert.equal((await other.get('/v1/store/wallet')).json.error?.code, 'phone_not_verified');
+    const later = await other.post('/v1/store/account/phone/later');
+    assert.equal(later.status, 200, JSON.stringify(later.json));
+    assert.deepEqual([later.json.phone_verified, later.json.phone_deferred], [false, true]);
+    assert.notEqual((await other.get('/v1/classifieds/conversations/unread')).json?.error?.code, 'phone_not_verified');
+    // Asking again changes nothing.
+    assert.equal((await other.post('/v1/store/account/phone/later')).json.phone_deferred, true);
+  });
+
+  test('a Google sign-up still chooses its country first, even after deferring its mobile', async () => {
+    const browser = site();
+    const email = unique();
+    assert.equal((await browser.post('/v1/store/account/signup', { ...account, email, country: 'NG', phone: testMobile('NG') })).status, 201);
+    const customer = await prisma.customer.findFirstOrThrow({ where: { email } });
+    await prisma.customer.update({ where: { id: customer.id }, data: { country: null, phoneDeferredAt: new Date(), emailVerifiedAt: new Date() } });
+    assert.equal((await browser.get('/v1/store/wallet')).json.error?.code, 'profile_incomplete');
+  });
+
   test('where the country cannot text, the number is kept and nothing waits for it', async () => {
     await prisma.country.update({ where: { code: 'KE' }, data: { smsProvider: null } });
     try {

@@ -488,9 +488,10 @@ export class AuthService {
     const phone = normalisePhone(raw, resellerCountry);
     const taken = await this.prisma.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null }, id: { not: userId } } });
     if (taken || await this.prisma.userPhone.findFirst({ where: { realm: 'reseller', phone, userId: { not: userId } } })) throw phoneInUse();
+    const attempt = await this.codes.sentToday(userId, 'phone_verification', phone);
     const code = await this.codes.issue(userId, 'phone_verification', phone);
     try {
-      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt });
     } catch (error) {
       await this.codes.cancel(userId, 'phone_verification');
       if (error instanceof ApiError) throw error;
@@ -533,9 +534,10 @@ export class AuthService {
     if (user.phone === phone || await this.prisma.userPhone.findFirst({ where: { userId, phone } })) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_already_added', 'This number is already on your account.', 'phone');
     if (await this.prisma.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null }, id: { not: userId } } }) || await this.prisma.userPhone.findUnique({ where: { realm_phone: { realm: 'reseller', phone } } })) throw phoneInUse();
     if (await this.prisma.userPhone.count({ where: { userId } }) >= 5) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_limit', 'You can have up to five phone numbers.');
+    const attempt = await this.codes.sentToday(userId, 'phone_add', phone);
     const code = await this.codes.issue(userId, 'phone_add', phone);
     try {
-      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt });
     } catch (error) {
       await this.codes.cancel(userId, 'phone_add');
       if (error instanceof ApiError) throw error;

@@ -56,6 +56,10 @@ class SignUpDto {
   @IsOptional() @IsString() @Length(20, 100)
   signup_token?: string;
 
+  /** Udozo: the customer chose to confirm their mobile later. It is kept unconfirmed and no code is texted. */
+  @IsOptional() @IsBoolean()
+  phone_later?: boolean;
+
   /** The referral or invite code on the sign-up link (`ref`), kept on the account so a campaign or invite can be traced. */
   @IsOptional() @Matches(/^[\w.~-]{1,64}$/, { message: 'ref must be a short code' })
   ref?: string;
@@ -468,6 +472,15 @@ export class CustomerAccountController {
   @HttpCode(HttpStatus.ACCEPTED)
   addPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
     return this.customers.addPhone(caller.customer, body.phone);
+  }
+
+  /** Udozo: confirm the mobile later. The account is usable without it (the profile confirms it any time). */
+  @UseGuards(CustomerGuard)
+  @TrackSignup('udozo', 'phone_later')
+  @Post('phone/later')
+  @HttpCode(HttpStatus.OK)
+  deferPhone(@CurrentCustomer() caller: CustomerCaller) {
+    return this.customers.deferPhone(caller.customer);
   }
 
   @UseGuards(CustomerGuard)

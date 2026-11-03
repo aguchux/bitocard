@@ -20,9 +20,23 @@ export type SmsResult = { provider: SmsProvider; held: boolean; reference: strin
 
 const providerNames: Record<SmsProvider, string> = { africas_talking: 'Africa’s Talking', termii: 'Termii' };
 
+const isProvider = (value: string | null | undefined): value is SmsProvider => smsProviders.includes(value as SmsProvider);
+
 /**
- * Sends profile verification SMS through the country's admin-selected provider, and admins' own messages through the
- * provider they choose (`sendWith`). Resold SMS products have separate suppliers. In local development and tests, a
+ * The order a market's providers are tried in for one text: the first provider, then the second, for the first text of
+ * a code (`attempt` 0); the second first for a resend (1); and so on, alternating. A market with one provider uses it
+ * every time.
+ */
+export function providerOrder(first: string | null | undefined, second: string | null | undefined, attempt = 0): SmsProvider[] {
+  const list = [first, second].filter(isProvider).filter((provider, index, all) => all.indexOf(provider) === index);
+  if (!list.length) return [];
+  const start = Math.max(0, Math.trunc(attempt)) % list.length;
+  return [...list.slice(start), ...list.slice(0, start)];
+}
+
+/**
+ * Sends profile verification SMS through the country's admin-selected providers (a first, and optionally a second it
+ * falls back to and resends through), and admins' own messages through the provider they choose (`sendWith`). Resold SMS products have separate suppliers. In local development and tests, a
  * provider without credentials captures messages in `outbox`.
  */
 @Injectable()
@@ -50,24 +64,47 @@ export class SmsService {
     ];
   }
 
-  /** A country is disabled until an admin assigns a provider and configures its credentials. */
-  async sendForCountry(countryCode: string | null, original: SmsMessage, platform: Platform = 'bitocard') {
+  /**
+   * Profile and sign-up codes, through the market's providers: its first (`countries.sms_provider`) and, where an admin
+   * set one, its second (`sms_fallback_provider`). A country without a first provider cannot text
+   * (`phone_verification_unavailable`). `attempt` counts the texts already sent for the same code (0 for the first):
+   * the first goes through the first provider and a resend through the second, alternating after that, since a code that
+   * did not arrive one way may arrive the other. Whichever provider it starts with, one that is not set up or refuses
+   * the message hands it to the other. Returns the provider that took it (`outbox` when held, outside production).
+   */
+  async sendForCountry(countryCode: string | null, original: SmsMessage, platform: Platform = 'bitocard', options: { attempt?: number } = {}) {
     const message = this.words(original, platform);
-    const country = countryCode ? await this.prisma.country.findUnique({ where: { code: countryCode } }) : null;
     if (!countryCode) return this.send(message, platform);
+    const country = await this.prisma.country.findUnique({ where: { code: countryCode } });
     if (!country?.smsProvider) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_verification_unavailable', 'Phone verification is not available in your country yet.');
+    const order = providerOrder(country.smsProvider, country.smsFallbackProvider, options.attempt ?? 0);
+    if (!order.length) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'sms_provider_unavailable', 'Phone verification is temporarily unavailable.');
+    const failures: unknown[] = [];
+    for (const provider of order) {
+      try {
+        return await this.through(provider, message, platform);
+      } catch (error) {
+        failures.push(error);
+        if (provider !== order.at(-1)) this.logger.warn({ err: error, provider, country: countryCode }, "SMS provider failed; trying the market's other provider");
+      }
+    }
+    // A provider's refusal says more than another one not being set up: callers report it as a failed delivery.
+    throw failures.find(error => !(error instanceof ApiError)) ?? failures.at(-1);
+  }
+
+  /** One message through a market's provider. Not set up: held in `outbox` outside production, refused in production. */
+  private async through(provider: SmsProvider, message: SmsMessage, platform: Platform): Promise<string> {
     const config = this.config(platform);
-    if (country.smsProvider === 'termii') {
-      if (!config.TERMII_API_KEY && process.env.NODE_ENV === 'production') throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'sms_provider_unavailable', 'Phone verification is temporarily unavailable.');
-      return this.send(message, platform);
+    const configured = this.providers(platform).find(item => item.provider === provider)?.configured ?? false;
+    if (!configured) {
+      if (process.env.NODE_ENV === 'production') throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'sms_provider_unavailable', 'Phone verification is temporarily unavailable.');
+      this.outbox.push(message);
+      this.logger.log({ to: message.to, provider }, 'SMS captured (no provider configured)');
+      return 'outbox';
     }
-    if (country.smsProvider !== 'africas_talking') throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'sms_provider_unavailable', 'Phone verification is temporarily unavailable.');
-    if (!config.AFRICASTALKING_USERNAME || !config.AFRICASTALKING_API_KEY) {
-      if (process.env.NODE_ENV !== 'production') { this.outbox.push(message); return 'outbox'; }
-      throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'sms_provider_unavailable', 'Phone verification is temporarily unavailable.');
-    }
-    await this.africasTalking(message, config, config.AFRICASTALKING_SENDER_ID);
-    return 'africas_talking';
+    if (provider === 'africas_talking') await this.africasTalking(message, config, config.AFRICASTALKING_SENDER_ID);
+    else await this.termii(message, config, { from: config.TERMII_SENDER_ID, channel: 'generic' });
+    return provider;
   }
 
   /** `to` is E.164 (+2348012345678). Throws if Termii rejects the message or cannot be reached. */

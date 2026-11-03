@@ -39,6 +39,8 @@ export function presentCountryAdmin(country: CountryWithCategories) {
     public_spins_enabled: country.publicSpinsEnabled,
     public_spin_limit: country.publicSpinLimit,
     sms_provider: country.smsProvider as 'termii' | 'africas_talking' | null,
+    /** The second provider: takes a code the first could not send, and sends resends. Null: the first alone. */
+    sms_fallback_provider: country.smsFallbackProvider as 'termii' | 'africas_talking' | null,
     /** The two-step sign-in methods resellers based here may choose. */
     reseller_two_step_methods: country.resellerMfaMethods,
     categories: country.categories
@@ -53,6 +55,7 @@ export type CountryUpdate = Partial<{
   reserved_accounts: boolean;
   identity_provider: 'bitocard' | 'didit';
   sms_provider: 'termii' | 'africas_talking' | null;
+  sms_fallback_provider: 'termii' | 'africas_talking' | null;
   markup_cap_percent: number;
   payout_hold_days: number;
   min_withdrawal_minor: number;
@@ -121,6 +124,10 @@ export class CountriesService {
 
   async update(actorId: string | null, code: string, input: CountryUpdate) {
     const before = await this.get(code);
+    // The second SMS provider is never the first, and goes with it when phone verification is switched off.
+    const first = input.sms_provider === undefined ? before.smsProvider : input.sms_provider;
+    const second = input.sms_fallback_provider === undefined ? before.smsFallbackProvider : input.sms_fallback_provider;
+    const fallback = !first || second === first ? null : second;
     const country = await this.prisma.country.update({
       where: { code: before.code },
       data: {
@@ -129,6 +136,7 @@ export class CountriesService {
         reservedAccounts: input.reserved_accounts,
         identityProvider: input.identity_provider,
         smsProvider: input.sms_provider,
+        smsFallbackProvider: fallback === before.smsFallbackProvider ? undefined : fallback,
         markupCapPercent: input.markup_cap_percent,
         payoutHoldDays: input.payout_hold_days,
         spinDailyLimit: input.spin_daily_limit,

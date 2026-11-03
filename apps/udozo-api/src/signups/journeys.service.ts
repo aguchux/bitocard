@@ -31,6 +31,7 @@ export const journeySteps = [
   'account_email_verify',
   'account_phone',
   'account_phone_verify',
+  'phone_later',
   'onboarding_token',
   'onboarding',
   'signin',
@@ -44,7 +45,7 @@ export type Milestone = (typeof milestones)[number];
 /** Steps that may start a journey; the rest only add to an open one. */
 const opening = new Set<JourneyStep>(['signin_lookup', 'email', 'signup', 'google']);
 /** Steps after which the account may have become usable. */
-const checking = new Set<JourneyStep>(['signup', 'google', 'profile', 'account_email_verify', 'account_phone_verify', 'onboarding', 'signin', 'phone_verify']);
+const checking = new Set<JourneyStep>(['signup', 'google', 'profile', 'account_email_verify', 'account_phone_verify', 'phone_later', 'onboarding', 'signin', 'phone_verify']);
 
 export const completedRetentionMs = 7 * 24 * 60 * 60 * 1000;
 export const openRetentionMs = 30 * 24 * 60 * 60 * 1000;
@@ -176,6 +177,9 @@ export class SignupJourneysService {
         return { method: 'google', ...first('emailEnteredAt'), ...first('emailVerifiedAt'), ...first('accountCreatedAt'), ...first('signedInAt') };
       case 'signin':
         return first('signedInAt');
+      case 'phone_later':
+        // Chose to confirm the mobile later: the mobile steps count as done, as where the country cannot text.
+        return { phoneSkipped: true, ...first('phoneEnteredAt') };
       default:
         return {};
     }
@@ -197,7 +201,7 @@ export class SignupJourneysService {
     if (!done) return;
     await this.prisma.signupJourney.updateMany({
       where: { id: journeyId, completedAt: null },
-      data: { completedAt: now, accountId: done.accountId, ...(journey.accountCreatedAt ? {} : { accountCreatedAt: now }), ...(journey.signedInAt ? {} : { signedInAt: now }) },
+      data: { completedAt: now, accountId: done.accountId, ...(done.phoneSkipped && !journey.phoneVerifiedAt ? { phoneSkipped: true, ...(journey.phoneEnteredAt ? {} : { phoneEnteredAt: now }) } : {}), ...(journey.accountCreatedAt ? {} : { accountCreatedAt: now }), ...(journey.signedInAt ? {} : { signedInAt: now }) },
     });
   }
 
@@ -205,11 +209,12 @@ export class SignupJourneysService {
     if (!journey.accountId) return null;
     const customer = await this.prisma.customer.findUnique({
       where: { id: journey.accountId },
-      select: { id: true, emailVerifiedAt: true, phoneVerifiedAt: true, country: true, market: { select: { smsProvider: true } } },
+      select: { id: true, emailVerifiedAt: true, phoneVerifiedAt: true, phoneDeferredAt: true, country: true, market: { select: { smsProvider: true } } },
     });
     if (!customer?.emailVerifiedAt || !customer.country) return null;
-    if (!customer.phoneVerifiedAt && customer.market?.smsProvider) return null;
-    return { accountId: customer.id };
+    // The mobile is confirmed, or the customer chose to confirm it later (or their country cannot text).
+    if (!customer.phoneVerifiedAt && !customer.phoneDeferredAt && customer.market?.smsProvider) return null;
+    return { accountId: customer.id, phoneSkipped: !customer.phoneVerifiedAt };
   }
 
   private async resellerReady(journey: Journey) {
@@ -218,7 +223,7 @@ export class SignupJourneysService {
       select: { id: true, emailVerifiedAt: true, memberships: { select: { resellerId: true }, take: 1 } },
     });
     if (!user?.emailVerifiedAt || user.memberships.length === 0) return null;
-    return { accountId: user.id };
+    return { accountId: user.id, phoneSkipped: false };
   }
 
   /** A sign-up page was opened: counted for the day, nothing about the visitor kept. */

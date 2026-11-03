@@ -108,6 +108,20 @@ describe('udozo.com sign-ups', () => {
     assert.deepEqual([journey.phoneSkipped, Boolean(journey.completedAt), journey.country], [true, true, 'KE']);
   });
 
+  test('a mobile the customer chose to confirm later counts as done, and the journey completes', async () => {
+    const browser = site();
+    const email = unique();
+    await browser.post('/v1/store/account/signup/email', { email });
+    const token = (await browser.post('/v1/store/account/signup/email/verify', { email, code: await lastEmailCode(server.app, email) })).json.signup_token;
+    const phone = testMobile('NG');
+    assert.equal((await browser.post('/v1/store/account/signup/phone', { email, signup_token: token, country: 'NG', phone })).status, 202);
+    // The code did not come: carry on without it.
+    const made = await browser.post('/v1/store/account/signup', { first_name: 'Chidi', last_name: 'Okeke', email, country: 'NG', phone, phone_later: true, password, signup_token: token });
+    assert.equal(made.status, 201, JSON.stringify(made.json));
+    const journey = await journeyOf('udozo', email);
+    assert.deepEqual([journey.phoneSkipped, Boolean(journey.phoneVerifiedAt), Boolean(journey.completedAt)], [true, false, true]);
+  });
+
   test('a sign-up page opened is counted, with nothing about the visitor', async () => {
     const before = (await prisma.signupVisitDay.findMany({ where: { surface: 'udozo' } })).reduce((sum, row) => sum + row.visits, 0);
     const visit = await client(server.base).post('/v1/signup-journeys/visits', { surface: 'udozo' });

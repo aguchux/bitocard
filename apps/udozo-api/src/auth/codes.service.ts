@@ -18,6 +18,11 @@ export class CodesService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** `lifetime` shortens how long the code works (30 minutes by default; two-step sign-in codes 10). */
+  /** Codes sent for a purpose to one target in the last day (a resend's place: the SMS provider it starts with). */
+  sentToday(userId: string, purpose: CodePurpose, target: string) {
+    return this.prisma.verificationCode.count({ where: { userId, purpose, target, createdAt: { gt: new Date(Date.now() - dayMs) } } });
+  }
+
   async issue(userId: string, purpose: CodePurpose, target: string, lifetime = lifetimeMs) {
     const latest = await this.prisma.verificationCode.findFirst({
       where: { userId, purpose, consumedAt: null },

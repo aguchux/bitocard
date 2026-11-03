@@ -43,6 +43,8 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     phone: customer.phone,
     phone_verified: customer.phoneVerifiedAt !== null,
     phone_verification_available: Boolean(customer.market?.smsProvider),
+    /** Udozo: the customer chose to confirm their mobile later, so nothing waits for it. */
+    phone_deferred: customer.phoneDeferredAt !== null,
     /** Chosen at sign-up and then fixed: the wallet, checkouts and prices are in its currency. Null until chosen (older accounts). */
     country: customer.country,
     currency: customer.market?.currency ?? null,
@@ -225,8 +227,11 @@ export class CustomersService {
    *
    * With `signup_token` (the step-by-step sign-up: `startSignupEmail` and on) the email is already confirmed, and the
    * number too when its texted code was confirmed for this sign-up, so no code is sent afterwards.
+   *
+   * `phone_later` (Udozo): the customer chose to confirm the number later (its code did not arrive, or they skipped the
+   * step), so it is kept unconfirmed, no code is texted, and the account is usable at once.
    */
-  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; first_name?: string; last_name?: string; name?: string; password: string; country?: string; phone?: string; signup_token?: string; ref?: string }) {
+  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; first_name?: string; last_name?: string; name?: string; password: string; country?: string; phone?: string; phone_later?: boolean; signup_token?: string; ref?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
@@ -241,7 +246,18 @@ export class CustomersService {
         if (input.signup_token) ({ phoneConfirmed } = await this.signups.consume(tx, email, input.signup_token, phone, store.id));
         const confirmed = input.signup_token ? new Date() : null;
         return tx.customer.create({
-          data: { storeId: store.id, email, ...nameData(input), country, phone, passwordHash, emailVerifiedAt: confirmed, phoneVerifiedAt: phoneConfirmed ? confirmed : null, signupRef: input.ref ?? null },
+          data: {
+            storeId: store.id,
+            email,
+            ...nameData(input),
+            country,
+            phone,
+            passwordHash,
+            emailVerifiedAt: confirmed,
+            phoneVerifiedAt: phoneConfirmed ? confirmed : null,
+            phoneDeferredAt: udozo && !phoneConfirmed && input.phone_later ? new Date() : null,
+            signupRef: input.ref ?? null,
+          },
         });
       });
     } catch (error) {
@@ -255,7 +271,7 @@ export class CustomersService {
     }
     if (!customer.emailVerifiedAt) await this.sendCode(customer, store, 'email_verification').catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not send the confirmation code'));
     // A delivery problem (or a country that cannot text yet) must not lose the account: the code can be asked for again.
-    if (udozo && phone && !phoneConfirmed) await this.addPhone({ ...customer, store }, phone).catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not text the sign-up code'));
+    if (udozo && phone && !phoneConfirmed && !customer.phoneDeferredAt) await this.addPhone({ ...customer, store }, phone).catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not text the sign-up code'));
     return { customer: await this.present(customer), session: await this.startSession(customer.id) };
   }
 
@@ -405,6 +421,8 @@ export class CustomersService {
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
     const sentToday = await this.prisma.customerCode.count({ where: { customerId: customer.id, purpose, createdAt: { gt: new Date(Date.now() - 24 * 60 * minute) } } });
     if (sentToday >= 10) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_daily_limit', 'Too many codes were sent today. Try again tomorrow.');
+    // Texts already sent to this number today: a resend goes through the market's other provider first.
+    const attempt = await this.prisma.customerCode.count({ where: { customerId: customer.id, purpose, target: phone, createdAt: { gt: new Date(Date.now() - 24 * 60 * minute) } } });
     const code = numericCode();
     await this.prisma.$transaction([
       this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } }),
@@ -413,7 +431,7 @@ export class CustomersService {
     try {
       // Afrippa's traders get Afrippa's text, through Afrippa's own SMS account.
       const afrippa = customer.store?.platform === 'afrippa';
-      await this.sms.sendForCountry(customer.country, { to: phone, text: `Your ${afrippa ? 'Afrippa' : 'BitoCard'} code is ${code}. It expires in 30 minutes. Never share it.` }, afrippa ? 'afrippa' : 'bitocard');
+      await this.sms.sendForCountry(customer.country, { to: phone, text: `Your ${afrippa ? 'Afrippa' : 'BitoCard'} code is ${code}. It expires in 30 minutes. Never share it.` }, afrippa ? 'afrippa' : 'bitocard', { attempt });
     } catch (error) {
       await this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
       if (error instanceof ApiError) throw error;
@@ -421,6 +439,18 @@ export class CustomersService {
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
     }
     return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+  }
+
+  /**
+   * Udozo: the customer confirms their mobile later (the code did not arrive, or not now). The account is then usable
+   * without it; anything that needs a confirmed mobile still asks, and the profile confirms it any time.
+   */
+  async deferPhone(customer: Customer) {
+    const updated =
+      customer.phoneVerifiedAt || customer.phoneDeferredAt
+        ? await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, include: { market: true } })
+        : await this.prisma.customer.update({ where: { id: customer.id }, data: { phoneDeferredAt: new Date() }, include: { market: true } });
+    return presentCustomer(updated);
   }
 
   async verifyPhone(customer: Customer, code: string) {

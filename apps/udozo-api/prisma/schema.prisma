@@ -662,8 +662,10 @@ model Country {
   minWithdrawalMinor        BigInt            @map("min_withdrawal_minor")
   /// Who checks identities here: `bitocard` (BitoCard Verify, every African country) or `didit` (elsewhere).
   identityProvider          String            @default("didit") @map("identity_provider")
-  /// Null disables profile phone verification in this market.
+  /// Null disables profile phone verification in this market. The first provider codes are texted through.
   smsProvider               String?           @map("sms_provider")
+  /// Optional second provider (never the first): takes a text the first could not send, and sends resends.
+  smsFallbackProvider       String?           @map("sms_fallback_provider")
   /// Spin and win: spins each customer may take per day (UTC) in this market, 1 to 10.
   spinDailyLimit            Int               @default(2) @map("spin_daily_limit")
   /// Customer Catcher: signed-out visitors may use the public Spin and win page in this market.
@@ -2643,6 +2645,9 @@ model Customer {
   emailVerifiedAt           DateTime?                 @map("email_verified_at")
   phone                     String?
   phoneVerifiedAt           DateTime?                 @map("phone_verified_at")
+  /// Udozo: when the customer chose to confirm their mobile later (at sign-up, or on the confirm step). The account is
+  /// then usable without it; things that need a confirmed mobile still ask for it.
+  phoneDeferredAt           DateTime?                 @map("phone_deferred_at")
   status                    UserStatus                @default(active)
   failedSignIns             Int                       @default(0) @map("failed_sign_ins")
   lockedUntil               DateTime?                 @map("locked_until")

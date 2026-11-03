@@ -33,6 +33,8 @@ class UpdateCountryDto {
   @IsOptional() @IsBoolean() reserved_accounts?: boolean;
   @IsOptional() @IsIn(['bitocard', 'didit']) identity_provider?: 'bitocard' | 'didit';
   @ValidateIf((_object, value) => value !== null) @IsOptional() @IsIn(['termii', 'africas_talking']) sms_provider?: 'termii' | 'africas_talking' | null;
+  /** The market's second SMS provider (never the first): a code the first could not send, and resends, go through it. */
+  @ValidateIf((_object, value) => value !== null) @IsOptional() @IsIn(['termii', 'africas_talking']) sms_fallback_provider?: 'termii' | 'africas_talking' | null;
   @IsOptional() @IsInt() @Min(0) @Max(100) markup_cap_percent?: number;
   @IsOptional() @IsInt() @Min(0) @Max(90) payout_hold_days?: number;
   /** Spin and win: spins per customer per day in this market. */

@@ -14,12 +14,16 @@ export type CustomerCaller = { customer: CustomerWithStore; sessionId: string; m
 export const twoStepPendingFor = (session: CustomerCaller) => session.customer.store.platform === 'afrippa' && !session.mfaVerifiedAt;
 
 /**
- * Udozo's customers confirm their mobile number at sign-up (texted through their country's SMS provider), and an
- * account without one (an older account, or a sign-up that stopped after the email) confirms it before anything else.
- * Only where the country can text: elsewhere the number stays unconfirmed and nothing waits for it.
+ * Udozo's customers are asked to confirm their mobile number at sign-up (texted through their country's SMS provider),
+ * and an account without one (an older account, or a sign-up that stopped after the email) is asked before anything
+ * else, unless they chose to confirm it later (`phoneDeferredAt`: the code did not arrive, or they would rather not now).
+ * Only where the country can text: elsewhere the number stays unconfirmed and nothing waits for it. A Google sign-up
+ * still chooses its country first.
  */
 export const phonePendingFor = (session: CustomerCaller, product: string) =>
-  product === 'udozo' && session.customer.store.platform !== 'afrippa' && (!session.customer.country || (!session.customer.phoneVerifiedAt && Boolean(session.customer.market?.smsProvider)));
+  product === 'udozo' &&
+  session.customer.store.platform !== 'afrippa' &&
+  (!session.customer.country || (!session.customer.phoneVerifiedAt && !session.customer.phoneDeferredAt && Boolean(session.customer.market?.smsProvider)));
 
 const ROUTE_PHONE_PENDING = 'customer:phone-pending';
 /** A customer route that takes a session whose mobile number is still to be confirmed (the account's own steps). */
