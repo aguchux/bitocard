@@ -215,6 +215,12 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
     if (sent) setNotice("A new code is on its way.");
   }
 
+  /** Carries on without the texted code: the number is kept unconfirmed and confirmed later in Settings. */
+  function confirmLater() {
+    if (!phone) return;
+    go("password", "Your number is kept unconfirmed. Confirm it any time in Settings > Your profile to sign in with it too.");
+  }
+
   async function create(event: FormEvent) {
     event.preventDefault();
     // Apart, as on the owner's ID: their identity check is matched against them.
@@ -446,7 +452,14 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
             <Button type="submit" className="min-h-12 w-full text-base" loading={startPhoneState.isLoading} disabled={!phone}>
               {phone && phoneConfirmed === phone ? "Continue" : "Text me a code"}
             </Button>
-            {back("business")}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {back("business")}
+              {phone && phoneConfirmed === phone ? null : (
+                <Button type="button" variant="ghost" size="sm" disabled={!phone} onClick={confirmLater}>
+                  Confirm it later
+                </Button>
+              )}
+            </div>
           </form>
         ) : null}
 
@@ -472,6 +485,12 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
               </Button>
               <Button type="button" variant="ghost" size="sm" loading={startPhoneState.isLoading} onClick={resendPhone}>
                 Send a new code
+              </Button>
+            </div>
+            <div className="rounded-xl bg-canvas p-3.5 text-sm text-muted">
+              <p>No code yet? A new one comes another way. Or carry on and confirm your number later in Settings.</p>
+              <Button type="button" variant="ghost" size="sm" className="mt-1" onClick={confirmLater}>
+                Skip and confirm later
               </Button>
             </div>
           </form>
@@ -515,7 +534,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
             <Button type="submit" className="min-h-12 w-full text-base" loading={signUpState.isLoading || signUpState.isSuccess} disabled={password.length < 10}>
               {invitation ? "Create account and join" : "Create account"}
             </Button>
-            {back(invitation ? "details" : textable && phoneConfirmed !== phone ? "mobile" : "phone")}
+            {back(invitation ? "details" : textable && texted === phone && phoneConfirmed !== phone ? "mobile" : "phone")}
           </form>
         ) : null}
 

@@ -157,8 +157,8 @@ const failureCode = (error: unknown) => (error && typeof error === "object" ? (e
  * Onboarding: signed in, but not a member of any reseller account. Google sign-ups land here first; so do people with
  * an invitation not yet accepted, or removed from a team. They open their own reseller account here, in two steps as
  * email sign-up does: their first and last name (Google's to check), the business, its country and their mobile; then
- * the code texted to the mobile, which becomes their sign-in number. Where the country cannot text yet, the account
- * opens with the number kept for Udozo's team only.
+ * the code texted to the mobile, which becomes their sign-in number. The code can be skipped (it did not come, or not
+ * now): the account opens with the number unconfirmed, confirmed later in Settings, as where the country cannot text.
  */
 function Onboarding({ user }: { user: User }) {
   const [signOut, signingOut] = useSignOut();
@@ -244,6 +244,12 @@ function Onboarding({ user }: { user: User }) {
             </Button>
             <Button type="button" variant="ghost" disabled={busy} onClick={() => (setTexted(null), setCode(""))}>
               Change the number
+            </Button>
+          </div>
+          <div className="rounded-xl bg-canvas p-3.5 text-sm text-muted">
+            <p>No code yet? A new one comes another way. Or carry on and confirm your number later in Settings.</p>
+            <Button type="button" variant="ghost" size="sm" className="mt-1" disabled={busy} onClick={() => void openAccount(null)}>
+              Skip and confirm later
             </Button>
           </div>
         </Card>

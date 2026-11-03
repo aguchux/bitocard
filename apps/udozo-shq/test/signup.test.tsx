@@ -80,4 +80,17 @@ describe("Seller HQ sign-up", () => {
     expect(sent.find(item => item.path === "/v1/auth/signup")?.body).toMatchObject({ phone: "+233241234567" });
     expect(sent.some(item => item.path === "/v1/auth/signup/phone/verify")).toBe(false);
   }, 20000);
+
+  test("a code that did not come can be skipped: the account is made with the number unconfirmed", async () => {
+    const sent = signUpRoutes({ object: "notice", message: "A code is on its way to +233241234567." });
+    await upToBusiness();
+    expect(await screen.findByText(/Enter the 6-digit code we texted to/, {}, slow)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Skip and confirm later" }));
+    expect(await screen.findByText(/Your number is kept unconfirmed/, {}, slow)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    await waitFor(() => expect(sent.some(item => item.path === "/v1/auth/signup")).toBe(true), slow);
+    expect(sent.find(item => item.path === "/v1/auth/signup")?.body).toMatchObject({ phone: "+233241234567", signup_token: "signup-token-0000000000000" });
+    expect(sent.some(item => item.path === "/v1/auth/signup/phone/verify")).toBe(false);
+  }, 20000);
 });

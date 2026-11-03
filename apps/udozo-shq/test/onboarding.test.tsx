@@ -66,4 +66,21 @@ describe("Seller HQ's onboarding after a Google sign-up", () => {
     await waitFor(() => expect(sent.find(item => item.path === "/v1/auth/reseller-account")?.body).toEqual({ business_name: "Kofi Digital", country: "GH", phone: "+233241234567" }), slow);
     expect(screen.queryByText("Confirm your mobile")).toBeNull();
   });
+
+  test("a code that did not come can be skipped: the account opens with the number unconfirmed", async () => {
+    const sent = fakeApi({
+      "/v1/auth/session": googleSignUp,
+      "/v1/countries": countries,
+      "PATCH /v1/auth/profile": googleSignUp,
+      "POST /v1/auth/onboarding/signup-token": token,
+      "POST /v1/auth/signup/phone": Response.json({ object: "notice", message: "A code is on its way." }, { status: 202 }),
+      "POST /v1/auth/reseller-account": googleSignUp,
+    });
+    renderSignedIn(<p>Console</p>);
+    await fillDetails();
+    expect(await screen.findByText("Confirm your mobile", {}, slow)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Skip and confirm later" }));
+    await waitFor(() => expect(sent.find(item => item.path === "/v1/auth/reseller-account")?.body).toEqual({ business_name: "Kofi Digital", country: "GH", phone: "+233241234567" }), slow);
+    expect(sent.some(item => item.path === "/v1/auth/signup/phone/verify")).toBe(false);
+  });
 });
