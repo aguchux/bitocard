@@ -14,9 +14,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
-    # Lint, typecheck, build and the in-process tests take about 12 minutes; the API and signer tests against Postgres
-    # and Redis follow, so 20 minutes cut them off.
-    timeout-minutes: 45
+    # Lint, typecheck, build and the in-process tests now take about 40 minutes (both APIs' suites, BitoCard's alone near
+    # 27); the API and signer tests against Postgres and Redis follow, so 45 minutes cut them off.
+    timeout-minutes: 75
 
     services:
       postgres:
