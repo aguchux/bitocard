@@ -59,7 +59,7 @@ describe('pawaPay catalogue', () => {
       [
         ['mobile_money:GH:mtn:ghs', 'MTN mobile money', 'GH', 'GHS', 'range', 100, 500000, 'phone'],
         ['mobile_money:KE:m-pesa:kes', 'M-Pesa mobile money', 'KE', 'KES', 'range', 1000, 15000000, 'phone'],
-        ['mobile_money:ZM:airtel:zmw', 'Airtel mobile money', 'ZM', 'ZMW', 'range', 100, 1000000, 'phone'],
+        ['mobile_money:MW:airtel:mwk', 'Airtel mobile money', 'MW', 'MWK', 'range', 100, 1000000, 'phone'],
       ],
       'a provider closed for payouts is left out',
     );
@@ -158,17 +158,17 @@ describe('pawaPay coverage', () => {
       assert.equal(coverage.status, 200, JSON.stringify(coverage.json));
       assert.equal(coverage.json.environment, 'live');
       const byCode = Object.fromEntries(coverage.json.data.map(country => [country.code, country]));
-      assert.deepEqual(Object.keys(byCode), ['GH', 'KE', 'ZM'], 'sorted by name');
+      assert.deepEqual(Object.keys(byCode), ['GH', 'KE', 'MW'], 'sorted by name');
       assert.deepEqual(byCode.GH.currencies[0].networks.map(network => [network.name, network.deposits, network.payouts]), [['MTN', 'OPERATIONAL', 'OPERATIONAL'], ['Telecel', 'CLOSED', 'CLOSED']]);
       assert.deepEqual(byCode.KE.currencies[0].networks[0].deposits, null, 'deposits not open in Kenya: payouts only');
-      assert.deepEqual([byCode.GH.market?.currency, byCode.ZM.market, byCode.ZM.alpha3, byCode.ZM.currencies[0].currency], ['GHS', null, 'ZMB', 'ZMW']);
+      assert.deepEqual([byCode.GH.market?.currency, byCode.MW.market, byCode.MW.alpha3, byCode.MW.currencies[0].currency], ['GHS', null, 'MWI', 'MWK']);
 
-      const added = await admin.post('/v1/admin/countries', { code: 'ZM', name: byCode.ZM.name, currency: 'ZMW', min_withdrawal_minor: 10_000 });
+      const added = await admin.post('/v1/admin/countries', { code: 'MW', name: byCode.MW.name, currency: 'MWK', min_withdrawal_minor: 10_000 });
       assert.equal(added.status, 201, JSON.stringify(added.json));
-      assert.equal((await admin.put('/v1/admin/countries/ZM/payment-methods', { purpose: 'checkout', enabled: ['pawapay'] })).status, 200);
-      assert.ok(await prisma.currencySetting.findUnique({ where: { currency: 'ZMW' } }), 'its currency gets exchange rates');
-      const after = (await admin.get('/v1/admin/pawapay/coverage')).json.data.find(country => country.code === 'ZM');
-      assert.deepEqual(after.market, { currency: 'ZMW', checkout: true, wallet_top_up: false });
+      assert.equal((await admin.put('/v1/admin/countries/MW/payment-methods', { purpose: 'checkout', enabled: ['pawapay'] })).status, 200);
+      assert.ok(await prisma.currencySetting.findUnique({ where: { currency: 'MWK' } }), 'its currency gets exchange rates');
+      const after = (await admin.get('/v1/admin/pawapay/coverage')).json.data.find(country => country.code === 'MW');
+      assert.deepEqual(after.market, { currency: 'MWK', checkout: true, wallet_top_up: false });
       const reseller = await resellerClient(server);
       assert.equal((await reseller.browser.get('/v1/admin/pawapay/coverage')).status, 401, 'admins only');
     } finally {

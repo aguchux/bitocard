@@ -71,6 +71,14 @@ async function bought(funding) {
 }
 
 const set = (id, data) => prisma.virtualNumber.update({ where: { id }, data });
+/** A midnight a few days ahead, inside the 7-day renewal window whatever today's date, and the month after it. */
+const soon = () => {
+  const now = new Date();
+  const expires = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 3));
+  const after = new Date(expires);
+  after.setUTCMonth(after.getUTCMonth() + 1);
+  return { expires, after };
+};
 const did = number => didww.state.dids.find(item => item.id === number.supplierNumberId);
 
 describe('numbers after their order', () => {
@@ -88,6 +96,9 @@ describe('numbers after their order', () => {
 
   test('renewing takes a month from the wallet and adds it with the supplier', async () => {
     const { browser, number } = await bought();
+    // The fake supplier's numbers expire on a fixed day: renewed from a few days ahead, the month is added to it.
+    const { expires, after } = soon();
+    await set(number.id, { expiresAt: expires });
     const price = await browser.get(`/v1/numbers/${number.id}/renewal-price`);
     check('GET /v1/numbers/{id}/renewal-price', 200, price.json);
     assert.equal(price.json.currency, 'NGN');
@@ -95,7 +106,7 @@ describe('numbers after their order', () => {
     const renewed = await browser.post(`/v1/numbers/${number.id}/renew`, {});
     assert.equal(renewed.status, 200, JSON.stringify(renewed.json));
     check('POST /v1/numbers/{id}/renew', 200, renewed.json);
-    assert.equal(renewed.json.expires_at, '2026-12-03T00:00:00.000Z');
+    assert.equal(renewed.json.expires_at, after.toISOString());
     assert.equal(before - (await available(browser)), price.json.amount, 'the renewal price, taken');
     assert.deepEqual(did(number).patches, [{ billing_cycles_count: 1 }], 'one more renewal with DIDWW');
     assert.ok(await prisma.event.findFirst({ where: { type: 'number.renewed', resellerId: number.resellerId } }));
@@ -175,6 +186,8 @@ describe('numbers after their order', () => {
 
   test('an unclear renewal keeps the money held and is asked again unchanged: one month, paid once', async () => {
     const { browser, number } = await bought();
+    const { expires, after } = soon();
+    await set(number.id, { expiresAt: expires });
     const price = (await browser.get(`/v1/numbers/${number.id}/renewal-price`)).json.amount;
     const before = await available(browser);
     didww.state.patchReply = 500;
@@ -187,7 +200,7 @@ describe('numbers after their order', () => {
     assert.deepEqual([unclear.status, unclear.json.error.code], [502, 'renewal_pending']);
     assert.equal(before - (await available(browser)), price, 'held, not returned: DIDWW may have renewed it');
     const pending = await prisma.virtualNumber.findUniqueOrThrow({ where: { id: number.id } });
-    assert.deepEqual([pending.renewalCycles, pending.expiresAt.toISOString()], [1, '2026-11-03T00:00:00.000Z']);
+    assert.deepEqual([pending.renewalCycles, pending.expiresAt.toISOString()], [1, expires.toISOString()]);
     assert.ok(pending.renewalPending);
 
     // The job asks again once the lease has passed: the same request, never a second month.
@@ -195,7 +208,7 @@ describe('numbers after their order', () => {
     assert.ok((await cron()).result.renewed >= 1);
     assert.deepEqual(did(number).patches, [{ billing_cycles_count: 1 }, { billing_cycles_count: 1 }], 'asked for the same renewals left both times');
     const renewed = await prisma.virtualNumber.findUniqueOrThrow({ where: { id: number.id } });
-    assert.deepEqual([renewed.expiresAt.toISOString(), renewed.renewalPending, renewed.renewalCycles], ['2026-12-03T00:00:00.000Z', null, null]);
+    assert.deepEqual([renewed.expiresAt.toISOString(), renewed.renewalPending, renewed.renewalCycles], [after.toISOString(), null, null]);
     assert.equal(before - (await available(browser)), price, 'taken once');
     const holds = await prisma.hold.findMany({ where: { reference: { startsWith: `number_renewal:${number.id}:` } } });
     assert.deepEqual(holds.map(hold => hold.status), ['captured'], 'one hold, captured');

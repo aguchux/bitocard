@@ -713,7 +713,7 @@ export async function fakePawapay() {
     countries: [
       { country: 'GHA', prefix: '233', displayName: { en: 'Ghana' }, providers: [provider('MTN_MOMO_GHA', 'MTN', 'GHS', '1', '5000'), provider('VODAFONE_GHA', 'Telecel', 'GHS', '1', '3000', 'NONE', 'CLOSED')] },
       { country: 'KEN', prefix: '254', displayName: { en: 'Kenya' }, providers: [provider('MPESA_KEN', 'M-Pesa', 'KES', '10', '150000')] },
-      { country: 'ZMB', prefix: '260', displayName: { en: 'Zambia' }, providers: [provider('AIRTEL_OAPI_ZMB', 'Airtel', 'ZMW', '1', '10000', 'TWO_PLACES')] },
+      { country: 'MWI', prefix: '265', displayName: { en: 'Malawi' }, providers: [provider('AIRTEL_MWI', 'Airtel', 'MWK', '1', '10000', 'TWO_PLACES')] },
     ],
     payouts: {},
     reply: 'COMPLETED',

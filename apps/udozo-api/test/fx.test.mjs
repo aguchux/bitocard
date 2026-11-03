@@ -31,7 +31,8 @@ const rates = async () => Object.fromEntries((await client(server.base).get('/v1
 describe('exchange rates', () => {
   test('before any refresh no currency is available', async () => {
     const list = await rates();
-    assert.deepEqual(Object.keys(list).sort(), ['GHS', 'KES', 'NGN']);
+    // Every market's currency, Udozo's twelve closed markets' included.
+    assert.deepEqual(Object.keys(list).sort(), ['CDF', 'GHS', 'KES', 'MZN', 'NGN', 'RWF', 'SLE', 'UGX', 'XAF', 'XOF', 'ZMW']);
     assert.equal(list.NGN.available, false);
   });
 
