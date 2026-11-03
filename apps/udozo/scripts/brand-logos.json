@@ -546,5 +546,17 @@
   "shell": {
     "icon": "shell",
     "hex": "FFD500"
+  },
+  "ge-healthcare": {
+    "icon": "generalelectric",
+    "hex": "0870D8"
+  },
+  "abbott": {
+    "icon": "abbott",
+    "hex": "008FC7"
+  },
+  "3m": {
+    "icon": "3m",
+    "hex": "FF0000"
   }
 }

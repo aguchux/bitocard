@@ -1,7 +1,7 @@
-// Hospital and medical equipment (docs/UDOZO_HOME_ROWS_PLAN.md part B): a top category again, with home care and
-// monitoring (Health and mobility aids moved here, its slug kept), mobility and patient care, clinic and hospital
-// equipment, laboratory equipment, and medical supplies and PPE, each with its features, brands and models, the Safe
-// Trade Guide's checks and refused words for what may never be sold.
+// Hospital and medical equipment (docs/UDOZO_HOME_ROWS_PLAN.md part B): a top category again, with medical equipment
+// (everyday instruments), home care and monitoring (Health and mobility aids moved here, its slug kept), mobility and
+// patient care, clinic and hospital equipment, laboratory equipment, and medical supplies and PPE, each with its
+// features, brands and models (logos where Simple Icons has them), the Safe Trade Guide's checks and refused words.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, client, startApp } from './helpers.mjs';
@@ -9,7 +9,7 @@ import { adminClient, client, startApp } from './helpers.mjs';
 let server;
 let prisma;
 let visitor;
-const subcategories = ['health-equipment', 'mobility-patient-care', 'clinic-hospital-equipment', 'lab-equipment', 'medical-supplies'];
+const subcategories = ['medical-devices', 'health-equipment', 'mobility-patient-care', 'clinic-hospital-equipment', 'lab-equipment', 'medical-supplies'];
 
 before(async () => {
   server = await startApp({ env: { APP_PRODUCT: 'udozo' } });
@@ -22,13 +22,14 @@ before(async () => {
 after(() => server?.close());
 
 describe('Hospital and medical equipment', () => {
-  test('a top category after Beauty and personal care, with its five subcategories, prefixes and checks', async () => {
+  test('a top category after Beauty and personal care, with its six subcategories, prefixes and checks', async () => {
     const top = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'medical-equipment' }, include: { children: { orderBy: { position: 'asc' } }, countries: true } });
     assert.deepEqual([top.parentId, top.name, top.enabled, top.b2b], [null, 'Hospital and medical equipment', true, false]);
     const beauty = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'health-beauty' } });
     assert.equal(top.position, beauty.position + 1);
     assert.deepEqual(top.children.map(c => c.slug), subcategories);
-    assert.equal(top.children[0].name, 'Home care and monitoring', 'Health and mobility aids moved here, its slug kept');
+    assert.deepEqual([top.children[0].name, top.children[0].icon], ['Medical equipment', 'briefcase-medical']);
+    assert.equal(top.children[1].name, 'Home care and monitoring', 'Health and mobility aids moved here, its slug kept');
     assert.ok(top.children.every(c => c.enabled));
     assert.match(top.safetyChecklist.join(' '), /registration number/);
 
@@ -44,6 +45,7 @@ describe('Hospital and medical equipment', () => {
     assert.ok(['brand', 'model', 'power_source', 'certification'].every(key => keys('clinic-hospital-equipment').includes(key)));
     assert.ok(['brand', 'pack_size', 'sterile', 'sealed', 'expiry', 'registration_number'].every(key => keys('medical-supplies').includes(key)));
     assert.ok(keys('mobility-patient-care').includes('max_weight'));
+    assert.ok(['brand', 'model', 'power_source', 'certification', 'registration_number'].every(key => keys('medical-devices').includes(key)));
     for (const c of rows) for (const link of c.features) if (link.filter) assert.ok(link.feature.filterable, `${c.slug} filters only on filterable keys (${link.feature.key})`);
   });
 
@@ -54,6 +56,7 @@ describe('Hospital and medical equipment', () => {
     assert.ok((await brands('lab-equipment')).includes('Sysmex'));
     assert.ok((await brands('medical-supplies')).includes('Mölnlycke'));
     assert.equal((await brands('health-equipment'))[0], 'Omron', 'Home care keeps its brands first');
+    assert.deepEqual((await brands('medical-devices')).slice(0, 4), ['Littmann', 'Welch Allyn', 'Riester', 'Omron']);
     assert.equal(await prisma.classifiedBrand.count({ where: { nameKey: 'philips' } }), 1);
     assert.equal(await prisma.classifiedBrand.count({ where: { nameKey: 'mindray' } }), 1, 'one Mindray for clinics and labs');
   });
@@ -67,8 +70,20 @@ describe('Hospital and medical equipment', () => {
     assert.deepEqual([found.brand.name, found.model], ['Mindray', 'iMEC 10']);
     const microscope = (await visitor.get(`/v1/classifieds/models/detect?category=lab-equipment&title=${encodeURIComponent('Olympus CX23 binocular microscope')}`)).json;
     assert.deepEqual([microscope.brand.name, microscope.model], ['Olympus', 'CX23']);
+    const stethoscope = (await visitor.get(`/v1/classifieds/models/detect?category=medical-devices&title=${encodeURIComponent('Littmann Classic III stethoscope, like new')}`)).json;
+    assert.deepEqual([stethoscope.brand.name, stethoscope.model], ['Littmann', 'Classic III']);
     const om = await prisma.classifiedBrand.findUniqueOrThrow({ where: { slug: 'om-system' } });
     assert.ok(!om.matchKeys.includes('olympus'), 'OM System no longer takes Olympus');
+  });
+
+  test('GE HealthCare, Abbott and 3M show their bundled logos; the others their initials', async () => {
+    const shown = Object.fromEntries((await visitor.get('/v1/classifieds/brands?category=lab-equipment&country=NG')).json.data.map(row => [row.name, row.logo_url]));
+    assert.equal(shown.Abbott, 'https://udozo.com/brand-logos/abbott.svg');
+    assert.equal(shown.Sysmex, null);
+    const clinic = Object.fromEntries((await visitor.get('/v1/classifieds/brands?category=clinic-hospital-equipment&country=NG')).json.data.map(row => [row.name, row.logo_url]));
+    assert.equal(clinic['GE HealthCare'], 'https://udozo.com/brand-logos/ge-healthcare.svg');
+    const supplies = Object.fromEntries((await visitor.get('/v1/classifieds/brands?category=medical-supplies&country=NG')).json.data.map(row => [row.name, row.logo_url]));
+    assert.equal(supplies['3M'], 'https://udozo.com/brand-logos/3m.svg');
   });
 
   test('used single-use items are refused, prescription medicines reviewed', async () => {
