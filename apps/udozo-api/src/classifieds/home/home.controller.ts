@@ -54,8 +54,18 @@ export class ClassifiedHomeController {
   }
 }
 
-class SectionsDto {
-  @IsArray() sections: unknown[];
+/** The draft's rows; `sections` (the editor of before) are saved as rows that look the same. */
+class DraftDto {
+  @IsOptional() @IsArray() rows?: unknown[];
+  @IsOptional() @IsArray() sections?: unknown[];
+}
+
+class ResolveDto {
+  @IsOptional() @IsArray() rows?: unknown[];
+}
+
+class StoresQueryDto {
+  @IsOptional() @IsString() @MaxLength(60) q?: string;
 }
 
 class LayoutDto {
@@ -67,7 +77,7 @@ class RestoreDto {
   @Type(() => Number) @IsInt() @Min(1) version: number;
 }
 
-/** Admins: udozo.com's home pages, each with its layout and sections, drafted, previewed and published. */
+/** Admins: udozo.com's home pages, each with its layout and rows of blocks, drafted, previewed and published. */
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin/classifieds/home')
@@ -89,8 +99,24 @@ export class AdminHomeController {
 
   @AdminRoles('operations')
   @Put(':page/draft')
-  saveDraft(@CurrentCaller() caller: Caller, @Param('page') pageId: string, @Body() body: SectionsDto) {
-    return this.home.saveDraft(adminId(caller), pageId, body.sections);
+  saveDraft(@CurrentCaller() caller: Caller, @Param('page') pageId: string, @Body() body: DraftDto) {
+    return this.home.saveDraft(adminId(caller), pageId, body);
+  }
+
+  /** The rows given (or the draft) filled as visitors would see them, for the editor's cards; nothing is saved. */
+  @AdminRoles('operations', 'support')
+  @SkipIdempotency()
+  @Post(':page/resolve')
+  @HttpCode(HttpStatus.OK)
+  resolve(@Param('page') pageId: string, @Body() body: ResolveDto) {
+    return this.home.resolveDraft(pageId, body);
+  }
+
+  /** Resellers' live stores to pick for a stores marquee on this page. */
+  @AdminRoles('operations', 'support')
+  @Get(':page/stores')
+  stores(@Param('page') pageId: string, @Query() query: StoresQueryDto) {
+    return this.home.stores(pageId, query.q);
   }
 
   @AdminRoles('operations')

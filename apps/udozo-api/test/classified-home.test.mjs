@@ -104,22 +104,27 @@ describe('the pages', () => {
   test("a country's page offers no country tiles, the global page no deals; the editor's field is named", async () => {
     const ng = await support.get('/v1/admin/classifieds/home/ng');
     assert.equal(ng.status, 200);
-    assert.ok(!ng.json.sections_allowed.includes('country_tiles'));
+    assert.ok(!ng.json.blocks_allowed.includes('country_tiles'));
     assert.deepEqual(ng.json.layouts.map(layout => layout.key), ['marketplace', 'deals', 'explorer']);
-    assert.equal(ng.json.draft[0].type, 'home_hero');
-    const tiles = await admin.put('/v1/admin/classifieds/home/NG/draft', { sections: [{ id: 'a', type: 'country_tiles', span: { lg: 12, md: 6 } }] });
+    assert.equal(ng.json.rows[0].blocks[0].type, 'home_hero');
+    const row = blocks => ({ id: `row-${blocks[0].id}`, blocks });
+    const tiles = await admin.put('/v1/admin/classifieds/home/NG/draft', { rows: [row([{ id: 'a', type: 'country_tiles', span: { lg: 12, md: 6 } }])] });
     assert.equal(tiles.status, 400);
     assert.equal(tiles.json.error.code, 'layout_invalid');
-    assert.equal(tiles.json.error.param, 'sections[0].type');
-    const deals = await admin.put('/v1/admin/classifieds/home/global/draft', { sections: [{ id: 'a', type: 'deals_rail', span: { lg: 12, md: 6 } }] });
-    assert.equal(deals.json.error.param, 'sections[0].type');
+    assert.equal(tiles.json.error.param, 'rows[0].blocks[0].type');
+    const deals = await admin.put('/v1/admin/classifieds/home/global/draft', { rows: [row([{ id: 'a', type: 'deals_rail', span: { lg: 12, md: 6 } }])] });
+    assert.equal(deals.json.error.param, 'rows[0].blocks[0].type');
     // Across countries a banner cannot send people to a search (searches are a country's).
-    const search = await admin.put('/v1/admin/classifieds/home/global/draft', { sections: [{ id: 'b', type: 'banner', span: { lg: 12, md: 6 }, items: [{ title: 'Phones', link: { kind: 'search', q: 'iphone' } }] }] });
-    assert.equal(search.json.error.param, 'sections[0].items[0].link.kind');
-    const group = await admin.put('/v1/admin/classifieds/home/NG/draft', { sections: [{ id: 'c', type: 'listing_group', span: { lg: 12, md: 6 }, title: 'By place', by: 'area' }] });
-    assert.equal(group.json.error.param, 'sections[0].value');
+    const search = await admin.put('/v1/admin/classifieds/home/global/draft', { rows: [row([{ id: 'b', type: 'banner', span: { lg: 12, md: 6 }, items: [{ title: 'Phones', link: { kind: 'search', q: 'iphone' } }] }])] });
+    assert.equal(search.json.error.param, 'rows[0].blocks[0].items[0].link.kind');
+    const group = await admin.put('/v1/admin/classifieds/home/NG/draft', { rows: [row([{ id: 'c', type: 'listing_group', span: { lg: 12, md: 6 }, title: 'By place', by: 'area' }])] });
+    assert.equal(group.json.error.param, 'rows[0].blocks[0].value');
+    // The editor of before still saves sections, as rows.
+    const sections = await admin.put('/v1/admin/classifieds/home/NG/draft', { sections: [{ id: 'd', type: 'trust_bar', span: { lg: 12, md: 6 }, items: [{ icon: 'shield', title: 'Safe pay' }] }] });
+    assert.equal(sections.status, 200, JSON.stringify(sections.json));
+    assert.deepEqual(sections.json.rows.map(item => item.blocks.map(block => block.id)), [['d']]);
     // Support reads, never changes.
-    assert.equal((await support.put('/v1/admin/classifieds/home/NG/draft', { sections: [] })).status, 403);
+    assert.equal((await support.put('/v1/admin/classifieds/home/NG/draft', { rows: [] })).status, 403);
     assert.equal((await support.get('/v1/admin/classifieds/home/ZZ')).status, 404);
   });
 
