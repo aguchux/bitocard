@@ -682,10 +682,27 @@ export function placePath(country: string, place: { state: string; area?: string
   return `/${[country.toLowerCase(), place.state, place.area, place.category].filter(Boolean).join('/')}`;
 }
 
-/** What a market calls its top-level areas: Nigeria's states, Ghana's regions, Kenya's counties. */
-export function regionWord(country: string): 'state' | 'region' | 'county' {
-  const code = country.toUpperCase();
-  return code === 'GH' ? 'region' : code === 'KE' ? 'county' : 'state';
+export type RegionWord = 'state' | 'region' | 'county' | 'department' | 'province' | 'district';
+const regionWords: Record<string, RegionWord> = {
+  GH: 'region',
+  KE: 'county',
+  BJ: 'department',
+  CG: 'department',
+  CM: 'region',
+  SN: 'region',
+  UG: 'region',
+  CD: 'province',
+  GA: 'province',
+  MZ: 'province',
+  RW: 'province',
+  SL: 'province',
+  ZM: 'province',
+  CI: 'district',
+};
+
+/** What a market calls its top-level areas: Nigeria's states, Ghana's regions, Kenya's counties, Rwanda's provinces. */
+export function regionWord(country: string): RegionWord {
+  return regionWords[country.toUpperCase()] ?? 'state';
 }
 
 // ---- Money and words ----

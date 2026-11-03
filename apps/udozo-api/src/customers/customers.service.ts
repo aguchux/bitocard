@@ -164,10 +164,14 @@ export class CustomersService {
     return this.marketCode(asked);
   }
 
-  /** A BitoCard market's code, or `market_unavailable`. */
+  /**
+   * A market's code, or `market_unavailable`. On Udozo the market must be open for sign-up (`reseller_signup`, the
+   * markets udozo.com offers): one added closed cannot be chosen, even by a request the site never sent, until an
+   * admin opens it.
+   */
   private async marketCode(asked: string) {
     const country = await this.prisma.country.findUnique({ where: { code: asked.toUpperCase() } });
-    if (!country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'market_unavailable', 'BitoCard does not sell in this country yet.', 'country');
+    if (!country || (this.product === 'udozo' && !country.resellerSignup)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'market_unavailable', 'BitoCard does not sell in this country yet.', 'country');
     return country.code;
   }
 
@@ -294,7 +298,8 @@ export class CustomersService {
    */
   async updateProfile(customer: CustomerWithStore, input: { first_name?: string; last_name?: string; name?: string; country?: string }) {
     if (input.country !== undefined) {
-      const code = await this.marketCode(input.country);
+      // Their own country sent again is theirs, open for sign-up now or not.
+      const code = customer.country && input.country.toUpperCase() === customer.country ? customer.country : await this.marketCode(input.country);
       if (customer.country !== code) {
         if (customer.country || !customer.store.reseller.house) throw countryLocked();
         const set = await this.prisma.customer.updateMany({ where: { id: customer.id, country: null }, data: { country: code } });

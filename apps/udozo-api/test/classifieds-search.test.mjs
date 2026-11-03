@@ -112,7 +112,7 @@ describe('search', () => {
     assert.deepEqual(titles(await get('/v1/classifieds/listings?country=NG&f=storage:200..&f=brand:apple,tecno&sort=price_desc')), ['iPhone 14 Pro, 256 GB', 'Tecno Camon 20, 256 GB']);
     assert.deepEqual(titles(await get('/v1/classifieds/listings?country=NG&f=memory:16')), ['HP EliteBook 840 G5 laptop']);
     assert.deepEqual(titles(await get('/v1/classifieds/listings?country=NG&f=colour:black&q=iphone')), ['iPhone 13, 128 GB, Midnight']);
-    const bad = await get('/v1/classifieds/listings?country=NG&f=model:iphone');
+    const bad = await get('/v1/classifieds/listings?country=NG&f=included:charger');
     assert.deepEqual([bad.status, bad.json.error.param], [400, 'f[0]'], 'only filterable keys');
     assert.equal((await get('/v1/classifieds/listings?country=NG&price_min=5&price_max=1')).json.error.param, 'price_min');
   });

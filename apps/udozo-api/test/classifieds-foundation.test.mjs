@@ -86,8 +86,9 @@ describe('categories', () => {
       assert.ok(sub.safetyChecklist.length > 0 || parent.safetyChecklist.length > 0, `${sub.slug} has a checklist`);
       for (const link of sub.features) if (link.filter) assert.ok(link.feature.filterable, `${sub.slug} filters only on filterable keys (${link.feature.key})`);
     }
-    // Open in Nigeria, then Ghana and Kenya as Nigeria has them.
-    for (const c of categories) assert.deepEqual(c.countries.map(row => [row.country, row.enabled]).sort(), [['GH', true], ['KE', true], ['NG', true]], `${c.slug} is open in Nigeria, Ghana and Kenya`);
+    // Open in Nigeria, then every other market as Nigeria has them (Ghana and Kenya, then BitoCard's other twelve).
+    const markets = ['BJ', 'CD', 'CG', 'CI', 'CM', 'GA', 'GH', 'KE', 'MZ', 'NG', 'RW', 'SL', 'SN', 'UG', 'ZM'];
+    for (const c of categories) assert.deepEqual(c.countries.map(row => [row.country, row.enabled]).sort(), markets.map(code => [code, true]), `${c.slug} is open in every market as in Nigeria`);
     assert.deepEqual(top.filter(c => c.b2b).map(c => c.slug), ['business-industrial']);
 
     const phones = categories.find(c => c.slug === 'mobile-phones');
