@@ -79,7 +79,7 @@ describe("rows", () => {
     expect(out).toMatch(/class="[^"]*bg-navy-900 text-white/);
     expect(out).toContain('href="/ng/search"');
     expect(out).not.toContain("Nothing");
-    expect(out).not.toContain("data-home-block", "never marked outside the editor's preview");
+    expect(out, "never marked outside the editor's preview").not.toContain("data-home-block");
   });
 
   it("marks rows and blocks for the editor only in its preview", () => {
