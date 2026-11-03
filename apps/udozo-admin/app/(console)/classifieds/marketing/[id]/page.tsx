@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useId, useState } from "react";
-import { CheckCircle2, Circle, Copy, ExternalLink, Mail, MessageCircle, Phone } from "lucide-react";
+import { CheckCircle2, Circle, Copy, ExternalLink, Mail, MessageCircle, MessageSquareText, Phone } from "lucide-react";
 import { Badge, Button, Card, CardHeader, errorMessage, Field, formatDate, Input, Notice, PageHeader, QueryView, Select, Skeleton, Textarea, Toggle } from "@bitocard/admin-ui";
 import { AppLink, useAdmin } from "@bitocard/admin-ui/shell";
 import {
@@ -25,6 +25,7 @@ import { UdozoShell } from "@/components/shell";
 import { udozoOrigin } from "@/components/theme";
 import { activityLabels, channelLabels, dialled, nextStage, outcomeLabels, stageLabels, stageOrder, statusLabels } from "@/components/marketing/labels";
 import { MarketSelect, useMarketName } from "@/components/marketing/market";
+import { SendSmsButton, SmsDialog } from "@/components/marketing/sms-dialog";
 import { fillTemplate, templatesFor, whatsappMessage } from "@/components/marketing/templates";
 
 /** `datetime-local` value for a date, in the browser's own time. */
@@ -56,13 +57,16 @@ function ProspectView({ prospect }: { prospect: MarketingProspectDetail }) {
         title={prospect.name}
         description={[prospect.store_name, prospect.location, market, `From ${prospect.source}`].filter(Boolean).join(" · ")}
         actions={
-          <span className="flex flex-wrap gap-1.5">
-            <Badge tone="pink" dot={false}>
-              {stageLabels[prospect.stage].title}
-            </Badge>
-            <Badge tone={statusLabels[prospect.stage_status].tone}>{statusLabels[prospect.stage_status].label}</Badge>
-            {prospect.outcome ? <Badge tone={outcomeLabels[prospect.outcome].tone}>{outcomeLabels[prospect.outcome].label}</Badge> : null}
-            {prospect.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="flex flex-wrap gap-1.5">
+              <Badge tone="pink" dot={false}>
+                {stageLabels[prospect.stage].title}
+              </Badge>
+              <Badge tone={statusLabels[prospect.stage_status].tone}>{statusLabels[prospect.stage_status].label}</Badge>
+              {prospect.outcome ? <Badge tone={outcomeLabels[prospect.outcome].tone}>{outcomeLabels[prospect.outcome].label}</Badge> : null}
+              {prospect.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
+            </span>
+            <SendSmsButton prospect={prospect} />
           </span>
         }
       />
@@ -163,6 +167,7 @@ function MessageCard({ prospect }: { prospect: MarketingProspectDetail }) {
   const [log, logging] = useLogMarketingActivityMutation();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [texting, setTexting] = useState(false);
   const phone = prospect.phones[0];
   const pick = (key: string) => {
     setTemplate(key);
@@ -187,7 +192,7 @@ function MessageCard({ prospect }: { prospect: MarketingProspectDetail }) {
   };
   return (
     <Card>
-      <CardHeader title="Send and log" description="Pick a message, edit it, then open it in WhatsApp (it is logged) or log a call, Jiji chat or note." />
+      <CardHeader title="Send and log" description="Pick a message, edit it, then open it in WhatsApp or send it by SMS (both are logged), or log a call, Jiji chat or note." />
       <div className="grid gap-3 p-5 sm:grid-cols-3 sm:px-6">
         <Field label="Message" htmlFor={`${id}-template`}>
           <Select id={`${id}-template`} value={template} onChange={event => pick(event.target.value)}>
@@ -239,12 +244,18 @@ function MessageCard({ prospect }: { prospect: MarketingProspectDetail }) {
               Open in WhatsApp
             </Button>
           ) : null}
+          {phone && channel === "sms" ? (
+            <Button icon={<MessageSquareText className="size-4" />} onClick={() => setTexting(true)} disabled={prospect.do_not_contact}>
+              Send by SMS
+            </Button>
+          ) : null}
           <Button variant="secondary" onClick={record} loading={logging.isLoading}>
             Log it
           </Button>
           {done ? <span className="text-sm text-emerald-700">{done}</span> : null}
         </div>
       </div>
+      {texting ? <SmsDialog prospect={prospect} text={text} onClose={() => setTexting(false)} /> : null}
     </Card>
   );
 }
@@ -437,6 +448,7 @@ function ContactCard({ prospect }: { prospect: MarketingProspectDetail }) {
   const id = useId();
   const [update, updating] = useUpdateMarketingProspectMutation();
   const [marketError, setMarketError] = useState<string | null>(null);
+  const [texting, setTexting] = useState<string | null>(null);
   const move = async (country: string) => {
     setMarketError(null);
     try {
@@ -463,6 +475,9 @@ function ContactCard({ prospect }: { prospect: MarketingProspectDetail }) {
               <a href={`tel:${phone}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-semibold hover:border-brand-400">
                 <Phone className="size-3.5" aria-hidden /> Call
               </a>
+              <button type="button" onClick={() => setTexting(phone)} disabled={prospect.do_not_contact} aria-label={`SMS ${dialled(phone)}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-semibold hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-50">
+                <MessageSquareText className="size-3.5" aria-hidden /> SMS
+              </button>
             </span>
           </div>
         ))}
@@ -492,6 +507,7 @@ function ContactCard({ prospect }: { prospect: MarketingProspectDetail }) {
         ) : null}
         <Toggle label="Asked not to be contacted again" checked={prospect.do_not_contact} disabled={updating.isLoading} onChange={checked => void update({ id: prospect.id, do_not_contact: checked })} />
       </div>
+      {texting ? <SmsDialog prospect={prospect} phone={texting} onClose={() => setTexting(null)} /> : null}
     </Card>
   );
 }

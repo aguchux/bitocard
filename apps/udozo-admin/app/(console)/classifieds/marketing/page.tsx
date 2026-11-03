@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { CalendarClock, MailPlus, MousePointerClick, Send, UserCheck, Users } from "lucide-react";
+import { CalendarClock, MailPlus, MessageSquareText, MousePointerClick, Send, UserCheck, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, DataTable, errorMessage, FilterSelect, formatDate, formatNumber, Input, PageHeader, StatCard, Tabs, useDebouncedValue, type Column } from "@bitocard/admin-ui";
 import { AppLink, useAdmin } from "@bitocard/admin-ui/shell";
 import { flagEmoji } from "@bitocard/ui/phone";
@@ -10,6 +10,7 @@ import { type MarketingFilters, type MarketingProspect, type MarketingStage, use
 import { useMarketOptions } from "@/components/classifieds";
 import { UdozoShell } from "@/components/shell";
 import { dialled, outcomeLabels, stageLabels, stageOrder, statusLabels } from "@/components/marketing/labels";
+import { SmsDialog } from "@/components/marketing/sms-dialog";
 
 const pageSize = 50;
 
@@ -56,6 +57,7 @@ function MarketingPipeline() {
   const data = summary.data;
   const reset = () => setOffset(0);
   const [now] = useState(() => Date.now());
+  const [texting, setTexting] = useState<MarketingProspect | null>(null);
 
   const columns: Array<Column<MarketingProspect>> = [
     {
@@ -103,6 +105,24 @@ function MarketingPipeline() {
     },
     { key: "owner", header: "Owner", hideOnMobile: true, cell: item => <span className="text-sm">{item.owner?.name ?? <span className="text-muted">Unassigned</span>}</span> },
     { key: "contact", header: "Last contact", hideOnMobile: true, cell: item => <span className="text-xs text-muted">{item.last_contact_at ? formatDate(item.last_contact_at) : "Never"}</span> },
+    {
+      key: "sms",
+      header: "SMS",
+      cell: item =>
+        item.phones.length && !item.do_not_contact ? (
+          <button
+            type="button"
+            aria-label={`Send SMS to ${item.name}`}
+            onClick={event => (event.stopPropagation(), setTexting(item))}
+            onKeyDown={event => event.stopPropagation()}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-xs font-semibold text-ink hover:border-brand-400 hover:text-brand-600"
+          >
+            <MessageSquareText className="size-3.5" aria-hidden /> SMS
+          </button>
+        ) : (
+          <span className="text-xs text-muted">—</span>
+        ),
+    },
   ];
 
   return (
@@ -223,6 +243,7 @@ function MarketingPipeline() {
       <p className="mt-6 flex items-center gap-2 text-xs text-muted">
         <MousePointerClick className="size-4" aria-hidden /> Sellers who sign up with their invite link, email or phone are linked to their Udozo account by themselves.
       </p>
+      {texting ? <SmsDialog prospect={texting} onClose={() => setTexting(null)} /> : null}
     </UdozoShell>
   );
 }

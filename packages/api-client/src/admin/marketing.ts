@@ -131,6 +131,28 @@ export type MarketingPatch = Partial<{
 
 export type MarketingEmailSent = 'outbox' | 'resend' | 'mailersend' | string;
 
+/** The SMS providers an admin texts sellers through, and Termii's routes (`generic` promotional, `dnd` transactional). */
+export const marketingSmsProviders = ['africas_talking', 'termii'] as const;
+export type MarketingSmsProvider = (typeof marketingSmsProviders)[number];
+export type MarketingSmsChannel = 'generic' | 'dnd';
+
+export type MarketingSmsSettings = {
+  object: 'marketing_sms_settings';
+  country: string | null;
+  /** The market's verification provider when it is set up, else the first that is. */
+  default_provider: MarketingSmsProvider;
+  market_provider: MarketingSmsProvider | null;
+  providers: Array<{ provider: MarketingSmsProvider; name: string; configured: boolean; sender_id: string | null; sandbox: boolean }>;
+  max_length: number;
+  /** Outside production a provider without keys holds the message instead of sending it. */
+  holds_without_keys: boolean;
+};
+
+export type MarketingSmsInput = { id: string; provider: MarketingSmsProvider; text: string; to?: string[]; sender_id?: string; channel?: MarketingSmsChannel; template?: string };
+export type MarketingSmsSent = MarketingProspectDetail & {
+  sms: { object: 'marketing_sms'; provider: MarketingSmsProvider; held: boolean; sent: Array<{ to: string; reference: string | null }>; failed: Array<{ to: string; reason: string }> };
+};
+
 const query = (filters: MarketingFilters) => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') params.set(key, String(value));
@@ -182,6 +204,12 @@ export const marketingApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/marketing/prospects/${id}/invite-email`, method: 'POST', body }),
       invalidatesTags: ['Marketing'],
     }),
+    marketingSmsSettings: build.query<MarketingSmsSettings, string>({ query: country => `/v1/admin/marketing/sms?country=${encodeURIComponent(country)}` }),
+    /** Texts the seller through Africa's Talking or Termii; logged on their timeline. */
+    sendMarketingSms: build.mutation<MarketingSmsSent, MarketingSmsInput>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/marketing/prospects/${id}/sms`, method: 'POST', body }),
+      invalidatesTags: ['Marketing'],
+    }),
     /** Invites anyone by email to sign up and sell on Udozo; they are added to Marketing to track. */
     inviteByEmail: build.mutation<MarketingProspectDetail & { email_sent: MarketingEmailSent }, { email: string; name?: string; message?: string; owner_id?: string; country?: string }>({
       query: body => ({ url: '/v1/admin/marketing/invites', method: 'POST', body }),
@@ -203,4 +231,6 @@ export const {
   useLinkMarketingAccountMutation,
   useEmailMarketingInviteMutation,
   useInviteByEmailMutation,
+  useMarketingSmsSettingsQuery,
+  useSendMarketingSmsMutation,
 } = marketingApi;

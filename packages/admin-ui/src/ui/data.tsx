@@ -253,9 +253,11 @@ export function Dialog({
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  size?: "default" | "full";
+  /** `sheet`: pulled up from the bottom edge on phones, centred from tablets up. */
+  size?: "default" | "full" | "sheet";
 }) {
   const full = size === "full";
+  const sheet = size === "sheet";
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -276,12 +278,15 @@ export function Dialog({
       className={
         full
           ? "m-auto h-[calc(100dvh-2rem)] max-h-none w-[calc(100vw-2rem)] max-w-none rounded-2xl border border-line bg-white p-0 text-ink shadow-xl"
-          : "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-0 text-ink shadow-xl"
+          : sheet
+            ? "mx-0 mb-0 mt-auto max-h-[92dvh] w-full max-w-none rounded-t-3xl border-t border-line bg-white p-0 text-ink shadow-xl sm:m-auto sm:max-h-[88vh] sm:w-[min(36rem,calc(100vw-2rem))] sm:rounded-2xl sm:border"
+            : "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-0 text-ink shadow-xl"
       }
     >
       {open ? (
-        <div className={full ? "flex h-full flex-col" : "flex max-h-[85vh] flex-col"}>
-          <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+        <div className={full ? "flex h-full flex-col" : sheet ? "flex max-h-[92dvh] flex-col sm:max-h-[88vh]" : "flex max-h-[85vh] flex-col"}>
+          {sheet ? <div className="mx-auto mt-2.5 h-1.5 w-11 shrink-0 rounded-full bg-line sm:hidden" aria-hidden /> : null}
+          <div className={`flex items-start justify-between gap-4 border-b border-line px-6 ${sheet ? "pb-4 pt-3 sm:pt-4" : "py-4"}`}>
             <div>
               <h2 id="dialog-title" className="text-lg font-bold">
                 {title}
@@ -292,8 +297,10 @@ export function Dialog({
               <X className="size-5" aria-hidden />
             </button>
           </div>
-          <div className={full ? "min-h-0 flex-1 overflow-y-auto px-6 py-5" : "overflow-y-auto px-6 py-5"}>{children}</div>
-          {footer ? <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{footer}</div> : null}
+          <div className={full || sheet ? "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5" : "overflow-y-auto px-6 py-5"}>{children}</div>
+          {footer ? (
+            <div className={sheet ? "flex gap-2 border-t border-line px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] *:flex-1 sm:justify-end sm:pb-4 sm:*:flex-none" : "flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4"}>{footer}</div>
+          ) : null}
         </div>
       ) : null}
     </dialog>

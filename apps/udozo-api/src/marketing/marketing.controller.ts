@@ -7,7 +7,8 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { adminId } from '../countries/countries.controller.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ProductOnly } from '../products/product.js';
-import { advocacies, channels, invitePattern, loggedKinds, MarketingService, type Outcome, outcomes, type Stage, stages, type StageStatus, stageStatuses } from './marketing.service.js';
+import { type SmsProvider, smsProviders, type TermiiChannel, termiiChannels } from '../notifications/sms.service.js';
+import { advocacies, channels, invitePattern, loggedKinds, MarketingService, type Outcome, outcomes, smsMaxLength, type Stage, stages, type StageStatus, stageStatuses } from './marketing.service.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toUpperCase() : value);
@@ -238,6 +239,34 @@ class InviteAnyoneDto {
   country?: string;
 }
 
+class SmsSettingsDto {
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
+}
+
+class SmsDto {
+  @IsIn(smsProviders)
+  provider: SmsProvider;
+
+  @IsString() @Length(1, smsMaxLength + 200)
+  text: string;
+
+  /** Among the seller's saved numbers, in E.164; the first when left out. */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(5) @IsString({ each: true }) @Matches(/^\+\d{8,15}$/, { each: true })
+  to?: string[];
+
+  /** A registered alphanumeric sender ID (up to 11 letters and digits) or a short code; else the provider's setting. */
+  @IsOptional() @Transform(trim) @Matches(/^(?:[A-Za-z0-9][A-Za-z0-9 ]{1,9}[A-Za-z0-9]|\+?\d{3,15})$/, { message: 'A sender ID is 3 to 11 letters and digits, or a short code.' })
+  sender_id?: string;
+
+  /** Termii only: `generic` (promotional) or `dnd` (transactional, also reaches do-not-disturb numbers). */
+  @IsOptional() @IsIn(termiiChannels)
+  channel?: TermiiChannel;
+
+  @IsOptional() @IsString() @MaxLength(60)
+  template?: string;
+}
+
 /** Marketplace > Marketing in Udozo's admin: every admin role works it (no `@AdminRoles`). */
 @ApiExcludeController()
 @RealmOnly('admin')
@@ -314,6 +343,19 @@ export class AdminMarketingController {
   @HttpCode(HttpStatus.OK)
   async inviteEmail(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: InviteEmailDto) {
     return this.marketing.emailInvite(await this.actor(caller), id, body);
+  }
+
+  /** The SMS providers to choose from for a market's sellers, and the one to start with. */
+  @Get('sms')
+  smsSettings(@Query() query: SmsSettingsDto) {
+    return this.marketing.smsSettings(query.country);
+  }
+
+  /** Texts the seller through Africa's Talking or Termii, logged on their timeline. */
+  @Post('prospects/:id/sms')
+  @HttpCode(HttpStatus.OK)
+  async sms(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SmsDto) {
+    return this.marketing.sendSms(await this.actor(caller), id, body);
   }
 
   /** Invites anyone by email to sign up and sell on Udozo (an ordinary account), added to Marketing to track. */

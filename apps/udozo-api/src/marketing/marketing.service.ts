@@ -8,6 +8,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { EmailService } from '../notifications/email.service.js';
+import { type SmsProvider, SmsService, type TermiiChannel } from '../notifications/sms.service.js';
 import { marketingInviteEmail } from '../notifications/templates.js';
 
 /**
@@ -35,6 +36,10 @@ export type Outcome = (typeof outcomes)[number];
 const postedStatuses = ['pending_review', 'active', 'sold', 'expired'];
 /** One invite email at a time: another only after this long. */
 const inviteEmailGapMs = 10 * 60 * 1000;
+/** One SMS to a seller a minute at most, so a double click never texts them twice. */
+const smsGapMs = 60 * 1000;
+/** Four 160-character parts, or ten in Unicode: longer messages cost more than they help. */
+export const smsMaxLength = 640;
 const maxAdverts = 50;
 export const invitePattern = /^[a-z0-9]{6,20}$/;
 
@@ -117,6 +122,7 @@ export class MarketingService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly integrations: IntegrationsService,
+    private readonly sms: SmsService,
   ) {}
 
   /** The invite link: udozo.com/i/<code>, which records the click and opens sign-up with the code. */
@@ -731,6 +737,87 @@ export class MarketingService {
       row = await this.insert(actor.id, { name: clean(input.name, 120) ?? email.split('@')[0]!, email, country, source: 'Email invite', ownerId: input.owner_id ?? actor.id }, 'Added to invite by email.');
     }
     return this.emailInvite(actor, row.id, { message: input.message });
+  }
+
+  // -- SMS -------------------------------------------------------------------------------------------------------------
+
+  /** What the SMS dialog offers for a market: each provider with its sender ID, and the one to start with. */
+  async smsSettings(code: string | null | undefined) {
+    const country = await this.prisma.country.findUnique({ where: { code: (code ?? 'NG').toUpperCase() }, select: { code: true, smsProvider: true } });
+    const providers = this.sms.providers();
+    const own = providers.find(item => item.provider === country?.smsProvider);
+    const chosen = own?.configured ? own : (providers.find(item => item.configured) ?? own ?? providers[0]!);
+    return {
+      object: 'marketing_sms_settings' as const,
+      country: country?.code ?? null,
+      default_provider: chosen.provider,
+      market_provider: (country?.smsProvider as SmsProvider | null) ?? null,
+      providers,
+      max_length: smsMaxLength,
+      // Outside production a provider without keys holds the message instead of sending it.
+      holds_without_keys: process.env.NODE_ENV !== 'production',
+    };
+  }
+
+  /**
+   * Texts the seller through the provider the admin chose (Africa's Talking or Termii), to the numbers chosen among
+   * theirs (the first by default), from the sender ID given or the provider's own. Logged on their timeline as an SMS:
+   * an invitation when it carries their invite link (invited, waiting on them), a follow-up in the follow-up stage, else
+   * a message. Never to someone who asked not to be contacted; one a minute at most.
+   */
+  async sendSms(actor: { id: string | null; name: string }, id: string, input: { provider: SmsProvider; text: string; to?: string[]; sender_id?: string; channel?: TermiiChannel; template?: string }) {
+    const row = await this.load(id);
+    if (row.doNotContact) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'do_not_contact', 'They asked not to be contacted again.', 'id');
+    if (!row.phones.length) throw invalid('parameter_missing', 'Add their mobile number first.', 'to');
+    const text = input.text.replace(/\r\n/g, '\n').trim();
+    if (!text) throw invalid('parameter_missing', 'Write the message.', 'text');
+    if (text.length > smsMaxLength) throw invalid('parameter_invalid', `Keep the message to ${smsMaxLength} characters.`, 'text');
+    const to = [...new Set(input.to?.length ? input.to : [row.phones[0]!])];
+    if (to.some(phone => !row.phones.includes(phone))) throw invalid('parameter_invalid', 'Choose among their saved numbers.', 'to');
+    const recent = await this.prisma.marketingActivity.findFirst({ where: { prospectId: id, channel: 'sms', createdAt: { gt: new Date(Date.now() - smsGapMs) } }, select: { id: true } });
+    if (recent) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'sms_recently_sent', 'An SMS went to them less than a minute ago.', 'id');
+
+    const sent: Array<{ to: string; reference: string | null }> = [];
+    const failed: Array<{ to: string; reason: string }> = [];
+    let held = false;
+    for (const phone of to) {
+      try {
+        const result = await this.sms.sendWith(input.provider, { to: phone, text }, { from: input.sender_id ?? null, channel: input.channel });
+        held ||= result.held;
+        sent.push({ to: phone, reference: result.reference });
+      } catch (error) {
+        if (error instanceof ApiError) throw error;
+        this.logger.warn({ err: error, provider: input.provider }, 'Marketing SMS refused');
+        failed.push({ to: phone, reason: clean(error instanceof Error ? error.message : String(error), 240) ?? 'The provider refused it.' });
+      }
+    }
+    const providerName = this.sms.providers().find(item => item.provider === input.provider)!.name;
+    if (!sent.length) {
+      await this.audit.record({ actorId: actor.id, action: 'marketing.sms_failed', targetType: 'marketing_prospect', targetId: id, after: { provider: input.provider, numbers: to.length } });
+      throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_failed', `${providerName} did not send it: ${failed[0]!.reason}`, 'provider');
+    }
+
+    const invite = text.includes(row.inviteCode);
+    const kind = invite ? 'invite' : row.stage === 'follow_up' ? 'follow_up' : 'message';
+    const now = new Date();
+    const moveToInvitation = invite && (row.stage === 'reach_out' || row.stage === 'invitation');
+    const waiting = moveToInvitation || row.stageStatus === 'not_started' || row.stageStatus === 'in_progress';
+    const footer = [`Texted to ${sent.map(item => item.to).join(', ')} through ${providerName}${input.sender_id ? ` as ${input.sender_id}` : ''}${held ? ' (held: no SMS provider is set up)' : ''}.`, failed.length ? `Not sent to ${failed.map(item => item.to).join(', ')}: ${failed[0]!.reason}` : null].filter(Boolean).join(' ');
+    await this.prisma.$transaction(async tx => {
+      await tx.marketingProspect.update({
+        where: { id },
+        data: {
+          lastContactAt: now,
+          ...(invite ? { invitedAt: row.invitedAt ?? now } : {}),
+          ...(kind === 'follow_up' ? { followUps: row.followUps + 1 } : {}),
+          ...(moveToInvitation ? { stage: 'invitation' } : {}),
+          ...(waiting ? { stageStatus: 'waiting' } : {}),
+        },
+      });
+      await this.note(id, actor.id, { kind, channel: 'sms', template: clean(input.template, 60), body: `${text}\n\n${footer}`, ...(waiting ? { stage: moveToInvitation ? 'invitation' : row.stage, status: 'waiting' } : {}) }, tx);
+    });
+    await this.audit.record({ actorId: actor.id, action: 'marketing.sms_sent', targetType: 'marketing_prospect', targetId: id, after: { provider: input.provider, sent: sent.length, failed: failed.length, held, sender_id: input.sender_id ?? null } });
+    return { ...(await this.get(id)), sms: { object: 'marketing_sms' as const, provider: input.provider, held, sent, failed } };
   }
 
   /**

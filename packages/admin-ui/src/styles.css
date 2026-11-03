@@ -29,4 +29,24 @@
   dialog::backdrop {
     background: rgb(4 9 53 / 0.45);
   }
+  /* A sheet (`Dialog size="sheet"`) rises from the bottom edge on phones. */
+  @media (width < 40rem) and (prefers-reduced-motion: no-preference) {
+    dialog[data-size="sheet"][open] {
+      animation: admin-sheet-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    dialog[data-size="sheet"][open]::backdrop {
+      animation: admin-backdrop-in 260ms ease-out;
+    }
+  }
+}
+
+@keyframes admin-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes admin-backdrop-in {
+  from {
+    opacity: 0;
+  }
 }

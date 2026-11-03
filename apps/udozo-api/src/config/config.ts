@@ -389,6 +389,7 @@ export const productDefaults: Record<'udozo', Record<string, string>> = {
     // Emails and pushes in Udozo's name, payment pages back to Udozo's Seller HQ, Google back to Udozo's API, and its
     // files under its own folders, never BitoCard's (a shared bucket keeps the two apart).
     EMAIL_FROM: 'Udozo <no-reply@udozo.com>',
+    TERMII_SENDER_ID: 'Udozo',
     WEB_PUSH_SUBJECT: 'mailto:support@udozo.com',
     GOOGLE_REDIRECT_URI: 'https://api.udozo.com/v1/auth/google/callback',
     PAYMENT_RETURN_URL: 'https://shq.udozo.com/wallet',

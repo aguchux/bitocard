@@ -165,6 +165,19 @@ describe('working a seller', () => {
   });
 });
 
+describe('texting without a provider set up', () => {
+  test('outside production the SMS is held, and the timeline says so', async () => {
+    const settings = await support.get('/v1/admin/marketing/sms?country=NG');
+    assert.equal(settings.json.holds_without_keys, true);
+    assert.ok(settings.json.providers.every(item => !item.configured));
+    const made = await support.post('/v1/admin/marketing/prospects', { name: 'Held Seller', phones: [testMobile('NG')] });
+    const sent = await support.post(`/v1/admin/marketing/prospects/${made.json.id}/sms`, { provider: 'africas_talking', text: 'Hello from Udozo' });
+    assert.equal(sent.status, 200, JSON.stringify(sent.json));
+    assert.equal(sent.json.sms.held, true);
+    assert.match(sent.json.activities.find(item => item.channel === 'sms').body, /held: no SMS provider is set up/);
+  });
+});
+
 describe('invites and tracking', () => {
   test('anyone invited by email gets a Udozo invitation; opening the link and signing up with it are tracked to onboarding', async () => {
     const to = unique();
