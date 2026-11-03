@@ -56,7 +56,7 @@ export default async function ProfilePage() {
         )}
         <p className="text-xs text-navy-500">You buy and sell in its market; your wallet and payouts are in its currency. It cannot be changed.</p>
       </section>
-      <section aria-label="Phone number" className={card}>
+      <section id="phone" aria-label="Phone number" className={card}>
         <PhoneForm phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} />
       </section>
       <section aria-labelledby="check" className={card}>

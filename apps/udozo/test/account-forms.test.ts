@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SignInForm, SignUpForm } from "@/components/account/sign-in-up";
 import { NameForm, VerificationForm } from "@/components/account-forms";
+import { MobileConfirmForm } from "@/components/account/mobile-confirm";
 
 const markets = [
   { code: "NG", name: "Nigeria", currency: "NGN" },
@@ -51,5 +52,16 @@ describe("signing up", () => {
   it("an email from sign-in's “Create an account with it” is filled in", () => {
     const html = renderToStaticMarkup(createElement(SignUpForm, { next: "/gh", markets, market: "GH", email: "new@example.com" }));
     expect(html).toMatch(/<input[^>]*type="email"[^>]*value="new@example.com"/);
+  });
+});
+
+describe("confirming the mobile", () => {
+  it("offers to skip the code and confirm it later, carrying on to the page asked for", () => {
+    for (const phone of ["+2348031234567", null]) {
+      const html = renderToStaticMarkup(createElement(MobileConfirmForm, { next: "/sell", phone, country: "NG" }));
+      expect(html).toContain("Skip and confirm later");
+      expect(html).toContain("comes another way");
+      expect(html).toMatch(/<input[^>]*name="next"[^>]*value="\/sell"/);
+    }
   });
 });

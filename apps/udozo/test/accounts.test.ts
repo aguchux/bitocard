@@ -132,6 +132,31 @@ describe("signing in and out", () => {
     expect(calls[1]!.body).toEqual({ code: "222222" });
   });
 
+  test("the mobile can be confirmed later: at sign-up, or on the confirm step, and nothing then waits for it", async () => {
+    setRequest({ host: "udozo.com" }, { udz_customer: "bcc_s" });
+    const deferred = { ...customer, phone_verified: false, phone_deferred: true };
+    reply = () => Response.json({ ...session, customer: deferred }, { status: 201 });
+    await expect(
+      actions.finishSignUp({ firstName: "Ada", lastName: "Obi", email: "ada@example.com", country: "NG", phone: "+2348031234567", phoneLater: true, password: "a long password", token: "tok_0123456789abcdefghij", next: "/sell" }),
+    ).rejects.toThrow("redirect:/sell");
+    expect(calls.at(-1)!.body).toMatchObject({ phone: "+2348031234567", phone_later: true });
+
+    reply = () => Response.json(deferred);
+    await expect(actions.confirmMobileLater({}, form({ next: "/account" }))).rejects.toThrow("redirect:/account");
+    expect(calls.at(-1)!.url).toBe("https://api.test/v1/store/account/phone/later");
+    // An unconfirmed email still waits.
+    reply = () => Response.json({ ...deferred, email_verified: false });
+    await expect(actions.confirmMobileLater({}, form({ next: "/account" }))).rejects.toThrow("redirect:/verify?next=%2Faccount");
+    reply = () => Response.json({ error: { code: "unauthenticated", message: "Sign in to continue." } }, { status: 401 });
+    expect(await actions.confirmMobileLater({}, form({ next: "/account" }))).toMatchObject({ error: "Sign in to continue." });
+
+    const { confirmationPending, mobileToConfirm } = await import("@/lib/customer");
+    expect(confirmationPending(deferred)).toBe(false);
+    expect(confirmationPending({ ...deferred, phone_deferred: false })).toBe(true);
+    expect(mobileToConfirm(deferred)).toBe(true);
+    expect(mobileToConfirm({ ...deferred, phone_verified: true })).toBe(false);
+  });
+
   test("signing out ends the session at the API and drops the cookie", async () => {
     setRequest({ host: "udozo.com" }, { udz_customer: "bcc_old" });
     reply = () => Response.json({ object: "ok" });

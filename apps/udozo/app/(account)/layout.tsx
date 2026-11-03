@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/footer";
 import { SiteHeader } from "@/components/header";
 import { accountCounts, marketOf } from "@/lib/account";
 import { markets } from "@/lib/api";
-import { confirmationPending, currentCustomer } from "@/lib/customer";
+import { confirmationPending, currentCustomer, mobileToConfirm } from "@/lib/customer";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -30,6 +30,14 @@ export default async function AccountLayout({ children }: { children: React.Reac
               Please check your first and last name, as on your ID.{" "}
               <Link href="/account/profile#you" className="font-semibold underline">
                 Check my name
+              </Link>
+            </p>
+          ) : null}
+          {customer && !confirmationPending(customer) && mobileToConfirm(customer) ? (
+            <p className="mb-4 rounded-xl bg-navy-50 p-3 text-sm text-navy-800">
+              Your mobile number is not confirmed yet. Calls, call backs and some purchases need it.{" "}
+              <Link href="/account/profile#phone" className="font-semibold underline">
+                Confirm my mobile
               </Link>
             </p>
           ) : null}

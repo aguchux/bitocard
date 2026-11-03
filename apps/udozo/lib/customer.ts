@@ -38,6 +38,8 @@ export type Customer = {
   phone: string | null;
   phone_verified: boolean;
   phone_verification_available: boolean;
+  /** The customer chose to confirm their mobile later: nothing waits for it. Missing on older API versions. */
+  phone_deferred?: boolean;
   country: string | null;
   currency: string | null;
   created_at: string;
@@ -46,10 +48,14 @@ export type Customer = {
 /**
  * Still to do before using the account: the emailed code; for a Google sign-up, its name and country; then the mobile
  * number's texted code (where the country can text: Udozo's API refuses everything else until then, `profile_incomplete`
- * or `phone_not_verified`).
+ * or `phone_not_verified`), unless the customer chose to confirm it later.
  */
-export const confirmationPending = (customer: Pick<Customer, "email_verified" | "phone_verified" | "phone_verification_available" | "country">) =>
-  !customer.email_verified || !customer.country || (customer.phone_verification_available && !customer.phone_verified);
+export const confirmationPending = (customer: Pick<Customer, "email_verified" | "phone_verified" | "phone_verification_available" | "country"> & { phone_deferred?: boolean }) =>
+  !customer.email_verified || !customer.country || (customer.phone_verification_available && !customer.phone_verified && !customer.phone_deferred);
+
+/** A mobile the customer chose to confirm later: the account's pages remind them. */
+export const mobileToConfirm = (customer: Pick<Customer, "phone_verified" | "phone_verification_available"> & { phone_deferred?: boolean }) =>
+  customer.phone_verification_available && !customer.phone_verified && Boolean(customer.phone_deferred);
 
 export type CustomerResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
 

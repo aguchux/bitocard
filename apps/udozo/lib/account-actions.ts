@@ -55,15 +55,17 @@ export async function confirmSignupMobile(input: { email: string; token: string;
 
 /**
  * The last step: the account, made with the email (and the mobile, when its code was confirmed) already confirmed, then
- * signed in and on to `next`, or to the confirmation page for whatever is still to confirm.
+ * signed in and on to `next`, or to the confirmation page for whatever is still to confirm. `phoneLater`: the customer
+ * chose to confirm the mobile later (its code did not come, or they skipped it), so nothing waits for it.
  */
-export async function finishSignUp(input: { firstName: string; lastName: string; email: string; country: string; phone: string; password: string; token: string; next: string; ref?: string | null }): Promise<StepResult> {
+export async function finishSignUp(input: { firstName: string; lastName: string; email: string; country: string; phone: string; phoneLater?: boolean; password: string; token: string; next: string; ref?: string | null }): Promise<StepResult> {
   const result = await customerApi<SessionReply>("POST", "/v1/store/account/signup", {
     first_name: input.firstName.trim(),
     last_name: input.lastName.trim(),
     email: input.email.trim(),
     country: input.country,
     phone: input.phone,
+    ...(input.phoneLater ? { phone_later: true } : {}),
     password: input.password,
     signup_token: input.token,
     // The referral or invite code the sign-up link carried, kept on the account.
@@ -106,6 +108,15 @@ export async function confirmMobile(_state: FormState, form: FormData): Promise<
   if (!result.ok) return failed(result);
   revalidatePath("/", "layout");
   redirect(safeNext(form.get("next")));
+}
+
+/** Confirm the mobile later (the code did not come, or not now): the account is usable, and the profile confirms it any time. */
+export async function confirmMobileLater(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<Customer>("POST", "/v1/store/account/phone/later", {});
+  if (!result.ok) return failed(result);
+  revalidatePath("/", "layout");
+  const next = safeNext(form.get("next"));
+  redirect(confirmationPending(result.data) ? `/verify?next=${encodeURIComponent(next)}` : next);
 }
 
 /** Texts a new code: to the number on the account, or to another one typed in its place. */
