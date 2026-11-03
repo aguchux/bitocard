@@ -37254,7 +37254,7 @@
           },
           "body": {
             "type": "string",
-            "description": "The message: no links, account or card numbers, or requests to pay outside BitoCard.",
+            "description": "The message: no links, account or card numbers, or requests to pay outside Udozo.",
             "maxLength": 2000
           }
         },
@@ -49960,6 +49960,7 @@
               "domain.renewal_failed",
               "domain.expired",
               "domain.suspended",
+              "store.sandbox_without_domain",
               "account.suspended",
               "account.reinstated",
               "connection.approved",
@@ -50170,6 +50171,7 @@
               "domain.renewal_failed",
               "domain.expired",
               "domain.suspended",
+              "store.sandbox_without_domain",
               "account.suspended",
               "account.reinstated",
               "connection.approved",
