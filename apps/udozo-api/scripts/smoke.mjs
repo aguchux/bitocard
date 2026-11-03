@@ -61,8 +61,10 @@ test('the pilot countries and plans are published', async () => {
   const countries = await (await get('/v1/countries')).json();
   assert.ok(countries.data.some(country => country.code === 'NG'));
   const plans = await (await get('/v1/plans')).json();
-  // Admins add and show plans (Enterprise, others); the free plan and Premium are always there.
   const codes = plans.data.map(plan => plan.code);
+  // Udozo launches free: while its `paid_plans` switch is off there is no plan to choose.
+  if (product === 'udozo' && !codes.length) return;
+  // Admins add and show plans (Enterprise, others); the free plan and Premium are always there.
   assert.equal(codes[0], 'standard');
   assert.ok(codes.includes('premium'), `plans: ${codes.join(', ')}`);
 });
