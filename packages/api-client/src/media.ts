@@ -21,6 +21,8 @@ export type MediaPurpose =
   | 'storefront_image'
   /** Udozo's admins: the home pages' banners, slides and category tile photos. */
   | 'home_image'
+  /** Udozo's admins: udozo.com's banner ads. */
+  | 'banner_image'
   | 'classified_brand_logo'
   | 'store_logo'
   | 'store_image'
