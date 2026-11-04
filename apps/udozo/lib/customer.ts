@@ -42,6 +42,10 @@ export type Customer = {
   phone_deferred?: boolean;
   country: string | null;
   currency: string | null;
+  /** Where they live (an area of their country, apart from where their listings are), their date of birth and sex. Missing on older API versions. */
+  area_id?: string | null;
+  birth_date?: string | null;
+  sex?: "female" | "male" | "unspecified" | null;
   created_at: string;
 };
 

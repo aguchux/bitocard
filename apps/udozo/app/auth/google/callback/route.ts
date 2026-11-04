@@ -10,8 +10,9 @@ const sameState = (a: string, b: string) => a.length === b.length && timingSafeE
 
 /**
  * Where Google returns the browser (`<udozo.com>/auth/google/callback`, one of the Google client's redirect addresses):
- * finished only with the state this same browser was given, then the customer is signed in (signed up first when asked).
- * A new account, or one still to finish, goes on to onboarding (`/verify`: its name and country, then its mobile).
+ * finished only with the state this same browser was given, then the customer is signed in (signed up first when no
+ * account uses that Google account, whether they chose sign-in or sign-up).
+ * A new account, or one still to finish, goes on to onboarding (`/verify`: its name, country and mobile, in one step).
  * Anything else goes back to the page it started from, with a code the page turns into words.
  */
 export async function GET(request: Request) {

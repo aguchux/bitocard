@@ -18,12 +18,10 @@ import {
 } from "@/components/account-forms";
 import {
   confirmSignupEmail,
-  confirmSignupMobile,
   finishSignUp,
   type FormState,
   lookupEmail,
   sendSignupEmailCode,
-  sendSignupMobileCode,
   signIn,
   type StepResult,
 } from "@/lib/account-actions";
@@ -233,23 +231,20 @@ export function SignInForm({
   );
 }
 
-type SignUpStep =
-  "email" | "code" | "details" | "mobile" | "mobileCode" | "password";
+type SignUpStep = "email" | "code" | "details" | "mobile" | "password";
 const stepNumber: Record<SignUpStep, [number, string]> = {
   email: [1, "Your email"],
   code: [1, "Confirm your email"],
   details: [2, "About you"],
   mobile: [3, "Your mobile"],
-  mobileCode: [3, "Confirm your mobile"],
   password: [4, "Your password"],
 };
 
 /**
  * Sign-up on udozo.com, one step at a time: (1) the email, which must be free, and the code emailed to it; (2) the name
- * and the country (from Udozo's markets, fixed for good); (3) the mobile number, locked to that country, and the code
- * texted to it; (4) the password, and the account is made with both confirmed. Only the email must be confirmed: the
- * mobile's code can be skipped (it did not come, or not now) and the number is kept, confirmed later from the profile.
- * Where the country cannot text yet, the number is kept unconfirmed and step 3 asks for no code.
+ * and the country (from Udozo's markets, fixed for good); (3) the mobile number, locked to that country, kept as typed:
+ * no code is texted while signing up, so nothing holds sign-up back, and it is confirmed later from the profile
+ * (`phone_later`); (4) the password, and the account is made with the email confirmed. Only the email must be confirmed.
  */
 export function SignUpForm({
   next,
@@ -274,9 +269,7 @@ export function SignUpForm({
     market && markets.some((item) => item.code === market) ? market : null,
   );
   const [phone, setPhone] = useState<string | null>(null);
-  const [mobileCode, setMobileCode] = useState("");
-  // The number for this sign-up: confirmed with its code, or kept unconfirmed (the country cannot text, or the customer
-  // chose to confirm it later).
+  // The number for this sign-up, kept unconfirmed: it is confirmed after sign-up, from the profile.
   const [mobile, setMobile] = useState<{
     phone: string;
     confirmed: boolean;
@@ -320,47 +313,6 @@ export function SignUpForm({
         go("code", event ? null : "We sent you a new code.");
       },
     );
-  };
-
-  const sendMobileCode = (event?: FormEvent) => {
-    event?.preventDefault();
-    if (!token || !country || !phone) return;
-    // Already confirmed this number: carry on.
-    if (mobile?.phone === phone) return go("password");
-    start(async () => {
-      const answer = await sendSignupMobileCode({
-        email: cleanEmail,
-        token,
-        country,
-        phone,
-      });
-      if (!answer.ok && answer.code === "phone_verification_unavailable") {
-        setMobile({ phone, confirmed: false });
-        return go(
-          "password",
-          "We cannot text numbers in your country yet, so your number is kept unconfirmed for now.",
-        );
-      }
-      if (!answer.ok && answer.code === "signup_token_invalid") {
-        setToken(null);
-        return go(
-          "email",
-          "Your email confirmation expired. Continue to get a new code.",
-        );
-      }
-      setResult(answer);
-      if (answer.ok) {
-        setMobileCode("");
-        go("mobileCode", event ? null : "We sent you a new code.");
-      }
-    });
-  };
-
-  /** Carries on without the texted code: the number is kept, confirmed later from the account. */
-  const confirmLater = (message: string) => {
-    if (!phone) return;
-    setMobile({ phone, confirmed: false });
-    go("password", message);
   };
 
   const [number, title] = stepNumber[step];
@@ -505,7 +457,15 @@ export function SignUpForm({
       ) : null}
 
       {step === "mobile" && country ? (
-        <form onSubmit={sendMobileCode} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!phone) return;
+            setMobile({ phone, confirmed: false });
+            go("password");
+          }}
+          className="space-y-4"
+        >
           <PhoneInput
             key={country}
             country={country}
@@ -519,101 +479,13 @@ export function SignUpForm({
             errorClassName="text-brand-700"
           />
           <p className="text-xs text-navy-500">
-            We text it a 6-digit code to confirm it. You can also confirm it
-            later.
+            Buyers and sellers reach you on it. You confirm it with a texted
+            code after signing up, from your profile, whenever suits you.
           </p>
-          <Submit pending={pending} className="w-full">
-            {mobile?.phone === phone && phone ? "Continue" : "Text me a code"}
+          <Submit pending={false} className="w-full">
+            Continue
           </Submit>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Back onClick={() => go("details")} />
-            {!(mobile?.phone === phone && phone) ? (
-              <button
-                type="button"
-                onClick={() =>
-                  confirmLater(
-                    "Your number is kept. Confirm it any time from your profile.",
-                  )
-                }
-                disabled={pending || !phone}
-                className="min-h-11 text-sm font-semibold text-navy-500 hover:underline disabled:opacity-60"
-              >
-                Confirm it later
-              </button>
-            ) : null}
-          </div>
-        </form>
-      ) : null}
-
-      {step === "mobileCode" ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!token) return;
-            run(
-              () =>
-                confirmSignupMobile({
-                  email: cleanEmail,
-                  token,
-                  code: mobileCode,
-                }),
-              (answer) => {
-                setMobile({
-                  phone: answer.phone ?? phone ?? "",
-                  confirmed: true,
-                });
-                go("password");
-              },
-            );
-          }}
-          className="space-y-4"
-        >
-          <TextField
-            label="6-digit code"
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="\d{6}"
-            maxLength={6}
-            required
-            autoFocus
-            value={mobileCode}
-            onChange={(event) => setMobileCode(event.target.value)}
-            state={error}
-            hint={`We texted it to ${phone}. It expires in 30 minutes.`}
-          />
-          <Submit pending={pending} className="w-full">
-            Confirm mobile
-          </Submit>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Back onClick={() => go("mobile")}>Change number</Back>
-            <button
-              type="button"
-              onClick={() => sendMobileCode()}
-              disabled={pending}
-              className="min-h-11 text-sm font-semibold text-brand-700 hover:underline disabled:opacity-60"
-            >
-              Send me a new code
-            </button>
-          </div>
-          <div className="rounded-xl bg-navy-50 p-3.5 text-sm text-navy-700">
-            <p>
-              No code yet? A new one comes another way. Or carry on and confirm
-              your number later from your profile.
-            </p>
-            <button
-              type="button"
-              onClick={() =>
-                confirmLater(
-                  "Your number is kept. Confirm it any time from your profile.",
-                )
-              }
-              disabled={pending}
-              className="mt-1 min-h-11 font-semibold text-navy-900 hover:underline disabled:opacity-60"
-            >
-              Skip and confirm later
-            </button>
-          </div>
+          <Back onClick={() => go("details")} />
         </form>
       ) : null}
 

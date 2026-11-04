@@ -8,9 +8,9 @@ import { confirmationPending, currentCustomer, safeNext, signInPath } from "@/li
 export const metadata: Metadata = { title: "Confirm your account", robots: { index: false, follow: false } };
 
 /**
- * Accounts confirm their email, then their mobile number (texted a code at sign-up, where the country can text), here
- * before chatting, buying or selling. A Google sign-up (its email confirmed by Google) onboards here: its first and last
- * name and its country first, then its mobile.
+ * Accounts confirm their email here before chatting, buying or selling (and an older account its mobile, unless it puts
+ * that off). A Google sign-up (its email confirmed by Google) onboards here in one step: its first and last name, its
+ * country and its mobile, kept to confirm later from the profile.
  */
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const next = safeNext((await searchParams).next);
@@ -22,9 +22,9 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
     const list = await countries();
     return (
       <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
-        <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">Step 1 of 2 · About you</p>
+        <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">Finish setting up</p>
         <h1 className="text-2xl font-extrabold">Welcome to Udozo, {customer.first_name}</h1>
-        <p className="text-sm text-navy-600">Check your name and choose your country: you buy and sell in its market, and your wallet is in its currency. It cannot be changed later.</p>
+        <p className="text-sm text-navy-600">Check your name, choose your country and add your mobile number. You buy and sell in your country&apos;s market, and your wallet is in its currency: it cannot be changed later.</p>
         <section className="rounded-3xl border border-navy-200 bg-white p-5">
           {list.length ? <ProfileStartForm next={next} firstName={customer.first_name} lastName={customer.last_name} markets={list} /> : <p className="text-sm text-navy-600">Your country could not be loaded just now. Try again shortly.</p>}
         </section>
@@ -33,7 +33,6 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   }
   return (
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
-      <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">Step {email ? 1 : 2} of 2</p>
       <h1 className="text-2xl font-extrabold">{email ? "Confirm your email" : "Confirm your mobile number"}</h1>
       <p className="text-sm text-navy-600">
         {email

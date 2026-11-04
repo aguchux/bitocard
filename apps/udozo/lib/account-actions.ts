@@ -160,14 +160,32 @@ export async function updateName(_state: FormState, form: FormData): Promise<For
 }
 
 /**
- * Onboarding a Google sign-up (`/verify`): its first and last name, as on its ID, and its country, fixed for good. The
- * mobile number comes next.
+ * Onboarding a Google sign-up (`/verify`), in one step: its first and last name, as on its ID, its country, fixed for
+ * good, and its mobile number, kept as typed to confirm later (nothing is texted now).
  */
 export async function finishProfile(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { first_name: text(form, "first_name"), last_name: text(form, "last_name"), country: text(form, "country") });
   if (!result.ok) return failed(result);
+  const phone = text(form, "phone");
+  if (!phone) return { error: "Add your mobile number.", field: "phone" };
+  // Sending it again is safe: the country is set once, then the number is replaced while it is unconfirmed.
+  const kept = await customerApi<Customer>("POST", "/v1/store/account/phone/later", { phone });
+  if (!kept.ok) return failed(kept);
   revalidatePath("/", "layout");
   redirect(`/verify?next=${encodeURIComponent(safeNext(form.get("next")))}`);
+}
+
+/** Where the customer lives, their date of birth and their sex (the profile's About you): empty ones are cleared. */
+export async function updateAbout(_state: FormState, form: FormData): Promise<FormState> {
+  const sex = text(form, "sex");
+  const result = await customerApi<Customer>("POST", "/v1/store/account/profile", {
+    area_id: text(form, "area_id") || null,
+    birth_date: text(form, "birth_date") || null,
+    sex: sex === "female" || sex === "male" || sex === "unspecified" ? sex : null,
+  });
+  if (!result.ok) return failed(result);
+  revalidatePath("/account/profile");
+  return { notice: "Saved." };
 }
 
 /** Sets the country of an account from before it was asked (once: it never changes after). */

@@ -192,6 +192,30 @@ describe("the account's profile", () => {
   });
 });
 
+describe("onboarding a Google sign-up and About you", () => {
+  test("onboarding saves the name and country, then keeps the mobile to confirm later, in one step", async () => {
+    setRequest({ host: "udozo.com" }, { udz_customer: "bcc_s" });
+    reply = () => Response.json({ ...customer, phone_verified: false, phone_deferred: true });
+    await expect(actions.finishProfile({}, form({ first_name: "Ada", last_name: "Obi", country: "NG", phone: "+2348031234567", next: "/sell" }))).rejects.toThrow("redirect:/verify?next=%2Fsell");
+    expect(calls.map(call => `${call.method} ${call.url.replace("https://api.test", "")}`)).toEqual(["POST /v1/store/account/profile", "POST /v1/store/account/phone/later"]);
+    expect(calls[0]!.body).toEqual({ first_name: "Ada", last_name: "Obi", country: "NG" });
+    expect(calls[1]!.body).toEqual({ phone: "+2348031234567" });
+
+    calls = [];
+    reply = url => (url.endsWith("/phone/later") ? Response.json({ error: { code: "phone_in_use", message: "Another account already uses this number.", param: "phone" } }, { status: 409 }) : Response.json(customer));
+    expect(await actions.finishProfile({}, form({ first_name: "Ada", last_name: "Obi", country: "NG", phone: "+2348031234567", next: "/sell" }))).toEqual({ error: "Another account already uses this number.", field: "phone" });
+  });
+
+  test("About you saves where they live, the date of birth and sex; empty ones are cleared", async () => {
+    reply = () => Response.json(customer);
+    expect(await actions.updateAbout({}, form({ area_id: "33333333-3333-4333-8333-333333333333", birth_date: "1994-03-21", sex: "unspecified" }))).toEqual({ notice: "Saved." });
+    expect(calls[0]!.body).toEqual({ area_id: "33333333-3333-4333-8333-333333333333", birth_date: "1994-03-21", sex: "unspecified" });
+    expect(await actions.updateAbout({}, form({ area_id: "33333333-3333-4333-8333-333333333333", birth_date: "", sex: "other" }))).toEqual({ notice: "Saved." });
+    expect(calls[1]!.body).toEqual({ area_id: "33333333-3333-4333-8333-333333333333", birth_date: null, sex: null });
+    expect(revalidatePath).toHaveBeenCalledWith("/account/profile");
+  });
+});
+
 describe("every account page", () => {
   test("signed out: to sign in and back; an unconfirmed email: to its code", async () => {
     await expect(requireCustomer("/account/wallet")).rejects.toThrow("redirect:/signin?next=%2Faccount%2Fwallet");

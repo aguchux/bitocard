@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useId, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle2, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { PhoneInput } from "@bitocard/ui/phone-input";
 import {
   changePassword,
   finishProfile,
@@ -215,9 +216,13 @@ export function NameForm({ firstName, lastName, confirm = false }: { firstName: 
   );
 }
 
-/** Onboarding a Google sign-up: its first and last name (Google's, to check) and its country. */
+/**
+ * Onboarding a Google sign-up, in one step: its first and last name (Google's, to check), its country (fixed) and its
+ * mobile number (a mobile of that country, kept as typed: it is confirmed later, from the profile).
+ */
 export function ProfileStartForm({ next, firstName, lastName, markets }: { next: string; firstName: string; lastName: string | null; markets: Market[] }) {
   const [state, action, pending] = useActionState(finishProfile, empty);
+  const [country, setCountry] = useState<string | null>(null);
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
@@ -227,9 +232,26 @@ export function ProfileStartForm({ next, firstName, lastName, markets }: { next:
         <TextField label="Last name" name="last_name" defaultValue={lastName ?? ""} required maxLength={60} autoComplete="family-name" state={state} />
       </div>
       <p className="text-xs text-navy-500">As they are on your ID: your identity check is matched against them.</p>
-      <CountryField markets={markets} state={state} />
+      <CountryField markets={markets} state={state} onChange={setCountry} />
+      {country ? (
+        <div className="space-y-1.5">
+          <PhoneInput
+            key={country}
+            country={country}
+            name="phone"
+            label="Mobile number"
+            required
+            className="space-y-1.5"
+            inputClassName={inputClass}
+            errorClassName="text-brand-700"
+          />
+          <p className="text-xs text-navy-500">Buyers and sellers reach you on it. You confirm it with a texted code later, from your profile, whenever suits you.</p>
+        </div>
+      ) : (
+        <p className="text-xs text-navy-500">Choose your country, then add your mobile number.</p>
+      )}
       <Submit pending={pending} className="w-full">
-        Continue
+        Finish setting up
       </Submit>
     </form>
   );
