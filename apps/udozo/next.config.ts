@@ -1,6 +1,12 @@
 import { createNextConfig } from "@bitocard/next-config";
 import { previewParents } from "./lib/preview";
 
+/**
+ * The site udozo.com served before (Udozo Memorial) gave /logo.png as its icon, which search engines still hold: it
+ * goes for good to Udozo's logo, so they fetch the new one.
+ */
+export const oldLogo = { source: "/logo.png", destination: "/udozo-logo.png", permanent: true };
+
 /** Categories that joined another: their old addresses go for good to where their listings are now. */
 export const movedCategories = [{ from: "computers", to: "electronics" }];
 
@@ -24,12 +30,15 @@ export default createNextConfig({
     ];
   },
   async redirects() {
-    return movedCategories.flatMap(({ from, to }) => [
-      { source: `/c/${from}`, destination: `/c/${to}`, permanent: true },
-      { source: `/:cc([a-z]{2})/c/${from}`, destination: `/:cc/c/${to}`, permanent: true },
-      // A place's category pages: /ng/lagos/computers and /ng/lagos/ikeja/computers.
-      { source: `/:cc([a-z]{2})/:place/${from}`, destination: `/:cc/:place/${to}`, permanent: true },
-      { source: `/:cc([a-z]{2})/:state/:area/${from}`, destination: `/:cc/:state/:area/${to}`, permanent: true },
-    ]);
+    return [
+      oldLogo,
+      ...movedCategories.flatMap(({ from, to }) => [
+        { source: `/c/${from}`, destination: `/c/${to}`, permanent: true },
+        { source: `/:cc([a-z]{2})/c/${from}`, destination: `/:cc/c/${to}`, permanent: true },
+        // A place's category pages: /ng/lagos/computers and /ng/lagos/ikeja/computers.
+        { source: `/:cc([a-z]{2})/:place/${from}`, destination: `/:cc/:place/${to}`, permanent: true },
+        { source: `/:cc([a-z]{2})/:state/:area/${from}`, destination: `/:cc/:state/:area/${to}`, permanent: true },
+      ]),
+    ];
   },
 });

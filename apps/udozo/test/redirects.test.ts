@@ -2,6 +2,11 @@ import { describe, expect, test } from "vitest";
 import config from "../next.config";
 
 describe("moved categories", () => {
+  test("the former site's icon, /logo.png, goes for good to Udozo's logo", async () => {
+    const redirects = await config.redirects!();
+    expect(redirects).toContainEqual({ source: "/logo.png", destination: "/udozo-logo.png", permanent: true });
+  });
+
   test("Computers' old addresses go for good to Electronics, also on a place's pages", async () => {
     const redirects = await config.redirects!();
     const to = (path: string) => {
