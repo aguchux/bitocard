@@ -28,7 +28,8 @@ import {
 } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { featureValue, fromMinor, toMinor, toggleList, wrapSelection } from "@/lib/shop";
-import { TermsAccept } from "@/components/terms-accept";
+import { TermsAccept, termsHref, type TermsStatus } from "@/components/terms-accept";
+import { firstIncomplete, lastPostStep, postSteps, stepOf, stepProblem, type PostValues } from "@/lib/post-steps";
 import { acceptShopTerms, createListing, detectModel, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, shopTerms, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
 import { type DraftPick, FillFromPhotos, ImproveListing, SuggestPrice } from "./assistant-help";
 import { BrandLogo } from "@/components/brand-logo";
@@ -96,9 +97,11 @@ function Chips<T extends string>({ label, options, value, onChange, disabled }: 
 }
 
 /**
- * Post an ad (`/sell`) and editing one (`/account/listings/<id>`), one screen on a phone as on the design canvas's
- * Post board: photos and video first, then title, category, price and condition, features from Udozo's
- * registry, the description with its small toolbar, then location, delivery and contact. The draft is made on the
+ * Post an ad (`/sell`) and editing one (`/account/listings/<id>`), a wizard with Previous and Next (`lib/post-steps.ts`):
+ * the title and category; photos and video; the price, condition, features from Udozo's registry and the description
+ * with its small toolbar; where to sell; the location, delivery and how buyers reach the seller; then a summary, the
+ * terms (a box ticked on that step) and Post. Each step says what it still needs before the next opens, a refusal from
+ * the API opens the step holding its field, and a saved draft carries on at its first unfinished step. The draft is made on the
  * seller's first change and every change after it is saved as they go; photos upload while they type (scaled to 1600 px
  * JPEG here first), and the video goes from the browser straight to the API with a 15-minute link. Where the country's
  * shop assistant helps sellers: Fill from photos, Suggest a price and Improve this listing, each for the seller to accept.
@@ -151,6 +154,38 @@ export function ListingForm({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(listing ? "saved" : "idle");
   const [problem, setProblem] = useState<{ message: string; param: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // ---- The steps ----
+  const valuesNow = (): PostValues => ({
+    title,
+    categoryId,
+    readyPhotos: photos.filter(photo => photo.status === "ready").length,
+    uploadingPhotos: photos.filter(photo => photo.status === "uploading").length,
+    failedPhotos: photos.filter(photo => photo.status === "failed").length,
+    minPhotos,
+    priceKind,
+    priceMinor: toMinor(price),
+    condition,
+    onShop: sellWhere.onShop,
+    resale: sellWhere.resale,
+    areaId,
+  });
+  // A saved draft carries on at its first step still missing something; a live ad opens at the start.
+  const [step, setStep] = useState(() => (listing && (listing.status === "draft" || listing.status === "rejected") ? Math.min(firstIncomplete(valuesNow()), lastPostStep) : 0));
+  // How far the seller has come: steps up to it can be opened from the step list (every one for a saved ad).
+  const [reached, setReached] = useState(() => (listing ? lastPostStep : 0));
+  const stepTop = useRef<HTMLParagraphElement>(null);
+  const goTo = (next: number) => {
+    setStep(next);
+    setReached(current => Math.max(current, next));
+    setProblem(null);
+    requestAnimationFrame(() => {
+      stepTop.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+      stepTop.current?.focus({ preventScroll: true });
+    });
+  };
+  const [terms, setTerms] = useState<TermsStatus | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   // Saving: changed fields gather in `pending` and go in one request after a pause; requests run one at a time.
   const idRef = useRef(id);
@@ -315,6 +350,14 @@ export function ListingForm({
   // ---- Posting ----
   const live = status === "active" || status === "pending_review";
   const post = async () => {
+    // Every step must be complete: the first one that is not opens, saying what it needs.
+    for (let index = 0; index < lastPostStep; index++) {
+      const missing = stepProblem(index, valuesNow());
+      if (missing) {
+        goTo(index);
+        return setProblem(missing);
+      }
+    }
     setSubmitting(true);
     setProblem(null);
     await flush();
@@ -328,11 +371,52 @@ export function ListingForm({
       router.push("/account");
       return router.refresh();
     }
+    // The terms are accepted here, on the last step, before the ad is posted.
+    if (terms && !terms.accepted) {
+      if (!agreed) {
+        setSubmitting(false);
+        return setProblem({ message: "Tick the box to accept Udozo's terms, then post your ad.", param: "terms_box" });
+      }
+      const accepted = await acceptShopTerms(terms.version);
+      if (!accepted.ok) {
+        setSubmitting(false);
+        return setProblem({ message: accepted.message, param: "terms_box" });
+      }
+      setTerms(accepted.data);
+    }
     const result = await submitListing(idRef.current);
     setSubmitting(false);
-    if (!result.ok) return setProblem({ message: result.message, param: result.param });
+    if (!result.ok) {
+      // A refusal opens the step holding what it names (the terms keep their own box on the last step).
+      const at = stepOf(result.param);
+      if (at !== null && at !== step) {
+        setStep(at);
+        setReached(current => Math.max(current, at));
+      }
+      return setProblem({ message: result.message, param: result.param });
+    }
     router.push(`/account?posted=${result.data.status === "active" ? "live" : "review"}`);
     router.refresh();
+  };
+
+  // The terms are read once the last step opens (an ad already live has accepted them).
+  useEffect(() => {
+    if (step !== lastPostStep || terms || live) return;
+    let current = true;
+    void shopTerms().then(status => {
+      if (current && status) setTerms(status);
+    });
+    return () => {
+      current = false;
+    };
+  }, [step, terms, live]);
+
+  /** On to the next step once this one has what it needs; what it is missing is said and marked otherwise. */
+  const next = () => {
+    const missing = stepProblem(step, valuesNow());
+    if (missing) return setProblem(missing);
+    void flush();
+    goTo(step + 1);
   };
 
   // ---- The shop assistant's suggestions (applied only when the seller accepts them) ----
@@ -393,6 +477,17 @@ export function ListingForm({
     }
   }, [currency]);
   const marks = (param: string) => (problem?.param?.startsWith(param) ? "border-brand-700 ring-2 ring-brand-500/20" : "border-slate-300");
+  // The last step's summary: each step's answers in a line, with Change opening it.
+  const areaName = state?.areas.find(area => area.id === areaId)?.name ?? null;
+  const priceLine = priceKind === "on_request" ? "Contact for price" : price.trim() ? `${symbol}${price}${priceKind === "negotiable" ? ", negotiable" : ""}` : "No price yet";
+  const places = [sellWhere.onShop ? "Udozo" : null, sellWhere.resale ? "resellers' stores" : null].filter(Boolean).join(" and ");
+  const summary: Array<[number, string, string]> = [
+    [0, "Title and category", `${title.trim() || "No title yet"}${found ? ` · ${found.top.name} › ${found.category.name}` : ""}`],
+    [1, "Photos and video", `${ready} photo${ready === 1 ? "" : "s"}${video && video.status !== "failed" ? " and a video" : ""}`],
+    [2, "Price and condition", `${priceLine}${condition ? ` · ${conditionLabels[condition]}` : ""}`],
+    [3, "Where to sell", `${places || "Nowhere yet"} · ${sellWhere.stock} available`],
+    [4, "Location and delivery", `${areaName && state ? `${areaName}, ${state.name}` : "No area yet"} · ${delivery === "none" ? "No delivery" : delivery === "state" ? `Delivers in the ${region}` : "Delivers nationwide"}`],
+  ];
 
   return (
     <div className="grid gap-6 pb-28 lg:pb-8">
@@ -422,348 +517,455 @@ export function ListingForm({
         />
       ) : null}
 
-      {/* Photos and video */}
-      <section aria-labelledby="photos" className="grid gap-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="photos" className="text-base font-bold">
-            Photos <span className="text-sm font-medium text-slate-500">at least {minPhotos}</span>
-          </h2>
-          <span className="text-xs text-slate-500">
-            {ready} of {maxPhotos}
-            {uploading ? ` · uploading ${uploading}` : ""}
-          </span>
+      {/* The steps: where the seller is, and those already reached to go back to. */}
+      <nav aria-label="Steps" className="grid gap-2.5">
+        <p ref={stepTop} tabIndex={-1} className="scroll-mt-24 text-sm font-semibold text-slate-600 outline-none">
+          Step {step + 1} of {postSteps.length}: <span className="text-navy-900">{postSteps[step]!.title}</span>
+        </p>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 sm:hidden" aria-hidden="true">
+          <div className="h-full rounded-full bg-brand-700 transition-[width]" style={{ width: `${((step + 1) / postSteps.length) * 100}%` }} />
         </div>
-        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-          {photos.map((photo, index) => (
-            <li
-              key={photo.key}
-              draggable={photo.status === "ready"}
-              onDragStart={() => (dragFrom.current = index)}
-              onDragOver={event => event.preventDefault()}
-              onDrop={() => dragFrom.current !== null && void movePhoto(dragFrom.current, index)}
-              className="group relative aspect-square overflow-hidden rounded-xl bg-slate-100"
-            >
-              <img src={photo.url} alt={`Photo ${index + 1}`} className={`size-full object-cover ${photo.status === "uploading" ? "opacity-60" : ""}`} />
-              {index === 0 && photo.status === "ready" ? <span className="absolute top-1.5 left-1.5 rounded-full bg-navy-900 px-2 py-0.5 text-[11px] font-bold text-white">Cover</span> : null}
-              {photo.status === "uploading" ? (
-                <span className="absolute inset-0 grid place-items-center">
-                  <LoaderCircle className="size-6 animate-spin text-navy-900" aria-label="Uploading" />
-                </span>
-              ) : null}
-              {photo.status === "failed" ? <span className="absolute inset-x-0 bottom-0 bg-brand-700/90 p-1 text-[11px] leading-tight text-white">{photo.error}</span> : null}
-              <span className="absolute top-1 right-1 flex gap-1">
-                <button type="button" onClick={() => void dropPhoto(photo)} aria-label={`Remove photo ${index + 1}`} className="grid size-7 place-items-center rounded-full bg-white/90 text-navy-900 shadow">
-                  <X className="size-4" aria-hidden="true" />
+        <ol className="hidden gap-2 sm:grid sm:grid-cols-6">
+          {postSteps.map((item, index) => {
+            const current = index === step;
+            const done = !current && index <= reached && !stepProblem(index, valuesNow()) && index < lastPostStep;
+            return (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  disabled={index > reached}
+                  aria-current={current ? "step" : undefined}
+                  onClick={() => goTo(index)}
+                  className={`flex h-11 w-full items-center gap-2 rounded-xl border px-2.5 text-left text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${current ? "border-navy-900 bg-navy-900 text-white" : "border-slate-200 bg-white text-navy-900 hover:border-slate-400"}`}
+                >
+                  <span className={`grid size-6 shrink-0 place-items-center rounded-full text-xs ${current ? "bg-white text-navy-900" : done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                    {done ? <Check className="size-3.5" aria-label="Done" /> : index + 1}
+                  </span>
+                  <span className="min-w-0 truncate">{item.short}</span>
                 </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+
+      {step === 0 ? (
+        <section className="grid gap-5">
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Title
+            <input
+              value={title}
+              maxLength={90}
+              onChange={event => {
+                setTitle(event.target.value);
+                // Saved once it is long enough to be a title (5 characters), so typing never shows an error.
+                const length = event.target.value.trim().length;
+                if (length === 0 || length >= 5) save({ title: event.target.value });
+              }}
+              placeholder="e.g. iPhone 13 Pro, 256 GB, Sierra Blue"
+              className={`h-12 rounded-xl border bg-white px-3.5 text-base font-normal ${marks("title")}`}
+            />
+          </label>
+          <CategoryPicker
+            categories={categories}
+            value={found}
+            invalid={problem?.param === "category_id"}
+            onChange={category => {
+              setCategoryId(category.id);
+              save({ category_id: category.id });
+            }}
+          />
+        </section>
+      ) : null}
+
+      {step === 1 ? (
+        <>
+          {/* Photos and video */}
+          <section aria-labelledby="photos" className="grid gap-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 id="photos" className="text-base font-bold">
+                Photos <span className="text-sm font-medium text-slate-500">at least {minPhotos}</span>
+              </h2>
+              <span className="text-xs text-slate-500">
+                {ready} of {maxPhotos}
+                {uploading ? ` · uploading ${uploading}` : ""}
               </span>
-              {photo.status === "ready" ? (
-                <span className="absolute right-1 bottom-1 left-1 flex justify-between">
-                  <button type="button" disabled={index === 0} onClick={() => void movePhoto(index, index - 1)} aria-label={`Move photo ${index + 1} earlier`} className="grid size-7 place-items-center rounded-full bg-white/90 text-navy-900 shadow disabled:invisible">
-                    <ArrowLeft className="size-4" aria-hidden="true" />
-                  </button>
-                  <button type="button" disabled={index === photos.length - 1} onClick={() => void movePhoto(index, index + 1)} aria-label={`Move photo ${index + 1} later`} className="grid size-7 place-items-center rounded-full bg-white/90 text-navy-900 shadow disabled:invisible">
-                    <ArrowRight className="size-4" aria-hidden="true" />
-                  </button>
+            </div>
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              {photos.map((photo, index) => (
+                <li
+                  key={photo.key}
+                  draggable={photo.status === "ready"}
+                  onDragStart={() => (dragFrom.current = index)}
+                  onDragOver={event => event.preventDefault()}
+                  onDrop={() => dragFrom.current !== null && void movePhoto(dragFrom.current, index)}
+                  className="group relative aspect-square overflow-hidden rounded-xl bg-slate-100"
+                >
+                  <img src={photo.url} alt={`Photo ${index + 1}`} className={`size-full object-cover ${photo.status === "uploading" ? "opacity-60" : ""}`} />
+                  {index === 0 && photo.status === "ready" ? <span className="absolute top-1.5 left-1.5 rounded-full bg-navy-900 px-2 py-0.5 text-[11px] font-bold text-white">Cover</span> : null}
+                  {photo.status === "uploading" ? (
+                    <span className="absolute inset-0 grid place-items-center">
+                      <LoaderCircle className="size-6 animate-spin text-navy-900" aria-label="Uploading" />
+                    </span>
+                  ) : null}
+                  {photo.status === "failed" ? <span className="absolute inset-x-0 bottom-0 bg-brand-700/90 p-1 text-[11px] leading-tight text-white">{photo.error}</span> : null}
+                  <span className="absolute top-1 right-1 flex gap-1">
+                    <button type="button" onClick={() => void dropPhoto(photo)} aria-label={`Remove photo ${index + 1}`} className="grid size-7 place-items-center rounded-full bg-white/90 text-navy-900 shadow">
+                      <X className="size-4" aria-hidden="true" />
+                    </button>
+                  </span>
+                  {photo.status === "ready" ? (
+                    <span className="absolute right-1 bottom-1 left-1 flex justify-between">
+                      <button type="button" disabled={index === 0} onClick={() => void movePhoto(index, index - 1)} aria-label={`Move photo ${index + 1} earlier`} className="grid size-7 place-items-center rounded-full bg-white/90 text-navy-900 shadow disabled:invisible">
+                        <ArrowLeft className="size-4" aria-hidden="true" />
+                      </button>
+                      <button type="button" disabled={index === photos.length - 1} onClick={() => void movePhoto(index, index + 1)} aria-label={`Move photo ${index + 1} later`} className="grid size-7 place-items-center rounded-full bg-white/90 text-navy-900 shadow disabled:invisible">
+                        <ArrowRight className="size-4" aria-hidden="true" />
+                      </button>
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+              {photos.length < maxPhotos ? (
+                <li>
+                  <label className={`grid aspect-square cursor-pointer place-content-center justify-items-center gap-1 rounded-xl border-2 border-dashed bg-white text-center text-xs font-semibold text-navy-900 hover:border-slate-400 ${marks("photos")}`}>
+                    <Camera className="size-6" aria-hidden="true" />
+                    Add photos
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      onChange={event => {
+                        addPhotos(event.target.files);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                </li>
+              ) : null}
+              <li>
+                {video ? (
+                  <div className="relative grid aspect-square place-content-center justify-items-center gap-1 overflow-hidden rounded-xl bg-navy-900 p-2 text-center text-xs font-semibold text-white">
+                    {video.poster && video.status === "ready" ? <img src={video.poster} alt="" className="absolute inset-0 size-full object-cover opacity-70" /> : null}
+                    <Video className="relative size-6" aria-hidden="true" />
+                    <span className="relative">
+                      {video.status === "uploading" ? `Sending ${video.progress}%` : video.status === "processing" ? "Preparing…" : video.status === "ready" ? "Video ready" : "Not added"}
+                    </span>
+                    {video.status === "failed" && video.error ? <span className="relative text-[11px] leading-tight font-normal">{video.error}</span> : null}
+                    {video.status !== "uploading" ? (
+                      <button type="button" onClick={() => void dropVideo()} aria-label="Remove the video" className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-white/90 text-navy-900">
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    ) : (
+                      <button type="button" onClick={cancelVideo} aria-label="Stop sending the video" className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-white/90 text-navy-900">
+                        <X className="size-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <label className="grid aspect-square cursor-pointer place-content-center justify-items-center gap-1 rounded-xl border-2 border-dashed border-slate-300 bg-white text-center text-xs font-semibold text-navy-900 hover:border-slate-400">
+                    <Video className="size-6" aria-hidden="true" />
+                    Add video
+                    <span className="font-normal text-slate-500">optional, 60 s</span>
+                    <input type="file" accept="video/mp4,video/quicktime,video/webm" className="sr-only" onChange={event => void addVideo(event.target.files?.[0])} />
+                  </label>
+                )}
+              </li>
+            </ul>
+            <p className="text-xs text-slate-500">The first photo is the cover: drag them, or use the arrows, to change the order. Locations stored in photos are removed.</p>
+            {assistant ? <FillFromPhotos name={assistant.name} ensureListing={latest} ready={ready >= minPhotos && !uploading} onAccept={applyDraft} /> : null}
+          </section>
+        </>
+      ) : null}
+
+      {step === 2 ? (
+        <>
+          <section className="grid gap-5">
+            <div className="grid gap-2">
+              <label htmlFor="price" className="text-sm font-semibold">
+                Price
+              </label>
+              {priceKind !== "on_request" ? (
+                <span className={`flex h-12 items-center gap-2 rounded-xl border bg-white px-3.5 ${marks("price")}`}>
+                  <span className="text-slate-500">{symbol}</span>
+                  <input
+                    id="price"
+                    inputMode="decimal"
+                    value={price}
+                    onChange={event => {
+                      setPrice(event.target.value);
+                      save({ price: event.target.value });
+                    }}
+                    onBlur={() => {
+                      const minor = price.trim() ? Number(price.replace(/[,\s]/g, "")) * 100 : null;
+                      if (minor && Number.isFinite(minor)) setPrice(fromMinor(Math.round(minor)));
+                    }}
+                    placeholder="0"
+                    className="min-w-0 flex-1 bg-transparent text-base outline-none"
+                  />
                 </span>
               ) : null}
-            </li>
-          ))}
-          {photos.length < maxPhotos ? (
-            <li>
-              <label className={`grid aspect-square cursor-pointer place-content-center justify-items-center gap-1 rounded-xl border-2 border-dashed bg-white text-center text-xs font-semibold text-navy-900 hover:border-slate-400 ${marks("photos")}`}>
-                <Camera className="size-6" aria-hidden="true" />
-                Add photos
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="sr-only"
-                  onChange={event => {
-                    addPhotos(event.target.files);
-                    event.target.value = "";
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["fixed", "Fixed"],
+                    ["negotiable", "Negotiable"],
+                    ["on_request", "Contact for price"],
+                  ] as const
+                ).map(([kind, label]) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    aria-pressed={priceKind === kind}
+                    onClick={() => {
+                      setPriceKind(kind);
+                      save({ price_kind: kind, ...(kind === "on_request" ? {} : { price }) });
+                    }}
+                    className={`h-9 rounded-full border px-3.5 text-[13px] font-semibold ${priceKind === kind ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white text-navy-900"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {assistant ? (
+                <SuggestPrice
+                  name={assistant.name}
+                  ensureListing={latest}
+                  enabled={Boolean(categoryId)}
+                  currency={currency}
+                  onUse={minor => {
+                    const value = fromMinor(minor);
+                    setPrice(value);
+                    const kind = priceKind === "on_request" ? "fixed" : priceKind;
+                    setPriceKind(kind);
+                    save({ price: value, price_kind: kind });
                   }}
                 />
-              </label>
-            </li>
-          ) : null}
-          <li>
-            {video ? (
-              <div className="relative grid aspect-square place-content-center justify-items-center gap-1 overflow-hidden rounded-xl bg-navy-900 p-2 text-center text-xs font-semibold text-white">
-                {video.poster && video.status === "ready" ? <img src={video.poster} alt="" className="absolute inset-0 size-full object-cover opacity-70" /> : null}
-                <Video className="relative size-6" aria-hidden="true" />
-                <span className="relative">
-                  {video.status === "uploading" ? `Sending ${video.progress}%` : video.status === "processing" ? "Preparing…" : video.status === "ready" ? "Video ready" : "Not added"}
-                </span>
-                {video.status === "failed" && video.error ? <span className="relative text-[11px] leading-tight font-normal">{video.error}</span> : null}
-                {video.status !== "uploading" ? (
-                  <button type="button" onClick={() => void dropVideo()} aria-label="Remove the video" className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-white/90 text-navy-900">
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </button>
-                ) : (
-                  <button type="button" onClick={cancelVideo} aria-label="Stop sending the video" className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-white/90 text-navy-900">
-                    <X className="size-4" aria-hidden="true" />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <label className="grid aspect-square cursor-pointer place-content-center justify-items-center gap-1 rounded-xl border-2 border-dashed border-slate-300 bg-white text-center text-xs font-semibold text-navy-900 hover:border-slate-400">
-                <Video className="size-6" aria-hidden="true" />
-                Add video
-                <span className="font-normal text-slate-500">optional, 60 s</span>
-                <input type="file" accept="video/mp4,video/quicktime,video/webm" className="sr-only" onChange={event => void addVideo(event.target.files?.[0])} />
-              </label>
-            )}
-          </li>
-        </ul>
-        <p className="text-xs text-slate-500">The first photo is the cover: drag them, or use the arrows, to change the order. Locations stored in photos are removed.</p>
-        {assistant ? <FillFromPhotos name={assistant.name} ensureListing={latest} ready={ready >= minPhotos && !uploading} onAccept={applyDraft} /> : null}
-      </section>
-
-      {/* Title, category, price, condition */}
-      <section className="grid gap-5">
-        <label className="grid gap-1.5 text-sm font-semibold">
-          Title
-          <input
-            value={title}
-            maxLength={90}
-            onChange={event => {
-              setTitle(event.target.value);
-              // Saved once it is long enough to be a title (5 characters), so typing never shows an error.
-              const length = event.target.value.trim().length;
-              if (length === 0 || length >= 5) save({ title: event.target.value });
-            }}
-            placeholder="e.g. iPhone 13 Pro, 256 GB, Sierra Blue"
-            className={`h-12 rounded-xl border bg-white px-3.5 text-base font-normal ${marks("title")}`}
-          />
-        </label>
-        <CategoryPicker
-          categories={categories}
-          value={found}
-          invalid={problem?.param === "category_id"}
-          onChange={category => {
-            setCategoryId(category.id);
-            save({ category_id: category.id });
-          }}
-        />
-        <div className="grid gap-2">
-          <label htmlFor="price" className="text-sm font-semibold">
-            Price
-          </label>
-          {priceKind !== "on_request" ? (
-            <span className={`flex h-12 items-center gap-2 rounded-xl border bg-white px-3.5 ${marks("price")}`}>
-              <span className="text-slate-500">{symbol}</span>
-              <input
-                id="price"
-                inputMode="decimal"
-                value={price}
-                onChange={event => {
-                  setPrice(event.target.value);
-                  save({ price: event.target.value });
-                }}
-                onBlur={() => {
-                  const minor = price.trim() ? Number(price.replace(/[,\s]/g, "")) * 100 : null;
-                  if (minor && Number.isFinite(minor)) setPrice(fromMinor(Math.round(minor)));
-                }}
-                placeholder="0"
-                className="min-w-0 flex-1 bg-transparent text-base outline-none"
-              />
-            </span>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["fixed", "Fixed"],
-                ["negotiable", "Negotiable"],
-                ["on_request", "Contact for price"],
-              ] as const
-            ).map(([kind, label]) => (
-              <button
-                key={kind}
-                type="button"
-                aria-pressed={priceKind === kind}
-                onClick={() => {
-                  setPriceKind(kind);
-                  save({ price_kind: kind, ...(kind === "on_request" ? {} : { price }) });
-                }}
-                className={`h-9 rounded-full border px-3.5 text-[13px] font-semibold ${priceKind === kind ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white text-navy-900"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {assistant ? (
-            <SuggestPrice
-              name={assistant.name}
-              ensureListing={latest}
-              enabled={Boolean(categoryId)}
-              currency={currency}
-              onUse={minor => {
-                const value = fromMinor(minor);
-                setPrice(value);
-                const kind = priceKind === "on_request" ? "fixed" : priceKind;
-                setPriceKind(kind);
-                save({ price: value, price_kind: kind });
+              ) : null}
+            </div>
+            <Chips
+              label="Condition"
+              options={(Object.keys(conditionLabels) as ShopCondition[]).map(value => ({ value, label: conditionLabels[value] }))}
+              value={condition}
+              onChange={value => {
+                setCondition(value);
+                save({ condition: value });
               }}
             />
-          ) : null}
-        </div>
-        <Chips
-          label="Condition"
-          options={(Object.keys(conditionLabels) as ShopCondition[]).map(value => ({ value, label: conditionLabels[value] }))}
-          value={condition}
-          onChange={value => {
-            setCondition(value);
-            save({ condition: value });
-          }}
-        />
-      </section>
+          </section>
 
-      <FeaturesField
-        suggested={suggested}
-        rows={features}
-        categoryId={categoryId}
-        title={title}
-        onChange={updateFeatures}
-        invalid={problem?.param?.startsWith("features") ? problem.message : null}
-      />
-
-      <DescriptionField
-        value={description}
-        invalid={problem?.param === "description"}
-        onChange={value => {
-          setDescription(value);
-          save({ description: value });
-        }}
-      />
-
-      <ResaleFields
-        value={sellWhere}
-        availability={resale}
-        priceMinor={toMinor(price)}
-        priceOnRequest={priceKind === "on_request"}
-        currency={currency}
-        invalid={param => Boolean(problem?.param?.startsWith(param))}
-        onChange={(next, keys) => {
-          setSellWhere(next);
-          const changes: ListingFields = {};
-          if (keys.includes("on_shop")) changes.on_shop = next.onShop;
-          if (keys.includes("stock")) changes.stock = next.stock;
-          if (keys.includes("resale")) Object.assign(changes, resaleChanges(next));
-          if (Object.keys(changes).length) save(changes);
-        }}
-      />
-
-      {/* Location, delivery, contact */}
-      <section className="grid gap-5">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-semibold">
-            {region.charAt(0).toUpperCase() + region.slice(1)}
-            <select
-              value={stateSlug}
-              onChange={event => {
-                setStateSlug(event.target.value);
-                setAreaId(null);
-              }}
-              className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("area_id")}`}
-            >
-              <option value="">{`Choose your ${region}`}</option>
-              {states.map(item => (
-                <option key={item.slug} value={item.slug}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold">
-            City or area
-            <select
-              value={areaId ?? ""}
-              disabled={!state}
-              onChange={event => {
-                setAreaId(event.target.value || null);
-                if (event.target.value) save({ area_id: event.target.value });
-              }}
-              className={`h-12 rounded-xl border bg-white px-3 text-base font-normal disabled:bg-slate-50 ${marks("area_id")}`}
-            >
-              <option value="">{state ? "Choose the area" : `Choose a ${region} first`}</option>
-              {state?.areas.map(area => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <Chips
-          label="Delivery"
-          options={[
-            { value: "none" as const, label: "No delivery" },
-            { value: "state" as const, label: state ? `Delivers in ${state.name}` : `Delivers in my ${region}` },
-            { value: "nationwide" as const, label: "Nationwide" },
-          ]}
-          value={delivery}
-          onChange={value => {
-            setDelivery(value);
-            // Without delivery, it must be handed over in person.
-            if (value === "none" && !pickup) setPickup(true);
-            save({ delivery: value, ...(value === "none" && !pickup ? { pickup: true } : {}) });
-          }}
-        />
-        {delivery !== "none" ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-semibold">
-              {state ? `Delivery charge in ${state.name}` : `Delivery charge in your ${region}`}
-              <input value={feeState} onChange={event => setFeeState(event.target.value)} onBlur={() => save({ delivery_fee_state: feeState })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_state")}`} />
-            </label>
-            {delivery === "nationwide" ? (
-              <label className="grid gap-1.5 text-sm font-semibold">
-                Delivery charge elsewhere
-                <input value={feeNation} onChange={event => setFeeNation(event.target.value)} onBlur={() => save({ delivery_fee_nationwide: feeNation })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_nationwide")}`} />
-              </label>
-            ) : null}
-            <p className="text-xs text-slate-600 sm:col-span-2">The buyer pays it on top and it is yours in full once they have the item; it is refunded if it never arrives. You ship with a courier and tracking number, after photographing the item and the sealed parcel.</p>
-          </div>
-        ) : null}
-        <label className="flex items-start gap-2.5 text-sm">
-          <input
-            type="checkbox"
-            checked={pickup}
-            disabled={delivery === "none"}
-            onChange={event => {
-              setPickup(event.target.checked);
-              save({ pickup: event.target.checked });
-            }}
-            className="mt-1 size-4 accent-navy-900"
+          <FeaturesField
+            suggested={suggested}
+            rows={features}
+            categoryId={categoryId}
+            title={title}
+            onChange={updateFeatures}
+            invalid={problem?.param?.startsWith("features") ? problem.message : null}
           />
-          <span>
-            <strong className="block">Hand it over in person</strong>
-            <span className="text-slate-600">You meet the buyer; they check it and give you their release code.{delivery === "none" ? " Needed without delivery." : ""}</span>
-          </span>
-        </label>
-        <div className="grid gap-2">
-          <Chips
-            label="How buyers reach you"
-            options={(Object.keys(contactLabels) as ShopContact[]).map(value => ({ value, label: contactLabels[value] }))}
-            value={contact}
-            disabled={value => value !== "chat" && !phoneConfirmed}
+
+          <DescriptionField
+            value={description}
+            invalid={problem?.param === "description"}
             onChange={value => {
-              setContact(value);
-              save({ contact: value });
+              setDescription(value);
+              save({ description: value });
             }}
           />
-          {!phoneConfirmed ? (
-            <p className="text-xs text-slate-600">
-              To show your phone number, confirm it on{" "}
-              <Link href="/account/profile" className="font-semibold text-brand-700 hover:underline">
-                your profile
-              </Link>{" "}
-              first.
-            </p>
-          ) : null}
-        </div>
-      </section>
+        </>
+      ) : null}
 
-      {/* Posting: fixed above the bottom bar on phones, in place on desktop. */}
+      {step === 3 ? (
+        <>
+          <ResaleFields
+            value={sellWhere}
+            availability={resale}
+            priceMinor={toMinor(price)}
+            priceOnRequest={priceKind === "on_request"}
+            currency={currency}
+            invalid={param => Boolean(problem?.param?.startsWith(param))}
+            onChange={(next, keys) => {
+              setSellWhere(next);
+              const changes: ListingFields = {};
+              if (keys.includes("on_shop")) changes.on_shop = next.onShop;
+              if (keys.includes("stock")) changes.stock = next.stock;
+              if (keys.includes("resale")) Object.assign(changes, resaleChanges(next));
+              if (Object.keys(changes).length) save(changes);
+            }}
+          />
+        </>
+      ) : null}
+
+      {step === 4 ? (
+        <>
+          {/* Location, delivery, contact */}
+          <section className="grid gap-5">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                {region.charAt(0).toUpperCase() + region.slice(1)}
+                <select
+                  value={stateSlug}
+                  onChange={event => {
+                    setStateSlug(event.target.value);
+                    setAreaId(null);
+                  }}
+                  className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("area_id")}`}
+                >
+                  <option value="">{`Choose your ${region}`}</option>
+                  {states.map(item => (
+                    <option key={item.slug} value={item.slug}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold">
+                City or area
+                <select
+                  value={areaId ?? ""}
+                  disabled={!state}
+                  onChange={event => {
+                    setAreaId(event.target.value || null);
+                    if (event.target.value) save({ area_id: event.target.value });
+                  }}
+                  className={`h-12 rounded-xl border bg-white px-3 text-base font-normal disabled:bg-slate-50 ${marks("area_id")}`}
+                >
+                  <option value="">{state ? "Choose the area" : `Choose a ${region} first`}</option>
+                  {state?.areas.map(area => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <Chips
+              label="Delivery"
+              options={[
+                { value: "none" as const, label: "No delivery" },
+                { value: "state" as const, label: state ? `Delivers in ${state.name}` : `Delivers in my ${region}` },
+                { value: "nationwide" as const, label: "Nationwide" },
+              ]}
+              value={delivery}
+              onChange={value => {
+                setDelivery(value);
+                // Without delivery, it must be handed over in person.
+                if (value === "none" && !pickup) setPickup(true);
+                save({ delivery: value, ...(value === "none" && !pickup ? { pickup: true } : {}) });
+              }}
+            />
+            {delivery !== "none" ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-semibold">
+                  {state ? `Delivery charge in ${state.name}` : `Delivery charge in your ${region}`}
+                  <input value={feeState} onChange={event => setFeeState(event.target.value)} onBlur={() => save({ delivery_fee_state: feeState })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_state")}`} />
+                </label>
+                {delivery === "nationwide" ? (
+                  <label className="grid gap-1.5 text-sm font-semibold">
+                    Delivery charge elsewhere
+                    <input value={feeNation} onChange={event => setFeeNation(event.target.value)} onBlur={() => save({ delivery_fee_nationwide: feeNation })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_nationwide")}`} />
+                  </label>
+                ) : null}
+                <p className="text-xs text-slate-600 sm:col-span-2">The buyer pays it on top and it is yours in full once they have the item; it is refunded if it never arrives. You ship with a courier and tracking number, after photographing the item and the sealed parcel.</p>
+              </div>
+            ) : null}
+            <label className="flex items-start gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={pickup}
+                disabled={delivery === "none"}
+                onChange={event => {
+                  setPickup(event.target.checked);
+                  save({ pickup: event.target.checked });
+                }}
+                className="mt-1 size-4 accent-navy-900"
+              />
+              <span>
+                <strong className="block">Hand it over in person</strong>
+                <span className="text-slate-600">You meet the buyer; they check it and give you their release code.{delivery === "none" ? " Needed without delivery." : ""}</span>
+              </span>
+            </label>
+            <div className="grid gap-2">
+              <Chips
+                label="How buyers reach you"
+                options={(Object.keys(contactLabels) as ShopContact[]).map(value => ({ value, label: contactLabels[value] }))}
+                value={contact}
+                disabled={value => value !== "chat" && !phoneConfirmed}
+                onChange={value => {
+                  setContact(value);
+                  save({ contact: value });
+                }}
+              />
+              {!phoneConfirmed ? (
+                <p className="text-xs text-slate-600">
+                  To show your phone number, confirm it on{" "}
+                  <Link href="/account/profile" className="font-semibold text-brand-700 hover:underline">
+                    your profile
+                  </Link>{" "}
+                  first.
+                </p>
+              ) : null}
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {step === lastPostStep ? (
+        <section aria-labelledby="post-check" className="grid gap-4">
+          <h2 id="post-check" className="text-base font-bold">
+            Check your ad
+          </h2>
+          <ul className="grid divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+            {summary.map(([index, label, value]) => (
+              <li key={label} className="flex items-center gap-3 px-4 py-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-slate-500">{label}</span>
+                  <span className="block truncate text-sm text-navy-900">{value}</span>
+                </span>
+                <button type="button" onClick={() => goTo(index)} className="text-sm font-semibold text-brand-700 hover:underline" aria-label={`Change ${label.toLowerCase()}`}>
+                  Change
+                </button>
+              </li>
+            ))}
+          </ul>
+          {live ? null : terms?.accepted ? (
+            <p className="flex items-start gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              <Check className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                You have accepted{" "}
+                <a href={termsHref(terms)} target="_blank" rel="noopener" className="font-semibold underline">
+                  Udozo&apos;s terms
+                </a>
+                .
+              </span>
+            </p>
+          ) : (
+            <label className={`flex items-start gap-3 rounded-2xl border bg-white px-4 py-3 text-sm ${problem?.param === "terms_box" ? "border-brand-700 ring-2 ring-brand-500/20" : "border-slate-200"}`}>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={event => {
+                  setAgreed(event.target.checked);
+                  if (event.target.checked && problem?.param === "terms_box") setProblem(null);
+                }}
+                className="mt-0.5 size-5 shrink-0 accent-navy-900"
+              />
+              <span>
+                <strong className="block text-navy-900">{terms?.previous_version ? "Udozo's terms have changed: I accept them" : "I accept Udozo's terms"}</strong>
+                <span className="text-slate-600">
+                  I have read{" "}
+                  <a href={termsHref(terms)} target="_blank" rel="noopener" className="font-semibold text-navy-900 underline">
+                    Udozo&apos;s terms
+                  </a>
+                  : what may be sold, Safe pay&apos;s fees, deadlines and disputes, and paying directly. My ad follows them.
+                </span>
+              </span>
+            </label>
+          )}
+        </section>
+      ) : null}
+
+      {/* Previous and Next, then Post: fixed above the bottom bar on phones, in place on desktop. */}
       <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto grid max-w-6xl gap-2">
           {problem?.param === "terms" ? (
@@ -780,20 +982,35 @@ export function ListingForm({
               {problem.message}
             </p>
           ) : null}
-          {video?.status === "uploading" ? (
+          {step === lastPostStep && video?.status === "uploading" ? (
             <p className="text-sm text-slate-600">The video is still sending: wait for it, or stop it to post your ad without one. The video is optional.</p>
-          ) : video?.status === "processing" ? (
+          ) : step === lastPostStep && video?.status === "processing" ? (
             <p className="text-sm text-slate-600">You can post now: your video joins the ad as soon as it is ready.</p>
           ) : null}
-          <button
-            type="button"
-            disabled={submitting || uploading > 0 || video?.status === "uploading"}
-            onClick={() => void post()}
-            className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-brand-700 px-6 font-bold text-white hover:bg-brand-600 disabled:opacity-60 lg:justify-self-start"
-          >
-            {submitting ? <LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> : <Check className="size-5" aria-hidden="true" />}
-            {live ? "Save changes" : status === "rejected" ? "Post it again" : "Post ad"}
-          </button>
+          <div className="flex gap-2">
+            {step > 0 ? (
+              <button type="button" onClick={() => goTo(step - 1)} className="flex h-12 items-center justify-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 font-bold text-navy-900 hover:border-slate-400">
+                <ArrowLeft className="size-5" aria-hidden="true" />
+                Previous
+              </button>
+            ) : null}
+            {step < lastPostStep ? (
+              <button type="button" onClick={next} className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-navy-900 px-6 font-bold text-white hover:bg-navy-700 lg:flex-none">
+                Next: {postSteps[step + 1]!.short}
+                <ArrowRight className="size-5" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={submitting || uploading > 0 || video?.status === "uploading"}
+                onClick={() => void post()}
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-700 px-6 font-bold text-white hover:bg-brand-600 disabled:opacity-60 lg:flex-none"
+              >
+                {submitting ? <LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> : <Check className="size-5" aria-hidden="true" />}
+                {live ? "Save changes" : status === "rejected" ? "Post it again" : "Post ad"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
