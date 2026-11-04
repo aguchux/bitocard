@@ -9,7 +9,7 @@ import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { AllowPhonePending, CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { CustomerGoogleService } from '../customers/customer-google.service.js';
-import { CustomersService } from '../customers/customers.service.js';
+import { CustomersService, customerSexes, type CustomerSex } from '../customers/customers.service.js';
 import { HandoffService } from '../customers/handoff.service.js';
 import { StoreKey } from '../customers/store-key.js';
 import { IdentityService } from '../identity/identity.service.js';
@@ -155,6 +155,24 @@ class ProfileDto {
   /** Only for an account with no country yet (bitocard.com); a country once set never changes. */
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
   country?: string;
+
+  /** Udozo: where the customer lives, an area of their country (null clears it). */
+  @IsOptional() @IsUUID('all', { message: 'area_id must be an area' })
+  area_id?: string | null;
+
+  /** Udozo: the date of birth, `YYYY-MM-DD` (null clears it). */
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'birth_date must be a date as YYYY-MM-DD' })
+  birth_date?: string | null;
+
+  /** Udozo: female, male or unspecified (null clears it). */
+  @IsOptional() @IsIn(customerSexes)
+  sex?: CustomerSex | null;
+}
+
+class PhoneLaterDto {
+  /** The number to keep, unconfirmed, as typed (a mobile of the account's country); none: only put confirming off. */
+  @IsOptional() @IsString() @Length(6, 25)
+  phone?: string;
 }
 
 class ChangePasswordDto {
@@ -479,8 +497,8 @@ export class CustomerAccountController {
   @TrackSignup('udozo', 'phone_later')
   @Post('phone/later')
   @HttpCode(HttpStatus.OK)
-  deferPhone(@CurrentCustomer() caller: CustomerCaller) {
-    return this.customers.deferPhone(caller.customer);
+  deferPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: PhoneLaterDto) {
+    return this.customers.deferPhone(caller.customer, body.phone);
   }
 
   @UseGuards(CustomerGuard)

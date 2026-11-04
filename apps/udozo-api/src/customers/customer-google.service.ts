@@ -34,11 +34,12 @@ const refused = (code: string) => {
  * one-time state (kept in its own cookie), Google returns the browser to `<STOREFRONT_URL>/auth/google/callback` (add it
  * to the Google client's redirect addresses beside Seller HQ's), and its server sends the code here.
  *
- * As for Seller HQ: signing up with Google is deliberate (`intent=signup` makes the account, its email confirmed by
- * Google, its first and last name Google's, unconfirmed, and no password until Forgot password sets one); signing in
- * with a Google account that never signed up creates nothing; and a Google account never links itself to an account
- * with the same email. A new account then onboards on udozo.com (its name, its country, fixed, and its mobile, texted a
- * code): until then it reaches only its own account routes (`phonePendingFor`).
+ * A Google account no account uses yet signs up, whether the customer chose sign-in or sign-up (4 November 2026, the
+ * owner's request): the account is made with its email confirmed by Google, its first and last name Google's,
+ * unconfirmed, and no password until Forgot password sets one. A Google account never links itself to an account with
+ * the same email (that one signs in with its password). A new account then onboards on udozo.com in one step (its name,
+ * its country, fixed, and its mobile, kept to confirm later): until then it reaches only its own account routes
+ * (`phonePendingFor`).
  */
 @Injectable()
 export class CustomerGoogleService {
@@ -78,7 +79,7 @@ export class CustomerGoogleService {
     return { object: 'google_sign_in' as const, url: googleAuthorizationUrl(config, { clientId, redirectUri, state, nonce, codeVerifier }), state, expires_at: expiresAt.toISOString() };
   }
 
-  /** Finishes it: the customer signed in (signing up first with `intent=signup`), with `signed_up` when the account is new. */
+  /** Finishes it: the customer signed in (signed up first when no account uses this Google account), with `signed_up` when the account is new. */
   async finish(store: Store, input: { state: string; code: string; ref?: string }) {
     const record = await this.prisma.oAuthState.findUnique({ where: { id: sha256(input.state) } });
     // Only this store's accounts' own round trips, unexpired.
@@ -102,7 +103,7 @@ export class CustomerGoogleService {
     if (!customer) {
       // Never linked through a matching email: they sign in with their password.
       if (await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email } } })) throw await this.refuseFor(email, 'account_exists_sign_in_with_password');
-      if (record.intent !== 'signup') throw await this.refuseFor(email, 'google_account_not_found');
+      // Signing in with a Google account no account uses yet signs up: onboarding follows.
       try {
         customer = await this.prisma.customer.create({
           data: { storeId: store.id, email, ...googleNames(claims, email), emailVerifiedAt: new Date(), googleSubject: sub, passwordHash: null, signupRef: input.ref ?? null },

@@ -48,8 +48,29 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     /** Chosen at sign-up and then fixed: the wallet, checkouts and prices are in its currency. Null until chosen (older accounts). */
     country: customer.country,
     currency: customer.market?.currency ?? null,
+    /** Udozo: where they live (an area of their country, apart from their listings'), their date of birth and sex; null until set. */
+    area_id: customer.areaId ?? null,
+    birth_date: customer.birthDate ? customer.birthDate.toISOString().slice(0, 10) : null,
+    sex: (customer.sex ?? null) as CustomerSex | null,
     created_at: customer.createdAt.toISOString(),
   };
+}
+
+/** How a customer describes their sex on their profile (`unspecified`: they would rather not say). */
+export const customerSexes = ['female', 'male', 'unspecified'] as const;
+export type CustomerSex = (typeof customerSexes)[number];
+
+const youngestAge = 13;
+
+/** A date of birth as `YYYY-MM-DD`: a real date, in the past, from someone at least 13 and at most 120 years old. */
+export function birthDateOf(value: string, now = new Date()): Date {
+  const date = new Date(`${value}T00:00:00Z`);
+  const refuse = (message: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'birth_date_invalid', message, 'birth_date');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw refuse('Enter your date of birth as a real date.');
+  const years = (from: Date, by: number) => new Date(Date.UTC(from.getUTCFullYear() - by, from.getUTCMonth(), from.getUTCDate()));
+  if (date > years(now, youngestAge)) throw refuse(`You must be at least ${youngestAge} years old.`);
+  if (date < years(now, 120)) throw refuse('Enter your date of birth as a real date.');
+  return date;
 }
 
 /**
@@ -312,7 +333,7 @@ export class CustomersService {
    * reseller's store is the reseller's country). A country already set never changes (`country_locked`): the wallet
    * and its money are in that country's currency.
    */
-  async updateProfile(customer: CustomerWithStore, input: { first_name?: string; last_name?: string; name?: string; country?: string }) {
+  async updateProfile(customer: CustomerWithStore, input: { first_name?: string; last_name?: string; name?: string; country?: string; area_id?: string | null; birth_date?: string | null; sex?: CustomerSex | null }) {
     if (input.country !== undefined) {
       // Their own country sent again is theirs, open for sign-up now or not.
       const code = customer.country && input.country.toUpperCase() === customer.country ? customer.country : await this.marketCode(input.country);
@@ -322,8 +343,20 @@ export class CustomersService {
         if (set.count === 0) throw countryLocked();
       }
     }
-    const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: namesGiven(input) ? nameData(input) : {}, include: { market: true } });
+    const about: Prisma.CustomerUncheckedUpdateInput = {};
+    if (input.area_id !== undefined) about.areaId = input.area_id === null ? null : await this.homeArea(customer, input.area_id);
+    if (input.birth_date !== undefined) about.birthDate = input.birth_date === null ? null : birthDateOf(input.birth_date);
+    if (input.sex !== undefined) about.sex = input.sex;
+    const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: { ...(namesGiven(input) ? nameData(input) : {}), ...about }, include: { market: true } });
     return presentCustomer(updated);
+  }
+
+  /** Where the customer lives: an area (never a whole state) of their own country, switched on. */
+  private async homeArea(customer: Customer, id: string) {
+    if (!customer.country) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'Choose your country first.', 'country');
+    const area = await this.prisma.classifiedArea.findFirst({ where: { id, country: customer.country, kind: 'area', enabled: true }, select: { id: true } });
+    if (!area) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'area_unavailable', 'Choose an area of your country.', 'area_id');
+    return area.id;
   }
 
   /** Needs the current password (wrong ones count towards the sign-in lockout); signs out the customer's other sessions. */
@@ -445,12 +478,28 @@ export class CustomersService {
    * Udozo: the customer confirms their mobile later (the code did not arrive, or not now). The account is then usable
    * without it; anything that needs a confirmed mobile still asks, and the profile confirms it any time.
    */
-  async deferPhone(customer: Customer) {
-    const updated =
-      customer.phoneVerifiedAt || customer.phoneDeferredAt
-        ? await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, include: { market: true } })
-        : await this.prisma.customer.update({ where: { id: customer.id }, data: { phoneDeferredAt: new Date() }, include: { market: true } });
-    return presentCustomer(updated);
+  /**
+   * Udozo: the mobile is confirmed later. With `raw`, the number is kept as typed (a mobile of the customer's country,
+   * unconfirmed, no code texted), as at sign-up; a confirmed number is never replaced this way.
+   */
+  async deferPhone(customer: Customer, raw?: string) {
+    if (customer.phoneVerifiedAt || (raw === undefined && customer.phoneDeferredAt)) {
+      return presentCustomer(await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, include: { market: true } }));
+    }
+    const phone = raw === undefined ? undefined : normalisePhone(raw, customer.country);
+    const inUse = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+    if (phone && (await this.prisma.customer.findFirst({ where: { storeId: customer.storeId, phone, id: { not: customer.id } }, select: { id: true } }))) throw inUse();
+    try {
+      const updated = await this.prisma.customer.update({
+        where: { id: customer.id },
+        data: { phoneDeferredAt: customer.phoneDeferredAt ?? new Date(), ...(phone ? { phone } : {}) },
+        include: { market: true },
+      });
+      return presentCustomer(updated);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw inUse();
+      throw error;
+    }
   }
 
   async verifyPhone(customer: Customer, code: string) {

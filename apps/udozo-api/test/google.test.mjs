@@ -129,13 +129,14 @@ describe('signing up and in', () => {
     assert.deepEqual([onboarded.json.memberships[0].role, onboarded.json.memberships[0].reseller.country], ['owner', 'NG']);
   });
 
-  test('signing in with a Google account that never signed up fails and creates nothing', async () => {
+  test('signing in with a Google account that never signed up signs up: a confirmed person, onboarding next', async () => {
     const email = uniqueEmail();
-    const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email });
-    assert.equal(location.searchParams.get('auth_error'), 'google_account_not_found');
-    assert.equal((await browser.get('/v1/auth/session')).status, 401);
-    const { PrismaService } = await import('../dist/database/prisma.service.js');
-    assert.equal(await server.app.get(PrismaService).user.count({ where: { email } }), 0);
+    const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email, name: 'Ada Lovelace' });
+    assert.equal(location.searchParams.get('auth_error'), null);
+    const session = await browser.get('/v1/auth/session');
+    assert.equal(session.status, 200, JSON.stringify(session.json));
+    assert.deepEqual([session.json.user.email, session.json.user.email_verified, session.json.user.has_password], [email, true, false]);
+    assert.deepEqual(session.json.memberships, [], 'no reseller account until onboarding');
   });
 
   test('the same Google account signs in to the same user next time', async () => {

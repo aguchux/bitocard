@@ -138,11 +138,16 @@ describe("udozo.com's customers with Google", () => {
     assert.equal((await browser.get('/v1/store/wallet')).status, 200, 'onboarded');
   });
 
-  test('signing in creates nothing; a Google account never takes over an account with the same email', async () => {
+  test('signing in with a Google account no account uses signs up, to onboard; it never takes over an account with the same email', async () => {
     const browser = site();
-    const stranger = await consent(browser, 'signin', who());
-    const unknown = await browser.post('/v1/store/account/google/finish', { state: stranger.state, code: 'google-code' });
-    assert.deepEqual([unknown.status, unknown.json.error.code], [404, 'google_account_not_found']);
+    const newcomer = who();
+    const stranger = await consent(browser, 'signin', newcomer);
+    const joined = await browser.post('/v1/store/account/google/finish', { state: stranger.state, code: 'google-code' });
+    assert.equal(joined.status, 200, JSON.stringify(joined.json));
+    assert.deepEqual([joined.json.signed_up, joined.json.customer.email, joined.json.customer.email_verified, joined.json.customer.country], [true, newcomer.email, true, null]);
+    const again = await consent(browser, 'signin', newcomer);
+    const back = await browser.post('/v1/store/account/google/finish', { state: again.state, code: 'google-code' });
+    assert.deepEqual([back.status, back.json.signed_up, back.json.customer.id], [200, false, joined.json.customer.id], 'the same account next time');
 
     const person = who();
     const made = await site().post('/v1/store/account/signup', { first_name: 'Ada', last_name: 'Obi', email: person.email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });

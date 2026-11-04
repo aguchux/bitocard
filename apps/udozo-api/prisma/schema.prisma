@@ -2648,6 +2648,13 @@ model Customer {
   /// Udozo: when the customer chose to confirm their mobile later (at sign-up, or on the confirm step). The account is
   /// then usable without it; things that need a confirmed mobile still ask for it.
   phoneDeferredAt           DateTime?                 @map("phone_deferred_at")
+  /// Udozo: where the customer lives, an area of their own country (apart from where their listings are), set on their
+  /// profile. Cleared if the area is ever removed.
+  areaId                    String?                   @map("area_id") @db.Uuid
+  area                      ClassifiedArea?           @relation("CustomerArea", fields: [areaId], references: [id], onDelete: SetNull)
+  /// Udozo: the customer's date of birth and sex, optional, set on their profile (`unspecified` when they would rather not say).
+  birthDate                 DateTime?                 @map("birth_date") @db.Date
+  sex                       String?
   status                    UserStatus                @default(active)
   failedSignIns             Int                       @default(0) @map("failed_sign_ins")
   lockedUntil               DateTime?                 @map("locked_until")
@@ -2746,6 +2753,7 @@ model Customer {
   @@unique([storeId, googleSubject])
   @@unique([storeId, phone])
   @@index([signupRef])
+  @@index([areaId])
   @@map("customers")
   resaleStoreReports        ResaleStoreReport[]
 }
@@ -4542,6 +4550,7 @@ model ClassifiedArea {
   children  ClassifiedArea[] @relation("ClassifiedAreaTree")
   listings  ClassifiedListing[] @relation("ClassifiedListingArea")
   inState   ClassifiedListing[] @relation("ClassifiedListingState")
+  customers Customer[]       @relation("CustomerArea")
 
   @@index([country, kind])
   @@index([parentId])

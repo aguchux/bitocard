@@ -91,9 +91,9 @@ export type GoogleIntent = 'signin' | 'signup' | 'link';
  * "Sign in with Google" for resellers (never admins): authorization code flow with PKCE, a one-time state,
  * and an ID token verified against Google's published keys.
  *
- * Sign-up is deliberate: only a round trip started with `intent=signup` creates an account, and it creates only the
- * person (Google has confirmed the email); they then open their reseller account in SHQ's onboarding (business name
- * and country). Signing in with a Google account that has no BitoCard account fails with `google_account_not_found`.
+ * A Google account no account uses yet signs up, whether the person chose sign-in or sign-up (4 November 2026, the
+ * owner's request): only the person is created (Google has confirmed the email), and they open their reseller account
+ * in Seller HQ's onboarding (name, business, country and mobile, in one step).
  * A Google-only person has no password until they set one with "Forgot password"; then both ways work.
  *
  * Linking rules: a Google account already linked signs in. A signed-in person can link Google to their account.
@@ -216,9 +216,8 @@ export class GoogleService {
     // Someone's other address: never a new account, and never linked to them automatically.
     if (await this.prisma.userEmail.findUnique({ where: { realm_email: { realm: 'reseller', email } } })) throw new GoogleSignInError('account_exists_sign_in_to_link');
 
-    // Signing in never creates an account: the person signs up first, on purpose.
-    if (intent !== 'signup') throw new GoogleSignInError('google_account_not_found');
-
+    // Signing in with a Google account no account uses yet signs up (4 November 2026, the owner's request): onboarding
+    // then opens the reseller account, as after a Google sign-up.
     // A new person: Google has confirmed the email. Their reseller account is opened during onboarding. Google's first
     // and last name are kept, unconfirmed: they may not be as on the person's ID, so Seller HQ asks them to check.
     const names = googleNames(claims, email);
