@@ -8,13 +8,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const finishSignUp = vi.fn(async () => ({ ok: true }));
+const finishSignUp = vi.fn(async (_input: unknown) => ({ ok: true }));
 const sendSignupMobileCode = vi.fn(async () => ({ ok: true }));
 vi.mock("@/lib/account-actions", () => ({
   sendSignupEmailCode: async () => ({ ok: true }),
   confirmSignupEmail: async () => ({ ok: true, token: "tok_0123456789abcdefghij" }),
   sendSignupMobileCode: () => sendSignupMobileCode(),
-  finishSignUp: (input: unknown) => finishSignUp(input as never),
+  finishSignUp: (input: unknown) => finishSignUp(input),
   finishProfile: async () => ({}),
   updateAbout: async () => ({}),
   lookupEmail: async () => ({ ok: true }),
