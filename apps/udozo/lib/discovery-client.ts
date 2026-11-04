@@ -102,16 +102,27 @@ export function beacon(path: string, body: string) {
 // -- The page's one queue ---------------------------------------------------------------------------------------------
 
 let current: EventQueue | null = null;
+/**
+ * Events from before the queue started. A page's own effects run before the root layout's, so on a page opened
+ * directly its first events (the listing's view, the results page's search) come before the tracker starts the queue:
+ * they wait here (stamped with their time) and go into the queue as it starts, which still decides whether they may be
+ * kept. Where the tracker never runs (resellers' stores), they are never sent.
+ */
+let early: Array<{ event: DiscoveryEvent; options?: { now?: boolean } }> = [];
 
-/** Starts the page's queue (the tracker, once, in the root layout). */
+/** Starts the page's queue (the tracker, once, in the root layout), with anything recorded before it. */
 export function startQueue(deps: Pick<Deps, "allowed" | "country">) {
   current ??= new EventQueue({ ...deps, send: beacon, setTimer: (run, ms) => setTimeout(run, ms), clearTimer: timer => clearTimeout(timer as ReturnType<typeof setTimeout>), now: () => new Date() });
+  const waiting = early;
+  early = [];
+  for (const { event, options } of waiting) current.track(event, options);
   return current;
 }
 
-/** Records an event on this page; nothing happens where the tracker is not running (resellers' stores) or nothing may be recorded. */
+/** Records an event on this page; nothing is sent where the tracker is not running (resellers' stores) or nothing may be recorded. */
 export function track(event: DiscoveryEvent, options?: { now?: boolean }) {
-  current?.track(event, options);
+  if (current) current.track(event, options);
+  else if (early.length < maxBatch) early.push({ event: { ...event, at: event.at ?? new Date().toISOString() }, options });
 }
 
 export function trackLater(event: DiscoveryEvent) {

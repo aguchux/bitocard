@@ -142,6 +142,34 @@ describe("the visit's event queue", () => {
     beacon("/api/events", '{"a":1}');
     expect(fetcher).toHaveBeenCalledWith("/api/events", expect.objectContaining({ method: "POST", keepalive: true }));
   });
+  test("events from before the tracker starts (a page opened directly) are kept and sent once it starts", async () => {
+    vi.resetModules();
+    const client = await import("@/lib/discovery-client");
+    const beacons: string[] = [];
+    vi.stubGlobal("navigator", { sendBeacon: (_path: string, body: Blob) => (void body.text().then(text => beacons.push(text)), true) });
+    // The page's own effect runs first: a search on a results page opened directly.
+    client.track({ kind: "search", query: "scooter", results: 4 });
+    client.track({ kind: "view", listing: 100004 });
+    expect(beacons).toHaveLength(0);
+    client.startQueue({ allowed: () => true, country: () => "NG" });
+    client.flushEvents();
+    await vi.waitFor(() => expect(beacons).toHaveLength(1));
+    const sent = JSON.parse(beacons[0]!) as { country: string; events: Array<{ kind: string; at?: string }> };
+    expect(sent.country).toBe("NG");
+    expect(sent.events.map(event => event.kind)).toEqual(["search", "view"]);
+    expect(sent.events.every(event => typeof event.at === "string")).toBe(true);
+  });
+
+  test("early events are still dropped when nothing may be recorded", async () => {
+    vi.resetModules();
+    const client = await import("@/lib/discovery-client");
+    const sendBeacon = vi.fn(() => true);
+    vi.stubGlobal("navigator", { sendBeacon });
+    client.track({ kind: "view", listing: 100004 });
+    client.startQueue({ allowed: () => false, country: () => "NG" });
+    client.flushEvents();
+    expect(sendBeacon).not.toHaveBeenCalled();
+  });
 });
 
 describe("what an event may say", () => {
