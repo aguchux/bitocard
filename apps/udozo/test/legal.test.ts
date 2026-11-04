@@ -53,6 +53,8 @@ describe("Udozo's legal documents", () => {
     const text = JSON.stringify(legalDocuments);
     for (const doc of ["terms", "sellers", "privacy"]) expect(await documentHtml(doc)).toContain(operator.name);
     expect(text).not.toMatch(/BitoCard|Bitocard|Golojan Ltd|legals\./);
+    // Reviewed and final: nothing left waiting on lawyers.
+    expect(text).not.toMatch(/lawyer|to be set up|to be confirmed/i);
     // No street address in the documents.
     expect(text).not.toMatch(/Agu Street|Abakpa|Enugu/);
     expect(text).toContain("legal@udozo.com");

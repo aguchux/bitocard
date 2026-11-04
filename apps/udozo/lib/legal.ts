@@ -5,9 +5,9 @@
  */
 
 export const legalVersion = "2026-11-01";
-/** Privacy and legal requests (to be set up). */
+/** Privacy and legal requests. */
 export const legalContact = "legal@udozo.com";
-/** Help with an account, a listing or an order (to be set up). */
+/** Help with an account, a listing or an order. */
 export const supportContact = "support@udozo.com";
 
 /** The company that owns and operates Udozo (the owner's decision, 30 October 2026). */
@@ -208,7 +208,7 @@ const terms: LegalDocument = {
       body: [
         "If you buy from someone selling as a business, you have the rights consumer law gives you against them. Sellers who sell as a business must say so in their listings and follow consumer law. These terms do not take away any right the law gives you.",
         "We are responsible for running Safe pay as the Safe pay rules describe, and for holding and paying out its money correctly. We are not responsible for the items, for what buyers, sellers and resellers say or do, or for payments made outside Safe pay.",
-        "Nothing in these terms limits a responsibility the law does not allow us to limit. The rest of our responsibility will be set out after lawyers' review in each market.",
+        "Nothing in these terms limits a responsibility the law does not allow us to limit.",
       ],
     },
     {
@@ -222,7 +222,7 @@ const terms: LegalDocument = {
       id: "law",
       heading: "13. Law and contact",
       body: [
-        `These terms are governed by ${operator.law}; the governing law for each market will be confirmed after lawyers' review. Tell us first: most problems are put right there. You keep any rights you have under the law where you live.`,
+        `These terms are governed by ${operator.law}. Tell us first: most problems are put right there. You keep any rights you have under the law where you live.`,
         `Ask for help from your account, or email ${supportContact}. For privacy and legal requests, email ${legalContact}.`,
       ],
     },
@@ -591,9 +591,9 @@ const sellers: LegalDocument = {
       id: "law",
       heading: "17. Responsibility, changes and law",
       body: [
-        "We run Seller HQ with reasonable care and skill. We are not responsible for what suppliers or buyers do, or for registrars and payment partners failing, beyond putting right what we can. Nothing in these terms limits a responsibility the law does not allow us to limit; the rest will be set out after lawyers' review in each market.",
+        "We run Seller HQ with reasonable care and skill. We are not responsible for what suppliers or buyers do, or for registrars and payment partners failing, beyond putting right what we can. Nothing in these terms limits a responsibility the law does not allow us to limit.",
         "We tell you in Seller HQ or by email at least 30 days before a change that is not in your favour takes effect, unless the law requires it sooner. If you do not agree, you may close your account before it does.",
-        `These terms are governed by ${operator.law}; the governing law for each market will be confirmed after lawyers' review. Questions: ${supportContact}; legal and privacy requests: ${legalContact}.`,
+        `These terms are governed by ${operator.law}. Questions: ${supportContact}; legal and privacy requests: ${legalContact}.`,
       ],
     },
   ],
@@ -704,7 +704,7 @@ const privacy: LegalDocument = {
     {
       id: "where",
       heading: "7. Where it is stored",
-      body: ["Your data is stored in the United States. What a shop assistant run by DeepSeek is sent (section 4) is processed in China. Where it leaves your country, we use the safeguards your country's law requires; these are being confirmed with lawyers in each market."],
+      body: ["Your data is stored in the United States. What a shop assistant run by DeepSeek is sent (section 4) is processed in China. Where it leaves your country, we use the safeguards your country's law requires."],
     },
     {
       id: "retention",
@@ -722,7 +722,7 @@ const privacy: LegalDocument = {
               ["Contact requests and call backs", "12 months after they are answered or cancelled. A shared contact stays shared until the seller stops sharing it or closes their account."],
               ["Calls", "Who called whom and when: 90 days. The connection details: deleted when the call ends. When you last had udozo.com open: replaced each time."],
               ["Buyers' details on store orders", "Shown to the supplier and reseller until 30 days after the order ends."],
-              ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years (to be confirmed with lawyers)."],
+              ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years."],
               ["Chats and questions with our team", "Chats 12 months after they end; questions two years after they are resolved."],
               ["Contact us messages", "Two years after the last reply or change; messages we mark as spam, after 30 days."],
               ["Your sign-up steps", "Deleted 7 days after your account is ready to use, or 30 days after your last step if you never finish. Only daily counts with nothing about you are kept, for a year."],
