@@ -65,35 +65,24 @@ details[open] > .menu-drop {
   }
 }
 
-/* Home pages' marquees (components/marquee.tsx): the track holds the items twice and moves by half its width, forever;
-   pausing on pointing, focus or the Pause button. Visitors who ask for reduced motion get a still row to scroll. */
-@keyframes marquee-run {
-  to {
-    transform: translateX(-50%);
-  }
+/* Home pages' marquees (components/marquee.tsx): a sideways scroller with no scroll bar, moved by its script and by
+   hand (swipe, wheel, trackpad, mouse drag). Visitors who ask for reduced motion get a still row to scroll. */
+.marquee .marquee-viewport {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  cursor: grab;
 }
-.marquee .marquee-track {
-  animation: marquee-run var(--marquee-duration, 40s) linear infinite;
+.marquee .marquee-viewport::-webkit-scrollbar {
+  display: none;
 }
-.marquee[data-direction="right"] .marquee-track {
-  animation-direction: reverse;
-}
-.marquee:hover .marquee-track,
-.marquee:focus-within .marquee-track,
-.marquee[data-paused="true"] .marquee-track {
-  animation-play-state: paused;
+.marquee .marquee-viewport:active {
+  cursor: grabbing;
 }
 @media (prefers-reduced-motion: reduce) {
-  .marquee .marquee-track {
-    animation: none;
-  }
   .marquee .marquee-copy,
   .marquee .marquee-control {
     display: none;
-  }
-  .marquee .marquee-viewport {
-    overflow-x: auto;
-    scrollbar-width: none;
   }
 }
 

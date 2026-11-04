@@ -1,5 +1,5 @@
 // udozo.com's home pages in rows (docs/UDOZO_HOME_ROWS_PLAN.md): each row with its background, heading and "See all";
-// marquees sliding their items twice (the copy hidden and inert) with a Pause button; resellers' stores opening their
+// marquees sliding their items twice (the copy hidden from screen readers) with a Pause button; resellers' stores opening their
 // own site; banners opening their category; the editor's preview marks (only in preview) and its framing (only there).
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -90,12 +90,12 @@ describe("rows", () => {
 });
 
 describe("marquees", () => {
-  it("slide their items twice, the copy hidden and inert, with a Pause button, its speed and direction", () => {
+  it("slide their items twice, the copy hidden from screen readers, with a Pause button, its speed and direction", () => {
     const out = html(page([row("r1", [marquee("m", [card("a"), card("b"), card("c")])])]));
     expect(out.match(/Item a/g)).toHaveLength(2);
-    expect(out).toMatch(/<ul aria-hidden="true" inert=""[^>]*class="marquee-copy/);
+    expect(out).toMatch(/<ul aria-hidden="true"[^>]*class="marquee-copy/);
     expect(out).toContain('data-direction="right"');
-    expect(out).toContain("--marquee-duration:12s");
+    expect(out).toContain('data-duration="12"');
     expect(out).toContain("Pause Trending");
   });
 
