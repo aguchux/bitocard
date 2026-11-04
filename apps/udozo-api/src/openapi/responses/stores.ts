@@ -50,6 +50,8 @@ const store = objectSchema(
     ai_overage: oneOf('Beyond the month’s AI replies on BitoCard’s AI: `stop` (people answer) or `pay` (each reply billed as it goes).', ['stop', 'pay']),
     desktop_nav: nullableStr('Your customers’ account app menu on desktop: `rail` (side rail) or `bottom` (bottom bar); null follows BitoCard’s default. Phones and tablets always use the bottom bar.', { enum: ['rail', 'bottom', null] }),
     customer_verification: bool('Whether your store’s customers are asked for the identity check where BitoCard’s market rules require one (`true`), or never (`false`). Turning it off never marks anyone as checked.'),
+    watermark_text: nullableStr('Your own text drawn on the store’s listing photos; null shows Udozo’s.'),
+    watermark_allowed: bool('Whether Udozo lets this store’s photos carry your own watermark text. While false, Udozo’s shows whatever is set.'),
     published_at: nullableTime('When the store was first published; kept when it is unpublished.'),
     created_at: time('When the store was created.'),
   },
@@ -73,6 +75,8 @@ const storeExample = {
   desktop_nav: null,
   ai_overage: 'stop',
   customer_verification: true,
+  watermark_text: null,
+  watermark_allowed: false,
   published_at: '2026-10-02T14:20:00.000Z',
   created_at: '2026-10-01T10:05:12.000Z',
 };

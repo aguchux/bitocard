@@ -140,9 +140,43 @@ export class MediaStorage {
     return this.publicUrl(key);
   }
 
-  private async send(method: string, key: string, headers: Record<string, string> = {}, body?: Buffer) {
+  /**
+   * Stores bytes the API has already checked at their key without public access: read back only with credentials
+   * (`get`). For listing photos while watermarks are on, whose originals are never public (docs/UDOZO_WATERMARK_PLAN.md).
+   * Returns the address the file would have if it were public, kept as the photo's `url` (never served while private).
+   */
+  async putPrivate(key: string, bytes: Buffer, contentType: string) {
+    if (contentType === 'image/svg+xml') throw new Error('SVG is only published through checked uploads');
+    const res = await this.send('PUT', key, { 'x-amz-acl': 'private', 'content-type': contentType, 'cache-control': 'private, no-store' }, bytes);
+    if (!res.ok) throw unavailable();
+    return this.publicUrl(key);
+  }
+
+  /**
+   * Makes a stored object private (S3's PutObjectAcl, `PUT <key>?acl` with `x-amz-acl: private`). False when it is not
+   * there; storage errors throw `storage_unavailable`.
+   */
+  async makePrivate(key: string) {
+    const res = await this.send('PUT', key, { 'x-amz-acl': 'private' }, undefined, { acl: '' });
+    if (res.status === 404) return false;
+    if (!res.ok) throw unavailable();
+    return true;
+  }
+
+  /** A whole object (at most `maxBytes`) and its type, read with credentials; null when it is not there. */
+  async get(key: string, maxBytes = 8 * 1024 * 1024) {
+    const res = await this.send('GET', key);
+    if (res.status === 404 || res.status === 403) return null;
+    if (!res.ok) throw unavailable();
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length > maxBytes) return null;
+    return { bytes, contentType: (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() };
+  }
+
+  private async send(method: string, key: string, headers: Record<string, string> = {}, body?: Buffer, query?: Record<string, string>) {
     const spaces = this.require();
     const url = this.objectUrl(spaces, key);
+    for (const [name, value] of Object.entries(query ?? {})) url.searchParams.set(name, value);
     const payloadHash = body ? createHash('sha256').update(body).digest('hex') : undefined;
     try {
       return await fetch(url, {

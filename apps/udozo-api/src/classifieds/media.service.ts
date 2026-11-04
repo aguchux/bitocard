@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { checkDocument, maxDocumentBytes, stripJpeg } from '../kyc/files.js';
 import { MediaStorage } from '../media/storage.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ListingsService } from './listings.service.js';
 import { invalid } from './rules.js';
 import { FfmpegTranscoder, maxVideoBytes, type VideoTranscoder, VideoRefused, videoKind } from './video.js';
@@ -37,6 +38,7 @@ export class ListingMediaService {
     private readonly storage: MediaStorage,
     private readonly listings: ListingsService,
     private readonly integrations: IntegrationsService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   private uploadKey() {
@@ -78,10 +80,11 @@ export class ListingMediaService {
     if (listing.media.filter(item => item.kind === 'photo').length >= settings.maxPhotos) throw conflict('too_many_photos', `A listing can have at most ${settings.maxPhotos} photos.`);
 
     const key = this.storage.key(this.folder(listing), `${randomUUID()}.${checked.contentType === 'image/png' ? 'png' : 'jpg'}`);
-    const url = await this.storage.putPublic(key, checked.bytes, checked.contentType);
+    // While watermarks are on the original is stored private: people only ever get udozo.com's watermarked copies.
+    const { url, privateAt } = await this.watermarks.putPhoto(key, checked.bytes, checked.contentType);
     const position = Math.max(-1, ...listing.media.filter(item => item.kind === 'photo').map(item => item.position)) + 1;
     const media = await this.prisma.classifiedMedia.create({
-      data: { listingId: listing.id, kind: 'photo', position, url, storageKey: key, width: checked.width, height: checked.height, contentHash: hash, status: 'ready' },
+      data: { listingId: listing.id, kind: 'photo', position, url, storageKey: key, width: checked.width, height: checked.height, contentHash: hash, status: 'ready', privateAt },
     });
     // A new photo on a live listing is checked like the rest (another seller's photo sends it to review).
     if (listing.status === 'active') await this.listings.recheck(listing.id);
@@ -199,7 +202,8 @@ export class ListingMediaService {
       id: media.id,
       kind: media.kind,
       position: media.position,
-      url: media.url,
+      // Videos are not watermarked (docs/UDOZO_WATERMARK_PLAN.md): their address stays the stored one.
+      url: media.kind === 'photo' ? this.watermarks.url(media, 960) : media.url,
       width: media.width,
       height: media.height,
       status: media.status,

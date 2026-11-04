@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { ClassifiedBrandsService } from './brands.service.js';
@@ -83,6 +84,7 @@ export class ListingSearchService {
     private readonly listings: ListingsService,
     private readonly leads: LeadsService,
     private readonly brands: ClassifiedBrandsService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   private async features(filters: string[] | undefined) {
@@ -207,7 +209,7 @@ export class ListingSearchService {
         category: { include: { features: { select: { featureId: true, position: true } } } },
         features: { include: { feature: true } },
         customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true } },
-        media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { kind: true, url: true, width: true, height: true, posterUrl: true } },
+        media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { id: true, kind: true, url: true, width: true, height: true, posterUrl: true } },
       },
     });
     const checked = await this.idChecked(rows.map(row => row.customerId));
@@ -228,7 +230,7 @@ export class ListingSearchService {
             condition: row.condition,
             category: row.category ? { slug: row.category.slug, name: row.category.name } : null,
             area: { slug: row.area!.slug, name: row.area!.name, state: { slug: row.area!.parent!.slug, name: row.area!.parent!.name } },
-            cover: photos[0] ? { url: photos[0].url, width: photos[0].width, height: photos[0].height } : null,
+            cover: photos[0] ? { url: this.watermarks.url(photos[0], 480), width: photos[0].width, height: photos[0].height } : null,
             photo_count: photos.length,
             has_video: row.media.some(item => item.kind === 'video'),
             highlights: highlights(row.features, row.category?.features ?? []),
@@ -307,7 +309,7 @@ export class ListingSearchService {
         .map(value => ({ key: value.feature.key, name: value.feature.name, icon: value.feature.icon, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) })),
       /** The brand feature's registry brand (its logo and colour), when the registry has it. */
       brand,
-      photos: photos.map(item => ({ url: item.url, width: item.width, height: item.height })),
+      photos: photos.map(item => ({ url: this.watermarks.url(item, 1600), width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
       /** Paid for with Safe pay and waiting for the hand-over. */

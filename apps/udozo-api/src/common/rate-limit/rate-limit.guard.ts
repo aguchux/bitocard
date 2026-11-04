@@ -6,6 +6,7 @@ import { PrismaService } from '../../database/prisma.service.js';
 import { sha256 } from '../crypto.js';
 import { ApiError } from '../errors/api-error.js';
 import { callerScope, type CustomerScopedRequest } from '../idempotency/idempotency.interceptor.js';
+import { mediaSignatureHeader, mediaSignatureValid } from '../../watermarks/watermarks.js';
 import { clientHeader, signedClientIp } from './client-ip.js';
 
 type Verdict = { success: boolean; limit: number; remaining: number; reset: number };
@@ -80,6 +81,18 @@ const rateLimited = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit
  * (`/v1/afrippa/`) with its own secret, the stores' servers for everything else with theirs, so neither can vouch for
  * the other's visitors.
  */
+const originalPath = /^\/v1\/classifieds\/media\/([0-9a-f-]{36})\/original(?:\?|$)/;
+
+/**
+ * udozo.com's image route reading a photo's original (signed with STORE_SERVER_SECRET for that photo): never limited,
+ * as every visitor's photos come through udozo.com's few servers, and a CDN miss must not turn into a broken photo.
+ * Anything unsigned or wrongly signed is limited as usual.
+ */
+function signedOriginal(req: Request, storeServerSecret: string | undefined) {
+  const match = originalPath.exec(req.originalUrl);
+  return Boolean(match && req.method === 'GET' && mediaSignatureValid(req.get(mediaSignatureHeader), storeServerSecret, match[1]!));
+}
+
 function clientSecret(url: string, secrets: { storeServerSecret: string | undefined; afrippaServerSecret: string | undefined }) {
   return url.startsWith('/v1/afrippa/') ? secrets.afrippaServerSecret : secrets.storeServerSecret;
 }
@@ -105,7 +118,7 @@ export class AddressRateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
-    if (!req.originalUrl.startsWith('/v1/')) return true;
+    if (!req.originalUrl.startsWith('/v1/') || signedOriginal(req, this.storeServerSecret)) return true;
     const address = signedClientIp(req.get(clientHeader), clientSecret(req.originalUrl, { storeServerSecret: this.storeServerSecret, afrippaServerSecret: this.afrippaServerSecret })) ?? req.ip ?? 'unknown';
     if (isSensitive(req.method, req.originalUrl)) {
       let verdict: Verdict;
@@ -159,7 +172,7 @@ export class RateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
-    if (!req.originalUrl.startsWith('/v1/')) return true;
+    if (!req.originalUrl.startsWith('/v1/') || signedOriginal(req, this.storeServerSecret)) return true;
     // Customers' routes: the stores' (`/v1/store/`) and Afrippa's (`/v1/afrippa/`), both called by a site's server.
     const store = /^\/v1\/(?:store|afrippa)\//.test(req.originalUrl);
     if (store) await this.identifyCustomer(req);

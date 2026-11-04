@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { checkDocument, maxDocumentBytes } from '../kyc/files.js';
@@ -72,7 +73,7 @@ const listingSummary = {
     priceMinor: true,
     customerId: true,
     contact: true,
-    media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { url: true } },
+    media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { id: true, url: true } },
   },
 } satisfies Prisma.ClassifiedListingDefaultArgs;
 
@@ -109,6 +110,7 @@ export class ConversationsService {
     private readonly integrations: IntegrationsService,
     private readonly audit: AuditService,
     private readonly discovery: DiscoveryRecorder,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   // ---- Reading ----
@@ -580,7 +582,7 @@ export class ConversationsService {
       status: listing.status,
       country: listing.country,
       price: { kind: listing.priceKind, amount: listing.priceMinor === null ? null : Number(listing.priceMinor), currency: listing.currency },
-      cover_url: listing.media[0]?.url ?? null,
+      cover_url: listing.media[0] ? this.watermarks.url(listing.media[0], 480) : null,
     };
   }
 

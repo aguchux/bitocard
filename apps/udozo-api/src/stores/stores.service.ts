@@ -12,6 +12,7 @@ import { reservedSubdomains } from './reserved.js';
 import { StoreHostsService } from './store-hosts.service.js';
 import { designFor, storeTemplates, templateFor, type StoreTemplate } from './templates.js';
 import { planFeatureRequired, planIncludes, PlanAccessService } from '../plans/plan-access.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 
 export { reservedSubdomains };
 
@@ -44,7 +45,11 @@ export function storeDesign(store: Pick<Store, 'template' | 'variant' | 'theme' 
   };
 }
 
-export function presentStore(store: Store) {
+/**
+ * A store as Seller HQ and the API show it. `watermarkAllowed`: whether the reseller may give it its own photo watermark
+ * (`store_watermarks`), which the store's service works out (false where it is not known, such as admins' views).
+ */
+export function presentStore(store: Store, watermarkAllowed = false) {
   const { template, variant, theme } = designFor(store.template, store.variant, store.theme);
   return {
     object: 'store' as const,
@@ -67,6 +72,10 @@ export function presentStore(store: Store) {
     ai_overage: store.aiOverage,
     /** Customers are asked for the identity check where BitoCard's market rules require it (true), or never. */
     customer_verification: store.customerVerification,
+    /** The store's own photo watermark (Udozo's shows while null or not allowed). */
+    watermark_text: store.watermarkText,
+    /** Whether Udozo lets this store's photos carry its own watermark text (`store_watermarks`). */
+    watermark_allowed: watermarkAllowed,
     published_at: store.publishedAt?.toISOString() ?? null,
     created_at: store.createdAt.toISOString(),
   };
@@ -86,6 +95,8 @@ export type StoreInput = {
   variant?: string;
   theme?: string;
   focus?: string | null;
+  /** The store's own photo watermark text, or null for Udozo's (`store_watermarks` must allow it). */
+  watermark_text?: string | null;
 };
 
 const invalid = (code: string, message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -121,7 +132,13 @@ export class StoresService {
     private readonly hosts: StoreHostsService,
     private readonly planAccess: PlanAccessService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly watermarks: WatermarkService,
   ) {}
+
+  /** The store as shown to its reseller, with whether they may give it its own photo watermark. */
+  private async present(store: Store) {
+    return presentStore(store, await this.watermarks.storeTextAllowed(store.resellerId));
+  }
 
   /**
    * Whether this product's stores may use a template (docs/UDOZO_SPINOFF_PLAN.md): Udozo's stores are Resale shops only,
@@ -189,7 +206,7 @@ export class StoresService {
       });
       // Its address on bitocard.com is set up at once (DNS and HTTPS take a few minutes), so it is ready by publishing.
       await this.hosts.sync(store.id);
-      return presentStore(store);
+      return this.present(store);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw taken();
       throw error;
@@ -198,7 +215,8 @@ export class StoresService {
 
   async list(resellerId: string) {
     const stores = await this.prisma.store.findMany({ where: { resellerId }, orderBy: { createdAt: 'asc' } });
-    return { object: 'list' as const, data: stores.map(presentStore) };
+    const allowed = stores.length ? await this.watermarks.storeTextAllowed(resellerId) : false;
+    return { object: 'list' as const, data: stores.map(store => presentStore(store, allowed)) };
   }
 
   async get(resellerId: string, id: string) {
@@ -240,6 +258,16 @@ export class StoresService {
         }, store.template)
       : null;
     const themeChanged = Boolean(design && design.theme.key !== store.theme);
+    // The store's own photo watermark: only where Udozo allows it; a new text gives its photos new addresses.
+    let watermarkText: string | null | undefined;
+    if (input.watermark_text !== undefined) {
+      if (!(await this.watermarks.storeTextAllowed(resellerId))) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'store_watermark_unavailable', 'Your own photo watermark is not available for your stores yet.', 'watermark_text');
+      }
+      const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { country: true } });
+      watermarkText = await this.watermarks.checkStoreText(input.watermark_text, reseller.country);
+      if (watermarkText === store.watermarkText) watermarkText = undefined;
+    }
     let subdomain: string | undefined;
     if (input.subdomain && input.subdomain.toLowerCase() !== store.subdomain) {
       if (store.status !== 'draft') {
@@ -263,11 +291,12 @@ export class StoresService {
           desktopNav: input.desktop_nav,
           aiOverage: input.ai_overage,
           customerVerification: input.customer_verification,
+          ...(watermarkText !== undefined ? { watermarkText, watermarkVersion: { increment: 1 } } : {}),
           ...(subdomain ? { hostStatus: 'pending' } : {}),
         },
       });
       if (subdomain) await this.hosts.sync(id);
-      return presentStore(updated);
+      return this.present(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw taken();
       throw error;
@@ -289,13 +318,13 @@ export class StoresService {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'email_verification_required', 'Confirm your email address before publishing.');
     }
     const updated = await this.prisma.store.update({ where: { id }, data: { status: 'published', publishedAt: store.publishedAt ?? new Date() } });
-    return presentStore(updated);
+    return this.present(updated);
   }
 
   async unpublish(resellerId: string, id: string) {
     const store = await this.get(resellerId, id);
-    if (store.status === 'suspended') return presentStore(store);
-    return presentStore(await this.prisma.store.update({ where: { id }, data: { status: 'draft' } }));
+    if (store.status === 'suspended') return this.present(store);
+    return this.present(await this.prisma.store.update({ where: { id }, data: { status: 'draft' } }));
   }
 
   /** Public: what the storefront app needs to render a published store. */
@@ -327,7 +356,7 @@ export class StoresService {
     if (!before) throw missing();
     const after = await this.prisma.store.update({ where: { id }, data: { status } });
     await this.audit.record({ actorId, action: `store.${status}`, targetType: 'store', targetId: id, before, after });
-    return presentStore(after);
+    return this.present(after);
   }
 
   /**

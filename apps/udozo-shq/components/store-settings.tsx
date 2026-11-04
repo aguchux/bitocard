@@ -2,7 +2,7 @@
 
 import { usePaidPlans } from "@/components/paid-plans";
 import { useEffect, useState, type FormEvent } from "react";
-import { CheckCircle2, CreditCard, ExternalLink, Globe, XCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, ExternalLink, Globe, Stamp, XCircle } from "lucide-react";
 import {
   ActionDialog,
   Button,
@@ -27,6 +27,8 @@ import {
   useSubdomainCheckQuery,
   useUnpublishStoreMutation,
   useUpdateStoreMutation,
+  watermarkTextMax,
+  watermarkTextProblem,
 } from "@bitocard/api-client/reseller";
 import { useReseller } from "@/components/reseller";
 
@@ -232,6 +234,94 @@ export function StoreLiveSwitch({ store, canManage }: { store: Store; canManage:
   );
 }
 
+/** A small preview of a listing photo with the mark: the text in the corner, and large and faint across the middle. */
+function WatermarkPreview({ text }: { text: string }) {
+  return (
+    <figure>
+      <div
+        role="img"
+        aria-label={`Preview of a listing photo marked “${text}”`}
+        className="relative aspect-[4/3] w-full max-w-xs overflow-hidden rounded-lg border border-line bg-gradient-to-br from-slate-300 via-slate-200 to-amber-100"
+        style={{ containerType: "inline-size" }}
+      >
+        <span aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap font-bold text-white" style={{ fontSize: "9cqw", opacity: 0.16, transform: "translate(-50%, -50%) rotate(-12deg)", textShadow: "0 0 1cqw rgba(0,0,0,0.6)" }}>
+          {text}
+        </span>
+        <span aria-hidden className="pointer-events-none absolute whitespace-nowrap font-semibold text-white" style={{ fontSize: "3.5cqw", right: "2.5cqw", bottom: "2cqw", textShadow: "0 0.15cqw 0.6cqw rgba(0,0,0,0.65)" }}>
+          {text}
+        </span>
+      </div>
+      <figcaption className="mt-1 text-xs text-muted">Preview. The mark is drawn into every listing photo on your store.</figcaption>
+    </figure>
+  );
+}
+
+/**
+ * The text drawn on the store's listing photos (docs/UDOZO_WATERMARK_PLAN.md): the store's own where Udozo allows it
+ * (`watermark_allowed`), else Udozo's. Saved and cleared with the store's PATCH; the API's refusals (`text_refused`,
+ * `store_watermark_unavailable`) are shown as it words them.
+ */
+export function StoreWatermarkCard({ store, canManage }: { store: Store; canManage: boolean }) {
+  // What is saved: the store's, then each answer's (the card keeps it while the store list refreshes).
+  const [current, setCurrent] = useState(store.watermark_text ?? null);
+  const [text, setText] = useState(current ?? "");
+  const [saved, setSaved] = useState<"saved" | "cleared" | null>(null);
+  const [update, state] = useUpdateStoreMutation();
+  if (!store.watermark_allowed) {
+    return (
+      <Card>
+        <CardHeader title="Photo watermark" description="Udozo’s watermark is used on your store’s photos." />
+      </Card>
+    );
+  }
+  const problem = watermarkTextProblem(text);
+  const dirty = text.trim() !== (current ?? "");
+  const send = async (watermark_text: string | null) => {
+    setSaved(null);
+    const done = await update({ id: store.id, watermark_text })
+      .unwrap()
+      .catch(() => null);
+    if (done) {
+      setCurrent(done.watermark_text ?? null);
+      setText(done.watermark_text ?? "");
+      setSaved(watermark_text === null ? "cleared" : "saved");
+    }
+  };
+  return (
+    <Card>
+      <CardHeader title="Photo watermark" description="Your own text on the listing photos on your store’s pages, so copies taken elsewhere still name your store. Leave it empty to use Udozo’s." />
+      <form
+        className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]"
+        onSubmit={event => {
+          event.preventDefault();
+          void send(text.trim());
+        }}
+      >
+        <div className="space-y-4">
+          {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+          {saved && !dirty ? <Notice tone="green">{saved === "cleared" ? "Your store uses Udozo’s watermark again." : "Watermark saved."}</Notice> : null}
+          <Field label="Watermark text" htmlFor={`watermark-${store.id}`} hint="2 to 30 letters, digits, spaces and . - _ @, such as your domain." error={dirty && text.trim() && problem ? problem : undefined}>
+            <Input id={`watermark-${store.id}`} value={text} maxLength={watermarkTextMax + 10} onChange={event => setText(event.target.value)} disabled={!canManage} spellCheck={false} autoComplete="off" placeholder="udozo.com" />
+          </Field>
+          {canManage ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={state.isLoading} disabled={!dirty || Boolean(problem)} icon={<Stamp className="size-4" aria-hidden />}>
+                Save watermark
+              </Button>
+              {current ? (
+                <Button type="button" variant="secondary" disabled={state.isLoading} onClick={() => void send(null)}>
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        <WatermarkPreview text={!text.trim() ? "udozo.com" : problem ? (current ?? "udozo.com") : text.trim()} />
+      </form>
+    </Card>
+  );
+}
+
 /** One store's settings: name, address, branding, the account app's menu, publishing, and going live. */
 export function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }) {
   const [name, setName] = useState(store.name);
@@ -358,6 +448,8 @@ export function StoreDetails({ store, canManage }: { store: Store; canManage: bo
           ) : null}
         </form>
       </Card>
+
+      <StoreWatermarkCard store={store} canManage={canManage} />
 
       <ActionDialog
         open={confirmUnpublish}

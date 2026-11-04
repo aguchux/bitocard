@@ -2,6 +2,7 @@ import { P2pMerchantsService } from '../afrippa/merchants.service.js';
 import { P2pOrdersService } from '../afrippa/orders.service.js';
 import { ListingsService } from '../classifieds/listings.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
@@ -110,6 +111,7 @@ export class CronController {
     calls: CallsService,
     signupJourneys: SignupJourneysService,
     discovery: DiscoveryAdminService,
+    watermarks: WatermarkService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -209,7 +211,8 @@ export class CronController {
        * lapse, are refunded (not handed over) or released (delivery not confirmed or disputed); resale deals past their
        * end end, auto-listing rules add new listings, and resellers are told when a store listing stops selling; calls
        * that rang out are missed (the seller told) and calls past 90 days deleted; every live listing's discovery signals
-       * (its quality in personalised rows) are refreshed.
+       * (its quality in personalised rows) are refreshed; while photo watermarks are on, up to 500 public listing photos
+       * are made private.
        */
       classifieds: async () => ({
         safe_pay: await safePay.runDue(),
@@ -222,6 +225,7 @@ export class CronController {
         old_resale_threads: await resaleOrders.purgeOldThreads(),
         calls: await calls.job(),
         listing_signals: await discovery.refreshSignals(),
+        private_photos: await watermarks.privatise(),
       }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),

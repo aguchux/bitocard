@@ -8,6 +8,7 @@ import { ResaleService } from '../classifieds/resale.service.js';
 import { featureValueOut, holdingStatuses, invalid, linkPattern, maxPriceMinor } from '../classifieds/rules.js';
 import { publicName } from '../classifieds/search.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { breakdown, type FeeRates, priceRange, resellerPrice, type ResaleTerms, termsWith } from './pricing.js';
 import { ResaleTradeService } from './resale-trade.service.js';
 
@@ -57,7 +58,7 @@ const listingSelect = {
   publishedAt: true,
   category: { select: { slug: true, name: true } },
   area: { select: { name: true, parent: { select: { name: true } } } },
-  media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { url: true, width: true, height: true } },
+  media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { id: true, url: true, width: true, height: true } },
   customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true } },
 } satisfies Prisma.ClassifiedListingSelect;
 type ListingRow = Prisma.ClassifiedListingGetPayload<{ select: typeof listingSelect }>;
@@ -93,6 +94,7 @@ export class ResaleStoresService {
     private readonly trade: ResaleTradeService,
     private readonly inbox: InboxService,
     private readonly emails: ShopEmails,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   // ---- Who may resell ----
@@ -252,7 +254,7 @@ export class ResaleStoresService {
         condition: row.condition,
         category: row.category ? { slug: row.category.slug, name: row.category.name } : null,
         area: row.area ? { name: row.area.name, state: row.area.parent?.name ?? null } : null,
-        cover: cover ? { url: cover.url, width: cover.width, height: cover.height } : null,
+        cover: cover ? { url: this.watermarks.url(cover, 480), width: cover.width, height: cover.height } : null,
         delivery: row.delivery,
         currency: row.currency,
         supplier_price: Number(price),
@@ -319,7 +321,7 @@ export class ResaleStoresService {
         description: true,
         category: { select: { features: { select: { featureId: true, position: true } } } },
         features: { include: { feature: true } },
-        media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { kind: true, url: true, width: true, height: true, posterUrl: true, durationMs: true } },
+        media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { id: true, kind: true, url: true, width: true, height: true, posterUrl: true, durationMs: true } },
       },
     });
     const video = detail.media.find(item => item.kind === 'video');
@@ -332,7 +334,7 @@ export class ResaleStoresService {
         .filter(value => value.feature.enabled)
         .sort((a, b) => (order.get(a.featureId) ?? 1000) - (order.get(b.featureId) ?? 1000) || a.feature.name.localeCompare(b.feature.name))
         .map(value => ({ key: value.feature.key, name: value.feature.name, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) })),
-      photos: detail.media.filter(item => item.kind === 'photo').map(item => ({ url: item.url, width: item.width, height: item.height })),
+      photos: detail.media.filter(item => item.kind === 'photo').map(item => ({ url: this.watermarks.url(item, 1600), width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs } : null,
     };
   }
@@ -428,7 +430,7 @@ export class ResaleStoresService {
       status: row.status as ResaleListingStatus,
       state,
       title: listing.title ?? '',
-      cover: cover ? { url: cover.url, width: cover.width, height: cover.height } : null,
+      cover: cover ? { url: this.watermarks.url(cover, 480), width: cover.width, height: cover.height } : null,
       currency: listing.currency,
       supplier_price: listing.priceMinor === null ? null : Number(listing.priceMinor),
       markup_bps: row.markupBps,

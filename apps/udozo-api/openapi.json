@@ -6824,6 +6824,8 @@
                   "desktop_nav": null,
                   "ai_overage": "stop",
                   "customer_verification": true,
+                  "watermark_text": null,
+                  "watermark_allowed": false,
                   "published_at": null,
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -6977,6 +6979,8 @@
                       "desktop_nav": null,
                       "ai_overage": "stop",
                       "customer_verification": true,
+                      "watermark_text": null,
+                      "watermark_allowed": false,
                       "published_at": "2026-10-02T14:20:00.000Z",
                       "created_at": "2026-10-01T10:05:12.000Z"
                     }
@@ -7114,6 +7118,8 @@
                   "desktop_nav": null,
                   "ai_overage": "stop",
                   "customer_verification": true,
+                  "watermark_text": null,
+                  "watermark_allowed": false,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -7276,6 +7282,8 @@
                   "desktop_nav": null,
                   "ai_overage": "stop",
                   "customer_verification": true,
+                  "watermark_text": null,
+                  "watermark_allowed": false,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -7618,6 +7626,8 @@
                   "desktop_nav": null,
                   "ai_overage": "stop",
                   "customer_verification": true,
+                  "watermark_text": null,
+                  "watermark_allowed": false,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -30094,6 +30104,12 @@
             "type": "object",
             "description": "Single product stores: the product key it sells (one you have listed).",
             "example": "esim:WW:global:10gb-30d"
+          },
+          "watermark_text": {
+            "type": "string",
+            "description": "Your own text drawn on your store’s listing photos (2 to 30 letters, digits, spaces and . - _ @), or null for Udozo’s. Only where Udozo allows it (`watermark_allowed` on the store); changed from Seller HQ only.",
+            "nullable": true,
+            "example": "gadgetsplus.ng"
           }
         }
       },
@@ -30180,6 +30196,12 @@
             "type": "object",
             "description": "Single product stores: the product key it sells (one you have listed).",
             "example": "esim:WW:global:10gb-30d"
+          },
+          "watermark_text": {
+            "type": "string",
+            "description": "Your own text drawn on your store’s listing photos (2 to 30 letters, digits, spaces and . - _ @), or null for Udozo’s. Only where Udozo allows it (`watermark_allowed` on the store); changed from Seller HQ only.",
+            "nullable": true,
+            "example": "gadgetsplus.ng"
           }
         }
       },
@@ -39327,6 +39349,8 @@
           "ai_overage",
           "desktop_nav",
           "customer_verification",
+          "watermark_text",
+          "watermark_allowed",
           "published_at",
           "created_at"
         ],
@@ -39478,6 +39502,17 @@
           "customer_verification": {
             "type": "boolean",
             "description": "Whether your store’s customers are asked for the identity check where BitoCard’s market rules require one (`true`), or never (`false`). Turning it off never marks anyone as checked."
+          },
+          "watermark_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own text drawn on the store’s listing photos; null shows Udozo’s."
+          },
+          "watermark_allowed": {
+            "type": "boolean",
+            "description": "Whether Udozo lets this store’s photos carry your own watermark text. While false, Udozo’s shows whatever is set."
           },
           "published_at": {
             "type": [
@@ -43420,6 +43455,7 @@
               "domain.expired",
               "domain.suspended",
               "store.sandbox_without_domain",
+              "store.watermark_cleared",
               "account.suspended",
               "account.reinstated",
               "connection.approved",
@@ -43628,6 +43664,7 @@
               "domain.expired",
               "domain.suspended",
               "store.sandbox_without_domain",
+              "store.watermark_cleared",
               "account.suspended",
               "account.reinstated",
               "connection.approved",

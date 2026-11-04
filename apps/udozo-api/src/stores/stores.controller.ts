@@ -82,6 +82,15 @@ class StoreFieldsDto {
   @ApiPropertyOptional({ description: 'Single product stores: the product key it sells (one you have listed).', example: 'esim:WW:global:10gb-30d' })
   @IsOptional() @ValidateIf((_object, value) => value !== null) @IsString() @Length(3, 200)
   focus?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Your own text drawn on your store’s listing photos (2 to 30 letters, digits, spaces and . - _ @), or null for Udozo’s. Only where Udozo allows it (`watermark_allowed` on the store); changed from Seller HQ only.',
+    nullable: true,
+    example: 'gadgetsplus.ng',
+  })
+  @IsOptional() @ValidateIf((_object, value) => value !== null) @IsString() @Length(0, 60)
+  watermark_text?: string | null;
 }
 
 class CreateStoreDto extends StoreFieldsDto {
@@ -219,6 +228,9 @@ export class StoresController {
   @ApiOperation({ summary: 'Update a store', description: 'Name and branding any time; the address only while it is a draft.' })
   @Patch(':id')
   update(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: StoreFieldsDto) {
+    if (body.watermark_text !== undefined && caller.kind !== 'session') {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'Change your photo watermark in Seller HQ.', 'watermark_text');
+    }
     return this.stores.update(resellerOf(caller), id, body);
   }
 

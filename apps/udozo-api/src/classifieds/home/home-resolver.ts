@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
+import { WatermarkService } from '../../watermarks/watermarks.service.js';
 import { resaleTemplate, resaleWhere } from '../../resale/resale-stores.service.js';
 import { onShopWhere } from '../rules.js';
 import { ListingSearchService } from '../search.service.js';
@@ -34,6 +35,7 @@ export class HomeResolver {
   constructor(
     private readonly prisma: PrismaService,
     private readonly search: ListingSearchService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   /**
@@ -209,7 +211,7 @@ export class HomeResolver {
         if (found) out.push({ kind: 'category', size: tile.size, slug: found.slug, title: found.name, listings: found.listings, image: tile.image ?? found.photo, href: this.href({ kind: 'category', slug: found.slug }, ctx) });
       } else if (tile.kind === 'listing') {
         const card = cards.get(tile.ref);
-        if (card) out.push({ kind: 'listing', size: tile.size, title: card.title, image: (card.cover as { url?: string } | null)?.url ?? null, href: card.url, listing: card });
+        if (card) out.push({ kind: 'listing', size: tile.size, title: card.title, image: (card.cover as { url?: string | null } | null)?.url?.replace('&w=480', '&w=960') ?? null, href: card.url, listing: card });
       } else {
         out.push({ kind: 'image', size: tile.size, title: tile.title, image: tile.image, href: this.href(tile.link, ctx) });
       }
@@ -227,13 +229,13 @@ export class HomeResolver {
     const ids = [category.id, ...category.children.map(child => child.id)];
     const [listings, photo] = await Promise.all([
       this.prisma.classifiedListing.count({ where: { ...onShopWhere, country: { in: countries }, categoryId: { in: ids } } }),
-      this.prisma.$queryRaw<{ url: string }[]>`
-        SELECT m."url" FROM "classified_listings" l
-        JOIN LATERAL (SELECT m."url" FROM "classified_media" m WHERE m."listing_id" = l."id" AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL ORDER BY m."position" LIMIT 1) m ON true
+      this.prisma.$queryRaw<{ id: string; url: string }[]>`
+        SELECT m."id", m."url" FROM "classified_listings" l
+        JOIN LATERAL (SELECT m."id", m."url" FROM "classified_media" m WHERE m."listing_id" = l."id" AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL ORDER BY m."position" LIMIT 1) m ON true
         WHERE l."country" = ANY(${countries}::text[]) AND l."status" = 'active' AND l."on_shop" AND l."category_id" = ANY(${ids}::uuid[])
         ORDER BY random() LIMIT 1`,
     ]);
-    return { slug: category.slug, name: category.name, icon: category.icon, listings, photo: photo[0]?.url ?? null };
+    return { slug: category.slug, name: category.name, icon: category.icon, listings, photo: photo[0] ? this.watermarks.url(photo[0], 960) : null };
   }
 
   /** Where a link goes on this page: a category's page (the country's, or across countries), a search, or the page given. */
@@ -391,18 +393,18 @@ export class HomeResolver {
       select: { id: true, slug: true, name: true, icon: true },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
-    const rows = await this.prisma.$queryRaw<{ top: string; listings: bigint; url: string | null }[]>`
+    const rows = await this.prisma.$queryRaw<{ top: string; listings: bigint; media_id: string | null; url: string | null }[]>`
       WITH live AS (
         SELECT l."id", COALESCE(c."parent_id", c."id") AS top
         FROM "classified_listings" l JOIN "classified_categories" c ON c."id" = l."category_id"
         WHERE l."country" = ANY(${countries}::text[]) AND l."status" = 'active' AND l."on_shop"
       )
-      SELECT counts.top, counts.listings, pick.url
+      SELECT counts.top, counts.listings, pick.media_id, pick.url
       FROM (SELECT top, count(*) AS listings FROM live GROUP BY top) counts
       LEFT JOIN LATERAL (
-        SELECT cover."url" FROM live
+        SELECT cover."id" AS media_id, cover."url" FROM live
         JOIN LATERAL (
-          SELECT m."url" FROM "classified_media" m
+          SELECT m."id", m."url" FROM "classified_media" m
           WHERE m."listing_id" = live."id" AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL
           ORDER BY m."position" LIMIT 1
         ) cover ON true
@@ -410,6 +412,11 @@ export class HomeResolver {
         ORDER BY random() LIMIT 1
       ) pick ON true`;
     const byTop = new Map(rows.map(row => [row.top, row]));
-    return categories.map(category => ({ slug: category.slug, name: category.name, icon: category.icon, listings: Number(byTop.get(category.id)?.listings ?? 0), photo: byTop.get(category.id)?.url ?? null }));
+    return categories.map(category => ({ slug: category.slug, name: category.name, icon: category.icon, listings: Number(byTop.get(category.id)?.listings ?? 0), photo: this.coverPhoto(byTop.get(category.id)) }));
+  }
+
+  /** A category tile's photo: the picked listing's cover, watermarked while watermarks are on. */
+  private coverPhoto(row: { media_id: string | null; url: string | null } | undefined) {
+    return row?.media_id && row.url ? this.watermarks.url({ id: row.media_id, url: row.url }, 960) : null;
   }
 }

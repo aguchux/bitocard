@@ -22,3 +22,4 @@ export * from '../support-bots';
 export * from './reports';
 export * from './resale';
 export * from './udozo';
+export { watermarkTextMax, watermarkTextPattern, watermarkTextProblem } from '../watermark';

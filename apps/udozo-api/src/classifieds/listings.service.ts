@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ClassifiedBrandsService } from './brands.service.js';
 import { ClassifiedModelsService } from './models.service.js';
 import { ModerationService, type ReviewFlag } from './moderation.service.js';
@@ -120,6 +121,7 @@ export class ListingsService {
     private readonly resale: ResaleService,
     private readonly brands: ClassifiedBrandsService,
     private readonly models: ClassifiedModelsService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -495,7 +497,7 @@ export class ListingsService {
       features: listing.features
         .map(value => ({ key: value.feature.key, name: value.feature.name, icon: value.feature.icon, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) }))
         .sort((a, b) => a.name.localeCompare(b.name)),
-      photos: photos.map(item => ({ id: item.id, url: item.url, width: item.width, height: item.height, status: item.status })),
+      photos: photos.map(item => ({ id: item.id, url: this.watermarks.url(item, 960), width: item.width, height: item.height, status: item.status })),
       video: video ? { id: video.id, url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, status: video.status, failure_reason: video.failureReason } : null,
       delivery: listing.delivery,
       pickup: listing.pickup,

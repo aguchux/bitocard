@@ -31,6 +31,13 @@ export type Store = {
   ai_overage: 'stop' | 'pay';
   /** Customers are asked for the identity check where BitoCard's market rules require one (true), or never. */
   customer_verification: boolean;
+  /**
+   * Udozo: the store's own text drawn on its listing photos, or null for Udozo's. Only set where `watermark_allowed`
+   * (the `store_watermarks` switch); missing on BitoCard's API.
+   */
+  watermark_text?: string | null;
+  /** Udozo: whether this store may set its own photo watermark text. Missing on BitoCard's API. */
+  watermark_allowed?: boolean;
   published_at: string | null;
   created_at: string;
 };
@@ -46,6 +53,8 @@ export type StoreInput = {
   desktop_nav?: 'rail' | 'bottom' | null;
   ai_overage?: 'stop' | 'pay';
   customer_verification?: boolean;
+  /** Udozo: the store's photo watermark text (2 to 30 letters, digits, spaces and . - _ @), or null for Udozo's. */
+  watermark_text?: string | null;
   template?: StoreTemplateKey;
   variant?: string;
   theme?: string;

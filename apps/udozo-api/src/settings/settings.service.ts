@@ -175,6 +175,16 @@ export const switchDefinitions = {
     description:
       "Udozo remembers what each person looks at, searches for and acts on in this market (signed-in customers who have not turned it off, and visitors who accepted all cookies; never under-18s) and fills the For you, Recently viewed, Because you searched and Price dropped rows with it. 10% of people keep the popular order, for comparison. Off: nothing is recorded there, and those rows show the popular order.",
   },
+  photo_watermarks: {
+    scopes: ['global'],
+    description:
+      "Udozo serves every listing photo with a watermark drawn in (udozo.com/img/…, Udozo's text from the admin's Watermarks page, or a store's own on its pages), new photos are stored private, and the classifieds job makes older originals private too. Turn on once udozo.com's image route is live. Off: photos are served from file storage as before.",
+  },
+  store_watermarks: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "Resellers write their own watermark text for their Resale shops' photos (Seller HQ, a store's settings). Needs photo_watermarks on. Off: their stores show Udozo's text.",
+  },
   classifieds_install_prompt: {
     scopes: ['global', 'country'],
     description:
@@ -217,6 +227,8 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'store_template_resale_shop',
   'paid_plans',
   'personalisation',
+  'photo_watermarks',
+  'store_watermarks',
 ]);
 
 /**
@@ -377,7 +389,15 @@ export class SettingsService {
       after = await this.prisma.featureSwitch.create({ data: { key, countryCode, resellerId, enabled } });
     }
     await this.audit.record({ actorId, action: enabled === null ? 'switch.cleared' : 'switch.set', targetType: 'switch', targetId: `${key}:${level}:${countryCode ?? resellerId ?? 'all'}`, before, after });
+    for (const listener of this.listeners) listener(key);
     return { object: 'switch' as const, key, scope: level, country_code: countryCode, reseller_id: resellerId, enabled };
+  }
+
+  private readonly listeners: Array<(key: SwitchKey) => void> = [];
+
+  /** Told after any switch changes on this instance (for services that keep a switch's value, such as photo watermarks). */
+  onSwitchChanged(listener: (key: SwitchKey) => void) {
+    this.listeners.push(listener);
   }
 
   async listSwitches() {

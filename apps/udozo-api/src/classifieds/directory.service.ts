@@ -4,6 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { onShopWhere } from './rules.js';
 import { ListingSearchService, soldVisibleMs } from './search.service.js';
@@ -38,6 +39,7 @@ export class ShopDirectoryService {
     private readonly settings: SettingsService,
     private readonly listings: ListingsService,
     private readonly search: ListingSearchService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   /**
@@ -87,19 +89,19 @@ export class ShopDirectoryService {
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
     // Listings sit in a category or its subcategory; each counts towards its top category.
-    const rows = await this.prisma.$queryRaw<{ top: string; listings: bigint; url: string | null; width: number | null; height: number | null; title: string | null }[]>`
+    const rows = await this.prisma.$queryRaw<{ top: string; listings: bigint; media_id: string | null; url: string | null; width: number | null; height: number | null; title: string | null }[]>`
       WITH live AS (
         SELECT l."id", l."title", COALESCE(c."parent_id", c."id") AS top
         FROM "classified_listings" l JOIN "classified_categories" c ON c."id" = l."category_id"
         WHERE l."country" = ${country} AND l."status" = 'active' AND l."on_shop"
       )
-      SELECT counts.top, counts.listings, pick.url, pick.width, pick.height, pick.title
+      SELECT counts.top, counts.listings, pick.media_id, pick.url, pick.width, pick.height, pick.title
       FROM (SELECT top, count(*) AS listings FROM live GROUP BY top) counts
       LEFT JOIN LATERAL (
-        SELECT cover."url", cover."width", cover."height", live."title"
+        SELECT cover."id" AS media_id, cover."url", cover."width", cover."height", live."title"
         FROM live
         JOIN LATERAL (
-          SELECT m."url", m."width", m."height" FROM "classified_media" m
+          SELECT m."id", m."url", m."width", m."height" FROM "classified_media" m
           WHERE m."listing_id" = live."id" AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL
           ORDER BY m."position" LIMIT 1
         ) cover ON true
@@ -121,7 +123,7 @@ export class ShopDirectoryService {
           icon: category.icon,
           listings: Number(row?.listings ?? 0),
           url: `${shopOrigin}/${cc}/c/${category.slug}`,
-          photo: row?.url ? { url: row.url, width: row.width, height: row.height, alt: row.title ?? category.name } : null,
+          photo: row?.url && row.media_id ? { url: this.watermarks.url({ id: row.media_id, url: row.url }, 960), width: row.width, height: row.height, alt: row.title ?? category.name } : null,
         };
       }),
     };
@@ -276,7 +278,7 @@ export class ShopDirectoryService {
     await this.listings.requireOpen(code);
     const rows = await this.prisma.classifiedListing.findMany({
       where: { country: code, onShop: true, ref: { gt: BigInt(after) }, OR: [{ status: 'active' }, { status: 'sold', soldAt: { gt: new Date(Date.now() - soldVisibleMs) } }] },
-      select: { ref: true, slug: true, title: true, updatedAt: true, media: { where: { kind: 'photo', status: 'ready', url: { not: null } }, orderBy: { position: 'asc' }, take: 5, select: { url: true } } },
+      select: { ref: true, slug: true, title: true, updatedAt: true, media: { where: { kind: 'photo', status: 'ready', url: { not: null } }, orderBy: { position: 'asc' }, take: 5, select: { id: true, url: true } } },
       orderBy: { ref: 'asc' },
       take: sitemapPage + 1,
     });
@@ -284,7 +286,7 @@ export class ShopDirectoryService {
     return {
       object: 'classified_sitemap_listings' as const,
       country: code,
-      listings: page.map(row => ({ ref: Number(row.ref), slug: row.slug, title: row.title ?? '', updated_at: row.updatedAt.toISOString(), images: row.media.flatMap(media => (media.url ? [media.url] : [])) })),
+      listings: page.map(row => ({ ref: Number(row.ref), slug: row.slug, title: row.title ?? '', updated_at: row.updatedAt.toISOString(), images: row.media.flatMap(media => (media.url ? [this.watermarks.url(media, 1600)!] : [])) })),
       next_after: rows.length > sitemapPage ? Number(page.at(-1)!.ref) : null,
     };
   }

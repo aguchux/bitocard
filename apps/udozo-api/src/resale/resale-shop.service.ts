@@ -7,6 +7,8 @@ import type { Section, Sections } from '../storefront/layout.js';
 import { type ResaleStoreRef, StorefrontService } from '../storefront/storefront.service.js';
 import { StoreHomeService } from '../stores/store-home.service.js';
 import { templateFor } from '../stores/templates.js';
+import { photoUrl } from '../watermarks/watermarks.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ResaleStoresService } from './resale-stores.service.js';
 
 const unavailable = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
@@ -32,6 +34,7 @@ export class ResaleShopService implements OnModuleInit {
     private readonly storefront: StorefrontService,
     private readonly home: StoreHomeService,
     private readonly audit: AuditService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   onModuleInit() {
@@ -67,11 +70,13 @@ export class ResaleShopService implements OnModuleInit {
   }
 
   /** A listing as the store's pages show it: the supplier's words and photos, the reseller's price, the approved note and the supplier. */
-  private async cards(items: OnSale[]) {
+  private async cards(store: { id: string }, items: OnSale[]) {
     const ids = items.map(item => item.row.listingId);
-    const [checked, extra] = await Promise.all([
+    const [checked, extra, photosAt] = await Promise.all([
       this.stores.idChecked(items.map(item => item.row.listing.customerId)),
       this.prisma.classifiedListing.findMany({ where: { id: { in: ids } }, select: { id: true, _count: { select: { media: { where: { kind: 'photo', status: 'ready' } } } } } }),
+      // The store's own pages: photos on its own address, with its mark.
+      this.watermarks.storeContext(store.id),
     ]);
     const photos = new Map(extra.map(row => [row.id, row._count.media]));
     return items.map(item => {
@@ -83,7 +88,7 @@ export class ResaleShopService implements OnModuleInit {
         ref: Number(listing.ref),
         slug: listing.slug ?? 'listing',
         title: listing.title ?? '',
-        cover: cover ? { url: cover.url, width: cover.width, height: cover.height } : null,
+        cover: cover ? { url: photoUrl(cover, photosAt, 480), width: cover.width, height: cover.height } : null,
         photo_count: photos.get(listing.id) ?? 0,
         currency: listing.currency,
         price: Number(item.price),
@@ -107,16 +112,17 @@ export class ResaleShopService implements OnModuleInit {
     const items = this.sorted(await this.onSale(store, { category: query.category, q: query.q }), query.sort ?? 'newest');
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 24;
-    return { object: 'list' as const, data: await this.cards(items.slice(offset, offset + limit)), total: items.length, offset, limit };
+    return { object: 'list' as const, data: await this.cards(store, items.slice(offset, offset + limit)), total: items.length, offset, limit };
   }
 
   /** What a store's sitemap lists: the categories it has on sale, and each listing with when it last changed and its photos. */
   async sitemap(subdomain: string) {
-    const items = await this.onSale(await this.store(subdomain));
+    const store = await this.store(subdomain);
+    const [items, photosAt] = await Promise.all([this.onSale(store), this.watermarks.storeContext(store.id)]);
     return {
       object: 'resale_store_sitemap' as const,
       categories: [...new Set(items.flatMap(item => (item.row.listing.category ? [item.row.listing.category.slug] : [])))].sort(),
-      listings: items.map(({ row: { listing } }) => ({ ref: Number(listing.ref), slug: listing.slug ?? 'listing', updated_at: listing.updatedAt.toISOString(), images: listing.media.flatMap(media => (media.url ? [media.url] : [])) })),
+      listings: items.map(({ row: { listing } }) => ({ ref: Number(listing.ref), slug: listing.slug ?? 'listing', updated_at: listing.updatedAt.toISOString(), images: listing.media.flatMap(media => (media.url ? [photoUrl(media, photosAt, 1600)!] : [])) })),
     };
   }
 
@@ -134,14 +140,14 @@ export class ResaleShopService implements OnModuleInit {
     const store = await this.store(subdomain);
     const [item] = await this.onSale(store, { listingRef: BigInt(ref) });
     if (!item) throw notFound('listing');
-    const [card] = await this.cards([item]);
+    const [[card], photosAt] = await Promise.all([this.cards(store, [item]), this.watermarks.storeContext(store.id)]);
     const detail = await this.prisma.classifiedListing.findUniqueOrThrow({
       where: { id: item.row.listingId },
       select: {
         description: true,
         category: { select: { safetyChecklist: true, parent: { select: { safetyChecklist: true } }, features: { select: { featureId: true, position: true } } } },
         features: { include: { feature: true } },
-        media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { kind: true, url: true, width: true, height: true, posterUrl: true, durationMs: true } },
+        media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { id: true, kind: true, url: true, width: true, height: true, posterUrl: true, durationMs: true } },
       },
     });
     const order = new Map((detail.category?.features ?? []).map(link => [link.featureId, link.position]));
@@ -155,7 +161,7 @@ export class ResaleShopService implements OnModuleInit {
         .filter(value => value.feature.enabled)
         .sort((a, b) => (order.get(a.featureId) ?? 1000) - (order.get(b.featureId) ?? 1000) || a.feature.name.localeCompare(b.feature.name))
         .map(value => ({ key: value.feature.key, name: value.feature.name, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) })),
-      photos: detail.media.filter(media => media.kind === 'photo').map(media => ({ url: media.url, width: media.width, height: media.height })),
+      photos: detail.media.filter(media => media.kind === 'photo').map(media => ({ url: photoUrl(media, photosAt, 1600), width: media.width, height: media.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs } : null,
       safety_checklist: checklist,
       /** The buyer's Safe pay fee, paid on top of the price. */
@@ -195,9 +201,10 @@ export class ResaleShopService implements OnModuleInit {
           category: { select: { slug: true, name: true } },
           area: { select: { name: true, parent: { select: { name: true } } } },
           features: { include: { feature: true } },
-          media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, select: { url: true, width: true, height: true } },
+          media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, select: { id: true, url: true, width: true, height: true } },
         },
       });
+      const photosAt = await this.watermarks.storeContext(store.id);
       listing = {
         ref: Number(row.ref),
         title: row.title ?? '',
@@ -206,7 +213,7 @@ export class ResaleShopService implements OnModuleInit {
         category: row.category ? { slug: row.category.slug, name: row.category.name } : null,
         area: row.area ? { name: row.area.name, state: row.area.parent?.name ?? null } : null,
         features: row.features.filter(value => value.feature.enabled).map(value => ({ key: value.feature.key, name: value.feature.name, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) })),
-        photos: row.media.map(media => ({ url: media.url, width: media.width, height: media.height })),
+        photos: row.media.map(media => ({ url: photoUrl(media, photosAt, 1600), width: media.width, height: media.height })),
       };
     }
     const area = here[0].row.listing.area;
@@ -230,12 +237,14 @@ export class ResaleShopService implements OnModuleInit {
 
   private async categoryTiles(store: ResaleStoreRef & { selling?: string | null }, limit: number) {
     const tiles = new Map<string, { slug: string; name: string; count: number; cover: { url: string; width: number | null; height: number | null } | null }>();
-    for (const item of await this.onSale(store)) {
+    const [items, photosAt] = await Promise.all([this.onSale(store), this.watermarks.storeContext(store.id)]);
+    for (const item of items) {
       const category = item.row.listing.category;
       if (!category) continue;
       const tile = tiles.get(category.slug) ?? { slug: category.slug, name: category.name, count: 0, cover: null };
       tile.count += 1;
-      tile.cover ??= item.row.listing.media[0]?.url ? { url: item.row.listing.media[0].url!, width: item.row.listing.media[0].width, height: item.row.listing.media[0].height } : null;
+      const photo = item.row.listing.media[0];
+      tile.cover ??= photo?.url ? { url: photoUrl(photo, photosAt, 960)!, width: photo.width, height: photo.height } : null;
       tiles.set(category.slug, tile);
     }
     return [...tiles.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, limit);
@@ -248,11 +257,11 @@ export class ResaleShopService implements OnModuleInit {
       case 'listing_rail': {
         const items = await this.onSale(store, { category: item.source === 'category' ? item.category : undefined });
         const chosen = this.sorted(items, item.source === 'price_low' ? 'price_asc' : 'newest').slice(0, item.limit);
-        return { listings: await this.cards(chosen), total: items.length };
+        return { listings: await this.cards(store, chosen), total: items.length };
       }
       case 'listing_grid': {
         const items = this.sorted(await this.onSale(store, { category: item.category }), item.sort);
-        return { listings: await this.cards(items.slice(0, item.limit)), total: items.length };
+        return { listings: await this.cards(store, items.slice(0, item.limit)), total: items.length };
       }
       case 'resale_categories':
         return { categories: await this.categoryTiles(store, item.limit) };
@@ -263,7 +272,7 @@ export class ResaleShopService implements OnModuleInit {
 
   private async hero(store: ResaleStoreRef) {
     const items = await this.onSale(store);
-    return { listings: await this.cards(items.slice(0, 6)), categories: await this.categoryTiles(store, 8) };
+    return { listings: await this.cards(store, items.slice(0, 6)), categories: await this.categoryTiles(store, 8) };
   }
 
   // ---- The store's own words ----

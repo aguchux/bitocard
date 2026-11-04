@@ -8,6 +8,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { Encryption } from '../common/encryption.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import type { LedgerMode, Prisma } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
@@ -89,7 +90,7 @@ export function safePayFee(amount: bigint, bps: number, cap: bigint) {
 }
 
 export const orderInclude = {
-  listing: { select: { id: true, ref: true, title: true, slug: true, status: true, onShop: true, delivery: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { url: true } } } },
+  listing: { select: { id: true, ref: true, title: true, slug: true, status: true, onShop: true, delivery: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { id: true, url: true } } } },
   buyer: { select: { id: true, name: true, email: true, storeId: true } },
   seller: { select: { id: true, name: true, email: true, storeId: true } },
   store: { select: { id: true, name: true, subdomain: true, logoUrl: true } },
@@ -142,6 +143,7 @@ export class SafePayService {
     private readonly terms: ShopTermsService,
     private readonly emails: ShopEmails,
     private readonly discovery: DiscoveryRecorder,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   private encryption() {
@@ -1364,7 +1366,7 @@ export class SafePayService {
       number: `SP-${order.number}`,
       role: viewer,
       status: order.status,
-      listing: { id: order.listing.id, ref: Number(order.listing.ref), title: order.listing.title, slug: order.listing.slug, cover_url: order.listing.media[0]?.url ?? null },
+      listing: { id: order.listing.id, ref: Number(order.listing.ref), title: order.listing.title, slug: order.listing.slug, cover_url: order.listing.media[0] ? this.watermarks.url(order.listing.media[0], 480) : null },
       kind: order.kind,
       quantity: order.quantity,
       ...(viewer === 'admin'
