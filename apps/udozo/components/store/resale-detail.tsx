@@ -1,9 +1,9 @@
-/* eslint-disable @next/next/no-img-element -- suppliers' photos from Udozo's storage */
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { BadgeCheck, ShieldCheck } from "lucide-react";
 import { descriptionBlocks, type DescriptionSpan, shopMoney } from "@bitocard/api-client/classifieds";
 import type { ResaleFeature, ResalePhoto, ResaleStoreListingDetail, ResaleStoreSupplier } from "@bitocard/api-client/storefront";
+import { Gallery as PhotoGallery } from "@/components/gallery";
 import { resaleCondition, resaleSupplierPath } from "@/lib/resale-links";
 import { DeliveryNote, SupplierLine } from "./resale";
 
@@ -63,28 +63,12 @@ export function Features({ features }: { features: ResaleFeature[] }) {
   );
 }
 
-/** The photos: the first large, the rest as a row that scrolls sideways on phones. */
+/**
+ * The supplier's photos in the store's own gallery: swiped, with thumbnails, opening over the whole screen. The raw
+ * files are never linked, so a buyer stays on the store.
+ */
 export function Gallery({ photos, title }: { photos: ResalePhoto[]; title: string }) {
-  const [first, ...rest] = photos;
-  if (!first) return <div className="aspect-[4/3] rounded-2xl bg-slate-100" />;
-  return (
-    <div className="grid gap-2">
-      <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100">
-        <img src={first.url} alt={title} className="size-full object-cover" />
-      </div>
-      {rest.length ? (
-        <ul className="flex snap-x gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {rest.map(photo => (
-            <li key={photo.url} className="aspect-square w-24 shrink-0 snap-start overflow-hidden rounded-xl bg-slate-100 sm:w-28">
-              <a href={photo.url} target="_blank" rel="noreferrer">
-                <img src={photo.url} alt="" loading="lazy" className="size-full object-cover" />
-              </a>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
+  return <PhotoGallery photos={photos} title={title} tone="store" />;
 }
 
 /**
