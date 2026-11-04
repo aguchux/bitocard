@@ -10,15 +10,12 @@ import {
   type ResellerRole,
   type User,
   useCreateResellerAccountMutation,
-  useOnboardingSignupTokenMutation,
   usePublicCountriesQuery,
   useResendEmailCodeMutation,
   useSessionQuery,
   useSignOutMutation,
-  useStartSignupPhoneMutation,
   useUpdateProfileMutation,
   useVerifyEmailMutation,
-  useVerifySignupPhoneMutation,
 } from "@bitocard/api-client/reseller";
 import { Button, Card, CodeInput, ErrorState, errorMessage, Field, Input, Notice, Select, Skeleton } from "@bitocard/admin-ui";
 import { PhoneInput } from "@bitocard/ui/phone-input";
@@ -150,15 +147,12 @@ function VerifyEmail({ user }: { user: User }) {
   );
 }
 
-type ApiFailure = { code?: string } | undefined;
-const failureCode = (error: unknown) => (error && typeof error === "object" ? (error as ApiFailure)?.code : undefined);
-
 /**
- * Onboarding: signed in, but not a member of any reseller account. Google sign-ups land here first; so do people with
- * an invitation not yet accepted, or removed from a team. They open their own reseller account here, in two steps as
- * email sign-up does: their first and last name (Google's to check), the business, its country and their mobile; then
- * the code texted to the mobile, which becomes their sign-in number. The code can be skipped (it did not come, or not
- * now): the account opens with the number unconfirmed, confirmed later in Settings, as where the country cannot text.
+ * Onboarding: signed in, but not a member of any reseller account. Google sign-ups land here first (signing in with a
+ * Google account no account uses yet signs up too); so do people with an invitation not yet accepted, or removed from a
+ * team. They open their own reseller account here in one step: their first and last name (Google's to check), the
+ * business, its country and their mobile number, kept as typed (nothing is texted now): they confirm it later in
+ * Settings > Your profile, and it then signs in too.
  */
 function Onboarding({ user }: { user: User }) {
   const [signOut, signingOut] = useSignOut();
@@ -170,91 +164,22 @@ function Onboarding({ user }: { user: User }) {
   const [country, setCountry] = useState("");
   // The owner's mobile number in E.164 (null until valid for the country).
   const [phone, setPhone] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [texted, setTexted] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
   const [saveName, nameState] = useUpdateProfileMutation();
-  const [issue, issueState] = useOnboardingSignupTokenMutation();
-  const [startPhone, startState] = useStartSignupPhoneMutation();
-  const [verifyPhone, verifyState] = useVerifySignupPhoneMutation();
   const [create, state] = useCreateResellerAccountMutation();
-  const busy = nameState.isLoading || issueState.isLoading || startState.isLoading || verifyState.isLoading || state.isLoading;
-  const error = nameState.error ?? issueState.error ?? (failureCode(startState.error) === "phone_verification_unavailable" ? undefined : startState.error) ?? verifyState.error ?? state.error;
-
-  // The session refetches and the gate opens the new account.
-  const openAccount = (signupToken: string | null) =>
-    create({ business_name: business.trim(), country, ...(phone ? { phone } : {}), ...(signupToken ? { signup_token: signupToken } : {}) })
-      .unwrap()
-      .catch(() => null);
-
-  async function sendCode(signupToken: string) {
-    if (!phone) return;
-    const sent = await startPhone({ email: user.email, signup_token: signupToken, country, phone })
-      .unwrap()
-      .then(() => true)
-      .catch((problem: unknown) => failureCode(problem) ?? "failed");
-    if (sent === true) {
-      setTexted(phone);
-      setCode("");
-    } else if (sent === "phone_verification_unavailable") {
-      // Nothing to text yet in this country: the number is kept unconfirmed, as at sign-up.
-      await openAccount(null);
-    }
-  }
+  const busy = nameState.isLoading || state.isLoading;
+  const error = nameState.error ?? state.error;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setNotice(null);
     const first = firstName.trim();
     const last = lastName.trim();
     if (!user.name_confirmed || first !== user.first_name || last !== (user.last_name ?? "")) {
       if (!(await saveName({ first_name: first, last_name: last }).unwrap().catch(() => null))) return;
     }
-    const issued = token ?? (await issue().unwrap().catch(() => null))?.signup_token ?? null;
-    if (!issued) return;
-    setToken(issued);
-    await sendCode(issued);
-  }
-
-  async function submitCode(value: string) {
-    if (verifyState.isLoading || value.length !== 6 || !token) return;
-    const done = await verifyPhone({ email: user.email, signup_token: token, code: value })
+    // The session refetches and the gate opens the new account.
+    await create({ business_name: business.trim(), country, ...(phone ? { phone } : {}) })
       .unwrap()
       .catch(() => null);
-    if (!done) return setCode("");
-    await openAccount(token);
-  }
-
-  if (texted) {
-    return (
-      <Centered>
-        <Card className="w-full max-w-md space-y-4 p-6 sm:p-8">
-          <div>
-            <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase">Step 2 of 2</p>
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">Confirm your mobile</h1>
-            <p className="mt-1 text-sm text-muted">We texted a 6-digit code to {texted}. It becomes your sign-in number.</p>
-          </div>
-          {notice ? <Notice tone="green">{notice}</Notice> : null}
-          {error ? <Notice tone="red">{errorMessage(error)}</Notice> : null}
-          <CodeInput label="6-digit code" value={code} onChange={setCode} onComplete={value => void submitCode(value)} autoFocus disabled={busy} invalid={Boolean(verifyState.error)} />
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => token && void sendCode(token).then(() => setNotice("A new code is on its way."))}>
-              Send me a new code
-            </Button>
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => (setTexted(null), setCode(""))}>
-              Change the number
-            </Button>
-          </div>
-          <div className="rounded-xl bg-canvas p-3.5 text-sm text-muted">
-            <p>No code yet? A new one comes another way. Or carry on and confirm your number later in Settings.</p>
-            <Button type="button" variant="ghost" size="sm" className="mt-1" disabled={busy} onClick={() => void openAccount(null)}>
-              Skip and confirm later
-            </Button>
-          </div>
-        </Card>
-      </Centered>
-    );
   }
 
   return (
@@ -264,7 +189,6 @@ function Onboarding({ user }: { user: User }) {
           <Building2 className="size-6" aria-hidden />
         </span>
         <div>
-          <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase">Step 1 of 2</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink">Set up your business</h1>
           <p className="mt-1 text-sm text-muted">
             Welcome, {firstName.trim() || user.name.trim().split(/\s+/)[0]}. Check your name, name your business, choose its country and give us your mobile number to open your Seller HQ account.
@@ -296,7 +220,6 @@ function Onboarding({ user }: { user: User }) {
                   setCountry(event.target.value);
                   // A number is checked against its country, so a new country starts it again.
                   setPhone(null);
-                  setTexted(null);
                 }}
               >
                 <option value="" disabled>
@@ -322,7 +245,7 @@ function Onboarding({ user }: { user: User }) {
                 inputClassName="min-h-11 border border-line bg-white px-3 text-sm text-ink focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none aria-[invalid=true]:border-red-400"
                 errorClassName="text-red-700"
               />
-              <p className="mt-1.5 text-xs text-muted">We text it a 6-digit code to confirm it. It becomes your sign-in number.</p>
+              <p className="mt-1.5 text-xs text-muted">Udozo&apos;s team reaches you on it. Confirm it with a texted code later in Settings &gt; Your profile, and you can sign in with it too.</p>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">

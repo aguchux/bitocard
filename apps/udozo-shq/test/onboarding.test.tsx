@@ -15,7 +15,6 @@ const slow = { timeout: 5000 };
 // A Google sign-up: signed in, email confirmed by Google, Google's names unconfirmed, no business yet.
 const googleSignUp = { ...session, user: { ...session.user, name: "Kofi Mensah", first_name: "Kofi", last_name: "Mensah", name_confirmed: false, phone: null, phone_verified: false, has_password: false }, memberships: [] };
 const countries = { object: "list", data: [{ object: "country", code: "GH", name: "Ghana", currency: "GHS", reseller_signup: true }] };
-const token = { object: "signup_verification", email: "ada@example.com", signup_token: "onboard-token-0000000000", expires_at: "2099-01-01T00:00:00.000Z" };
 
 afterEach(cleanup);
 
@@ -29,58 +28,32 @@ async function fillDetails() {
 }
 
 describe("Seller HQ's onboarding after a Google sign-up", () => {
-  test("the name is checked, the mobile texted a code and confirmed, then the account opens with it as a sign-in number", async () => {
+  test("one step: the name is checked, then the account opens with the business, country and the mobile as typed, nothing texted", async () => {
     const sent = fakeApi({
       "/v1/auth/session": googleSignUp,
       "/v1/countries": countries,
       "PATCH /v1/auth/profile": googleSignUp,
-      "POST /v1/auth/onboarding/signup-token": token,
-      "POST /v1/auth/signup/phone": Response.json({ object: "notice", message: "A code is on its way." }, { status: 202 }),
-      "POST /v1/auth/signup/phone/verify": { object: "signup_phone_verification", phone: "+233241234567", verified_at: "2026-10-31T00:00:00.000Z" },
       "POST /v1/auth/reseller-account": googleSignUp,
     });
     renderSignedIn(<p>Console</p>);
     expect((await screen.findByLabelText("Last name", {}, slow) as HTMLInputElement).value).toBe("Mensah");
     await fillDetails();
-    expect(await screen.findByText("Confirm your mobile", {}, slow)).toBeTruthy();
-    expect(sent.find(item => item.method === "PATCH" && item.path === "/v1/auth/profile")?.body).toEqual({ first_name: "Kofi Ama", last_name: "Mensah" });
-    expect(sent.find(item => item.path === "/v1/auth/signup/phone")?.body).toEqual({ email: googleSignUp.user.email, signup_token: token.signup_token, country: "GH", phone: "+233241234567" });
-
-    const boxes = screen.getAllByRole("textbox").filter(box => box.getAttribute("aria-label")?.startsWith("Digit"));
-    fireEvent.change(boxes[0]!, { target: { value: "123456" } });
-    await waitFor(() => expect(sent.find(item => item.path === "/v1/auth/reseller-account")?.body).toEqual({ business_name: "Kofi Digital", country: "GH", phone: "+233241234567", signup_token: token.signup_token }), slow);
-    expect(sent.find(item => item.path === "/v1/auth/signup/phone/verify")?.body).toEqual({ email: googleSignUp.user.email, signup_token: token.signup_token, code: "123456" });
-  });
-
-  test("where the country cannot text yet, the account opens with the number kept unconfirmed", async () => {
-    const sent = fakeApi({
-      "/v1/auth/session": googleSignUp,
-      "/v1/countries": countries,
-      "PATCH /v1/auth/profile": googleSignUp,
-      "POST /v1/auth/onboarding/signup-token": token,
-      "POST /v1/auth/signup/phone": refusal(400, "phone_verification_unavailable", "We cannot text numbers in this country yet.", "phone"),
-      "POST /v1/auth/reseller-account": googleSignUp,
-    });
-    renderSignedIn(<p>Console</p>);
-    await fillDetails();
     await waitFor(() => expect(sent.find(item => item.path === "/v1/auth/reseller-account")?.body).toEqual({ business_name: "Kofi Digital", country: "GH", phone: "+233241234567" }), slow);
+    expect(sent.find(item => item.method === "PATCH" && item.path === "/v1/auth/profile")?.body).toEqual({ first_name: "Kofi Ama", last_name: "Mensah" });
+    expect(sent.some(item => item.path.startsWith("/v1/auth/signup/phone") || item.path === "/v1/auth/onboarding/signup-token")).toBe(false);
     expect(screen.queryByText("Confirm your mobile")).toBeNull();
   });
 
-  test("a code that did not come can be skipped: the account opens with the number unconfirmed", async () => {
-    const sent = fakeApi({
+  test("a refusal keeps the person on the form, saying why", async () => {
+    fakeApi({
       "/v1/auth/session": googleSignUp,
       "/v1/countries": countries,
       "PATCH /v1/auth/profile": googleSignUp,
-      "POST /v1/auth/onboarding/signup-token": token,
-      "POST /v1/auth/signup/phone": Response.json({ object: "notice", message: "A code is on its way." }, { status: 202 }),
-      "POST /v1/auth/reseller-account": googleSignUp,
+      "POST /v1/auth/reseller-account": refusal(409, "phone_in_use", "Another account already uses this number.", "phone"),
     });
     renderSignedIn(<p>Console</p>);
     await fillDetails();
-    expect(await screen.findByText("Confirm your mobile", {}, slow)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Skip and confirm later" }));
-    await waitFor(() => expect(sent.find(item => item.path === "/v1/auth/reseller-account")?.body).toEqual({ business_name: "Kofi Digital", country: "GH", phone: "+233241234567" }), slow);
-    expect(sent.some(item => item.path === "/v1/auth/signup/phone/verify")).toBe(false);
+    expect(await screen.findByText("Another account already uses this number.", {}, slow)).toBeTruthy();
+    expect(screen.getByLabelText("Business name")).toBeTruthy();
   });
 });
