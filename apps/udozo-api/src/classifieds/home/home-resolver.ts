@@ -110,6 +110,9 @@ export class HomeResolver {
         return { ...section, data: { stores: await this.storeCards(section, ctx) } };
       case 'masonry_grid':
         return { ...section, data: { tiles: await this.masonry(section, ctx, taken) } };
+      case 'personal_rail':
+        // Filled for the person by udozo.com after the page loads; the shared (cached) page only holds its place.
+        return { ...section, data: { kind: section.kind } };
       case 'category_banner': {
         const found = await this.categoryCover(section.category, ctx.countries);
         if (!found) return { ...section, data: { category: null } };

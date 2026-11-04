@@ -43,11 +43,12 @@ export function countryName(code: string) {
 
 /**
  * A listing in a grid: photo, price (country pages only), title, place and when. Across countries (the showcase, with no
- * price) the place says its country too, with its flag: "Ikeja, Nigeria".
+ * price) the place says its country too, with its flag: "Ikeja, Nigeria". Every card names its listing
+ * (`data-listing-ref`, and its place in a list when given), so discovery can tell which card in which list was clicked.
  */
-export function ListingTile({ card, now, badge, was, className = "" }: { card: Card; now?: number; badge?: string; was?: number | null; className?: string }) {
+export function ListingTile({ card, now, badge, was, position, className = "" }: { card: Card; now?: number; badge?: string; was?: number | null; position?: number; className?: string }) {
   return (
-    <Link href={listingPath(card.country, card.ref, card.slug)} className={`flex flex-col overflow-hidden rounded-2xl border border-navy-200 bg-white text-navy-900 hover:border-navy-400 ${className}`}>
+    <Link href={listingPath(card.country, card.ref, card.slug)} data-listing-ref={card.ref} data-position={position} className={`flex flex-col overflow-hidden rounded-2xl border border-navy-200 bg-white text-navy-900 hover:border-navy-400 ${className}`}>
       <Cover card={card} className="aspect-[4/3]" />
       <span className="flex min-w-0 flex-col gap-0.5 p-2.5 pb-3">
         {/* Visible text, first in the link, so it is part of its name too ("Sponsored: …"). */}
@@ -89,14 +90,14 @@ export function ListingTile({ card, now, badge, was, className = "" }: { card: C
   );
 }
 
-/** A listing in a results list: photo beside price, condition, title, its first features, place and delivery. */
-export function ListingRow({ card, now }: { card: ShopResult | ShopListingCard; now?: number }) {
+/** A listing in a results list: photo beside price, condition, title, its first features, place and delivery. `menu`: room for a card menu in its corner. */
+export function ListingRow({ card, now, position, menu = false }: { card: ShopResult | ShopListingCard; now?: number; position?: number; menu?: boolean }) {
   const delivers = "delivers_to_you" in card && card.delivers_to_you;
   return (
-    <Link href={listingPath(card.country, card.ref, card.slug)} className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-2.5 text-navy-900 hover:border-navy-400">
+    <Link href={listingPath(card.country, card.ref, card.slug)} data-listing-ref={card.ref} data-position={position} className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-2.5 text-navy-900 hover:border-navy-400">
       <Cover card={card} className="size-24 shrink-0 rounded-xl sm:size-28" />
       {/* `contain-inline-size`: the one-line highlights never make the card (and the page) wider than the screen. */}
-      <span className="flex min-w-0 flex-1 flex-col gap-1 contain-inline-size">
+      <span className={`flex min-w-0 flex-1 flex-col gap-1 contain-inline-size${menu ? " pr-8" : ""}`}>
         <span className="flex flex-wrap items-baseline gap-x-2">
           <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong>
           {card.price.kind === "negotiable" ? <span className="text-xs font-semibold text-navy-500">Negotiable</span> : null}
@@ -123,10 +124,10 @@ export function ListingRow({ card, now }: { card: ShopResult | ShopListingCard; 
   );
 }
 
-/** A grid of tiles: two across on phones, more as the screen widens. */
-export function ListingGrid({ cards, now }: { cards: Card[]; now?: number }) {
+/** A grid of tiles: two across on phones, more as the screen widens. `source`: where discovery says its clicks came from. */
+export function ListingGrid({ cards, now, source }: { cards: Card[]; now?: number; source?: string }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div data-discovery-source={source} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {cards.map(card => (
         <ListingTile key={card.id} card={card} now={now} />
       ))}

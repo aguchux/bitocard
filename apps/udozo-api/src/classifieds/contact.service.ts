@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { DiscoveryRecorder } from './discovery/recorder.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -56,6 +57,7 @@ export class ContactRequestsService {
     private readonly listings: ListingsService,
     private readonly inbox: InboxService,
     private readonly emails: ShopEmails,
+    private readonly discovery: DiscoveryRecorder,
   ) {}
 
   /** A live listing in the buyer's own market that is not theirs, whose seller has not blocked them. */
@@ -108,6 +110,7 @@ export class ContactRequestsService {
     }
     await this.limit(customer.id, 'contact', contactRequestsPerHour, `You can ask ${contactRequestsPerHour} sellers for their details an hour. Try again later, or chat with the seller here.`);
     const request = await this.create(customer, listing, 'contact', note);
+    await this.discovery.record(customer.id, listing.country, 'contact', listing.id);
     const name = publicName(customer.name);
     await this.tellSeller(request, 'customer.classifieds.contact_request', `${name} asked for your contact details`, `${name} asked for your phone number and email about “${listing.title ?? 'your listing'}”. Accept or decline in Requests.`);
     return this.present(request, 'buyer');
@@ -122,6 +125,7 @@ export class ContactRequestsService {
     if (open) return this.present(open, 'buyer');
     await this.limit(customer.id, 'callback', callbacksPerHour, `You can ask for ${callbacksPerHour} call backs an hour. Try again later, or chat with the seller here.`);
     const request = await this.create(customer, listing, 'callback', note);
+    await this.discovery.record(customer.id, listing.country, 'contact', listing.id);
     const name = publicName(customer.name);
     await this.tellSeller(request, 'customer.classifieds.callback_request', `${name} asked you to call them back`, `${name} would like a call about “${listing.title ?? 'your listing'}”. Their number is in Requests.`);
     return this.present(request, 'buyer');

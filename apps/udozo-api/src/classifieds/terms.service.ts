@@ -7,7 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
  * Bump both when the terms change in a way people must accept again; everyone is then asked once more before they next
  * post or use Safe pay.
  */
-export const shopTermsVersion = '2026-11-01';
+export const shopTermsVersion = '2026-11-04';
 /** Their path on udozo.com, where the apps link it (the Safe pay rules and privacy notice are beside it, under `/legal`). */
 export const shopTermsPath = '/legal/terms';
 

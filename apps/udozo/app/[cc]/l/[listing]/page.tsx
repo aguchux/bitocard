@@ -19,6 +19,7 @@ import {
   type DescriptionSpan,
   type ShopChat,
   type ShopListingPage,
+  type ShopListingCard,
   type ShopSearch,
 } from "@bitocard/api-client/classifieds";
 import { BrandLogo } from "@/components/brand-logo";
@@ -34,6 +35,7 @@ import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { buyButton } from "@/lib/buy";
 import { breadcrumbJsonLd, listingJsonLd, productMetaTags } from "@/lib/seo";
 import type { ShopViewer } from "@bitocard/api-client/classifieds";
+import type { HomeCard } from "@bitocard/api-client/home";
 import { ListingView } from "@/components/listing-view";
 
 type Props = { params: Promise<{ cc: string; listing: string }> };
@@ -104,7 +106,8 @@ function Description({ text }: { text: string | null }) {
 /**
  * A listing's one public page (`/ng/l/<number>-<slug>`): gallery and video, price, condition, features, description,
  * the seller, the category's Safe trade checks, and the buyer's actions. A changed title keeps the number and sends the
- * old slug here; sold listings show as Sold with similar listings and no offer markup.
+ * old slug here; sold listings show as Sold with similar listings and no offer markup. Below: what people who looked
+ * at it also looked at, then more like it nearby.
  */
 export default async function ListingPage({ params }: Props) {
   const { cc, listing: segment } = await params;
@@ -123,8 +126,13 @@ export default async function ListingPage({ params }: Props) {
   const viewerResult = customer ? await customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${listing.id}/viewer`) : null;
   const viewer = viewerResult?.ok ? viewerResult.data : null;
   const chatResult = viewer?.conversation_id ? await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${viewer.conversation_id}`) : null;
-  const similar = await shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&category=${listing.category.slug}&state=${listing.area.state.slug}&limit=9`);
+  const [similar, alsoViewed] = await Promise.all([
+    shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&category=${listing.category.slug}&state=${listing.area.state.slug}&limit=9`),
+    // What people who looked at this also looked at (kept five minutes, as the API says).
+    shopApi<{ object: "list"; data: HomeCard[] }>(`/v1/classifieds/listings/${listing.ref}/also-viewed?limit=8`, { revalidate: 300 }),
+  ]);
   const others = similar.ok ? similar.data.data.filter(card => card.id !== listing.id).slice(0, 8) : [];
+  const viewedToo = alsoViewed.ok && Array.isArray(alsoViewed.data.data) ? (alsoViewed.data.data.filter(card => card.id !== listing.id && card.price).slice(0, 8) as ShopListingCard[]) : [];
 
   const sold = listing.status === "sold";
   const buy = buyButton(listing, viewer, `/${cc}/l/${listing.ref}/buy`, market.safe_pay);
@@ -153,7 +161,7 @@ export default async function ListingPage({ params }: Props) {
                 <strong className={`text-[26px] font-extrabold tracking-tight ${sold ? "text-navy-500 line-through" : ""}`}>{shopPriceText(listing.price)}</strong>
                 {listing.price.kind === "negotiable" ? <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-700">Negotiable</span> : null}
               </div>
-              <SaveShare listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href }} viewer={viewer} signedIn={Boolean(customer)} />
+              <SaveShare listing={{ id: listing.id, ref: Number(listing.ref), title: listing.title, url: new URL(path, origin).href }} viewer={viewer} signedIn={Boolean(customer)} />
             </div>
             <h1 className="text-xl leading-snug font-bold">{listing.title}</h1>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-navy-600">
@@ -260,12 +268,20 @@ export default async function ListingPage({ params }: Props) {
           </section>
         </aside>
       </div>
+      {viewedToo.length ? (
+        <section aria-labelledby="also-viewed" className="mt-8 px-4 sm:px-0">
+          <h2 id="also-viewed" className="mb-3 text-base font-bold">
+            People also viewed
+          </h2>
+          <ListingGrid cards={viewedToo} source="also_viewed" />
+        </section>
+      ) : null}
       {others.length ? (
         <section aria-labelledby="similar" className="mt-8 px-4 sm:px-0">
           <h2 id="similar" className="mb-3 text-base font-bold">
             {sold ? "Similar listings" : `More ${listing.category.name.toLowerCase()} in ${listing.area.state.name}`}
           </h2>
-          <ListingGrid cards={others} />
+          <ListingGrid cards={others} source="similar" />
         </section>
       ) : null}
       <JsonLd data={listingJsonLd(listing, origin, cc)} />

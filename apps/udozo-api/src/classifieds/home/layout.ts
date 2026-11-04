@@ -188,8 +188,22 @@ const categoryBanner = z.object({
   showCount: z.boolean().default(true),
 });
 
+export const personalRailKinds = ['for_you', 'recent', 'searched', 'price_drops'] as const;
+
+/**
+ * Listings chosen for the person looking (docs/UDOZO_PERSONALISATION_PLAN.md), country pages only: the page holds its
+ * place (`data: { kind }`), and udozo.com fills it for the person after the page loads (`GET /v1/classifieds/for-you`).
+ */
+const personalRail = z.object({
+  ...base,
+  type: z.literal('personal_rail'),
+  title: text(80).default('For you'),
+  kind: z.enum(personalRailKinds).default('for_you'),
+  limit: z.number().int().min(4).max(24).default(12),
+});
+
 /** A block: what a row holds. Every section type of before, and the marquees, masonry grids and category banners. */
-export const homeBlock = z.discriminatedUnion('type', [homeHero, categoryMasonry, dealsRail, sponsoredRail, topSellingRail, listingGroup, banner, countryTiles, trustBar, listingMarquee, storeMarquee, masonryGrid, categoryBanner]);
+export const homeBlock = z.discriminatedUnion('type', [homeHero, categoryMasonry, dealsRail, sponsoredRail, topSellingRail, listingGroup, banner, countryTiles, trustBar, listingMarquee, storeMarquee, masonryGrid, categoryBanner, personalRail]);
 export type HomeBlock = z.infer<typeof homeBlock>;
 export type HomeBlockType = HomeBlock['type'];
 export const homeBlockTypes = [
@@ -206,13 +220,14 @@ export const homeBlockTypes = [
   'store_marquee',
   'masonry_grid',
   'category_banner',
+  'personal_rail',
 ] as const satisfies readonly HomeBlockType[];
 /** A block is what a section was (the resolver and the old editor's word). */
 export type HomeSection = HomeBlock;
 export type HomeSectionType = HomeBlockType;
 
-/** What each page offers: no deals across countries (they have no prices), country tiles only there. */
-export const blocksFor = (scope: HomeScope): readonly HomeBlockType[] => homeBlockTypes.filter(type => (scope === 'global' ? type !== 'deals_rail' : type !== 'country_tiles'));
+/** What each page offers: no deals or personal rails across countries (no prices, no market), country tiles only there. */
+export const blocksFor = (scope: HomeScope): readonly HomeBlockType[] => homeBlockTypes.filter(type => (scope === 'global' ? type !== 'deals_rail' && type !== 'personal_rail' : type !== 'country_tiles'));
 
 export const rowBackgrounds = ['none', 'soft', 'navy', 'brand', 'image'] as const;
 

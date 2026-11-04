@@ -46,6 +46,8 @@ export type Customer = {
   area_id?: string | null;
   birth_date?: string | null;
   sex?: "female" | "male" | "unspecified" | null;
+  /** Whether what they look at shapes what udozo.com shows them (Account > Privacy). Missing on older API versions. */
+  personalisation?: boolean;
   created_at: string;
 };
 

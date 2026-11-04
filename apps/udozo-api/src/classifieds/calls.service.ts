@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { DiscoveryRecorder } from './discovery/recorder.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -56,6 +57,7 @@ export class CallsService {
     private readonly integrations: IntegrationsService,
     private readonly inbox: InboxService,
     private readonly contacts: ContactRequestsService,
+    private readonly discovery: DiscoveryRecorder,
   ) {}
 
   private turn() {
@@ -129,6 +131,8 @@ export class CallsService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw conflict(...words.busy);
       throw error;
     }
+    // A call to the listing's seller says the caller wanted it (never a seller calling a buyer back).
+    if (calleeId === call.listing.customerId) await this.discovery.record(customer.id, listing.country, 'call', listing.id);
     await this.inbox.customer({ customerId: call.callee.id, storeId: call.callee.storeId }, 'customer.classifieds.call_incoming', {
       subject: call.id,
       title: `${publicName(call.caller.name)} is calling you`,

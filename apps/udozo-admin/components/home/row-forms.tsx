@@ -276,7 +276,9 @@ export function RowSettingsForm({ kit, row, onChange }: { kit: RowFormKit; row: 
 export const blankRow = () => ({ hidden: false, title: "", subtitle: "", viewAll: null, background: "none", image: null, width: "contained", spacing: "normal" }) as unknown as Omit<EditorRow<HomeSection>, "id" | "blocks">;
 
 /** What a block will show, drawn small on its card: photos, logos or the banner, or a warning when it shows nothing. */
-export function BlockThumb({ resolved }: { block: HomeSection; resolved: unknown }) {
+export function BlockThumb({ block, resolved }: { block: HomeSection; resolved: unknown }) {
+  // A personal row is a placeholder (`data: { kind }`): udozo.com fills it for each visitor, so there is nothing to show.
+  if (block.type === "personal_rail") return <p className="rounded-lg bg-canvas px-2 py-1.5 text-xs text-muted">Filled for each visitor when the page loads: nothing to preview here.</p>;
   const data = (resolved as { data?: Record<string, unknown> } | undefined)?.data;
   if (!data) return null;
   const items = (data.items as HomeCard[] | undefined) ?? [];

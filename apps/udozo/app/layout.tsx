@@ -6,7 +6,9 @@ import { installCaptureScript } from "@bitocard/ui/install";
 import { CallProvider } from "@/components/calls/call-provider";
 import { ChatDock } from "@/components/chat-dock";
 import { CookieConsent } from "@/components/cookie-consent";
+import { DiscoveryTracker } from "@/components/discovery/tracker";
 import { customerCookie, siteOrigin } from "@/lib/customer";
+import { visitorCookie } from "@/lib/discovery";
 import { storeHeader } from "@/lib/store-host";
 import { previewHeader, siteTheme, themeCss } from "@/lib/theme";
 import "./globals.css";
@@ -46,13 +48,15 @@ export async function generateViewport(): Promise<Viewport> {
  * Every page wears Udozo's theme, chosen by its admins (`/v1/theme`): its colours re-point the variables every utility
  * reads. `?theme_preview=<token>` on any address (the admins' preview link; the proxy passes it on) shows the draft.
  * A signed-in customer on udozo.com (never a reseller's store) can call and be called on every page (`CallProvider`), and
- * has their chats at hand (`ChatDock`). Every page asks for cookie consent until the visitor chooses (`CookieConsent`).
+ * has their chats at hand (`ChatDock`), and what they look at shapes what udozo.com shows them (`DiscoveryTracker`: signed
+ * in, or a visitor who chose Accept all). Every page asks for cookie consent until the visitor chooses (`CookieConsent`).
  */
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const list = await headers();
   const theme = await siteTheme(list.get(previewHeader));
   const onStore = Boolean(list.get(storeHeader));
-  const calls = !onStore && (await cookies()).has(customerCookie);
+  const jar = await cookies();
+  const calls = !onStore && jar.has(customerCookie);
   return (
     <html lang="en-GB" className={inter.variable} data-theme-preview={theme.preview ? "" : undefined}>
       <head>
@@ -73,6 +77,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         ) : (
           children
         )}
+        {onStore ? null : <DiscoveryTracker signedIn={jar.has(customerCookie)} hasVisitor={jar.has(visitorCookie)} />}
         <InstallSupport />
         {/* A reseller's store has no legal pages of its own: its banner links udozo.com's cookie notice. */}
         <CookieConsent noticeHref={onStore ? `${siteOrigin()}/legal/cookies` : "/legal/cookies"} />

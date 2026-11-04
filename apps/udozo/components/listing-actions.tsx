@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Check, Contact, Flag as FlagIcon, Heart, Mail, MessageCircle, Phone, PhoneCall, PhoneIncoming, Share2, ShieldCheck, X } from "lucide-react";
 import { reportReasonLabels, type ShopChat, type ShopReportReason, type ShopViewer } from "@bitocard/api-client/classifieds";
+import { track } from "@/lib/discovery-client";
 import { reportListing, requestContact, saveListing } from "@/lib/listing-actions";
 import { useAssistantDraft } from "./assistant";
 import { useCalls } from "./calls/call-provider";
@@ -31,7 +32,7 @@ function Sheet({ dialog, title, children }: { dialog: React.RefObject<HTMLDialog
 const button = "flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-navy-900 bg-white px-3 py-2 text-center text-sm leading-tight font-bold text-navy-900 hover:bg-navy-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 /** Save to favourites and share (WhatsApp, or the device's share sheet, or copying the link). */
-export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing, "id" | "title" | "url">; viewer: ShopViewer | null; signedIn: boolean }) {
+export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing, "id" | "title" | "url"> & { ref?: number }; viewer: ShopViewer | null; signedIn: boolean }) {
   const [saved, setSaved] = useState(viewer?.favourite ?? false);
   const [note, setNote] = useState<string | null>(null);
   const toggle = async () => {
@@ -45,6 +46,8 @@ export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing
   };
   const share = async () => {
     const text = `${listing.title} on Udozo`;
+    // A share is a strong sign of interest (recorded only where discovery may record anything).
+    if (listing.ref) track({ kind: "share", listing: listing.ref });
     if (navigator.share) {
       await navigator.share({ title: text, url: listing.url }).catch(() => undefined);
       return;

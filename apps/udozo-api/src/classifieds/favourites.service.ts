@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { DiscoveryRecorder } from './discovery/recorder.service.js';
 import { ListingsService } from './listings.service.js';
 import { invalid, isOnShop } from './rules.js';
 import { ListingSearchService, soldVisibleMs } from './search.service.js';
@@ -19,6 +20,7 @@ export class FavouritesService {
     private readonly prisma: PrismaService,
     private readonly listings: ListingsService,
     private readonly search: ListingSearchService,
+    private readonly discovery: DiscoveryRecorder,
   ) {}
 
   async list(customer: CustomerWithStore, page: { limit?: number; offset?: number }) {
@@ -65,16 +67,14 @@ export class FavouritesService {
     if ((await this.prisma.classifiedFavourite.count({ where: { customerId: customer.id } })) >= maxFavourites) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'too_many_favourites', `You can save up to ${maxFavourites} listings. Remove some first.`);
     }
-    await this.prisma.classifiedFavourite.upsert({
-      where: { customerId_listingId: { customerId: customer.id, listingId } },
-      create: { customerId: customer.id, listingId, savedPriceMinor: listing.priceMinor },
-      update: {},
-    });
+    const saved = await this.prisma.classifiedFavourite.createMany({ data: [{ customerId: customer.id, listingId, savedPriceMinor: listing.priceMinor }], skipDuplicates: true });
+    if (saved.count) await this.discovery.record(customer.id, country, 'save', listingId);
     return { object: 'classified_favourite' as const, listing_id: listingId, saved: true };
   }
 
   async remove(customer: CustomerWithStore, listingId: string) {
-    await this.listings.sellerCountry(customer);
-    await this.prisma.classifiedFavourite.deleteMany({ where: { customerId: customer.id, listingId } });
+    const country = await this.listings.sellerCountry(customer);
+    const removed = await this.prisma.classifiedFavourite.deleteMany({ where: { customerId: customer.id, listingId } });
+    if (removed.count) await this.discovery.record(customer.id, country, 'unsave', listingId);
   }
 }

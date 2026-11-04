@@ -170,6 +170,11 @@ export const switchDefinitions = {
     description:
       "Udozo customers must pass an identity check (live) before they accept Safe pay orders, open listings to resellers or pay money out, and payout accounts must carry the name it verified. Off (the default): the check is optional, offered but never required, and payout accounts must carry the name on the customer's Udozo account.",
   },
+  personalisation: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo remembers what each person looks at, searches for and acts on in this market (signed-in customers who have not turned it off, and visitors who accepted all cookies; never under-18s) and fills the For you, Recently viewed, Because you searched and Price dropped rows with it. 10% of people keep the popular order, for comparison. Off: nothing is recorded there, and those rows show the popular order.",
+  },
   classifieds_install_prompt: {
     scopes: ['global', 'country'],
     description:
@@ -211,6 +216,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'reseller_resale',
   'store_template_resale_shop',
   'paid_plans',
+  'personalisation',
 ]);
 
 /**

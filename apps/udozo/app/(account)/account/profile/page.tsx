@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { Eye, ShieldCheck } from "lucide-react";
 import { regionWord } from "@bitocard/api-client/classifieds";
 import { CountryForm, NameForm, PasswordForm } from "@/components/account-forms";
 import { AboutForm } from "@/components/account/about-form";
@@ -19,7 +19,8 @@ const card = "grid gap-3 rounded-2xl border border-navy-200 bg-white p-4 sm:p-5"
  * The customer's profile: their first and last name (an older account is asked to confirm how its old name was
  * split), the email they sign in with (read only), their country (fixed: chosen once by an
  * older account that has none), about them (where they live, their date of birth and sex), their mobile number (from
- * that country, confirmed by a texted code), the password and signing out. The identity check, for Safe pay sellers, is its own page.
+ * that country, confirmed by a texted code), the password and signing out. The identity check, for Safe pay sellers, and
+ * Privacy (personalisation and history) are their own pages.
  */
 export default async function ProfilePage() {
   const customer = await requireCustomer("/account/profile");
@@ -76,6 +77,15 @@ export default async function ProfilePage() {
         <p className="text-sm text-navy-600">Needed once before you are paid for a Safe pay sale.</p>
         <Link href="/account/verification" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-navy-200 px-4 font-semibold hover:border-navy-300">
           <ShieldCheck className="size-4" aria-hidden="true" /> Your identity check
+        </Link>
+      </section>
+      <section aria-labelledby="privacy" className={card}>
+        <h2 id="privacy" className="font-bold">
+          Privacy
+        </h2>
+        <p className="text-sm text-navy-600">Personalise what you see, and what Udozo remembers: listings you viewed and your searches.</p>
+        <Link href="/account/privacy" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-navy-200 px-4 font-semibold hover:border-navy-300">
+          <Eye className="size-4" aria-hidden="true" /> Privacy and your history
         </Link>
       </section>
       <section aria-labelledby="password" className={card}>

@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { Search, Sparkles } from "lucide-react";
+import { Clock, Search, Sparkles, TrendingUp, X } from "lucide-react";
 import type { ShopSuggestions } from "@bitocard/api-client/classifieds";
+import type { SearchSuggestions } from "@/lib/discovery";
 import { useAssistant } from "./assistant";
 
 /**
  * The Shop's search: a GET form to the country's `/search` (it works without script), with suggestions as the buyer
  * types (categories, then titles of live listings like it), read from this site's own `/api/suggest`. Where the
- * country's assistant answers, Ask hands what was typed to it ("Describe what you want"). `blended`: inside the
- * header's bar beside the Categories menu, which draws the border.
+ * country's assistant answers, Ask hands what was typed to it ("Describe what you want"). Focused and empty, it offers
+ * the person's recent searches (each can be removed) and the market's popular ones (`/api/searches`). `blended`: inside
+ * the header's bar beside the Categories menu, which draws the border.
  */
 export function SearchBar({ country, q = "", area, state, autoFocus, blended = false }: { country: string; q?: string; area?: string | null; state?: string | null; autoFocus?: boolean; blended?: boolean }) {
   const cc = country.toLowerCase();
@@ -20,6 +22,25 @@ export function SearchBar({ country, q = "", area, state, autoFocus, blended = f
   const list = useId();
   const form = useRef<HTMLFormElement>(null);
   const assistant = useAssistant();
+  const [before, setBefore] = useState<SearchSuggestions | null>(null);
+
+  // Before anything is typed: recent and popular searches, read again each time the box is focused.
+  const loadBefore = () => {
+    fetch(`/api/searches?country=${cc}`, { cache: "no-store" })
+      .then(res => (res.ok ? (res.json() as Promise<SearchSuggestions>) : null))
+      .then(data => setBefore(data && Array.isArray(data.recent) && Array.isArray(data.popular) ? data : null))
+      .catch(() => undefined);
+  };
+  const removeRecent = (text: string) => {
+    setBefore(current => (current ? { ...current, recent: current.recent.filter(item => item !== text) } : current));
+    void fetch(`/api/searches?country=${cc}&q=${encodeURIComponent(text)}`, { method: "DELETE" }).catch(() => undefined);
+  };
+  const searchFor = (text: string) => {
+    setValue(text);
+    setOpen(false);
+    // The input is controlled: submit once React has written the chosen words into it.
+    requestAnimationFrame(() => form.current?.requestSubmit());
+  };
 
   useEffect(() => {
     const words = value.trim();
@@ -38,6 +59,8 @@ export function SearchBar({ country, q = "", area, state, autoFocus, blended = f
   }, [value, cc]);
 
   const shown = open && value.trim().length >= 2 && suggestions && (suggestions.categories.length || suggestions.queries.length) ? suggestions : null;
+  const empty = open && !value.trim() && before && (before.recent.length || before.popular.length) ? before : null;
+  const popular = empty ? empty.popular.filter(text => !empty.recent.includes(text)) : [];
 
   return (
     <form ref={form} action={`/${cc}/search`} method="get" role="search" className={blended ? "relative min-w-0 flex-1" : "relative"} onSubmit={() => setOpen(false)}>
@@ -51,7 +74,10 @@ export function SearchBar({ country, q = "", area, state, autoFocus, blended = f
             setValue(event.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            loadBefore();
+          }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={event => {
             if (event.key === "Escape") setOpen(false);
@@ -59,8 +85,8 @@ export function SearchBar({ country, q = "", area, state, autoFocus, blended = f
           placeholder="Phones, cars, flats, generators…"
           aria-label="Search Udozo"
           aria-autocomplete="list"
-          aria-controls={shown ? list : undefined}
-          aria-expanded={Boolean(shown)}
+          aria-controls={shown || empty ? list : undefined}
+          aria-expanded={Boolean(shown || empty)}
           role="combobox"
           autoComplete="off"
           enterKeyHint="search"
@@ -98,19 +124,60 @@ export function SearchBar({ country, q = "", area, state, autoFocus, blended = f
                 type="button"
                 className="flex w-full items-center gap-2 px-3.5 py-2 text-left hover:bg-navy-50"
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => {
-                  setValue(text);
-                  setOpen(false);
-                  // The input is controlled: submit once React has written the chosen words into it.
-                  requestAnimationFrame(() => form.current?.requestSubmit());
-                }}
+                onClick={() => searchFor(text)}
               >
                 <Search className="size-4 shrink-0 text-navy-400" aria-hidden="true" /> {text}
               </button>
             </li>
           ))}
         </ul>
+      ) : empty ? (
+        <BeforeTyping id={list} recent={empty.recent} popular={popular} onSearch={searchFor} onRemove={removeRecent} />
       ) : null}
     </form>
+  );
+}
+
+const heading = "px-3.5 pt-1.5 pb-1 text-xs font-bold tracking-wide text-navy-500 uppercase";
+
+/** Recent searches (with remove) and the market's popular searches, shown in the empty, focused search box. */
+export function BeforeTyping({ id, recent, popular, onSearch, onRemove }: { id: string; recent: string[]; popular: string[]; onSearch: (text: string) => void; onRemove: (text: string) => void }) {
+  const keep = (event: React.MouseEvent) => event.preventDefault();
+  return (
+    <div id={id} className="absolute inset-x-0 top-full z-30 mt-1.5 grid gap-1 overflow-hidden rounded-2xl border border-navy-200 bg-white py-1.5 text-sm text-navy-900 shadow-lg">
+      {recent.length ? (
+        <div role="group" aria-label="Your recent searches">
+          <p className={heading}>Recent searches</p>
+          <ul>
+            {recent.map(text => (
+              <li key={text} className="flex items-center hover:bg-navy-50">
+                <button type="button" onMouseDown={keep} onClick={() => onSearch(text)} className="flex min-h-10 min-w-0 flex-1 items-center gap-2 px-3.5 text-left">
+                  <Clock className="size-4 shrink-0 text-navy-400" aria-hidden="true" />
+                  <span className="truncate">{text}</span>
+                </button>
+                <button type="button" onMouseDown={keep} onClick={() => onRemove(text)} aria-label={`Remove ${text} from your recent searches`} className="grid size-10 shrink-0 place-items-center text-navy-500 hover:text-navy-900">
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {popular.length ? (
+        <div role="group" aria-label="Popular searches">
+          <p className={heading}>Popular searches</p>
+          <ul>
+            {popular.map(text => (
+              <li key={text}>
+                <button type="button" onMouseDown={keep} onClick={() => onSearch(text)} className="flex min-h-10 w-full items-center gap-2 px-3.5 text-left hover:bg-navy-50">
+                  <TrendingUp className="size-4 shrink-0 text-navy-400" aria-hidden="true" />
+                  <span className="truncate">{text}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }

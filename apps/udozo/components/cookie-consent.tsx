@@ -17,7 +17,7 @@ export function CookieConsentBody({ noticeHref, current, onChoose }: { noticeHre
             Cookies on Udozo
           </h2>
           <p>
-            We use cookies that are needed to sign you in and keep Udozo safe. We would also like to use optional cookies, such as analytics to see how Udozo is used, but only if you agree. We use none yet, and never for advertising.{" "}
+            We use cookies that are needed to sign you in and keep Udozo safe. If you agree, we also use one optional cookie to remember what you look at on udozo.com, so we can show you listings you are likely to want. Never for advertising.{" "}
             <a href={noticeHref} className="font-semibold text-navy-900 underline">
               Read the cookie notice
             </a>

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { DiscoveryRecorder } from './discovery/recorder.service.js';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -107,6 +108,7 @@ export class ConversationsService {
     private readonly email: EmailService,
     private readonly integrations: IntegrationsService,
     private readonly audit: AuditService,
+    private readonly discovery: DiscoveryRecorder,
   ) {}
 
   // ---- Reading ----
@@ -218,6 +220,7 @@ export class ConversationsService {
       return this.get(customer, chat.id);
     }
     const chat = await this.prisma.classifiedConversation.findUniqueOrThrow({ where: { id }, include: chatInclude });
+    await this.discovery.record(customer.id, country, 'chat', listing.id);
     await this.alert(chat, 'seller', `${publicName(customer.name)} asked about "${chat.listing.title}"`, text);
     return this.get(customer, id);
   }
@@ -309,6 +312,7 @@ export class ConversationsService {
       if ((error as { code?: string }).code === 'P2002') throw conflict('offer_changed', 'Another offer was just made in this chat. Refresh and try again.');
       throw error;
     }
+    if (side === 'buyer') await this.discovery.record(customer.id, chat.country, 'offer', chat.listingId);
     const recipient = side === 'buyer' ? chat.seller : chat.buyer;
     await this.inbox.customer({ customerId: recipient.id, storeId: recipient.storeId }, 'customer.classifieds.offer', {
       subject: offer.id,

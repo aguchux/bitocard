@@ -4,6 +4,8 @@ import { ArrowRight, BadgeCheck, CreditCard, Gift, Globe2, Headphones, Lock, Lin
 import type { ShopListingCard, ShopShowcaseCard } from "@bitocard/api-client/classifieds";
 import type { ClassifiedHome, HomeCard, HomeLook, HomeTile, ResolvedHomeRow, ResolvedHomeSection } from "@bitocard/api-client/home";
 import type { TrustIcon } from "@bitocard/api-client/storefront";
+import { homeSource } from "@/lib/discovery";
+import { PersonalRail } from "../discovery/personal-rail";
 import { Flag } from "../flag";
 import { ShopIcon } from "../icon";
 import { ListingGrid, ListingTile } from "../listing-card";
@@ -238,7 +240,7 @@ function Trust({ section, look }: { section: Of<"trust_bar">; look: HomeLook }) 
   );
 }
 
-function One({ section, look }: { section: ResolvedHomeSection; look: HomeLook }) {
+function One({ section, look, country }: { section: ResolvedHomeSection; look: HomeLook; country: string | null }) {
   const id = `home-${section.id}`;
   switch (section.type) {
     case "home_hero":
@@ -267,33 +269,40 @@ function One({ section, look }: { section: ResolvedHomeSection; look: HomeLook }
       return <MasonryGridBlock section={section} look={look} />;
     case "category_banner":
       return <CategoryBannerBlock section={section} look={look} />;
+    case "personal_rail":
+      // Filled for the person after the page loads (countries only); nothing across countries.
+      return country ? <PersonalRail id={id} country={country} kind={section.data.kind} title={section.title} limit={section.limit} itemClass={railItem(look)} /> : null;
   }
 }
+
+/** The market a home page is for (`NG`), or null across countries (personal rows need a market). */
+const pageCountry = (home: ClassifiedHome) => (home.scope === "country" && /^[a-z]{2}$/i.test(home.page) ? home.page.toUpperCase() : null);
 
 const rowBackgrounds: Record<ResolvedHomeRow["background"], string> = { none: "", soft: "bg-navy-50", navy: "bg-navy-900 text-white", brand: "bg-brand-700 text-white", image: "relative isolate text-white" };
 const rowSpacing: Record<ResolvedHomeRow["spacing"], string> = { tight: "py-2", normal: "py-4 sm:py-5", loose: "py-8 sm:py-12" };
 const container = "mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8";
 
 /** A block on its row's grid (12 columns on desktops, 6 on tablets, full width on phones), marked for the editor's preview. */
-function Block({ block, look, preview }: { block: ResolvedHomeSection; look: HomeLook; preview: boolean }) {
+function Block({ block, look, preview, country }: { block: ResolvedHomeSection; look: HomeLook; preview: boolean; country: string | null }) {
   return (
     <div data-home-block={preview ? block.id : undefined} className={`min-w-0 ${mdSpans[block.span.md] ?? "md:col-span-6"} ${lgSpans[block.span.lg] ?? "lg:col-span-12"}`}>
-      <One section={block} look={look} />
+      <One section={block} look={look} country={country} />
     </div>
   );
 }
 
 /**
  * A row of the page: its own background (edge to edge), heading and "See all", then its blocks on the grid. A contained
- * row keeps the page's width; a full one runs edge to edge. Text on navy, brand and photo backgrounds is white.
+ * row keeps the page's width; a full one runs edge to edge. Text on navy, brand and photo backgrounds is white. Clicks
+ * on its cards are the row's (`home:<row id>`) for discovery, unless a personal row inside says its own.
  */
-function Row({ row, look, preview }: { row: ResolvedHomeRow; look: HomeLook; preview: boolean }) {
+function Row({ row, look, preview, country }: { row: ResolvedHomeRow; look: HomeLook; preview: boolean; country: string | null }) {
   const blocks = row.blocks.filter(showsSomething);
   if (!blocks.length) return null;
   const id = `row-${row.id}`;
   const coloured = row.background === "navy" || row.background === "brand" || row.background === "image";
   return (
-    <section data-home-row={preview ? row.id : undefined} aria-labelledby={row.title ? id : undefined} className={`${rowBackgrounds[row.background]} ${row.background === "none" ? "" : rowSpacing[row.spacing]}`}>
+    <section data-home-row={preview ? row.id : undefined} data-discovery-source={homeSource(row.id)} aria-labelledby={row.title ? id : undefined} className={`${rowBackgrounds[row.background]} ${row.background === "none" ? "" : rowSpacing[row.spacing]}`}>
       {row.background === "image" && row.image ? (
         <>
           <img src={row.image} alt="" loading="lazy" className="absolute inset-0 -z-10 size-full object-cover" />
@@ -320,7 +329,7 @@ function Row({ row, look, preview }: { row: ResolvedHomeRow; look: HomeLook; pre
         ) : null}
         <div className={`grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 ${gaps[look.density]}`}>
           {blocks.map(block => (
-            <Block key={block.id} block={block} look={look} preview={preview} />
+            <Block key={block.id} block={block} look={look} preview={preview} country={country} />
           ))}
         </div>
       </div>
@@ -345,7 +354,7 @@ export function HomeRows({ home, rows, preview = false }: { home: ClassifiedHome
         </div>
       ) : null}
       {(leadHero ? rest : [first, ...rest]).filter(Boolean).map(row => (
-        <Row key={row!.id} row={row!} look={home.look} preview={preview} />
+        <Row key={row!.id} row={row!} look={home.look} preview={preview} country={pageCountry(home)} />
       ))}
     </div>
   );
@@ -367,8 +376,8 @@ export function HomeSections({ home, preview = false }: { home: ClassifiedHome; 
       {leadHero ? <Hero section={leadHero} look={home.look} bleed /> : null}
       <div className={`mx-auto grid max-w-[1400px] grid-cols-1 px-4 pt-5 pb-4 sm:px-6 md:grid-cols-6 lg:grid-cols-12 lg:px-8 ${gaps[home.look.density]}`}>
         {body.map(section => (
-          <div key={section.id} className={`min-w-0 ${mdSpans[section.span.md] ?? "md:col-span-6"} ${lgSpans[section.span.lg] ?? "lg:col-span-12"}`}>
-            <One section={section} look={home.look} />
+          <div key={section.id} data-discovery-source={homeSource(section.id)} className={`min-w-0 ${mdSpans[section.span.md] ?? "md:col-span-6"} ${lgSpans[section.span.lg] ?? "lg:col-span-12"}`}>
+            <One section={section} look={home.look} country={pageCountry(home)} />
           </div>
         ))}
       </div>

@@ -52,6 +52,8 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     area_id: customer.areaId ?? null,
     birth_date: customer.birthDate ? customer.birthDate.toISOString().slice(0, 10) : null,
     sex: (customer.sex ?? null) as CustomerSex | null,
+    /** Udozo: Personalise what I see (docs/UDOZO_PERSONALISATION_PLAN.md); off, nothing is recorded about what they look at. */
+    personalisation: !customer.personalisationOffAt,
     created_at: customer.createdAt.toISOString(),
   };
 }

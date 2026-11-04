@@ -1,7 +1,8 @@
 // Site › Home pages and Sponsored: each home page (across countries, then each market) with its layout and its rows
 // of blocks in the rows editor, each block showing what it will show, the live preview beside them (a click in it
 // chooses a block), listings and stores picked for marquees, layouts changed keeping the rows or not, publishing and
-// previews on udozo.com; Sponsored placements placed, refused with the field named, and ended. Support looks only.
+// previews on udozo.com; personal rows (filled for each visitor) on a country's page only; Sponsored placements placed,
+// refused with the field named, and ended. Support looks only.
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminGate, AdminProviders } from "@bitocard/admin-ui/shell";
@@ -45,8 +46,18 @@ const page = (layout = "marketplace") => ({
   updated_at: "2026-11-01T10:00:00.000Z",
   versions: [],
   layouts,
-  blocks_allowed: ["home_hero", "category_masonry", "deals_rail", "sponsored_rail", "top_selling_rail", "listing_group", "banner", "trust_bar", "listing_marquee", "store_marquee", "masonry_grid", "category_banner"],
+  blocks_allowed: ["home_hero", "category_masonry", "deals_rail", "sponsored_rail", "top_selling_rail", "listing_group", "banner", "trust_bar", "listing_marquee", "store_marquee", "masonry_grid", "category_banner", "personal_rail"],
   sections_allowed: ["home_hero"],
+});
+// The page across countries. Its allowed blocks name a personal row as if the API offered one: the editor still never does.
+const globalPage = () => ({
+  ...page("explorer"),
+  page: "global",
+  name: "All countries",
+  scope: "global",
+  rows: [row("g1", [hero], { width: "full" })],
+  draft: [hero],
+  blocks_allowed: ["home_hero", "category_masonry", "sponsored_rail", "listing_group", "banner", "country_tiles", "trust_bar", "personal_rail"],
 });
 const cover = (n: number) => ({ url: `https://media.test/${n}.jpg`, width: 800, height: 600 });
 const pages = { object: "list", data: [{ object: "home_page_summary", page: "global", name: "All countries", scope: "global", layout: "explorer", live: false, version: 0, unpublished_changes: true }, { object: "home_page_summary", page: "NG", name: "Nigeria", scope: "country", layout: "marketplace", live: true, version: 2, unpublished_changes: false }] };
@@ -82,11 +93,14 @@ beforeEach(() => {
     if (path === "/v1/admin/classifieds/categories") return ok({ object: "list", country: "NG", data: [{ object: "classified_admin_category", id: "c1", slug: "phones-tablets", name: "Phones and tablets", icon: "smartphone", b2b: false, enabled: true, open: true, active_listings: 3, children: [] }] });
     if (path === "/v1/admin/classifieds/home") return ok(pages);
     if (path === "/v1/admin/classifieds/home/NG") return ok(page());
+    if (path === "/v1/admin/classifieds/home/global") return ok(globalPage());
     if (path === "/v1/admin/classifieds/home/NG/layout") return ok(page((body as { layout: string }).layout));
     if (path === "/v1/admin/classifieds/home/NG/draft") return ok(page());
-    if (path === "/v1/admin/classifieds/home/NG/resolve") {
-      const rows = (body as { rows: Array<{ id: string; blocks: Array<{ id: string; type: string }> }> }).rows;
-      return ok({ object: "home_page_resolved", page: "NG", rows: rows.map(item => ({ ...item, view_all_href: null, blocks: item.blocks.map(block => ({ ...block, data: block.type === "listing_marquee" ? { items: [{ id: "l1", title: "Galaxy A54", cover: cover(1) }, { id: "l2", title: "iPhone 13", cover: cover(2) }] } : block.type === "sponsored_rail" ? { items: [] } : { slides: [] } })) })) });
+    if (path === "/v1/admin/classifieds/home/NG/resolve" || path === "/v1/admin/classifieds/home/global/resolve") {
+      const rows = (body as { rows: Array<{ id: string; blocks: Array<{ id: string; type: string; kind?: string }> }> }).rows;
+      const data = (block: { type: string; kind?: string }) =>
+        block.type === "listing_marquee" ? { items: [{ id: "l1", title: "Galaxy A54", cover: cover(1) }, { id: "l2", title: "iPhone 13", cover: cover(2) }] } : block.type === "sponsored_rail" ? { items: [] } : block.type === "personal_rail" ? { kind: block.kind } : { slides: [] };
+      return ok({ object: "home_page_resolved", page: path.split("/")[5], rows: rows.map(item => ({ ...item, view_all_href: null, blocks: item.blocks.map(block => ({ ...block, data: data(block) })) })) });
     }
     if (path === "/v1/admin/classifieds/listings") return ok({ object: "list", data: [{ id: "x1", ref: 100031, sku: "PHN-000031", title: "Tecno Camon 20", country: "NG", status: "active", photos: [], price: { kind: "fixed", amount: 9000000, currency: "NGN" } }], total: 1, has_more: false });
     if (path === "/v1/admin/classifieds/home/NG/stores") return ok({ object: "list", data: [] });
@@ -147,6 +161,45 @@ describe("Home pages", () => {
       },
       { timeout: 10000 },
     );
+  });
+
+  test("a personal row added on a country's page: its kind, title and size, saved; it says it is filled for each visitor", slow, async () => {
+    show(<HomePagesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add row" }, { timeout: 10000 }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /Personal listings/ }));
+    const kind = (await screen.findByLabelText("Shows", {}, { timeout: 10000 })) as HTMLSelectElement;
+    expect(kind.value).toBe("for_you");
+    // A title still the kind's own follows the kind chosen.
+    fireEvent.change(kind, { target: { value: "recent" } });
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Recently viewed");
+    fireEvent.change(screen.getByLabelText("Listings"), { target: { value: "8" } });
+    await waitFor(
+      () => {
+        const saved = sent.filter(item => item.path === "/v1/admin/classifieds/home/NG/draft").at(-1)?.body as { rows: Array<{ blocks: Array<Record<string, unknown>> }> } | undefined;
+        expect(saved?.rows).toHaveLength(3);
+        expect(saved!.rows[2]!.blocks[0]).toMatchObject({ type: "personal_rail", kind: "recent", title: "Recently viewed", limit: 8 });
+      },
+      { timeout: 10000 },
+    );
+    // One the admin titled keeps its title when the kind changes.
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Still thinking about these?" } });
+    fireEvent.change(screen.getByLabelText("Shows"), { target: { value: "price_drops" } });
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Still thinking about these?");
+    // Nothing to preview from the API: the card says it is filled for each visitor.
+    expect(await screen.findByText(/Filled for each visitor when the page loads/, {}, { timeout: 10000 })).toBeTruthy();
+  });
+
+  test("the page across countries never offers a personal row", slow, async () => {
+    search.value = new URLSearchParams("page=global");
+    try {
+      show(<HomePagesPage />);
+      fireEvent.click(await screen.findByRole("button", { name: "Add row" }, { timeout: 10000 }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByRole("button", { name: /Countries/ })).toBeTruthy();
+      expect(within(dialog).queryByRole("button", { name: /Personal listings/ })).toBeNull();
+    } finally {
+      search.value = new URLSearchParams("page=NG");
+    }
   });
 
   test("a click on a block in the live preview opens its form; a message from another site does nothing", slow, async () => {

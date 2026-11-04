@@ -1,9 +1,10 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- sellers' photos come from the media CDN at their own sizes. */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon, Play } from "lucide-react";
 import type { ShopListingPage } from "@bitocard/api-client/classifieds";
+import { photoOpened } from "@/lib/discovery-client";
 
 const seconds = (ms: number | null) => {
   if (!ms) return "";
@@ -11,12 +12,16 @@ const seconds = (ms: number | null) => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
 
-/** The listing's photos with their thumbnails, and the seller's video (played only when chosen, never on its own). */
+/** The listing's photos with their thumbnails, and the seller's video (played only when chosen, never on its own). Each photo shown is noted for discovery. */
 export function Gallery({ title, photos, video }: { title: string; photos: ShopListingPage["photos"]; video: ShopListingPage["video"] }) {
   const [shown, setShown] = useState<number | "video">(0);
   const count = photos.length;
   const step = (by: number) => setShown(current => (typeof current === "number" && count ? (current + by + count) % count : 0));
   const photo = typeof shown === "number" ? photos[shown] : null;
+  // Which photos were looked at, for the listing's engagement (`ListingView`).
+  useEffect(() => {
+    if (typeof shown === "number" && count) photoOpened(shown);
+  }, [shown, count]);
   return (
     <div className="grid gap-2">
       <div className="relative aspect-[4/3] overflow-hidden bg-navy-100 sm:rounded-2xl" aria-roledescription="carousel" aria-label={`Photos of ${title}`}>

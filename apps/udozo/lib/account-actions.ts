@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { confirmationPending, type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
+import { mergeVisitorHistory } from "@/lib/discovery-server";
 import { cleanRef } from "@/lib/invite";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
@@ -73,6 +74,8 @@ export async function finishSignUp(input: { firstName: string; lastName: string;
   });
   if (!result.ok) return refused(result);
   await keepSession(result.data.session);
+  // What they looked at before signing in (a visitor who chose Accept all) becomes the account's.
+  await mergeVisitorHistory(result.data.session);
   revalidatePath("/", "layout");
   const next = safeNext(input.next);
   redirect(confirmationPending(result.data.customer) ? `/verify?next=${encodeURIComponent(next)}` : next);
@@ -83,6 +86,8 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   const result = await customerApi<SessionReply>("POST", "/v1/store/account/signin", { email: text(form, "email"), password: String(form.get("password") ?? "") });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
+  // What they looked at before signing in (a visitor who chose Accept all) becomes the account's.
+  await mergeVisitorHistory(result.data.session);
   const next = safeNext(form.get("next"));
   redirect(confirmationPending(result.data.customer) ? `/verify?next=${encodeURIComponent(next)}` : next);
 }
@@ -147,6 +152,8 @@ export async function resetPassword(_state: FormState, form: FormData): Promise<
   });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
+  // What they looked at before signing in (a visitor who chose Accept all) becomes the account's.
+  await mergeVisitorHistory(result.data.session);
   redirect("/account");
 }
 

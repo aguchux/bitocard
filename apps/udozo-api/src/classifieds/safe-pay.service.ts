@@ -1,4 +1,5 @@
 import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { DiscoveryRecorder } from './discovery/recorder.service.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
@@ -140,6 +141,7 @@ export class SafePayService {
     private readonly guards: SafePayGuardsService,
     private readonly terms: ShopTermsService,
     private readonly emails: ShopEmails,
+    private readonly discovery: DiscoveryRecorder,
   ) {}
 
   private encryption() {
@@ -304,6 +306,7 @@ export class SafePayService {
       if ((error as { code?: string }).code === 'P2002') throw conflict('order_exists', 'You have already asked for this with Safe pay.');
       throw error;
     }
+    await this.discovery.record(customer.id, country, 'order', listing.id);
     await this.noteInChat(order, `${publicName(customer.name)} asked to buy with Safe pay for ${priceText(price, order.currency)}.`);
     await this.tell(order, 'seller', 'customer.classifieds.order_requested', `Safe pay request for "${order.listing.title}"`, `${publicName(customer.name)} wants to buy it for ${priceText(price, order.currency)}. Accept or decline within ${settings.acceptHours} hours.`);
     return this.present(order, 'buyer');

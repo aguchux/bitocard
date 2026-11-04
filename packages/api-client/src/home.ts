@@ -49,6 +49,12 @@ export type HomeMasonryTile =
   | { kind: 'listing'; ref: string; size: HomeTileSize }
   | { kind: 'image'; image: string; title: string; link: HomeLink; size: HomeTileSize };
 export type MasonryGridSection = Base<'masonry_grid'> & { title: string; tiles: HomeMasonryTile[] };
+/**
+ * Listings chosen for the person looking (docs/UDOZO_PERSONALISATION_PLAN.md), countries only: the home page holds its
+ * place; udozo.com fills it after the page loads (`GET /v1/classifieds/for-you`), and leaves it out when it is empty.
+ */
+export type PersonalRailKind = 'for_you' | 'recent' | 'searched' | 'price_drops';
+export type PersonalRailSection = Base<'personal_rail'> & { title: string; kind: PersonalRailKind; limit: number };
 export type CategoryBannerSection = Base<'category_banner'> & {
   category: string;
   title: string;
@@ -74,7 +80,8 @@ export type HomeSection =
   | ListingMarqueeSection
   | StoreMarqueeSection
   | MasonryGridSection
-  | CategoryBannerSection;
+  | CategoryBannerSection
+  | PersonalRailSection;
 export type HomeSectionType = HomeSection['type'];
 export type HomeBlock = HomeSection;
 export type HomeBlockType = HomeSectionType;
@@ -117,6 +124,7 @@ export type ResolvedHomeSection =
   | (ListingMarqueeSection & { data: { items: HomeCard[] } })
   | (StoreMarqueeSection & { data: { stores: HomeStoreCard[] } })
   | (MasonryGridSection & { data: { tiles: HomeMasonryCell[] } })
+  | (PersonalRailSection & { data: { kind: PersonalRailKind } })
   | (CategoryBannerSection & { data: { category: { slug: string; name: string; icon: string; listings: number } | null; title?: string; image?: string | null; href?: string } });
 
 /** A reseller's store live on its own domain, in a stores marquee. */

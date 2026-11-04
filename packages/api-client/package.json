@@ -10,6 +10,7 @@
     "./storefront": "./src/storefront.ts",
     "./classifieds": "./src/classifieds.ts",
     "./home": "./src/home.ts",
+    "./discovery": "./src/discovery.ts",
     "./kyc": "./src/kyc.ts",
     "./crypto": "./src/crypto.ts",
     "./afrippa-admin": "./src/afrippa-admin.ts"

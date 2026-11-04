@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Cpu, Crown, Flag, FlaskConical, GalleryHorizontal, Globe2, HandCoins, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, Flag, FlaskConical, GalleryHorizontal, Globe2, HandCoins, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -119,6 +119,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "P&L", href: "/reports", icon: ChartNoAxesColumn },
       { label: "Growth", href: "/reports/growth", icon: TrendingUp },
       { label: "Sign-up journeys", href: "/reports/signups", icon: Route },
+      { label: "Discovery", href: "/reports/discovery", icon: Compass },
       { label: "Safe pay and resale", href: "/reports/resale", icon: HandCoins },
       { label: "Statements", href: "/reports/statements", icon: ReceiptText },
     ],

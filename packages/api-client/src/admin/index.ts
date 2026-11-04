@@ -519,6 +519,7 @@ export * from './team';
 export * from './marketing';
 export * from './contact-messages';
 export * from './signup-journeys';
+export * from './discovery';
 export * from './vpn';
 export * from './domains';
 export * from './reports';

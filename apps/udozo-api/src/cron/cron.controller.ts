@@ -6,6 +6,7 @@ import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
 import { CallsService } from '../classifieds/calls.service.js';
+import { DiscoveryAdminService } from '../classifieds/discovery/discovery-admin.service.js';
 import { MarketingService } from '../marketing/marketing.service.js';
 import { ResaleStoresService } from '../resale/resale-stores.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
@@ -108,6 +109,7 @@ export class CronController {
     marketing: MarketingService,
     calls: CallsService,
     signupJourneys: SignupJourneysService,
+    discovery: DiscoveryAdminService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -179,9 +181,11 @@ export class CronController {
       'notifications-cleanup': () => inbox.purge(),
       /**
        * Udozo, daily: Marketing keeps no one it never brought on for long, and nothing but the contact of who asked to
-       * stop; sign-up journeys are rolled into daily counts and deleted 7 days after completing (30 days unfinished).
+       * stop; sign-up journeys are rolled into daily counts and deleted 7 days after completing (30 days unfinished);
+       * discovery's "people also viewed" is rebuilt, and its events (90 days), idle profiles (180 days) and searches per
+       * day (13 months) deleted.
        */
-      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge() }),
+      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), discovery: await discovery.daily() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the
@@ -204,7 +208,8 @@ export class CronController {
        * their time expire, unread messages are emailed, chats a year old are deleted, and Safe pay orders past a deadline
        * lapse, are refunded (not handed over) or released (delivery not confirmed or disputed); resale deals past their
        * end end, auto-listing rules add new listings, and resellers are told when a store listing stops selling; calls
-       * that rang out are missed (the seller told) and calls past 90 days deleted.
+       * that rang out are missed (the seller told) and calls past 90 days deleted; every live listing's discovery signals
+       * (its quality in personalised rows) are refreshed.
        */
       classifieds: async () => ({
         safe_pay: await safePay.runDue(),
@@ -216,6 +221,7 @@ export class CronController {
         resale: await resale.job(),
         old_resale_threads: await resaleOrders.purgeOldThreads(),
         calls: await calls.job(),
+        listing_signals: await discovery.refreshSignals(),
       }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),

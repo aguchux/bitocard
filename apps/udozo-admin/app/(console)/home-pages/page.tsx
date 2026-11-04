@@ -158,7 +158,8 @@ function Editor({ page, editable }: { page: HomePage; editable: boolean }) {
           unpublishedChanges: page.unpublished_changes,
           versions: page.versions.map(item => ({ version: item.version, publishedAt: item.published_at, note: layoutName(item.layout) })),
         }}
-        allowed={page.blocks_allowed}
+        // Personal rows are a country's (the API refuses them across countries): never offered there.
+        allowed={page.scope === "global" ? page.blocks_allowed.filter(type => type !== "personal_rail") : page.blocks_allowed}
         registry={homeRegistry}
         RowForm={HomeRowForm}
         blankRow={blankRow}

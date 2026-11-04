@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useContext, useId, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, BadgePercent, Globe2, ImageIcon, LayoutDashboard, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, Store, Tag, TrendingUp, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgePercent, Globe2, ImageIcon, LayoutDashboard, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, Sparkles, Store, Tag, TrendingUp, X } from "lucide-react";
 import { Button, Field, ImageField, Input, Select, Textarea, Toggle } from "@bitocard/admin-ui";
 import { defineRegistry, type EditorRow, StoreSectionForm } from "@bitocard/admin-ui/storefront";
 import { conditionLabels } from "@bitocard/api-client/classifieds";
 import type { StoreSection } from "@bitocard/api-client/storefront";
-import { homeLinkText, type HomeGroupKind, type HomeLink, type HomeSection, type HomeTileSize, type HomeTone } from "@bitocard/api-client/home";
+import { homeLinkText, type HomeGroupKind, type HomeLink, type HomeSection, type HomeTileSize, type HomeTone, type PersonalRailKind } from "@bitocard/api-client/home";
 import { CategoryBannerForm, ListingMarqueeForm, MasonryGridForm, RowSettingsForm, type RowFormKit, StoreMarqueeForm } from "./row-forms";
 
 /** What the forms choose from: the page's scope, the categories (with their subcategories) and the open markets. */
@@ -27,6 +27,13 @@ const sizeLabels: Record<HomeTileSize, string> = { sm: "Small", wide: "Wide", ta
 const toneLabels: Record<HomeTone, string> = { navy: "Navy", brand: "Brand colour", light: "Light" };
 const groupLabels: Record<HomeGroupKind, string> = { newest: "The newest", trending: "Trending", category: "A category", area: "A state or area", condition: "A condition" };
 const heroStyles = { search: "Search", carousel: "Carousel of slides", minimal: "Minimal" } as const;
+/** A personal row's kinds: its name in the editor, the title it starts with, and what it shows. */
+export const personalKinds: Record<PersonalRailKind, { label: string; title: string; hint: string }> = {
+  for_you: { label: "For you", title: "For you", hint: "Listings picked from what they look at, save and contact; popular listings for someone new." },
+  recent: { label: "Recently viewed", title: "Recently viewed", hint: "Listings they opened lately, newest first." },
+  searched: { label: "Because you searched", title: "Because you searched", hint: "Listings matching one of their recent searches." },
+  price_drops: { label: "Price dropped", title: "Price dropped", hint: "Listings they viewed or saved whose price came down." },
+};
 
 type Of<T extends HomeSection["type"]> = Extract<HomeSection, { type: T }>;
 type Props<T extends HomeSection["type"]> = { section: Of<T>; onChange: (next: HomeSection) => void };
@@ -319,6 +326,36 @@ function BannerFields({ item, change }: { item: Of<"banner">["items"][number]; c
   );
 }
 
+function PersonalRailForm({ section, onChange }: Props<"personal_rail">) {
+  const id = useId();
+  const kind = personalKinds[section.kind];
+  return (
+    <>
+      <Field label="Shows" htmlFor={id} hint={kind.hint}>
+        <Select
+          id={id}
+          value={section.kind}
+          onChange={event => {
+            const next = event.target.value as PersonalRailKind;
+            // A title still the kind's own (or empty) follows the new kind; one the admin wrote is kept.
+            const own = !section.title.trim() || Object.values(personalKinds).some(item => item.title === section.title);
+            onChange({ ...section, kind: next, title: own ? personalKinds[next].title : section.title });
+          }}
+        >
+          {(Object.keys(personalKinds) as PersonalRailKind[]).map(value => (
+            <option key={value} value={value}>
+              {personalKinds[value].label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <TextField label="Title" value={section.title} max={80} required onChange={title => onChange({ ...section, title })} />
+      <NumberField label="Listings" value={section.limit} min={4} max={24} onChange={limit => onChange({ ...section, limit })} />
+      <p className="text-xs text-muted">Filled for each visitor after the page loads, from what they did on Udozo; search engines never see it. Someone with nothing to show does not see the row.</p>
+    </>
+  );
+}
+
 function CountryTilesForm({ section, onChange }: Props<"country_tiles">) {
   const { markets } = useForm();
   const toggle = (country: string, on: boolean) => onChange({ ...section, countries: on ? [...section.countries, country] : section.countries.filter(code => code !== country) });
@@ -389,6 +426,8 @@ function HomeSectionForm({ section, onChange }: { section: HomeSection; onChange
       return <BannerForm section={section} onChange={onChange} />;
     case "country_tiles":
       return <CountryTilesForm section={section} onChange={onChange} />;
+    case "personal_rail":
+      return <PersonalRailForm section={section} onChange={onChange} />;
     case "trust_bar":
       return <StoreSectionForm section={section as StoreSection} onChange={next => onChange(next as HomeSection)} />;
   }
@@ -408,6 +447,7 @@ const icons = {
   store_marquee: Store,
   masonry_grid: LayoutDashboard,
   category_banner: Tag,
+  personal_rail: Sparkles,
 };
 
 /** A new section of each type, valid as the API expects. */
@@ -440,6 +480,8 @@ function newSection(type: HomeSection["type"], id: string): HomeSection {
       return { ...base, type, title: "", tiles: [{ kind: "image", image: "", title: "Sell what you no longer use", link: { kind: "href", href: "/sell" }, size: "wide" }] };
     case "category_banner":
       return { ...base, type, category: "phones-tablets", title: "", body: "", image: null, tone: "navy", style: "split", cta: "Shop now", showCount: true };
+    case "personal_rail":
+      return { ...base, type, title: personalKinds.for_you.title, kind: "for_you", limit: 12 };
   }
 }
 
@@ -471,6 +513,8 @@ function summary(section: HomeSection): string {
       return `${section.tiles.length} tile${section.tiles.length === 1 ? "" : "s"}: ${section.tiles.map(tile => (tile.kind === "category" ? tile.slug || "—" : tile.kind === "listing" ? `listing ${tile.ref || "—"}` : tile.title || "photo")).join(", ")}`;
     case "category_banner":
       return [`Opens ${section.category || "—"}`, section.style === "overlay" ? "words on the photo" : "words beside the photo", section.image ? "its own photo" : "a listing's photo"].join(" · ");
+    case "personal_rail":
+      return [personalKinds[section.kind].label, "filled for each visitor", `up to ${section.limit}`].join(" · ");
   }
 }
 
@@ -481,6 +525,7 @@ function title(section: HomeSection): string {
   if (section.type === "listing_marquee") return section.title || "Moving listings";
   if (section.type === "store_marquee") return section.title || "Moving stores";
   if (section.type === "masonry_grid") return section.title || "Masonry grid";
+  if (section.type === "personal_rail") return section.title || personalKinds[section.kind].label;
   return section.title;
 }
 
@@ -500,6 +545,7 @@ export const homeRegistry = defineRegistry<HomeSection>({
     { type: "store_marquee", label: "Moving stores", description: "Resellers' stores live on their own domain, sliding past: picked, or those with most listings." },
     { type: "masonry_grid", label: "Masonry grid", description: "Tiles of different sizes: categories, listings, or photos linking anywhere." },
     { type: "category_banner", label: "Category banner", description: "A banner opening one category, with its name, a listing's photo and its count unless you set them." },
+    { type: "personal_rail", label: "Personal listings", description: "For you, Recently viewed, Because you searched or Price dropped: filled for each visitor (a country’s page)." },
   ],
   newSection,
   summary,

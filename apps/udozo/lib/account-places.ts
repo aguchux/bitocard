@@ -21,7 +21,7 @@ export function accountPlaces(counts: PlaceCounts): Place[] {
     { key: "wallet", href: "/account/wallet", label: "Wallet" },
     { key: "safe-pay", href: "/account/safe-pay", label: "Safe pay" },
     { key: "payouts", href: "/account/payouts", label: "Payouts" },
-    { key: "profile", href: "/account/profile", label: "Profile", also: ["/account/verification"] },
+    { key: "profile", href: "/account/profile", label: "Profile", also: ["/account/verification", "/account/privacy"] },
   ];
 }
 

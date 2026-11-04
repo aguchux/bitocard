@@ -2655,6 +2655,9 @@ model Customer {
   /// Udozo: the customer's date of birth and sex, optional, set on their profile (`unspecified` when they would rather not say).
   birthDate                 DateTime?                 @map("birth_date") @db.Date
   sex                       String?
+  /// Udozo: when the customer turned off "Personalise what I see" (null: on). Off, nothing is recorded about what they
+  /// look at, and their discovery history and interest profile are deleted (docs/UDOZO_PERSONALISATION_PLAN.md).
+  personalisationOffAt      DateTime?                 @map("personalisation_off_at")
   status                    UserStatus                @default(active)
   failedSignIns             Int                       @default(0) @map("failed_sign_ins")
   lockedUntil               DateTime?                 @map("locked_until")
@@ -5996,6 +5999,114 @@ model ClassifiedBanner {
 
   @@index([position, country])
   @@map("classified_banners")
+}
+
+/// Udozo's personalised discovery (docs/UDOZO_PERSONALISATION_PLAN.md): what one person (a signed-in customer `c:<id>`,
+/// or a visitor who accepted all cookies, `v:<HMAC of their visitor ID>`) looked at, searched for and did, append-only,
+/// with what it was about copied at the time. Kept 90 days. No foreign keys: a listing gone keeps its events until then.
+model DiscoveryEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  subject    String
+  /// A random ID per visit, from the page (never a cookie); null for events the API records itself.
+  session    String?
+  /// view, engaged, search, filter, result_click, rail_click, impression, share, not_interested (from the browser);
+  /// save, unsave, chat, contact, call, offer, order (recorded by the API where they happen).
+  kind       String   @db.VarChar(20)
+  listingId  String?  @map("listing_id") @db.Uuid
+  categoryId String?  @map("category_id") @db.Uuid
+  brand      String?
+  model      String?
+  areaId     String?  @map("area_id") @db.Uuid
+  priceMinor BigInt?  @map("price_minor")
+  condition  String?
+  /// A search's words, cleaned (lower case, no emails, phone numbers, long digit runs or codes), at most 100 characters.
+  query      String?  @db.VarChar(100)
+  filters    Json?
+  results    Int?
+  sort       String?  @db.VarChar(20)
+  /// Where a click or impression came from: search, home:<row>, for_you, for_you_holdout, similar, also_viewed, recent.
+  source     String?  @db.VarChar(40)
+  position   Int?
+  seconds    Int?
+  photos     Int?
+  depth      Int?
+  country    String   @db.Char(2)
+  at         DateTime @default(now())
+
+  @@index([subject, at])
+  @@index([listingId, at])
+  @@index([country, kind, at])
+  @@map("discovery_events")
+}
+
+/// One person's interests in one market, built from their events: decayed scores (halving every 14 days) per category,
+/// brand, model, area and condition, the price band per category, their last searches, the listings they have seen
+/// (with how often) and those they marked not interested. Deleted after 180 days without a visit.
+model InterestProfile {
+  id            String   @id @default(uuid()) @db.Uuid
+  subject       String
+  country       String   @db.Char(2)
+  categories    Json     @default("{}")
+  brands        Json     @default("{}")
+  models        Json     @default("{}")
+  areas         Json     @default("{}")
+  conditions    Json     @default("{}")
+  /// Per category: `{ low, high, weight }` in minor units, from the prices they engaged with.
+  prices        Json     @default("{}")
+  /// The last 20 searches, newest first: `[{ query, at, results }]`.
+  searches      Json     @default("[]")
+  /// Listing ids seen, with how many times and when last: `{ <id>: [count, unix seconds, clicked] }`, at most 200.
+  seen          Json     @default("{}")
+  /// Listing ids marked not interested (never shown again in their rows).
+  excluded      String[] @default([])
+  /// Score weights are as of this time (decay is worked out from it).
+  updatedAt     DateTime @default(now()) @map("updated_at")
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([subject, country])
+  @@index([lastSeenAt])
+  @@map("interest_profiles")
+}
+
+/// Searches per market, cleaned query and UTC day: for popular searches, zero-result searches and Reports > Discovery.
+model SearchQueryDay {
+  country     String   @db.Char(2)
+  query       String   @db.VarChar(100)
+  day         DateTime @db.Date
+  searches    Int      @default(0)
+  zeroResults Int      @default(0) @map("zero_results")
+  /// Different people searching it that day, approximately (a person counts once a day per query, by an in-memory note).
+  subjects    Int      @default(0)
+  clicks      Int      @default(0)
+  contacts    Int      @default(0)
+
+  @@id([country, query, day])
+  @@index([country, day])
+  @@map("search_query_days")
+}
+
+/// Per live listing, the quality half of every score (refreshed by the `classifieds` job): smoothed click-through from
+/// impressions, save and contact rates against views, so a new listing starts at the market's average.
+model ListingSignal {
+  listingId   String   @id @map("listing_id") @db.Uuid
+  quality     Float    @default(1)
+  ctr         Float    @default(0)
+  saveRate    Float    @default(0) @map("save_rate")
+  contactRate Float    @default(0) @map("contact_rate")
+  refreshedAt DateTime @default(now()) @map("refreshed_at")
+
+  @@map("listing_signals")
+}
+
+/// "People who looked at this also looked at": for each listing, the listings most often viewed or contacted in the same
+/// visits over 30 days (at most 20), rebuilt daily.
+model ListingNeighbour {
+  listingId   String @map("listing_id") @db.Uuid
+  neighbourId String @map("neighbour_id") @db.Uuid
+  score       Float
+
+  @@id([listingId, neighbourId])
+  @@map("listing_neighbours")
 }
 
 /// A listing's page views on one UTC day (trending ranks by recent views); the listing's `views` keeps the total.

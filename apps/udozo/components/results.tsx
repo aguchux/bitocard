@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { SlidersHorizontal } from "lucide-react";
 import { brandFeatureKey, conditionLabels, modelFeatureKey, shopMoney, sortLabels, type ShopBrand, type ShopCategory, type ShopCondition, type ShopModel, type ShopResult, type ShopSearch, type ShopSort, type ShopTier } from "@bitocard/api-client/classifieds";
+import { searchFilters } from "@/lib/discovery";
 import { featureFilter, filterCount, filtersHref, maxOffset, perPage, type ShopFilters } from "@/lib/search";
 import { BrandLogo } from "./brand-logo";
+import { NotInterested } from "./discovery/not-interested";
+import { SearchEvent } from "./discovery/search-event";
 import { ListingRow } from "./listing-card";
 
 /** Where each tier sits from the buyer's place outwards. */
@@ -205,7 +208,8 @@ function FiltersForm({ path, filters, category, brands, models, currency }: { pa
 
 /**
  * A page of results: the filters, the count, the results in their tiers (from the buyer's place outwards) and the
- * pages. Empty results say so and offer to widen the search.
+ * pages. Empty results say so and offer to widen the search. For discovery, the search is recorded once, every result
+ * names its place (clicks are `search`'s), and each has Not interested in its menu.
  */
 export function Results({
   result,
@@ -229,8 +233,11 @@ export function Results({
   currency: string;
 }) {
   const pages = Math.min(Math.ceil(result.total / perPage), Math.floor(maxOffset / perPage) + 1);
+  const first = (filters.page - 1) * perPage;
+  const at = (row: ShopResult) => first + result.data.indexOf(row);
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4" data-discovery-source="search">
+      <SearchEvent query={filters.q} filters={searchFilters(filters, category)} results={result.total} sort={filters.sort} />
       <FiltersForm path={path} filters={filters} category={category} brands={brands} models={models} currency={currency} />
       <p className="text-sm text-navy-600" aria-live="polite">
         {result.total === 0 ? "No listings match yet." : `${result.total.toLocaleString("en-GB")} listing${result.total === 1 ? "" : "s"}`}
@@ -254,7 +261,9 @@ export function Results({
           ) : null}
           <div className="grid gap-2.5 lg:grid-cols-2">
             {group.rows.map(row => (
-              <ListingRow key={row.id} card={row} />
+              <NotInterested key={row.id} listing={row.ref} source="search">
+                <ListingRow card={row} position={at(row)} menu />
+              </NotInterested>
             ))}
           </div>
         </section>

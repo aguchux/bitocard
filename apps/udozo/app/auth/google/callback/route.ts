@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { confirmationPending, type Customer, customerApi, keepSession, safeNext } from "@/lib/customer";
+import { mergeVisitorHistory } from "@/lib/discovery-server";
 import { takeGoogleFlow } from "@/lib/google";
 import { siteOrigin } from "@/lib/site";
 
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
   const result = await customerApi<SessionReply>("POST", "/v1/store/account/google/finish", { state, code, ...(flow.ref ? { ref: flow.ref } : {}) });
   if (!result.ok) return back(result.code ?? "google_failed");
   await keepSession(result.data.session);
+  await mergeVisitorHistory(result.data.session);
   const next = safeNext(flow.next);
   return NextResponse.redirect(new URL(confirmationPending(result.data.customer) ? `/verify?next=${encodeURIComponent(next)}` : next, siteOrigin()), 303);
 }

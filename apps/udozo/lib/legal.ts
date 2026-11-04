@@ -4,7 +4,7 @@
  * or use Safe pay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
-export const legalVersion = "2026-11-01";
+export const legalVersion = "2026-11-04";
 /** Privacy and legal requests. */
 export const legalContact = "legal@udozo.com";
 /** Help with an account, a listing or an order. */
@@ -59,6 +59,8 @@ const terms: LegalDocument = {
             "Some rows show listings or stores Udozo's team picked by hand to show what is on Udozo. Nobody pays for these; a store or listing is only picked while it is live.",
             "Trending deals are listings whose price came down, shown beside the lowest price they had in the 30 days before.",
             "Top selling ranks listings by Safe pay sales completed in the last 30 days. Until enough have sold, the most contacted listings show instead, titled Popular, never as sales.",
+            "For you, Recently viewed, Because you searched and Price dropped are chosen for you from your own activity on Udozo: the listings you looked at, saved and contacted, and what you searched for. Without that activity, or if you turn personalisation off, For you shows what is popular. People also viewed shows listings that others who looked at a listing looked at too.",
+            "Personalisation only changes the order of listings that are already on Udozo for you to see. Sponsored listings stay labelled, and nothing moves up because anyone paid. You can turn personalisation off, and clear what Udozo remembers, under Account, Privacy.",
           ],
         },
       ],
@@ -640,9 +642,11 @@ const privacy: LegalDocument = {
             "Signing up: each step you take to create an account on udozo.com or Seller HQ (entering your email, the emailed and texted codes, your mobile number, your password, signing in with Google), when you took it, whether it went through or why not (for example a wrong or expired code), the country you chose, and the kind of device and browser (such as \"Chrome on Android\"), never your codes or password. Our team uses it to see where people get stuck signing up, and may contact you to help. We also count how many times the sign-up pages are opened each day, without anything about who opened them.",
             "Technical data: your IP address, used for rate limits and security, and the requests your browser makes, in our server logs.",
             "Listing views: how many times each listing's page was opened, each day, shown to its seller and used to rank Trending. Nothing about who viewed it is kept: so one visitor counts once, a one-way code of their IP address, browser and the listing is held in memory for half an hour, then forgotten.",
+            "What you look at, to personalise what you see (section 5): signed in, or if you are not signed in and chose Accept all on our cookie banner, the listings you open, how long you read them, how many photos you open and how far down you read; what you search for (the words, with phone numbers, emails, long numbers and codes taken out) and the filters you use; which listings you click, share or mark Not interested, and where on the page they were; and, from your account, the listings you save, contact, call, make offers on or buy. Each visit has a random ID kept only in the page while it is open. If you are not signed in, a random ID in the optional udz_vid cookie links your visits; we keep only a one-way code of it. From this we keep a short profile of your interests (categories, brands, models, areas, price ranges and condition, which fade over time), your last searches and the listings you viewed.",
           ],
         },
-        'We do not collect your precise location: "Use my location" on udozo.com finds the nearest area in your browser, and your position is never sent to us. We use no analytics, advertising or tracking cookies.',
+        'We do not collect your precise location: "Use my location" on udozo.com finds the nearest area in your browser, and your position is never sent to us. We use no analytics, advertising or tracking cookies. Our one optional cookie, udz_vid, is set only if you choose Accept all, and only to personalise what you see.',
+        "Personalisation never uses your date of birth (except to leave out anyone under 18, who gets no profile), your sex, what you write in messages or chats, or your phone number. It is never used for advertising, never sold and never shown to sellers: they see only how many people viewed and contacted their listings. One person in ten, chosen at random, sees the usual popular order in For you instead, so we can measure whether personalising helps.",
       ],
     },
     {
@@ -677,12 +681,14 @@ const privacy: LegalDocument = {
               ["Shop assistants, and reviewing their answers to improve them", "Our legitimate interest in helping people use Udozo, and our contract with you"],
               ["Running Seller HQ, stores, domains, invoices and payouts", "Our contract with sellers"],
               ["Seeing where people get stuck signing up, and helping them finish", "Our legitimate interest in a sign-up that works for everyone"],
+              ["Personalising what you see (For you, Recently viewed, your searches, People also viewed) and improving search", "Signed in: our contract with you (the terms) and our legitimate interest in showing you what you are looking for; you can object by turning personalisation off. Not signed in: your consent, given by choosing Accept all"],
               ["Inviting sellers whose business details are public, and following up", "Our legitimate interest in growing Udozo's marketplace. Tell us at any time and we stop: we keep only your number or email, marked so we never contact you again"],
               ["Accounting and tax records", "The law"],
             ],
           },
         },
         "Some decisions are made automatically: refusing a listing that uses a word for an item that may never be sold, refusing store pages that claim to own the items, refusing a Safe pay order whose buyer and seller our checks show are the same person, limits, and pausing a seller or store at the strike limit. A person on Udozo's team reviews them if you ask.",
+        "Personalisation is automated too: it chooses the order of listings in For you and the other rows made for you. It decides nothing about you beyond that order: it never stops you seeing, buying or selling anything, and search with words still shows the best matches first. Turn it off, remove single items or clear your history at any time under Account, Privacy (signed in), or with Necessary only in Cookie settings (not signed in).",
       ],
     },
     {
@@ -725,6 +731,8 @@ const privacy: LegalDocument = {
               ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years."],
               ["Chats and questions with our team", "Chats 12 months after they end; questions two years after they are resolved."],
               ["Contact us messages", "Two years after the last reply or change; messages we mark as spam, after 30 days."],
+              ["What you looked at and searched for (to personalise)", "90 days. Your interest profile: deleted after 180 days without a visit, and at once when you turn personalisation off, clear your history, choose Necessary only (not signed in) or close your account. When you sign in, what was kept under your udz_vid cookie becomes your account's."],
+              ["Searches counted per day", "Each search's words (cleaned as section 2 says) and how often they were searched each day, with nothing about who searched: 13 months, to suggest popular searches and improve search."],
               ["Your sign-up steps", "Deleted 7 days after your account is ready to use, or 30 days after your last step if you never finish. Only daily counts with nothing about you are kept, for a year."],
               ["Sellers we invite who do not sign up", "Deleted 12 months after our last contact (or after we added you, if we never reached you). If you ask us to stop, only your number or email, marked not to contact."],
               ["Your account", "While it is open. Ask us to close it; we then delete your account details within 30 days, apart from the records above."],
@@ -745,7 +753,7 @@ const privacy: LegalDocument = {
     {
       id: "children",
       heading: "10. Children",
-      body: ["Udozo is for adults only. We do not knowingly keep data about anyone under 18; we close such accounts when we find them."],
+      body: ["Udozo is for adults only. We do not knowingly keep data about anyone under 18; we close such accounts when we find them. Nobody under 18, by the date of birth on their profile, gets a personalisation profile."],
     },
     {
       id: "changes",
@@ -764,7 +772,7 @@ const cookies: LegalDocument = {
       id: "cookies",
       heading: "1. Cookies",
       body: [
-        "Udozo uses only cookies that are strictly necessary for its sites to work. It uses no analytics, advertising or tracking cookies today; if it ever adds optional ones, it will use them only after you agree (section 3).",
+        "Udozo uses cookies that are strictly necessary for its sites to work, and one optional cookie, udz_vid, set only if you choose Accept all (section 3). It uses no analytics, advertising or tracking cookies.",
         {
           table: {
             head: ["Name", "Site", "What for", "Kept"],
@@ -777,6 +785,7 @@ const cookies: LegalDocument = {
               ["udz_admin_session", "Udozo's admin", "Keeps Udozo's team signed in", "12 hours"],
               ["udz_kyc", "verify.udozo.com", "Keeps your identity check open while you do it", "Two hours"],
               ["udz_cookie_consent", "udozo.com, and each reseller's store on its own address", "Remembers your cookie choice (Necessary only or Accept all) and when you made it", "12 months"],
+              ["udz_vid", "udozo.com", "Optional, only after Accept all: a random ID that links your visits when you are not signed in, so udozo.com can remember what you look at and show you listings you are likely to want (For you, Recently viewed, your searches). Never used for advertising. Removed, with what was kept under it, when you choose Necessary only", "12 months"],
             ],
           },
         },
@@ -809,7 +818,7 @@ const cookies: LegalDocument = {
       id: "choices",
       heading: "3. Your cookie choices",
       body: [
-        "On your first visit each of Udozo's sites asks about cookies. Necessary only keeps to the cookies above; Accept all also allows optional cookies, such as analytics to see how Udozo is used. Udozo uses no optional cookies yet: if it adds any, this notice will name them first, and they will be used only where you chose Accept all.",
+        "On your first visit each of Udozo's sites asks about cookies. Necessary only keeps to the strictly necessary cookies above; Accept all also allows Udozo's one optional cookie, udz_vid, on udozo.com. If Udozo adds other optional cookies, this notice will name them first, and you will be asked again.",
         "Your choice is kept for 12 months in udz_cookie_consent, then you are asked again. You can change it at any time with Cookie settings at the foot of every page. Each reseller's store on its own address asks separately.",
       ],
     },
