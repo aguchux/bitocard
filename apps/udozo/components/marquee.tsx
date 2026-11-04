@@ -22,14 +22,22 @@ export function wrapOffset(offset: number, period: number): number {
   return inside === 0 ? period : inside;
 }
 
+function isFocusVisible(target: EventTarget): boolean {
+  try {
+    return target instanceof Element && target.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
+
 /**
  * A row of items sliding past on its own, which people can also move themselves: a swipe on phones, the trackpad or
  * wheel, or dragging it with the mouse, either way; it carries on by itself `marqueeResumeMs` after they let go. The row
  * is a sideways scroller (scroll bar hidden) holding the items twice; it is moved by setting its scroll offset each
- * frame, wrapped at the copy's start so the loop never jumps. The copy is hidden from screen readers and taken out of
+ * frame, wrapped at the copy's start so the loop never jumps, and held still while a finger or the mouse is on it. The copy is hidden from screen readers and taken out of
  * the tab order (`aria-hidden`, its links `tabindex="-1"`), so each item is read and reached once, yet a tap on it still
  * opens it. It pauses while pointed at with a mouse or while
- * something in it has focus, and with its own Pause button (moving content needs one, WCAG 2.2.2). For visitors who ask
+ * something in it has keyboard focus, and with its own Pause button (moving content needs one, WCAG 2.2.2). For visitors who ask
  * for reduced motion it never moves by itself: the copy goes and the row only scrolls by hand. Never wider than the screen.
  */
 export function Marquee({ label, count, speed = "normal", direction = "left", children }: { label: string; count: number; speed?: MarqueeSpeed; direction?: "left" | "right"; children: React.ReactNode }) {
@@ -37,7 +45,7 @@ export function Marquee({ label, count, speed = "normal", direction = "left", ch
   const duration = Math.max(12, count * marqueeSeconds[speed]);
   const viewport = useRef<HTMLDivElement>(null);
   const copy = useRef<HTMLUListElement>(null);
-  const state = useRef({ paused: false, hover: false, focus: false, quietUntil: 0, offset: 0, set: -1, dragging: false, dragged: false, draggedAt: 0, startX: 0, startOffset: 0 });
+  const state = useRef({ paused: false, hover: false, focus: false, touching: false, quietUntil: 0, offset: 0, set: -1, dragging: false, dragged: false, draggedAt: 0, startX: 0, startOffset: 0 });
 
   useEffect(() => {
     state.current.paused = paused;
@@ -67,9 +75,26 @@ export function Marquee({ label, count, speed = "normal", direction = "left", ch
       }
     };
     el.addEventListener("scroll", onScroll, { passive: true });
+    // A finger on the row holds it still (moving it under the finger would fight the swipe), then the swipe's momentum.
+    const touchStart = () => {
+      s.touching = true;
+    };
+    const touchEnd = () => {
+      s.touching = false;
+      s.quietUntil = performance.now() + marqueeResumeMs;
+    };
+    el.addEventListener("touchstart", touchStart, { passive: true });
+    el.addEventListener("touchend", touchEnd, { passive: true });
+    el.addEventListener("touchcancel", touchEnd, { passive: true });
+    const unlisten = () => {
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("touchstart", touchStart);
+      el.removeEventListener("touchend", touchEnd);
+      el.removeEventListener("touchcancel", touchEnd);
+    };
     // The copy's links stay out of the tab order (it is hidden from screen readers), but can be tapped.
     for (const item of copy.current?.querySelectorAll<HTMLElement>("a, button, input, select, textarea, [tabindex]") ?? []) item.tabIndex = -1;
-    if (reduced) return () => el.removeEventListener("scroll", onScroll);
+    if (reduced) return unlisten;
 
     // Start just past the copy's start (it looks the same), so the row can be swiped back as well as on.
     place(s.offset || period());
@@ -79,14 +104,14 @@ export function Marquee({ label, count, speed = "normal", direction = "left", ch
       const elapsed = Math.min(now - last, 100);
       last = now;
       const loop = period();
-      const still = s.paused || s.hover || s.focus || s.dragging || now < s.quietUntil || document.hidden;
+      const still = s.paused || s.hover || s.focus || s.touching || s.dragging || now < s.quietUntil || document.hidden;
       if (!still && loop > 0) place(s.offset + ((direction === "left" ? 1 : -1) * loop * elapsed) / (duration * 1000));
       frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => {
       cancelAnimationFrame(frame);
-      el.removeEventListener("scroll", onScroll);
+      unlisten();
     };
   }, [direction, duration]);
 
@@ -142,8 +167,9 @@ export function Marquee({ label, count, speed = "normal", direction = "left", ch
       onPointerLeave={() => {
         state.current.hover = false;
       }}
-      onFocus={() => {
-        state.current.focus = true;
+      // Keyboard focus holds it (a mouse press focuses the link under it, which must not stop the row for good).
+      onFocus={event => {
+        state.current.focus = isFocusVisible(event.target);
       }}
       onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) state.current.focus = false;
