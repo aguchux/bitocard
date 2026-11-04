@@ -4,15 +4,6 @@ import { type LegalBlock, type LegalDocument, legalDocuments, legalVersion } fro
 
 export const legalDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${legalVersion}T00:00:00Z`));
 
-/** Says plainly that these are drafts: Udozo's documents are reviewed by lawyers in each market before it opens. */
-export function DraftNotice() {
-  return (
-    <p role="note" className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
-      <strong>Draft for lawyers&apos; review.</strong> Udozo is not open for real payments yet. These documents describe how it works and will be reviewed by qualified lawyers in each market before it opens.
-    </p>
-  );
-}
-
 /** A legal page's frame (inside the global layout's header and footer): a narrow readable column and links to the other documents. */
 export function LegalFrame({ current, children }: { current: string | null; children: ReactNode }) {
   return (
@@ -77,7 +68,7 @@ function Block({ block }: { block: LegalBlock }) {
   );
 }
 
-/** One document: its title and date, the draft notice, contents, then each section with an anchor. */
+/** One document: its title and date, contents, then each section with an anchor. */
 export function LegalArticle({ doc }: { doc: LegalDocument }) {
   return (
     <article className="grid gap-6">
@@ -88,7 +79,6 @@ export function LegalArticle({ doc }: { doc: LegalDocument }) {
           Version {legalVersion} · last updated {legalDate}
         </p>
       </header>
-      <DraftNotice />
       <nav aria-label="Contents" className="rounded-2xl border border-navy-200 bg-white p-4">
         <p className="text-sm font-semibold text-navy-900">Contents</p>
         <ol className="mt-2 space-y-1 text-sm">

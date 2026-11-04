@@ -28,15 +28,17 @@ afterEach(() => {
 });
 
 describe("Udozo's legal documents", () => {
-  test("every document has its page, a draft notice, contents and anchored sections; the hub lists them all", async () => {
+  test("every document has its page, no draft notice, contents and anchored sections; the hub lists them all", async () => {
     expect(generateStaticParams().map(item => item.doc)).toEqual(["terms", "safe-pay", "sellers", "privacy", "cookies"]);
     const hub = render(LegalPage());
-    expect(hub).toContain("Draft for lawyers&#x27; review.");
+    expect(hub).not.toContain("Draft for lawyers");
+    expect(hub).not.toContain("not open for real payments");
     for (const doc of legalDocuments) {
       expect(hub).toContain(`href="/legal/${doc.slug}"`);
       const html = await documentHtml(doc.slug);
       expect(html).toContain(doc.title);
-      expect(html).toContain("Draft for lawyers&#x27; review.");
+      expect(html).not.toContain("Draft for lawyers");
+      expect(html).not.toMatch(/not (open for|taking) real payments/);
       expect(html).toContain(`Version ${legalVersion}`);
       for (const section of doc.sections) expect(html).toContain(`id="${section.id}"`);
       expect(new Set(doc.sections.map(section => section.id)).size).toBe(doc.sections.length);
@@ -51,6 +53,8 @@ describe("Udozo's legal documents", () => {
     const text = JSON.stringify(legalDocuments);
     for (const doc of ["terms", "sellers", "privacy"]) expect(await documentHtml(doc)).toContain(operator.name);
     expect(text).not.toMatch(/BitoCard|Bitocard|Golojan Ltd|legals\./);
+    // No street address in the documents.
+    expect(text).not.toMatch(/Agu Street|Abakpa|Enugu/);
     expect(text).toContain("legal@udozo.com");
     expect(text).toContain("support@udozo.com");
   });

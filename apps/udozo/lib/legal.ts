@@ -1,6 +1,6 @@
 /**
- * Udozo's legal documents (docs/UDOZO_SPINOFF_PLAN.md, step 5 item 3): drafts for lawyers' review in each market,
- * describing what Udozo actually does. `legalVersion` is the date of the terms people accept before they post a listing
+ * Udozo's legal documents (docs/UDOZO_SPINOFF_PLAN.md, step 5 item 3), describing what Udozo actually does now that it
+ * is live and takes real payments. `legalVersion` is the date of the terms people accept before they post a listing
  * or use Safe pay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
@@ -14,7 +14,6 @@ export const supportContact = "support@udozo.com";
 export const operator = {
   name: "De-Golojan Technologies Ltd",
   number: "RC 1606658",
-  address: "3 Agu Street, Upper Housing Estate Extension, Abakpa Nike, Enugu, Nigeria",
   law: "the laws of the Federal Republic of Nigeria",
 };
 
@@ -22,7 +21,7 @@ export type LegalBlock = string | { list: string[] } | { table: { head: string[]
 export type LegalSection = { id: string; heading: string; body: LegalBlock[] };
 export type LegalDocument = { slug: string; title: string; summary: string; sections: LegalSection[] };
 
-const whoWeAre = `Udozo is owned and operated by ${operator.name} (${operator.number}), ${operator.address} ("Udozo", "we", "us").`;
+const whoWeAre = `Udozo is owned and operated by ${operator.name} (${operator.number}) ("Udozo", "we", "us").`;
 
 const terms: LegalDocument = {
   slug: "terms",
@@ -223,7 +222,7 @@ const terms: LegalDocument = {
       id: "law",
       heading: "13. Law and contact",
       body: [
-        `This draft is governed by ${operator.law}; the governing law for each market will be confirmed after lawyers' review. Tell us first: most problems are put right there. You keep any rights you have under the law where you live.`,
+        `These terms are governed by ${operator.law}; the governing law for each market will be confirmed after lawyers' review. Tell us first: most problems are put right there. You keep any rights you have under the law where you live.`,
         `Ask for help from your account, or email ${supportContact}. For privacy and legal requests, email ${legalContact}.`,
       ],
     },
@@ -240,7 +239,7 @@ const safePay: LegalDocument = {
       heading: "1. What Safe pay is",
       body: [
         "Safe pay lets a buyer pay through Udozo, which holds the money until the buyer has the item. It is the buyer's choice on each purchase, offered where we have opened it in your country. Purchases on resellers' stores always use it.",
-        "Safe pay is not taking real payments in any country yet. Udozo collects, holds and refunds Safe pay money through licensed payment partners. It opens in a country only once lawyers have confirmed what that country's law requires.",
+        "Safe pay takes real payments. Udozo collects, holds and refunds Safe pay money through licensed payment partners.",
         "The deadlines below are those set for Nigeria. Each country's own are shown before anyone commits.",
       ],
     },
@@ -594,7 +593,7 @@ const sellers: LegalDocument = {
       body: [
         "We run Seller HQ with reasonable care and skill. We are not responsible for what suppliers or buyers do, or for registrars and payment partners failing, beyond putting right what we can. Nothing in these terms limits a responsibility the law does not allow us to limit; the rest will be set out after lawyers' review in each market.",
         "We tell you in Seller HQ or by email at least 30 days before a change that is not in your favour takes effect, unless the law requires it sooner. If you do not agree, you may close your account before it does.",
-        `This draft is governed by ${operator.law}; the governing law for each market will be confirmed after lawyers' review. Questions: ${supportContact}; legal and privacy requests: ${legalContact}.`,
+        `These terms are governed by ${operator.law}; the governing law for each market will be confirmed after lawyers' review. Questions: ${supportContact}; legal and privacy requests: ${legalContact}.`,
       ],
     },
   ],

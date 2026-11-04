@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DraftNotice, legalDate, LegalFrame } from "@/components/legal";
+import { legalDate, LegalFrame } from "@/components/legal";
 import { legalContact, legalDocuments, legalVersion, operator, supportContact } from "@/lib/legal";
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function LegalPage() {
           How Udozo works, how Safe pay holds your money, the terms for sellers, and how your data is used. Version {legalVersion}, last updated {legalDate}.
         </p>
       </header>
-      <DraftNotice />
       <ul className="grid gap-3 sm:grid-cols-2">
         {legalDocuments.map(doc => (
           <li key={doc.slug}>
