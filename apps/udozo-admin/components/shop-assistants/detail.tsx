@@ -5,6 +5,7 @@ import { ActionDialog, Badge, Button, Card, DataTable, Field, Notice, QueryView,
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { botStatusLabels, providerLabels, type AssistantContext } from "@bitocard/admin-ui/support";
 import { shopMoney, type ShopAssistantCard } from "@bitocard/api-client/classifieds";
+import { AnswerHtml } from "@bitocard/ui/answer-html";
 import {
   type AssistantThreadRow,
   type ShopBotRole,
@@ -247,6 +248,9 @@ function Knowledge({ bot }: { bot: SupportBot }) {
   );
 }
 
+/** An answer's tags (`AnswerHtml`), styled as the person saw them: Tailwind's reset removes bullets and spacing. */
+const answerStyle = "break-words [&_a]:font-semibold [&_a]:underline [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_strong]:font-semibold [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5";
+
 function TryIt({ bot }: { bot: SupportBot }) {
   const [test, state] = useTestSupportBotMutation();
   const countries = bot.shop?.countries ?? [];
@@ -289,7 +293,7 @@ function TryIt({ bot }: { bot: SupportBot }) {
       <ol className="space-y-3">
         {turns.map((turn, index) => (
           <li key={index} className={turn.role === "user" ? "ml-auto max-w-[85%] rounded-2xl bg-brand-50 p-3 text-sm" : "max-w-[90%] space-y-2"}>
-            {turn.role === "assistant" ? <p className="rounded-2xl border border-line p-3 text-sm whitespace-pre-wrap">{turn.content || "(no words, only cards)"}</p> : turn.content}
+            {turn.role === "assistant" ? turn.content ? <AnswerHtml html={turn.content} className={`rounded-2xl border border-line p-3 text-sm ${answerStyle}`} /> : <p className="rounded-2xl border border-line p-3 text-sm">(no words, only cards)</p> : turn.content}
             {turn.cards?.map((card, at) => (
               <CardPreview key={at} card={card} />
             ))}
@@ -328,7 +332,11 @@ function Thread({ bot, thread, onClose }: { bot: SupportBot; thread: string; onC
             <li className="text-xs text-muted">{`${data.country} · ${languageLabel(data.language)} · ${data.surface} · ${data.signed_in ? "signed in" : "visitor"} · ${new Date(data.created_at).toLocaleString("en-GB")}`}</li>
             {data.messages.map(message => (
               <li key={message.id} className="space-y-2">
-                <p className={message.role === "user" ? "ml-auto max-w-[85%] rounded-2xl bg-brand-50 p-3 text-sm" : "max-w-[90%] rounded-2xl border border-line p-3 text-sm whitespace-pre-wrap"}>{message.body || "(cards only)"}</p>
+                {message.role === "assistant" && message.body ? (
+                  <AnswerHtml html={message.body} className={`max-w-[90%] rounded-2xl border border-line p-3 text-sm ${answerStyle}`} />
+                ) : (
+                  <p className={message.role === "user" ? "ml-auto max-w-[85%] rounded-2xl bg-brand-50 p-3 text-sm" : "max-w-[90%] rounded-2xl border border-line p-3 text-sm whitespace-pre-wrap"}>{message.body || "(cards only)"}</p>
+                )}
                 {message.cards.map((card, at) => (
                   <CardPreview key={at} card={card} />
                 ))}

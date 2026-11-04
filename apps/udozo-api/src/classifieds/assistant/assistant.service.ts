@@ -17,7 +17,7 @@ import { cleanMessage } from '../conversations.service.js';
 import { checkDescription, checkFeatureValue, checkTitle, conditionHelp, conditions, isOnShop, linkPattern } from '../rules.js';
 import { evalCases, type EvalOutcome, scoreCase } from './evals.js';
 import { answerLanguage, greetingFor, languageName } from './languages.js';
-import { quoted, sanitiseAnswer } from './sanitise.js';
+import { answerHtml, answerText, quoted, sanitiseAnswer } from './sanitise.js';
 import { ShopAssistantsService } from './shop-assistants.service.js';
 import { type AssistantCard, ShopAssistantTools, type ToolScope } from './tools.js';
 
@@ -270,7 +270,7 @@ export class ShopAssistantService {
       usage.input += reply.usage.input;
       usage.output += reply.usage.output;
       usage.cost += reply.costMicros;
-      if (!reply.toolCalls.length) return { text: sanitiseAnswer(reply.text ?? '', urls), cards: cards.slice(0, maxCards), calls, usage };
+      if (!reply.toolCalls.length) return { text: answerHtml(reply.text ?? '', urls), cards: cards.slice(0, maxCards), calls, usage };
       messages.push({ role: 'assistant', content: reply.text, toolCalls: reply.toolCalls });
       for (const call of reply.toolCalls as AiToolCall[]) {
         emit?.({ event: 'status', data: { tool: call.name } });
@@ -284,7 +284,7 @@ export class ShopAssistantService {
         messages.push({ role: 'tool', toolCallId: call.id, name: call.name, content: done.result });
       }
     }
-    return { text: sanitiseAnswer('', urls), cards: cards.slice(0, maxCards), calls, usage };
+    return { text: '', cards: cards.slice(0, maxCards), calls, usage };
   }
 
   /** The thread's earlier turns as the model reads them (the person's words redacted again; the answers as shown). */
@@ -376,7 +376,7 @@ export class ShopAssistantService {
     const messages = await this.prisma.assistantMessage.findMany({ where: { threadId }, orderBy: { createdAt: 'desc' }, take: 8 });
     const transcript = messages
       .reverse()
-      .map(message => `${message.role === 'user' ? 'Me' : (bot?.name ?? 'Assistant')}: ${message.body || '(showed results)'}`)
+      .map(message => `${message.role === 'user' ? 'Me' : (bot?.name ?? 'Assistant')}: ${message.body ? (message.role === 'user' ? message.body : answerText(message.body)) : '(showed results)'}`)
       .join('\n');
     const body = `I was talking to ${bot?.name ?? 'the assistant'} on Udozo (${thread.country}) and need a person.\n\n${transcript}`.slice(0, 1900);
     const chat = await this.chats.sendAs({ kind: 'customer', customer: asker.customer }, body);
@@ -581,7 +581,7 @@ export class ShopAssistantService {
         continue;
       }
       const failure = scoreCase(item, outcome);
-      results.push({ id: item.id, kind: item.kind, ask: item.ask, passed: !failure, reason: failure, tools: outcome.tools.map(call => call.name), answer: outcome.text.slice(0, 600) });
+      results.push({ id: item.id, kind: item.kind, ask: item.ask, passed: !failure, reason: failure, tools: outcome.tools.map(call => call.name), answer: answerText(outcome.text).slice(0, 600) });
     }
     const row = await this.prisma.shopBotEval.create({ data: { botId, provider: bot.provider, model: bot.model, cases: results.length, passed: results.filter(item => item.passed).length, results: results as Prisma.InputJsonValue, createdById: actorId } });
     return { object: 'shop_bot_eval' as const, id: row.id, country: market, provider: row.provider, model: row.model, cases: row.cases, passed: row.passed, results, created_at: row.createdAt.toISOString() };

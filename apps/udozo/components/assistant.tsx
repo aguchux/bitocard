@@ -16,6 +16,7 @@ import {
   type ShopListingCard,
 } from "@bitocard/api-client/classifieds";
 import { assistantIn, rateAnswer, reportAnswer, startConversation, talkToPerson } from "@/lib/assistant-actions";
+import { AnswerHtml } from "@bitocard/ui/answer-html";
 import { SignInHere } from "./sign-in-here";
 
 type Opening = { listingId?: string; listingTitle?: string; question?: string };
@@ -208,6 +209,10 @@ function CardView({ card, signedIn, listingOnPage, onPerson }: { card: ShopAssis
   }
 }
 
+/** The tags an answer may carry (`AnswerHtml`), styled: Tailwind's reset removes list bullets and spacing. */
+const answerStyle =
+  "max-w-[92%] rounded-2xl rounded-tl-md bg-navy-50 px-3.5 py-2.5 text-sm break-words [&_a]:font-semibold [&_a]:text-brand-700 [&_a]:underline [&_li]:mt-0.5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_strong]:font-semibold [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5";
+
 function Answer({ message, signedIn, listingOnPage, onPerson }: { message: ShopAssistantMessage; signedIn: boolean; listingOnPage: string | null; onPerson: () => void }) {
   const [rating, setRating] = useState(message.rating);
   const [reporting, setReporting] = useState(false);
@@ -219,7 +224,7 @@ function Answer({ message, signedIn, listingOnPage, onPerson }: { message: ShopA
   };
   return (
     <div className="grid gap-2">
-      {message.body ? <p className="max-w-[92%] rounded-2xl rounded-tl-md bg-navy-50 px-3.5 py-2.5 text-sm whitespace-pre-wrap">{message.body}</p> : null}
+      {message.body ? <AnswerHtml html={message.body} className={answerStyle} /> : null}
       {message.cards.map((card, index) => (
         <CardView key={index} card={card} signedIn={signedIn} listingOnPage={listingOnPage} onPerson={onPerson} />
       ))}

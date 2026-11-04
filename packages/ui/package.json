@@ -26,7 +26,8 @@
     "./install": "./src/install.ts",
     "./install-ui": "./src/install-ui.tsx",
     "./offline-worker": "./src/offline-worker.ts",
-    "./underline-tabs": "./src/underline-tabs.tsx"
+    "./underline-tabs": "./src/underline-tabs.tsx",
+    "./answer-html": "./src/answer-html.tsx"
   },
   "scripts": {
     "lint": "eslint .",
