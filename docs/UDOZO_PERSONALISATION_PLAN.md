@@ -1,6 +1,6 @@
 # Udozo: interest tracking and personalised discovery (plan)
 
-Status: **plan, nothing built** (4 November 2026). Build in `apps/udozo-api` and `apps/udozo` only.
+Status: **approved 4 November 2026, being built** (phases 1 and 2; search re-ranking is phase 3). Build in `apps/udozo-api`, `apps/udozo`, `apps/udozo-admin` and `packages/api-client` only, never in BitoCard's apps.
 
 ## Goal
 
@@ -158,10 +158,80 @@ and drawn in place of their placeholders after the page loads.
 | 2 | Profiles and surfaces: `interest_profiles`, `listing_signals`, `listing_neighbours`; For you, Recently viewed, Because you searched, Price dropped, People also viewed, recent and popular searches; holdout and Reports > Discovery | about 1.5 weeks |
 | 3 | Search re-ranking (browse first, then ties with words), weight tuning from the holdout, then embeddings | after 2 to 4 weeks of data |
 
-## Decisions for the owner
+## Decisions (the owner, 4 November 2026)
+
+1. Visitors: remembered only after Accept all. Signed-in customers: covered by the terms (accepted by version), and they keep the Privacy screen (switch off, Clear my history).
+2. Age and sex: never used.
+3. Search with words typed: interest only breaks ties (phase 3).
+4. Retention: 90 days of events, 180 days for an idle profile.
+5. Every market can have it: the `personalisation` switch is on for Nigeria and off for every other market, switched by admins.
+
+## Decisions asked (kept for the record)
 
 1. **Visitors:** remember signed-out visitors only after Accept all (recommended), or not at all?
 2. **Age and sex:** never used for ranking (recommended), as above?
 3. **Search with words typed:** interest only breaks ties (recommended), or a stronger personal boost?
 4. **Retention:** 90 days of events and 180 days for an idle profile, as proposed?
 5. **Start market:** one market first (Nigeria), with the 10% holdout, then the others?
+
+
+## API contract (phases 1 and 2)
+
+Every route is Udozo's (`@ProductOnly('udozo')`, `@ApiExcludeController()`), in `apps/udozo-api/src/classifieds/discovery/`.
+
+**Who is recorded (the subject).** A signed-in customer (their session, `BitoCard-Customer-Session`): `c:<customer id>`.
+Otherwise a visitor who chose Accept all: udozo.com's server sends their visitor ID (`udz_vid`, `v_` and 32 base64url
+characters) as the `Udozo-Visitor` header; the subject is `v:<HMAC-SHA256 of the ID, keyed from ENCRYPTION_KEY>` (the ID
+itself is never stored). Nobody else is recorded. Nothing is recorded where the `personalisation` switch is off for the
+market (`SettingsService.isOnForCountry('personalisation', country)`), for a customer who turned it off
+(`customers.personalisation_off_at`), or for one under 18 (`customers.birth_date`). Never read: `sex`, `birth_date`
+beyond that check, message text.
+
+**Holdout.** `holdout(subject)`: the first byte of SHA-256(subject) below 26 (about 10%). Held-out subjects are recorded
+as usual but their For you row is the popular order (`personalised: false`), and their clicks carry `source: for_you_holdout`.
+
+1. `POST /v1/classifieds/events` (public, `@SkipIdempotency`, 204 always, even when nothing is kept). Body
+   `{ country: 'NG', session: string (8 to 40 of [A-Za-z0-9_-]), events: Event[] (1 to 50) }`, the subject from the
+   session or `Udozo-Visitor` header, the address signed in `BitoCard-Client` as for `/listings/:ref/view`. Robots and
+   empty browsers dropped (the same pattern as `ListingViewsService`), a seller's events on their own listings dropped,
+   at most 300 events a minute per subject (in memory). `Event = { kind, listing?: number (the listing's ref),
+   query?: string (max 100), filters?: Record<string, string | string[]>, results?: int, sort?: string,
+   source?: string (max 40), position?: int 0..500, seconds?: int 0..600, photos?: int 0..50, depth?: int 0..100,
+   at?: ISO time (clamped to the last hour) }`. Browser kinds: `view`, `engaged`, `search`, `filter`, `result_click`,
+   `rail_click`, `impression`, `share`, `not_interested`. Server kinds, written by the API where they happen, after they
+   commit, never failing them: `save`, `unsave`, `chat`, `contact` (contact request or call back), `call`, `offer`,
+   `order`. Queries are cleaned before they are kept: lower-cased, spaces collapsed, phone numbers, emails, long digit
+   runs and codes removed.
+2. `GET /v1/classifieds/for-you?country=NG&kinds=for_you,recent,searched,price_drops&limit=12` (public, `no-store`;
+   subject as above) answers `{ object: 'for_you', personalised: boolean, rows: ForYouRow[] }`, `ForYouRow = { kind:
+   'for_you' | 'recent' | 'searched' | 'price_drops', title: string, href: string | null, query?: string, items:
+   HomeCard[] }` (the home page's card shape, `HomeCard` in `@bitocard/api-client/home`), empty rows left out. Without a
+   subject, a profile or with the switch off: only `for_you`, filled with the popular order, `personalised: false`.
+   Titles: "For you", "Recently viewed", `Because you searched "<q>"` (href `/<cc>/search?q=`), "Price dropped".
+3. `GET /v1/classifieds/listings/:ref/also-viewed?limit=8` (public, `Cache-Control: public, max-age=300`):
+   `{ object: 'list', data: HomeCard[] }` from `listing_neighbours`, live listings only, never the listing itself.
+4. `GET /v1/classifieds/history` (subject required, else `subject_required` 401; `no-store`): `{ object: 'history',
+   personalisation: boolean, listings: Array<HomeCard & { viewed_at }>, searches: Array<{ query, searched_at }> }`
+   (the last 30 listings and 20 searches). `DELETE /v1/classifieds/history` clears everything (events and profile),
+   `DELETE /v1/classifieds/history/listings/:ref` and `DELETE /v1/classifieds/history/searches?q=` one item.
+   `PUT /v1/classifieds/me/personalisation { enabled: boolean }` (customers only): off deletes their events and profile
+   and stops recording; on starts again. `GET /v1/store/account` adds `personalisation: boolean`.
+5. `POST /v1/classifieds/history/merge { visitor }` (customer session): after sign-in, the visitor's events and profile
+   become the customer's (unless the customer turned personalisation off: then the visitor's are deleted).
+6. `GET /v1/classifieds/search/recent?country=` (subject; `no-store`): `{ object: 'list', data: Array<{ query }> }`
+   (last 8, newest first). `GET /v1/classifieds/search/popular?country=` (public, `max-age=600`): the market's 8 most
+   searched queries of the last 7 days with results, from `search_query_days`, each searched by at least 3 subjects.
+7. Home pages: a new block type `personal_rail` (`{ title, kind: 'for_you' | 'recent' | 'searched' | 'price_drops',
+   limit }`, countries only, in `layout.ts` and the shared `HomeSection` types), resolved by the home page as an empty
+   placeholder (`data: { kind }`): udozo.com fills it for the person after the page loads.
+8. Admin `GET /v1/admin/classifieds/discovery?country=&days=7|30|90` (operations and support): searches, subjects,
+   zero-result rate, top queries and top zero-result queries (with counts), clicks and contacts by source (`search`,
+   `home:<row>`, `for_you`, `for_you_holdout`, `similar`, `also_viewed`, `recent`), For you click-through and contacts
+   per subject for personalised against holdout, events per kind per day.
+
+**Tables** (one migration): `discovery_events`, `interest_profiles` (subject and country unique), `search_query_days`,
+`listing_signals`, `listing_neighbours`, and `customers.personalisation_off_at`. The `personalisation` switch (Udozo's,
+global or country, off by default) is set on for `NG` by the migration.
+
+**Jobs:** `listing_signals` refreshed by the `classifieds` job (every 15 minutes); `listing_neighbours`, retention
+(events after 90 days, profiles idle 180 days, `search_query_days` after 13 months) by the daily `marketing` job.
