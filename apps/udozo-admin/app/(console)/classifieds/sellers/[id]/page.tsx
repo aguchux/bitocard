@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, errorMessage, formatDateTime, formatNumber, KeyValue, Notice, PageHeader, QueryView, Skeleton, StatCard, type Column } from "@bitocard/admin-ui";
+import { useId, useState } from "react";
+import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, errorMessage, Field, formatDateTime, formatNumber, Input, KeyValue, Notice, PageHeader, QueryView, Skeleton, StatCard, type Column } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
 import { udozoOrigin } from "@/components/theme";
@@ -12,15 +12,17 @@ import {
   useClassifiedListingsQuery,
   useClassifiedSellerQuery,
   useClearClassifiedStrikesMutation,
+  usePauseSellerBuyOrdersMutation,
   useRemoveClassifiedSellerAvatarMutation,
   useRemoveClassifiedSellerUsernameMutation,
   useSetClassifiedSellerSuspendedMutation,
+  useUnpauseSellerBuyOrdersMutation,
 } from "@bitocard/api-client/admin";
 import { Avatar } from "@bitocard/ui/avatar";
 import { Ban, Flag, HandCoins, Package } from "lucide-react";
 import { ListingCell, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
 
-type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username";
+type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username" | "pause" | "unpause";
 
 /**
  * One Udozo seller: their ads, reports about them or their ads, and their Safe pay standing (strikes over 90
@@ -36,8 +38,25 @@ export default function ClassifiedSellerPage() {
   const [clear] = useClearClassifiedStrikesMutation();
   const [removePhoto] = useRemoveClassifiedSellerAvatarMutation();
   const [removeUsername] = useRemoveClassifiedSellerUsernameMutation();
+  const [pause] = usePauseSellerBuyOrdersMutation();
+  const [unpause] = useUnpauseSellerBuyOrdersMutation();
   const [action, setAction] = useState<Action | null>(null);
+  const [days, setDays] = useState("30");
+  const daysId = useId();
   const operations = can(admin, "operations");
+
+  const confirm = (chosen: Action, reason: string): Promise<unknown> => {
+    if (chosen === "pause") {
+      const count = /^\d+$/.test(days.trim()) ? Number(days) : 0;
+      if (count < 1 || count > 365) return Promise.reject(new Error("Days to pause: a whole number from 1 to 365."));
+      return pause({ customer: id, reason, days: count }).unwrap();
+    }
+    if (chosen === "unpause") return unpause({ customer: id, reason }).unwrap();
+    if (chosen === "clear") return clear({ id, reason }).unwrap();
+    if (chosen === "photo") return removePhoto({ id, reason }).unwrap();
+    if (chosen === "username") return removeUsername({ id, reason }).unwrap();
+    return suspend({ id, suspended: chosen === "suspend", reason }).unwrap();
+  };
 
   const columns: Array<Column<AdminClassifiedListing>> = [
     { key: "ad", header: "Ad", cell: item => <ListingCell listing={item} /> },
@@ -106,6 +125,10 @@ export default function ClassifiedSellerPage() {
               </Card>
               <div className="space-y-6">
                 <Standing seller={data} />
+                <BuyOrders seller={data} operations={operations} onPause={() => {
+                    setDays("30");
+                    setAction("pause");
+                  }} onUnpause={() => setAction("unpause")} />
                 <Reports seller={data} />
                 <Card>
                   <CardHeader title="Account" />
@@ -152,7 +175,7 @@ export default function ClassifiedSellerPage() {
               <ActionDialog
                 open
                 onClose={() => setAction(null)}
-                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, username: `Remove ${data.name}'s username?` }[action]}
+                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?` }[action]}
                 description={
                   {
                     suspend: "They cannot post, and their live and waiting ads are removed from Udozo. Ads removed now stay removed when they come back.",
@@ -160,25 +183,56 @@ export default function ClassifiedSellerPage() {
                     clear: "They can take Safe pay orders again. Strikes before now stop counting; new ones count from today.",
                     photo: "Their photo is deleted and their initials show instead, everywhere. They can choose another; remove it again if it is not acceptable.",
                     username: `Their seller page goes back to its handle and they are told. Nobody can take "${data.username ?? ""}" for 90 days. They can choose another username; remove it again if it is not acceptable.`,
+                    pause: "Buyers cannot send them new buy orders until the pause ends. Buy orders already open carry on.",
+                    unpause: "Buyers can send them buy orders again at once.",
                   }[action]
                 }
-                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", username: "Remove username" }[action]}
-                tone={action === "suspend" || action === "photo" || action === "username" ? "danger" : "primary"}
-                onConfirm={reason =>
-                  action === "clear"
-                    ? clear({ id, reason }).unwrap()
-                    : action === "photo"
-                      ? removePhoto({ id, reason }).unwrap()
-                      : action === "username"
-                        ? removeUsername({ id, reason }).unwrap()
-                        : suspend({ id, suspended: action === "suspend", reason }).unwrap()
-                }
-              />
+                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", username: "Remove username", pause: "Pause buy orders", unpause: "Unpause buy orders" }[action]}
+                tone={action === "suspend" || action === "photo" || action === "username" || action === "pause" ? "danger" : "primary"}
+                onConfirm={reason => confirm(action, reason)}
+              >
+                {action === "pause" ? (
+                  <Field label="Days to pause" hint="1 to 365." htmlFor={daysId}>
+                    <Input id={daysId} inputMode="numeric" value={days} onChange={event => setDays(event.target.value)} />
+                  </Field>
+                ) : null}
+              </ActionDialog>
             ) : null}
           </>
         )}
       </QueryView>
     </UdozoShell>
+  );
+}
+
+/** Whether buyers can send them buy orders (3 voided in 90 days pause them for 30 days), with Pause and Unpause for operations. */
+function BuyOrders({ seller, operations, onPause, onUnpause }: { seller: ClassifiedSellerDetail; operations: boolean; onPause: () => void; onUnpause: () => void }) {
+  const until = seller.buy_orders_paused_until ?? null;
+  // When the page opened: a pause whose end has passed reads as over.
+  const [now] = useState(() => Date.now());
+  const paused = Boolean(until && new Date(until).getTime() > now);
+  return (
+    <Card>
+      <CardHeader title="Buy orders" description="Buyers ask to buy at a price and pay in person." />
+      <div className="space-y-3 px-5 pb-5 text-sm sm:px-6">
+        {paused ? <Badge tone="red">{`Paused until ${formatDateTime(until)}`}</Badge> : <Badge tone="green">Taking buy orders</Badge>}
+        {paused ? <p className="break-words text-ink">{seller.buy_orders_paused_reason ?? "No reason recorded."}</p> : null}
+        <AppLink href={`/classifieds/buy-orders?seller=${seller.id}`} className="block w-fit font-semibold text-brand-600 hover:underline">
+          See their buy orders
+        </AppLink>
+        {operations ? (
+          paused ? (
+            <Button size="sm" variant="secondary" onClick={onUnpause}>
+              Unpause buy orders
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={onPause}>
+              Pause buy orders
+            </Button>
+          )
+        ) : null}
+      </div>
+    </Card>
   );
 }
 

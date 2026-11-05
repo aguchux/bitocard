@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { shopMoney, type ShopChat, type ShopMessage } from "@bitocard/api-client/classifieds";
+import { BuyOrderCard } from "@/components/buy-order";
 import { offerQuestion, useConfirm } from "@/components/confirm-dialog";
 import { answerOffer, loadChat, makeOffer, sendMessage, startChat } from "@/lib/listing-actions";
 
@@ -151,6 +152,8 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath,
             <li key={message.id} className={message.from === "me" ? "justify-self-end" : message.from === "bitocard" ? "justify-self-center" : "justify-self-start"}>
               {message.kind === "offer" && message.offer ? (
                 <OfferCard message={message} onAnswer={onAnswer} busy={busy} buyPath={buyPath} />
+              ) : message.kind === "buy_order" && message.buy_order ? (
+                <BuyOrderCard body={message.body} order={message.buy_order} mine={message.from === "me"} />
               ) : message.from === "bitocard" ? (
                 <p className="max-w-md rounded-xl bg-white px-3 py-2 text-center text-xs text-navy-600">{message.body}</p>
               ) : (

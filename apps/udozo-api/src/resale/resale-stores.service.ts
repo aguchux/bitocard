@@ -5,7 +5,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { ShopEmails } from '../classifieds/shop-emails.service.js';
 import { ResaleService } from '../classifieds/resale.service.js';
-import { featureValueOut, holdingStatuses, invalid, linkPattern, maxPriceMinor } from '../classifieds/rules.js';
+import { buyOrderHoldingStatuses, featureValueOut, holdingStatuses, invalid, linkPattern, maxPriceMinor } from '../classifieds/rules.js';
 import { publicName } from '../classifieds/search.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
@@ -186,11 +186,16 @@ export class ResaleStoresService {
     return { resellerFeeBps: limits.resellerFeeBps, resellerFeeCapMinor: limits.resellerFeeCapMinor, buyerFeeBps: safePay?.buyerFeeBps ?? null, buyerFeeCapMinor: safePay?.buyerFeeCapMinor ?? null };
   }
 
-  /** Units not yet held by paid orders, per listing. */
+  /** Units not yet held by paid orders or accepted buy orders, per listing. */
   private async available(listings: { id: string; stock: number }[]) {
     if (!listings.length) return new Map<string, number>();
-    const held = await this.prisma.classifiedOrder.groupBy({ by: ['listingId'], where: { listingId: { in: listings.map(row => row.id) }, status: { in: holdingStatuses } }, _sum: { quantity: true } });
-    const counts = new Map(held.map(row => [row.listingId, row._sum.quantity ?? 0]));
+    const ids = listings.map(row => row.id);
+    const [held, buyHeld] = await Promise.all([
+      this.prisma.classifiedOrder.groupBy({ by: ['listingId'], where: { listingId: { in: ids }, status: { in: holdingStatuses } }, _sum: { quantity: true } }),
+      this.prisma.classifiedBuyOrder.groupBy({ by: ['listingId'], where: { listingId: { in: ids }, status: { in: buyOrderHoldingStatuses } }, _sum: { quantity: true } }),
+    ]);
+    const counts = new Map<string, number>();
+    for (const row of [...held, ...buyHeld]) counts.set(row.listingId, (counts.get(row.listingId) ?? 0) + (row._sum.quantity ?? 0));
     return new Map(listings.map(row => [row.id, Math.max(row.stock - (counts.get(row.id) ?? 0), 0)]));
   }
 

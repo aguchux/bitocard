@@ -28,12 +28,23 @@ export const isOnShop = (listing: { status: string; onShop: boolean }) => listin
 /** Statuses in which an order holds units of its listing: a resale order's locked money, and paid orders not yet released. */
 export const holdingStatuses = ['locked', 'paid', 'sent', 'disputed'];
 
-type OrderCounter = { classifiedOrder: { aggregate(args: { where: { listingId: string; status: { in: string[] }; id?: { not: string } }; _sum: { quantity: true } }): Promise<{ _sum: { quantity: number | null } }> } };
+/** Udozo buy orders hold their units once the seller accepts (`docs/UDOZO_RATINGS_PLAN.md` phase 0). */
+export const buyOrderHoldingStatuses = ['accepted'];
 
-/** Units of a listing held by orders (`holdingStatuses`), less one order's own when given. */
+type Summer = { aggregate(args: { where: { listingId: string; status: { in: string[] }; id?: { not: string } }; _sum: { quantity: true } }): Promise<{ _sum: { quantity: number | null } }> };
+type OrderCounter = { classifiedOrder: Summer; classifiedBuyOrder: Summer };
+
+/**
+ * Units of a listing held by Safe pay orders (`holdingStatuses`) and accepted buy orders, less one order's own when
+ * given (an id of either kind).
+ */
 export async function heldUnits(db: OrderCounter, listingId: string, exceptOrderId?: string) {
-  const result = await db.classifiedOrder.aggregate({ where: { listingId, status: { in: holdingStatuses }, ...(exceptOrderId ? { id: { not: exceptOrderId } } : {}) }, _sum: { quantity: true } });
-  return result._sum.quantity ?? 0;
+  const except = exceptOrderId ? { id: { not: exceptOrderId } } : {};
+  const [orders, buyOrders] = await Promise.all([
+    db.classifiedOrder.aggregate({ where: { listingId, status: { in: holdingStatuses }, ...except }, _sum: { quantity: true } }),
+    db.classifiedBuyOrder.aggregate({ where: { listingId, status: { in: buyOrderHoldingStatuses }, ...except }, _sum: { quantity: true } }),
+  ]);
+  return (orders._sum.quantity ?? 0) + (buyOrders._sum.quantity ?? 0);
 }
 
 /** Most units one listing can hold (its stock). */

@@ -30,6 +30,10 @@ const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: 
     max: 100,
     fallback: 5,
   },
+  { key: "buy_request_hours", label: "Hours to answer a buy order", hint: "The seller accepts, counters or declines in this time, else it lapses. 1 to 168.", min: 1, max: 168, fallback: 48 },
+  { key: "buy_meet_days", label: "Days to meet once accepted", hint: "The buyer and seller meet and pay in person within this time. 1 to 30.", min: 1, max: 30, fallback: 7 },
+  { key: "buy_open_per_buyer", label: "Open buy orders per buyer", hint: "Waiting, countered or accepted at once. 1 to 100.", min: 1, max: 100, fallback: 10 },
+  { key: "buy_requests_per_day", label: "Buy orders a buyer may send a day", hint: "1 to 200.", min: 1, max: 200, fallback: 20 },
 ];
 
 /** What the market has saved for a field; a setting the API does not send yet reads as its default. */

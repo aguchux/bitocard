@@ -1,21 +1,22 @@
 /** What the account's places show beside their names: unread messages, requests and resellers waiting on the seller. */
-export type PlaceCounts = { unread: number; resellers: { count: number; waiting: number }; requests?: number };
+export type PlaceCounts = { unread: number; resellers: { count: number; waiting: number }; requests?: number; buyOrders?: number };
 
-export type PlaceKey = "listings" | "messages" | "requests" | "orders" | "favourites" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
+export type PlaceKey = "listings" | "messages" | "requests" | "buy-orders" | "orders" | "favourites" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
 
 export type Place = { key: PlaceKey; href: string; label: string; badge?: number; also?: string[] };
 
 /**
  * The seller's area on udozo.com (`/account`), in order. My Resellers shows once a reseller carries the seller's
  * listings (B2B reselling), badged with what waits on them; Messages with its unread count; Requests (contact requests,
- * call backs and calls) with those waiting.
+ * call backs and calls) with those waiting; Buy orders with those waiting on the reader.
  */
 export function accountPlaces(counts: PlaceCounts): Place[] {
   return [
     { key: "listings", href: "/account", label: "My listings", also: ["/account/listings"] },
     { key: "messages", href: "/account/messages", label: "Messages", ...(counts.unread ? { badge: counts.unread } : {}) },
     { key: "requests", href: "/account/requests", label: "Requests", ...(counts.requests ? { badge: counts.requests } : {}) },
-    { key: "orders", href: "/account/orders", label: "Orders" },
+    { key: "buy-orders", href: "/account/buy-orders", label: "Buy orders", ...(counts.buyOrders ? { badge: counts.buyOrders } : {}) },
+    { key: "orders", href: "/account/orders", label: "Safe pay orders" },
     { key: "favourites", href: "/account/favourites", label: "Favourites" },
     ...(counts.resellers.count ? [{ key: "resellers" as const, href: "/account/resellers", label: "My Resellers", ...(counts.resellers.waiting ? { badge: counts.resellers.waiting } : {}) }] : []),
     { key: "wallet", href: "/account/wallet", label: "Wallet" },

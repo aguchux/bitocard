@@ -29,6 +29,7 @@ import { conditions, contacts, deliveries, invalid, type ListingStatus, listingS
 import { ProductOnly } from '../products/product.js';
 import { SellerProfilesService } from './sellers.service.js';
 import { sellerKeyPattern } from './usernames.service.js';
+import { BuyOrdersService } from './buy-orders/buy-orders.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -547,6 +548,7 @@ export class ClassifiedChatsController {
     private readonly directory: ShopDirectoryService,
     private readonly contacts: ContactRequestsService,
     private readonly calls: CallsService,
+    private readonly buyOrders: BuyOrdersService,
   ) {}
 
   /**
@@ -556,10 +558,15 @@ export class ClassifiedChatsController {
   @Get('listings/:id/viewer')
   async viewer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     const viewer = await this.directory.viewer(caller.customer, id);
-    if (viewer.own || !viewer.can_contact) return { ...viewer, contact: null, callback: null, seller_online: false, calls: false };
+    if (viewer.own || !viewer.can_contact) return { ...viewer, contact: null, callback: null, seller_online: false, calls: false, buy_orders: false, buy_order: null };
     const listing = await this.directory.contactOf(id);
-    const [contact, online] = await Promise.all([this.contacts.forViewer(caller.customer, listing), this.calls.online(listing.customerId)]);
-    return { ...viewer, ...contact, seller_online: online, calls: listing.contact !== 'chat' && this.calls.available() };
+    const [contact, online, buyOrders, buyOrder] = await Promise.all([
+      this.contacts.forViewer(caller.customer, listing),
+      this.calls.online(listing.customerId),
+      this.buyOrders.enabled(listing.country),
+      this.buyOrders.forViewer(caller.customer.id, id),
+    ]);
+    return { ...viewer, ...contact, seller_online: online, calls: listing.contact !== 'chat' && this.calls.available(), buy_orders: buyOrders, buy_order: buyOrder };
   }
 
   /** Views, leads, phone reveals, chats and offers on one of the seller's listings. */

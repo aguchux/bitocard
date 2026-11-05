@@ -7,6 +7,7 @@ import { reportReasonLabels, shopMoney, type ShopChat, type ShopMessage, type Sh
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl } from "@/lib/shop";
 import { answerOffer, blockChat, loadChat, makeOffer, reportChat, sendMessage } from "@/lib/shop-actions";
+import { BuyOrderCard } from "../buy-order";
 import { offerQuestion, useConfirm } from "../confirm-dialog";
 import { useDismiss } from "../dropdown";
 import { SuggestReply } from "./assistant-help";
@@ -213,6 +214,8 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
             <li key={message.id} className={message.from === "me" ? "justify-self-end" : message.from === "bitocard" ? "justify-self-center" : "justify-self-start"}>
               {message.kind === "offer" && message.offer ? (
                 <OfferCard message={message} busy={busy} onAnswer={answer} buy={chat.role === "buyer" ? buy : null} withName={chat.with.name} />
+              ) : message.kind === "buy_order" && message.buy_order ? (
+                <BuyOrderCard body={message.body} order={message.buy_order} mine={message.from === "me"} />
               ) : message.from === "bitocard" ? (
                 <p className="max-w-md rounded-xl bg-white px-3 py-2 text-center text-xs text-slate-600 ring-1 ring-slate-200/70">{message.body}</p>
               ) : (

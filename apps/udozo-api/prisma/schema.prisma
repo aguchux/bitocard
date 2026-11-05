@@ -2753,6 +2753,8 @@ model Customer {
   classifiedFavourites      ClassifiedFavourite[]
   classifiedBuying          ClassifiedConversation[]  @relation("ClassifiedBuying")
   classifiedSelling         ClassifiedConversation[]  @relation("ClassifiedSelling")
+  classifiedBuyOrdersBuying  ClassifiedBuyOrder[]      @relation("ClassifiedBuyOrdersBuying")
+  classifiedBuyOrdersSelling ClassifiedBuyOrder[]      @relation("ClassifiedBuyOrdersSelling")
   classifiedLeads           ClassifiedLead[]
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
@@ -4645,6 +4647,12 @@ model ClassifiedMarketSettings {
   maxPhotos             Int      @default(12) @map("max_photos")
   /// Udozo: ads a customer must have posted before choosing a username (0 to 100).
   usernameMinListings   Int      @default(5) @map("username_min_listings")
+  /// Udozo buy orders: hours to answer a request (or a counter), days to meet once accepted, open requests a buyer may
+  /// have, and requests a buyer may send in a day.
+  buyRequestHours       Int      @default(48) @map("buy_request_hours")
+  buyMeetDays           Int      @default(7) @map("buy_meet_days")
+  buyOpenPerBuyer       Int      @default(10) @map("buy_open_per_buyer")
+  buyRequestsPerDay     Int      @default(20) @map("buy_requests_per_day")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("classified_market_settings")
@@ -4738,6 +4746,7 @@ model ClassifiedListing {
   reports      ClassifiedReport[]
   favourites   ClassifiedFavourite[]
   contactRequests ClassifiedContactRequest[]
+  buyOrders       ClassifiedBuyOrder[]
   calls        ClassifiedCall[]
   chats        ClassifiedConversation[]
   orders       ClassifiedOrder[]
@@ -4935,6 +4944,9 @@ model ClassifiedSeller {
   safePayClearedAt DateTime? @map("safe_pay_cleared_at")
   /// Accept resale orders by themselves while the listing has stock (the supplier's choice, off by default).
   resaleAutoAccept Boolean   @default(false) @map("resale_auto_accept")
+  /// Udozo: new buy orders on their listings are refused until then (buyers' voids, or an admin), and why.
+  buyOrdersPausedUntil  DateTime? @map("buy_orders_paused_until")
+  buyOrdersPausedReason String?   @map("buy_orders_paused_reason")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -4985,6 +4997,7 @@ model ClassifiedConversation {
   messages        ClassifiedMessage[]
   offers          ClassifiedOffer[]
   reports         ClassifiedReport[]
+  buyOrders       ClassifiedBuyOrder[]
 
   @@unique([listingId, buyerId])
   @@index([buyerId, lastMessageAt])
@@ -5013,6 +5026,9 @@ model ClassifiedMessage {
   createdAt      DateTime               @default(now()) @map("created_at")
   conversation   ClassifiedConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   offer          ClassifiedOffer?       @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  /// A buy order's step (kind `buy_order`).
+  buyOrderId     String?                @map("buy_order_id") @db.Uuid
+  buyOrder       ClassifiedBuyOrder?    @relation(fields: [buyOrderId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, seq])
   @@map("classified_messages")
@@ -5038,6 +5054,60 @@ model ClassifiedOffer {
   @@index([conversationId, createdAt])
   @@index([status, expiresAt])
   @@map("classified_offers")
+}
+
+/// Udozo: a buy order (docs/UDOZO_RATINGS_PLAN.md phase 0). The buyer asks at a price; the seller accepts (holding the
+/// units) or counters; they meet and pay off Udozo; the seller marks it sold or the buyer says they bought it. One open
+/// order per buyer and listing (a partial unique index).
+model ClassifiedBuyOrder {
+  id               String                  @id @default(uuid()) @db.Uuid
+  /// BO-000123.
+  number           BigInt                  @unique @default(autoincrement())
+  listingId        String                  @map("listing_id") @db.Uuid
+  conversationId   String?                 @map("conversation_id") @db.Uuid
+  buyerId          String                  @map("buyer_id") @db.Uuid
+  sellerId         String                  @map("seller_id") @db.Uuid
+  country          String                  @db.Char(2)
+  currency         String                  @db.Char(3)
+  /// For all the units: the buyer's price, or the seller's counter once the buyer accepted it.
+  priceMinor       BigInt                  @map("price_minor")
+  counterMinor     BigInt?                 @map("counter_minor")
+  quantity         Int                     @default(1)
+  note             String?
+  meetNote         String?                 @map("meet_note")
+  /// requested, countered, accepted, completed, declined, cancelled, lapsed, expired, no_show or voided.
+  status           String                  @default("requested")
+  respondBy        DateTime?               @map("respond_by")
+  meetBy           DateTime?               @map("meet_by")
+  meetExtended     Boolean                 @default(false) @map("meet_extended")
+  acceptedAt       DateTime?               @map("accepted_at")
+  /// The buyer said they bought it (it completes by itself after 3 days unless the seller acts).
+  boughtAt         DateTime?               @map("bought_at")
+  completedAt      DateTime?               @map("completed_at")
+  /// seller, buyer (the seller confirmed the buyer's word) or auto.
+  completedBy      String?                 @map("completed_by")
+  buyerConfirmedAt DateTime?               @map("buyer_confirmed_at")
+  voidedAt         DateTime?               @map("voided_at")
+  voidReason       String?                 @map("void_reason")
+  /// buyer, seller or udozo.
+  endedBy          String?                 @map("ended_by")
+  endReason        String?                 @map("end_reason")
+  closedAt         DateTime?               @map("closed_at")
+  meetRemindedAt   DateTime?               @map("meet_reminded_at")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+  listing          ClassifiedListing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  conversation     ClassifiedConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  buyer            Customer                @relation("ClassifiedBuyOrdersBuying", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller           Customer                @relation("ClassifiedBuyOrdersSelling", fields: [sellerId], references: [id], onDelete: Cascade)
+  messages         ClassifiedMessage[]
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([listingId, status])
+  @@index([status, respondBy])
+  @@index([status, meetBy])
+  @@map("classified_buy_orders")
 }
 
 /// A buyer's interest in a listing, once per kind (phone revealed, chat started): the seller's leads and the reveal limit.

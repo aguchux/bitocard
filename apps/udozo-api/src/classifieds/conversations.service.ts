@@ -19,6 +19,7 @@ import { ListingsService } from './listings.service.js';
 import { type ReportReason } from './moderation.service.js';
 import { invalid, isOnShop, maxPriceMinor, priceText } from './rules.js';
 import { onlineAmong } from './presence.js';
+import { summary as buyOrderSummary } from './buy-orders/present.js';
 import { publicName } from './search.service.js';
 import { callsConfigured } from './turn.js';
 import type { MediaUpload } from './media.service.js';
@@ -88,7 +89,11 @@ const chatInclude = {
 } satisfies Prisma.ClassifiedConversationInclude;
 
 type ChatRow = Prisma.ClassifiedConversationGetPayload<{ include: typeof chatInclude }>;
-type MessageRow = Prisma.ClassifiedMessageGetPayload<{ include: { offer: true } }>;
+const messageInclude = {
+  offer: true,
+  buyOrder: { select: { id: true, number: true, buyerId: true, sellerId: true, status: true, priceMinor: true, counterMinor: true, currency: true, quantity: true, meetExtended: true, boughtAt: true, completedAt: true, completedBy: true } },
+} satisfies Prisma.ClassifiedMessageInclude;
+type MessageRow = Prisma.ClassifiedMessageGetPayload<{ include: typeof messageInclude }>;
 type OfferRow = Prisma.ClassifiedOfferGetPayload<object>;
 
 /**
@@ -157,12 +162,12 @@ export class ConversationsService {
     let hasMore = false;
     if (page.after) {
       const from = await this.seqOf(chat.id, page.after, 'after');
-      messages = await this.prisma.classifiedMessage.findMany({ where: { conversationId: chat.id, seq: { gt: from } }, include: { offer: true }, orderBy: { seq: 'asc' }, take: limit + 1 });
+      messages = await this.prisma.classifiedMessage.findMany({ where: { conversationId: chat.id, seq: { gt: from } }, include: messageInclude, orderBy: { seq: 'asc' }, take: limit + 1 });
       hasMore = messages.length > limit;
       messages = messages.slice(0, limit);
     } else {
       const to = page.before ? await this.seqOf(chat.id, page.before, 'before') : undefined;
-      messages = await this.prisma.classifiedMessage.findMany({ where: { conversationId: chat.id, ...(to !== undefined ? { seq: { lt: to } } : {}) }, include: { offer: true }, orderBy: { seq: 'desc' }, take: limit + 1 });
+      messages = await this.prisma.classifiedMessage.findMany({ where: { conversationId: chat.id, ...(to !== undefined ? { seq: { lt: to } } : {}) }, include: messageInclude, orderBy: { seq: 'desc' }, take: limit + 1 });
       hasMore = messages.length > limit;
       messages = messages.slice(0, limit).reverse();
     }
@@ -458,7 +463,7 @@ export class ConversationsService {
   /** A reported chat in full, for a moderator: only chats someone has reported, and every read is audited. */
   async adminGet(actorId: string | null, id: string) {
     const chat = await this.reportedChat(id);
-    const messages = await this.prisma.classifiedMessage.findMany({ where: { conversationId: chat.id }, include: { offer: true }, orderBy: { seq: 'asc' }, take: 1000 });
+    const messages = await this.prisma.classifiedMessage.findMany({ where: { conversationId: chat.id }, include: messageInclude, orderBy: { seq: 'asc' }, take: 1000 });
     await this.audit.record({ actorId, action: 'classifieds.conversation_viewed', targetType: 'classified_conversation', targetId: chat.id, before: null, after: { messages: messages.length } });
     const author = (senderId: string | null) => (senderId === null ? 'bitocard' : senderId === chat.buyerId ? 'buyer' : 'seller');
     return {
@@ -521,7 +526,7 @@ export class ConversationsService {
     const now = new Date();
     const writer = side === 'buyer' ? chat.buyerId : chat.sellerId;
     const [message] = await this.prisma.$transaction([
-      this.prisma.classifiedMessage.create({ data: { ...data, conversationId: chat.id, senderId: writer, createdAt: now }, include: { offer: true } }),
+      this.prisma.classifiedMessage.create({ data: { ...data, conversationId: chat.id, senderId: writer, createdAt: now }, include: messageInclude }),
       this.prisma.classifiedConversation.update({ where: { id: chat.id }, data: { lastMessageAt: now, ...readNow(side, now), ...(side === 'seller' && !chat.sellerRepliedAt ? { sellerRepliedAt: now } : {}) } }),
     ]);
     return message;
@@ -622,6 +627,7 @@ export class ConversationsService {
       body: message.body,
       photo: message.objectKey ? this.photoOf(message.conversationId, message) : null,
       offer: message.offer && message.kind === 'offer' ? this.presentOffer(message.offer, viewerId) : null,
+      buy_order: message.buyOrder && message.kind === 'buy_order' ? buyOrderSummary(message.buyOrder, viewerId) : null,
       created_at: message.createdAt.toISOString(),
     };
   }

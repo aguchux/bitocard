@@ -151,6 +151,11 @@ export const switchDefinitions = {
     scopes: ['global', 'country'],
     description: "Safe pay on Udozo: buyers pay from their wallet, Udozo holds the money until they confirm, then pays the seller. Needs classifieds on and the market's Safe pay fees set. Off until holding buyers' money is cleared there.",
   },
+  classifieds_buy_orders: {
+    scopes: ['global', 'country'],
+    description:
+      "Buy orders on Udozo: a buyer asks to buy a listing at a price, the seller accepts (holding it for them) or offers another price before they meet, they pay each other in person off Udozo, and the seller marks it sold. The record of who bought what, which reviews will use. Needs classifieds on. Off: listings show no Buy this.",
+  },
   classifieds_assistant: {
     scopes: ['global', 'country'],
     description: "Shop assistants (Anjio) on Udozo: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
@@ -220,6 +225,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds',
   'classifieds_safe_pay',
   'classifieds_assistant',
+  'classifieds_buy_orders',
   'classifieds_install_prompt',
   'classifieds_resale',
   'customer_identity_check',

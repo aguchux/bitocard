@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Contact, Flag as FlagIcon, Heart, Mail, MessageCircle, Phone, PhoneCall, PhoneIncoming, Share2, ShieldCheck, X } from "lucide-react";
+import { Check, Contact, Flag as FlagIcon, HandCoins, Heart, Mail, MessageCircle, Phone, PhoneCall, PhoneIncoming, Share2, ShieldCheck, X } from "lucide-react";
+import Link from "next/link";
+import { buyOrderLabels, type ShopBuyOrderSummary } from "@bitocard/api-client/classifieds";
+import { BuyOrderSheet } from "./buy-order";
 import { reportReasonLabels, type ShopChat, type ShopReportReason, type ShopViewer } from "@bitocard/api-client/classifieds";
 import { track } from "@/lib/discovery-client";
 import { reportListing, requestContact, saveListing } from "@/lib/listing-actions";
@@ -10,7 +13,23 @@ import { useCalls } from "./calls/call-provider";
 import { ChatPanel } from "./chat-panel";
 import { SignInHere } from "./sign-in-here";
 
-type Listing = { id: string; title: string; url: string; currency: string; active: boolean; chat: boolean; phone: boolean; buyPath: string; buyHref: string | null; buyLabel: string };
+type Listing = {
+  id: string;
+  title: string;
+  url: string;
+  currency: string;
+  active: boolean;
+  chat: boolean;
+  phone: boolean;
+  buyPath: string;
+  buyHref: string | null;
+  buyLabel: string;
+  /** Its asking price (minor units) and units still to be had, for the buy form. */
+  price?: number | null;
+  available?: number;
+  /** Buy orders are open in its market (signed out: from the market; signed in: the viewer says). */
+  buyOrders?: boolean;
+};
 
 /** A sheet over the page: from the bottom on phones, centred above (a native modal dialog: Escape closes it). */
 function Sheet({ dialog, title, children }: { dialog: React.RefObject<HTMLDialogElement | null>; title: string; children: React.ReactNode }) {
@@ -205,6 +224,8 @@ export function ListingActions({
   const contactSheet = useRef<HTMLDialogElement>(null);
   const callbackSheet = useRef<HTMLDialogElement>(null);
   const reportSheet = useRef<HTMLDialogElement>(null);
+  const buySheet = useRef<HTMLDialogElement>(null);
+  const [buyOrder, setBuyOrder] = useState<ShopBuyOrderSummary | null>(viewer?.buy_order ?? null);
 
   if (viewer?.own) return <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">This is your listing. Manage it in My listings.</p>;
   if (!listing.active) return null;
@@ -217,6 +238,10 @@ export function ListingActions({
   const offersCallback = signedIn ? Boolean(viewer?.callback?.available) : listing.phone;
   const offersContact = signedIn ? Boolean(viewer?.contact?.available) && !shared : listing.phone;
   const online = Boolean(viewer?.seller_online);
+  // Buy this: where buy orders are open, the listing is priced or not, and units are left (or the buyer has an order).
+  const buyOrders = signedIn ? Boolean(viewer?.buy_orders) : Boolean(listing.buyOrders);
+  const openOrder = buyOrder && ["requested", "countered", "accepted"].includes(buyOrder.status) ? buyOrder : null;
+  const offersBuy = buyOrders && canContact && (openOrder || (listing.available ?? 1) > 0);
 
   const report = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -237,6 +262,24 @@ export function ListingActions({
         <a href={listing.buyHref} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 px-4 text-[15px] font-bold text-white hover:bg-mint-500">
           <ShieldCheck className="size-5" aria-hidden="true" /> {listing.buyLabel}
         </a>
+      ) : null}
+      {offersBuy ? (
+        openOrder ? (
+          <Link href={`/account/buy-orders/${openOrder.id}`} className="grid min-h-13 content-center justify-items-center rounded-2xl border-2 border-navy-900 bg-white px-4 py-2 text-center hover:bg-navy-50">
+            <span className="flex items-center gap-2 text-[15px] font-bold">
+              <HandCoins className="size-5" aria-hidden="true" /> Your buy order {openOrder.number}
+            </span>
+            <span className="text-xs text-navy-700">{buyOrderLabels.buyer[openOrder.status]}</span>
+          </Link>
+        ) : signedIn ? (
+          <button type="button" onClick={() => buySheet.current?.showModal()} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-navy-900 px-4 text-[15px] font-bold text-white hover:bg-navy-700">
+            <HandCoins className="size-5" aria-hidden="true" /> Buy this
+          </button>
+        ) : (
+          <SignInHere reason="buy" className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-navy-900 px-4 text-[15px] font-bold text-white hover:bg-navy-700">
+            <HandCoins className="size-5" aria-hidden="true" /> Buy this
+          </SignInHere>
+        )
       ) : null}
       {shared && canContact ? <SellerContact shared={shared} /> : null}
       {canContact ? (
@@ -304,6 +347,7 @@ export function ListingActions({
         )}
       </div>
 
+      {signedIn && buyOrders ? <BuyOrderSheet dialog={buySheet} listing={{ id: listing.id, title: listing.title, currency: listing.currency, price: listing.price ?? null, available: listing.available ?? 1 }} onSent={setBuyOrder} /> : null}
       {signedIn ? <RequestSheet dialog={callbackSheet} kind="callback" listingId={listing.id} myPhone={myPhone} onSent={setCallbackSent} /> : null}
       {signedIn ? <RequestSheet dialog={contactSheet} kind="contact" listingId={listing.id} myPhone={myPhone} onSent={setContactSent} /> : null}
 

@@ -52,11 +52,12 @@ export class ShopDirectoryService {
     const countries = await this.prisma.country.findMany({ orderBy: { name: 'asc' } });
     const open = (await Promise.all(countries.map(async country => ((await this.settings.isOnForCountry('classifieds', country.code)) ? country : null)))).filter(country => country !== null);
     const codes = open.map(country => country.code);
-    const [counts, safePay, installPrompt, fees] = await Promise.all([
+    const [counts, safePay, installPrompt, fees, buyOrders] = await Promise.all([
       codes.length ? this.prisma.classifiedListing.groupBy({ by: ['country'], where: { country: { in: codes }, ...onShopWhere }, _count: { _all: true } }) : [],
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_safe_pay', code))),
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_install_prompt', code))),
       this.prisma.classifiedSafePaySettings.findMany({ where: { country: { in: codes } } }),
+      Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_buy_orders', code))),
     ]);
     const feesSet = (code: string) => {
       const row = fees.find(item => item.country === code);
@@ -72,6 +73,8 @@ export class ShopDirectoryService {
         listings: counts.find(row => row.country === country.code)?._count._all ?? 0,
         safe_pay: safePay[index]! && feesSet(country.code),
         install_prompt: installPrompt[index]!,
+        /** Buyers can send buy orders there (`classifieds_buy_orders`). */
+        buy_orders: buyOrders[index]!,
       })),
       showcase: open.length >= showcaseFrom,
     };
@@ -330,6 +333,6 @@ export class ShopDirectoryService {
 
   /** Who sells a listing and how they take contact (for the viewer's contact and call state). */
   contactOf(listingId: string) {
-    return this.prisma.classifiedListing.findUniqueOrThrow({ where: { id: listingId }, select: { id: true, customerId: true, contact: true } });
+    return this.prisma.classifiedListing.findUniqueOrThrow({ where: { id: listingId }, select: { id: true, customerId: true, contact: true, country: true } });
   }
 }

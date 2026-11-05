@@ -5,6 +5,7 @@ import { ListingMediaService } from '../classifieds/media.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
+import { BuyOrdersService } from '../classifieds/buy-orders/buy-orders.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
 import { CallsService } from '../classifieds/calls.service.js';
 import { DiscoveryAdminService } from '../classifieds/discovery/discovery-admin.service.js';
@@ -112,6 +113,7 @@ export class CronController {
     signupJourneys: SignupJourneysService,
     discovery: DiscoveryAdminService,
     watermarks: WatermarkService,
+    buyOrders: BuyOrdersService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -187,7 +189,7 @@ export class CronController {
        * discovery's "people also viewed" is rebuilt, and its events (90 days), idle profiles (180 days) and searches per
        * day (13 months) deleted.
        */
-      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), discovery: await discovery.daily() }),
+      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the
@@ -212,10 +214,11 @@ export class CronController {
        * end end, auto-listing rules add new listings, and resellers are told when a store listing stops selling; calls
        * that rang out are missed (the seller told) and calls past 90 days deleted; every live listing's discovery signals
        * (its quality in personalised rows) are refreshed; while photo watermarks are on, up to 500 public listing photos
-       * are made private.
+       * are made private; buy orders past their deadlines lapse, end, are reminded or complete.
        */
       classifieds: async () => ({
         safe_pay: await safePay.runDue(),
+        buy_orders: await buyOrders.job(),
         listings: await listings.expireDue(),
         stale_videos: await listingMedia.failStale(),
         offers: await conversations.expireOffers(),

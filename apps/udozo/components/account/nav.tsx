@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
+  HandCoins,
   Heart,
   Landmark,
   LayoutList,
@@ -27,6 +28,7 @@ const icons = {
   listings: LayoutList,
   messages: MessagesSquare,
   requests: PhoneCall,
+  "buy-orders": HandCoins,
   orders: ReceiptText,
   favourites: Heart,
   resellers: Store,

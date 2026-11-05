@@ -22,7 +22,7 @@ export type ShopPlace = { slug: string; name: string; state: { slug: string; nam
  * `safe_pay`: open there (its switch on and both fees set); a buyer's own wallet is checked when they ask.
  * `install_prompt`: the site asks visitors there to install it as an app (an admin switch).
  */
-export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean };
+export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean };
 export type ShopMarkets = { object: 'list'; data: ShopMarket[]; showcase: boolean };
 
 export type ShopFeature = {
@@ -156,6 +156,8 @@ export type ShopListingPage = {
   video: { url: string; poster_url: string | null; duration_ms: number | null; width: number | null; height: number | null } | null;
   delivery: ShopDelivery;
   reserved: boolean;
+  /** Units still to be had: its stock less those held for buyers (Safe pay, or buy orders the seller accepted). */
+  available?: number;
   contact: { chat: boolean; phone: boolean };
   seller: { name: string; handle?: string; username?: string | null; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
   published_at: string | null;
@@ -245,6 +247,9 @@ export type ShopViewer = {
   /** The seller had Udozo open in the last minute, and whether calls can be made (Udozo). */
   seller_online?: boolean;
   calls?: boolean;
+  /** Udozo: whether buy orders are open in the market, and the buyer's open (or last completed) buy order for it. */
+  buy_orders?: boolean;
+  buy_order?: ShopBuyOrderSummary | null;
 };
 
 export type ShopContactStatus = 'pending' | 'accepted' | 'declined' | 'done' | 'dismissed' | 'cancelled';
@@ -310,11 +315,13 @@ export type ShopOffer = {
 export type ShopMessage = {
   object: 'classified_message';
   id: string;
-  kind: 'text' | 'photo' | 'offer' | 'system';
+  kind: 'text' | 'photo' | 'offer' | 'system' | 'buy_order';
   from: 'me' | 'them' | 'bitocard';
   body: string;
   photo: { url: string; content_type: string | null; size: number | null; width: number | null; height: number | null } | null;
   offer: ShopOffer | null;
+  /** A buy order's step (Udozo): the order as it stands now, so the card shows its buttons. */
+  buy_order?: ShopBuyOrderSummary | null;
   created_at: string;
 };
 export type ShopConversation = {
@@ -965,3 +972,88 @@ export type UsernameStatus = {
   dismissals: number;
 };
 export type UsernameAvailability = { object: 'username_availability'; username: string; available: boolean; reason: 'taken' | 'reserved' | 'refused' | 'invalid' | 'own' | null; suggestions: string[] };
+
+// ---- Buy orders (Udozo, docs/UDOZO_RATINGS_PLAN.md phase 0) ----
+
+/**
+ * A buy order: the buyer asks to buy at a price, the seller accepts (or counters) before they meet, they trade in person,
+ * and the seller marks it sold (or the buyer says they bought it). Payment is between them, off Udozo.
+ */
+export type ShopBuyOrderStatus = 'requested' | 'countered' | 'accepted' | 'completed' | 'declined' | 'cancelled' | 'lapsed' | 'expired' | 'no_show' | 'voided';
+export const buyOrderOpenStatuses: readonly ShopBuyOrderStatus[] = ['requested', 'countered', 'accepted'];
+export type ShopBuyOrderAction = 'accept' | 'counter' | 'decline' | 'accept_counter' | 'cancel' | 'no_show' | 'complete' | 'bought' | 'void' | 'extend';
+
+/** The words each side reads for a status. */
+export const buyOrderLabels: Record<'buyer' | 'seller', Record<ShopBuyOrderStatus, string>> = {
+  buyer: {
+    requested: 'Waiting for the seller',
+    countered: 'The seller offered a price',
+    accepted: 'Accepted: meet the seller',
+    completed: 'Bought',
+    declined: 'Declined',
+    cancelled: 'Cancelled',
+    lapsed: 'No answer in time',
+    expired: 'Ended: not completed in time',
+    no_show: 'Did not happen',
+    voided: 'You said you did not buy it',
+  },
+  seller: {
+    requested: 'Answer the buyer',
+    countered: 'Waiting for the buyer',
+    accepted: 'Accepted: meet the buyer',
+    completed: 'Sold',
+    declined: 'Declined',
+    cancelled: 'Cancelled',
+    lapsed: 'No answer in time',
+    expired: 'Ended: not completed in time',
+    no_show: 'Did not happen',
+    voided: 'The buyer said they did not buy it',
+  },
+};
+
+export type ShopBuyOrderSummary = {
+  object: 'classified_buy_order';
+  id: string;
+  /** BO-000123. */
+  number: string;
+  status: ShopBuyOrderStatus;
+  role: 'buyer' | 'seller';
+  /** The price agreed so far (the buyer's, or theirs after accepting the seller's counter), for all the units. */
+  price: number;
+  /** The seller's counter price, while it waits for the buyer. */
+  counter: number | null;
+  currency: string;
+  quantity: number;
+  /** What the reader can do now. */
+  actions: ShopBuyOrderAction[];
+};
+
+export type ShopBuyOrder = ShopBuyOrderSummary & {
+  listing: { id: string; ref: number; title: string | null; path: string; status: string; cover_url: string | null; price: ShopPrice };
+  /** The other person, by their public name. */
+  with: { name: string };
+  note: string | null;
+  meet_note: string | null;
+  conversation_id: string | null;
+  /** Whose turn it is to answer, and by when (requested: the seller; countered: the buyer). */
+  respond_by: string | null;
+  /** An accepted order is completed by then, or ends. */
+  meet_by: string | null;
+  meet_extended: boolean;
+  accepted_at: string | null;
+  /** The buyer said they bought it: the seller confirms, else it completes by itself on this date. */
+  bought_at: string | null;
+  completes_at: string | null;
+  completed_at: string | null;
+  /** seller, buyer or auto. */
+  completed_by: 'seller' | 'buyer' | 'auto' | null;
+  /** The buyer may say they did not buy it until then. */
+  void_until: string | null;
+  /** buyer, seller or udozo: who ended it, and why. */
+  ended_by: 'buyer' | 'seller' | 'udozo' | null;
+  end_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ShopBuyOrders = { object: 'list'; data: ShopBuyOrder[]; waiting: number };

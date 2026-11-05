@@ -4,7 +4,7 @@
  * or use Safe pay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
-export const legalVersion = "2026-11-04";
+export const legalVersion = "2026-11-05";
 /** Privacy and legal requests. */
 export const legalContact = "legal@udozo.com";
 /** Help with an account, a listing or an order. */
@@ -188,6 +188,23 @@ const terms: LegalDocument = {
           ],
         },
         "The guide gives advice. It is not a promise that a trade will be safe, and following it does not make Udozo part of the sale.",
+      ],
+    },
+    {
+      id: "buy-orders",
+      heading: "9a. Buy orders",
+      body: [
+        "Where buy orders are open, a buyer can ask to buy a listing at a price with Buy this. A buy order is an agreement between the buyer and the seller: Udozo is not the seller or the buyer, does not hold the money, and cannot recover money paid outside Safe pay. Section 9 applies to every buy order.",
+        {
+          list: [
+            "The seller has the hours shown to accept, offer another price or decline. Without an answer the buy order ends. A price the seller offers is answered by the buyer in the same time.",
+            "Once accepted, the item is held for the buyer: it cannot be accepted for someone else, or bought with Safe pay, while the buy order is open. Meet within the days shown; the seller can give more time once. Either side can cancel, or say the sale did not happen, before it is marked sold.",
+            "The seller marks the buy order sold only once the buyer has paid and has the item. The buyer can say they bought it; if the seller does not answer within 3 days, it is recorded as sold.",
+            "A buyer can say they did not buy it within 7 days of the seller marking it sold. Marking a sale that did not happen, or denying one that did, breaks these terms. When buyers say they did not buy from a seller three times in 90 days, we pause that seller's buy orders for 30 days, and we may suspend accounts that misuse buy orders.",
+            "Completed buy orders are the record of who bought what on Udozo, which we use to let buyers review sellers when reviews open.",
+            "We limit how many buy orders a buyer can have open and send each day, and we may refuse them between accounts that look like one person.",
+          ],
+        },
       ],
     },
     {
@@ -627,6 +644,7 @@ const privacy: LegalDocument = {
             "Chats: messages, photos (encrypted, in private storage, seen only by the two of you), offers, when each side read them, blocks, and how fast sellers reply. A moderator reads a chat only when one of you reports it, or when it matters to a Safe pay dispute, and each reading is recorded.",
             "Interest in listings: the listings you save, and that you started a chat, asked for a seller's contact details or a call back, or called a seller.",
             "Contact requests and call backs: who asked whom, about which listing, the note written (numbers and links hidden) and the answer. When a seller shares their contact, the buyers they shared it with.",
+            "Buy orders: who asked to buy which listing, the price asked and any price the seller offered back, how many, the notes and meeting place written (numbers and links hidden), each step and when it was taken (accepted, cancelled, marked sold, said bought, said not bought, and why), and when deadlines were reminded. Each step also shows in your chat with the other person.",
             "Calls: who called whom, about which listing, when it rang, was answered and ended, and how. The connection details the two browsers swap are deleted when the call ends. Calls are not recorded. While you have udozo.com open signed in, when you last had it open, so buyers can see you are there.",
             "Reports and safety: reports you make or that are made about you, our checks and reviews of listings, strikes and any suspension, with its reason.",
             "Your wallet and payments: top-ups, purchases, refunds and payouts. You pay on our payment partner's page; we never receive your full card number, card security code or mobile money PIN.",
@@ -699,7 +717,7 @@ const privacy: LegalDocument = {
         {
           list: [
             "The public: live listings and each seller's page (first name and initial, username if they chose one, profile photo, badges, when they joined, their live listings and figures), including in search engines and in previews when a link is shared.",
-            "The other person in a chat: your first name and initial, your messages and offers. A seller sees a Safe pay buyer's delivery address once they have paid. A seller sees a buyer's name, confirmed mobile number and email when the buyer asks for a call back, and a buyer sees a seller's confirmed phone number and email once the seller shares them. Neither sees the other's number in a call. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
+            "The other person in a chat: your first name and initial, your messages and offers. The other person in a buy order: your first name and initial, the price, notes and meeting place written, and each step. A seller sees a Safe pay buyer's delivery address once they have paid. A seller sees a buyer's name, confirmed mobile number and email when the buyer asks for a call back, and a buyer sees a seller's confirmed phone number and email once the seller shares them. Neither sees the other's number in a call. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
             "Udozo's team, as their work needs.",
             "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS, the network in front of our API, and relaying calls between buyers and sellers: the call passes through it, encrypted, and is not recorded), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), and browser push services (Google, Mozilla, Apple, Microsoft) for Seller HQ's notifications.",
             "Authorities, where the law requires it.",
@@ -727,6 +745,7 @@ const privacy: LegalDocument = {
               ["Safe pay and store orders, disputes, store reports and payouts", "As long as accounting and tax laws require, usually six years after the order."],
               ["Order chats on a reseller's store", "12 months after the order ends."],
               ["Contact requests and call backs", "12 months after they are answered or cancelled. A shared contact stays shared until the seller stops sharing it or closes their account."],
+              ["Buy orders", "Two years after they end, as the record of who bought what (reviews of sellers will rely on it)."],
               ["Calls", "Who called whom and when: 90 days. The connection details: deleted when the call ends. When you last had udozo.com open: replaced each time."],
               ["Buyers' details on store orders", "Shown to the supplier and reseller until 30 days after the order ends."],
               ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years."],

@@ -173,6 +173,9 @@ export type ClassifiedSeller = {
   handle?: string;
   /** Udozo: the username they chose for their seller page (`/<cc>/seller/<username>`), or null. */
   username?: string | null;
+  /** Udozo: until when their new buy orders are paused (3 voided in 90 days, or an admin), and why; null when not. */
+  buy_orders_paused_until?: string | null;
+  buy_orders_paused_reason?: string | null;
   suspended: boolean;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -225,6 +228,14 @@ export type ClassifiedMarketSettings = {
   max_photos: number;
   /** Udozo: ads a customer must have posted before choosing a username for their seller page (0 to 100, default 5). */
   username_min_listings: number;
+  /** Udozo buy orders: hours a seller has to answer one (1 to 168, default 48). */
+  buy_request_hours?: number;
+  /** Days to meet once one is accepted (1 to 30, default 7). */
+  buy_meet_days?: number;
+  /** Open buy orders a buyer may have at once (1 to 100, default 10). */
+  buy_open_per_buyer?: number;
+  /** Buy orders a buyer may send a day (1 to 200, default 20). */
+  buy_requests_per_day?: number;
 };
 
 /** A reported chat, read in full (every read is audited). */
