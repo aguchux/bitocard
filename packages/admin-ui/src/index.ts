@@ -9,6 +9,7 @@ export { ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod } from './ui
 export { Badge, EmptyState, ErrorState, Notice, QueryView, RefreshFailed, StatusBadge, Trend, type QueryLike, type Tone } from './ui/status';
 export { Wordmark } from './ui/wordmark';
 export { ImageField, type ImageFieldProps } from './ui/image-field';
+export { ProfilePhotoCard } from './ui/profile-photo';
 export { ExternalLinks } from './ui/external-links';
 export { PhoneContact, whatsappUrl } from './ui/phone-contact';
 export { StoreGuideDialog, storeGuideSteps } from './ui/store-guide';

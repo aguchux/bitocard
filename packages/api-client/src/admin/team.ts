@@ -3,6 +3,8 @@ import type { AdminRole } from './types';
 
 /** An admin as Settings > Team shows them (`AdminTeamService`): never a password, code or secret. */
 export type AdminMember = {
+  /** Udozo's API: their profile photo, or null for their initials. */
+  avatar_url?: string | null;
   object: 'admin_member';
   id: string;
   name: string;

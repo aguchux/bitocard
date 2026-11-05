@@ -68,6 +68,8 @@ model User {
   phones          UserPhone[]
   /// Argon2id. Null for Google-only accounts.
   passwordHash    String?     @map("password_hash")
+  /// Udozo: their profile photo (a face, logo or icon), shown in Seller HQ and the admin; null shows their initials.
+  avatarUrl       String?     @map("avatar_url")
   /// The first and last name joined, for showing and emails. Kept in step with the two below.
   name            String
   /// First and last name apart, matched against identity documents (`src/auth/names.ts`). Older accounts were split by
@@ -2664,6 +2666,9 @@ model Customer {
   personalisationOffAt      DateTime?                 @map("personalisation_off_at")
   /// Udozo: the account's public seller page (`/<cc>/seller/<handle>`): 10 random letters and digits, so the page never
   /// shows the account's id. Set for every account (the column's default).
+  /// Udozo: their profile photo (a face, logo or icon), the public address of a checked upload (`AvatarsService`); null
+  /// shows their initials.
+  avatarUrl                 String?                   @map("avatar_url")
   sellerHandle              String                    @unique @default(dbgenerated("substr(md5((random())::text || (clock_timestamp())::text), 1, 10)")) @map("seller_handle") @db.VarChar(12)
   status                    UserStatus                @default(active)
   failedSignIns             Int                       @default(0) @map("failed_sign_ins")

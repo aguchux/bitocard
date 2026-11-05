@@ -48,6 +48,8 @@ export type Customer = {
   sex?: "female" | "male" | "unspecified" | null;
   /** Whether what they look at shapes what udozo.com shows them (Account > Privacy). Missing on older API versions. */
   personalisation?: boolean;
+  /** Their profile photo, or null for their initials. Missing on older API versions. */
+  avatar_url?: string | null;
   created_at: string;
 };
 

@@ -31,7 +31,7 @@ export class SellerProfilesService {
   /** The account a handle names, while it is usable (a suspended account has no page). */
   async seller(handle: string) {
     if (!sellerHandlePattern.test(handle)) throw notFound();
-    const customer = await this.prisma.customer.findUnique({ where: { sellerHandle: handle }, select: { id: true, name: true, country: true, status: true, createdAt: true, phoneVerifiedAt: true, phone: true } });
+    const customer = await this.prisma.customer.findUnique({ where: { sellerHandle: handle }, select: { id: true, name: true, country: true, status: true, createdAt: true, phoneVerifiedAt: true, phone: true, avatarUrl: true } });
     if (!customer || customer.status !== 'active') throw notFound();
     return customer;
   }
@@ -71,6 +71,8 @@ export class SellerProfilesService {
       object: 'classified_seller' as const,
       handle,
       name: publicName(customer.name),
+      /** Their profile photo (a face, logo or icon), or null for their initials. */
+      avatar_url: customer.avatarUrl,
       country,
       url: `${shopOrigin}/${country.toLowerCase()}/seller/${handle}`,
       member_since: customer.createdAt.toISOString(),

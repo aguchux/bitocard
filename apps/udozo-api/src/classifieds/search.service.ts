@@ -281,7 +281,7 @@ export class ListingSearchService {
         area: { include: { parent: true } },
         category: { include: { parent: true, features: true } },
         features: { include: { feature: true } },
-        customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true, phone: true, sellerHandle: true } },
+        customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true, phone: true, sellerHandle: true, avatarUrl: true } },
         media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }] },
       },
     });
@@ -331,7 +331,7 @@ export class ListingSearchService {
       /** Units still to be had: its stock less those paid for and waiting to be handed over. */
       available: Math.max(row.stock - holding, 0),
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
-      seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
+      seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, avatar_url: row.customer.avatarUrl, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
       published_at: row.publishedAt?.toISOString() ?? null,
       sold_at: row.soldAt?.toISOString() ?? null,
     };

@@ -168,6 +168,9 @@ export type ClassifiedSeller = {
   country: string | null;
   member_since: string;
   phone_confirmed: boolean;
+  /** Udozo: their profile photo and the handle of their public seller page (`/<cc>/seller/<handle>`). */
+  avatar_url?: string | null;
+  handle?: string;
   suspended: boolean;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -479,6 +482,11 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       // Suspending removes the seller's live and waiting listings.
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, { type: 'ClassifiedSeller', id: 'LIST' }, { type: 'ClassifiedListing', id: 'LIST' }, 'ClassifiedListing', 'Activity'],
     }),
+    /** Takes a seller's profile photo off (their initials show again), with why; audited. */
+    removeClassifiedSellerAvatar: build.mutation<unknown, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/avatar/remove`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, { type: 'ClassifiedSeller', id: 'LIST' }, 'Activity'],
+    }),
     clearClassifiedStrikes: build.mutation<unknown, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/safe-pay/clear`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, 'Activity'],
@@ -699,6 +707,7 @@ export const {
   useClassifiedSellerQuery,
   useSetClassifiedSellerSuspendedMutation,
   useClearClassifiedStrikesMutation,
+  useRemoveClassifiedSellerAvatarMutation,
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,
   useSetClassifiedCategorySkuPrefixMutation,

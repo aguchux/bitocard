@@ -415,7 +415,7 @@ export class AdminAuthService {
 
   /** `authenticator`: whether they use one; `authenticator_required`: whether they must (else it is their choice). */
   private present(user: User, authenticator: boolean) {
-    return { object: 'admin' as const, id: user.id, name: user.name, ...namesOf(user), email: user.email, roles: user.adminRoles, authenticator, authenticator_required: authenticatorRequired(user) };
+    return { object: 'admin' as const, id: user.id, name: user.name, ...namesOf(user), email: user.email, avatar_url: user.avatarUrl ?? null, roles: user.adminRoles, authenticator, authenticator_required: authenticatorRequired(user) };
   }
 
   /** The signed-in admin's first and last name (Your account): saving both confirms them. */

@@ -55,6 +55,7 @@ export class TeamService {
         user_id: member.userId,
         name: member.user.name,
         email: member.user.email,
+        avatar_url: member.user.avatarUrl ?? null,
         role: member.role,
         joined_at: member.createdAt.toISOString(),
       })),

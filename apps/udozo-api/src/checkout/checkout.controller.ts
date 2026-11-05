@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { TrackSignup } from '../signups/track.js';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
@@ -21,6 +21,8 @@ import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.
 import { EsimsService } from '../esims/esims.service.js';
 import { StoreSellers } from './store-sellers.js';
 import { ProductOnly } from '../products/product.js';
+import { AvatarsService } from '../media/avatars.service.js';
+import { AvatarSetDto, AvatarUploadDto } from '../media/avatars.controller.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -323,7 +325,42 @@ export class CustomerAccountController {
     private readonly identity: IdentityService,
     private readonly handoffs: HandoffService,
     private readonly google: CustomerGoogleService,
+    private readonly avatars: AvatarsService,
   ) {}
+
+  /** Udozo: whether profile photos can be uploaded (storage set up), and what is accepted. */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Get('avatar/settings')
+  avatarSettings() {
+    return this.avatars.settings();
+  }
+
+  /** Udozo: a signed link to send a profile photo (a face, logo or icon) to storage; then `POST avatar` with its id. */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Post('avatar/uploads')
+  avatarUpload(@CurrentCustomer() caller: CustomerCaller, @Body() body: AvatarUploadDto) {
+    return this.avatars.startUpload({ kind: 'customer', id: caller.customer.id }, body);
+  }
+
+  /** Udozo: checks the uploaded photo and makes it the customer's (shown on their seller page and listings). */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Post('avatar')
+  @HttpCode(HttpStatus.OK)
+  setAvatar(@CurrentCustomer() caller: CustomerCaller, @Body() body: AvatarSetDto) {
+    return this.avatars.set({ kind: 'customer', id: caller.customer.id }, body.media_id);
+  }
+
+  /** Udozo: takes the photo off; their initials show again. */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Delete('avatar')
+  async removeAvatar(@CurrentCustomer() caller: CustomerCaller) {
+    const { object, avatar_url } = await this.avatars.remove({ kind: 'customer', id: caller.customer.id });
+    return { object, avatar_url };
+  }
 
   /**
    * Udozo: "Continue with Google", step 1 (udozo.com's server): Google's consent address and the one-time state to keep

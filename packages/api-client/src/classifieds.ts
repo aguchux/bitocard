@@ -157,7 +157,7 @@ export type ShopListingPage = {
   delivery: ShopDelivery;
   reserved: boolean;
   contact: { chat: boolean; phone: boolean };
-  seller: { name: string; handle?: string; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
+  seller: { name: string; handle?: string; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
   published_at: string | null;
   sold_at: string | null;
 };
@@ -170,6 +170,8 @@ export type ShopSellerProfile = {
   object: 'classified_seller';
   handle: string;
   name: string;
+  /** Their profile photo (a face, logo or icon), or null for their initials. */
+  avatar_url?: string | null;
   country: string;
   url: string;
   member_since: string;

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Plus, UserRound } from "lucide-react";
 import type { ShopMarket, ShopShowcase } from "@bitocard/api-client/classifieds";
 import { nameInitials } from "@bitocard/api-client/classifieds";
+import { Avatar } from "@bitocard/ui/avatar";
 import { signOut } from "@/lib/account-actions";
 import { markets, shopApi } from "@/lib/api";
 import type { Customer } from "@/lib/customer";
@@ -119,7 +120,9 @@ function ProfileMenu({ customer }: { customer: Customer | null }) {
         className="inline-flex size-11 cursor-pointer list-none items-center justify-center rounded-full text-navy-900 hover:bg-navy-50 [&::-webkit-details-marker]:hidden"
         aria-label={customer ? `Account: ${customer.name}` : "Account menu"}
       >
-        {customer ? (
+        {customer?.avatar_url ? (
+          <Avatar name={customer.name} url={customer.avatar_url} className="size-8 text-xs" />
+        ) : customer ? (
           <span className="grid size-8 place-items-center rounded-full bg-brand-500 text-xs font-bold text-white" aria-hidden="true">
             {nameInitials(customer.name)}
           </span>

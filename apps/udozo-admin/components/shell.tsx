@@ -149,6 +149,7 @@ function AccountArea() {
     <AccountMenu
       name={admin.name}
       email={admin.email}
+      avatarUrl={admin.avatar_url}
       detail={admin.roles.map(humanise).join(", ")}
       signingOut={isLoading}
       onSignOut={async () => {

@@ -4,6 +4,7 @@ import { Eye, ShieldCheck } from "lucide-react";
 import { regionWord } from "@bitocard/api-client/classifieds";
 import { CountryForm, NameForm, PasswordForm } from "@/components/account-forms";
 import { AboutForm } from "@/components/account/about-form";
+import { AvatarForm } from "@/components/account/avatar-form";
 import { PageTitle } from "@/components/account/nav";
 import { PhoneForm } from "@/components/account/phone-form";
 import { Flag } from "@/components/flag";
@@ -29,6 +30,12 @@ export default async function ProfilePage() {
   return (
     <div className="grid max-w-2xl gap-5">
       <PageTitle title="Profile" post={false} />
+      <section aria-labelledby="photo" className={card}>
+        <h2 id="photo" className="font-bold">
+          Profile photo
+        </h2>
+        <AvatarForm name={customer.name} url={customer.avatar_url ?? null} />
+      </section>
       <section aria-labelledby="you" className={card}>
         <h2 id="you" className="font-bold">
           You

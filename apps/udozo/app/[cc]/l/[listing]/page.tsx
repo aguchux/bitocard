@@ -12,7 +12,6 @@ import {
   featureValueText,
   listingPath,
   listingRef,
-  nameInitials,
   placePath,
   postedAgo,
   sellerPath,
@@ -23,6 +22,7 @@ import {
   type ShopListingCard,
   type ShopSearch,
 } from "@bitocard/api-client/classifieds";
+import { Avatar } from "@bitocard/ui/avatar";
 import { BrandLogo } from "@/components/brand-logo";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { Gallery } from "@/components/gallery";
@@ -228,9 +228,7 @@ export default async function ListingPage({ params }: Props) {
           {sold ? null : <AskAboutListing listingId={listing.id} title={listing.title} />}
           <section aria-label="The seller" className="grid gap-3 rounded-2xl border border-navy-200 bg-white p-4">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-navy-900 font-bold text-white" aria-hidden="true">
-                {nameInitials(listing.seller.name)}
-              </span>
+              <Avatar name={listing.seller.name} url={listing.seller.avatar_url} className="size-11 font-bold" />
               <span className="grid">
                 {listing.seller.handle ? (
                   <Link href={sellerPath(cc, listing.seller.handle)} className="font-bold hover:underline">

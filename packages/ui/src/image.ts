@@ -63,3 +63,44 @@ export async function compressImage(file: Blob, max = maxImageSide, redraw: (typ
     bitmap?.close();
   }
 }
+
+/** How a profile photo fills its square: `cover` crops to the middle (faces), `contain` shows it all (logos and icons). */
+export type SquareFit = "cover" | "contain";
+/** Profile photos are stored this many pixels square. */
+export const avatarSide = 512;
+
+/** Where to draw an image of `width` × `height` inside a square of `side` (no enlarging beyond the square). */
+export function squareDraw(width: number, height: number, side: number, fit: SquareFit) {
+  if (!(width > 0) || !(height > 0)) return { x: 0, y: 0, width: 0, height: 0 };
+  const scale = fit === "cover" ? side / Math.min(width, height) : side / Math.max(width, height);
+  const w = Math.round(width * scale);
+  const h = Math.round(height * scale);
+  return { x: Math.round((side - w) / 2), y: Math.round((side - h) / 2), width: w, height: h };
+}
+
+/**
+ * A profile photo, square: upright, cropped to its middle (`cover`) or shown whole on white (`contain`), at `side`
+ * pixels, re-encoded without its metadata: PNG where the picture had transparency to keep (a logo), else JPEG.
+ */
+export async function squareImage(file: Blob, fit: SquareFit = "cover", side = avatarSide): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  try {
+    const size = Math.min(side, fit === "cover" ? Math.min(bitmap.width, bitmap.height) : Math.max(bitmap.width, bitmap.height)) || side;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("The photo could not be prepared.");
+    const keepClear = file.type === "image/png" || file.type === "image/webp";
+    if (!keepClear || fit === "contain") {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, size, size);
+    }
+    const place = squareDraw(bitmap.width, bitmap.height, size, fit);
+    context.drawImage(bitmap, place.x, place.y, place.width, place.height);
+    const type = keepClear && fit === "cover" ? "image/png" : "image/jpeg";
+    return await new Promise((resolve, reject) => canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error("The photo could not be saved."))), type, jpegQuality));
+  } finally {
+    bitmap.close();
+  }
+}

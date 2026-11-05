@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { KeyRound, LogOut, Mail, Pencil, Plus, Smartphone, Star, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader, PasswordInput, Skeleton } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader, PasswordInput, ProfilePhotoCard, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   useAddAdditionalPhoneMutation,
@@ -449,6 +449,8 @@ export default function ProfilePage() {
   return (
     <ShqShell section="settings" current="/settings/profile" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Your profile" }]}>
       <PageHeader title="Your profile" description="Your own sign-in details. They apply to every reseller account you belong to." />
+
+      <ProfilePhotoCard realm="reseller" name={user.name} url={user.avatar_url} />
 
       <Card>
         <CardHeader

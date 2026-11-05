@@ -4,4 +4,5 @@ export { prefetchQuery, usePrefetchQuery } from './prefetch';
 export * from './notifications';
 export * from './push';
 export * from './media';
+export * from './avatars';
 export * from './support-bots';

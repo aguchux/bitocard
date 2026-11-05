@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, ChevronUp, LogOut, Menu, X } from 'lucide-react';
+import { Avatar } from '@bitocard/ui/avatar';
 import { cn } from '../format';
 import type { NavItem, SubNavItem } from './nav';
 import { AppLink } from './session';
@@ -128,6 +129,8 @@ export type AccountMenuProps = {
   email: string;
   /** A line under the email, for example the admin's roles or the reseller account. */
   detail?: string;
+  /** Their profile photo (Udozo), shown in place of their initial. */
+  avatarUrl?: string | null;
   /** Extra menu items above Sign out (for example switching account). */
   children?: ReactNode;
   signingOut?: boolean;
@@ -135,7 +138,7 @@ export type AccountMenuProps = {
 };
 
 /** The signed-in person, with Sign out and any extra items the app adds. */
-export function AccountMenu({ name, email, detail, children, signingOut, onSignOut }: AccountMenuProps) {
+export function AccountMenu({ name, email, detail, avatarUrl, children, signingOut, onSignOut }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -154,9 +157,13 @@ export function AccountMenu({ name, email, detail, children, signingOut, onSignO
   return (
     <div className="relative" ref={ref}>
       <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-haspopup="menu" className="flex min-h-11 items-center gap-2 rounded-xl px-2 hover:bg-canvas">
-        <span aria-hidden className="grid size-9 place-items-center rounded-full bg-navy-700 text-sm font-bold text-white">
-          {initial}
-        </span>
+        {avatarUrl ? (
+          <Avatar name={name} url={avatarUrl} className="size-9 text-sm" />
+        ) : (
+          <span aria-hidden className="grid size-9 place-items-center rounded-full bg-navy-700 text-sm font-bold text-white">
+            {initial}
+          </span>
+        )}
         <span className="hidden max-w-40 truncate text-sm font-semibold text-ink sm:block">{name}</span>
         <ChevronDown className="size-4 text-muted" aria-hidden />
       </button>

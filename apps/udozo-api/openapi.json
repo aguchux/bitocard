@@ -8564,6 +8564,7 @@
                     "phone": null,
                     "phone_verified": false,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-10-06T09:12:44.000Z"
                   },
                   "memberships": [
@@ -8753,6 +8754,7 @@
                     "phone": "+2348031234567",
                     "phone_verified": true,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-09-14T09:12:44.000Z"
                   },
                   "memberships": [
@@ -8969,6 +8971,7 @@
                     "phone": "+2348031234567",
                     "phone_verified": true,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-09-14T09:12:44.000Z"
                   },
                   "memberships": [
@@ -9135,6 +9138,7 @@
                     "phone": "+2348031234567",
                     "phone_verified": true,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-09-14T09:12:44.000Z"
                   },
                   "memberships": [
@@ -9397,6 +9401,7 @@
                     "phone": "+2348031234567",
                     "phone_verified": true,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-09-14T09:12:44.000Z"
                   },
                   "memberships": [
@@ -9619,6 +9624,7 @@
                     "phone": "+2348031234567",
                     "phone_verified": true,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-09-14T09:12:44.000Z"
                   },
                   "memberships": [
@@ -10671,6 +10677,7 @@
                     "phone": "+2348031234567",
                     "phone_verified": true,
                     "has_password": true,
+                    "avatar_url": null,
                     "created_at": "2026-09-14T09:12:44.000Z"
                   },
                   "memberships": [
@@ -13577,6 +13584,7 @@
                       "user_id": "c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f",
                       "name": "Ada Obi",
                       "email": "ada@example.com",
+                      "avatar_url": null,
                       "role": "owner",
                       "joined_at": "2026-10-01T08:00:00.000Z"
                     },
@@ -13585,6 +13593,7 @@
                       "user_id": "d4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a",
                       "name": "Bola Ade",
                       "email": "bola@example.com",
+                      "avatar_url": null,
                       "role": "finance",
                       "joined_at": "2026-10-03T12:30:00.000Z"
                     }
@@ -14083,6 +14092,7 @@
                       "user_id": "c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f",
                       "name": "Ada Obi",
                       "email": "ada@example.com",
+                      "avatar_url": null,
                       "role": "owner",
                       "joined_at": "2026-10-01T08:00:00.000Z"
                     },
@@ -14091,6 +14101,7 @@
                       "user_id": "d4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a",
                       "name": "Bola Ade",
                       "email": "bola@example.com",
+                      "avatar_url": null,
                       "role": "admin",
                       "joined_at": "2026-10-03T12:30:00.000Z"
                     }
@@ -34868,6 +34879,7 @@
                 "user_id",
                 "name",
                 "email",
+                "avatar_url",
                 "role",
                 "joined_at"
               ],
@@ -34891,6 +34903,14 @@
                   "type": "string",
                   "description": "Their email address.",
                   "format": "email"
+                },
+                "avatar_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Their profile photo, or null to show their initials.",
+                  "format": "uri"
                 },
                 "role": {
                   "type": "string",
@@ -42863,6 +42883,7 @@
           "phone",
           "phone_verified",
           "has_password",
+          "avatar_url",
           "created_at"
         ],
         "additionalProperties": false,
@@ -42919,6 +42940,14 @@
           "has_password": {
             "type": "boolean",
             "description": "Whether the account has a password. People who signed up with Google have none until they set one with \"Forgot password\"."
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their profile photo (a face, logo or icon), or null to show their initials.",
+            "format": "uri"
           },
           "created_at": {
             "type": "string",

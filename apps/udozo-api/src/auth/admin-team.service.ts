@@ -22,6 +22,7 @@ function present(member: Member) {
     name: member.name,
     ...namesOf(member),
     email: member.email,
+    avatar_url: member.avatarUrl ?? null,
     roles: member.adminRoles,
     status: member.status,
     // `invited` until they choose a password with the emailed link.

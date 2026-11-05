@@ -85,8 +85,8 @@ const exampleInvitation = {
 const exampleTeam = {
   object: 'team',
   members: [
-    { object: 'member', user_id: 'c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f', name: 'Ada Obi', email: 'ada@example.com', role: 'owner', joined_at: '2026-10-01T08:00:00.000Z' },
-    { object: 'member', user_id: 'd4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a', name: 'Bola Ade', email: 'bola@example.com', role: 'finance', joined_at: '2026-10-03T12:30:00.000Z' },
+    { object: 'member', user_id: 'c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f', name: 'Ada Obi', email: 'ada@example.com', avatar_url: null, role: 'owner', joined_at: '2026-10-01T08:00:00.000Z' },
+    { object: 'member', user_id: 'd4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a', name: 'Bola Ade', email: 'bola@example.com', avatar_url: null, role: 'finance', joined_at: '2026-10-03T12:30:00.000Z' },
   ],
   invitations: [exampleInvitation],
 };
@@ -220,6 +220,7 @@ export const accountDocs: DocsArea = {
             user_id: uuid('The person’s user ID.'),
             name: str('Their name.'),
             email: str('Their email address.', { format: 'email' }),
+            avatar_url: nullableStr('Their profile photo, or null to show their initials.', { format: 'uri' }),
             role: oneOf('`owner` (one per account; cannot be changed or removed), `admin` (team and keys), `developer` (keys and webhooks), `finance` or `support`.', roles),
             joined_at: time('When they joined.'),
           }),

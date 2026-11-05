@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@bitocard/ui/avatar";
 import { useId, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, DataTable, Dialog, errorMessage, Field, formatRelative, Input, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
@@ -202,12 +203,15 @@ export default function TeamPage() {
                       key: "who",
                       header: "Name",
                       cell: member => (
-                        <span className="block min-w-0">
-                          <span className="block font-semibold text-ink">
-                            {member.name}
-                            {member.id === admin?.id ? <span className="ml-2 text-xs font-normal text-muted">(you)</span> : null}
+                        <span className="flex min-w-0 items-center gap-3">
+                          <Avatar name={member.name} url={member.avatar_url} className="size-9 text-xs" />
+                          <span className="block min-w-0">
+                            <span className="block font-semibold text-ink">
+                              {member.name}
+                              {member.id === admin?.id ? <span className="ml-2 text-xs font-normal text-muted">(you)</span> : null}
+                            </span>
+                            <span className="block text-sm break-all text-muted">{member.email}</span>
                           </span>
-                          <span className="block text-sm break-all text-muted">{member.email}</span>
                         </span>
                       ),
                     },

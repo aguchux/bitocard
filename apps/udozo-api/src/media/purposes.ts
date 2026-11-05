@@ -7,7 +7,8 @@ export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'regis
 
 export type MediaPurpose = {
   label: string;
-  realm: 'admin' | 'afrippa_admin' | 'reseller';
+  /** `person`: anyone's own profile photo (`AvatarsService`), in their own folder. */
+  realm: 'admin' | 'afrippa_admin' | 'reseller' | 'person';
   /** What `target_id` names; purposes without one need none. */
   target?: MediaTarget;
   folder: (target: string | undefined, resellerId: string | undefined) => string;
@@ -60,6 +61,9 @@ const purposeTable = {
   bot_avatar: { label: 'Assistant avatar', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/bots/avatars`, maxBytes: 1 * MB, types: rasterTypes },
   platform_bot_avatar: { label: 'BitoCard assistant avatar', realm: 'admin', folder: () => 'platform/bots/avatars', maxBytes: 1 * MB, types: rasterTypes },
   shop_bot_avatar: { label: 'Shop assistant avatar', realm: 'admin', folder: () => 'platform/shop/assistants/avatars', maxBytes: 1 * MB, types: rasterTypes },
+  // A person's own profile photo: `target` is `customers/<id>` or `users/<id>` (`AvatarsService`). Public, as it is shown
+  // on their seller page; never an SVG.
+  avatar: { label: 'Profile photo', realm: 'person', folder: owner => `people/${owner}/avatars`, maxBytes: 2 * MB, types: rasterTypes },
   // Afrippa's admins, on Afrippa's own storage (`MediaStorage.forPlatform`).
   afrippa_bot_avatar: { label: 'Afrippa assistant avatar', realm: 'afrippa_admin', folder: () => 'afrippa/assistants/avatars', maxBytes: 1 * MB, types: rasterTypes },
 } satisfies Record<string, MediaPurpose>;

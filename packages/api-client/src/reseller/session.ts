@@ -16,6 +16,8 @@ export type User = {
   phone: string | null;
   phone_verified: boolean;
   has_password: boolean;
+  /** Udozo's API: their profile photo, or null for their initials. */
+  avatar_url?: string | null;
   created_at: string;
 };
 export type ResellerRef = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus };

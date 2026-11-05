@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { ShieldCheck } from "lucide-react";
-import { Badge, Button, Card, CodeInput, errorMessage, Field, Input, Notice, PageHeader } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CodeInput, errorMessage, Field, Input, Notice, PageHeader, ProfilePhotoCard } from "@bitocard/admin-ui";
 import { useAdmin } from "@bitocard/admin-ui/shell";
 import { type MfaSetup, useAdminAuthenticatorConfirmMutation, useAdminAuthenticatorSetupMutation, useAdminUpdateProfileMutation } from "@bitocard/api-client/admin";
 import { UdozoShell } from "@/components/shell";
@@ -164,6 +164,7 @@ export default function AccountPage() {
           </div>
           <p className="text-xs text-subtle">A super admin changes your roles in Settings &gt; Team.</p>
         </Card>
+        <ProfilePhotoCard realm="admin" name={admin.name} url={admin.avatar_url} />
         <NameCard />
         <TwoStep />
       </div>

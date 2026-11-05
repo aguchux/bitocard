@@ -27,7 +27,7 @@ export type AdminRole = (typeof adminRoles)[number];
 /** Udozo's API also names the admin apart (`first_name`, `last_name`, as on their ID) and says whether they confirmed it. */
 type NamedApart = { first_name?: string; last_name?: string | null; name_confirmed?: boolean };
 
-export type Admin = { object: 'admin'; id: string; name: string; email: string; roles: AdminRole[]; authenticator?: boolean; authenticator_required?: boolean } & NamedApart;
+export type Admin = { object: 'admin'; id: string; name: string; email: string; /** Udozo's API: their profile photo, or null for their initials. */ avatar_url?: string | null; roles: AdminRole[]; authenticator?: boolean; authenticator_required?: boolean } & NamedApart;
 /** `step_up_until`: sensitive and money actions are open on this session until then (after the authenticator code), else null. */
 export type AdminSession = { object: 'admin_session'; admin: Admin; recovery_codes?: string[]; step_up_until?: string | null };
 export type AdminStepUp = { object: 'admin_step_up'; step_up_until: string };

@@ -5,7 +5,7 @@ import type { ResellerRole } from './common';
 export type StaffRole = Exclude<ResellerRole, 'owner'>;
 export const staffRoles: StaffRole[] = ['admin', 'developer', 'finance', 'support'];
 
-export type TeamMember = { object: 'member'; user_id: string; name: string; email: string; role: ResellerRole; joined_at: string };
+export type TeamMember = { object: 'member'; user_id: string; name: string; email: string; /** Udozo's API: their profile photo. */ avatar_url?: string | null; role: ResellerRole; joined_at: string };
 export type Invitation = { object: 'invitation'; id: string; email: string; role: StaffRole; expires_at: string; created_at: string };
 export type Team = { object: 'team'; members: TeamMember[]; invitations: Invitation[] };
 export type InvitationAccepted = { object: 'membership_created'; reseller_id: string; role: StaffRole };

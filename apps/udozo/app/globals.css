@@ -2,6 +2,7 @@
 @import "@bitocard/ui/styles/tokens.css";
 @import "@bitocard/ui/styles/interactive.css";
 /* Shared components styled with Tailwind utilities. */
+@source "../../../packages/ui/src/avatar.tsx";
 @source "../../../packages/ui/src/handoff-ui.tsx";
 @source "../../../packages/ui/src/install-ui.tsx";
 @source "../../../packages/ui/src/phone-input.tsx";

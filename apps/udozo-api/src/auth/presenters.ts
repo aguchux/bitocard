@@ -13,6 +13,8 @@ export function presentUser(user: User) {
     phone: user.phone,
     phone_verified: user.phoneVerifiedAt !== null,
     has_password: user.passwordHash !== null,
+    /** Udozo: their profile photo, or null for their initials. */
+    avatar_url: user.avatarUrl ?? null,
     created_at: user.createdAt.toISOString(),
   };
 }

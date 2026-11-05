@@ -18,6 +18,7 @@ import { type ListingStatus, listingStatuses, readSku, skuPrefixPattern } from '
 import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFaults, SafePayService } from './safe-pay.service.js';
 import { ResaleService } from './resale.service.js';
 import { ProductOnly } from '../products/product.js';
+import { AvatarsService } from '../media/avatars.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -160,7 +161,7 @@ const adminInclude = {
   reports: { where: { status: 'open' }, select: { id: true, reason: true, details: true, createdAt: true } },
 } satisfies Prisma.ClassifiedListingInclude;
 
-const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
+const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, avatarUrl: true, sellerHandle: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
 
 /** The moderators' reads: listings with their seller (email included, admins only), flags and open reports. */
 @Injectable()
@@ -328,6 +329,9 @@ export class ClassifiedsAdminService {
       country: row.country,
       member_since: row.createdAt.toISOString(),
       phone_confirmed: Boolean(row.phoneVerifiedAt),
+      /** Their profile photo and the handle of their public seller page (`/<cc>/seller/<handle>`). */
+      avatar_url: row.avatarUrl,
+      handle: row.sellerHandle,
       suspended: Boolean(seller?.suspendedAt),
       suspended_reason: seller?.suspendedReason ?? null,
       suspended_at: seller?.suspendedAt?.toISOString() ?? null,
@@ -455,7 +459,20 @@ export class AdminClassifiedsController {
     private readonly admin: ClassifiedsAdminService,
     private readonly moderation: ModerationService,
     private readonly conversations: ConversationsService,
+    private readonly avatars: AvatarsService,
+    private readonly audit: AuditService,
   ) {}
+
+  /** Takes a seller's profile photo off (an abusive or misleading picture): their initials show again; audited. */
+  @Post('sellers/:customer/avatar/remove')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('operations')
+  async removeAvatar(@CurrentCaller() caller: Caller, @Param('customer', ParseUUIDPipe) customer: string, @Body() body: ReasonDto) {
+    const row = await this.admin.seller(customer);
+    await this.avatars.remove({ kind: 'customer', id: customer });
+    await this.audit.record({ actorId: adminId(caller), action: 'classifieds.seller_avatar_removed', targetType: 'customer', targetId: customer, before: { avatar_url: row.avatar_url }, after: { avatar_url: null, reason: body.reason } });
+    return this.admin.seller(customer);
+  }
 
   /** A reported chat, read in full (only once someone has reported it; every read is audited). */
   @Get('conversations/:id')

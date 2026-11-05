@@ -1,3 +1,4 @@
 @import "tailwindcss";
 @import "@bitocard/ui/styles/interactive.css";
 @import "@bitocard/admin-ui/styles.css";
+@source "../../../packages/ui/src/avatar.tsx";

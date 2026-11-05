@@ -11,7 +11,11 @@ import { extensions, type MediaPurposeKey, mediaPurposeKeys, mediaPurposes, purp
 import { MediaStorage, uploadLinkSeconds } from './storage.js';
 
 /** Who is uploading: an admin (platform files), one of Afrippa's admins (Afrippa's files) or a reseller (their own folder). */
-export type MediaActor = { realm: 'admin' | 'afrippa_admin'; userId: string | null } | { realm: 'reseller'; userId: string | null; resellerId: string };
+export type MediaActor =
+  | { realm: 'admin' | 'afrippa_admin'; userId: string | null }
+  | { realm: 'reseller'; userId: string | null; resellerId: string }
+  /** Someone uploading their own profile photo: a customer, or one of Seller HQ's or the admin's people. */
+  | { realm: 'person'; userId: string; owner: 'customers' | 'users' };
 
 /** Whose files an actor works with: Afrippa's admins only Afrippa's, everyone else only BitoCard's. */
 const platformOf = (actor: MediaActor): Platform => (actor.realm === 'afrippa_admin' ? 'afrippa' : 'bitocard');
@@ -65,7 +69,7 @@ export class MediaService {
   }
 
   /** Whether uploads are on, and what each purpose accepts (for the apps' upload buttons). */
-  settings(realm: 'admin' | 'afrippa_admin' | 'reseller') {
+  settings(realm: 'admin' | 'afrippa_admin' | 'reseller' | 'person') {
     return {
       object: 'media_settings' as const,
       configured: this.storageOf(realm === 'afrippa_admin' ? 'afrippa' : 'bitocard').configured(),
@@ -111,7 +115,7 @@ export class MediaService {
     const platform = platformOf(actor);
     const storage = this.storageOf(platform);
     const id = randomUUID();
-    const folder = purpose.folder(targetId, resellerId);
+    const folder = purpose.folder(actor.realm === 'person' ? `${actor.owner}/${actor.userId}` : targetId, resellerId);
     const key = storage.key(folder, `${id}.${extensions[contentType]}`);
     const upload = storage.presignUpload(storage.stagingKey(`${id}.${extensions[contentType]}`), contentType, input.size);
     const asset = await this.prisma.mediaAsset.create({
@@ -139,6 +143,8 @@ export class MediaService {
     // Admins manage platform files and can see resellers' (to remove abuse); resellers only their own; each product's
     // admins only that product's files.
     if (!asset || asset.platform !== platformOf(actor) || (actor.realm === 'reseller' && asset.resellerId !== actor.resellerId)) throw notFound();
+    // A person's own photos only: never someone else's, nor any other file.
+    if (actor.realm === 'person' && (asset.purpose !== 'avatar' || asset.uploadedById !== actor.userId)) throw notFound();
     return asset;
   }
 
@@ -177,7 +183,7 @@ export class MediaService {
     }
     const claimed = await this.prisma.mediaAsset.updateMany({ where: { id, status: 'pending' }, data: { status: 'ready', width: info!.width, height: info!.height, completedAt: new Date() } });
     const ready = await this.prisma.mediaAsset.findUniqueOrThrow({ where: { id } });
-    if (claimed.count && actor.realm !== 'reseller') {
+    if (claimed.count && actor.realm !== 'reseller' && actor.realm !== 'person') {
       await this.audit.record({ actorId: actor.userId, action: 'media.uploaded', targetType: 'media', targetId: id, after: presentMedia(ready) });
     }
     return presentMedia(ready);
@@ -219,7 +225,7 @@ export class MediaService {
     const add = (url: string | null, label: string) => {
       if (url && urls.includes(url)) uses.set(url, [...(uses.get(url) ?? []), label]);
     };
-    const [brands, products, suppliers, categories, stores, pages, registry, bots, shopBrands, banners] = await Promise.all([
+    const [brands, products, suppliers, categories, stores, pages, registry, bots, shopBrands, banners, customers, people] = await Promise.all([
       this.prisma.brand.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { imageUrl: { in: urls } }] }, select: { slug: true, logoUrl: true, imageUrl: true } }),
       this.prisma.product.findMany({ where: { imageUrl: { in: urls } }, select: { key: true, imageUrl: true } }),
       this.prisma.supplier.findMany({ where: { logoUrl: { in: urls } }, select: { code: true, logoUrl: true } }),
@@ -230,7 +236,11 @@ export class MediaService {
       this.prisma.supportBot.findMany({ where: { avatarUrl: { in: urls } }, select: { name: true, avatarUrl: true } }),
       this.prisma.classifiedBrand.findMany({ where: { logoUrl: { in: urls } }, select: { slug: true, logoUrl: true } }),
       this.prisma.classifiedBanner.findMany({ where: { imageUrl: { in: urls } }, select: { id: true, position: true, imageUrl: true } }),
+      this.prisma.customer.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
+      this.prisma.user.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
     ]);
+    for (const customer of customers) add(customer.avatarUrl, `customer:${customer.id}:avatar`);
+    for (const person of people) add(person.avatarUrl, `user:${person.id}:avatar`);
     for (const banner of banners) add(banner.imageUrl, `banner:${banner.position}:${banner.id}`);
     for (const brand of shopBrands) add(brand.logoUrl, `marketplace_brand:${brand.slug}`);
     for (const entry of registry) {
@@ -271,6 +281,16 @@ export class MediaService {
     await this.prisma.mediaAsset.delete({ where: { id } });
     if (actor.realm !== 'reseller') await this.audit.record({ actorId: actor.userId, action: 'media.deleted', targetType: 'media', targetId: id, before: presentMedia(asset) });
     return { object: 'media_asset' as const, id, deleted: true };
+  }
+
+  /** Removes a file from storage and the library, whatever uses it: for a person's photo they replaced or removed. */
+  async discardFile(id: string) {
+    const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
+    if (!asset) return;
+    await this.storageOf(asset.platform)
+      .remove(asset.key)
+      .catch(error => this.logger.warn(`Could not remove ${asset.key}: ${error}`));
+    await this.prisma.mediaAsset.deleteMany({ where: { id } });
   }
 
   /** Daily: removes uploads that were started but never completed, an hour after their link expired. */

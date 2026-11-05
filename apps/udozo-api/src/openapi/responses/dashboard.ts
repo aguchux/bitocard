@@ -57,6 +57,7 @@ const userExample = {
   phone: '+2348031234567',
   phone_verified: true,
   has_password: true,
+  avatar_url: null,
   created_at: '2026-09-14T09:12:44.000Z',
 };
 
@@ -231,6 +232,7 @@ const schemas = {
       phone: nullableStr('Their mobile number in E.164 form (for example `+2348031234567`), or null. Only a verified number signs in.'),
       phone_verified: bool('Whether the mobile number has been confirmed by SMS code, so it can be used to sign in.'),
       has_password: bool('Whether the account has a password. People who signed up with Google have none until they set one with "Forgot password".'),
+      avatar_url: nullableStr('Their profile photo (a face, logo or icon), or null to show their initials.', { format: 'uri' }),
       created_at: time('When the account was created.'),
     },
     'A person signed in to SHQ. One person can belong to several reseller accounts.',

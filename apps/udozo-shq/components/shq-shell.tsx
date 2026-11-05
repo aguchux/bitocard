@@ -13,7 +13,7 @@ function ShqAccountMenu() {
   const [signOut, signingOut] = useSignOut();
   const others = memberships.filter(item => item.reseller.id !== membership.reseller.id);
   return (
-    <AccountMenu name={user.name} email={user.email} detail={`${membership.reseller.name} · ${humanise(membership.role)}`} signingOut={signingOut} onSignOut={signOut}>
+    <AccountMenu name={user.name} email={user.email} avatarUrl={user.avatar_url} detail={`${membership.reseller.name} · ${humanise(membership.role)}`} signingOut={signingOut} onSignOut={signOut}>
       {others.length
         ? others.map(item => (
             <button

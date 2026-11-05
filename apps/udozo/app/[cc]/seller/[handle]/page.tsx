@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, MapPin, PackageOpen, ShieldCheck, Store } from "lucide-react";
-import { badgeLabels, nameInitials, placePath, sellerPath, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopViewer } from "@bitocard/api-client/classifieds";
+import { badgeLabels, placePath, sellerPath, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopViewer } from "@bitocard/api-client/classifieds";
+import { Avatar } from "@bitocard/ui/avatar";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ShopIcon } from "@/components/icon";
 import { JsonLd } from "@/components/json-ld";
@@ -96,10 +97,9 @@ export default async function SellerPage({ params, searchParams }: Props) {
           <span className="absolute top-6 left-8 size-16 rounded-full border border-white/15" />
         </div>
         <div className="grid gap-4 px-4 pb-5 sm:px-6">
-          <div className="-mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">
-            <span className="grid size-24 place-items-center rounded-full bg-navy-900 text-3xl font-extrabold tracking-tight text-white ring-4 ring-white sm:size-28 sm:text-4xl" aria-hidden="true">
-              {nameInitials(profile.name)}
-            </span>
+          {/* Drawn above the banner (it is positioned, so it would otherwise paint over the photo's top half). */}
+          <div className="relative z-10 -mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">
+            <Avatar name={profile.name} url={profile.avatar_url} label={profile.avatar_url ? `${profile.name}'s photo` : undefined} className="size-24 text-3xl font-extrabold tracking-tight shadow-md ring-4 ring-white sm:size-28 sm:text-4xl" />
             <SellerShare url={new URL(path, origin).href} name={profile.name} />
           </div>
           <div className="grid gap-2">

@@ -54,6 +54,8 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     sex: (customer.sex ?? null) as CustomerSex | null,
     /** Udozo: Personalise what I see (docs/UDOZO_PERSONALISATION_PLAN.md); off, nothing is recorded about what they look at. */
     personalisation: !customer.personalisationOffAt,
+    /** Udozo: their profile photo, or null for their initials. */
+    avatar_url: customer.avatarUrl ?? null,
     created_at: customer.createdAt.toISOString(),
   };
 }

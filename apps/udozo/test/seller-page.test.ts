@@ -116,6 +116,10 @@ describe("a seller's page", () => {
   it("shows who they are, their figures, what they sell and where, and their listings", async () => {
     const html = await page();
     expect(html.querySelector("h1")?.textContent).toBe("Chinedu O.");
+    // Initials until they add a photo, drawn above the banner (a positioned block), never under it.
+    const head = html.querySelector('[aria-labelledby="seller-name"] .-mt-12');
+    expect(head?.className.split(" ")).toEqual(expect.arrayContaining(["relative", "z-10"]));
+    expect(head?.textContent).toContain("CO");
     expect(html.textContent).toContain("On Udozo since March 2026");
     expect(html.textContent).toContain("Sells in Lagos and Ogun");
     expect([...html.querySelectorAll('[aria-label="Checks"] li')].map(item => item.textContent?.trim())).toEqual(["Phone confirmed", "ID checked"]);
@@ -134,6 +138,13 @@ describe("a seller's page", () => {
     expect([...html.querySelectorAll('[aria-labelledby="contact"] .hidden')].some(node => node.textContent?.includes("Report this listing"))).toBe(true);
     const scripts = [...html.querySelectorAll('script[type="application/ld+json"]')].map(script => JSON.parse(script.textContent ?? "{}"));
     expect(scripts.some(data => data["@type"] === "ProfilePage" && data.mainEntity.name === "Chinedu O.")).toBe(true);
+  });
+
+  it("shows their photo when they have one", async () => {
+    api.profile = profile({ avatar_url: "https://media.test/me.jpg" });
+    const html = await page();
+    expect(html.querySelector('[aria-labelledby="seller-name"] img')?.getAttribute("src")).toBe("https://media.test/me.jpg");
+    expect(html.querySelector('[aria-labelledby="seller-name"] img')?.getAttribute("alt")).toBe("Chinedu O.'s photo");
   });
 
   it("filters by one of their categories with a sort and a page, and ignores anything else in the address", async () => {
