@@ -159,13 +159,13 @@ describe("the account's places", () => {
 
   test("listings, messages, requests, buy orders, Safe pay orders, favourites, the wallet, Safe pay, payouts and the profile; Messages badged with its unread count", () => {
     const places = accountPlaces({ ...none, unread: 3, requests: 2 });
-    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Requests", "Buy orders", "Safe pay orders", "Favourites", "Wallet", "Safe pay", "Payouts", "Profile"]);
+    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Requests", "Buy orders", "Safe pay orders", "Reviews", "Favourites", "Wallet", "Safe pay", "Payouts", "Profile"]);
     expect(places.find(place => place.label === "Messages")?.badge).toBe(3);
     expect(places.find(place => place.label === "Requests")?.badge).toBe(2);
     expect(accountPlaces(none).find(place => place.label === "Requests")?.badge).toBeUndefined();
     expect(accountPlaces({ ...none, buyOrders: 4 }).find(place => place.label === "Buy orders")?.badge).toBe(4);
     expect(currentPlace(places, `/account/buy-orders/${order}`)).toBe("/account/buy-orders");
-    expect(places.map(place => place.href)).toEqual(["/account", "/account/messages", "/account/requests", "/account/buy-orders", "/account/orders", "/account/favourites", "/account/wallet", "/account/safe-pay", "/account/payouts", "/account/profile"]);
+    expect(places.map(place => place.href)).toEqual(["/account", "/account/messages", "/account/requests", "/account/buy-orders", "/account/orders", "/account/reviews", "/account/favourites", "/account/wallet", "/account/safe-pay", "/account/payouts", "/account/profile"]);
   });
 
   test("the current place follows the address: a listing, a chat or an order keeps its place; /account only for itself", () => {
@@ -184,7 +184,7 @@ describe("the account's places", () => {
   test("My Resellers shows once resellers carry the supplier's listings, badged with what waits there", () => {
     expect(accountPlaces(none).map(place => place.label)).not.toContain("My Resellers");
     const places = accountPlaces({ unread: 0, resellers: { count: 2, waiting: 3 } });
-    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Requests", "Buy orders", "Safe pay orders", "Favourites", "My Resellers", "Wallet", "Safe pay", "Payouts", "Profile"]);
+    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Requests", "Buy orders", "Safe pay orders", "Reviews", "Favourites", "My Resellers", "Wallet", "Safe pay", "Payouts", "Profile"]);
     expect(places.find(place => place.label === "My Resellers")?.badge).toBe(3);
     expect(currentPlace(places, `/account/resellers/${listing}`)).toBe("/account/resellers");
   });
@@ -207,10 +207,10 @@ describe("the seller's links and market", () => {
   });
 
   test("the badges come from the unread counts; nothing to show while the API cannot be reached", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => reply(url.includes("contact-requests") ? { pending: 5 } : url.includes("buy-orders") ? { object: "list", data: [], waiting: 2 } : { unread: 4, resellers: 2, resellers_waiting: 1 })));
-    expect(await accountCounts()).toEqual({ unread: 4, resellers: { count: 2, waiting: 1 }, requests: 5, buyOrders: 2 });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => reply(url.includes("contact-requests") ? { pending: 5 } : url.includes("buy-orders") ? { object: "list", data: [], waiting: 2 } : url.includes("purchases") ? { object: "list", data: [], to_review: 3 } : { unread: 4, resellers: 2, resellers_waiting: 1 })));
+    expect(await accountCounts()).toEqual({ unread: 4, resellers: { count: 2, waiting: 1 }, requests: 5, buyOrders: 2, reviews: 3 });
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
-    expect(await accountCounts()).toEqual({ unread: 0, resellers: { count: 0, waiting: 0 }, requests: 0, buyOrders: 0 });
+    expect(await accountCounts()).toEqual({ unread: 0, resellers: { count: 0, waiting: 0 }, requests: 0, buyOrders: 0, reviews: 0 });
   });
 });
 

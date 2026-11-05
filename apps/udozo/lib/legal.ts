@@ -208,6 +208,23 @@ const terms: LegalDocument = {
       ],
     },
     {
+      id: "reviews",
+      heading: "9b. Reviews and ratings",
+      body: [
+        "Where reviews are open, a buyer who completed a purchase (a Safe pay order released to the seller, or a buy order the seller marked sold) can review the seller once for it, within the time shown (30 days unless the market says otherwise): positive or negative, and neutral where the market offers it. A negative review says what went wrong.",
+        {
+          list: [
+            "Reviews are public on the seller's page and their listings, with the reviewer's first name and initial, their photo if they have one, the item and the month. A seller's positive share counts the last 12 months, each buyer once (their latest review), and leaves neutral reviews out.",
+            "Each review is a conversation: the seller can reply, the reviewer can add to it, and other buyers who bought the same item (the same brand and model, else the same listing) from the same seller in the last 12 months can say whether they agree. Each person may write a few times, and a conversation closes after 12 months.",
+            "A review can be changed three times within 30 days, or withdrawn. Earlier versions are kept for Udozo's moderators, and a review changed after the seller replied says so.",
+            "Not allowed: reviews of purchases that did not happen, reviewing yourself or someone you work with, reviews paid for or given in exchange for anything; sellers offering refunds, discounts or gifts to change or remove a review, or pressuring a buyer; buyers asking for anything in exchange for a good review or for removing a bad one; contact details, links, other people's personal details, threats or abuse. Contact details and links are hidden automatically.",
+            "Anyone can report a review or a reply. Udozo's moderators read reported reviews, and may hold a review before it shows (for example from a new account), remove it or a reply, close a conversation, or stop someone writing reviews (for 180 days for faking or extortion). We tell the reviewer when their review is removed and why; ask us to look again through Contact us.",
+            "Reviews are people's opinions, not Udozo's. They do not change how listings are ranked, and Udozo does not edit them, except to hide contact details and links.",
+          ],
+        },
+      ],
+    },
+    {
       id: "assistants",
       heading: "10. Shop assistants",
       body: [
@@ -644,6 +661,7 @@ const privacy: LegalDocument = {
             "Chats: messages, photos (encrypted, in private storage, seen only by the two of you), offers, when each side read them, blocks, and how fast sellers reply. A moderator reads a chat only when one of you reports it, or when it matters to a Safe pay dispute, and each reading is recorded.",
             "Interest in listings: the listings you save, and that you started a chat, asked for a seller's contact details or a call back, or called a seller.",
             "Contact requests and call backs: who asked whom, about which listing, the note written (numbers and links hidden) and the answer. When a seller shares their contact, the buyers they shared it with.",
+            "Purchases and reviews: each completed purchase (what was bought, from whom and when) as the right to review it; your reviews, the parts you marked, their earlier versions, your replies in reviews' conversations (contact details and links hidden), the reports you make about reviews and what moderators decided. Reviews and replies are public with your first name and initial and your photo if you have one.",
             "Buy orders: who asked to buy which listing, the price asked and any price the seller offered back, how many, the notes and meeting place written (numbers and links hidden), each step and when it was taken (accepted, cancelled, marked sold, said bought, said not bought, and why), and when deadlines were reminded. Each step also shows in your chat with the other person.",
             "Calls: who called whom, about which listing, when it rang, was answered and ended, and how. The connection details the two browsers swap are deleted when the call ends. Calls are not recorded. While you have udozo.com open signed in, when you last had it open, so buyers can see you are there.",
             "Reports and safety: reports you make or that are made about you, our checks and reviews of listings, strikes and any suspension, with its reason.",
@@ -745,7 +763,8 @@ const privacy: LegalDocument = {
               ["Safe pay and store orders, disputes, store reports and payouts", "As long as accounting and tax laws require, usually six years after the order."],
               ["Order chats on a reseller's store", "12 months after the order ends."],
               ["Contact requests and call backs", "12 months after they are answered or cancelled. A shared contact stays shared until the seller stops sharing it or closes their account."],
-              ["Buy orders", "Two years after they end, as the record of who bought what (reviews of sellers will rely on it)."],
+              ["Buy orders", "Two years after they end, as the record of who bought what (reviews of sellers rely on it)."],
+              ["Reviews and their replies", "While both accounts are open. A withdrawn review's words are deleted after 30 days; reviews and replies Udozo removed, and decided reports, after two years. A purchase never reviewed: 13 months."],
               ["Calls", "Who called whom and when: 90 days. The connection details: deleted when the call ends. When you last had udozo.com open: replaced each time."],
               ["Buyers' details on store orders", "Shown to the supplier and reseller until 30 days after the order ends."],
               ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years."],

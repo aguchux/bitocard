@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AtSign, BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, MapPin, PackageOpen, ShieldCheck, Store } from "lucide-react";
-import { badgeLabels, placePath, sellerPath, sellerSlug, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopViewer, type UsernameStatus } from "@bitocard/api-client/classifieds";
+import { AtSign, BadgeCheck, CalendarDays, Star, ChevronLeft, ChevronRight, MapPin, PackageOpen, ShieldCheck, Store } from "lucide-react";
+import { badgeLabels, placePath, sellerPath, sellerSlug, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopSellerReviews, type ShopViewer, type UsernameStatus } from "@bitocard/api-client/classifieds";
 import { Avatar } from "@bitocard/ui/avatar";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ShopIcon } from "@/components/icon";
@@ -15,6 +15,8 @@ import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { gifSizes, sellerCardUrl } from "@/lib/seller-card";
 import { isSellerKey, placesText, queryString, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
 import { usernameNudge } from "@/lib/username";
+import { ReviewCard, ReviewSummaryBar } from "@/components/reviews/review-view";
+import { readReviewFilters, reviewPath, reviewsHref, reviewPageSize, sellerReviewsQuery, summaryText } from "@/lib/reviews";
 import { breadcrumbJsonLd, itemListJsonLd, noindexFollow, sellerJsonLd } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string; handle: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -50,7 +52,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     .join(", ")}${profile.categories.length ? ". " : ""}Chat with the seller and pay with Safe pay.`;
   const query = await searchParams;
   // Indexed while they have something for sale, and only the page itself (not filtered or later pages).
-  const filtered = Object.keys(query).some(key => ["category", "sort", "page"].includes(key));
+  const filtered = Object.keys(query).some(key => ["category", "sort", "page", "rv_product", "rv_sort", "rv_page"].includes(key));
   // The animated card first (WhatsApp and others show its first frame, the same card), then the still one, which X uses.
   const origin = siteOrigin();
   const alt = `${profile.name} on Udozo: ${profile.active_listings} listing${profile.active_listings === 1 ? "" : "s"} for sale`;
@@ -86,10 +88,14 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const filters = readSellerFilters(query, profile);
   const customer = await currentCustomer();
   const firstListing = profile.contact_listings[0];
-  const [listings, viewer] = await Promise.all([
+  const reviewFilters = readReviewFilters(query);
+  const [listings, viewer, reviewPage] = await Promise.all([
     shopApi<ShopSearch>(sellerListingsQuery(cc, profile.handle, filters)),
     customer && firstListing ? customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${firstListing.id}/viewer`) : null,
+    // Reviews where they are open in the market (the profile's summary is null otherwise).
+    profile.reviews ? shopApi<ShopSellerReviews>(sellerReviewsQuery(profile.handle, reviewFilters)) : null,
   ]);
+  const reviews = reviewPage?.ok ? reviewPage.data : null;
   const firstViewer = viewer?.ok ? viewer.data : null;
   // The seller on their own page (their account's handle, else a listing of theirs, says so) with no username yet: what it takes to choose one.
   const own = (customer?.seller_handle ? customer.seller_handle === profile.handle : false) || Boolean(firstViewer?.own);
@@ -137,6 +143,11 @@ export default async function SellerPage({ params, searchParams }: Props) {
               <span className="inline-flex items-center gap-1.5">
                 <CalendarDays className="size-4" aria-hidden="true" /> On Udozo since {sinceText(profile.member_since)}
               </span>
+              {summaryText(profile.reviews) ? (
+                <a href="#reviews" className="inline-flex items-center gap-1.5 font-semibold text-navy-900 hover:underline">
+                  <Star className="size-4 fill-amber-400 text-amber-500" aria-hidden="true" /> {summaryText(profile.reviews)}
+                </a>
+              ) : null}
               {where ? (
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="size-4" aria-hidden="true" /> Sells in {where}
@@ -307,6 +318,64 @@ export default async function SellerPage({ params, searchParams }: Props) {
               </nav>
             ) : null}
           </section>
+          {reviews ? (
+            <section id="reviews" aria-labelledby="reviews-title" className="mt-8 grid gap-4">
+              <h2 id="reviews-title" className="text-xl font-extrabold">
+                Reviews of {profile.name}
+              </h2>
+              <ReviewSummaryBar summary={reviews.summary} />
+              {reviews.products.length > 1 ? (
+                <nav aria-label="Reviews by item" className="flex flex-wrap gap-2">
+                  <Link href={reviewsHref(path, reviewFilters, { product: null })} aria-current={!reviewFilters.product ? "page" : undefined} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${!reviewFilters.product ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white"}`}>
+                    All items
+                  </Link>
+                  {reviews.products.slice(0, 12).map(item => (
+                    <Link key={item.key} href={reviewsHref(path, reviewFilters, { product: item.key })} aria-current={reviewFilters.product === item.key ? "page" : undefined} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${reviewFilters.product === item.key ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white"}`}>
+                      {item.label} ({item.count})
+                    </Link>
+                  ))}
+                </nav>
+              ) : null}
+              {reviews.total ? (
+                <>
+                  <p className="flex gap-3 text-sm">
+                    <Link href={reviewsHref(path, reviewFilters, { sort: "newest" })} aria-current={reviewFilters.sort === "newest" ? "page" : undefined} className={reviewFilters.sort === "newest" ? "font-bold" : "text-navy-600 hover:underline"}>
+                      Newest
+                    </Link>
+                    <Link href={reviewsHref(path, reviewFilters, { sort: "negative" })} aria-current={reviewFilters.sort === "negative" ? "page" : undefined} className={reviewFilters.sort === "negative" ? "font-bold" : "text-navy-600 hover:underline"}>
+                      Negatives first
+                    </Link>
+                  </p>
+                  <ul className="grid gap-3 lg:grid-cols-2">
+                    {reviews.data.map(review => (
+                      <li key={review.id}>
+                        <ReviewCard review={review} href={reviewPath(path, review.id)} />
+                      </li>
+                    ))}
+                  </ul>
+                  {reviews.total > reviewPageSize ? (
+                    <nav aria-label="Review pages" className="flex items-center justify-center gap-3 text-sm">
+                      {reviewFilters.page > 1 ? (
+                        <Link href={reviewsHref(path, reviewFilters, { page: reviewFilters.page - 1 })} className="inline-flex h-10 items-center rounded-xl border border-navy-200 bg-white px-3.5 font-semibold">
+                          Newer
+                        </Link>
+                      ) : null}
+                      <span className="text-navy-600">
+                        Page {reviewFilters.page} of {Math.ceil(reviews.total / reviewPageSize)}
+                      </span>
+                      {reviewFilters.page * reviewPageSize < reviews.total ? (
+                        <Link href={reviewsHref(path, reviewFilters, { page: reviewFilters.page + 1 })} className="inline-flex h-10 items-center rounded-xl border border-navy-200 bg-white px-3.5 font-semibold">
+                          Older
+                        </Link>
+                      ) : null}
+                    </nav>
+                  ) : null}
+                </>
+              ) : (
+                <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-600">No reviews yet. Buyers can rate {profile.name} after buying with Safe pay or a buy order.</p>
+              )}
+            </section>
+          ) : null}
         </div>
 
         <aside className="grid content-start gap-4 px-4 sm:px-0 lg:sticky lg:top-4">

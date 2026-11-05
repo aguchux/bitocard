@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { BadgeCheck, ChevronRight, MapPin, ShieldCheck } from "lucide-react";
+import { BadgeCheck, ChevronRight, MapPin, ShieldCheck, Star } from "lucide-react";
 import {
   brandFeatureKey,
   badgeLabels,
@@ -39,6 +39,8 @@ import { breadcrumbJsonLd, listingJsonLd, productMetaTags } from "@/lib/seo";
 import type { ShopViewer } from "@bitocard/api-client/classifieds";
 import type { HomeCard } from "@bitocard/api-client/home";
 import { ListingView } from "@/components/listing-view";
+import { ReviewCard } from "@/components/reviews/review-view";
+import { reviewPath, reviewsHref, summaryText } from "@/lib/reviews";
 
 type Props = { params: Promise<{ cc: string; listing: string }> };
 
@@ -242,6 +244,11 @@ export default async function ListingPage({ params }: Props) {
                   On Udozo since {new Date(listing.seller.member_since).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
                   {listing.seller.response_rate !== null ? ` · answers ${listing.seller.response_rate}% of chats` : ""}
                 </span>
+                {summaryText(listing.seller.reviews) && sellerSlug(listing.seller) ? (
+                  <Link href={`${sellerPath(cc, sellerSlug(listing.seller))}#reviews`} className="inline-flex items-center gap-1 text-xs font-semibold text-navy-900 hover:underline">
+                    <Star className="size-3.5 fill-amber-400 text-amber-500" aria-hidden="true" /> {summaryText(listing.seller.reviews)}
+                  </Link>
+                ) : null}
               </span>
             </div>
             {listing.seller.badges.length ? (
@@ -266,6 +273,19 @@ export default async function ListingPage({ params }: Props) {
               </span>
             )}
           </section>
+          {listing.product_reviews?.length && sellerSlug(listing.seller) ? (
+            <section aria-labelledby="item-reviews" className="grid gap-3">
+              <h2 id="item-reviews" className="font-bold">
+                Reviews of this item from {listing.seller.name}
+              </h2>
+              {listing.product_reviews.map(review => (
+                <ReviewCard key={review.id} review={review} href={reviewPath(sellerPath(cc, sellerSlug(listing.seller)), review.id)} />
+              ))}
+              <Link href={reviewsHref(sellerPath(cc, sellerSlug(listing.seller)), { product: listing.product_reviews[0]!.product.key, sort: "newest", page: 1 }, {})} className="text-sm font-semibold text-brand-700 hover:underline">
+                All reviews of this item
+              </Link>
+            </section>
+          ) : null}
           <section aria-labelledby="safe-trade" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4 text-mint-700">
             <h2 id="safe-trade" className="flex items-center gap-2 font-bold">
               <ShieldCheck className="size-5" aria-hidden="true" /> Safe trade

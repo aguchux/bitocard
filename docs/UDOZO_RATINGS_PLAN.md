@@ -1,9 +1,14 @@
 # Udozo seller ratings: three kinds
 
-Status: **phase 0 (buy orders) built, 5 November 2026**; phases 1 to 3 planned. Phase 0 as built differs from the
-plan below in one way: a buy order is always paid in person (`payment` and `order_id` are not stored). Where Safe pay
-is open, the listing still offers Buy with Safe pay beside Buy this, as its own order; both kinds of completed order
-will open reviews.
+Status: **phases 0 (buy orders) and 1 (post-purchase reviews) built, 5 November 2026**; phases 2 and 3 planned.
+Phase 0 as built differs from the plan below in one way: a buy order is always paid in person (`payment` and
+`order_id` are not stored). Where Safe pay is open, the listing still offers Buy with Safe pay beside Buy this, as its
+own order; both kinds of completed order open reviews. Phase 1 as built differs in these ways: the seller summaries
+are worked out when read (`ReviewStatsService`, last 12 months, one voice per reviewer) instead of kept in a
+`classified_seller_review_stats` table, which phase 3's nightly job can add; udozo.com's Account > Reviews has To
+review, Your reviews and About you (no To confirm tab, since buyers void a buy order from its own page); replies can
+be deleted but not edited from udozo.com yet (the API allows edits for 15 minutes); and the chat report reason
+`review_pressure` is not added yet.
 
 ## Context
 Udozo (udozo.com) has no ratings or reviews today. Buyers judge sellers only by two badges (phone confirmed, ID checked) and "answers N% of chats". The owner wants three kinds of ratings:

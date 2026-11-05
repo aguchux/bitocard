@@ -5,6 +5,7 @@ import { ArrowLeft, MessageCircle } from "lucide-react";
 import { shopMoney, type ShopBuyOrder } from "@bitocard/api-client/classifieds";
 import { BuyOrderControls, BuyOrderStatus } from "@/components/buy-order";
 import { Thumb } from "@/components/account/thumb";
+import { PurchaseReview } from "@/components/reviews/purchase-review";
 import { requireSeller } from "@/lib/account";
 import { buyOrderNext } from "@/lib/buy-orders";
 import { customerApi } from "@/lib/customer";
@@ -63,6 +64,7 @@ export default async function BuyOrderPage({ params }: Props) {
       </section>
       <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-800">{buyOrderNext(order)}</p>
       <BuyOrderControls order={order} />
+      {!seller && order.status === "completed" ? <PurchaseReview buyOrderId={order.id} /> : null}
       {order.meet_note || order.note ? (
         <dl className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           {order.meet_note ? (

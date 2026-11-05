@@ -14,7 +14,7 @@ import {
 } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
 
-type Limits = Omit<ClassifiedMarketSettings, "object" | "country">;
+type Limits = Omit<ClassifiedMarketSettings, "object" | "country" | "reviews_neutral">;
 
 const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: number; max: number; fallback?: number }> = [
   { key: "listing_days", label: "Days an ad stays live", hint: "Then it expires; the seller can renew it.", min: 1, max: 365 },
@@ -34,6 +34,8 @@ const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: 
   { key: "buy_meet_days", label: "Days to meet once accepted", hint: "The buyer and seller meet and pay in person within this time. 1 to 30.", min: 1, max: 30, fallback: 7 },
   { key: "buy_open_per_buyer", label: "Open buy orders per buyer", hint: "Waiting, countered or accepted at once. 1 to 100.", min: 1, max: 100, fallback: 10 },
   { key: "buy_requests_per_day", label: "Buy orders a buyer may send a day", hint: "1 to 200.", min: 1, max: 200, fallback: 20 },
+  { key: "review_window_days", label: "Days to review a purchase", hint: "From the purchase completing; reminders go on days 2 and 7. 1 to 180.", min: 1, max: 180, fallback: 30 },
+  { key: "review_min_shown", label: "Reviews before the positive share shows", hint: "Counted reviews (positive and negative) in the last 12 months. 1 to 50.", min: 1, max: 50, fallback: 3 },
 ];
 
 /** What the market has saved for a field; a setting the API does not send yet reads as its default. */
@@ -80,14 +82,16 @@ function LimitsForm({ saved, changes }: { saved: ClassifiedMarketSettings; chang
   const [values, setValues] = useState<Record<keyof Limits, string>>(() => Object.fromEntries(limitFields.map(field => [field.key, String(savedValue(saved, field))])) as Record<keyof Limits, string>);
   const [update, updating] = useUpdateClassifiedMarketSettingsMutation();
   const [done, setDone] = useState(false);
+  const savedNeutral = saved.reviews_neutral ?? false;
+  const [neutral, setNeutral] = useState(savedNeutral);
   const parsed = Object.fromEntries(limitFields.map(field => [field.key, /^\d+$/.test(values[field.key].trim()) ? Number(values[field.key]) : null])) as Record<keyof Limits, number | null>;
   const invalid = limitFields.find(field => parsed[field.key] === null || parsed[field.key]! < field.min || parsed[field.key]! > field.max);
   const changed = limitFields.filter(field => parsed[field.key] !== savedValue(saved, field));
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (invalid || !changed.length) return;
-    await update({ country: saved.country, ...Object.fromEntries(changed.map(field => [field.key, parsed[field.key]])) }).unwrap();
+    if (invalid || (!changed.length && neutral === savedNeutral)) return;
+    await update({ country: saved.country, ...Object.fromEntries(changed.map(field => [field.key, parsed[field.key]])), ...(neutral !== savedNeutral ? { reviews_neutral: neutral } : {}) }).unwrap();
     setDone(true);
   };
 
@@ -103,11 +107,27 @@ function LimitsForm({ saved, changes }: { saved: ClassifiedMarketSettings; chang
           </Field>
         ))}
       </div>
+      <label className="flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4"
+          disabled={!changes}
+          checked={neutral}
+          onChange={event => {
+            setNeutral(event.target.checked);
+            setDone(false);
+          }}
+        />
+        <span>
+          <span className="block font-semibold text-ink">Offer Neutral in reviews</span>
+          <span className="block text-muted">Off, buyers choose Positive or Negative. Neutral reviews are listed but never counted in the positive share.</span>
+        </span>
+      </label>
       {invalid ? <p className="text-sm text-red-700">{`${invalid.label}: a whole number from ${invalid.min} to ${invalid.max}.`}</p> : null}
       {updating.error ? <Notice tone="red">{errorMessage(updating.error)}</Notice> : null}
       {done ? <Notice tone="green">Saved. New ads follow these limits.</Notice> : null}
       {changes ? (
-        <Button type="submit" loading={updating.isLoading} disabled={Boolean(invalid) || !changed.length}>
+        <Button type="submit" loading={updating.isLoading} disabled={Boolean(invalid) || (!changed.length && neutral === savedNeutral)}>
           Save limits
         </Button>
       ) : null}

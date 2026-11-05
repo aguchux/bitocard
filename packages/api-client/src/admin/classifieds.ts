@@ -176,6 +176,8 @@ export type ClassifiedSeller = {
   /** Udozo: until when their new buy orders are paused (3 voided in 90 days, or an admin), and why; null when not. */
   buy_orders_paused_until?: string | null;
   buy_orders_paused_reason?: string | null;
+  /** They cannot write reviews until then (a fake or extorting reviewer). */
+  reviews_blocked_until?: string | null;
   suspended: boolean;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -236,6 +238,10 @@ export type ClassifiedMarketSettings = {
   buy_open_per_buyer?: number;
   /** Buy orders a buyer may send a day (1 to 200, default 20). */
   buy_requests_per_day?: number;
+  /** Reviews: Neutral offered, days to review a purchase, counted reviews before the positive share shows. */
+  reviews_neutral?: boolean;
+  review_window_days?: number;
+  review_min_shown?: number;
 };
 
 /** A reported chat, read in full (every read is audited). */

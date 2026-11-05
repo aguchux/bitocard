@@ -17,12 +17,13 @@ import {
   useRemoveClassifiedSellerUsernameMutation,
   useSetClassifiedSellerSuspendedMutation,
   useUnpauseSellerBuyOrdersMutation,
+  useBlockReviewerMutation,
 } from "@bitocard/api-client/admin";
 import { Avatar } from "@bitocard/ui/avatar";
 import { Ban, Flag, HandCoins, Package } from "lucide-react";
 import { ListingCell, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
 
-type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username" | "pause" | "unpause";
+type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username" | "pause" | "unpause" | "block" | "unblock";
 
 /**
  * One Udozo seller: their ads, reports about them or their ads, and their Safe pay standing (strikes over 90
@@ -40,6 +41,7 @@ export default function ClassifiedSellerPage() {
   const [removeUsername] = useRemoveClassifiedSellerUsernameMutation();
   const [pause] = usePauseSellerBuyOrdersMutation();
   const [unpause] = useUnpauseSellerBuyOrdersMutation();
+  const [blockReviewer] = useBlockReviewerMutation();
   const [action, setAction] = useState<Action | null>(null);
   const [days, setDays] = useState("30");
   const daysId = useId();
@@ -52,6 +54,12 @@ export default function ClassifiedSellerPage() {
       return pause({ customer: id, reason, days: count }).unwrap();
     }
     if (chosen === "unpause") return unpause({ customer: id, reason }).unwrap();
+    if (chosen === "block") {
+      const count = /^\d+$/.test(days.trim()) ? Number(days) : 0;
+      if (count < 1 || count > 730) return Promise.reject(new Error("Days to block: a whole number from 1 to 730."));
+      return blockReviewer({ customer: id, blocked: true, reason, days: count }).unwrap();
+    }
+    if (chosen === "unblock") return blockReviewer({ customer: id, blocked: false, reason }).unwrap();
     if (chosen === "clear") return clear({ id, reason }).unwrap();
     if (chosen === "photo") return removePhoto({ id, reason }).unwrap();
     if (chosen === "username") return removeUsername({ id, reason }).unwrap();
@@ -129,6 +137,10 @@ export default function ClassifiedSellerPage() {
                     setDays("30");
                     setAction("pause");
                   }} onUnpause={() => setAction("unpause")} />
+                <Reviews seller={data} operations={operations} onBlock={() => {
+                    setDays("180");
+                    setAction("block");
+                  }} onUnblock={() => setAction("unblock")} />
                 <Reports seller={data} />
                 <Card>
                   <CardHeader title="Account" />
@@ -175,7 +187,7 @@ export default function ClassifiedSellerPage() {
               <ActionDialog
                 open
                 onClose={() => setAction(null)}
-                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?` }[action]}
+                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?`, block: `Stop ${data.name} writing reviews?`, unblock: `Let ${data.name} write reviews again?` }[action]}
                 description={
                   {
                     suspend: "They cannot post, and their live and waiting ads are removed from Udozo. Ads removed now stay removed when they come back.",
@@ -185,14 +197,21 @@ export default function ClassifiedSellerPage() {
                     username: `Their seller page goes back to its handle and they are told. Nobody can take "${data.username ?? ""}" for 90 days. They can choose another username; remove it again if it is not acceptable.`,
                     pause: "Buyers cannot send them new buy orders until the pause ends. Buy orders already open carry on.",
                     unpause: "Buyers can send them buy orders again at once.",
+                    block: "For fake reviews or using a review to pressure a seller. They cannot write reviews or reply in a review's conversation until the block ends. Reviews they wrote stay until you remove them.",
+                    unblock: "They can write reviews and reply again at once.",
                   }[action]
                 }
-                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", username: "Remove username", pause: "Pause buy orders", unpause: "Unpause buy orders" }[action]}
-                tone={action === "suspend" || action === "photo" || action === "username" || action === "pause" ? "danger" : "primary"}
+                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", username: "Remove username", pause: "Pause buy orders", unpause: "Unpause buy orders", block: "Block reviewing", unblock: "Unblock" }[action]}
+                tone={action === "suspend" || action === "photo" || action === "username" || action === "pause" || action === "block" ? "danger" : "primary"}
                 onConfirm={reason => confirm(action, reason)}
               >
                 {action === "pause" ? (
                   <Field label="Days to pause" hint="1 to 365." htmlFor={daysId}>
+                    <Input id={daysId} inputMode="numeric" value={days} onChange={event => setDays(event.target.value)} />
+                  </Field>
+                ) : null}
+                {action === "block" ? (
+                  <Field label="Days to block" hint="1 to 730." htmlFor={daysId}>
                     <Input id={daysId} inputMode="numeric" value={days} onChange={event => setDays(event.target.value)} />
                   </Field>
                 ) : null}
@@ -230,6 +249,32 @@ function BuyOrders({ seller, operations, onPause, onUnpause }: { seller: Classif
               Pause buy orders
             </Button>
           )
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** Reviews about them and by them, and whether they may write reviews (blocked for fake reviews or pressure). */
+function Reviews({ seller, operations, onBlock, onUnblock }: { seller: ClassifiedSellerDetail; operations: boolean; onBlock: () => void; onUnblock: () => void }) {
+  const until = seller.reviews_blocked_until ?? null;
+  const [now] = useState(() => Date.now());
+  const blocked = Boolean(until && new Date(until).getTime() > now);
+  return (
+    <Card>
+      <CardHeader title="Reviews" description="Buyers review sellers after a completed purchase." />
+      <div className="space-y-3 px-5 pb-5 text-sm sm:px-6">
+        {blocked ? <Badge tone="red">{`Blocked from reviewing until ${formatDateTime(until)}`}</Badge> : <Badge tone="green">Can write reviews</Badge>}
+        <AppLink href={`/classifieds/reviews?seller=${seller.id}`} className="block w-fit font-semibold text-brand-600 hover:underline">
+          Reviews about them
+        </AppLink>
+        <AppLink href={`/classifieds/reviews?reviewer=${seller.id}`} className="block w-fit font-semibold text-brand-600 hover:underline">
+          Reviews they wrote
+        </AppLink>
+        {operations ? (
+          <Button size="sm" variant="secondary" onClick={blocked ? onUnblock : onBlock}>
+            {blocked ? "Unblock reviewing" : "Block reviewing"}
+          </Button>
         ) : null}
       </div>
     </Card>

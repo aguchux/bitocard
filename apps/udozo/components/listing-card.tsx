@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- sellers' photos come from the media CDN at their own sizes; the card crops them. */
 import Link from "next/link";
-import { BadgeCheck, ImageIcon, Play, Truck } from "lucide-react";
+import { BadgeCheck, ImageIcon, Play, Star, Truck } from "lucide-react";
 import { conditionLabels, listingPath, postedAgo, shopPriceText, type ShopListingCard, type ShopResult, type ShopShowcaseCard } from "@bitocard/api-client/classifieds";
 import { Flag } from "./flag";
 
@@ -111,6 +111,11 @@ export function ListingRow({ card, now, position, menu = false }: { card: ShopRe
           {delivers ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-navy-50 px-2 py-0.5 font-semibold text-navy-700">
               <Truck className="size-3" aria-hidden="true" /> Delivers to you
+            </span>
+          ) : null}
+          {card.seller.rating ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
+              <Star className="size-3 fill-amber-400 text-amber-500" aria-hidden="true" /> {card.seller.rating.positive_pct}% positive
             </span>
           ) : null}
           {card.seller.badges.includes("id_checked") ? (

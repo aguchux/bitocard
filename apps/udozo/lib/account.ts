@@ -8,16 +8,18 @@ import { confirmationPending, type Customer, currentCustomer, customerApi, signI
 
 /** The badges for the account's places, or nothing to show while the API cannot be reached. */
 export async function accountCounts(): Promise<PlaceCounts> {
-  const [result, requests, buyOrders] = await Promise.all([
+  const [result, requests, buyOrders, reviews] = await Promise.all([
     customerApi<{ unread: number; resellers?: number; resellers_waiting?: number }>("GET", "/v1/classifieds/conversations/unread"),
     customerApi<{ pending: number }>("GET", "/v1/classifieds/me/contact-requests?status=pending&limit=1"),
     customerApi<{ waiting: number }>("GET", "/v1/classifieds/me/buy-orders?status=open&limit=1"),
+    customerApi<{ to_review: number }>("GET", "/v1/classifieds/me/purchases?state=to_review&limit=1"),
   ]);
   const waiting = requests.ok ? requests.data.pending : 0;
   const buying = buyOrders.ok ? buyOrders.data.waiting : 0;
+  const rating = reviews.ok ? reviews.data.to_review : 0;
   return result.ok
-    ? { unread: result.data.unread, resellers: { count: result.data.resellers ?? 0, waiting: result.data.resellers_waiting ?? 0 }, requests: waiting, buyOrders: buying }
-    : { unread: 0, resellers: { count: 0, waiting: 0 }, requests: waiting, buyOrders: buying };
+    ? { unread: result.data.unread, resellers: { count: result.data.resellers ?? 0, waiting: result.data.resellers_waiting ?? 0 }, requests: waiting, buyOrders: buying, reviews: rating }
+    : { unread: 0, resellers: { count: 0, waiting: 0 }, requests: waiting, buyOrders: buying, reviews: rating };
 }
 
 /** The customer's own market (their fixed country), where Udozo is open there; null otherwise. */

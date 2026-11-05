@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ShopConversations, ShopCourier, ShopDispute, ShopOrder, ShopReadiness, ShopWallet } from "@bitocard/api-client/classifieds";
 import { OrderDetail } from "@/components/account/order-detail";
+import { PurchaseReview } from "@/components/reviews/purchase-review";
 import { customerApi } from "@/lib/customer";
 import { orderActions, uuidPattern } from "@/lib/shop";
 import { requireSeller } from "@/lib/account";
@@ -34,17 +35,21 @@ export default async function ShopOrderPage({ params }: Props) {
   // with this buyer's name, linked only when no other buyer of the listing shares it). Resale orders have their own threads.
   const matches = chats?.ok ? chats.data.data.filter(item => item.listing.id === order.listing.id && item.with.name === order.with.name) : [];
   const chatHref = matches.length === 1 ? `/account/messages/${matches[0]!.id}` : null;
+  const reviewable = buyer && order.kind === "direct" && (order.status === "released" || order.status === "partly_refunded");
   return (
-    <OrderDetail
-      order={order}
-      actions={actions}
-      readiness={readiness?.ok ? readiness.data : null}
-      balance={wallet?.ok ? wallet.data.balance : null}
-      addFundsHref={`/account/wallet${order.currency === "USD" ? "?wallet=USD" : ""}`}
-      chatHref={chatHref}
-      couriers={couriers?.ok ? couriers.data.data : []}
-      dispute={dispute?.ok ? dispute.data : null}
-      back={{ href: `/account/orders${buyer ? "" : "?role=selling"}`, label: "Back to orders" }}
-    />
+    <div className="grid gap-5">
+      <OrderDetail
+        order={order}
+        actions={actions}
+        readiness={readiness?.ok ? readiness.data : null}
+        balance={wallet?.ok ? wallet.data.balance : null}
+        addFundsHref={`/account/wallet${order.currency === "USD" ? "?wallet=USD" : ""}`}
+        chatHref={chatHref}
+        couriers={couriers?.ok ? couriers.data.data : []}
+        dispute={dispute?.ok ? dispute.data : null}
+        back={{ href: `/account/orders${buyer ? "" : "?role=selling"}`, label: "Back to orders" }}
+      />
+      {reviewable ? <PurchaseReview orderId={order.id} /> : null}
+    </div>
   );
 }
