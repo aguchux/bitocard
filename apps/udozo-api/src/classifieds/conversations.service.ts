@@ -16,7 +16,7 @@ import { shopMessagesEmail } from '../notifications/templates.js';
 import { redact } from '../support/redact.js';
 import { addLead } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
-import { type ReportReason } from './moderation.service.js';
+import { type ChatReportReason } from './moderation.service.js';
 import { invalid, isOnShop, maxPriceMinor, priceText } from './rules.js';
 import { onlineAmong } from './presence.js';
 import { summary as buyOrderSummary } from './buy-orders/present.js';
@@ -278,7 +278,7 @@ export class ConversationsService {
   }
 
   /** Reports the other person from the chat; moderators may then read it. */
-  async report(customer: CustomerWithStore, id: string, input: { reason: ReportReason; details?: string }) {
+  async report(customer: CustomerWithStore, id: string, input: { reason: ChatReportReason; details?: string }) {
     await this.listings.sellerCountry(customer);
     const chat = await this.chatFor(customer, id);
     const side = this.sideOf(chat, customer.id)!;

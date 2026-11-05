@@ -11,6 +11,9 @@ import { invalid } from './rules.js';
 export const reviewFlags = ['first_listings', 'prohibited_words', 'price_low', 'photo_reused', 'posting_fast', 'reported'] as const;
 export type ReviewFlag = (typeof reviewFlags)[number];
 export const reportReasons = ['scam', 'prohibited', 'wrong_category', 'duplicate', 'sold', 'offensive', 'other'] as const;
+/** Chats may also be reported for pressure over a review: a seller offering a refund or discount to change one, or a buyer demanding something for one. */
+export const chatReportReasons = [...reportReasons, 'review_pressure'] as const;
+export type ChatReportReason = (typeof chatReportReasons)[number];
 export type ReportReason = (typeof reportReasons)[number];
 
 /** A price below this share of the category's usual (median) price looks like bait. */

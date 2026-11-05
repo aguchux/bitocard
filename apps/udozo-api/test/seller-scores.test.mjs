@@ -72,6 +72,14 @@ async function live(seller, title, price = 25000000) {
   return submitted;
 }
 
+/** A listing put live directly (near-identical test listings would otherwise wait for review). */
+async function liveNow(seller, title, price) {
+  const [cat, area] = await Promise.all([prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } }), prisma.classifiedArea.findFirstOrThrow({ where: { slug: 'gwarinpa' } })]);
+  const draft = (await seller.post('/v1/classifieds/listings', { title, price, condition: 'used', category_id: cat.id, area_id: area.id })).json;
+  await prisma.classifiedListing.update({ where: { id: draft.id }, data: { status: 'active', publishedAt: new Date() } });
+  return draft;
+}
+
 describe('the rules', () => {
   test('response time, costing, bands, the overall needs weight behind it, and the public view', () => {
     assert.equal(rules.responseScore(10 * minuteMs), 100);
@@ -207,5 +215,24 @@ describe('a seller scored', () => {
 
     await prisma.supportBot.update({ where: { id: anjio }, data: { limits: { monthly_budget_usd: 0.000001, summaries_daily: 10, summary_budget_share: 0.25 } } });
     assert.equal(await scores.summarise(seller.id), 'budget');
+  });
+
+  test('prices are compared with delivery; reports carry moderation rates', async () => {
+    const seller = await customer('Price Seller');
+    const others = await customer('Other Seller');
+    for (let index = 0; index < 8; index += 1) await liveNow(others, `Hisense TV ${index}`, 20000000 + index * 1000000);
+    const mine = [];
+    for (let index = 0; index < 3; index += 1) mine.push(await liveNow(seller, `My TV ${index}`, 20000000));
+    let row = await scores.refresh(seller.id, 'NG');
+    assert.equal(row.metrics.costing.n, 3);
+    assert.ok(!row.details.tips.some(tip => /priced above most similar/.test(tip)), 'at the low end without delivery');
+    await prisma.classifiedListing.updateMany({ where: { id: { in: mine.map(item => item.id) } }, data: { delivery: 'state', deliveryFeeStateMinor: 10000000n } });
+    row = await scores.refresh(seller.id, 'NG');
+    assert.ok(row.details.tips.some(tip => /3 listings are priced above most similar ones/.test(tip)), JSON.stringify(row.details.tips));
+    assert.ok(row.metrics.costing.score < 50);
+
+    const report = (await admin.get('/v1/admin/classifieds/scores/report?country=NG')).json;
+    assert.deepEqual(Object.keys(report.moderation.reviews).sort(), ['held', 'removed', 'reported', 'total']);
+    assert.equal(typeof report.moderation.ratings.flagged.pct, 'number');
   });
 });

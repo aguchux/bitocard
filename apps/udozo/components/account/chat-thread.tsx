@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- chat photos are private: read through this site with the customer's session. */
 import { useEffect, useId, useRef, useState } from "react";
 import { Camera, EllipsisVertical, LoaderCircle, Send, X } from "lucide-react";
-import { reportReasonLabels, shopMoney, type ShopChat, type ShopMessage, type ShopReportReason } from "@bitocard/api-client/classifieds";
+import { chatReportReasonLabels, shopMoney, type ShopChat, type ShopChatReportReason, type ShopMessage } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl } from "@/lib/shop";
 import { answerOffer, blockChat, loadChat, makeOffer, reportChat, sendMessage } from "@/lib/shop-actions";
@@ -45,7 +45,7 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
-  const [report, setReport] = useState<{ reason: ShopReportReason; details: string; sent: boolean } | null>(null);
+  const [report, setReport] = useState<{ reason: ShopChatReportReason; details: string; sent: boolean } | null>(null);
   const list = useRef<HTMLOListElement>(null);
   const more = useRef<HTMLDivElement>(null);
   useDismiss(more, menu, () => setMenu(false), () => more.current?.querySelector("button"));
@@ -189,10 +189,10 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
             <>
               <label className="grid gap-1 text-sm font-semibold">
                 What is wrong?
-                <select value={report.reason} onChange={event => setReport({ ...report, reason: event.target.value as ShopReportReason })} className="h-11 rounded-xl border border-slate-300 bg-white px-3 font-normal">
-                  {(Object.keys(reportReasonLabels) as ShopReportReason[]).map(reason => (
+                <select value={report.reason} onChange={event => setReport({ ...report, reason: event.target.value as ShopChatReportReason })} className="h-11 rounded-xl border border-slate-300 bg-white px-3 font-normal">
+                  {(Object.keys(chatReportReasonLabels) as ShopChatReportReason[]).map(reason => (
                     <option key={reason} value={reason}>
-                      {reportReasonLabels[reason]}
+                      {chatReportReasonLabels[reason]}
                     </option>
                   ))}
                 </select>

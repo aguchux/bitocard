@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Lock, Star } from "lucide-react";
-import type { ShopInteractionSummary, ShopMyScores } from "@bitocard/api-client/classifieds";
+import { reviewRatingLabels, type ShopInteractionSummary, type ShopMyReviews, type ShopMyScores } from "@bitocard/api-client/classifieds";
 import { PageTitle } from "@/components/account/nav";
 import { ReviewsNav } from "@/components/reviews/reviews-nav";
 import { ReportSummary } from "@/components/scores/report-summary";
-import { bandText, myScoreLines } from "@/lib/scores";
+import { bandText, myScoreLines, waitingForReply } from "@/lib/scores";
 import Link from "next/link";
 import { requireSeller } from "@/lib/account";
 import { customerApi } from "@/lib/customer";
@@ -19,7 +19,12 @@ export const metadata: Metadata = { title: "Private ratings" };
  */
 export default async function RatingsPage() {
   await requireSeller("/account/ratings");
-  const [answer, mine] = await Promise.all([customerApi<ShopInteractionSummary>("GET", "/v1/classifieds/me/ratings"), customerApi<ShopMyScores>("GET", "/v1/classifieds/me/scores")]);
+  const [answer, mine, received] = await Promise.all([
+    customerApi<ShopInteractionSummary>("GET", "/v1/classifieds/me/ratings"),
+    customerApi<ShopMyScores>("GET", "/v1/classifieds/me/scores"),
+    customerApi<ShopMyReviews>("GET", "/v1/classifieds/me/reviews?role=received"),
+  ]);
+  const unanswered = received.ok ? waitingForReply(received.data.data) : [];
   const scores = mine.ok ? mine.data : null;
   const summary = answer.ok ? answer.data : null;
   const lines = summary ? summaryLines(summary) : null;
@@ -29,6 +34,22 @@ export default async function RatingsPage() {
       <PageTitle title="Reviews" />
       <ReviewsNav current="ratings" />
       {scores ? <MyScores scores={scores} /> : null}
+      {unanswered.length ? (
+        <section aria-labelledby="to-answer" className="grid gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+          <h2 id="to-answer" className="text-sm font-bold">
+            {unanswered.length === 1 ? "A review waits for your reply" : `${unanswered.length} reviews wait for your reply`}
+          </h2>
+          <ul className="grid gap-1 text-sm">
+            {unanswered.map(review => (
+              <li key={review.id}>
+                <Link href={`/account/reviews?tab=about&review=${review.id}`} className="font-semibold text-navy-900 hover:underline">
+                  {reviewRatingLabels[review.rating]} · {review.listing.title ?? review.product.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <p className="flex gap-2 rounded-2xl bg-navy-50 p-4 text-sm text-navy-800">
         <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>

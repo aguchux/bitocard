@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Flag, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { reviewAspectLabels, reviewRatingLabels, reviewReportReasonLabels, reviewStanceLabels, type ShopReview, type ShopReviewAspect, type ShopReviewPost, type ShopReviewRating, type ShopReviewReportReason, type ShopReviewStance, type ShopReviewViewer } from "@bitocard/api-client/classifieds";
-import { deleteReply, dismissPurchase, editReview, postReply, reportReview, withdrawReview, writeReview } from "@/lib/review-actions";
-import { deletePostQuestion, maxPostBody, maxReviewBody, negativeProblem, negativeQuestion, withdrawQuestion } from "@/lib/reviews";
+import { deleteReply, dismissPurchase, editReply, editReview, postReply, reportReview, withdrawReview, writeReview } from "@/lib/review-actions";
+import { canEditPost, deletePostQuestion, maxPostBody, maxReviewBody, negativeProblem, negativeQuestion, withdrawQuestion } from "@/lib/reviews";
 import { useConfirm } from "../confirm-dialog";
 import { ReviewPostItem } from "./review-view";
 
@@ -238,6 +238,16 @@ export function ReviewThread({ review, viewer }: { review: ShopReview; viewer: S
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState(nonce);
   const [reporting, setReporting] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
+  const saveEdit = async () => {
+    if (!editing) return;
+    setBusy(true);
+    const result = await editReply(editing.id, editing.body);
+    setBusy(false);
+    if (!result.ok) return setError(result.message);
+    setEditing(null);
+    router.refresh();
+  };
   const sheet = useRef<HTMLDialogElement>(null);
   const report = (postId: string | null) => {
     setReporting(postId);
@@ -269,8 +279,25 @@ export function ReviewThread({ review, viewer }: { review: ShopReview; viewer: S
         <ol className="grid gap-1.5">
           {review.posts.map(post => (
             <ReviewPostItem key={post.id} post={post}>
-              {viewer ? (
+              {editing?.id === post.id ? (
+                <span className="grid gap-1.5">
+                  <textarea aria-label="Change your reply" value={editing.body} onChange={event => setEditing({ id: post.id, body: event.target.value })} rows={2} maxLength={maxPostBody} className="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                  <span className="flex gap-2 text-xs">
+                    <button type="button" disabled={busy} onClick={() => void saveEdit()} className="font-semibold text-navy-900 hover:underline">
+                      Save
+                    </button>
+                    <button type="button" onClick={() => setEditing(null)} className="font-semibold text-slate-600 hover:underline">
+                      Cancel
+                    </button>
+                  </span>
+                </span>
+              ) : viewer ? (
                 <span className="flex gap-3 text-xs">
+                  {canEditPost(post) ? (
+                    <button type="button" onClick={() => setEditing({ id: post.id, body: post.body ?? "" })} className="font-semibold text-navy-900 hover:underline">
+                      Edit
+                    </button>
+                  ) : null}
                   {post.mine && !post.removed ? (
                     <button type="button" onClick={() => void remove(post)} className="font-semibold text-red-800 hover:underline">
                       Delete

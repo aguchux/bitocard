@@ -1,8 +1,9 @@
 import Link from "next/link";
 
-export type ReviewsTab = "to_review" | "given" | "about" | "ratings";
+export type ReviewsTab = "to_review" | "to_confirm" | "given" | "about" | "ratings";
 const tabs: Array<{ key: ReviewsTab; label: string; href: string }> = [
   { key: "to_review", label: "To review", href: "/account/reviews" },
+  { key: "to_confirm", label: "To confirm", href: "/account/reviews?tab=to_confirm" },
   { key: "given", label: "Your reviews", href: "/account/reviews?tab=given" },
   { key: "about", label: "About you", href: "/account/reviews?tab=about" },
   { key: "ratings", label: "Private ratings", href: "/account/ratings" },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ShopMyReviews, ShopPurchases, ShopReview, ShopReviewViewer } from "@bitocard/api-client/classifieds";
+import type { ShopBuyOrders, ShopMyReviews, ShopPurchases, ShopReview, ShopReviewViewer } from "@bitocard/api-client/classifieds";
+import { BuyOrderControls } from "@/components/buy-order";
 import { PageTitle } from "@/components/account/nav";
 import { Thumb } from "@/components/account/thumb";
 import { OwnReviewActions, ReviewForm, ReviewThread } from "@/components/reviews/review-forms";
@@ -13,7 +14,7 @@ import { reviewPath, reviewSellerBase } from "@/lib/reviews";
 export const metadata: Metadata = { title: "Reviews" };
 
 type Props = { searchParams: Promise<{ tab?: string; review?: string }> };
-type Tab = "to_review" | "given" | "about";
+type Tab = "to_review" | "to_confirm" | "given" | "about";
 const statusWords = { held: "Waiting for a moderator", removed: "Removed by Udozo", withdrawn: "Withdrawn", published: "Showing" } as const;
 
 /**
@@ -23,12 +24,15 @@ const statusWords = { held: "Waiting for a moderator", removed: "Removed by Udoz
 export default async function ReviewsPage({ searchParams }: Props) {
   const query = await searchParams;
   await requireSeller("/account/reviews");
-  const tab: Tab = query.tab === "given" || query.tab === "about" ? query.tab : "to_review";
-  const [toReview, given, about] = await Promise.all([
+  const tab: Tab = query.tab === "given" || query.tab === "about" || query.tab === "to_confirm" ? query.tab : "to_review";
+  const [toReview, given, about, sold] = await Promise.all([
     customerApi<ShopPurchases>("GET", "/v1/classifieds/me/purchases?state=to_review&limit=50"),
     tab === "given" ? customerApi<ShopMyReviews>("GET", "/v1/classifieds/me/reviews?role=given") : null,
     tab === "about" ? customerApi<ShopMyReviews>("GET", "/v1/classifieds/me/reviews?role=received") : null,
+    // Sales a seller marked that the buyer has not said yes or no to (within the 7 days they can still say no).
+    customerApi<ShopBuyOrders>("GET", "/v1/classifieds/me/buy-orders?role=buying&status=completed&limit=50"),
   ]);
+  const toConfirm = sold.ok ? sold.data.data.filter(order => order.actions.includes("confirm")) : [];
   const purchases = toReview.ok ? toReview.data.data.filter(item => !item.dismissed) : [];
   const chosen = tab === "given" ? given : about;
   const list: ShopMyReviews["data"] = chosen?.ok ? chosen.data.data : [];
@@ -37,13 +41,34 @@ export default async function ReviewsPage({ searchParams }: Props) {
     const answers = await Promise.all(list.map(review => customerApi<ShopReviewViewer>("GET", `/v1/classifieds/reviews/${review.id}/viewer`)));
     answers.forEach((answer, index) => answer.ok && viewers.set(list[index]!.id, answer.data));
   }
-  const counts: Record<Tab, number> = { to_review: toReview.ok ? toReview.data.to_review : 0, given: 0, about: 0 };
+  const counts: Record<Tab, number> = { to_review: toReview.ok ? toReview.data.to_review : 0, to_confirm: toConfirm.length, given: 0, about: 0 };
   return (
     <div className="grid max-w-3xl gap-5">
       <PageTitle title="Reviews" />
       <ReviewsNav current={tab} counts={counts} />
 
-      {tab === "to_review" ? (
+      {tab === "to_confirm" ? (
+        toConfirm.length ? (
+          <ul className="grid gap-4">
+            {toConfirm.map(order => (
+              <li key={order.id} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                <span className="flex items-center gap-3">
+                  <Thumb url={order.listing.cover_url} size="size-14" />
+                  <span className="grid min-w-0">
+                    <Link href={`/account/buy-orders/${order.id}`} className="truncate font-bold hover:underline">
+                      {order.listing.title ?? "Your purchase"}
+                    </Link>
+                    <span className="text-xs text-slate-500">{order.with.name} marked it sold to you. Did you buy it?</span>
+                  </span>
+                </span>
+                <BuyOrderControls order={order} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">Nothing to confirm. When a seller marks a buy order sold to you, you can say yes or no here.</p>
+        )
+      ) : tab === "to_review" ? (
         purchases.length ? (
           <ul className="grid gap-4">
             {purchases.map(purchase => (

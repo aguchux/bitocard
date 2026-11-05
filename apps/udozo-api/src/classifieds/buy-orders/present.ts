@@ -7,7 +7,7 @@ export const buyOrderStatuses = ['requested', 'countered', 'accepted', 'complete
 export type BuyOrderStatus = (typeof buyOrderStatuses)[number];
 /** Statuses still in play (one per buyer and listing, a partial unique index). */
 export const openBuyOrderStatuses: BuyOrderStatus[] = ['requested', 'countered', 'accepted'];
-export const buyOrderActions = ['accept', 'counter', 'decline', 'accept_counter', 'cancel', 'no_show', 'complete', 'bought', 'void', 'extend'] as const;
+export const buyOrderActions = ['accept', 'counter', 'decline', 'accept_counter', 'cancel', 'no_show', 'complete', 'bought', 'void', 'confirm', 'extend'] as const;
 export type BuyOrderAction = (typeof buyOrderActions)[number];
 export type BuyOrderSide = 'buyer' | 'seller';
 
@@ -41,6 +41,8 @@ export type BuyOrderRow = {
   boughtAt: Date | null;
   completedAt: Date | null;
   completedBy: string | null;
+  /** The buyer said yes, they bought it (or reviewed it): no longer to confirm. */
+  buyerConfirmedAt?: Date | null;
 };
 
 export const buyOrderNumber = (number: bigint | number) => `BO-${String(number).padStart(6, '0')}`;
@@ -68,7 +70,7 @@ export function actionsFor(row: BuyOrderRow, side: BuyOrderSide, now = new Date(
     }
     case 'completed': {
       const until = voidUntil(row);
-      return side === 'buyer' && until && until > now ? ['void'] : [];
+      return side === 'buyer' && until && until > now ? (row.buyerConfirmedAt ? ['void'] : ['confirm', 'void']) : [];
     }
     default:
       return [];

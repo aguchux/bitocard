@@ -58,6 +58,14 @@ export async function postReply(reviewId: string, input: { body: string; stance?
   return answer(await customerApi<ShopReviewPost>("POST", `/v1/classifieds/reviews/${reviewId}/posts`, { body, ...(input.stance ? { stance: input.stance } : {}), ...(input.reply_to ? { reply_to: input.reply_to } : {}) }, { idempotencyKey: nonce }));
 }
 
+/** Changes one's own reply (within 15 minutes of writing it). */
+export async function editReply(postId: string, body: string): Promise<ActionResult<ShopReviewPost>> {
+  if (!uuid.test(postId)) return refused("No such reply.");
+  const text = clean(body, 600);
+  if (!text) return refused("Write something.");
+  return answer(await customerApi<ShopReviewPost>("PATCH", `/v1/classifieds/review-posts/${postId}`, { body: text }));
+}
+
 export async function deleteReply(postId: string): Promise<ActionResult<unknown>> {
   if (!uuid.test(postId)) return refused("No such reply.");
   return answer(await customerApi("DELETE", `/v1/classifieds/review-posts/${postId}`));

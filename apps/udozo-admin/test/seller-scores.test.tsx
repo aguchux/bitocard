@@ -102,6 +102,7 @@ beforeEach(() => {
           { band: null, label: "Not enough to rate yet", count: 2 },
         ],
         summaries: { written: 2, hidden: 1, reported: 1, this_month: { count: 3, cost_usd: 0.12 } },
+        moderation: { reviews: { total: 20, held: { count: 2, pct: 10 }, removed: { count: 1, pct: 5 }, reported: { count: 3, pct: 15 } }, ratings: { total: 10, flagged: { count: 1, pct: 10 }, excluded: { count: 0, pct: 0 } } },
       });
     if (url.pathname === "/v1/admin/classifieds/sellers/cus_1") return ok(seller());
     if (url.pathname === "/v1/admin/classifieds/listings") return ok({ object: "list", data: [], has_more: false, total: 0 });
@@ -166,6 +167,8 @@ describe("Reports > Seller ratings", () => {
     expect(await screen.findByText("Not enough to rate yet", {}, slow)).toBeTruthy();
     expect(screen.getByText("2 (50%)")).toBeTruthy();
     expect(screen.getByText("3 · US$0.12")).toBeTruthy();
+    expect(screen.getByText("Reviews held for a moderator")).toBeTruthy();
+    expect(screen.getByText("2 of 20 (10%)")).toBeTruthy();
     onlyAdminRoutes();
   });
 });

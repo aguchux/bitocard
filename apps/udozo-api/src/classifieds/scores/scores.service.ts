@@ -9,6 +9,7 @@ import { AiService } from '../../support/ai/ai.service.js';
 import type { AiProviderName } from '../../support/ai/providers.js';
 import { shopLimitsOf } from '../../support/bots.service.js';
 import { redact } from '../../support/redact.js';
+import { languageName } from '../assistant/languages.js';
 import { ShopAssistantsService } from '../assistant/shop-assistants.service.js';
 import { SafePayGuardsService } from '../safe-pay-guards.service.js';
 import { bandLabels, bandOf, costingScore, median, metric, type Metrics, noReplyMs, numbersIn, overall, publicScores, responseScore, smoothed, summaryDenied, summaryMax, summaryMin } from './metrics.js';
@@ -28,6 +29,8 @@ const minComparable = 8;
 /** At most this many of a seller's live listings are placed against the market. */
 const costingListings = 20;
 
+/** What a buyer pays for a listing: its price, and the delivery charge within the seller's state where it delivers. */
+const delivered = Prisma.sql`(l."price_minor" + CASE WHEN l."delivery" = 'none' THEN 0 ELSE l."delivery_fee_state_minor" END)`;
 const startOfDay = (now = new Date()) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 const startOfMonth = (now = new Date()) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 const monthStart = startOfMonth;
@@ -121,7 +124,7 @@ export class SellerScoresService {
     return { metric: metric('pricing', score, listings.length), rose, onRequest };
   }
 
-  /** Each live listing's price against similar live and recently sold ones (category, condition, brand and model). */
+  /** Each live listing's price, with delivery, against similar live and recently sold ones (category, condition, brand and model). */
   private async costing(sellerId: string, country: string, now: Date) {
     const since = new Date(now.getTime() - windowMs);
     const [brand, model] = await Promise.all([this.prisma.classifiedFeature.findUnique({ where: { key: 'brand' }, select: { id: true } }), this.prisma.classifiedFeature.findUnique({ where: { key: 'model' }, select: { id: true } })]);
@@ -129,7 +132,7 @@ export class SellerScoresService {
       where: { customerId: sellerId, country, status: 'active', priceMinor: { not: null }, categoryId: { not: null } },
       orderBy: { publishedAt: 'desc' },
       take: costingListings,
-      select: { id: true, priceMinor: true, categoryId: true, condition: true, features: { where: { featureId: { in: [brand?.id, model?.id].filter((id): id is string => Boolean(id)) } }, select: { featureId: true, valueText: true } } },
+      select: { id: true, priceMinor: true, delivery: true, deliveryFeeStateMinor: true, categoryId: true, condition: true, features: { where: { featureId: { in: [brand?.id, model?.id].filter((id): id is string => Boolean(id)) } }, select: { featureId: true, valueText: true } } },
     });
     const scores: number[] = [];
     let tooLow = 0;
@@ -149,12 +152,12 @@ export class SellerScoresService {
         ...filters,
       ];
       const [row] = await this.prisma.$queryRaw<{ p25: number | null; p50: number | null; p75: number | null; n: bigint }[]>`
-        SELECT percentile_cont(0.25) WITHIN GROUP (ORDER BY l."price_minor")::float8 AS p25,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY l."price_minor")::float8 AS p50,
-               percentile_cont(0.75) WITHIN GROUP (ORDER BY l."price_minor")::float8 AS p75, count(*) AS n
+        SELECT percentile_cont(0.25) WITHIN GROUP (ORDER BY ${delivered})::float8 AS p25,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ${delivered})::float8 AS p50,
+               percentile_cont(0.75) WITHIN GROUP (ORDER BY ${delivered})::float8 AS p75, count(*) AS n
         FROM "classified_listings" l WHERE ${Prisma.join(where, ' AND ')}`;
       if (!row || Number(row.n) < minComparable || row.p25 === null || row.p50 === null || row.p75 === null) continue;
-      const price = Number(listing.priceMinor);
+      const price = Number(listing.priceMinor) + (listing.delivery === 'none' ? 0 : Number(listing.deliveryFeeStateMinor));
       // A price under half the market's is never rewarded: left out, and flagged to admins.
       if (price < row.p50 / 2) {
         tooLow += 1;
@@ -279,7 +282,7 @@ export class SellerScoresService {
   // ---- Anjio's summary ----
 
   /** What Anjio is told about a seller: bands, words and counts only. Never a name, message, review's words or price. */
-  private async summaryInputs(sellerId: string, metrics: Metrics, overallScore: number, now: Date) {
+  private async summaryInputs(sellerId: string, metrics: Metrics, overallScore: number, now: Date, language: string) {
     const [customer, categories, satisfaction] = await Promise.all([
       this.prisma.customer.findUniqueOrThrow({ where: { id: sellerId }, select: { createdAt: true } }),
       this.prisma.$queryRaw<{ name: string }[]>`SELECT c."name" FROM "classified_listings" l JOIN "classified_categories" c ON c."id" = l."category_id" WHERE l."customer_id" = ${sellerId}::uuid AND l."status" = 'active' GROUP BY c."name" ORDER BY count(*) DESC LIMIT 3`,
@@ -287,7 +290,7 @@ export class SellerScoresService {
     ]);
     const shown = publicScores(metrics, overallScore);
     return {
-      language: 'English',
+      language: languageName(language),
       on_udozo_since: customer.createdAt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
       sells: categories.map(row => row.name),
       overall_band: bandLabels[bandOf(overallScore)],
@@ -325,9 +328,11 @@ export class SellerScoresService {
   }
 
   /** Why no summary can be written now in a market (budget, daily cap, no assistant), or null and the assistant to use. */
-  private async summaryGate(country: string, now = new Date()): Promise<{ bot: SupportBot; reason: null } | { bot: null; reason: string }> {
+  private async summaryGate(country: string, now = new Date()): Promise<{ bot: SupportBot; language: string; reason: null } | { bot: null; reason: string }> {
     if (!(await this.reader.summariesOn(country))) return { bot: null, reason: 'switched_off' };
-    const bot = await this.assistants.resolve(country, 'en');
+    // The market's own language: the first its assistants speak.
+    const language = (await this.assistants.languagesIn(country))[0]?.code ?? 'en';
+    const bot = await this.assistants.resolve(country, language);
     if (!bot) return { bot: null, reason: 'no_assistant' };
     const limits = shopLimitsOf(bot);
     const [today, month, summaries] = await Promise.all([
@@ -341,7 +346,7 @@ export class SellerScoresService {
       if (Number(month._sum.costMicros ?? 0n) >= 0.9 * budget) return { bot: null, reason: 'budget' };
       if (Number(summaries._sum.costMicros ?? 0n) >= limits.summary_budget_share * budget) return { bot: null, reason: 'summary_share' };
     }
-    return { bot, reason: null };
+    return { bot, language, reason: null };
   }
 
   /**
@@ -357,7 +362,7 @@ export class SellerScoresService {
     const bot = gate.bot;
     const limits = shopLimitsOf(bot);
     const metrics = metricsOf(row);
-    const inputs = await this.summaryInputs(sellerId, metrics, row.overallScore, now);
+    const inputs = await this.summaryInputs(sellerId, metrics, row.overallScore, now, gate.language);
     const model = limits.summary_model ?? bot.model;
     let text: string | null = null;
     let usage: { input: number; output: number } = { input: 0, output: 0 };
@@ -514,6 +519,18 @@ export class SellerScoresService {
   /** Reports > Ratings: sellers by band per market, the summaries written, and their cost this month. */
   async adminReport(country?: string, now = new Date()) {
     const where = country ? { country } : {};
+    const since = new Date(now.getTime() - windowMs);
+    const recent = { ...where, createdAt: { gt: since } };
+    const [reviews, held, removed, reportedReviews, ratings, flagged, excluded] = await Promise.all([
+      this.prisma.classifiedReview.count({ where: recent }),
+      this.prisma.classifiedReview.count({ where: { ...recent, heldReason: { not: null } } }),
+      this.prisma.classifiedReview.count({ where: { ...recent, status: 'removed' } }),
+      this.prisma.classifiedReview.count({ where: { ...recent, reports: { some: {} } } }),
+      this.prisma.classifiedInteractionRating.count({ where: recent }),
+      this.prisma.classifiedInteractionRating.count({ where: { ...recent, flagged: true } }),
+      this.prisma.classifiedInteractionRating.count({ where: { ...recent, excludedAt: { not: null } } }),
+    ]);
+    const rate = (part: number, whole: number) => ({ count: part, pct: whole ? Math.round((1000 * part) / whole) / 10 : 0 });
     const [bandsBy, scored, summaries, hidden, reported, cost] = await Promise.all([
       this.prisma.classifiedSellerScore.groupBy({ by: ['band'], where, _count: { _all: true } }),
       this.prisma.classifiedSellerScore.count({ where }),
@@ -527,6 +544,11 @@ export class SellerScoresService {
       sellers: scored,
       bands: ['excellent', 'very_good', 'good', 'fair', 'needs_work', null].map(band => ({ band, label: band ? bandLabels[band as keyof typeof bandLabels] : 'Not enough to rate yet', count: bandsBy.find(row => row.band === band)?._count._all ?? 0 })),
       summaries: { written: summaries, hidden, reported, this_month: { count: cost._count._all, cost_usd: Number(cost._sum.costMicros ?? 0n) / 1_000_000 } },
+      /** The last 90 days: how often reviews were held, removed or reported, and private ratings flagged or left out. */
+      moderation: {
+        reviews: { total: reviews, held: rate(held, reviews), removed: rate(removed, reviews), reported: rate(reportedReviews, reviews) },
+        ratings: { total: ratings, flagged: rate(flagged, ratings), excluded: rate(excluded, ratings) },
+      },
     };
   }
 }

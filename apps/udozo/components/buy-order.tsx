@@ -137,9 +137,10 @@ const buttonWords: Record<ShopBuyOrderAction, string> = {
   complete: "Mark sold",
   bought: "I bought it",
   void: "I did not buy this",
+  confirm: "Yes, I bought it",
   extend: "Give more time",
 };
-const primary: ShopBuyOrderAction[] = ["accept", "accept_counter", "complete", "bought"];
+const primary: ShopBuyOrderAction[] = ["accept", "accept_counter", "complete", "bought", "confirm"];
 
 /** The steps the reader can take on a buy order, each confirmed first in Udozo's own dialog. */
 export function BuyOrderControls({ order }: { order: ShopBuyOrder }) {

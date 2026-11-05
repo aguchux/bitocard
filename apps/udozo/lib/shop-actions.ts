@@ -20,7 +20,7 @@ import type {
   ShopOrderMessage,
   ShopPriceKind,
   ShopReleaseCode,
-  ShopReportReason,
+  ShopChatReportReason,
   ShopResaleDeal,
   ShopResaleMessage,
   ShopReseller,
@@ -260,7 +260,7 @@ export async function blockChat(chatId: string, block: boolean): Promise<ShopRes
   return answer(await customerApi("POST", `/v1/classifieds/conversations/${chatId}/${block ? "block" : "unblock"}`, {}));
 }
 
-export async function reportChat(chatId: string, reason: ShopReportReason, details: string): Promise<ShopResult<unknown>> {
+export async function reportChat(chatId: string, reason: ShopChatReportReason, details: string): Promise<ShopResult<unknown>> {
   if (!id(chatId)) return refused("No such chat.");
   return answer(await customerApi("POST", `/v1/classifieds/conversations/${chatId}/report`, { reason, ...(details.trim() ? { details: details.trim().slice(0, 1000) } : {}) }));
 }

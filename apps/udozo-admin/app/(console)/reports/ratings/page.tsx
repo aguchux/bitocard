@@ -3,9 +3,21 @@
 import { useState } from "react";
 import { EyeOff, Gauge, Sparkles, Wallet } from "lucide-react";
 import { Card, CardHeader, formatNumber, PageHeader, QueryView, Skeleton, StatCard } from "@bitocard/admin-ui";
-import { useScoresReportQuery } from "@bitocard/api-client/admin";
+import { type AdminScoresReport, useScoresReportQuery } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
 import { UdozoShell } from "@/components/shell";
+
+/** Each moderation rate with what it is out of. */
+function moderationRows(moderation: NonNullable<AdminScoresReport["moderation"]>) {
+  const { reviews, ratings } = moderation;
+  return [
+    { label: "Reviews held for a moderator", rate: reviews.held, total: reviews.total },
+    { label: "Reviews reported", rate: reviews.reported, total: reviews.total },
+    { label: "Reviews removed", rate: reviews.removed, total: reviews.total },
+    { label: "Private ratings flagged for safety", rate: ratings.flagged, total: ratings.total },
+    { label: "Private ratings left out", rate: ratings.excluded, total: ratings.total },
+  ];
+}
 
 /**
  * Reports > Seller ratings: how Anjio's scores spread across sellers (by band, and those not enough to rate yet), and
@@ -29,6 +41,19 @@ export default function RatingsReportPage() {
               <StatCard icon={<EyeOff className="size-5" />} label="Hidden or reported" value={`${formatNumber(data.summaries.hidden)} / ${formatNumber(data.summaries.reported)}`} />
               <StatCard icon={<Wallet className="size-5" />} label="Summaries this month" value={`${formatNumber(data.summaries.this_month.count)} · US$${data.summaries.this_month.cost_usd.toFixed(2)}`} />
             </div>
+            {data.moderation ? (
+              <Card>
+                <CardHeader title="Moderation, last 90 days" description="How often reviews and private ratings needed Udozo's team." />
+                <dl className="grid gap-2 px-5 pb-5 text-sm sm:grid-cols-2 sm:px-6">
+                  {moderationRows(data.moderation).map(row => (
+                    <div key={row.label} className="flex justify-between gap-2">
+                      <dt className="text-muted">{row.label}</dt>
+                      <dd>{`${formatNumber(row.rate.count)} of ${formatNumber(row.total)} (${row.rate.pct}%)`}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
+            ) : null}
             <Card>
               <CardHeader title="By band" />
               <ul className="grid gap-2 px-5 pb-5 text-sm sm:px-6">

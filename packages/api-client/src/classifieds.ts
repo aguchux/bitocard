@@ -12,6 +12,8 @@ export type ShopSort = 'relevant' | 'newest' | 'price_asc' | 'price_desc';
 export type ShopBadge = 'phone_confirmed' | 'id_checked';
 export type ShopTier = 'area' | 'nearby' | 'state' | 'country';
 export type ShopReportReason = 'scam' | 'prohibited' | 'wrong_category' | 'duplicate' | 'sold' | 'offensive' | 'other';
+/** Chats are also reported for pressure over a review (Udozo). */
+export type ShopChatReportReason = ShopReportReason | 'review_pressure';
 export type ShopOrderStatus = 'requested' | 'declined' | 'lapsed' | 'awaiting_payment' | 'cancelled' | 'locked' | 'paid' | 'sent' | 'disputed' | 'released' | 'refunded' | 'partly_refunded';
 export type ShopFeatureType = 'text' | 'number' | 'choice' | 'boolean';
 
@@ -663,6 +665,11 @@ export const reportReasonLabels: Record<ShopReportReason, string> = {
   offensive: 'It is offensive',
   other: 'Something else',
 };
+/** Why a chat is reported: the listing's reasons, and pressure over a review. */
+export const chatReportReasonLabels: Record<ShopChatReportReason, string> = {
+  ...reportReasonLabels,
+  review_pressure: 'Pressure over a review (a refund or discount to change one, or demands for one)',
+};
 /** An order's state, as its buyer reads it. */
 export const buyerOrderLabels: Record<ShopOrderStatus, string> = {
   requested: 'Waiting for the seller to accept',
@@ -987,7 +994,8 @@ export type UsernameAvailability = { object: 'username_availability'; username: 
  */
 export type ShopBuyOrderStatus = 'requested' | 'countered' | 'accepted' | 'completed' | 'declined' | 'cancelled' | 'lapsed' | 'expired' | 'no_show' | 'voided';
 export const buyOrderOpenStatuses: readonly ShopBuyOrderStatus[] = ['requested', 'countered', 'accepted'];
-export type ShopBuyOrderAction = 'accept' | 'counter' | 'decline' | 'accept_counter' | 'cancel' | 'no_show' | 'complete' | 'bought' | 'void' | 'extend';
+/** `confirm`: the buyer says yes, they bought it (a sale the seller marked), in Reviews' To confirm. */
+export type ShopBuyOrderAction = 'accept' | 'counter' | 'decline' | 'accept_counter' | 'cancel' | 'no_show' | 'complete' | 'bought' | 'void' | 'confirm' | 'extend';
 
 /** The words each side reads for a status. */
 export const buyOrderLabels: Record<'buyer' | 'seller', Record<ShopBuyOrderStatus, string>> = {

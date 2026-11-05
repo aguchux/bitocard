@@ -8,7 +8,11 @@ import { setRequest } from "./request";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }), usePathname: () => "/account/reviews" }));
 
-const { monthText, negativeProblem, readReviewFilters, reviewsHref, reviewSellerBase, sellerReviewsQuery, summaryText } = await import("@/lib/reviews");
+const { canEditPost, monthText, negativeProblem, readReviewFilters, reviewsHref, reviewSellerBase, sellerReviewsQuery, summaryText } = await import("@/lib/reviews");
+const { buyQuestion } = await import("@/lib/buy-orders");
+const buyActions = await import("@/lib/buy-order-actions");
+const { waitingForReply } = await import("@/lib/scores");
+const { chatReportReasonLabels } = await import("@bitocard/api-client/classifieds");
 const actions = await import("@/lib/review-actions");
 const { ReviewCard, ReviewSummaryBar } = await import("@/components/reviews/review-view");
 const { ReviewForm, ReviewThread } = await import("@/components/reviews/review-forms");
@@ -146,5 +150,39 @@ describe("review screens", () => {
     expect(outsider).toContain("Only buyers of the same item can write here.");
     expect(outsider).toContain("Report this review");
     expect(renderToStaticMarkup(createElement(ReviewThread, { review, viewer: null }))).not.toContain("Report");
+  });
+});
+
+describe("the gaps filled", () => {
+  test("own replies can be edited for 15 minutes; the edit goes to the reply's address", async () => {
+    const now = Date.parse("2026-11-05T12:00:00Z");
+    expect(canEditPost({ mine: true, removed: false, created_at: "2026-11-05T11:50:00Z" }, now)).toBe(true);
+    expect(canEditPost({ mine: true, removed: false, created_at: "2026-11-05T11:40:00Z" }, now)).toBe(false);
+    expect(canEditPost({ mine: false, removed: false, created_at: "2026-11-05T11:59:00Z" }, now)).toBe(false);
+    const fetch = vi.fn(async () => reply({}));
+    vi.stubGlobal("fetch", fetch);
+    expect((await actions.editReply("11111111-1111-4111-8111-111111111111", "   ")).ok).toBe(false);
+    await actions.editReply("11111111-1111-4111-8111-111111111111", " Changed my mind ");
+    const [url, init] = fetch.mock.calls[0] as unknown as Call;
+    expect(`${init.method} ${url}`).toBe("PATCH http://api.test/v1/classifieds/review-posts/11111111-1111-4111-8111-111111111111");
+    expect(JSON.parse(String(init.body))).toEqual({ body: "Changed my mind" });
+  });
+
+  test("To confirm: Yes, I bought it is a buy order step with its own question", async () => {
+    const question = buyQuestion("confirm", { price: 25000000, counter: null, currency: "NGN", with: { name: "Chinedu O." }, listing: { title: "Hisense TV" } } as never);
+    expect([question.title, question.action]).toEqual(["You bought Hisense TV?", "Yes, I bought it"]);
+    const fetch = vi.fn(async () => reply({}));
+    vi.stubGlobal("fetch", fetch);
+    await buyActions.buyOrderStep(id, "confirm");
+    expect((fetch.mock.calls[0] as unknown as Call)[0]).toBe(`http://api.test/v1/classifieds/buy-orders/${id}/confirm`);
+  });
+
+  test("chats can be reported for pressure over a review; reviews waiting for the seller's reply", () => {
+    expect(chatReportReasonLabels.review_pressure).toMatch(/Pressure over a review/);
+    expect(readFileSync(join(__dirname, "..", "components/account/chat-thread.tsx"), "utf8")).toContain("chatReportReasonLabels");
+    const answered = { ...review, id: "a", status: "published", posts: [{ ...review.posts[0]!, role: "seller" as const }] };
+    const waiting = { ...review, id: "b", status: "published", posts: [] };
+    const locked = { ...review, id: "c", status: "published", locked: true, posts: [] };
+    expect(waitingForReply([answered, waiting, locked] as never).map(item => item.id)).toEqual(["b"]);
   });
 });

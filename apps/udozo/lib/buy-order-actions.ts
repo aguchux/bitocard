@@ -6,7 +6,7 @@ import type { ActionResult } from "@/lib/listing-actions";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const refused = (message: string, param = "parameter_invalid"): ActionResult<never> => ({ ok: false, message, code: param, signIn: false });
-const steps: ShopBuyOrderAction[] = ["accept", "counter", "decline", "accept_counter", "cancel", "no_show", "complete", "bought", "void", "extend"];
+const steps: ShopBuyOrderAction[] = ["accept", "counter", "decline", "accept_counter", "cancel", "no_show", "complete", "bought", "void", "confirm", "extend"];
 const largest = 1_000_000_000_000_000;
 
 function answer(result: Awaited<ReturnType<typeof customerApi<ShopBuyOrder>>>): ActionResult<ShopBuyOrder> {

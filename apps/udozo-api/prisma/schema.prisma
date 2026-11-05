@@ -4883,7 +4883,7 @@ model ClassifiedReport {
   /// The chat a customer was reported from (moderators may then read it).
   conversationId     String?                 @map("conversation_id") @db.Uuid
   reporterId         String                  @map("reporter_id") @db.Uuid
-  /// scam, prohibited, wrong_category, duplicate, sold, offensive or other.
+  /// scam, prohibited, wrong_category, duplicate, sold, offensive or other; a chat also review_pressure.
   reason             String
   details            String?
   /// open, dismissed or actioned.

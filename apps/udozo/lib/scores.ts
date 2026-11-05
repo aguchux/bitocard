@@ -1,4 +1,4 @@
-import { scoreKeyLabels, type ShopMyScores, type ShopScoreKey } from "@bitocard/api-client/classifieds";
+import { scoreKeyLabels, type ShopMyReviews, type ShopMyScores, type ShopScoreKey } from "@bitocard/api-client/classifieds";
 
 /** What each score measures, for the seller's own page: the score, or why it is not shown yet. */
 export function myScoreLines(scores: ShopMyScores) {
@@ -49,3 +49,8 @@ export const anjioMethod = {
     },
   ],
 };
+
+/** Reviews about the seller still showing, open for replies, that they have not answered: the ones worth a reply. */
+export function waitingForReply(reviews: ShopMyReviews["data"]) {
+  return reviews.filter(review => review.status === "published" && !review.locked && !review.posts.some(post => post.role === "seller"));
+}

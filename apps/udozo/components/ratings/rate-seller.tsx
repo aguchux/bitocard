@@ -167,20 +167,25 @@ export function RateSellerPrompt({ listingId, seller, tone = "light" }: { listin
   );
 }
 
-/** On a listing's page: Rate the seller once the buyer may, or their own rating with Change while it can be changed. */
-export function RateSellerButton({ listingId, seller, initial = null }: { listingId: string; seller: string; initial?: ShopInteractionState | null }) {
+/**
+ * On a listing's page: Rate the seller once the buyer may, or their own rating with Change while it can be changed.
+ * `ask` (a request the seller answered): asked as a card with Not now where the API says to ask now (and it counts).
+ */
+export function RateSellerButton({ listingId, seller, initial = null, ask = false }: { listingId: string; seller: string; initial?: ShopInteractionState | null; ask?: boolean }) {
   const [state, setState] = useState<ShopInteractionState | null>(initial);
   const [open, setOpen] = useState(false);
+  const [asked, setAsked] = useState(false);
   useEffect(() => {
     if (initial) return;
     let live = true;
-    void ratingState(listingId).then(result => {
+    void ratingState(listingId, ask).then(result => {
+      if (live && result.ok) setAsked(result.data.prompt);
       if (live && result.ok) setState(result.data);
     });
     return () => {
       live = false;
     };
-  }, [listingId, initial]);
+  }, [listingId, initial, ask]);
   if (!state || !state.open) return null;
   const done = (rating: ShopInteractionRating) => {
     setState({ ...state, rating, can_rate: false, reason: "rated", prompt: false });
@@ -199,6 +204,29 @@ export function RateSellerButton({ listingId, seller, initial = null }: { listin
       </p>
     );
   if (!state.can_rate) return null;
+  if (asked)
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 text-sm text-navy-900 ring-1 ring-slate-200">
+        <Star className="size-5 shrink-0 text-amber-500" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <strong>How did {seller} deal with you?</strong> <span className="text-slate-600">Private: they never see who said what.</span>
+        </span>
+        <button type="button" onClick={() => setOpen(true)} className="min-h-10 rounded-xl bg-navy-900 px-3 font-semibold text-white">
+          Rate {seller}
+        </button>
+        <button
+          type="button"
+          aria-label="Not now"
+          onClick={() => {
+            setAsked(false);
+            void notNow(listingId);
+          }}
+          className="grid size-10 place-items-center rounded-xl hover:bg-black/5"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+    );
   return (
     <button type="button" onClick={() => setOpen(true)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 px-4 text-sm font-semibold">
       <Star className="size-4 text-amber-500" aria-hidden="true" /> Rate how {seller} dealt with you

@@ -256,4 +256,25 @@ describe('Reviews', () => {
       assert.equal((await admin.put('/v1/admin/switches/classifieds_reviews', { country_code: 'NG', enabled: true })).status, 200);
     }
   });
+
+  test("the buyer confirms a sale the seller marked (To confirm), and chats can be reported for pressure over a review", async () => {
+    const seller = await customer('Bisi Ade');
+    const buyer = await customer('Femi Ade');
+    const tv = await live(seller, 'TCL 43 inch TV');
+    const { order } = await bought(buyer, seller, tv);
+    const before = (await buyer.get(`/v1/classifieds/buy-orders/${order.id}`)).json;
+    assert.deepEqual(before.actions, ['confirm', 'void']);
+    assert.equal((await seller.post(`/v1/classifieds/buy-orders/${order.id}/confirm`)).json.error.code, 'buy_order_not_yours');
+    const confirmed = await buyer.post(`/v1/classifieds/buy-orders/${order.id}/confirm`);
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
+    assert.deepEqual(confirmed.json.actions, ['void'], 'they can still say otherwise within 7 days');
+    assert.ok((await prisma.classifiedBuyOrder.findUniqueOrThrow({ where: { id: order.id } })).buyerConfirmedAt);
+    assert.equal((await buyer.post(`/v1/classifieds/buy-orders/${order.id}/confirm`)).json.error.code, 'buy_order_confirmed');
+
+    const chat = (await prisma.classifiedConversation.findFirstOrThrow({ where: { listingId: tv.id, buyerId: buyer.id } }));
+    const pressure = await seller.post(`/v1/classifieds/conversations/${chat.id}/report`, { reason: 'review_pressure', details: 'Offered a refund to change my review' });
+    assert.equal(pressure.status, 201, JSON.stringify(pressure.json));
+    assert.equal(pressure.json.reason, 'review_pressure');
+    assert.equal((await buyer.post('/v1/classifieds/reports', { listing_id: tv.id, reason: 'review_pressure' })).status, 400, 'listings are not reported for it');
+  });
 });

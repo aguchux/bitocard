@@ -337,7 +337,7 @@ export function ListingActions({
       ) : (
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
-      {signedIn && viewer && canContact ? <RateSellerButton listingId={listing.id} seller={listing.seller ?? "the seller"} /> : null}
+      {signedIn && viewer && canContact ? <RateSellerButton listingId={listing.id} seller={listing.seller ?? "the seller"} ask={Boolean(shared || viewer?.callback?.request?.status === "done")} /> : null}
       {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} /> : null}
       <div className={variant === "seller" ? "hidden" : "text-center"}>
         {signedIn ? (

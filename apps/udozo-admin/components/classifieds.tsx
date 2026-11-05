@@ -55,6 +55,7 @@ export const reportReasonLabels: Record<ClassifiedReportReason, string> = {
   sold: "Already sold",
   offensive: "Offensive",
   other: "Other",
+  review_pressure: "Pressure over a review",
 };
 
 export const orderStatusLabels: Record<ClassifiedOrderStatus, string> = {

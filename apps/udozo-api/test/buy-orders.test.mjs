@@ -129,7 +129,7 @@ describe('Buy orders', () => {
     assert.deepEqual([listing.stock, listing.status], [0, 'sold']);
     assert.equal(await notices(buyer.id, 'customer.classifieds.buy_completed'), 1);
     const mine = (await buyer.get(`/v1/classifieds/buy-orders/${asked.json.id}`)).json;
-    assert.deepEqual(mine.actions, ['void']);
+    assert.deepEqual(mine.actions, ['confirm', 'void'], 'Yes, I bought it, or not');
     assert.ok(mine.void_until);
 
     // The job closes the other buyer's request on the sold listing.

@@ -33,7 +33,13 @@ export type AdminScoresReport = {
   sellers: number;
   bands: Array<{ band: string | null; label: string; count: number }>;
   summaries: { written: number; hidden: number; reported: number; this_month: { count: number; cost_usd: number } };
+  /** The last 90 days. */
+  moderation?: {
+    reviews: { total: number; held: AdminRate; removed: AdminRate; reported: AdminRate };
+    ratings: { total: number; flagged: AdminRate; excluded: AdminRate };
+  };
 };
+export type AdminRate = { count: number; pct: number };
 
 const tag = (id: string) => ({ type: 'ClassifiedSeller' as const, id: `scores:${id}` });
 const reportTag = { type: 'ClassifiedSeller' as const, id: 'SCORES_REPORT' };

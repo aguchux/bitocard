@@ -260,6 +260,12 @@ export class BuyOrdersService {
         return this.present(await this.reload(id), customer.id);
       case 'void':
         return this.void(customer, order, reason);
+      case 'confirm': {
+        // Yes, I bought it: the sale stands (no longer to confirm in Reviews); they can still say otherwise within 7 days.
+        const claimed = await this.prisma.classifiedBuyOrder.updateMany({ where: { id: order.id, status: 'completed', buyerConfirmedAt: null }, data: { buyerConfirmedAt: new Date() } });
+        if (!claimed.count) throw conflict('buy_order_changed', 'This buy order has changed. Refresh to see where it stands.');
+        return this.present(await this.reload(id), customer.id);
+      }
     }
   }
 
@@ -588,11 +594,12 @@ export class BuyOrdersService {
   }
 
   private refusal(order: OrderRow, side: BuyOrderSide, action: BuyOrderAction) {
-    if (!openBuyOrderStatuses.includes(order.status as BuyOrderStatus) && !(action === 'void' && order.status === 'completed')) return conflict('buy_order_closed', 'This buy order has ended.');
-    const theirs: Record<BuyOrderAction, BuyOrderSide | 'either'> = { accept: 'seller', counter: 'seller', decline: 'seller', complete: 'seller', extend: 'seller', accept_counter: 'buyer', bought: 'buyer', void: 'buyer', cancel: 'either', no_show: 'either' };
+    if (!openBuyOrderStatuses.includes(order.status as BuyOrderStatus) && !((action === 'void' || action === 'confirm') && order.status === 'completed')) return conflict('buy_order_closed', 'This buy order has ended.');
+    const theirs: Record<BuyOrderAction, BuyOrderSide | 'either'> = { accept: 'seller', counter: 'seller', decline: 'seller', complete: 'seller', extend: 'seller', accept_counter: 'buyer', bought: 'buyer', void: 'buyer', confirm: 'buyer', cancel: 'either', no_show: 'either' };
     const owner = theirs[action];
     if (owner !== 'either' && owner !== side) return forbidden('buy_order_not_yours', owner === 'seller' ? 'Only the seller can do this.' : 'Only the buyer can do this.');
-    if (action === 'void') return conflict('void_closed', 'You can only say you did not buy it within 7 days of the seller marking it sold.');
+    if (action === 'confirm' && order.buyerConfirmedAt) return conflict('buy_order_confirmed', 'You already said you bought it.');
+    if (action === 'void' || action === 'confirm') return conflict('void_closed', 'You can only say you did not buy it within 7 days of the seller marking it sold.');
     return conflict('buy_order_not_pending', `This buy order is ${order.status.replace('_', ' ')}, so that cannot be done now.`);
   }
 

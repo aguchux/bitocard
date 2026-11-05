@@ -57,6 +57,8 @@ export function buyQuestion(action: ShopBuyOrderAction, order: Pick<ShopBuyOrder
       return { title: `Did you buy ${title}?`, body: `${name} is asked to confirm. If they say nothing, it is recorded as bought in 3 days.`, action: "Yes, I bought it", tone: "money" };
     case "complete":
       return { title: `Mark ${title} sold to ${name}?`, body: "Only once they have paid you and have the item. The sale is recorded on Udozo, and your stock goes down.", action: "Mark sold", tone: "money" };
+    case "confirm":
+      return { title: `You bought ${title}?`, body: `Thanks. The sale stands, and you can rate ${name}. If something is wrong, you can still say you did not buy it within 7 days.`, action: "Yes, I bought it", tone: "money" };
     case "void":
       return { title: "You did not buy this?", body: `Udozo removes the sale from your record and tells ${name}. Marking sales that did not happen breaks Udozo's terms.`, action: "I did not buy this", tone: "danger", reason: { label: "What happened", required: true, maxLength: 300 } };
   }

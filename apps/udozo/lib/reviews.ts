@@ -10,6 +10,9 @@ export const reviewPageSize = 10;
 export const negativeMinChars = 20;
 export const maxReviewBody = 1000;
 export const maxPostBody = 600;
+/** One's own reply can be changed this long after it was written (the API's rule too). */
+export const postEditMs = 15 * 60_000;
+export const canEditPost = (post: { mine?: boolean; removed: boolean; created_at: string }, now = Date.now()) => Boolean(post.mine) && !post.removed && now - Date.parse(post.created_at) < postEditMs;
 
 /** "98% positive · 120 reviews", or "3 reviews" before the share shows; null with none. */
 export function summaryText(summary: ShopReviewSummary | null | undefined) {

@@ -7,7 +7,8 @@ import type { List } from './types';
 export const classifiedListingStatuses = ['draft', 'pending_review', 'active', 'sold', 'expired', 'rejected', 'removed', 'deleted'] as const;
 export type ClassifiedListingStatus = (typeof classifiedListingStatuses)[number];
 export type ClassifiedReviewFlag = 'first_listings' | 'prohibited_words' | 'price_low' | 'photo_reused' | 'posting_fast' | 'reported';
-export type ClassifiedReportReason = 'scam' | 'prohibited' | 'wrong_category' | 'duplicate' | 'sold' | 'offensive' | 'other';
+/** `review_pressure`: chats only (Udozo): a refund or discount offered to change a review, or something demanded for one. */
+export type ClassifiedReportReason = 'scam' | 'prohibited' | 'wrong_category' | 'duplicate' | 'sold' | 'offensive' | 'other' | 'review_pressure';
 export type ClassifiedReportStatus = 'open' | 'dismissed' | 'actioned';
 
 export type ClassifiedListing = {

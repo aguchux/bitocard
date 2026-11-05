@@ -16,7 +16,7 @@ import { ListingsService } from './listings.service.js';
 import { type DisputeReason, disputeReasons, SafePayService, type ShipmentUpdate, shipmentUpdates } from './safe-pay.service.js';
 import { FavouritesService } from './favourites.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
-import { ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
+import { type ChatReportReason, chatReportReasons, ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
 import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ShopDirectoryService } from './directory.service.js';
@@ -255,8 +255,8 @@ class ChatPageDto {
 }
 
 class ChatReportDto {
-  @IsIn(reportReasons)
-  reason: ReportReason;
+  @IsIn(chatReportReasons)
+  reason: ChatReportReason;
 
   @IsOptional() @IsString() @MaxLength(1000)
   details?: string;
