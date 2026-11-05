@@ -1,5 +1,5 @@
 """Generates every logo file from each brand's master artwork: BitoCard's assets/logo.png (the lowercase "b" mark) for
-BitoCard's apps, Udozo's placeholder "u" (assets/udozo/drafts/mark-placeholder.png) for its apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
+BitoCard's apps, Udozo's logo (assets/udozo/logo.png: the blue script "u" on a grey disc) for its apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
 master arrives) for apps/afrippa.
 
 Run from the repository root after the logo changes: python scripts/brand-assets.py (needs Pillow and NumPy).
@@ -31,8 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BRANDS = [
     ("bitocard", ROOT / "assets" / "logo.png", ["storefront", "docs", "legals", "admin", "shq", "verify"]),
     ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa", "afrippa-admin"]),
-    # Udozo's placeholder "u" (scripts/udozo-mark-draft.py) until its artwork arrives (docs/UDOZO_SPINOFF_PLAN.md).
-    ("udozo", ROOT / "assets" / "udozo" / "drafts" / "mark-placeholder.png", ["udozo", "udozo-shq", "udozo-admin"]),
+    ("udozo", ROOT / "assets" / "udozo" / "logo.png", ["udozo", "udozo-shq", "udozo-admin"]),
 ]
 
 # Apps deployed a second time in another brand: that brand's whole set (marks, favicons, app and manifest icons) goes in
@@ -68,6 +67,21 @@ def load_clean(source):
     box = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1))
     print(f"Navy {tuple(int(v) for v in navy_colour)}, pink {tuple(int(v) for v in pink_colour)}")
     return colour[box], alpha[box], pink[box], pink_colour
+
+
+# Brands whose artwork is used in its own colours, never recoloured: Udozo's "u" sits on its own grey disc, which reads
+# on white and on navy alike, so its light files are the artwork itself (white on the grey disc would barely show).
+AS_DRAWN = {"udozo"}
+
+
+def load_as_drawn(source):
+    """The artwork as it is, cropped to its drawing (near-transparent strays removed)."""
+    rgba = np.asarray(Image.open(source).convert("RGBA")).astype(np.float64)
+    rgb, alpha = rgba[..., :3], rgba[..., 3]
+    alpha[alpha < 4] = 0
+    ys, xs = np.nonzero(alpha > 0)
+    box = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1))
+    return rgb[box], alpha[box]
 
 
 def image(colour, alpha):
@@ -160,9 +174,12 @@ def main():
 
 
 def write_brand(brand, source, apps):
-    colour, alpha, pink, pink_colour = load_clean(source)
-    dark = image(colour, alpha)
-    white = image(light(pink, pink_colour), alpha)
+    if brand in AS_DRAWN:
+        dark = white = image(*load_as_drawn(source))
+    else:
+        colour, alpha, pink, pink_colour = load_clean(source)
+        dark = image(colour, alpha)
+        white = image(light(pink, pink_colour), alpha)
     outputs = {}
     for name, mark in (("", dark), ("-light", white)):
         tight = mark.resize((round(mark.width * MARK_HEIGHT / mark.height), MARK_HEIGHT), Image.LANCZOS)
