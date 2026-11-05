@@ -30,6 +30,7 @@ import { ProductOnly } from '../products/product.js';
 import { SellerProfilesService } from './sellers.service.js';
 import { sellerKeyPattern } from './usernames.service.js';
 import { BuyOrdersService } from './buy-orders/buy-orders.service.js';
+import { ReviewsService } from './reviews/reviews.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -283,6 +284,7 @@ export class ClassifiedReferenceController {
     private readonly search: ListingSearchService,
     private readonly directory: ShopDirectoryService,
     private readonly sellers: SellerProfilesService,
+    private readonly reviews: ReviewsService,
   ) {}
 
   /** The countries BitoCard Shop is open in, with their live listings, and whether the global showcase is on. */
@@ -330,8 +332,10 @@ export class ClassifiedReferenceController {
   /** A listing's public page by its number (`/ng/l/<ref>-<slug>`); 410 once gone. */
   @Get('listings/:ref')
   @Header('Cache-Control', 'public, max-age=60')
-  listing(@Param('ref', ParseIntPipe) ref: number, @Query() query: CountryDto) {
-    return this.search.listing(query.country, ref);
+  async listing(@Param('ref', ParseIntPipe) ref: number, @Query() query: CountryDto) {
+    const page = await this.search.listing(query.country, ref);
+    // Udozo: the latest reviews of this product (same brand and model) from this seller, where reviews are open.
+    return { ...page, product_reviews: await this.reviews.forListing(page.id) };
   }
 
   /**

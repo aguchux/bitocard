@@ -6,6 +6,7 @@ import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { BuyOrdersService } from '../classifieds/buy-orders/buy-orders.service.js';
+import { ReviewsService } from '../classifieds/reviews/reviews.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
 import { CallsService } from '../classifieds/calls.service.js';
 import { DiscoveryAdminService } from '../classifieds/discovery/discovery-admin.service.js';
@@ -114,6 +115,7 @@ export class CronController {
     discovery: DiscoveryAdminService,
     watermarks: WatermarkService,
     buyOrders: BuyOrdersService,
+    reviews: ReviewsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -189,7 +191,7 @@ export class CronController {
        * discovery's "people also viewed" is rebuilt, and its events (90 days), idle profiles (180 days) and searches per
        * day (13 months) deleted.
        */
-      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld() }),
+      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld(), reviews: await reviews.purge() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the
@@ -219,6 +221,7 @@ export class CronController {
       classifieds: async () => ({
         safe_pay: await safePay.runDue(),
         buy_orders: await buyOrders.job(),
+        reviews: await reviews.remind(),
         listings: await listings.expireDue(),
         stale_videos: await listingMedia.failStale(),
         offers: await conversations.expireOffers(),

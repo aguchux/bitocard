@@ -2755,6 +2755,12 @@ model Customer {
   classifiedSelling         ClassifiedConversation[]  @relation("ClassifiedSelling")
   classifiedBuyOrdersBuying  ClassifiedBuyOrder[]      @relation("ClassifiedBuyOrdersBuying")
   classifiedBuyOrdersSelling ClassifiedBuyOrder[]      @relation("ClassifiedBuyOrdersSelling")
+  classifiedPurchasesSold    ClassifiedPurchase[]      @relation("ClassifiedPurchasesSold")
+  classifiedPurchasesBought  ClassifiedPurchase[]      @relation("ClassifiedPurchasesBought")
+  classifiedReviewsWritten   ClassifiedReview[]        @relation("ClassifiedReviewsWritten")
+  classifiedReviewsReceived  ClassifiedReview[]        @relation("ClassifiedReviewsReceived")
+  classifiedReviewPosts      ClassifiedReviewPost[]    @relation("ClassifiedReviewPosts")
+  classifiedReviewReports    ClassifiedReviewReport[]  @relation("ClassifiedReviewReports")
   classifiedLeads           ClassifiedLead[]
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
@@ -4653,6 +4659,10 @@ model ClassifiedMarketSettings {
   buyMeetDays           Int      @default(7) @map("buy_meet_days")
   buyOpenPerBuyer       Int      @default(10) @map("buy_open_per_buyer")
   buyRequestsPerDay     Int      @default(20) @map("buy_requests_per_day")
+  /// Udozo reviews: whether Neutral is offered, days a purchase can be reviewed, counted reviews before the positive share shows.
+  reviewsNeutral        Boolean  @default(false) @map("reviews_neutral")
+  reviewWindowDays      Int      @default(30) @map("review_window_days")
+  reviewMinShown        Int      @default(3) @map("review_min_shown")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("classified_market_settings")
@@ -4747,6 +4757,8 @@ model ClassifiedListing {
   favourites   ClassifiedFavourite[]
   contactRequests ClassifiedContactRequest[]
   buyOrders       ClassifiedBuyOrder[]
+  purchases       ClassifiedPurchase[]
+  reviews         ClassifiedReview[]
   calls        ClassifiedCall[]
   chats        ClassifiedConversation[]
   orders       ClassifiedOrder[]
@@ -4947,6 +4959,8 @@ model ClassifiedSeller {
   /// Udozo: new buy orders on their listings are refused until then (buyers' voids, or an admin), and why.
   buyOrdersPausedUntil  DateTime? @map("buy_orders_paused_until")
   buyOrdersPausedReason String?   @map("buy_orders_paused_reason")
+  /// Udozo: cannot write reviews until then (a fake or extorting reviewer).
+  reviewsBlockedUntil   DateTime? @map("reviews_blocked_until")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -5101,6 +5115,7 @@ model ClassifiedBuyOrder {
   buyer            Customer                @relation("ClassifiedBuyOrdersBuying", fields: [buyerId], references: [id], onDelete: Cascade)
   seller           Customer                @relation("ClassifiedBuyOrdersSelling", fields: [sellerId], references: [id], onDelete: Cascade)
   messages         ClassifiedMessage[]
+  purchase         ClassifiedPurchase?
 
   @@index([buyerId, createdAt])
   @@index([sellerId, createdAt])
@@ -5108,6 +5123,133 @@ model ClassifiedBuyOrder {
   @@index([status, respondBy])
   @@index([status, meetBy])
   @@map("classified_buy_orders")
+}
+
+/// Udozo: a completed purchase (a released Safe pay order or a buy order marked sold): the right to review the seller
+/// once, and to join the conversation on reviews of the same product from the same seller.
+model ClassifiedPurchase {
+  id             String                 @id @default(uuid()) @db.Uuid
+  /// safe_pay or buy_order (exactly one of orderId and buyOrderId, a database check).
+  source         String
+  orderId        String?                @unique @map("order_id") @db.Uuid
+  buyOrderId     String?                @unique @map("buy_order_id") @db.Uuid
+  listingId      String                 @map("listing_id") @db.Uuid
+  sellerId       String                 @map("seller_id") @db.Uuid
+  buyerId        String                 @map("buyer_id") @db.Uuid
+  country        String                 @db.Char(2)
+  /// `bm:<brand>:<model>` (letters and digits), else `l:<listing id>`: what "the same product" means.
+  productKey     String                 @map("product_key")
+  productLabel   String                 @map("product_label")
+  completedAt    DateTime               @map("completed_at")
+  reviewClosesAt DateTime               @map("review_closes_at")
+  remind1At      DateTime?              @map("remind1_at")
+  remind2At      DateTime?              @map("remind2_at")
+  dismissedAt    DateTime?              @map("dismissed_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  order          ClassifiedOrder?       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyOrder       ClassifiedBuyOrder?    @relation(fields: [buyOrderId], references: [id], onDelete: Cascade)
+  listing        ClassifiedListing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  seller         Customer               @relation("ClassifiedPurchasesSold", fields: [sellerId], references: [id], onDelete: Cascade)
+  buyer          Customer               @relation("ClassifiedPurchasesBought", fields: [buyerId], references: [id], onDelete: Cascade)
+  review         ClassifiedReview?
+  posts          ClassifiedReviewPost[]
+
+  @@index([buyerId, completedAt])
+  @@index([sellerId, productKey])
+  @@index([completedAt])
+  @@map("classified_purchases")
+}
+
+/// Udozo: a buyer's review of a seller after a purchase: positive, neutral or negative, with aspects and words.
+model ClassifiedReview {
+  id               String                   @id @default(uuid()) @db.Uuid
+  purchaseId       String                   @unique @map("purchase_id") @db.Uuid
+  reviewerId       String                   @map("reviewer_id") @db.Uuid
+  sellerId         String                   @map("seller_id") @db.Uuid
+  listingId        String                   @map("listing_id") @db.Uuid
+  country          String                   @db.Char(2)
+  source           String
+  productKey       String                   @map("product_key")
+  productLabel     String                   @map("product_label")
+  /// positive, neutral or negative.
+  rating           String
+  /// { described, communication, handover }: up or down each.
+  aspects          Json                     @default("{}")
+  body             String?
+  /// published, held (for a moderator), removed (by Udozo) or withdrawn (by the reviewer).
+  status           String                   @default("published")
+  heldReason       String?                  @map("held_reason")
+  removedReason    String?                  @map("removed_reason")
+  edits            Int                      @default(0)
+  /// Every earlier version, for moderators.
+  versions         Json                     @default("[]")
+  editedAfterReply Boolean                  @default(false) @map("edited_after_reply")
+  lockedAt         DateTime?                @map("locked_at")
+  postCount        Int                      @default(0) @map("post_count")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  purchase         ClassifiedPurchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  reviewer         Customer                 @relation("ClassifiedReviewsWritten", fields: [reviewerId], references: [id], onDelete: Cascade)
+  seller           Customer                 @relation("ClassifiedReviewsReceived", fields: [sellerId], references: [id], onDelete: Cascade)
+  listing          ClassifiedListing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  posts            ClassifiedReviewPost[]
+  reports          ClassifiedReviewReport[]
+
+  @@index([sellerId, status, createdAt])
+  @@index([reviewerId, createdAt])
+  @@index([status, createdAt])
+  @@map("classified_reviews")
+}
+
+/// Udozo: a post in a review's conversation: the seller, the reviewer, or another buyer of the same product.
+model ClassifiedReviewPost {
+  id            String                   @id @default(uuid()) @db.Uuid
+  reviewId      String                   @map("review_id") @db.Uuid
+  authorId      String                   @map("author_id") @db.Uuid
+  /// seller, reviewer or buyer.
+  role          String
+  /// A buyer's purchase of the same product, which gives them the right to post.
+  purchaseId    String?                  @map("purchase_id") @db.Uuid
+  /// A buyer's: agree, disagree or context.
+  stance        String?
+  replyTo       String?                  @map("reply_to") @db.Uuid
+  body          String
+  /// published, removed (by Udozo) or deleted (by its author).
+  status        String                   @default("published")
+  removedReason String?                  @map("removed_reason")
+  editedAt      DateTime?                @map("edited_at")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  review        ClassifiedReview         @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  author        Customer                 @relation("ClassifiedReviewPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  purchase      ClassifiedPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  reports       ClassifiedReviewReport[]
+
+  @@index([reviewId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("classified_review_posts")
+}
+
+/// Udozo: a report of a review or one of its posts, for Udozo's moderators.
+model ClassifiedReviewReport {
+  id          String                @id @default(uuid()) @db.Uuid
+  reviewId    String                @map("review_id") @db.Uuid
+  postId      String?               @map("post_id") @db.Uuid
+  reporterId  String                @map("reporter_id") @db.Uuid
+  reason      String
+  details     String?
+  /// open, upheld or dismissed.
+  status      String                @default("open")
+  decidedById String?               @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime?             @map("decided_at")
+  note        String?
+  createdAt   DateTime              @default(now()) @map("created_at")
+  review      ClassifiedReview      @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  post        ClassifiedReviewPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter    Customer              @relation("ClassifiedReviewReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([reviewId])
+  @@map("classified_review_reports")
 }
 
 /// A buyer's interest in a listing, once per kind (phone revealed, chat started): the seller's leads and the reveal limit.
@@ -5384,6 +5526,7 @@ model ClassifiedOrder {
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
+  purchase                 ClassifiedPurchase?
 
   @@index([resellerId, createdAt])
   @@index([buyerId, createdAt])

@@ -127,7 +127,7 @@ export type ShopListingCard = {
   highlights: string[];
   delivery: ShopDelivery;
   /** The seller by their public name; `handle` names their seller page (Udozo). */
-  seller: { name: string; handle?: string; username?: string | null; badges: ShopBadge[] };
+  seller: { name: string; handle?: string; username?: string | null; badges: ShopBadge[]; rating?: { positive_pct: number; counted: number } | null };
   published_at: string | null;
 };
 /** A search result: its tier (from the buyer's area outwards) when an area or state was given. */
@@ -159,7 +159,9 @@ export type ShopListingPage = {
   /** Units still to be had: its stock less those held for buyers (Safe pay, or buy orders the seller accepted). */
   available?: number;
   contact: { chat: boolean; phone: boolean };
-  seller: { name: string; handle?: string; username?: string | null; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
+  seller: { name: string; handle?: string; username?: string | null; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null; reviews?: ShopReviewSummary | null };
+  /** Udozo: the latest reviews of this product (same brand and model) from this seller, when reviews are open. */
+  product_reviews?: ShopReview[];
   published_at: string | null;
   sold_at: string | null;
 };
@@ -192,6 +194,8 @@ export type ShopSellerProfile = {
   contact: { chat: boolean; phone: boolean };
   /** Their newest live listings taking chats or calls: what a buyer contacting them from their page asks about. */
   contact_listings: Array<{ id: string; ref: number; title: string; slug: string; currency: string; chat: boolean; phone: boolean }>;
+  /** Udozo: their reviews' summary, when reviews are open in the market (null otherwise). */
+  reviews?: ShopReviewSummary | null;
 };
 
 /** A showcase card: never a price (prices belong to each country's pages). */
@@ -1057,3 +1061,114 @@ export type ShopBuyOrder = ShopBuyOrderSummary & {
 };
 
 export type ShopBuyOrders = { object: 'list'; data: ShopBuyOrder[]; waiting: number };
+
+// ---- Reviews (Udozo, docs/UDOZO_RATINGS_PLAN.md phase 1) ----
+
+export type ShopReviewRating = 'positive' | 'neutral' | 'negative';
+export type ShopReviewSource = 'safe_pay' | 'buy_order';
+export type ShopReviewAspect = 'described' | 'communication' | 'handover';
+export type ShopReviewAspects = Partial<Record<ShopReviewAspect, 'up' | 'down'>>;
+export type ShopReviewStance = 'agree' | 'disagree' | 'context';
+export type ShopReviewReportReason = 'fake' | 'not_a_buyer' | 'offensive' | 'personal_info' | 'contact_or_links' | 'threat_or_extortion' | 'off_topic' | 'other';
+
+export const reviewRatingLabels: Record<ShopReviewRating, string> = { positive: 'Positive', neutral: 'Neutral', negative: 'Negative' };
+export const reviewAspectLabels: Record<ShopReviewAspect, string> = { described: 'As described', communication: 'Communication', handover: 'Hand-over' };
+export const reviewStanceLabels: Record<ShopReviewStance, string> = { agree: 'Agrees', disagree: 'Disagrees', context: 'Adds context' };
+export const reviewSourceLabels: Record<ShopReviewSource, string> = { safe_pay: 'Safe pay purchase', buy_order: 'Buy order' };
+export const reviewReportReasonLabels: Record<ShopReviewReportReason, string> = {
+  fake: 'It looks fake',
+  not_a_buyer: 'They did not buy it',
+  offensive: 'Offensive or abusive',
+  personal_info: "Someone's personal details",
+  contact_or_links: 'Contact details or links',
+  threat_or_extortion: 'A threat, or asking for something to change it',
+  off_topic: 'Not about the seller or the item',
+  other: 'Something else',
+};
+
+/** A seller's reviews of the last 12 months, one voice per reviewer; the positive share once enough count (neutral left out). */
+export type ShopReviewSummary = { positive: number; neutral: number; negative: number; counted: number; positive_pct: number | null };
+
+export type ShopReviewPost = {
+  id: string;
+  role: 'seller' | 'reviewer' | 'buyer';
+  name: string;
+  avatar_url: string | null;
+  stance: ShopReviewStance | null;
+  reply_to: string | null;
+  /** Null once Udozo removed it. */
+  body: string | null;
+  removed: boolean;
+  edited: boolean;
+  /** Written by the reader (signed in), who may edit it within 15 minutes or delete it. */
+  mine?: boolean;
+  created_at: string;
+};
+
+export type ShopReview = {
+  object: 'classified_review';
+  id: string;
+  rating: ShopReviewRating;
+  aspects: ShopReviewAspects;
+  body: string | null;
+  reviewer: { name: string; avatar_url: string | null };
+  /** The seller, for links to their page. */
+  seller: { name: string; handle: string; username: string | null; country: string | null };
+  product: { key: string; label: string };
+  source: ShopReviewSource;
+  /** When it was bought, as YYYY-MM. */
+  month: string;
+  edited: boolean;
+  edited_after_reply: boolean;
+  locked: boolean;
+  post_count: number;
+  /** The conversation (the first few on lists, all on the review's own page). */
+  posts: ShopReviewPost[];
+  /** Only to its author: published, held, removed or withdrawn. */
+  status?: 'published' | 'held' | 'removed' | 'withdrawn';
+  created_at: string;
+};
+
+export type ShopSellerReviews = {
+  object: 'list';
+  summary: ShopReviewSummary;
+  /** The seller's products with reviews, most reviewed first (the filter chips). */
+  products: Array<{ key: string; label: string; count: number }>;
+  data: ShopReview[];
+  total: number;
+};
+
+export type ShopReviewViewer = {
+  object: 'classified_review_viewer';
+  /** reviewer, seller, or buyer (of the same product from the same seller); null: cannot post. */
+  role: 'seller' | 'reviewer' | 'buyer' | null;
+  can_post: boolean;
+  posts_left: number;
+  /** Why not, in words, when signed in and not allowed. */
+  reason: string | null;
+  can_report: boolean;
+  own_review: boolean;
+  can_edit: boolean;
+};
+
+export type ShopPurchase = {
+  object: 'classified_purchase';
+  id: string;
+  source: ShopReviewSource;
+  /** The Safe pay order or buy order it came from. */
+  order_id: string | null;
+  buy_order_id: string | null;
+  listing: { id: string; title: string | null; path: string; cover_url: string | null };
+  seller: { name: string; handle: string; username: string | null };
+  product_label: string;
+  completed_at: string;
+  review_closes_at: string;
+  can_review: boolean;
+  dismissed: boolean;
+  /** Neutral is offered in the market. */
+  neutral_allowed: boolean;
+  review: ShopReview | null;
+};
+
+export type ShopPurchases = { object: 'list'; data: ShopPurchase[]; to_review: number };
+export type ShopMyReviews = { object: 'list'; data: Array<ShopReview & { listing: { title: string | null; path: string } }> };

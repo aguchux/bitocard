@@ -7,6 +7,7 @@ import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { ClassifiedBrandsService } from './brands.service.js';
 import { brandFeatureKey, conditions, featureValueOut, heldUnits, invalid, onShopWhere, readSku } from './rules.js';
+import { ReviewStatsService } from './reviews/stats.service.js';
 
 /** Areas whose centres are this close count as nearby. */
 export const nearbyKm = 25;
@@ -87,6 +88,7 @@ export class ListingSearchService {
     private readonly leads: LeadsService,
     private readonly brands: ClassifiedBrandsService,
     private readonly watermarks: WatermarkService,
+    private readonly reviewStats: ReviewStatsService,
   ) {}
 
   private async features(filters: string[] | undefined) {
@@ -221,6 +223,12 @@ export class ListingSearchService {
       },
     });
     const checked = await this.idChecked(rows.map(row => row.customerId));
+    // Sellers' positive share, per market where reviews are open (one read per market on the page).
+    const ratings = new Map<string, { positive_pct: number; counted: number } | null>();
+    for (const country of new Set(rows.map(row => row.country))) {
+      const summaries = await this.reviewStats.summaries(rows.filter(row => row.country === country).map(row => row.customerId), country);
+      for (const [id, summary] of summaries ?? []) ratings.set(`${country}:${id}`, summary.positive_pct === null ? null : { positive_pct: summary.positive_pct, counted: summary.counted });
+    }
     return new Map(
       rows.map(row => {
         const photos = row.media.filter(item => item.kind === 'photo');
@@ -243,7 +251,7 @@ export class ListingSearchService {
             has_video: row.media.some(item => item.kind === 'video'),
             highlights: highlights(row.features, row.category?.features ?? []),
             delivery: row.delivery,
-            seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, badges: this.badges(row.customer, checked) },
+            seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, badges: this.badges(row.customer, checked), rating: ratings.get(`${row.country}:${row.customerId}`) ?? null },
             published_at: row.publishedAt?.toISOString() ?? null,
           },
         ] as const;
@@ -288,12 +296,13 @@ export class ListingSearchService {
     // A listing sold only through resellers' stores has no page on BitoCard Shop.
     if (!row || row.country !== code || !row.onShop || ['draft', 'pending_review'].includes(row.status)) throw notFound();
     if (row.status === 'sold' ? !row.soldAt || Date.now() - row.soldAt.getTime() > soldVisibleMs : row.status !== 'active') throw gone();
-    const [checked, active, responseRate, holding, brand] = await Promise.all([
+    const [checked, active, responseRate, holding, brand, reviews] = await Promise.all([
       this.idChecked([row.customerId]),
       this.prisma.classifiedListing.count({ where: { customerId: row.customerId, ...onShopWhere } }),
       this.leads.responseRate(row.customerId),
       heldUnits(this.prisma, row.id),
       this.brands.lookup(row.features.find(value => value.feature.key === brandFeatureKey)?.valueText),
+      this.reviewStats.summary(row.customerId, row.country),
     ]);
     const order = new Map(row.category!.features.map(link => [link.featureId, link.position]));
     const photos = row.media.filter(item => item.kind === 'photo');
@@ -331,7 +340,7 @@ export class ListingSearchService {
       /** Units still to be had: its stock less those paid for and waiting to be handed over. */
       available: Math.max(row.stock - holding, 0),
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
-      seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, avatar_url: row.customer.avatarUrl, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
+      seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, avatar_url: row.customer.avatarUrl, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate, reviews },
       published_at: row.publishedAt?.toISOString() ?? null,
       sold_at: row.soldAt?.toISOString() ?? null,
     };

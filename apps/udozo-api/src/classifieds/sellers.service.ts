@@ -6,6 +6,7 @@ import { ListingsService, shopOrigin } from './listings.service.js';
 import { ListingSearchService, publicName } from './search.service.js';
 import { onShopWhere } from './rules.js';
 import { UsernamesService } from './usernames.service.js';
+import { ReviewStatsService } from './reviews/stats.service.js';
 
 /** A seller's handle: 10 lower-case letters and digits (`customers.seller_handle`). */
 export const sellerHandlePattern = /^[a-z0-9]{6,12}$/;
@@ -28,6 +29,7 @@ export class SellerProfilesService {
     private readonly search: ListingSearchService,
     private readonly leads: LeadsService,
     private readonly usernames: UsernamesService,
+    private readonly reviewStats: ReviewStatsService,
   ) {}
 
   /**
@@ -52,7 +54,7 @@ export class SellerProfilesService {
     await this.listings.requireOpen(country);
     const inMarket = { ...live, country };
 
-    const [byCategory, byState, sold, sales, responseRate, badges, contactRows, latest] = await Promise.all([
+    const [byCategory, byState, sold, sales, responseRate, badges, contactRows, latest, reviews] = await Promise.all([
       this.prisma.classifiedListing.groupBy({ by: ['categoryId'], where: inMarket, _count: { _all: true } }),
       this.prisma.classifiedListing.groupBy({ by: ['stateId'], where: inMarket, _count: { _all: true } }),
       this.prisma.classifiedListing.count({ where: { customerId: customer.id, country, status: 'sold', onShop: true } }),
@@ -66,6 +68,7 @@ export class SellerProfilesService {
         select: { id: true, ref: true, title: true, slug: true, currency: true, contact: true },
       }),
       this.prisma.classifiedListing.findFirst({ where: inMarket, orderBy: { publishedAt: 'desc' }, select: { publishedAt: true } }),
+      this.reviewStats.summary(customer.id, country),
     ]);
     const [categories, states] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { id: { in: byCategory.map(row => row.categoryId).filter((id): id is string => Boolean(id)) } }, include: { parent: true } }),
@@ -102,6 +105,8 @@ export class SellerProfilesService {
       /** How buyers can reach them: by chat and by phone (calls and call backs) on any of their listings. */
       contact: { chat: contactRows.some(row => row.contact !== 'phone'), phone: phone && contactRows.some(row => row.contact !== 'chat') },
       /** Their newest live listings that take chats or calls: what a buyer contacting them from this page is asking about. */
+      /** Their reviews' summary where reviews are open in the market (null otherwise). */
+      reviews,
       contact_listings: contactRows.map(row => ({ id: row.id, ref: Number(row.ref), title: row.title!, slug: row.slug!, currency: row.currency, chat: row.contact !== 'phone', phone: phone && row.contact !== 'chat' })),
     };
   }

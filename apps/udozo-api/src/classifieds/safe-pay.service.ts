@@ -25,6 +25,8 @@ import type { MediaUpload } from './media.service.js';
 import { heldUnits, invalid, isOnShop, priceText } from './rules.js';
 import { publicName } from './search.service.js';
 import { ShopTermsService } from './terms.service.js';
+import { recordPurchase } from './reviews/purchases.js';
+import { ReviewsService } from './reviews/reviews.service.js';
 
 const hourMs = 3_600_000;
 const dayMs = 24 * hourMs;
@@ -144,6 +146,7 @@ export class SafePayService {
     private readonly emails: ShopEmails,
     private readonly discovery: DiscoveryRecorder,
     private readonly watermarks: WatermarkService,
+    private readonly reviews: ReviewsService,
   ) {}
 
   private encryption() {
@@ -1198,6 +1201,10 @@ export class SafePayService {
           WHERE "id" = ${order.listingId}::uuid`;
       }
       if (order.kind === 'resale') await this.resaleEvents?.changed(tx, order.id);
+      // A live direct sale released (wholly or in part) is a purchase: its buyer may review the seller.
+      if (status !== 'refunded' && order.kind === 'direct' && order.mode === 'live') {
+        await recordPurchase(tx, { source: 'safe_pay', orderId: order.id, listingId: order.listingId, sellerId: order.sellerId, buyerId: order.buyerId, country: order.country, completedAt: now });
+      }
     });
     if (order.kind === 'resale') this.resaleEvents?.committed();
     const done = await this.reload(order.id);
@@ -1220,6 +1227,10 @@ export class SafePayService {
       await this.noteInChat(done, 'Safe pay released the money to the seller.');
     }
     if (refund !== null) await this.tell(done, 'buyer', 'customer.classifieds.order_refunded', `SP-${done.number} was refunded`, `${priceText(refund, order.currency)} is back in your wallet.`);
+    if (status !== 'refunded' && done.kind === 'direct') {
+      const purchase = await this.prisma.classifiedPurchase.findUnique({ where: { orderId: done.id }, select: { id: true, productLabel: true } });
+      if (purchase) await this.reviews.invite({ id: done.buyer.id, storeId: done.buyer.storeId }, { country: done.country, sellerName: done.seller.name, productLabel: purchase.productLabel, subject: purchase.id });
+    }
   }
 
   // ---- Helpers ----

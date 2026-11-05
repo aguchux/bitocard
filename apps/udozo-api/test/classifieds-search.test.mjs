@@ -142,7 +142,7 @@ describe('search', () => {
     assert.deepEqual(card.price, { kind: 'fixed', amount: 28000000, currency: 'NGN' });
     assert.deepEqual([card.cover.url.endsWith('/0.jpg'), card.photo_count, card.area.name, card.area.state.name], [true, 4, 'Ikeja', 'Lagos']);
     // Every Udozo seller confirmed their mobile at sign-up.
-    assert.deepEqual(card.seller, { name: 'Chinedu O.', handle: card.seller.handle, username: null, badges: ['phone_confirmed'] });
+    assert.deepEqual(card.seller, { name: 'Chinedu O.', handle: card.seller.handle, username: null, badges: ['phone_confirmed'], rating: null });
     assert.match(card.seller.handle, /^[a-z0-9]{10}$/, 'the handle naming their seller page, never their account id');
     const amina = (await get('/v1/classifieds/listings?country=NG&q=tecno')).json.data[0];
     assert.deepEqual(amina.seller.badges, ['phone_confirmed']);

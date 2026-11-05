@@ -17,6 +17,8 @@ import { SafePayGuardsService } from '../safe-pay-guards.service.js';
 import { publicName } from '../search.service.js';
 import { ShopEmails } from '../shop-emails.service.js';
 import { ShopTermsService } from '../terms.service.js';
+import { recordPurchase } from '../reviews/purchases.js';
+import { ReviewsService } from '../reviews/reviews.service.js';
 import {
   actionsFor,
   autoCompleteMs,
@@ -93,6 +95,7 @@ export class BuyOrdersService {
     private readonly audit: AuditService,
     private readonly discovery: DiscoveryRecorder,
     private readonly watermarks: WatermarkService,
+    private readonly reviews: ReviewsService,
   ) {}
 
   /** Whether buy orders are open in a market (the `classifieds_buy_orders` switch). */
@@ -313,6 +316,8 @@ export class BuyOrdersService {
           "updated_at" = ${now}
         WHERE "id" = ${order.listingId}::uuid`;
       await tx.classifiedPriceHistory.updateMany({ where: { listingId: order.listingId, to: null, listing: { status: 'sold' } }, data: { to: now } });
+      // The record of who bought what: the buyer's right to review the seller.
+      await recordPurchase(tx, { source: 'buy_order', buyOrderId: order.id, listingId: order.listingId, sellerId: order.sellerId, buyerId: order.buyerId, country: order.country, completedAt: now });
       await this.card(tx, order, actorId, by === 'auto' ? 'Recorded as sold: the buyer said they bought it and the seller did not answer.' : 'Marked sold. Thank you for trading on Udozo.', now);
     });
     const done = await this.reload(order.id);
@@ -324,6 +329,8 @@ export class BuyOrdersService {
       await this.tell(done, 'buyer', 'customer.classifieds.buy_completed', `Your purchase of “${title}” is recorded`, `${seller}'s sale to you is on Udozo now.`);
       if (by === 'auto') await this.tell(done, 'seller', 'customer.classifieds.buy_completed', `“${title}” was recorded as sold`, `${publicName(order.buyer.name)} said they bought it and you did not answer within 3 days.`);
     }
+    const purchase = await this.prisma.classifiedPurchase.findUnique({ where: { buyOrderId: order.id }, select: { id: true, productLabel: true } });
+    if (purchase) await this.reviews.invite({ id: order.buyer.id, storeId: order.buyer.storeId }, { country: order.country, sellerName: order.seller.name, productLabel: purchase.productLabel, subject: purchase.id });
     return done;
   }
 
@@ -333,6 +340,8 @@ export class BuyOrdersService {
     if (!until || until <= new Date()) throw conflict('void_closed', 'It is more than 7 days since this was marked sold. Contact Udozo if something is wrong.');
     if (!reason) throw invalid('parameter_missing', 'Say what happened.', 'reason');
     await this.step(order, ['completed'], { status: 'voided', voidedAt: new Date(), voidReason: reason }, customer.id, `Said they did not buy it: ${reason}`, { completedBy: 'seller' });
+    // No purchase, so no review of it.
+    await this.prisma.classifiedPurchase.deleteMany({ where: { buyOrderId: order.id } });
     const done = await this.reload(order.id);
     await this.tell(done, 'seller', 'customer.classifieds.buy_voided', `${publicName(customer.name)} said they did not buy “${order.listing.title ?? 'your listing'}”`, 'Only mark a buy order sold once the buyer has bought it. Repeated reports pause your buy orders.');
     const voids = await this.prisma.classifiedBuyOrder.count({ where: { sellerId: order.sellerId, status: 'voided', voidedAt: { gt: new Date(Date.now() - voidWindowCountMs) } } });

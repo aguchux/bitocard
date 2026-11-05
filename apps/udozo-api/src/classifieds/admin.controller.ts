@@ -131,6 +131,16 @@ class MarketSettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(200)
   buy_requests_per_day?: number;
+
+  /** Reviews (docs/UDOZO_RATINGS_PLAN.md phase 1): Neutral offered, days to review a purchase, counted reviews before the share shows. */
+  @IsOptional() @IsBoolean()
+  reviews_neutral?: boolean;
+
+  @IsOptional() @IsInt() @Min(1) @Max(180)
+  review_window_days?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(50)
+  review_min_shown?: number;
 }
 
 class SellersDto {
@@ -358,6 +368,8 @@ export class ClassifiedsAdminService {
       /** New buy orders on their listings are refused until then (buyers' voids, or an admin). */
       buy_orders_paused_until: seller?.buyOrdersPausedUntil && seller.buyOrdersPausedUntil > new Date() ? seller.buyOrdersPausedUntil.toISOString() : null,
       buy_orders_paused_reason: seller?.buyOrdersPausedUntil && seller.buyOrdersPausedUntil > new Date() ? seller.buyOrdersPausedReason : null,
+      /** They cannot write reviews until then (a fake or extorting reviewer). */
+      reviews_blocked_until: seller?.reviewsBlockedUntil && seller.reviewsBlockedUntil > new Date() ? seller.reviewsBlockedUntil.toISOString() : null,
       listings: {
         active: count('active'),
         pending_review: count('pending_review'),
@@ -449,7 +461,8 @@ export class ClassifiedsAdminService {
   async marketSettings(country: string) {
     const row = await this.listings.marketSettings(country);
     return { object: 'classified_market_settings' as const, country, listing_days: row.listingDays, monthly_listing_limit: row.monthlyListingLimit, first_listings_reviewed: row.firstListingsReviewed, min_photos: row.minPhotos, max_photos: row.maxPhotos, username_min_listings: row.usernameMinListings,
-      buy_request_hours: row.buyRequestHours, buy_meet_days: row.buyMeetDays, buy_open_per_buyer: row.buyOpenPerBuyer, buy_requests_per_day: row.buyRequestsPerDay };
+      buy_request_hours: row.buyRequestHours, buy_meet_days: row.buyMeetDays, buy_open_per_buyer: row.buyOpenPerBuyer, buy_requests_per_day: row.buyRequestsPerDay,
+      reviews_neutral: row.reviewsNeutral, review_window_days: row.reviewWindowDays, review_min_shown: row.reviewMinShown };
   }
 
   async setMarketSettings(actorId: string | null, country: string, input: MarketSettingsDto) {
@@ -469,6 +482,9 @@ export class ClassifiedsAdminService {
       ...(input.buy_meet_days !== undefined ? { buyMeetDays: input.buy_meet_days } : {}),
       ...(input.buy_open_per_buyer !== undefined ? { buyOpenPerBuyer: input.buy_open_per_buyer } : {}),
       ...(input.buy_requests_per_day !== undefined ? { buyRequestsPerDay: input.buy_requests_per_day } : {}),
+      ...(input.reviews_neutral !== undefined ? { reviewsNeutral: input.reviews_neutral } : {}),
+      ...(input.review_window_days !== undefined ? { reviewWindowDays: input.review_window_days } : {}),
+      ...(input.review_min_shown !== undefined ? { reviewMinShown: input.review_min_shown } : {}),
     };
     await this.prisma.classifiedMarketSettings.upsert({ where: { country }, create: { country, ...data }, update: data });
     const after = await this.marketSettings(country);

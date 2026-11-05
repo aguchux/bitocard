@@ -65,7 +65,7 @@ export const renewWindowMs = 3 * dayMs;
 /** The limit on new listings counts those submitted in the last 30 days. */
 const limitWindowMs = 30 * dayMs;
 
-const defaults = { listingDays: 30, monthlyListingLimit: 10, firstListingsReviewed: 3, minPhotos: 4, maxPhotos: 12, usernameMinListings: 5, buyRequestHours: 48, buyMeetDays: 7, buyOpenPerBuyer: 10, buyRequestsPerDay: 20 };
+const defaults = { listingDays: 30, monthlyListingLimit: 10, firstListingsReviewed: 3, minPhotos: 4, maxPhotos: 12, usernameMinListings: 5, buyRequestHours: 48, buyMeetDays: 7, buyOpenPerBuyer: 10, buyRequestsPerDay: 20, reviewsNeutral: false, reviewWindowDays: 30, reviewMinShown: 3 };
 
 const listingInclude = {
   category: { include: { parent: true } },
