@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, ShieldCheck, X } from "lucide-react";
 import type { CallView, MicProblem } from "@/lib/call-engine";
+import { RateSellerPrompt } from "../ratings/rate-seller";
 
 /** What the browser says about the microphone for this site: "granted", "prompt", "denied", or unknown (null). */
 type MicPermission = "granted" | "prompt" | "denied" | null;
@@ -162,6 +163,7 @@ export function CallPanel({
           </button>
         ) : null}
       </div>
+      {view.phase === "ended" && view.call?.listing && view.call.answered_at ? <RateSellerPrompt listingId={view.call.listing.id} seller={view.call.with.name} tone="dark" /> : null}
       {help ? (
         <div className="grid gap-3">
           <div className="flex gap-3 rounded-2xl bg-white/10 p-3.5 text-sm">

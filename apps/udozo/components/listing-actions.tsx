@@ -10,6 +10,7 @@ import { track } from "@/lib/discovery-client";
 import { reportListing, requestContact, saveListing } from "@/lib/listing-actions";
 import { useAssistantDraft } from "./assistant";
 import { useCalls } from "./calls/call-provider";
+import { RateSellerButton } from "./ratings/rate-seller";
 import { ChatPanel } from "./chat-panel";
 import { SignInHere } from "./sign-in-here";
 
@@ -29,6 +30,8 @@ type Listing = {
   available?: number;
   /** Buy orders are open in its market (signed out: from the market; signed in: the viewer says). */
   buyOrders?: boolean;
+  /** The seller's public name, for rating how they dealt with the buyer. */
+  seller?: string;
 };
 
 /** A sheet over the page: from the bottom on phones, centred above (a native modal dialog: Escape closes it). */
@@ -334,6 +337,7 @@ export function ListingActions({
       ) : (
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
+      {signedIn && viewer && canContact ? <RateSellerButton listingId={listing.id} seller={listing.seller ?? "the seller"} /> : null}
       {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} /> : null}
       <div className={variant === "seller" ? "hidden" : "text-center"}>
         {signedIn ? (

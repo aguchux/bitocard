@@ -10,6 +10,7 @@ import { answerOffer, blockChat, loadChat, makeOffer, reportChat, sendMessage } 
 import { BuyOrderCard } from "../buy-order";
 import { offerQuestion, useConfirm } from "../confirm-dialog";
 import { useDismiss } from "../dropdown";
+import { RateSellerPrompt } from "../ratings/rate-seller";
 import { SuggestReply } from "./assistant-help";
 
 const pollMs = 4000;
@@ -233,6 +234,8 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
           ))}
         </ol>
       </div>
+
+      {chat.role === "buyer" && !fill ? <RateSellerPrompt key={`${chat.listing.id}:${messages.length >= 3}`} listingId={chat.listing.id} seller={chat.with.name} /> : null}
 
       {blocked ? (
         <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm text-slate-700">{chat.blocked.by_me ? `You blocked ${chat.with.name}. Unblock them from the menu to write again.` : "You cannot write in this chat."}</p>

@@ -1,6 +1,6 @@
 # Udozo seller ratings: three kinds
 
-Status: **phases 0 (buy orders) and 1 (post-purchase reviews) built, 5 November 2026**; phases 2 and 3 planned.
+Status: **phases 0 (buy orders), 1 (post-purchase reviews) and 2 (private interaction ratings) built, 5 November 2026**; phase 3 planned.
 Phase 0 as built differs from the plan below in one way: a buy order is always paid in person (`payment` and
 `order_id` are not stored). Where Safe pay is open, the listing still offers Buy with Safe pay beside Buy this, as its
 own order; both kinds of completed order open reviews. Phase 1 as built differs in these ways: the seller summaries
@@ -9,6 +9,11 @@ are worked out when read (`ReviewStatsService`, last 12 months, one voice per re
 review, Your reviews and About you (no To confirm tab, since buyers void a buy order from its own page); replies can
 be deleted but not edited from udozo.com yet (the API allows edits for 15 minutes); and the chat report reason
 `review_pressure` is not added yet.
+Phase 2 as built differs in these ways: the seller's summary is worked out when read (ratings up to the last midnight,
+UTC, which does what "refreshed nightly" was for) and counts the last 12 months; buyers are asked after a chat (in the
+thread), after an answered call (the call panel) and on the listing's page (Rate how the seller dealt with you), not
+beside each answered request; admins can also put a left-out rating back; and the seller's page is a Private ratings
+tab under Reviews (`/account/ratings`) rather than its own place in the account.
 
 ## Context
 Udozo (udozo.com) has no ratings or reviews today. Buyers judge sellers only by two badges (phone confirmed, ID checked) and "answers N% of chats". The owner wants three kinds of ratings:

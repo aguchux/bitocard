@@ -220,7 +220,7 @@ export default async function ListingPage({ params }: Props) {
             <p className="rounded-2xl bg-navy-50 p-4 text-sm text-navy-700">This was sold{listing.sold_at ? ` ${postedAgo(listing.sold_at).toLowerCase()}` : ""}. Similar listings are below.</p>
           ) : (
             <ListingActions
-              listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href, currency: listing.price.currency, active: listing.status === "active", chat: listing.contact.chat, phone: listing.contact.phone, buyPath: `/${cc}/l/${listing.ref}/buy`, buyHref: buy?.href ?? null, buyLabel: buy?.label ?? "", price: listing.price.amount, available: listing.available, buyOrders: Boolean(market.buy_orders) }}
+              listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href, currency: listing.price.currency, active: listing.status === "active", chat: listing.contact.chat, phone: listing.contact.phone, buyPath: `/${cc}/l/${listing.ref}/buy`, buyHref: buy?.href ?? null, buyLabel: buy?.label ?? "", price: listing.price.amount, available: listing.available, buyOrders: Boolean(market.buy_orders), seller: listing.seller.name }}
               viewer={viewer}
               signedIn={Boolean(customer)}
               chat={chatResult?.ok ? chatResult.data : null}

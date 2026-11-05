@@ -1151,6 +1151,67 @@ export type ShopReviewViewer = {
   can_edit: boolean;
 };
 
+// ---- Udozo: private ratings of how sellers deal with buyers before a sale (docs/UDOZO_RATINGS_PLAN.md phase 2) ----
+
+export type ShopInteractionChannel = 'call' | 'chat' | 'callback' | 'contact';
+export const interactionGoodTags = ['answered_fast', 'clear_answers', 'honest_item'] as const;
+export const interactionBadTags = ['pushy', 'rude', 'no_reply', 'no_show', 'price_changed', 'item_unavailable'] as const;
+/** Safety tags: they put the rating in front of Udozo's team. */
+export const interactionSafetyTags = ['pay_outside', 'upfront_payment'] as const;
+export type ShopInteractionTag = (typeof interactionGoodTags)[number] | (typeof interactionBadTags)[number] | (typeof interactionSafetyTags)[number];
+export const interactionTagLabels: Record<ShopInteractionTag, string> = {
+  answered_fast: 'Answered fast',
+  clear_answers: 'Clear answers',
+  honest_item: 'Honest about the item',
+  pushy: 'Pushy',
+  rude: 'Rude',
+  no_reply: 'Did not reply',
+  no_show: 'Did not show up',
+  price_changed: 'Changed the price',
+  item_unavailable: 'Item not available',
+  pay_outside: 'Asked me to pay outside Udozo',
+  upfront_payment: 'Asked me to pay before seeing it',
+};
+export const interactionScoreLabels = { responsiveness: 'Replies', helpfulness: 'Helpfulness', courtesy: 'Courtesy' } as const;
+export type ShopInteractionScores = { responsiveness: number; helpfulness: number; courtesy: number };
+
+/** The buyer's own rating (never shown to the seller as theirs). */
+export type ShopInteractionRating = ShopInteractionScores & {
+  object: 'classified_interaction_rating';
+  id: string;
+  listing_id: string;
+  channel: ShopInteractionChannel;
+  tags: ShopInteractionTag[];
+  comment: string | null;
+  can_edit: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Whether the buyer can rate the seller about a listing; `prompt` whether to ask them now. */
+export type ShopInteractionState = {
+  object: 'classified_interaction_rating_state';
+  listing_id: string;
+  open: boolean;
+  can_rate: boolean;
+  reason: 'own_listing' | 'closed' | 'rated' | 'nothing_yet' | 'seller_rated_recently' | null;
+  channels: ShopInteractionChannel[];
+  prompt: boolean;
+  rating: ShopInteractionRating | null;
+};
+
+/** The seller's anonymous summary: from `minimum` ratings, counted up to `as_of` (last midnight, UTC). */
+export type ShopInteractionSummary = {
+  object: 'classified_interaction_summary';
+  open: boolean;
+  as_of: string;
+  minimum: number;
+  shown: boolean;
+  count: number | null;
+  scores: { responsiveness: number | null; helpfulness: number | null; courtesy: number | null } | null;
+  tags: Array<{ tag: ShopInteractionTag; count: number }>;
+};
+
 export type ShopPurchase = {
   object: 'classified_purchase';
   id: string;

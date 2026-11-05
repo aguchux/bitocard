@@ -18,10 +18,12 @@ import {
   useSetClassifiedSellerSuspendedMutation,
   useUnpauseSellerBuyOrdersMutation,
   useBlockReviewerMutation,
+  useSellerInteractionRatingsQuery,
 } from "@bitocard/api-client/admin";
 import { Avatar } from "@bitocard/ui/avatar";
 import { Ban, Flag, HandCoins, Package } from "lucide-react";
 import { ListingCell, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
+import { InteractionRatingItem, tagLabel } from "@/components/interaction-ratings";
 
 type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username" | "pause" | "unpause" | "block" | "unblock";
 
@@ -141,6 +143,7 @@ export default function ClassifiedSellerPage() {
                     setDays("180");
                     setAction("block");
                   }} onUnblock={() => setAction("unblock")} />
+                <PrivateRatings sellerId={data.id} operations={operations} />
                 <Reports seller={data} />
                 <Card>
                   <CardHeader title="Account" />
@@ -250,6 +253,48 @@ function BuyOrders({ seller, operations, onPause, onUnpause }: { seller: Classif
             </Button>
           )
         ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** How buyers rated their dealings before a sale: the summary as it stands now (today's too) and the latest three. */
+function PrivateRatings({ sellerId, operations }: { sellerId: string; operations: boolean }) {
+  const ratings = useSellerInteractionRatingsQuery(sellerId);
+  const data = ratings.data;
+  return (
+    <Card>
+      <CardHeader title="Private ratings" description="Buyers rate how they were dealt with after a chat, call or request. The seller sees a summary of five or more, never who." />
+      <div className="space-y-3 px-5 pb-5 text-sm sm:px-6">
+        {!data ? (
+          <Skeleton className="h-20 w-full" />
+        ) : data.count ? (
+          <>
+            <KeyValue
+              items={[
+                { label: "Ratings counted", value: `${formatNumber(data.count)}${data.excluded ? ` (${formatNumber(data.excluded)} left out)` : ""}` },
+                { label: "Replies", value: data.scores.responsiveness === null ? "—" : `${data.scores.responsiveness.toFixed(1)} of 5` },
+                { label: "Helpfulness", value: data.scores.helpfulness === null ? "—" : `${data.scores.helpfulness.toFixed(1)} of 5` },
+                { label: "Courtesy", value: data.scores.courtesy === null ? "—" : `${data.scores.courtesy.toFixed(1)} of 5` },
+                { label: "Seller sees it", value: data.shown_to_seller ? "Yes (up to last midnight)" : `Not yet: from ${data.minimum}` },
+              ]}
+            />
+            {data.tags.length ? <p className="text-muted">{data.tags.map(tag => `${tagLabel(tag.tag)} (${tag.count})`).join(", ")}</p> : null}
+            <ol className="grid gap-2">
+              {data.data.slice(0, 3).map(rating => (
+                <InteractionRatingItem key={rating.id} rating={rating} operations={operations} showSeller={false} />
+              ))}
+            </ol>
+          </>
+        ) : (
+          <p className="text-muted">No buyer has rated them yet.</p>
+        )}
+        <AppLink href={`/classifieds/ratings?seller=${sellerId}`} className="block w-fit font-semibold text-brand-600 hover:underline">
+          All ratings about them
+        </AppLink>
+        <AppLink href={`/classifieds/ratings?rater=${sellerId}`} className="block w-fit font-semibold text-brand-600 hover:underline">
+          Ratings they gave
+        </AppLink>
       </div>
     </Card>
   );

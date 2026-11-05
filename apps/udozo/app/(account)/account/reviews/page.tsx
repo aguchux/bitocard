@@ -5,6 +5,7 @@ import { PageTitle } from "@/components/account/nav";
 import { Thumb } from "@/components/account/thumb";
 import { OwnReviewActions, ReviewForm, ReviewThread } from "@/components/reviews/review-forms";
 import { ReviewCard } from "@/components/reviews/review-view";
+import { ReviewsNav } from "@/components/reviews/reviews-nav";
 import { requireSeller } from "@/lib/account";
 import { customerApi } from "@/lib/customer";
 import { reviewPath, reviewSellerBase } from "@/lib/reviews";
@@ -13,11 +14,6 @@ export const metadata: Metadata = { title: "Reviews" };
 
 type Props = { searchParams: Promise<{ tab?: string; review?: string }> };
 type Tab = "to_review" | "given" | "about";
-const tabs: Array<{ key: Tab; label: string }> = [
-  { key: "to_review", label: "To review" },
-  { key: "given", label: "Your reviews" },
-  { key: "about", label: "About you" },
-];
 const statusWords = { held: "Waiting for a moderator", removed: "Removed by Udozo", withdrawn: "Withdrawn", published: "Showing" } as const;
 
 /**
@@ -45,22 +41,7 @@ export default async function ReviewsPage({ searchParams }: Props) {
   return (
     <div className="grid max-w-3xl gap-5">
       <PageTitle title="Reviews" />
-      <nav aria-label="Reviews">
-        <ul className="flex flex-wrap gap-2">
-          {tabs.map(item => (
-            <li key={item.key}>
-              <Link
-                href={item.key === "to_review" ? "/account/reviews" : `/account/reviews?tab=${item.key}`}
-                aria-current={item.key === tab ? "page" : undefined}
-                className={`flex h-9 items-center gap-1.5 rounded-full border px-4 text-[13px] font-semibold ${item.key === tab ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white text-navy-900"}`}
-              >
-                {item.label}
-                {counts[item.key] ? <span className={item.key === tab ? "text-brand-300" : "text-brand-700"}>• {counts[item.key]}</span> : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <ReviewsNav current={tab} counts={counts} />
 
       {tab === "to_review" ? (
         purchases.length ? (

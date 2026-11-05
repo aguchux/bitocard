@@ -2761,6 +2761,9 @@ model Customer {
   classifiedReviewsReceived  ClassifiedReview[]        @relation("ClassifiedReviewsReceived")
   classifiedReviewPosts      ClassifiedReviewPost[]    @relation("ClassifiedReviewPosts")
   classifiedReviewReports    ClassifiedReviewReport[]  @relation("ClassifiedReviewReports")
+  interactionRatingsGiven    ClassifiedInteractionRating[] @relation("InteractionRatingsGiven")
+  interactionRatingsReceived ClassifiedInteractionRating[] @relation("InteractionRatingsReceived")
+  interactionPrompts         ClassifiedInteractionPrompt[]
   classifiedLeads           ClassifiedLead[]
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
@@ -4759,6 +4762,8 @@ model ClassifiedListing {
   buyOrders       ClassifiedBuyOrder[]
   purchases       ClassifiedPurchase[]
   reviews         ClassifiedReview[]
+  interactionRatings ClassifiedInteractionRating[]
+  interactionPrompts ClassifiedInteractionPrompt[]
   calls        ClassifiedCall[]
   chats        ClassifiedConversation[]
   orders       ClassifiedOrder[]
@@ -5250,6 +5255,58 @@ model ClassifiedReviewReport {
   @@index([status, createdAt])
   @@index([reviewId])
   @@map("classified_review_reports")
+}
+
+/// A buyer's private rating of how a seller dealt with them before buying (docs/UDOZO_RATINGS_PLAN.md phase 2): after a
+/// chat, call, call back or contact request about a listing. Never shown with who wrote it: the seller sees only an
+/// anonymous summary of five or more, counted up to the last midnight (UTC); admins see everything.
+model ClassifiedInteractionRating {
+  id             String            @id @default(uuid()) @db.Uuid
+  raterId        String            @map("rater_id") @db.Uuid
+  sellerId       String            @map("seller_id") @db.Uuid
+  listingId      String            @map("listing_id") @db.Uuid
+  country        String            @db.Char(2)
+  /// chat, call, callback or contact.
+  channel        String
+  /// The conversation, call or request that allowed it (no foreign key: those are deleted on their own schedules).
+  sourceId       String            @map("source_id") @db.Uuid
+  /// 1 to 5 each.
+  responsiveness Int
+  helpfulness    Int
+  courtesy       Int
+  tags           String[]          @default([])
+  /// For Udozo's team only, never the seller (links, codes, numbers and emails hidden).
+  comment        String?
+  /// A safety tag (asked to pay outside Udozo, or upfront) puts it in front of admins.
+  flagged        Boolean           @default(false)
+  excludedAt     DateTime?         @map("excluded_at")
+  excludedById   String?           @map("excluded_by_id") @db.Uuid
+  excludedReason String?           @map("excluded_reason")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  rater          Customer          @relation("InteractionRatingsGiven", fields: [raterId], references: [id], onDelete: Cascade)
+  seller         Customer          @relation("InteractionRatingsReceived", fields: [sellerId], references: [id], onDelete: Cascade)
+  listing        ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([raterId, listingId])
+  @@index([sellerId, createdAt])
+  @@index([raterId, createdAt])
+  @@index([flagged, createdAt])
+  @@map("classified_interaction_ratings")
+}
+
+/// When a buyer was asked to rate a seller about a listing, and whether they said not now (at most one prompt a day).
+model ClassifiedInteractionPrompt {
+  customerId  String            @map("customer_id") @db.Uuid
+  listingId   String            @map("listing_id") @db.Uuid
+  shownAt     DateTime          @default(now()) @map("shown_at")
+  dismissedAt DateTime?         @map("dismissed_at")
+  customer    Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  listing     ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, listingId])
+  @@index([customerId, shownAt])
+  @@map("classified_interaction_prompts")
 }
 
 /// A buyer's interest in a listing, once per kind (phone revealed, chat started): the seller's leads and the reveal limit.

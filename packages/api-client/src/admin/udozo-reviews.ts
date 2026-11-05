@@ -105,3 +105,64 @@ export const adminUdozoReviewsApi = bitocardApi.injectEndpoints({
 });
 
 export const { useReviewsQuery, useReviewQuery, useModerateReviewMutation, useRemoveReviewPostMutation, useDecideReviewReportMutation, useBlockReviewerMutation } = adminUdozoReviewsApi;
+
+// Udozo's private ratings of how sellers deal with buyers before a sale (docs/UDOZO_RATINGS_PLAN.md phase 2): admins see
+// who rated whom and the notes; a safety tag flags one; a rating can be left out of the seller's summary.
+
+export type AdminInteractionRating = {
+  object: 'classified_admin_interaction_rating';
+  id: string;
+  channel: 'call' | 'chat' | 'callback' | 'contact';
+  country: string;
+  responsiveness: number;
+  helpfulness: number;
+  courtesy: number;
+  tags: string[];
+  comment: string | null;
+  flagged: boolean;
+  excluded: { at: string; reason: string | null } | null;
+  rater: { id: string; name: string; email: string };
+  seller: { id: string; name: string; email: string };
+  listing: { id: string; title: string | null; path: string };
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminInteractionScores = { responsiveness: number | null; helpfulness: number | null; courtesy: number | null };
+
+export type AdminSellerInteractionRatings = {
+  object: 'classified_admin_interaction_summary';
+  seller_id: string;
+  minimum: number;
+  shown_to_seller: boolean;
+  excluded: number;
+  count: number;
+  scores: AdminInteractionScores;
+  tags: Array<{ tag: string; count: number }>;
+  data: AdminInteractionRating[];
+};
+
+export type AdminInteractionRatingFilter = { flagged?: boolean; country?: string; seller?: string; rater?: string; limit?: number; offset?: number };
+
+const ratingsTag = { type: 'ClassifiedListing' as const, id: 'INTERACTION_RATINGS' };
+const sellerRatingsTag = (id: string) => ({ type: 'ClassifiedListing' as const, id: `interaction_ratings:${id}` });
+
+export const adminUdozoInteractionRatingsApi = bitocardApi.injectEndpoints({
+  endpoints: build => ({
+    interactionRatings: build.query<{ object: 'list'; counts: { flagged: number }; data: AdminInteractionRating[]; total: number }, AdminInteractionRatingFilter | void>({
+      query: filter => ({ url: '/v1/admin/classifieds/interaction-ratings', params: clean({ limit: 50, ...(filter ?? {}), flagged: filter?.flagged ? 'true' : undefined }) }),
+      providesTags: [ratingsTag],
+    }),
+    sellerInteractionRatings: build.query<AdminSellerInteractionRatings, string>({
+      query: id => `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/ratings`,
+      providesTags: (_result, _error, id) => [sellerRatingsTag(id)],
+    }),
+    /** Leaves a rating out of the seller's summary (`excluded: true`) or puts it back, with why; audited. */
+    excludeInteractionRating: build.mutation<AdminInteractionRating, { id: string; excluded: boolean; reason: string; seller?: string }>({
+      query: ({ id, excluded, reason }) => ({ url: `/v1/admin/classifieds/interaction-ratings/${encodeURIComponent(id)}/${excluded ? 'exclude' : 'restore'}`, method: 'POST', body: { reason } }),
+      invalidatesTags: (result, _error, { seller }) => [ratingsTag, sellerRatingsTag(seller ?? result?.seller.id ?? ''), 'Activity'],
+    }),
+  }),
+});
+
+export const { useInteractionRatingsQuery, useSellerInteractionRatingsQuery, useExcludeInteractionRatingMutation } = adminUdozoInteractionRatingsApi;

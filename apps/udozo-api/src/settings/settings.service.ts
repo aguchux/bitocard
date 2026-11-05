@@ -161,6 +161,11 @@ export const switchDefinitions = {
     description:
       "Reviews on Udozo: buyers who completed a purchase (a Safe pay order or a buy order the seller marked sold) review the seller, positive or negative (neutral where the market allows it), and the seller and other buyers of the same item reply. Purchases are recorded while it is off. Off: no reviews are written or shown there.",
   },
+  classifieds_interaction_ratings: {
+    scopes: ['global', 'country'],
+    description:
+      "Private ratings of sellers on Udozo: after a chat, call, call back or contact request about a listing, the buyer rates how the seller dealt with them (replies, help, courtesy). Never public: the seller sees only an anonymous summary of five or more, and Udozo's team sees everything. Off: buyers are not asked.",
+  },
   classifieds_assistant: {
     scopes: ['global', 'country'],
     description: "Shop assistants (Anjio) on Udozo: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
@@ -232,6 +237,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_assistant',
   'classifieds_buy_orders',
   'classifieds_reviews',
+  'classifieds_interaction_ratings',
   'classifieds_install_prompt',
   'classifieds_resale',
   'customer_identity_check',

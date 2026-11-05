@@ -222,6 +222,7 @@ const terms: LegalDocument = {
             "Reviews are people's opinions, not Udozo's. They do not change how listings are ranked, and Udozo does not edit them, except to hide contact details and links.",
           ],
         },
+        "Private ratings: where they are open, after a chat, call, call back or contact request about a listing, the buyer can privately rate how the seller dealt with them (replies, helpfulness and courtesy, with optional tags and a note for Udozo's team). They are never public. The seller sees only a summary once five buyers have rated them, counted up to the previous day, never who rated them, which listing or any note. Each buyer rates a seller about a listing once, and a seller at most once in 30 days. Udozo's team reads them, may leave a rating out of a summary, and looks into any rating saying the seller asked for payment outside Udozo or before the item was seen.",
       ],
     },
     {
@@ -662,6 +663,7 @@ const privacy: LegalDocument = {
             "Interest in listings: the listings you save, and that you started a chat, asked for a seller's contact details or a call back, or called a seller.",
             "Contact requests and call backs: who asked whom, about which listing, the note written (numbers and links hidden) and the answer. When a seller shares their contact, the buyers they shared it with.",
             "Purchases and reviews: each completed purchase (what was bought, from whom and when) as the right to review it; your reviews, the parts you marked, their earlier versions, your replies in reviews' conversations (contact details and links hidden), the reports you make about reviews and what moderators decided. Reviews and replies are public with your first name and initial and your photo if you have one.",
+            "Private ratings of sellers: the scores, tags and note you give a seller after being in touch about a listing, with how you were in touch (a chat, call, call back or contact request). The seller sees only an anonymous summary of five or more ratings; only Udozo's team sees who rated whom and the notes.",
             "Buy orders: who asked to buy which listing, the price asked and any price the seller offered back, how many, the notes and meeting place written (numbers and links hidden), each step and when it was taken (accepted, cancelled, marked sold, said bought, said not bought, and why), and when deadlines were reminded. Each step also shows in your chat with the other person.",
             "Calls: who called whom, about which listing, when it rang, was answered and ended, and how. The connection details the two browsers swap are deleted when the call ends. Calls are not recorded. While you have udozo.com open signed in, when you last had it open, so buyers can see you are there.",
             "Reports and safety: reports you make or that are made about you, our checks and reviews of listings, strikes and any suspension, with its reason.",
@@ -765,6 +767,7 @@ const privacy: LegalDocument = {
               ["Contact requests and call backs", "12 months after they are answered or cancelled. A shared contact stays shared until the seller stops sharing it or closes their account."],
               ["Buy orders", "Two years after they end, as the record of who bought what (reviews of sellers rely on it)."],
               ["Reviews and their replies", "While both accounts are open. A withdrawn review's words are deleted after 30 days; reviews and replies Udozo removed, and decided reports, after two years. A purchase never reviewed: 13 months."],
+              ["Private ratings of sellers", "Two years after they are given; when you were asked to rate one, 90 days."],
               ["Calls", "Who called whom and when: 90 days. The connection details: deleted when the call ends. When you last had udozo.com open: replaced each time."],
               ["Buyers' details on store orders", "Shown to the supplier and reseller until 30 days after the order ends."],
               ["Identity documents and photos", "Deleted 90 days after a check is declined, and a week after an unfinished one is left. For an approved check, five years."],
