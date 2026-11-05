@@ -50,7 +50,7 @@ export function countryEntries(origin: string, cc: string, sitemap: ShopSitemap)
 
 /** The pages across countries: Start here (sellers' landing page), the Safe Trade Guide, the legal documents, and the showcase and its categories once it is on. */
 export function mainEntries(origin: string, showcaseCategories: string[] | null) {
-  const entries: SitemapEntry[] = [{ loc: `${origin}/start-here` }, { loc: `${origin}/safe-trade` }, { loc: `${origin}/help/faqs` }, { loc: `${origin}/help/contact` }, { loc: `${origin}/legal` }, ...legalDocuments.map(doc => ({ loc: `${origin}/legal/${doc.slug}` }))];
+  const entries: SitemapEntry[] = [{ loc: `${origin}/start-here` }, { loc: `${origin}/safe-trade` }, { loc: `${origin}/help/faqs` }, { loc: `${origin}/help/how-anjio-rates-sellers` }, { loc: `${origin}/help/contact` }, { loc: `${origin}/legal` }, ...legalDocuments.map(doc => ({ loc: `${origin}/legal/${doc.slug}` }))];
   return showcaseCategories ? [{ loc: `${origin}/` }, ...entries, ...showcaseCategories.map(slug => ({ loc: `${origin}/c/${slug}` }))] : entries;
 }
 

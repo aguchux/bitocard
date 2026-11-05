@@ -7,6 +7,7 @@ import { ListingSearchService, publicName } from './search.service.js';
 import { onShopWhere } from './rules.js';
 import { UsernamesService } from './usernames.service.js';
 import { ReviewStatsService } from './reviews/stats.service.js';
+import { SellerScoreReader } from './scores/reader.js';
 
 /** A seller's handle: 10 lower-case letters and digits (`customers.seller_handle`). */
 export const sellerHandlePattern = /^[a-z0-9]{6,12}$/;
@@ -30,6 +31,7 @@ export class SellerProfilesService {
     private readonly leads: LeadsService,
     private readonly usernames: UsernamesService,
     private readonly reviewStats: ReviewStatsService,
+    private readonly scores: SellerScoreReader,
   ) {}
 
   /**
@@ -54,7 +56,7 @@ export class SellerProfilesService {
     await this.listings.requireOpen(country);
     const inMarket = { ...live, country };
 
-    const [byCategory, byState, sold, sales, responseRate, badges, contactRows, latest, reviews] = await Promise.all([
+    const [byCategory, byState, sold, sales, responseRate, badges, contactRows, latest, reviews, scores] = await Promise.all([
       this.prisma.classifiedListing.groupBy({ by: ['categoryId'], where: inMarket, _count: { _all: true } }),
       this.prisma.classifiedListing.groupBy({ by: ['stateId'], where: inMarket, _count: { _all: true } }),
       this.prisma.classifiedListing.count({ where: { customerId: customer.id, country, status: 'sold', onShop: true } }),
@@ -69,6 +71,7 @@ export class SellerProfilesService {
       }),
       this.prisma.classifiedListing.findFirst({ where: inMarket, orderBy: { publishedAt: 'desc' }, select: { publishedAt: true } }),
       this.reviewStats.summary(customer.id, country),
+      this.scores.forPublic(customer.id, country),
     ]);
     const [categories, states] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { id: { in: byCategory.map(row => row.categoryId).filter((id): id is string => Boolean(id)) } }, include: { parent: true } }),
@@ -107,6 +110,8 @@ export class SellerProfilesService {
       /** Their newest live listings that take chats or calls: what a buyer contacting them from this page is asking about. */
       /** Their reviews' summary where reviews are open in the market (null otherwise). */
       reviews,
+      /** Anjio's view, in words, where scores are public in the market (null otherwise); never in metadata. */
+      scores,
       contact_listings: contactRows.map(row => ({ id: row.id, ref: Number(row.ref), title: row.title!, slug: row.slug!, currency: row.currency, chat: row.contact !== 'phone', phone: phone && row.contact !== 'chat' })),
     };
   }

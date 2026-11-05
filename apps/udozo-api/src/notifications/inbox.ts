@@ -143,6 +143,7 @@ export const notificationTypes = {
   'admin.classifieds.buy_orders_paused': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'A seller’s buy orders were paused' },
   'admin.classifieds.review_reported': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'A review was reported' },
   'admin.classifieds.review_held': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'A review waits for a moderator' },
+  'admin.classifieds.seller_summary_reported': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: "A seller says Anjio's summary of them is wrong" },
   'admin.classifieds.interaction_flagged': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'A buyer said a seller asked them to pay outside Udozo or upfront' },
   'admin.classifieds.same_person': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'Safe pay refused: one person on both sides' },
   'admin.classifieds.seller_limited': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'BitoCard Shop seller reached the Safe pay strike limit' },

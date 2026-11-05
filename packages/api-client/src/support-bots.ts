@@ -5,7 +5,8 @@ export type BotsBase = '/v1/support/bots' | '/v1/admin/support/bots';
 export type BotRole = 'chat' | 'tickets';
 /** A shop assistant's roles: buyers on shop.bitocard.com, sellers in the Shop tab, and questions about the Shop. */
 export type ShopBotRole = 'browse' | 'sell' | 'help';
-export type ShopBotLimits = { customer_daily: number; visitor_daily: number; photos_per_draft: number; monthly_budget_usd: number | null };
+/** Udozo also keeps the nightly seller summaries' limits: how many a day, their share of the monthly cap, and an optional cheaper model. */
+export type ShopBotLimits = { customer_daily: number; visitor_daily: number; photos_per_draft: number; monthly_budget_usd: number | null; summaries_daily?: number; summary_budget_share?: number; summary_model?: string | null };
 
 /** What only shop assistants have: the default, languages and greetings, limits, countries and this month's use. */
 export type ShopBotDetails = {

@@ -188,7 +188,7 @@ export class ShopAssistantsService {
     const [assignments, served, usage, ratings, reported, lastEval] = await Promise.all([
       this.prisma.shopBotAssignment.findMany({ where: { botId: bot.id }, orderBy: [{ country: 'asc' }, { language: 'asc' }] }),
       this.servedCountries(bot),
-      this.prisma.aiUsage.aggregate({ where: { botId: bot.id, kind: 'shop', createdAt: { gte: monthStart() } }, _sum: { costMicros: true }, _count: { _all: true } }),
+      this.prisma.aiUsage.aggregate({ where: { botId: bot.id, kind: { in: ['shop', 'shop_summary'] }, createdAt: { gte: monthStart() } }, _sum: { costMicros: true }, _count: { _all: true } }),
       this.prisma.assistantMessage.groupBy({ by: ['rating'], where: { thread: { botId: bot.id }, rating: { not: null } }, _count: { _all: true } }),
       this.prisma.assistantMessage.count({ where: { thread: { botId: bot.id }, reportedAt: { not: null } } }),
       this.prisma.shopBotEval.findFirst({ where: { botId: bot.id }, orderBy: { createdAt: 'desc' } }),

@@ -125,6 +125,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Sign-up journeys", href: "/reports/signups", icon: Route },
       { label: "Discovery", href: "/reports/discovery", icon: Compass },
       { label: "Safe pay and resale", href: "/reports/resale", icon: HandCoins },
+      { label: "Seller ratings", href: "/reports/ratings", icon: Gauge },
       { label: "Statements", href: "/reports/statements", icon: ReceiptText },
     ],
   },

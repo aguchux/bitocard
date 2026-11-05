@@ -1,6 +1,6 @@
 # Udozo seller ratings: three kinds
 
-Status: **phases 0 (buy orders), 1 (post-purchase reviews) and 2 (private interaction ratings) built, 5 November 2026**; phase 3 planned.
+Status: **all four phases built, 5 November 2026**: 0 (buy orders), 1 (post-purchase reviews), 2 (private interaction ratings) and 3 (Anjio's scores and summaries).
 Phase 0 as built differs from the plan below in one way: a buy order is always paid in person (`payment` and
 `order_id` are not stored). Where Safe pay is open, the listing still offers Buy with Safe pay beside Buy this, as its
 own order; both kinds of completed order open reviews. Phase 1 as built differs in these ways: the seller summaries
@@ -14,6 +14,14 @@ UTC, which does what "refreshed nightly" was for) and counts the last 12 months;
 thread), after an answered call (the call panel) and on the listing's page (Rate how the seller dealt with you), not
 beside each answered request; admins can also put a left-out rating back; and the seller's page is a Private ratings
 tab under Reviews (`/account/ratings`) rather than its own place in the account.
+Phase 3 as built differs in these ways: each seller is scored by a few queries of their own (not set-based SQL per
+metric), the job stopping at four minutes and carrying on at the next hourly run (the rows done today are the cursor);
+the overall score needs at least 30 of weight behind it, so never one metric alone; the bands are Excellent from 85,
+Very good from 70, Good from 55 and Fair from 40; costing compares prices alone (not price plus delivery) and leaves
+out the seller's own listings; reliability's strikes are the Safe pay standing's (90 days) while the rest looks back 180;
+summaries are written in English with the market's Anjio; `/account/ratings` shows the scores beside the private
+ratings, the reviews waiting for a reply staying on Reviews > About you; and Reports > Seller ratings shows bands and
+the summaries' counts and cost, not moderation rates.
 
 ## Context
 Udozo (udozo.com) has no ratings or reviews today. Buyers judge sellers only by two badges (phone confirmed, ID checked) and "answers N% of chats". The owner wants three kinds of ratings:

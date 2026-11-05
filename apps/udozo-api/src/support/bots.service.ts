@@ -21,8 +21,9 @@ export const botScopes = ['store', 'platform', 'shop'] as const;
 export type BotScope = (typeof botScopes)[number];
 
 /** A shop assistant's limits; missing ones take these defaults. */
-export type ShopLimits = { customer_daily: number; visitor_daily: number; photos_per_draft: number; monthly_budget_usd: number | null };
-export const defaultShopLimits: ShopLimits = { customer_daily: 50, visitor_daily: 10, photos_per_draft: 8, monthly_budget_usd: null };
+/** `summaries_daily`, `summary_budget_share` and `summary_model`: Anjio's nightly seller summaries (at most that many a day, that share of the monthly budget, on a cheaper model of the same provider if set). */
+export type ShopLimits = { customer_daily: number; visitor_daily: number; photos_per_draft: number; monthly_budget_usd: number | null; summaries_daily: number; summary_budget_share: number; summary_model: string | null };
+export const defaultShopLimits: ShopLimits = { customer_daily: 50, visitor_daily: 10, photos_per_draft: 8, monthly_budget_usd: null, summaries_daily: 50, summary_budget_share: 0.25, summary_model: null };
 export const shopLimitsOf = (bot: Pick<SupportBot, 'limits'>): ShopLimits => ({ ...defaultShopLimits, ...((bot.limits ?? {}) as Partial<ShopLimits>) });
 
 /**

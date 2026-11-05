@@ -47,6 +47,7 @@ import { MarketingModule } from './marketing/marketing.controller.js';
 import { SignupsModule } from './signups/signups.module.js';
 import { ResaleModule } from './resale/resale.module.js';
 import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
+import { SellerScoresModule } from './classifieds/scores/scores.module.js';
 import { DisputesModule } from './disputes/disputes.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { AfrippaModule } from './afrippa/afrippa.module.js';
@@ -124,6 +125,7 @@ export class AppModule {
         SignupsModule,
         ResaleModule,
         ShopAssistantModule,
+        SellerScoresModule,
         CryptoModule,
         AfrippaModule,
         SpinsModule,

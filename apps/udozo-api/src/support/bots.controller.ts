@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, SessionOnly } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { type AiProviderName, aiProviders } from './ai/providers.js';
@@ -24,6 +24,18 @@ class ShopLimitsDto {
 
   @IsOptional() @ValidateIf((_object, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000)
   monthly_budget_usd?: number | null;
+
+  /** Anjio's nightly seller summaries: at most this many a day (0 writes none). */
+  @IsOptional() @IsInt() @Min(0) @Max(5000)
+  summaries_daily?: number;
+
+  /** The share of the monthly budget they may use (0 to 1). */
+  @IsOptional() @IsNumber() @Min(0) @Max(1)
+  summary_budget_share?: number;
+
+  /** A cheaper model of the same provider for them (one offered on Udozo's AI), or null for the assistant's own. */
+  @IsOptional() @ValidateIf((_object, value) => value !== null) @IsString() @Length(1, 100)
+  summary_model?: string | null;
 }
 
 class BotProfileDto {

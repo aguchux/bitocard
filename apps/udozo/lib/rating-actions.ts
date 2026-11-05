@@ -57,3 +57,10 @@ export async function notNow(listingId: string): Promise<ActionResult<unknown>> 
 export async function mySummary(): Promise<ActionResult<ShopInteractionSummary>> {
   return answer(await customerApi<ShopInteractionSummary>("GET", "/v1/classifieds/me/ratings"));
 }
+
+/** The seller says Anjio's summary of them is wrong: Udozo's team reads it. */
+export async function reportSummary(details: string): Promise<ActionResult<unknown>> {
+  const text = details.trim().slice(0, 500);
+  if (text.length < 3) return refused("Say what is wrong.");
+  return answer(await customerApi<unknown>("POST", "/v1/classifieds/me/scores/summary/report", { details: text }));
+}

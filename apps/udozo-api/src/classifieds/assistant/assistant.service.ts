@@ -225,7 +225,7 @@ export class ShopAssistantService {
   private async checkBudget(bot: SupportBot) {
     const budget = shopLimitsOf(bot).monthly_budget_usd;
     if (budget === null) return;
-    const spent = await this.prisma.aiUsage.aggregate({ where: { botId: bot.id, kind: 'shop', createdAt: { gte: monthStart() } }, _sum: { costMicros: true } });
+    const spent = await this.prisma.aiUsage.aggregate({ where: { botId: bot.id, kind: { in: ['shop', 'shop_summary'] }, createdAt: { gte: monthStart() } }, _sum: { costMicros: true } });
     if (Number(spent._sum.costMicros ?? 0n) >= budget * 1_000_000) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'assistant_budget_reached', `${bot.name} has reached this month’s limit. Search and the help pages still work.`);
   }
 

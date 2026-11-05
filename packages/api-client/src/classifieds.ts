@@ -196,6 +196,8 @@ export type ShopSellerProfile = {
   contact_listings: Array<{ id: string; ref: number; title: string; slug: string; currency: string; chat: boolean; phone: boolean }>;
   /** Udozo: their reviews' summary, when reviews are open in the market (null otherwise). */
   reviews?: ShopReviewSummary | null;
+  /** Udozo: Anjio's view in words, where scores are public in the market (null otherwise). Never put in metadata. */
+  scores?: ShopPublicScores | null;
 };
 
 /** A showcase card: never a price (prices belong to each country's pages). */
@@ -1233,3 +1235,46 @@ export type ShopPurchase = {
 
 export type ShopPurchases = { object: 'list'; data: ShopPurchase[]; to_review: number };
 export type ShopMyReviews = { object: 'list'; data: Array<ShopReview & { listing: { title: string | null; path: string } }> };
+
+// ---- Udozo: Anjio's seller scores (docs/UDOZO_RATINGS_PLAN.md phase 3) ----
+
+export type ShopScoreKey = 'response' | 'attention' | 'pricing' | 'costing' | 'reliability' | 'satisfaction' | 'salesmanship';
+export type ShopScoreBand = 'excellent' | 'very_good' | 'good' | 'fair' | 'needs_work';
+export const scoreKeyLabels: Record<ShopScoreKey, string> = {
+  response: 'Reply time',
+  attention: 'Answering buyers',
+  pricing: 'Keeping to prices',
+  costing: 'Prices against the market',
+  reliability: 'Completing sales',
+  satisfaction: 'Reviews',
+  salesmanship: 'How buyers rate your dealings',
+};
+export type ShopScoreSummary = { text: string; credit: string; how_it_works: string; written_at: string | null };
+
+/** What the public sees: words only, the band at Good or better, strong points; never numbers. */
+export type ShopPublicScores = {
+  new_seller: boolean;
+  response: string | null;
+  attention: string | null;
+  band: ShopScoreBand | null;
+  band_label: string | null;
+  highlights: Array<{ key: ShopScoreKey; words: string }>;
+  summary: ShopScoreSummary | null;
+  how_it_works: string;
+};
+
+/** The seller's own: every number with its sample and minimum, tips, and what the public sees. */
+export type ShopMyScores = {
+  object: 'classified_seller_scores';
+  public: boolean;
+  computed_at: string | null;
+  overall: number | null;
+  band: ShopScoreBand | null;
+  band_label: string | null;
+  metrics: Array<{ key: ShopScoreKey; score: number | null; n: number; minimum: number; public: boolean }>;
+  tips: string[];
+  public_view: Omit<ShopPublicScores, 'summary' | 'how_it_works'>;
+  summary: ShopScoreSummary | null;
+  summary_reported: boolean;
+  how_it_works: string;
+};

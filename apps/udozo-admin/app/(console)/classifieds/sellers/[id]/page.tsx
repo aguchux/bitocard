@@ -24,6 +24,7 @@ import { Avatar } from "@bitocard/ui/avatar";
 import { Ban, Flag, HandCoins, Package } from "lucide-react";
 import { ListingCell, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
 import { InteractionRatingItem, tagLabel } from "@/components/interaction-ratings";
+import { SellerScoresCard } from "@/components/seller-scores";
 
 type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username" | "pause" | "unpause" | "block" | "unblock";
 
@@ -143,6 +144,7 @@ export default function ClassifiedSellerPage() {
                     setDays("180");
                     setAction("block");
                   }} onUnblock={() => setAction("unblock")} />
+                <SellerScoresCard sellerId={data.id} operations={operations} />
                 <PrivateRatings sellerId={data.id} operations={operations} />
                 <Reports seller={data} />
                 <Card>

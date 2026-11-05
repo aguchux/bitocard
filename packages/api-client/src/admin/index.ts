@@ -531,3 +531,4 @@ export * from './udozo-banners';
 export * from './udozo-watermark';
 export * from './udozo-buy-orders';
 export * from './udozo-reviews';
+export * from './udozo-scores';

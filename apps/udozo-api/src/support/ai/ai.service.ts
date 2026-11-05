@@ -15,7 +15,8 @@ import { aiCostMicros, aiProvider, type AiProvider, type AiProviderName, aiProvi
 
 export type AiFunding = 'bitocard' | 'own';
 /** chat and ticket replies count towards a store's allowance; shop is BitoCard Shop's assistants (BitoCard's own cost). */
-export type AiKind = 'chat' | 'ticket' | 'generate' | 'test' | 'shop';
+/** `shop_summary`: Anjio's nightly seller summaries, inside the shop assistant's budget. */
+export type AiKind = 'chat' | 'ticket' | 'generate' | 'test' | 'shop' | 'shop_summary';
 export type AiCall = { funding: AiFunding; provider: AiProviderName; model: string; resellerId: string; storeId: string | null; botId: string | null; mode: LedgerMode; kind: AiKind };
 
 const keys: Record<AiProviderName, { key: keyof AppConfig; url: keyof AppConfig; prices: keyof AppConfig }> = {

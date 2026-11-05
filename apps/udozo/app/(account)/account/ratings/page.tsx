@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Lock, Star } from "lucide-react";
-import type { ShopInteractionSummary } from "@bitocard/api-client/classifieds";
+import type { ShopInteractionSummary, ShopMyScores } from "@bitocard/api-client/classifieds";
 import { PageTitle } from "@/components/account/nav";
 import { ReviewsNav } from "@/components/reviews/reviews-nav";
+import { ReportSummary } from "@/components/scores/report-summary";
+import { bandText, myScoreLines } from "@/lib/scores";
+import Link from "next/link";
 import { requireSeller } from "@/lib/account";
 import { customerApi } from "@/lib/customer";
 import { asOfText, scoreWord, summaryLines, summaryWaiting } from "@/lib/ratings";
@@ -16,7 +19,8 @@ export const metadata: Metadata = { title: "Private ratings" };
  */
 export default async function RatingsPage() {
   await requireSeller("/account/ratings");
-  const answer = await customerApi<ShopInteractionSummary>("GET", "/v1/classifieds/me/ratings");
+  const [answer, mine] = await Promise.all([customerApi<ShopInteractionSummary>("GET", "/v1/classifieds/me/ratings"), customerApi<ShopMyScores>("GET", "/v1/classifieds/me/scores")]);
+  const scores = mine.ok ? mine.data : null;
   const summary = answer.ok ? answer.data : null;
   const lines = summary ? summaryLines(summary) : null;
   const waiting = summary ? summaryWaiting(summary) : "Your ratings could not be loaded just now. Try again shortly.";
@@ -24,6 +28,7 @@ export default async function RatingsPage() {
     <div className="grid max-w-3xl gap-5">
       <PageTitle title="Reviews" />
       <ReviewsNav current="ratings" />
+      {scores ? <MyScores scores={scores} /> : null}
       <p className="flex gap-2 rounded-2xl bg-navy-50 p-4 text-sm text-navy-800">
         <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
@@ -65,5 +70,48 @@ export default async function RatingsPage() {
         <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">{waiting}</p>
       )}
     </div>
+  );
+}
+
+/** Anjio's scores for the seller: every number with what it is based on, tips, and the summary to report. */
+function MyScores({ scores }: { scores: ShopMyScores }) {
+  return (
+    <section aria-labelledby="my-scores" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="my-scores" className="text-lg font-bold">
+          Anjio&apos;s scores: {bandText(scores)}
+        </h2>
+        <span className="text-xs text-slate-500">{scores.public ? "Buyers see these in words on your page." : "Not shown to buyers yet."}</span>
+      </div>
+      <dl className="grid gap-2 sm:grid-cols-2">
+        {myScoreLines(scores).map(line => (
+          <div key={line.key} className="grid gap-0.5 rounded-xl bg-slate-50 p-3">
+            <dt className="text-xs font-semibold text-slate-600">{line.label}</dt>
+            <dd className="font-bold">{line.text}</dd>
+            {line.note ? <dd className="text-xs text-slate-500">{line.note}</dd> : null}
+          </div>
+        ))}
+      </dl>
+      {scores.tips.length ? (
+        <div className="grid gap-1.5">
+          <h3 className="text-sm font-semibold">What would help</h3>
+          <ul className="grid list-disc gap-1 pl-5 text-sm text-slate-700">
+            {scores.tips.map(tip => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {scores.summary ? (
+        <figure className="grid gap-1.5 rounded-xl bg-navy-50 p-3">
+          <blockquote className="text-sm">{scores.summary.text}</blockquote>
+          <figcaption className="text-xs text-navy-600">{scores.summary.credit}</figcaption>
+          <ReportSummary reported={scores.summary_reported} />
+        </figure>
+      ) : null}
+      <Link href={scores.how_it_works} className="w-fit text-xs font-semibold text-navy-700 hover:underline">
+        How Anjio rates sellers
+      </Link>
+    </section>
   );
 }

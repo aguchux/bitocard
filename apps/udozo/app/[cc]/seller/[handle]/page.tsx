@@ -16,6 +16,7 @@ import { gifSizes, sellerCardUrl } from "@/lib/seller-card";
 import { isSellerKey, placesText, queryString, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
 import { usernameNudge } from "@/lib/username";
 import { ReviewCard, ReviewSummaryBar } from "@/components/reviews/review-view";
+import { AnjioView } from "@/components/scores/anjio-view";
 import { readReviewFilters, reviewPath, reviewsHref, reviewPageSize, sellerReviewsQuery, summaryText } from "@/lib/reviews";
 import { breadcrumbJsonLd, itemListJsonLd, noindexFollow, sellerJsonLd } from "@/lib/seo";
 
@@ -177,6 +178,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="grid min-w-0 content-start gap-6 px-4 sm:px-0">
+          {profile.scores ? <AnjioView scores={profile.scores} name={profile.name} /> : null}
           {profile.categories.length ? (
             <section aria-labelledby="sells">
               <h2 id="sells" className="mb-3 text-base font-bold">

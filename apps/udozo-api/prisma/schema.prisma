@@ -2764,6 +2764,8 @@ model Customer {
   interactionRatingsGiven    ClassifiedInteractionRating[] @relation("InteractionRatingsGiven")
   interactionRatingsReceived ClassifiedInteractionRating[] @relation("InteractionRatingsReceived")
   interactionPrompts         ClassifiedInteractionPrompt[]
+  sellerScore                ClassifiedSellerScore?
+  sellerScoreMonths          ClassifiedSellerScoreMonth[]
   classifiedLeads           ClassifiedLead[]
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
@@ -5307,6 +5309,56 @@ model ClassifiedInteractionPrompt {
   @@id([customerId, listingId])
   @@index([customerId, shownAt])
   @@map("classified_interaction_prompts")
+}
+
+/// Anjio's view of a seller (docs/UDOZO_RATINGS_PLAN.md phase 3), worked out each night: every metric's 0-100 score and
+/// sample (`metrics`, null below its minimum), the overall score and band, the seller's tips and admins' flags
+/// (`details`), and the short summary Anjio wrote from those figures (never from names, messages or prices).
+model ClassifiedSellerScore {
+  sellerId            String    @id @map("seller_id") @db.Uuid
+  country             String    @db.Char(2)
+  /// { response, attention, pricing, costing, reliability, satisfaction, salesmanship }: { score, n, ... } or null each.
+  metrics             Json      @default("{}")
+  overallScore        Int?      @map("overall_score")
+  /// excellent, very_good, good, fair or needs_work.
+  band                String?
+  /// { tips: string[], flags: string[], public: {...} }.
+  details             Json      @default("{}")
+  inputsHash          String?   @map("inputs_hash")
+  computedAt          DateTime  @default(now()) @map("computed_at")
+  summaryText         String?   @map("summary_text")
+  summaryProvider     String?   @map("summary_provider")
+  summaryModel        String?   @map("summary_model")
+  summaryInputTokens  Int?      @map("summary_input_tokens")
+  summaryOutputTokens Int?      @map("summary_output_tokens")
+  summaryCostMicros   BigInt?   @map("summary_cost_micros")
+  /// What the summary was written from (band, overall, reviews counted): a material change writes it again.
+  summaryInputs       Json?     @map("summary_inputs")
+  summaryWrittenAt    DateTime? @map("summary_written_at")
+  summaryHiddenAt     DateTime? @map("summary_hidden_at")
+  summaryHiddenReason String?   @map("summary_hidden_reason")
+  /// The seller said the summary is wrong (admins told once until it is written again).
+  summaryReportedAt   DateTime? @map("summary_reported_at")
+  summaryReport       String?   @map("summary_report")
+  seller              Customer  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([country, computedAt])
+  @@map("classified_seller_scores")
+}
+
+/// A seller's scores at the start of each month, kept 24 months.
+model ClassifiedSellerScoreMonth {
+  sellerId     String   @map("seller_id") @db.Uuid
+  month        DateTime @db.Date
+  country      String   @db.Char(2)
+  overallScore Int?     @map("overall_score")
+  band         String?
+  metrics      Json     @default("{}")
+  seller       Customer @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@id([sellerId, month])
+  @@index([month])
+  @@map("classified_seller_score_months")
 }
 
 /// A buyer's interest in a listing, once per kind (phone revealed, chat started): the seller's leads and the reveal limit.

@@ -166,6 +166,16 @@ export const switchDefinitions = {
     description:
       "Private ratings of sellers on Udozo: after a chat, call, call back or contact request about a listing, the buyer rates how the seller dealt with them (replies, help, courtesy). Never public: the seller sees only an anonymous summary of five or more, and Udozo's team sees everything. Off: buyers are not asked.",
   },
+  seller_scores: {
+    scopes: ['global', 'country'],
+    description:
+      "Anjio's seller scores in public on Udozo: a seller's page says how fast they reply and how often they answer, their band at Good or better, and their strongest points. Scores are worked out every night whether it is on or off, so admins and sellers can see them first. Off: nothing is shown in public.",
+  },
+  seller_score_summaries: {
+    scopes: ['global', 'country'],
+    description:
+      "Anjio's one or two sentences about each seller, written each night from Udozo's figures (never names, messages or prices) and checked before they show, within the shop assistant's budget. Needs classifieds_assistant on, and seller_scores for the public to see them.",
+  },
   classifieds_assistant: {
     scopes: ['global', 'country'],
     description: "Shop assistants (Anjio) on Udozo: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
@@ -238,6 +248,8 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_buy_orders',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
+  'seller_scores',
+  'seller_score_summaries',
   'classifieds_install_prompt',
   'classifieds_resale',
   'customer_identity_check',

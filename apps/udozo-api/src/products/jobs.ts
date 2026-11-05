@@ -21,6 +21,7 @@ export const jobOwners: Readonly<Record<string, Product>> = {
   'crypto-reconcile': 'bitocard',
   classifieds: 'udozo',
   marketing: 'udozo',
+  'seller-scores': 'udozo',
 };
 
 /** Whether a job runs on this product's instance. */

@@ -32,7 +32,7 @@ export const shopRoleLabels: Record<ShopBotRole, { title: string; text: string }
   help: { title: "Shop help", text: "How the Shop, Safe pay, fees and disputes work, and the customer’s own listings and orders." },
 };
 
-const defaultLimits: ShopBotLimits = { customer_daily: 50, visitor_daily: 10, photos_per_draft: 8, monthly_budget_usd: null };
+const defaultLimits: ShopBotLimits = { customer_daily: 50, visitor_daily: 10, photos_per_draft: 8, monthly_budget_usd: null, summaries_daily: 50, summary_budget_share: 0.25, summary_model: null };
 
 /** A shop assistant's profile: what it does, its AI, its face and voice, the languages it speaks and its limits. */
 export function ShopAssistantForm({
@@ -236,6 +236,17 @@ export function ShopAssistantForm({
           </Field>
           <Field label="Monthly cap (US$)" htmlFor={`${id}-budget`} hint="Empty: no cap. It stops and says so when reached.">
             <Input id={`${id}-budget`} type="number" min={1} value={limits.monthly_budget_usd ?? ""} onChange={event => limit("monthly_budget_usd", event.target.value)} />
+          </Field>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Seller summaries a day" htmlFor={`${id}-summaries`} hint="Written each night from sellers' scores. 0 writes none.">
+            <Input id={`${id}-summaries`} type="number" min={0} max={5000} value={limits.summaries_daily ?? 50} onChange={event => setLimits(current => ({ ...current, summaries_daily: Math.max(0, Math.min(5000, Math.round(Number(event.target.value) || 0))) }))} />
+          </Field>
+          <Field label="Summaries' share of the cap (%)" htmlFor={`${id}-share`} hint="They stop once they have used this much of the month's cap.">
+            <Input id={`${id}-share`} type="number" min={0} max={100} value={Math.round((limits.summary_budget_share ?? 0.25) * 100)} onChange={event => setLimits(current => ({ ...current, summary_budget_share: Math.max(0, Math.min(100, Number(event.target.value) || 0)) / 100 }))} />
+          </Field>
+          <Field label="Summary model (optional)" htmlFor={`${id}-summary-model`} hint="A cheaper model of the same provider, offered on Udozo's AI. Empty: the assistant's own.">
+            <Input id={`${id}-summary-model`} value={limits.summary_model ?? ""} onChange={event => setLimits(current => ({ ...current, summary_model: event.target.value.trim() || null }))} />
           </Field>
         </div>
       </section>
