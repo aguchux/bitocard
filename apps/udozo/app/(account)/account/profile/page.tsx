@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Eye, ShieldCheck } from "lucide-react";
+import { AtSign, Eye, ShieldCheck } from "lucide-react";
 import { regionWord } from "@bitocard/api-client/classifieds";
 import { CountryForm, NameForm, PasswordForm } from "@/components/account-forms";
 import { AboutForm } from "@/components/account/about-form";
@@ -9,6 +9,7 @@ import { PageTitle } from "@/components/account/nav";
 import { PhoneForm } from "@/components/account/phone-form";
 import { Flag } from "@/components/flag";
 import { requireCustomer, sellReference } from "@/lib/account";
+import { usernameScreen } from "@/lib/username";
 import { signOut } from "@/lib/account-actions";
 import { countries } from "@/lib/countries";
 
@@ -20,7 +21,7 @@ const card = "grid gap-3 rounded-2xl border border-navy-200 bg-white p-4 sm:p-5"
  * The customer's profile: their first and last name (an older account is asked to confirm how its old name was
  * split), the email they sign in with (read only), their country (fixed: chosen once by an
  * older account that has none), about them (where they live, their date of birth and sex), their mobile number (from
- * that country, confirmed by a texted code), the password and signing out. The identity check, for Safe pay sellers, and
+ * that country, confirmed by a texted code), the password and signing out. Their username has its own page, linked here. The identity check, for Safe pay sellers, and
  * Privacy (personalisation and history) are their own pages.
  */
 export default async function ProfilePage() {
@@ -49,6 +50,23 @@ export default async function ProfilePage() {
         <p className="text-sm text-navy-600">
           You sign in with <strong className="text-navy-900">{customer.email}</strong>.
         </p>
+      </section>
+      <section id="username" aria-labelledby="username-title" className={card}>
+        <h2 id="username-title" className="font-bold">
+          Username
+        </h2>
+        <p className="text-sm text-navy-600">
+          {customer.username ? (
+            <>
+              Your seller page is at your username, <strong className="break-all text-navy-900">{customer.username}</strong>.
+            </>
+          ) : (
+            "Choose a username and your seller page's address becomes your name, once you have posted enough ads."
+          )}
+        </p>
+        <Link href={usernameScreen} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-navy-200 px-4 font-semibold hover:border-navy-300">
+          <AtSign className="size-4" aria-hidden="true" /> {customer.username ? "Your username" : "Choose a username"}
+        </Link>
       </section>
       <section id="country" aria-labelledby="country-title" className={card}>
         <h2 id="country-title" className="font-bold">

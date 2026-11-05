@@ -5,6 +5,7 @@ import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { ListingSearchService, publicName } from './search.service.js';
 import { onShopWhere } from './rules.js';
+import { UsernamesService } from './usernames.service.js';
 
 /** A seller's handle: 10 lower-case letters and digits (`customers.seller_handle`). */
 export const sellerHandlePattern = /^[a-z0-9]{6,12}$/;
@@ -26,18 +27,24 @@ export class SellerProfilesService {
     private readonly listings: ListingsService,
     private readonly search: ListingSearchService,
     private readonly leads: LeadsService,
+    private readonly usernames: UsernamesService,
   ) {}
 
-  /** The account a handle names, while it is usable (a suspended account has no page). */
-  async seller(handle: string) {
-    if (!sellerHandlePattern.test(handle)) throw notFound();
-    const customer = await this.prisma.customer.findUnique({ where: { sellerHandle: handle }, select: { id: true, name: true, country: true, status: true, createdAt: true, phoneVerifiedAt: true, phone: true, avatarUrl: true } });
+  /**
+   * The account a page's address names, while it is usable (a suspended account has no page): their username, their
+   * handle, or a username they gave up within its 90 days (`redirect`: the address their page is at now).
+   */
+  async seller(key: string) {
+    const found = await this.usernames.resolve(key);
+    if (!found) throw notFound();
+    const customer = await this.prisma.customer.findUnique({ where: { id: found.customerId }, select: { id: true, name: true, country: true, status: true, createdAt: true, phoneVerifiedAt: true, phone: true, avatarUrl: true, sellerHandle: true, username: true } });
     if (!customer || customer.status !== 'active') throw notFound();
-    return customer;
+    return { ...customer, redirect: found.redirect };
   }
 
-  async profile(handle: string) {
-    const customer = await this.seller(handle);
+  async profile(key: string) {
+    const customer = await this.seller(key);
+    const handle = customer.sellerHandle;
     const live = { customerId: customer.id, ...onShopWhere };
     // The page lives in the seller's own market; an account from before countries were asked takes its listings'.
     const country = customer.country ?? (await this.prisma.classifiedListing.findFirst({ where: live, orderBy: { publishedAt: 'desc' }, select: { country: true } }))?.country ?? null;
@@ -70,11 +77,15 @@ export class SellerProfilesService {
     return {
       object: 'classified_seller' as const,
       handle,
+      /** Their chosen username, their page's address once set (else `handle`). */
+      username: customer.username,
+      /** Asked by a username they gave up (within 90 days): the address their page is at now, to redirect to. */
+      redirect: customer.redirect,
       name: publicName(customer.name),
       /** Their profile photo (a face, logo or icon), or null for their initials. */
       avatar_url: customer.avatarUrl,
       country,
-      url: `${shopOrigin}/${country.toLowerCase()}/seller/${handle}`,
+      url: `${shopOrigin}/${country.toLowerCase()}/seller/${customer.username ?? handle}`,
       member_since: customer.createdAt.toISOString(),
       badges: badges.get(customer.id) ?? [],
       response_rate: responseRate,

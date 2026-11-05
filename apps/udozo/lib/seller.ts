@@ -1,4 +1,18 @@
-import { sellerPath, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
+import { sellerPath, usernamePattern, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
+
+/** A seller's random handle (10 characters today; 6 to 12 accepted). */
+export const handlePattern = /^[a-z0-9]{6,12}$/;
+
+/** Whether an address can name a seller page: their username (`usernamePattern`) or their handle. The API decides which. */
+export const isSellerKey = (key: string) => usernamePattern.test(key) || handlePattern.test(key);
+
+/** The page's query string again (`?category=tvs&sort=…`), for a redirect that keeps it; empty when there is none. */
+export function queryString(params: Record<string, string | string[] | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
+  const text = query.toString();
+  return text ? `?${text}` : "";
+}
 
 /** A seller page's listings: one category of theirs (or all), a sort, and a page of `sellerPageSize`. */
 export type SellerFilters = { category: string | null; sort: SellerSort; page: number };

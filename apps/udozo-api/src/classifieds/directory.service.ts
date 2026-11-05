@@ -17,7 +17,7 @@ export const sitemapPage = 5000;
 export const sitemapPlaceFrom = 5;
 
 type ListingPageRow = { last_ref: bigint | number; listings: bigint | number; updated_at: Date };
-type SellerRow = { handle: string; listings: bigint | number; updated_at: Date };
+type SellerRow = { handle: string; username: string | null; listings: bigint | number; updated_at: Date };
 
 /** Each file of a country's listings: the number it starts after (the last one of the file before), its size and its newest change. */
 export const listingPages = (rows: ListingPageRow[]) => rows.map((row, index) => ({ after: index ? Number(rows[index - 1]!.last_ref) : 0, listings: Number(row.listings), updated_at: row.updated_at.toISOString() }));
@@ -227,11 +227,11 @@ export class ShopDirectoryService {
       // A seller's page lives in their own market and counts only their live listings there (`SellerProfilesService`);
       // a suspended account has no page.
       this.prisma.$queryRaw<SellerRow[]>`
-        SELECT c."seller_handle" AS handle, count(*) AS listings, max(l."updated_at") AS updated_at
+        SELECT c."seller_handle" AS handle, c."username" AS username, count(*) AS listings, max(l."updated_at") AS updated_at
         FROM "classified_listings" l
         JOIN "customers" c ON c."id" = l."customer_id"
         WHERE l."country" = ${code} AND l."status" = 'active' AND l."on_shop" AND c."status" = 'active' AND c."country" = ${code}
-        GROUP BY c."seller_handle"
+        GROUP BY c."seller_handle", c."username"
         ORDER BY 1`,
     ]);
     const categoryOf = new Map(categories.map(category => [category.id, category]));
@@ -281,7 +281,7 @@ export class ShopDirectoryService {
       places: places.filter(place => !place.category).map(({ state, area, listings, updated_at }) => ({ state, area, listings, updated_at })).sort((a, b) => a.state.localeCompare(b.state) || (a.area ?? '').localeCompare(b.area ?? '')),
       category_places: places.filter(place => place.category && place.listings >= sitemapPlaceFrom && (place.area || !areaNames.has(`${place.state}/${place.category}`))).sort(byPlace),
       listing_pages: listingPages(pages),
-      sellers: sellers.map(row => ({ handle: row.handle, listings: Number(row.listings), updated_at: row.updated_at.toISOString() })),
+      sellers: sellers.map(row => ({ handle: row.handle, username: row.username, listings: Number(row.listings), updated_at: row.updated_at.toISOString() })),
     };
   }
 

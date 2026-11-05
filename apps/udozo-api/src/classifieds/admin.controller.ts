@@ -19,6 +19,7 @@ import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFault
 import { ResaleService } from './resale.service.js';
 import { ProductOnly } from '../products/product.js';
 import { AvatarsService } from '../media/avatars.service.js';
+import { UsernamesService } from './usernames.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -113,6 +114,10 @@ class MarketSettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(30)
   max_photos?: number;
+
+  /** Ads a customer must have posted before choosing a username (docs/UDOZO_USERNAMES_PLAN.md). */
+  @IsOptional() @IsInt() @Min(0) @Max(100)
+  username_min_listings?: number;
 }
 
 class SellersDto {
@@ -161,7 +166,7 @@ const adminInclude = {
   reports: { where: { status: 'open' }, select: { id: true, reason: true, details: true, createdAt: true } },
 } satisfies Prisma.ClassifiedListingInclude;
 
-const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, avatarUrl: true, sellerHandle: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
+const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, avatarUrl: true, sellerHandle: true, username: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
 
 /** The moderators' reads: listings with their seller (email included, admins only), flags and open reports. */
 @Injectable()
@@ -332,6 +337,8 @@ export class ClassifiedsAdminService {
       /** Their profile photo and the handle of their public seller page (`/<cc>/seller/<handle>`). */
       avatar_url: row.avatarUrl,
       handle: row.sellerHandle,
+      /** Their chosen username (their page's address once set), or null. */
+      username: row.username,
       suspended: Boolean(seller?.suspendedAt),
       suspended_reason: seller?.suspendedReason ?? null,
       suspended_at: seller?.suspendedAt?.toISOString() ?? null,
@@ -425,7 +432,7 @@ export class ClassifiedsAdminService {
 
   async marketSettings(country: string) {
     const row = await this.listings.marketSettings(country);
-    return { object: 'classified_market_settings' as const, country, listing_days: row.listingDays, monthly_listing_limit: row.monthlyListingLimit, first_listings_reviewed: row.firstListingsReviewed, min_photos: row.minPhotos, max_photos: row.maxPhotos };
+    return { object: 'classified_market_settings' as const, country, listing_days: row.listingDays, monthly_listing_limit: row.monthlyListingLimit, first_listings_reviewed: row.firstListingsReviewed, min_photos: row.minPhotos, max_photos: row.maxPhotos, username_min_listings: row.usernameMinListings };
   }
 
   async setMarketSettings(actorId: string | null, country: string, input: MarketSettingsDto) {
@@ -440,6 +447,7 @@ export class ClassifiedsAdminService {
       ...(input.first_listings_reviewed !== undefined ? { firstListingsReviewed: input.first_listings_reviewed } : {}),
       ...(input.min_photos !== undefined ? { minPhotos: input.min_photos } : {}),
       ...(input.max_photos !== undefined ? { maxPhotos: input.max_photos } : {}),
+      ...(input.username_min_listings !== undefined ? { usernameMinListings: input.username_min_listings } : {}),
     };
     await this.prisma.classifiedMarketSettings.upsert({ where: { country }, create: { country, ...data }, update: data });
     const after = await this.marketSettings(country);
@@ -461,7 +469,21 @@ export class AdminClassifiedsController {
     private readonly conversations: ConversationsService,
     private readonly avatars: AvatarsService,
     private readonly audit: AuditService,
+    private readonly usernames: UsernamesService,
   ) {}
+
+  /**
+   * Takes a seller's username away (abuse, impersonation): their page goes back to its handle, the username is held for
+   * 90 days, and they are told; audited.
+   */
+  @Post('sellers/:customer/username/remove')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('operations')
+  async removeUsername(@CurrentCaller() caller: Caller, @Param('customer', ParseUUIDPipe) customer: string, @Body() body: ReasonDto) {
+    await this.admin.seller(customer);
+    await this.usernames.remove(adminId(caller), customer, body.reason);
+    return this.admin.seller(customer);
+  }
 
   /** Takes a seller's profile photo off (an abusive or misleading picture): their initials show again; audited. */
   @Post('sellers/:customer/avatar/remove')

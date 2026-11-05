@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, MapPin, PackageOpen, ShieldCheck, Store } from "lucide-react";
-import { badgeLabels, placePath, sellerPath, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopViewer } from "@bitocard/api-client/classifieds";
+import { AtSign, BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, MapPin, PackageOpen, ShieldCheck, Store } from "lucide-react";
+import { badgeLabels, placePath, sellerPath, sellerSlug, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopViewer, type UsernameStatus } from "@bitocard/api-client/classifieds";
 import { Avatar } from "@bitocard/ui/avatar";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ShopIcon } from "@/components/icon";
@@ -13,24 +13,35 @@ import { SellerShare } from "@/components/seller-share";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { gifSizes, sellerCardUrl } from "@/lib/seller-card";
-import { placesText, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
+import { isSellerKey, placesText, queryString, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
+import { usernameNudge } from "@/lib/username";
 import { breadcrumbJsonLd, itemListJsonLd, noindexFollow, sellerJsonLd } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string; handle: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-const handlePattern = /^[a-z0-9]{6,12}$/;
+/** The profile as the API answers it: an old username in its 90 days also names where the seller is now. */
+type Loaded = ShopSellerProfile;
 
-async function load(handle: string) {
-  if (!handlePattern.test(handle)) return null;
-  const result = await shopApi<ShopSellerProfile>(`/v1/classifieds/sellers/${handle}`);
+/**
+ * The seller an address names: their username or their handle (the folder keeps its old name), whichever the API knows,
+ * typed in any case. Anything that cannot be either never reaches the API.
+ */
+async function load(key: string) {
+  const lower = key.toLowerCase();
+  if (!isSellerKey(lower)) return null;
+  const result = await shopApi<Loaded>(`/v1/classifieds/sellers/${lower}`);
   return result.ok ? result.data : null;
 }
+
+/** Where the seller's page is now: the API's `redirect` (an old username), else their username once chosen, else their handle. */
+const slugOf = (profile: Loaded) => profile.redirect || sellerSlug(profile);
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { cc, handle } = await params;
   const [market, profile] = await Promise.all([marketFor(cc), load(handle)]);
   if (!market || !profile) return { title: "This seller is not on Udozo", robots: noindexFollow };
-  const path = sellerPath(profile.country, handle);
+  const slug = slugOf(profile);
+  const path = sellerPath(profile.country, slug);
   const where = placesText(profile.states);
   const title = `${profile.name}: ${profile.active_listings} listing${profile.active_listings === 1 ? "" : "s"} for sale on Udozo`;
   const description = `Shop from ${profile.name}${where ? ` in ${where}` : ""} on Udozo: ${profile.categories
@@ -43,21 +54,24 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // The animated card first (WhatsApp and others show its first frame, the same card), then the still one, which X uses.
   const origin = siteOrigin();
   const alt = `${profile.name} on Udozo: ${profile.active_listings} listing${profile.active_listings === 1 ? "" : "s"} for sale`;
-  const still = { url: sellerCardUrl(origin, handle, "jpg"), width: 1200, height: 630, type: "image/jpeg", alt };
+  const still = { url: sellerCardUrl(origin, slug, "jpg"), width: 1200, height: 630, type: "image/jpeg", alt };
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type: "profile", url: path, title, description, siteName: "Udozo", images: [{ url: sellerCardUrl(origin, handle, "gif"), ...gifSizes[0], type: "image/gif", alt }, still] },
+    openGraph: { type: "profile", url: path, title, description, siteName: "Udozo", images: [{ url: sellerCardUrl(origin, slug, "gif"), ...gifSizes[0], type: "image/gif", alt }, still] },
     twitter: { card: "summary_large_image", title, description, images: [still] },
     ...(profile.active_listings === 0 || filtered ? { robots: noindexFollow } : {}),
   };
 }
 
 /**
- * Every account's public seller page (`/ng/seller/<handle>`): who they are as their listings show them (first name and
- * initial, badges, since when), their figures, what they sell and where, their live listings by category with a sort
- * and pages, and the same ways to get in touch as on a listing, about the listing the buyer chooses.
+ * Every account's public seller page (`/ng/seller/<username>`, else `/ng/seller/<handle>`): who they are as their
+ * listings show them (first name and initial, badges, since when), their figures, what they sell and where, their live
+ * listings by category with a sort and pages, and the same ways to get in touch as on a listing, about the listing the
+ * buyer chooses. One address per seller: their handle once they have a username, an old username in its 90 days, another
+ * market's address or another case all redirect for good to the current one, keeping the query string. The seller
+ * themselves, with no username yet, is offered one above their listings.
  */
 export default async function SellerPage({ params, searchParams }: Props) {
   const { cc, handle } = await params;
@@ -65,19 +79,27 @@ export default async function SellerPage({ params, searchParams }: Props) {
   if (!market) notFound();
   const profile = await load(handle);
   if (!profile) notFound();
-  if (profile.country.toLowerCase() !== cc.toLowerCase()) permanentRedirect(sellerPath(profile.country, handle));
+  const slug = slugOf(profile);
+  const query = await searchParams;
+  if (profile.country.toLowerCase() !== cc.toLowerCase() || handle !== slug) permanentRedirect(`${sellerPath(profile.country, slug)}${queryString(query)}`);
 
-  const filters = readSellerFilters(await searchParams, profile);
+  const filters = readSellerFilters(query, profile);
   const customer = await currentCustomer();
   const firstListing = profile.contact_listings[0];
   const [listings, viewer] = await Promise.all([
-    shopApi<ShopSearch>(sellerListingsQuery(cc, handle, filters)),
+    shopApi<ShopSearch>(sellerListingsQuery(cc, profile.handle, filters)),
     customer && firstListing ? customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${firstListing.id}/viewer`) : null,
   ]);
   const firstViewer = viewer?.ok ? viewer.data : null;
-  const chat = firstViewer?.conversation_id ? await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${firstViewer.conversation_id}`) : null;
+  // The seller on their own page (their account's handle, else a listing of theirs, says so) with no username yet: what it takes to choose one.
+  const own = (customer?.seller_handle ? customer.seller_handle === profile.handle : false) || Boolean(firstViewer?.own);
+  const [chat, usernameStatus] = await Promise.all([
+    firstViewer?.conversation_id ? customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${firstViewer.conversation_id}`) : null,
+    own && !profile.username ? customerApi<UsernameStatus>("GET", "/v1/store/account/username") : null,
+  ]);
+  const nudge = usernameStatus?.ok ? usernameNudge(usernameStatus.data) : null;
 
-  const path = sellerPath(cc, handle);
+  const path = sellerPath(cc, slug);
   const origin = siteOrigin();
   const trail = [
     { name: market.name, path: `/${cc}` },
@@ -153,7 +175,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
                 {profile.categories.map(category => (
                   <li key={category.slug} className="min-w-0">
                     <Link
-                      href={sellerHref(cc, handle, filters, { category: category.slug })}
+                      href={sellerHref(cc, slug, filters, { category: category.slug })}
                       aria-current={filters.category === category.slug ? "true" : undefined}
                       className="flex items-center gap-2.5 rounded-2xl border border-navy-200 bg-white p-2.5 hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-50"
                     >
@@ -192,6 +214,23 @@ export default async function SellerPage({ params, searchParams }: Props) {
             </section>
           ) : null}
 
+          {nudge ? (
+            <aside aria-labelledby="username-nudge" className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-brand-700">
+                <AtSign className="size-5" aria-hidden="true" />
+              </span>
+              <span className="grid min-w-0 flex-1 basis-48 gap-0.5">
+                <strong id="username-nudge" className="text-sm">
+                  {nudge.title}
+                </strong>
+                <span className="text-sm text-navy-700">{nudge.body}</span>
+              </span>
+              <Link href={nudge.href} className="inline-flex h-10 shrink-0 items-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white">
+                {nudge.action}
+              </Link>
+            </aside>
+          ) : null}
+
           <section aria-labelledby="listings-heading" id="listings" className="scroll-mt-24">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
               <h2 id="listings-heading" className="text-base font-bold">
@@ -201,7 +240,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
                 {sellerSorts.map(sort => (
                   <Link
                     key={sort}
-                    href={sellerHref(cc, handle, filters, { sort })}
+                    href={sellerHref(cc, slug, filters, { sort })}
                     aria-current={filters.sort === sort ? "true" : undefined}
                     className="rounded-full px-3 py-1.5 text-xs font-semibold text-navy-600 hover:text-navy-900 aria-[current]:bg-white aria-[current]:text-navy-900 aria-[current]:shadow-sm"
                   >
@@ -214,14 +253,14 @@ export default async function SellerPage({ params, searchParams }: Props) {
               <nav aria-label="Categories" className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
                 <ul className="flex gap-2 whitespace-nowrap">
                   <li>
-                    <Link href={sellerHref(cc, handle, filters, { category: null })} aria-current={!filters.category ? "true" : undefined} className="flex h-9 items-center rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-900 aria-[current]:text-white">
+                    <Link href={sellerHref(cc, slug, filters, { category: null })} aria-current={!filters.category ? "true" : undefined} className="flex h-9 items-center rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-900 aria-[current]:text-white">
                       All
                     </Link>
                   </li>
                   {profile.categories.map(category => (
                     <li key={category.slug}>
                       <Link
-                        href={sellerHref(cc, handle, filters, { category: category.slug })}
+                        href={sellerHref(cc, slug, filters, { category: category.slug })}
                         aria-current={filters.category === category.slug ? "true" : undefined}
                         className="flex h-9 items-center gap-1.5 rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-900 aria-[current]:text-white"
                       >
@@ -253,7 +292,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
             {pages > 1 ? (
               <nav aria-label="Pages" className="mt-5 flex items-center justify-center gap-3 text-sm">
                 {filters.page > 1 ? (
-                  <Link href={sellerHref(cc, handle, filters, { page: filters.page - 1 })} className="inline-flex h-10 items-center gap-1 rounded-xl border border-navy-200 bg-white px-3.5 font-semibold hover:border-navy-400">
+                  <Link href={sellerHref(cc, slug, filters, { page: filters.page - 1 })} className="inline-flex h-10 items-center gap-1 rounded-xl border border-navy-200 bg-white px-3.5 font-semibold hover:border-navy-400">
                     <ChevronLeft className="size-4" aria-hidden="true" /> Previous
                   </Link>
                 ) : null}
@@ -261,7 +300,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
                   Page {filters.page} of {pages}
                 </span>
                 {filters.page < pages ? (
-                  <Link href={sellerHref(cc, handle, filters, { page: filters.page + 1 })} className="inline-flex h-10 items-center gap-1 rounded-xl border border-navy-200 bg-white px-3.5 font-semibold hover:border-navy-400">
+                  <Link href={sellerHref(cc, slug, filters, { page: filters.page + 1 })} className="inline-flex h-10 items-center gap-1 rounded-xl border border-navy-200 bg-white px-3.5 font-semibold hover:border-navy-400">
                     Next <ChevronRight className="size-4" aria-hidden="true" />
                   </Link>
                 ) : null}
@@ -300,7 +339,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
         </aside>
       </div>
 
-      <JsonLd data={sellerJsonLd(profile, new URL(path, origin).href, sellerCardUrl(origin, handle, "jpg"))} />
+      <JsonLd data={sellerJsonLd(profile, new URL(path, origin).href, sellerCardUrl(origin, slug, "jpg"))} />
       <JsonLd data={breadcrumbJsonLd(trail, origin)} />
       {cards.length ? <JsonLd data={itemListJsonLd(`Listings by ${profile.name}`, cards, origin, cc)} /> : null}
     </div>

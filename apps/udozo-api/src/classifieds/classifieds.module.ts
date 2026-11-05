@@ -38,12 +38,14 @@ import { AdminDiscoveryController, DiscoveryAccountController, DiscoveryControll
 import { DiscoveryAdminService } from './discovery/discovery-admin.service.js';
 import { DiscoveryService } from './discovery/discovery.service.js';
 import { DiscoveryRecorder } from './discovery/recorder.service.js';
+import { UsernamesController } from './usernames.controller.js';
+import { UsernamesService } from './usernames.service.js';
 
 /** BitoCard Shop (classifieds): docs/BITOCARD_CLASSIFIEDS_PLAN.md. */
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
-  controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedContactController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController, ClassifiedHomeController, AdminHomeController, AdminSponsoredController, ClassifiedBannersController, AdminBannersController, ClassifiedBrandsController, AdminBrandsController, ClassifiedModelsController, AdminModelsController, DiscoveryController, DiscoveryAccountController, AdminDiscoveryController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, SellerProfilesService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails, ContactRequestsService, CallsService, HomeResolver, HomeService, SponsoredService, BannersService, ListingViewsService, ClassifiedBrandsService, ClassifiedModelsService, DiscoveryRecorder, DiscoveryService, DiscoveryAdminService],
+  controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedContactController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController, ClassifiedHomeController, AdminHomeController, AdminSponsoredController, ClassifiedBannersController, AdminBannersController, ClassifiedBrandsController, AdminBrandsController, ClassifiedModelsController, AdminModelsController, DiscoveryController, DiscoveryAccountController, AdminDiscoveryController, UsernamesController],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, SellerProfilesService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails, ContactRequestsService, CallsService, HomeResolver, HomeService, SponsoredService, BannersService, ListingViewsService, ClassifiedBrandsService, ClassifiedModelsService, DiscoveryRecorder, DiscoveryService, DiscoveryAdminService, UsernamesService],
   exports: [ShopEmails, ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, SafePayGuardsService, ListingSearchService, ContactRequestsService, CallsService, DiscoveryRecorder, DiscoveryAdminService],
 })
 export class ClassifiedsModule {}

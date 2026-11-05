@@ -13,18 +13,19 @@ import {
   useClassifiedSellerQuery,
   useClearClassifiedStrikesMutation,
   useRemoveClassifiedSellerAvatarMutation,
+  useRemoveClassifiedSellerUsernameMutation,
   useSetClassifiedSellerSuspendedMutation,
 } from "@bitocard/api-client/admin";
 import { Avatar } from "@bitocard/ui/avatar";
 import { Ban, Flag, HandCoins, Package } from "lucide-react";
 import { ListingCell, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
 
-type Action = "suspend" | "unsuspend" | "clear" | "photo";
+type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username";
 
 /**
  * One Udozo seller: their ads, reports about them or their ads, and their Safe pay standing (strikes over 90
  * days). Operations suspend them (their live and waiting ads leave the market), bring them back, or lift a Safe pay
- * limit (strikes so far stop counting). Every change is audited.
+ * limit (strikes so far stop counting), and take off a photo or username that is not acceptable. Every change is audited.
  */
 export default function ClassifiedSellerPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function ClassifiedSellerPage() {
   const [suspend] = useSetClassifiedSellerSuspendedMutation();
   const [clear] = useClearClassifiedStrikesMutation();
   const [removePhoto] = useRemoveClassifiedSellerAvatarMutation();
+  const [removeUsername] = useRemoveClassifiedSellerUsernameMutation();
   const [action, setAction] = useState<Action | null>(null);
   const operations = can(admin, "operations");
 
@@ -119,9 +121,23 @@ export default function ClassifiedSellerPage() {
                         ) : null}
                       </span>
                     </div>
+                    <div className="mb-3 grid gap-1">
+                      {data.username ? (
+                        <span>
+                          Username <span className="font-mono font-semibold text-ink">{data.username}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted">No username: their seller page uses its handle.</span>
+                      )}
+                      {data.username && operations ? (
+                        <button type="button" onClick={() => setAction("username")} className="w-fit text-sm font-semibold text-red-600 hover:underline">
+                          Remove username
+                        </button>
+                      ) : null}
+                    </div>
                     <p className="text-muted">{data.phone_confirmed ? "Phone confirmed." : "No confirmed phone."}</p>
-                    {data.handle && data.country ? (
-                      <a href={`${udozoOrigin()}/${data.country.toLowerCase()}/seller/${data.handle}`} target="_blank" rel="noopener" className="mt-2 block font-semibold text-brand-600 hover:underline">
+                    {(data.username ?? data.handle) && data.country ? (
+                      <a href={`${udozoOrigin()}/${data.country.toLowerCase()}/seller/${data.username ?? data.handle}`} target="_blank" rel="noopener" className="mt-2 block font-semibold text-brand-600 hover:underline">
                         Open their seller page
                       </a>
                     ) : null}
@@ -136,19 +152,26 @@ export default function ClassifiedSellerPage() {
               <ActionDialog
                 open
                 onClose={() => setAction(null)}
-                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?` }[action]}
+                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, username: `Remove ${data.name}'s username?` }[action]}
                 description={
                   {
                     suspend: "They cannot post, and their live and waiting ads are removed from Udozo. Ads removed now stay removed when they come back.",
                     unsuspend: "They can post again. Ads removed while suspended stay removed.",
                     clear: "They can take Safe pay orders again. Strikes before now stop counting; new ones count from today.",
                     photo: "Their photo is deleted and their initials show instead, everywhere. They can choose another; remove it again if it is not acceptable.",
+                    username: `Their seller page goes back to its handle and they are told. Nobody can take "${data.username ?? ""}" for 90 days. They can choose another username; remove it again if it is not acceptable.`,
                   }[action]
                 }
-                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo" }[action]}
-                tone={action === "suspend" || action === "photo" ? "danger" : "primary"}
+                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", username: "Remove username" }[action]}
+                tone={action === "suspend" || action === "photo" || action === "username" ? "danger" : "primary"}
                 onConfirm={reason =>
-                  action === "clear" ? clear({ id, reason }).unwrap() : action === "photo" ? removePhoto({ id, reason }).unwrap() : suspend({ id, suspended: action === "suspend", reason }).unwrap()
+                  action === "clear"
+                    ? clear({ id, reason }).unwrap()
+                    : action === "photo"
+                      ? removePhoto({ id, reason }).unwrap()
+                      : action === "username"
+                        ? removeUsername({ id, reason }).unwrap()
+                        : suspend({ id, suspended: action === "suspend", reason }).unwrap()
                 }
               />
             ) : null}

@@ -5,10 +5,10 @@ import { ogImageSize } from "@bitocard/ui/og-image";
 import type { ShopSearch, ShopSellerProfile } from "@bitocard/api-client/classifieds";
 import { shopApi } from "./api";
 import { Lockup, navy, ogClip, ogFonts, ogMark, ogMoney, pink, slate } from "./og";
-import { placesText, sinceText } from "./seller";
+import { isSellerKey, placesText, sinceText } from "./seller";
 
 /**
- * A seller page's share images (`/seller-card/<handle>.jpg` and `.gif`), udozo.com's only: the still card, a collage of
+ * A seller page's share images (`/seller-card/<username or handle>.jpg` and `.gif`), udozo.com's only: the still card, a collage of
  * up to four of their photos beside who they are, and an animated GIF that opens on the same card and then shows a few
  * of their listings, chosen at random on each request (the CDN keeps a pick for hours, so it changes a few times a day).
  * WhatsApp shows no preview for heavy images and only ever the first frame, so the GIF stays within `gifBudget` and its
@@ -37,16 +37,16 @@ export const frameDelay = 1800;
 export const cardCacheControl = "public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400";
 export const failureCacheControl = "no-store";
 
-const filePattern = /^([a-z0-9]{6,12})\.(jpg|gif)$/;
+const filePattern = /^([a-z0-9_]+)\.(jpg|gif)$/;
 
-/** The handle and kind an address names (`a1b2c3d4e5.gif`), or null for anything else. */
-export function readSellerCard(file: string): { handle: string; kind: SellerCardKind } | null {
+/** The seller (their username or handle, as the page's address names them) and kind an address names (`chinedu_o.gif`, `a1b2c3d4e5.gif`), or null for anything else. */
+export function readSellerCard(file: string): { key: string; kind: SellerCardKind } | null {
   const match = filePattern.exec(file);
-  return match ? { handle: match[1]!, kind: match[2] as SellerCardKind } : null;
+  return match && isSellerKey(match[1]!) ? { key: match[1]!, kind: match[2] as SellerCardKind } : null;
 }
 
-/** The share images' addresses, from the site's own origin. */
-export const sellerCardUrl = (origin: string, handle: string, kind: SellerCardKind) => new URL(`/seller-card/${handle}.${kind}`, origin).href;
+/** The share images' addresses, from the site's own origin, named as the seller's page is (`sellerSlug`). */
+export const sellerCardUrl = (origin: string, slug: string, kind: SellerCardKind) => new URL(`/seller-card/${slug}.${kind}`, origin).href;
 
 /** Up to two initials from a public name ("Chinedu O." is CO). */
 export function initialsOf(name: string) {
@@ -65,13 +65,14 @@ export type CardListing = { photo: string; title: string; price: string };
 export type SellerCardData = { profile: ShopSellerProfile; listings: CardListing[] };
 
 /**
- * The seller and up to 24 of their live listings with a photo (https only). "missing" for a handle the API does not know
- * (or a suspended account), null when the API cannot answer (never cached).
+ * The seller and up to 24 of their live listings with a photo (https only). "missing" for a username or handle the API
+ * does not know (or a suspended account), null when the API cannot answer (never cached). An old username still in its
+ * 90 days answers its seller, so a card shared before a change keeps working.
  */
-export async function sellerCardData(handle: string): Promise<SellerCardData | "missing" | null> {
-  const profile = await shopApi<ShopSellerProfile>(`/v1/classifieds/sellers/${handle}`);
+export async function sellerCardData(key: string): Promise<SellerCardData | "missing" | null> {
+  const profile = await shopApi<ShopSellerProfile>(`/v1/classifieds/sellers/${key}`);
   if (!profile.ok) return profile.status >= 400 && profile.status < 500 ? "missing" : null;
-  const query = new URLSearchParams({ country: profile.data.country, seller: handle, sort: "newest", limit: "24" });
+  const query = new URLSearchParams({ country: profile.data.country, seller: profile.data.handle, sort: "newest", limit: "24" });
   const search = await shopApi<ShopSearch>(`/v1/classifieds/listings?${query}`);
   if (!search.ok) return null;
   const listings = search.data.data.flatMap(card => {
@@ -314,11 +315,11 @@ async function render(data: SellerCardData, kind: SellerCardKind, random: () => 
 
 const failure = (status: number) => new Response(null, { status, headers: { "Cache-Control": failureCacheControl } });
 
-/** The route's answer for `file` (`<handle>.jpg` or `.gif`): 404 for anything else or an unknown seller, 502 when the API cannot answer. */
+/** The route's answer for `file` (`<username or handle>.jpg` or `.gif`): 404 for anything else or an unknown seller, 502 when the API cannot answer. */
 export async function serveSellerCard(file: string, random: () => number = Math.random): Promise<Response> {
   const card = readSellerCard(file);
   if (!card) return failure(404);
-  const data = await sellerCardData(card.handle);
+  const data = await sellerCardData(card.key);
   if (data === "missing") return failure(404);
   if (!data) return failure(502);
   let bytes: Buffer;

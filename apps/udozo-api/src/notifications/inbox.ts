@@ -189,6 +189,7 @@ export const notificationTypes = {
   'customer.classifieds.listing_live': { realm: 'customer', severity: 'success', label: 'Your BitoCard Shop ad is live', push: true },
   'customer.classifieds.listing_rejected': { realm: 'customer', severity: 'warning', label: 'Your BitoCard Shop ad needs changes', push: true },
   'customer.classifieds.listing_removed': { realm: 'customer', severity: 'warning', label: 'Your BitoCard Shop ad was removed', push: true },
+  'customer.classifieds.username_removed': { realm: 'customer', severity: 'warning', label: 'Udozo removed your username', push: true },
   'customer.classifieds.message': { realm: 'customer', severity: 'info', label: 'New BitoCard Shop message', push: true },
   'customer.classifieds.offer': { realm: 'customer', severity: 'info', label: 'New offer on BitoCard Shop', push: true },
   'customer.classifieds.contact_request': { realm: 'customer', severity: 'info', label: 'A buyer asked for your contact details', push: true },

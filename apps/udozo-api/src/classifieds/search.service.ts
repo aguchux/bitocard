@@ -31,7 +31,7 @@ export type SearchInput = {
   condition?: string[];
   /** `key:value[,value…]` for text, choices and yes or no; `key:min..max` (either end optional) for numbers. */
   f?: string[];
-  /** One seller's listings only (their handle, as on their seller page). */
+  /** One seller's listings only (their username or handle, as on their seller page). */
   seller?: string;
   sort?: SearchSort;
   offset?: number;
@@ -147,7 +147,7 @@ export class ListingSearchService {
     const [place, featureFilters, seller] = await Promise.all([
       this.place(country, input),
       this.features(input.f),
-      input.seller ? this.prisma.customer.findUnique({ where: { sellerHandle: input.seller }, select: { id: true, status: true } }) : null,
+      input.seller ? this.prisma.customer.findFirst({ where: { OR: [{ username: input.seller.toLowerCase() }, { sellerHandle: input.seller.toLowerCase() }] }, select: { id: true, status: true } }) : null,
     ]);
     if (input.seller && (!seller || seller.status !== 'active')) throw invalid('parameter_invalid', 'No such seller.', 'seller');
 
@@ -216,7 +216,7 @@ export class ListingSearchService {
         area: { include: { parent: true } },
         category: { include: { features: { select: { featureId: true, position: true } } } },
         features: { include: { feature: true } },
-        customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true, sellerHandle: true } },
+        customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true, sellerHandle: true, username: true } },
         media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { id: true, kind: true, url: true, width: true, height: true, posterUrl: true } },
       },
     });
@@ -243,7 +243,7 @@ export class ListingSearchService {
             has_video: row.media.some(item => item.kind === 'video'),
             highlights: highlights(row.features, row.category?.features ?? []),
             delivery: row.delivery,
-            seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, badges: this.badges(row.customer, checked) },
+            seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, badges: this.badges(row.customer, checked) },
             published_at: row.publishedAt?.toISOString() ?? null,
           },
         ] as const;
@@ -281,7 +281,7 @@ export class ListingSearchService {
         area: { include: { parent: true } },
         category: { include: { parent: true, features: true } },
         features: { include: { feature: true } },
-        customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true, phone: true, sellerHandle: true, avatarUrl: true } },
+        customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true, phone: true, sellerHandle: true, username: true, avatarUrl: true } },
         media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }] },
       },
     });
@@ -331,7 +331,7 @@ export class ListingSearchService {
       /** Units still to be had: its stock less those paid for and waiting to be handed over. */
       available: Math.max(row.stock - holding, 0),
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
-      seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, avatar_url: row.customer.avatarUrl, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
+      seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, avatar_url: row.customer.avatarUrl, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
       published_at: row.publishedAt?.toISOString() ?? null,
       sold_at: row.soldAt?.toISOString() ?? null,
     };

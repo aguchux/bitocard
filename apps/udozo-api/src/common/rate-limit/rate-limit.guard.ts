@@ -49,9 +49,10 @@ class MemoryLimiter {
   }
 }
 
-type Limiter = { limitFor(key: string): Promise<Verdict> };
+export type Limiter = { limitFor(key: string): Promise<Verdict> };
 
-function limiterFor(config: AppConfig, limit: number): Limiter {
+/** A fixed one-minute limit per key: Redis when configured, else this instance's memory (also for limits a route sets itself). */
+export function limiterFor(config: AppConfig, limit: number): Limiter {
   if (config.UPSTASH_REDIS_REST_URL && config.UPSTASH_REDIS_REST_TOKEN) {
     return new RedisLimiter(new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN }), limit);
   }

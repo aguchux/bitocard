@@ -16,13 +16,24 @@ import { MarketFilter } from "@/components/classifieds";
 
 type Limits = Omit<ClassifiedMarketSettings, "object" | "country">;
 
-const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: number; max: number }> = [
+const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: number; max: number; fallback?: number }> = [
   { key: "listing_days", label: "Days an ad stays live", hint: "Then it expires; the seller can renew it.", min: 1, max: 365 },
   { key: "monthly_listing_limit", label: "Ads per top category in 30 days", hint: "Per seller.", min: 1, max: 10000 },
   { key: "first_listings_reviewed", label: "A new seller's first ads reviewed", hint: "0 puts new sellers' ads live at once (other checks still apply).", min: 0, max: 100 },
   { key: "min_photos", label: "Fewest photos", hint: "Needed to submit.", min: 1, max: 30 },
   { key: "max_photos", label: "Most photos", hint: "At least the fewest.", min: 1, max: 30 },
+  {
+    key: "username_min_listings",
+    label: "Ads before choosing a username",
+    hint: "Customers choose a username, their seller page's address, once they have posted this many ads. 0 lets anyone choose one.",
+    min: 0,
+    max: 100,
+    fallback: 5,
+  },
 ];
+
+/** What the market has saved for a field; a setting the API does not send yet reads as its default. */
+const savedValue = (saved: ClassifiedMarketSettings, field: (typeof limitFields)[number]) => (saved as Partial<Limits>)[field.key] ?? field.fallback ?? 0;
 
 /**
  * Udozo > Limits and words: each market's posting rules, and the refused and doubtful words. A refused word
@@ -34,7 +45,7 @@ export default function ClassifiedRulesPage() {
   const changes = can(admin, "operations");
   return (
     <UdozoShell section="marketplace" current="/classifieds/rules" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Limits and words" }]}>
-      <PageHeader title="Limits and words" description="Posting rules per market, and the words that stop an ad or send it to a moderator. Whole words and phrases match, in any letter case." />
+      <PageHeader title="Limits and words" description="Posting rules per market, when sellers may choose a username, and the words that stop an ad or send it to a moderator. Whole words and phrases match, in any letter case." />
       <div className="mt-6 flex flex-wrap gap-3">
         <MarketFilter id="rules-market" value={country} onChange={setCountry} all={false} />
       </div>
@@ -62,12 +73,12 @@ function MarketLimits({ country, changes }: { country: string; changes: boolean 
 
 function LimitsForm({ saved, changes }: { saved: ClassifiedMarketSettings; changes: boolean }) {
   const id = useId();
-  const [values, setValues] = useState<Record<keyof Limits, string>>(() => Object.fromEntries(limitFields.map(field => [field.key, String(saved[field.key])])) as Record<keyof Limits, string>);
+  const [values, setValues] = useState<Record<keyof Limits, string>>(() => Object.fromEntries(limitFields.map(field => [field.key, String(savedValue(saved, field))])) as Record<keyof Limits, string>);
   const [update, updating] = useUpdateClassifiedMarketSettingsMutation();
   const [done, setDone] = useState(false);
   const parsed = Object.fromEntries(limitFields.map(field => [field.key, /^\d+$/.test(values[field.key].trim()) ? Number(values[field.key]) : null])) as Record<keyof Limits, number | null>;
   const invalid = limitFields.find(field => parsed[field.key] === null || parsed[field.key]! < field.min || parsed[field.key]! > field.max);
-  const changed = limitFields.filter(field => parsed[field.key] !== saved[field.key]);
+  const changed = limitFields.filter(field => parsed[field.key] !== savedValue(saved, field));
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

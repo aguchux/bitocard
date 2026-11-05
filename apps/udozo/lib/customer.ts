@@ -50,6 +50,10 @@ export type Customer = {
   personalisation?: boolean;
   /** Their profile photo, or null for their initials. Missing on older API versions. */
   avatar_url?: string | null;
+  /** Their username (Udozo): their seller page's address once chosen. Missing on older API versions. */
+  username?: string | null;
+  /** Their seller page's random handle (Udozo), to know them on their own page. Missing on older API versions. */
+  seller_handle?: string | null;
   created_at: string;
 };
 

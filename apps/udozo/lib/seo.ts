@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { conditionLabels, listingPath, type ShopListingCard, type ShopListingPage, type ShopMarket, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
+import { conditionLabels, listingPath, sellerSlug, type ShopListingCard, type ShopListingPage, type ShopMarket, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
 import type { FaqGroup } from "./help";
 import { supportEmail, supportPhone } from "./help";
 
@@ -145,7 +145,7 @@ export function sellerJsonLd(profile: ShopSellerProfile, url: string, card: stri
       "@type": "Person",
       "@id": `${url}#seller`,
       name: profile.name,
-      identifier: profile.handle,
+      identifier: sellerSlug(profile),
       url,
       image: profile.avatar_url?.startsWith("https://") ? profile.avatar_url : card,
       ...(profile.active_listings > 0 ? { agentInteractionStatistic: { "@type": "InteractionCounter", interactionType: "https://schema.org/WriteAction", userInteractionCount: profile.active_listings } } : {}),

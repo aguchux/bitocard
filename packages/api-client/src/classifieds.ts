@@ -127,7 +127,7 @@ export type ShopListingCard = {
   highlights: string[];
   delivery: ShopDelivery;
   /** The seller by their public name; `handle` names their seller page (Udozo). */
-  seller: { name: string; handle?: string; badges: ShopBadge[] };
+  seller: { name: string; handle?: string; username?: string | null; badges: ShopBadge[] };
   published_at: string | null;
 };
 /** A search result: its tier (from the buyer's area outwards) when an area or state was given. */
@@ -157,7 +157,7 @@ export type ShopListingPage = {
   delivery: ShopDelivery;
   reserved: boolean;
   contact: { chat: boolean; phone: boolean };
-  seller: { name: string; handle?: string; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
+  seller: { name: string; handle?: string; username?: string | null; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
   published_at: string | null;
   sold_at: string | null;
 };
@@ -169,6 +169,10 @@ export type ShopListingPage = {
 export type ShopSellerProfile = {
   object: 'classified_seller';
   handle: string;
+  /** Their chosen username (Udozo): their page's address once set, else `handle`. */
+  username?: string | null;
+  /** Set when the address asked for is an old username still held: where the page is now (Udozo). */
+  redirect?: string | null;
   name: string;
   /** Their profile photo (a face, logo or icon), or null for their initials. */
   avatar_url?: string | null;
@@ -212,7 +216,7 @@ export type ShopSitemap = {
   /** The files its listings come in: each starts after a listing number. */
   listing_pages: Array<{ after: number; listings: number; updated_at: string }>;
   /** Udozo: sellers of this market with a live listing here (their page is indexed only then), with that count and their newest listing change. */
-  sellers?: Array<{ handle: string; listings: number; updated_at: string }>;
+  sellers?: Array<{ handle: string; username?: string | null; listings: number; updated_at: string }>;
 };
 
 /** One file of a country's listings, each with its title and up to five photos (for the image sitemap). */
@@ -703,6 +707,9 @@ export function listingRef(segment: string) {
 }
 
 /** A seller's public page (Udozo): `/ng/seller/k3f9a0b2c1`. */
+/** A seller's page address: their username once they chose one, else their random handle. */
+export const sellerSlug = (seller: { handle?: string | null; username?: string | null }) => seller.username || seller.handle || '';
+
 export function sellerPath(country: string, handle: string) {
   return `/${country.toLowerCase()}/seller/${handle}`;
 }
@@ -938,3 +945,23 @@ export function parseAssistantEvents(buffer: string): { events: ShopAssistantEve
   }
   return { events, rest };
 }
+
+/**
+ * Usernames (Udozo, docs/UDOZO_USERNAMES_PLAN.md): 3 to 24 characters, lower-case letters, digits and underscores,
+ * starting with a letter; chosen once the customer has posted the market's minimum of ads.
+ */
+export const usernamePattern = /^[a-z][a-z0-9_]{2,23}$/;
+export type UsernameStatus = {
+  object: 'username_status';
+  username: string | null;
+  /** Ads they have posted (published at least once, not removed by moderation) and the market's minimum. */
+  posted: number;
+  required: number;
+  eligible: boolean;
+  /** When they may change it again (null: now, or never set). */
+  change_after: string | null;
+  /** Whether the banner asking them to choose one should show (eligible, none yet, dismissed fewer than 3 times). */
+  prompt: boolean;
+  dismissals: number;
+};
+export type UsernameAvailability = { object: 'username_availability'; username: string; available: boolean; reason: 'taken' | 'reserved' | 'refused' | 'invalid' | 'own' | null; suggestions: string[] };

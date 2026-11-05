@@ -167,9 +167,10 @@ describe("the sitemap", () => {
 });
 
 describe("the share images", () => {
-  test("only <handle>.jpg and <handle>.gif are addresses, and the proxy sees them (so a store's host never serves them)", async () => {
-    expect(readSellerCard("a1b2c3d4e5.gif")).toEqual({ handle: "a1b2c3d4e5", kind: "gif" });
-    for (const file of ["A1B2C3D4E5.gif", "a1b2c3d4e5.png", "abc.gif", "a1b2c3d4e5.gif.gif", "../a1b2c3d4e5.jpg", "a1b2c3d4e5"]) expect(readSellerCard(file), file).toBeNull();
+  test("only <username or handle>.jpg and .gif are addresses, and the proxy sees them (so a store's host never serves them)", async () => {
+    expect(readSellerCard("a1b2c3d4e5.gif")).toEqual({ key: "a1b2c3d4e5", kind: "gif" });
+    expect(readSellerCard("abc.gif")).toEqual({ key: "abc", kind: "gif" });
+    for (const file of ["A1B2C3D4E5.gif", "a1b2c3d4e5.png", "ab.gif", "a1b2c3d4e5.gif.gif", "../a1b2c3d4e5.jpg", "a1b2c3d4e5"]) expect(readSellerCard(file), file).toBeNull();
     expect(config.matcher).toContain("/seller-card/:path*");
     const bad = await get("NOT-A-HANDLE.gif");
     expect([bad.status, bad.headers.get("cache-control")]).toEqual([404, "no-store"]);

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountNav } from "@/components/account/nav";
 import { RailBanner } from "@/components/account/rail-banner";
+import { UsernameBanner } from "@/components/account/username-banner";
 import { MicrophonePrompt } from "@/components/calls/microphone-prompt";
 import { SiteFooter } from "@/components/footer";
 import { SiteHeader } from "@/components/header";
@@ -11,8 +12,12 @@ import { bannersFor, pickBanner } from "@/lib/banners";
 import {
   confirmationPending,
   currentCustomer,
+  customerApi,
   mobileToConfirm,
+  siteOrigin,
 } from "@/lib/customer";
+import { bannerShown } from "@/lib/username";
+import { sellerPath, type UsernameStatus } from "@bitocard/api-client/classifieds";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -29,12 +34,14 @@ export default async function AccountLayout({
   const [customer, all] = await Promise.all([currentCustomer(), markets()]);
   const market = await marketOf(customer);
   const signedIn = customer && !confirmationPending(customer);
-  const [counts, banners] = signedIn
+  // The username ask is read with the rest; when it cannot be, there is simply no banner.
+  const [counts, banners, username] = signedIn
     ? await Promise.all([
         accountCounts(),
         bannersFor("account_rail", market?.country ?? customer.country),
+        customerApi<UsernameStatus>("GET", "/v1/store/account/username"),
       ])
-    : [null, []];
+    : [null, [], null];
   const banner = pickBanner(banners);
   return (
     <>
@@ -79,6 +86,11 @@ export default async function AccountLayout({
                 Confirm my mobile
               </Link>
             </p>
+          ) : null}
+          {customer && username?.ok && bannerShown(username.data) ? (
+            <UsernameBanner
+              example={`${new URL(siteOrigin()).host}${sellerPath(customer.country ?? "ng", "yourname")}`}
+            />
           ) : null}
           {children}
           {/* Signed in and confirmed: ask for the microphone where calls are set up and it is not allowed yet. */}

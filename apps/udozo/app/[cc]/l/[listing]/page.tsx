@@ -15,6 +15,7 @@ import {
   placePath,
   postedAgo,
   sellerPath,
+  sellerSlug,
   shopPriceText,
   type DescriptionSpan,
   type ShopChat,
@@ -230,8 +231,8 @@ export default async function ListingPage({ params }: Props) {
             <div className="flex items-center gap-3">
               <Avatar name={listing.seller.name} url={listing.seller.avatar_url} className="size-11 font-bold" />
               <span className="grid">
-                {listing.seller.handle ? (
-                  <Link href={sellerPath(cc, listing.seller.handle)} className="font-bold hover:underline">
+                {sellerSlug(listing.seller) ? (
+                  <Link href={sellerPath(cc, sellerSlug(listing.seller))} className="font-bold hover:underline">
                     {listing.seller.name}
                   </Link>
                 ) : (
@@ -252,8 +253,8 @@ export default async function ListingPage({ params }: Props) {
                 ))}
               </div>
             ) : null}
-            {listing.seller.handle ? (
-              <Link href={sellerPath(cc, listing.seller.handle)} className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-navy-50 px-3 text-sm font-semibold text-navy-900 hover:bg-navy-100">
+            {sellerSlug(listing.seller) ? (
+              <Link href={sellerPath(cc, sellerSlug(listing.seller))} className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-navy-50 px-3 text-sm font-semibold text-navy-900 hover:bg-navy-100">
                 <span>
                   See all {listing.seller.active_listings} listing{listing.seller.active_listings === 1 ? "" : "s"} by {listing.seller.name}
                 </span>

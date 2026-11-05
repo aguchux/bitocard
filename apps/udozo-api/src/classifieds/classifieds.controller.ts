@@ -27,7 +27,8 @@ import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, invalid, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
 import { ProductOnly } from '../products/product.js';
-import { SellerProfilesService, sellerHandlePattern } from './sellers.service.js';
+import { SellerProfilesService } from './sellers.service.js';
+import { sellerKeyPattern } from './usernames.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -68,8 +69,8 @@ class SearchDto extends CountryDto {
   @IsOptional() @Transform(many) @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(120, { each: true })
   f?: string[];
 
-  /** One seller's listings (the handle on their seller page). */
-  @IsOptional() @Matches(sellerHandlePattern)
+  /** One seller's listings (the username or handle on their seller page). */
+  @IsOptional() @Matches(sellerKeyPattern)
   seller?: string;
 
   @IsOptional() @IsIn(searchSorts)
@@ -332,11 +333,14 @@ export class ClassifiedReferenceController {
     return this.search.listing(query.country, ref);
   }
 
-  /** A seller's public page (`/<cc>/seller/<handle>`): their public name, badges, sales, categories and states. */
-  @Get('sellers/:handle')
+  /**
+   * A seller's public page (`/<cc>/seller/<username or handle>`): their public name, badges, sales, categories and
+   * states. A username they gave up answers for 90 days with `redirect` (where their page is now).
+   */
+  @Get('sellers/:key')
   @Header('Cache-Control', 'public, max-age=60')
-  seller(@Param('handle') handle: string) {
-    return this.sellers.profile(handle);
+  seller(@Param('key') key: string) {
+    return this.sellers.profile(key);
   }
 
   @Get('search/suggest')

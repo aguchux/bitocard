@@ -171,6 +171,8 @@ export type ClassifiedSeller = {
   /** Udozo: their profile photo and the handle of their public seller page (`/<cc>/seller/<handle>`). */
   avatar_url?: string | null;
   handle?: string;
+  /** Udozo: the username they chose for their seller page (`/<cc>/seller/<username>`), or null. */
+  username?: string | null;
   suspended: boolean;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -221,6 +223,8 @@ export type ClassifiedMarketSettings = {
   first_listings_reviewed: number;
   min_photos: number;
   max_photos: number;
+  /** Udozo: ads a customer must have posted before choosing a username for their seller page (0 to 100, default 5). */
+  username_min_listings: number;
 };
 
 /** A reported chat, read in full (every read is audited). */
@@ -487,6 +491,11 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/avatar/remove`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, { type: 'ClassifiedSeller', id: 'LIST' }, 'Activity'],
     }),
+    /** Takes a seller's username away (their page goes back to its handle), with why; audited. */
+    removeClassifiedSellerUsername: build.mutation<unknown, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/username/remove`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, { type: 'ClassifiedSeller', id: 'LIST' }, 'Activity'],
+    }),
     clearClassifiedStrikes: build.mutation<unknown, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/safe-pay/clear`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, 'Activity'],
@@ -708,6 +717,7 @@ export const {
   useSetClassifiedSellerSuspendedMutation,
   useClearClassifiedStrikesMutation,
   useRemoveClassifiedSellerAvatarMutation,
+  useRemoveClassifiedSellerUsernameMutation,
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,
   useSetClassifiedCategorySkuPrefixMutation,
