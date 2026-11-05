@@ -16,6 +16,7 @@ import { ListingsService } from './listings.service.js';
 import { ListingMediaService } from './media.service.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ListingSearchService } from './search.service.js';
+import { SellerProfilesService } from './sellers.service.js';
 import { FavouritesService } from './favourites.service.js';
 import { ShopDirectoryService } from './directory.service.js';
 import { ContactRequestsService } from './contact.service.js';
@@ -42,7 +43,7 @@ import { DiscoveryRecorder } from './discovery/recorder.service.js';
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
   controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedContactController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController, ClassifiedHomeController, AdminHomeController, AdminSponsoredController, ClassifiedBannersController, AdminBannersController, ClassifiedBrandsController, AdminBrandsController, ClassifiedModelsController, AdminModelsController, DiscoveryController, DiscoveryAccountController, AdminDiscoveryController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails, ContactRequestsService, CallsService, HomeResolver, HomeService, SponsoredService, BannersService, ListingViewsService, ClassifiedBrandsService, ClassifiedModelsService, DiscoveryRecorder, DiscoveryService, DiscoveryAdminService],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, SellerProfilesService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails, ContactRequestsService, CallsService, HomeResolver, HomeService, SponsoredService, BannersService, ListingViewsService, ClassifiedBrandsService, ClassifiedModelsService, DiscoveryRecorder, DiscoveryService, DiscoveryAdminService],
   exports: [ShopEmails, ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, SafePayGuardsService, ListingSearchService, ContactRequestsService, CallsService, DiscoveryRecorder, DiscoveryAdminService],
 })
 export class ClassifiedsModule {}

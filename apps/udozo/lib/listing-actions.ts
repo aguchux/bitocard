@@ -1,6 +1,6 @@
 "use server";
 
-import type { ShopChat, ShopContactRequest, ShopMessage, ShopOrder, ShopReportReason } from "@bitocard/api-client/classifieds";
+import type { ShopChat, ShopContactRequest, ShopMessage, ShopOrder, ShopReportReason, ShopViewer } from "@bitocard/api-client/classifieds";
 import type { TermsStatus } from "@/components/terms-accept";
 import { type CustomerResult, customerApi } from "@/lib/customer";
 
@@ -124,4 +124,16 @@ export async function paySafePay(orderId: string, nonce?: string): Promise<Actio
 export async function cancelSafePay(orderId: string): Promise<ActionResult<ShopOrder>> {
   if (!uuid.test(orderId)) return refused("No such order.");
   return answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/cancel`, {}));
+}
+
+/**
+ * What the signed-in buyer has with one of a seller's listings (their chat, requests, the seller online), for the
+ * contact panel on the seller's page when the buyer chooses which listing they are asking about.
+ */
+export async function listingContactState(listingId: string): Promise<ActionResult<{ viewer: ShopViewer; chat: ShopChat | null }>> {
+  if (!uuid.test(listingId)) return refused("No such listing.");
+  const viewer = await customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${listingId}/viewer`);
+  if (!viewer.ok) return answer(viewer);
+  const chat = viewer.data.conversation_id ? await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${viewer.data.conversation_id}`) : null;
+  return { ok: true, data: { viewer: viewer.data, chat: chat?.ok ? chat.data : null } };
 }

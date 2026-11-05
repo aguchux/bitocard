@@ -176,7 +176,24 @@ function Action({ signedIn, label, icon, onClick, reason, disabled, title, expan
  * **Request contact** (the seller's phone and email, shown here once they accept), and **Report**. Nobody's details are
  * on the page for everyone. A visitor is asked to sign in first and comes back here.
  */
-export function ListingActions({ listing, viewer, signedIn, chat, messagesHref, myPhone = null }: { listing: Listing; viewer: ShopViewer | null; signedIn: boolean; chat: ShopChat | null; messagesHref: string | null; myPhone?: string | null }) {
+export function ListingActions({
+  listing,
+  viewer,
+  signedIn,
+  chat,
+  messagesHref,
+  myPhone = null,
+  variant = "listing",
+}: {
+  listing: Listing;
+  viewer: ShopViewer | null;
+  signedIn: boolean;
+  chat: ShopChat | null;
+  messagesHref: string | null;
+  myPhone?: string | null;
+  /** `seller`: on the seller's page, about one of their listings (no Report this listing there). */
+  variant?: "listing" | "seller";
+}) {
   const [chatOpen, setChatOpen] = useState(Boolean(chat));
   const draft = useAssistantDraft(listing.id, () => setChatOpen(true));
   const calls = useCalls();
@@ -275,7 +292,7 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref, 
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
       {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} /> : null}
-      <div className="text-center">
+      <div className={variant === "seller" ? "hidden" : "text-center"}>
         {signedIn ? (
           <button type="button" onClick={() => reportSheet.current?.showModal()} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy-600 hover:underline">
             <FlagIcon className="size-4" aria-hidden="true" /> Report this listing

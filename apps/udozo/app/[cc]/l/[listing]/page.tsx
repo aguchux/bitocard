@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { BadgeCheck, MapPin, ShieldCheck } from "lucide-react";
+import { BadgeCheck, ChevronRight, MapPin, ShieldCheck } from "lucide-react";
 import {
   brandFeatureKey,
   badgeLabels,
@@ -15,6 +15,7 @@ import {
   nameInitials,
   placePath,
   postedAgo,
+  sellerPath,
   shopPriceText,
   type DescriptionSpan,
   type ShopChat,
@@ -231,7 +232,13 @@ export default async function ListingPage({ params }: Props) {
                 {nameInitials(listing.seller.name)}
               </span>
               <span className="grid">
-                <strong>{listing.seller.name}</strong>
+                {listing.seller.handle ? (
+                  <Link href={sellerPath(cc, listing.seller.handle)} className="font-bold hover:underline">
+                    {listing.seller.name}
+                  </Link>
+                ) : (
+                  <strong>{listing.seller.name}</strong>
+                )}
                 <span className="text-xs text-navy-600">
                   On Udozo since {new Date(listing.seller.member_since).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
                   {listing.seller.response_rate !== null ? ` · answers ${listing.seller.response_rate}% of chats` : ""}
@@ -247,9 +254,18 @@ export default async function ListingPage({ params }: Props) {
                 ))}
               </div>
             ) : null}
-            <span className="text-xs text-navy-600">
-              {listing.seller.active_listings} live listing{listing.seller.active_listings === 1 ? "" : "s"}
-            </span>
+            {listing.seller.handle ? (
+              <Link href={sellerPath(cc, listing.seller.handle)} className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-navy-50 px-3 text-sm font-semibold text-navy-900 hover:bg-navy-100">
+                <span>
+                  See all {listing.seller.active_listings} listing{listing.seller.active_listings === 1 ? "" : "s"} by {listing.seller.name}
+                </span>
+                <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+              </Link>
+            ) : (
+              <span className="text-xs text-navy-600">
+                {listing.seller.active_listings} live listing{listing.seller.active_listings === 1 ? "" : "s"}
+              </span>
+            )}
           </section>
           <section aria-labelledby="safe-trade" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4 text-mint-700">
             <h2 id="safe-trade" className="flex items-center gap-2 font-bold">

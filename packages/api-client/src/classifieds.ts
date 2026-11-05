@@ -126,7 +126,8 @@ export type ShopListingCard = {
   /** The first few feature values, as people read them ("256 GB"). */
   highlights: string[];
   delivery: ShopDelivery;
-  seller: { name: string; badges: ShopBadge[] };
+  /** The seller by their public name; `handle` names their seller page (Udozo). */
+  seller: { name: string; handle?: string; badges: ShopBadge[] };
   published_at: string | null;
 };
 /** A search result: its tier (from the buyer's area outwards) when an area or state was given. */
@@ -156,9 +157,33 @@ export type ShopListingPage = {
   delivery: ShopDelivery;
   reserved: boolean;
   contact: { chat: boolean; phone: boolean };
-  seller: { name: string; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
+  seller: { name: string; handle?: string; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null };
   published_at: string | null;
   sold_at: string | null;
+};
+
+/**
+ * A seller's public page (Udozo, `/<cc>/seller/<handle>`): only what their listings already show, gathered, with their
+ * live listings' categories and states and their sales. Their listings come from the search with `seller=<handle>`.
+ */
+export type ShopSellerProfile = {
+  object: 'classified_seller';
+  handle: string;
+  name: string;
+  country: string;
+  url: string;
+  member_since: string;
+  badges: ShopBadge[];
+  response_rate: number | null;
+  active_listings: number;
+  sold_listings: number;
+  safe_pay_sales: number;
+  last_listed_at: string | null;
+  categories: Array<{ slug: string; name: string; icon: string; parent: { slug: string; name: string } | null; listings: number }>;
+  states: Array<{ slug: string; name: string; listings: number }>;
+  contact: { chat: boolean; phone: boolean };
+  /** Their newest live listings taking chats or calls: what a buyer contacting them from their page asks about. */
+  contact_listings: Array<{ id: string; ref: number; title: string; slug: string; currency: string; chat: boolean; phone: boolean }>;
 };
 
 /** A showcase card: never a price (prices belong to each country's pages). */
@@ -671,6 +696,11 @@ export function listingPath(country: string, ref: number, slug: string) {
 export function listingRef(segment: string) {
   const match = /^(\d{1,15})(?:-[a-z0-9-]*)?$/.exec(segment);
   return match ? Number(match[1]) : null;
+}
+
+/** A seller's public page (Udozo): `/ng/seller/k3f9a0b2c1`. */
+export function sellerPath(country: string, handle: string) {
+  return `/${country.toLowerCase()}/seller/${handle}`;
 }
 
 export function categoryPath(country: string, slug: string) {

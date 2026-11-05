@@ -27,6 +27,7 @@ import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, invalid, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
 import { ProductOnly } from '../products/product.js';
+import { SellerProfilesService, sellerHandlePattern } from './sellers.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -66,6 +67,10 @@ class SearchDto extends CountryDto {
   /** Feature filters, repeated: `f=memory:4..16&f=colour:black,white`. */
   @IsOptional() @Transform(many) @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(120, { each: true })
   f?: string[];
+
+  /** One seller's listings (the handle on their seller page). */
+  @IsOptional() @Matches(sellerHandlePattern)
+  seller?: string;
 
   @IsOptional() @IsIn(searchSorts)
   sort?: SearchSort;
@@ -275,6 +280,7 @@ export class ClassifiedReferenceController {
     private readonly reference: ClassifiedReferenceService,
     private readonly search: ListingSearchService,
     private readonly directory: ShopDirectoryService,
+    private readonly sellers: SellerProfilesService,
   ) {}
 
   /** The countries BitoCard Shop is open in, with their live listings, and whether the global showcase is on. */
@@ -324,6 +330,13 @@ export class ClassifiedReferenceController {
   @Header('Cache-Control', 'public, max-age=60')
   listing(@Param('ref', ParseIntPipe) ref: number, @Query() query: CountryDto) {
     return this.search.listing(query.country, ref);
+  }
+
+  /** A seller's public page (`/<cc>/seller/<handle>`): their public name, badges, sales, categories and states. */
+  @Get('sellers/:handle')
+  @Header('Cache-Control', 'public, max-age=60')
+  seller(@Param('handle') handle: string) {
+    return this.sellers.profile(handle);
   }
 
   @Get('search/suggest')

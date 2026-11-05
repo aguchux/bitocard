@@ -1,0 +1,303 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound, permanentRedirect } from "next/navigation";
+import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, MapPin, PackageOpen, ShieldCheck, Store } from "lucide-react";
+import { badgeLabels, nameInitials, placePath, sellerPath, type ShopChat, type ShopSearch, type ShopSellerProfile, type ShopViewer } from "@bitocard/api-client/classifieds";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ShopIcon } from "@/components/icon";
+import { JsonLd } from "@/components/json-ld";
+import { ListingGrid } from "@/components/listing-card";
+import { SellerContactPanel } from "@/components/seller-contact";
+import { SellerShare } from "@/components/seller-share";
+import { marketFor, shopApi } from "@/lib/api";
+import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
+import { placesText, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
+import { breadcrumbJsonLd, itemListJsonLd, noindexFollow } from "@/lib/seo";
+
+type Props = { params: Promise<{ cc: string; handle: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+const handlePattern = /^[a-z0-9]{6,12}$/;
+
+async function load(handle: string) {
+  if (!handlePattern.test(handle)) return null;
+  const result = await shopApi<ShopSellerProfile>(`/v1/classifieds/sellers/${handle}`);
+  return result.ok ? result.data : null;
+}
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const { cc, handle } = await params;
+  const [market, profile] = await Promise.all([marketFor(cc), load(handle)]);
+  if (!market || !profile) return { title: "This seller is not on Udozo", robots: noindexFollow };
+  const path = sellerPath(profile.country, handle);
+  const where = placesText(profile.states);
+  const title = `${profile.name}: ${profile.active_listings} listing${profile.active_listings === 1 ? "" : "s"} for sale on Udozo`;
+  const description = `Shop from ${profile.name}${where ? ` in ${where}` : ""} on Udozo: ${profile.categories
+    .slice(0, 3)
+    .map(item => item.name.toLowerCase())
+    .join(", ")}${profile.categories.length ? ". " : ""}Chat with the seller and pay with Safe pay.`;
+  const query = await searchParams;
+  // Indexed while they have something for sale, and only the page itself (not filtered or later pages).
+  const filtered = Object.keys(query).some(key => ["category", "sort", "page"].includes(key));
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { type: "profile", url: path, title, description, siteName: "Udozo" },
+    twitter: { card: "summary", title, description },
+    ...(profile.active_listings === 0 || filtered ? { robots: noindexFollow } : {}),
+  };
+}
+
+/**
+ * Every account's public seller page (`/ng/seller/<handle>`): who they are as their listings show them (first name and
+ * initial, badges, since when), their figures, what they sell and where, their live listings by category with a sort
+ * and pages, and the same ways to get in touch as on a listing, about the listing the buyer chooses.
+ */
+export default async function SellerPage({ params, searchParams }: Props) {
+  const { cc, handle } = await params;
+  const market = await marketFor(cc);
+  if (!market) notFound();
+  const profile = await load(handle);
+  if (!profile) notFound();
+  if (profile.country.toLowerCase() !== cc.toLowerCase()) permanentRedirect(sellerPath(profile.country, handle));
+
+  const filters = readSellerFilters(await searchParams, profile);
+  const customer = await currentCustomer();
+  const firstListing = profile.contact_listings[0];
+  const [listings, viewer] = await Promise.all([
+    shopApi<ShopSearch>(sellerListingsQuery(cc, handle, filters)),
+    customer && firstListing ? customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${firstListing.id}/viewer`) : null,
+  ]);
+  const firstViewer = viewer?.ok ? viewer.data : null;
+  const chat = firstViewer?.conversation_id ? await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${firstViewer.conversation_id}`) : null;
+
+  const path = sellerPath(cc, handle);
+  const origin = siteOrigin();
+  const trail = [
+    { name: market.name, path: `/${cc}` },
+    { name: profile.name, path },
+  ];
+  const where = placesText(profile.states);
+  const cards = listings.ok ? listings.data.data : [];
+  const total = listings.ok ? listings.data.total : 0;
+  const pages = Math.max(1, Math.ceil(total / sellerPageSize));
+  const chosen = profile.categories.find(item => item.slug === filters.category);
+
+  return (
+    <div className="mx-auto max-w-[1400px] pb-10 sm:px-6 sm:pt-4 lg:px-8">
+      <div className="hidden px-4 sm:block sm:px-0">
+        <Breadcrumbs trail={trail} />
+      </div>
+
+      <section aria-labelledby="seller-name" className="overflow-hidden border-navy-200 bg-white sm:mt-4 sm:rounded-3xl sm:border">
+        <div className="relative h-28 overflow-hidden bg-gradient-to-br from-navy-900 via-navy-700 to-brand-600 sm:h-36" aria-hidden="true">
+          <span className="absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
+          <span className="absolute -bottom-20 left-1/3 size-48 rounded-full bg-brand-400/20" />
+          <span className="absolute top-6 left-8 size-16 rounded-full border border-white/15" />
+        </div>
+        <div className="grid gap-4 px-4 pb-5 sm:px-6">
+          <div className="-mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">
+            <span className="grid size-24 place-items-center rounded-full bg-navy-900 text-3xl font-extrabold tracking-tight text-white ring-4 ring-white sm:size-28 sm:text-4xl" aria-hidden="true">
+              {nameInitials(profile.name)}
+            </span>
+            <SellerShare url={new URL(path, origin).href} name={profile.name} />
+          </div>
+          <div className="grid gap-2">
+            <h1 id="seller-name" className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              {profile.name}
+            </h1>
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-navy-600">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays className="size-4" aria-hidden="true" /> On Udozo since {sinceText(profile.member_since)}
+              </span>
+              {where ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4" aria-hidden="true" /> Sells in {where}
+                </span>
+              ) : null}
+            </p>
+            {profile.badges.length ? (
+              <ul className="flex flex-wrap gap-2" aria-label="Checks">
+                {profile.badges.map(badge => (
+                  <li key={badge} className="inline-flex items-center gap-1 rounded-full bg-mint-50 px-2.5 py-1 text-xs font-bold text-mint-700">
+                    <BadgeCheck className="size-3.5" aria-hidden="true" /> {badgeLabels[badge]}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {sellerStats(profile).map(stat => (
+              <div key={stat.key} className="grid gap-0.5 rounded-2xl bg-navy-50 px-3.5 py-3">
+                <dt className="order-2 text-xs text-navy-600">{stat.label}</dt>
+                <dd className="order-1 text-xl font-extrabold tracking-tight">{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="grid min-w-0 content-start gap-6 px-4 sm:px-0">
+          {profile.categories.length ? (
+            <section aria-labelledby="sells">
+              <h2 id="sells" className="mb-3 text-base font-bold">
+                What {profile.name} sells
+              </h2>
+              <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+                {profile.categories.map(category => (
+                  <li key={category.slug} className="min-w-0">
+                    <Link
+                      href={sellerHref(cc, handle, filters, { category: category.slug })}
+                      aria-current={filters.category === category.slug ? "true" : undefined}
+                      className="flex items-center gap-2.5 rounded-2xl border border-navy-200 bg-white p-2.5 hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-50"
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                        <ShopIcon name={category.icon} className="size-5" />
+                      </span>
+                      <span className="grid min-w-0">
+                        <span className="truncate text-sm font-bold">{category.name}</span>
+                        <span className="truncate text-xs text-navy-600">
+                          {category.listings} listing{category.listings === 1 ? "" : "s"}
+                          {category.parent ? ` · ${category.parent.name}` : ""}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {profile.states.length ? (
+            <section aria-labelledby="where">
+              <h2 id="where" className="mb-3 text-base font-bold">
+                Where their listings are
+              </h2>
+              <ul className="flex flex-wrap gap-2">
+                {profile.states.map(state => (
+                  <li key={state.slug}>
+                    <Link href={placePath(cc, { state: state.slug })} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400">
+                      <MapPin className="size-3.5 text-navy-500" aria-hidden="true" /> {state.name}
+                      <span className="text-xs font-normal text-navy-500">{state.listings}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section aria-labelledby="listings-heading" id="listings" className="scroll-mt-24">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <h2 id="listings-heading" className="text-base font-bold">
+                {chosen ? chosen.name : "All listings"} <span className="font-normal text-navy-500">({total.toLocaleString("en-GB")})</span>
+              </h2>
+              <nav aria-label="Sort" className="flex gap-1 rounded-full bg-navy-50 p-1">
+                {sellerSorts.map(sort => (
+                  <Link
+                    key={sort}
+                    href={sellerHref(cc, handle, filters, { sort })}
+                    aria-current={filters.sort === sort ? "true" : undefined}
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold text-navy-600 hover:text-navy-900 aria-[current]:bg-white aria-[current]:text-navy-900 aria-[current]:shadow-sm"
+                  >
+                    {sellerSortLabels[sort]}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+            {profile.categories.length > 1 ? (
+              <nav aria-label="Categories" className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+                <ul className="flex gap-2 whitespace-nowrap">
+                  <li>
+                    <Link href={sellerHref(cc, handle, filters, { category: null })} aria-current={!filters.category ? "true" : undefined} className="flex h-9 items-center rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-900 aria-[current]:text-white">
+                      All
+                    </Link>
+                  </li>
+                  {profile.categories.map(category => (
+                    <li key={category.slug}>
+                      <Link
+                        href={sellerHref(cc, handle, filters, { category: category.slug })}
+                        aria-current={filters.category === category.slug ? "true" : undefined}
+                        className="flex h-9 items-center gap-1.5 rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400 aria-[current]:border-navy-900 aria-[current]:bg-navy-900 aria-[current]:text-white"
+                      >
+                        {category.name} <span className="text-xs font-normal opacity-70">{category.listings}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ) : null}
+            {!listings.ok ? (
+              <p className="rounded-2xl border border-dashed border-navy-200 p-6 text-center text-sm text-navy-600">Listings could not be loaded just now. Try again shortly.</p>
+            ) : cards.length ? (
+              <ListingGrid cards={cards} source="seller_page" />
+            ) : (
+              <div className="grid justify-items-center gap-2 rounded-3xl border border-dashed border-navy-200 bg-white px-6 py-12 text-center">
+                <span className="grid size-14 place-items-center rounded-full bg-navy-50 text-navy-500">
+                  <PackageOpen className="size-7" aria-hidden="true" />
+                </span>
+                <p className="font-bold">Nothing for sale right now</p>
+                <p className="max-w-sm text-sm text-navy-600">
+                  {profile.sold_listings ? `${profile.name} has sold ${profile.sold_listings} on Udozo. ` : ""}Come back later, or see what else is for sale in {market.name}.
+                </p>
+                <Link href={`/${cc}`} className="mt-2 inline-flex h-10 items-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white">
+                  Browse {market.name}
+                </Link>
+              </div>
+            )}
+            {pages > 1 ? (
+              <nav aria-label="Pages" className="mt-5 flex items-center justify-center gap-3 text-sm">
+                {filters.page > 1 ? (
+                  <Link href={sellerHref(cc, handle, filters, { page: filters.page - 1 })} className="inline-flex h-10 items-center gap-1 rounded-xl border border-navy-200 bg-white px-3.5 font-semibold hover:border-navy-400">
+                    <ChevronLeft className="size-4" aria-hidden="true" /> Previous
+                  </Link>
+                ) : null}
+                <span className="text-navy-600">
+                  Page {filters.page} of {pages}
+                </span>
+                {filters.page < pages ? (
+                  <Link href={sellerHref(cc, handle, filters, { page: filters.page + 1 })} className="inline-flex h-10 items-center gap-1 rounded-xl border border-navy-200 bg-white px-3.5 font-semibold hover:border-navy-400">
+                    Next <ChevronRight className="size-4" aria-hidden="true" />
+                  </Link>
+                ) : null}
+              </nav>
+            ) : null}
+          </section>
+        </div>
+
+        <aside className="grid content-start gap-4 px-4 sm:px-0 lg:sticky lg:top-4">
+          <section aria-labelledby="contact" className="grid gap-3 rounded-2xl border border-navy-200 bg-white p-4">
+            <h2 id="contact" className="flex items-center gap-2 font-bold">
+              <Store className="size-5 text-brand-600" aria-hidden="true" /> Contact {profile.name}
+            </h2>
+            <SellerContactPanel
+              cc={cc}
+              seller={profile.name}
+              listings={profile.contact_listings}
+              first={{ viewer: firstViewer, chat: chat?.ok ? chat.data : null }}
+              signedIn={Boolean(customer)}
+              myPhone={customer?.phone_verified ? customer.phone : null}
+            />
+          </section>
+          <section aria-labelledby="safe-trade" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4">
+            <h2 id="safe-trade" className="flex items-center gap-2 font-bold text-mint-700">
+              <ShieldCheck className="size-5" aria-hidden="true" /> Buy safely
+            </h2>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-navy-800">
+              <li>Pay with Safe pay: the seller is paid only once you have the item.</li>
+              <li>Meeting? Choose a busy public place and check the item first.</li>
+              <li>Never pay in advance. Udozo never asks for your codes.</li>
+            </ul>
+            <Link href="/safe-trade" className="text-sm font-semibold text-brand-700 hover:underline">
+              Read the Safe Trade Guide
+            </Link>
+          </section>
+        </aside>
+      </div>
+
+      <JsonLd data={{ "@context": "https://schema.org", "@type": "ProfilePage", url: new URL(path, origin).href, mainEntity: { "@type": "Person", name: profile.name, url: new URL(path, origin).href } }} />
+      <JsonLd data={breadcrumbJsonLd(trail, origin)} />
+      {cards.length ? <JsonLd data={itemListJsonLd(`Listings by ${profile.name}`, cards, origin, cc)} /> : null}
+    </div>
+  );
+}
