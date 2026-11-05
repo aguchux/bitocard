@@ -9,11 +9,11 @@ const footers: Record<EmailProduct, string> = { BitoCard: 'BitoCard, a Golojan L
 function layout(heading: string, paragraphs: string[], code?: string, product: EmailProduct = 'BitoCard') {
   const footer = footers[product];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
     code ? `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(code)}</p>` : '',
-    `<p style="font-size:13px;color:#5b6488">${escape(footer)}</p>`,
+    `<p style="font-size:13px;color:#5f6b73">${escape(footer)}</p>`,
     '</div>',
   ].join('');
   const text = [heading, '', ...paragraphs, ...(code ? ['', code] : []), '', footer].join('\n');
@@ -445,22 +445,22 @@ export function deliveryEmail(
     return { label, code: delivery.code, extras };
   });
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(`Your ${input.product}`)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(`Your ${input.product}`)}</h1>`,
     ...intro.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
     ...rows.map(
       row =>
-        `<div style="border:1px solid #dfe3f0;border-radius:10px;padding:12px 14px;margin:10px 0">` +
-        `<p style="margin:0;font-size:12px;color:#5b6488">${escape(row.label)}</p>` +
+        `<div style="border:1px solid #dce3e8;border-radius:10px;padding:12px 14px;margin:10px 0">` +
+        `<p style="margin:0;font-size:12px;color:#5f6b73">${escape(row.label)}</p>` +
         `<p style="margin:4px 0 0;font-family:Consolas,monospace;font-size:18px;font-weight:bold;word-break:break-all">${escape(row.code)}</p>` +
         row.extras.map(([name, value]) => `<p style="margin:4px 0 0;font-size:13px">${escape(name)}: <strong>${escape(value)}</strong></p>`).join('') +
         '</div>',
     ),
     ...(input.instructions ? [`<p style="font-size:15px;line-height:1.5"><strong>How to redeem:</strong> ${escape(input.instructions)}</p>`] : []),
     ...(input.link
-      ? [`<p style="font-size:15px;line-height:1.5">You can also see your order at any time on its page: <a href="${escape(input.link)}" style="color:#2477ff">view your order</a>. Keep the link private: it opens your order.</p>`]
+      ? [`<p style="font-size:15px;line-height:1.5">You can also see your order at any time on its page: <a href="${escape(input.link)}" style="color:#0e7cc0">view your order</a>. Keep the link private: it opens your order.</p>`]
       : []),
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   const text = [
@@ -514,11 +514,11 @@ export function numberReminderEmail(to: string, input: { store: string; number: 
   const { subject, heading, paragraphs } = content[input.stage];
   const lines = [...paragraphs, ...(input.link && input.stage !== 'deleted' ? [`See your number: ${input.link}`] : [])];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    ...(input.link && input.stage !== 'deleted' ? [`<p style="font-size:15px"><a href="${escape(input.link)}" style="color:#2477ff">See your number</a></p>`] : []),
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    ...(input.link && input.stage !== 'deleted' ? [`<p style="font-size:15px"><a href="${escape(input.link)}" style="color:#0e7cc0">See your number</a></p>`] : []),
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return { to, subject, html, text: [heading, '', ...lines, '', `Sent for ${input.store}.`].join('\n') };
@@ -531,11 +531,11 @@ export function orderAccessCodeEmail(to: string, input: { store: string; product
     'If you did not ask for it, someone may have your order link: you can ignore this email, and they cannot open your order without the code.',
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    '<h1 style="font-size:20px">Open your order</h1>',
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    '<h1 style="font-size:20px;color:#185174">Open your order</h1>',
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
     `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return {
@@ -554,10 +554,10 @@ export function orderRevealedEmail(to: string, input: { store: string; product: 
     `If that was not you, contact ${input.store} straight away: anyone who has a code can use it.`,
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    '<h1 style="font-size:20px">Your codes were viewed</h1>',
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    '<h1 style="font-size:20px;color:#185174">Your codes were viewed</h1>',
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return { to, subject: `Your ${input.product} codes were viewed`, html, text: ['Your codes were viewed', '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
@@ -570,11 +570,11 @@ export function customerCodeEmail(to: string, input: { store: string; code: stri
     ? [`Enter this code to confirm your email for your ${input.store} account. It expires in 30 minutes.`, 'If you did not create an account, you can ignore this email.']
     : [`Enter this code to choose a new password for your ${input.store} account. It expires in 30 minutes.`, 'If you did not ask to reset your password, you can ignore this email.'];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
     `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return {
@@ -593,11 +593,11 @@ export function manualTopUpCodeEmail(to: string, input: { code: string; number: 
     'Nothing moves until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-word">${escape(paragraph)}</p>`),
     `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
-    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    '<p style="font-size:13px;color:#5f6b73">BitoCard, a Golojan Ltd venture.</p>',
     '</div>',
   ].join('');
   return {
@@ -633,11 +633,11 @@ export function cryptoWithdrawalCodeEmail(to: string, input: { store: string; co
     `If you did not ask for this, do not share the code: change your ${input.store} password and contact the store.`,
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-all">${escape(paragraph)}</p>`),
     `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return {
@@ -657,10 +657,10 @@ export function cryptoAddressAddedEmail(to: string, input: { store: string; labe
     `If this was not you, remove the address from your crypto settings, change your password and contact ${input.store} straight away.`,
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-all">${escape(paragraph)}</p>`),
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return { to, subject: `A withdrawal address was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
@@ -675,10 +675,10 @@ export function customerBankAccountAddedEmail(to: string, input: { store: string
     `If this was not you, remove it, change your password and contact ${input.store} straight away.`,
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return { to, subject: `A bank account was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
@@ -696,10 +696,10 @@ export function verifyOutcomeEmail(to: string, input: { brand: string; outcome: 
     ...(input.link && input.outcome !== 'approved' ? [`Continue here: ${input.link}`] : []),
   ];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    `<p style="font-size:13px;color:#5b6488">Sent by BitoCard Verify for ${escape(input.brand)}.</p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent by BitoCard Verify for ${escape(input.brand)}.</p>`,
     '</div>',
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', `Sent by BitoCard Verify for ${input.brand}.`].join('\n') };
@@ -710,11 +710,11 @@ export function chatReplyEmail(to: string, input: { store: string; name: string;
   const heading = `${input.store} replied to your chat`;
   const paragraphs = [`Hi ${input.name}, ${input.store} answered your message. Open the store to read it and reply: the chat opens where you left it, on the same browser.`, 'Never send codes, PINs or passwords in a chat.'];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open the chat</a></p>`,
-    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#185174;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open the chat</a></p>`,
+    `<p style="font-size:13px;color:#5f6b73">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', `Sent for ${input.store}.`].join('\n') };
@@ -728,11 +728,11 @@ export function shopMessagesEmail(to: string, input: { name: string; chats: { ti
   const more = input.chats.length > 5 ? [`And ${input.chats.length - 5} more chats.`] : [];
   const paragraphs = [`Hi ${input.name}, people are waiting for your reply.`, ...lines, ...more, 'Stay safe: keep the chat on BitoCard, meet in a public place, inspect before paying, and never pay in advance.'];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(heading)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open your messages</a></p>`,
-    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#185174;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open your messages</a></p>`,
+    '<p style="font-size:13px;color:#5f6b73">BitoCard, a Golojan Ltd venture.</p>',
     '</div>',
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', 'BitoCard, a Golojan Ltd venture.'].join('\n') };
@@ -746,11 +746,11 @@ export function resaleOrderEmail(to: string, input: { title: string; body: strin
   const subject = `${input.sandbox ? '[Sandbox] ' : ''}${input.title}`;
   const paragraphs = [input.body, 'Keep every message and payment on BitoCard. Never give a release code before you have checked the item, and never pay outside BitoCard.'];
   const html = [
-    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
-    `<h1 style="font-size:20px">${escape(input.title)}</h1>`,
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(input.title)}</h1>`,
     ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
-    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">${escape(input.action)}</a></p>`,
-    `<p style="font-size:13px;color:#5b6488">${escape(input.signature)}</p>`,
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#185174;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">${escape(input.action)}</a></p>`,
+    `<p style="font-size:13px;color:#5f6b73">${escape(input.signature)}</p>`,
     '</div>',
   ].join('');
   return { to, subject, html, text: [input.title, '', ...paragraphs, '', `${input.action}: ${input.link}`, '', input.signature].join('\n') };

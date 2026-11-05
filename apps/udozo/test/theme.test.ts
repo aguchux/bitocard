@@ -1,4 +1,6 @@
 // Udozo's colour theme, chosen by its admins (`GET /v1/theme`), on every page; `?theme_preview=` shows the draft.
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { setRequest } from "./request";
@@ -47,7 +49,7 @@ describe("the theme", () => {
       throw new Error("down");
     });
     expect(await siteTheme()).toEqual({ colors: fallbackTheme, preview: false });
-    expect(fallbackTheme).toEqual({ primary: "#070f4c", accent: "#d6136a", ink: "#0f172a", page: "#ffffff" });
+    expect(fallbackTheme).toEqual({ primary: "#185174", accent: "#0e7cc0", ink: "#10212e", page: "#ffffff" });
     vi.stubGlobal("fetch", async () => Response.json({ object: "theme", colors: { ...forest, page: "white;}body{display:none" } }));
     expect((await siteTheme()).colors).toEqual(fallbackTheme);
   });
@@ -74,5 +76,29 @@ describe("the proxy passes an admin's preview to the page", () => {
     expect(nextHeader(await proxy(new NextRequest("https://udozo.com/account?theme_preview=nonsense")))).toBeNull();
     // A header the browser sent itself is never passed on.
     expect(nextHeader(await proxy(new NextRequest("https://udozo.com/ng", { headers: { [previewHeader]: token } })))).toBeNull();
+  });
+});
+
+/** A Tailwind colour class of the navy, brand or pink scale, capturing the shade (`navy-300`). */
+const SHADE = /\b(?:bg|text|border|ring|from|to|via|fill|stroke|outline|decoration|accent|caret|divide)-((?:navy|brand|pink)-\d+)\b/g;
+
+/** Every source file of the site's pages, components and helpers. */
+function sources(dir: string): string[] {
+  return readdirSync(dir).flatMap(name => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return sources(path);
+    return /\.tsx?$/.test(name) ? [path] : [];
+  });
+}
+
+describe("every colour follows the theme", () => {
+  test("each navy, brand and pink shade the site uses has its theme variable, so none stays BitoCard's", () => {
+    const used = new Set<string>();
+    for (const file of ["app", "components", "lib"].flatMap(dir => sources(join(__dirname, "..", dir)))) {
+      for (const match of readFileSync(file, "utf8").matchAll(SHADE)) used.add(match[1]);
+    }
+    expect(used.size).toBeGreaterThan(10);
+    const vars = themeVars(fallbackTheme);
+    expect([...used].filter(shade => !vars[`--color-${shade}`])).toEqual([]);
   });
 });

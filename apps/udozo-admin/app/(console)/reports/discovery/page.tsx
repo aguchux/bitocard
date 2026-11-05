@@ -147,7 +147,7 @@ function Report({ data, where }: { data: DiscoverySummary; where: string }) {
             labels={data.daily.map(row => shortDate(row.day))}
             series={[
               { name: "Events", color: "#94a3b8", values: data.daily.map(row => row.events), format: formatNumber },
-              { name: "Searches", color: "#ec4899", values: data.daily.map(row => row.searches), format: formatNumber },
+              { name: "Searches", color: "#0e7cc0", values: data.daily.map(row => row.searches), format: formatNumber },
               { name: "People", color: "#10b981", values: data.daily.map(row => row.subjects), format: formatNumber },
             ]}
           />

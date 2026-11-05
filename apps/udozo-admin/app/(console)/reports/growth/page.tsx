@@ -61,7 +61,7 @@ export default function GrowthReportPage() {
             <LineChart
               label={chosen.label}
               labels={data.points.map(point => shortDate(point.date))}
-              series={[{ name: chosen.label, color: "#ec4899", values: data.points.map(point => point.value), format: chosen.format }]}
+              series={[{ name: chosen.label, color: "#0e7cc0", values: data.points.map(point => point.value), format: chosen.format }]}
             />
           ) : null}
         </div>

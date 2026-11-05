@@ -8,14 +8,15 @@ export { previewHeader } from "./theme-preview";
  * Udozo's colour theme, chosen by its admins (`GET /v1/theme`, docs/UDOZO_SPINOFF_PLAN.md step 3): `primary` for
  * buttons and headings (white text sits on it), `accent` for highlights, badges and prices, `ink` for body text and
  * `page` behind everything. Applied on `<html>` as the colour variables every Tailwind utility reads, so the whole site
- * follows; until the admins publish one, the API answers its default (navy and pink), as does this site while the API
- * cannot be reached.
+ * follows; until the admins publish one, the API answers its default (Udozo blue, from its logo), as does this site while
+ * the API cannot be reached.
  */
 export type ThemeColors = { primary: string; accent: string; ink: string; page: string };
 
 export type Theme = { colors: ThemeColors; preview: boolean };
 
-export const fallbackTheme: ThemeColors = { primary: "#070f4c", accent: "#d6136a", ink: "#0f172a", page: "#ffffff" };
+/** Udozo blue, the API's default (its logo's #185174 with a brighter blue), while the API cannot be reached. */
+export const fallbackTheme: ThemeColors = { primary: "#185174", accent: "#0e7cc0", ink: "#10212e", page: "#ffffff" };
 
 const hex = /^#[0-9a-f]{6}$/i;
 
@@ -67,6 +68,7 @@ export function themeVars({ primary, accent, ink, page }: ThemeColors): Record<s
     "--color-navy-600": mix(primary, "white", 70),
     "--color-navy-500": mix(primary, "white", 58),
     "--color-navy-400": mix(primary, "white", 46),
+    "--color-navy-300": mix(primary, "white", 30),
     "--color-navy-200": mix(primary, "white", 12),
     "--color-navy-100": mix(primary, "white", 9),
     "--color-navy-50": mix(primary, "white", 4),
@@ -80,6 +82,7 @@ export function themeVars({ primary, accent, ink, page }: ThemeColors): Record<s
     "--color-brand-700": mix(accent, "black", 76),
     "--color-pink-50": mix(accent, "white", 7),
     "--color-pink-100": mix(accent, "white", 14),
+    "--color-pink-200": mix(accent, "white", 28),
     "--color-pink-500": accent,
     "--color-pink-600": mix(accent, "black", 88),
   };

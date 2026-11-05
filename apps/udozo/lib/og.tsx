@@ -9,9 +9,10 @@ import { ogImageSize, pngRatio } from "@bitocard/ui/og-image";
  * never fails: a photo that cannot be read leaves the card without it.
  */
 
-export const navy = "#070f4c";
-export const pink = "#d6136a";
-const slate = "#414f77";
+/** Udozo's logo blue, for headings, and the brighter blue of its default theme, for prices and highlights. */
+export const navy = "#185174";
+export const pink = "#0e7cc0";
+const slate = "#5f6b73";
 
 /** Inter 600 and 800; the built-in font if they cannot be read. */
 export async function ogFonts() {
@@ -83,7 +84,7 @@ function Lockup({ mark, size = 52 }: { mark: string; size?: number }) {
 }
 
 function Badge({ children, tone = "mint" }: { children: React.ReactNode; tone?: "mint" | "pink" | "navy" }) {
-  const colours = { mint: ["#e6f7ef", "#0b6b45"], pink: ["#fdeaf2", pink], navy: ["#eef0f8", navy] }[tone];
+  const colours = { mint: ["#e6f7ef", "#0b6b45"], pink: ["#e4f1f9", pink], navy: ["#e8eef2", navy] }[tone];
   return <div style={{ display: "flex", padding: "8px 18px", borderRadius: 999, background: colours[0], color: colours[1], fontSize: 24, fontWeight: 600 }}>{children}</div>;
 }
 
@@ -121,13 +122,13 @@ export async function listingCard(listing: { title: string; price: string; place
   );
 }
 
-/** A market's or category's card: an eyebrow, the headline, a line beneath, on Udozo's pink sweep. */
+/** A market's or category's card: an eyebrow, the headline, a line beneath, on Udozo's grey-blue sweep (the logo's disc). */
 export async function textCard({ eyebrow, title, line }: { eyebrow: string; title: string; line: string }) {
   const [fonts, mark] = await Promise.all([ogFonts(), ogMark()]);
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: "#ffffff", color: navy, fontFamily: "Inter, sans-serif" }}>
-        <div style={{ position: "absolute", right: -160, top: 150, width: 720, height: 560, borderRadius: 400, background: "linear-gradient(110deg, #fdeaf2, #f9c2d9)", transform: "rotate(-25deg)" }} />
+        <div style={{ position: "absolute", right: -160, top: 150, width: 720, height: 560, borderRadius: 400, background: "linear-gradient(110deg, #eef2f4, #cfdde6)", transform: "rotate(-25deg)" }} />
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "64px 72px", width: "100%" }}>
           <Lockup mark={mark} size={60} />
           <div style={{ display: "flex", flexDirection: "column" }}>

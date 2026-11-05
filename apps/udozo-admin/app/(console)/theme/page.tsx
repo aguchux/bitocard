@@ -71,7 +71,7 @@ function ThemeEditor({ settings, editable }: { settings: ThemeSettings; editable
             {colorFields.map(({ key, label, hint }) => {
               const id = `theme-${key}`;
               const invalid = !hexColor.test(colors[key]);
-              const error = invalid ? "Use #rrggbb, such as #070f4c." : errorKey === key ? errorMessage(saveState.error) : undefined;
+              const error = invalid ? "Use #rrggbb, such as #185174." : errorKey === key ? errorMessage(saveState.error) : undefined;
               return (
                 <Field key={key} label={label} htmlFor={id} hint={hint} error={error}>
                   <span className="flex items-center gap-2">

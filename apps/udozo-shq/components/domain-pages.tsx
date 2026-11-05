@@ -34,7 +34,7 @@ function TrafficCard({ traffic, loading }: { traffic: StoreTraffic | undefined; 
               labels={traffic.daily.map(day => shortDate(day.date))}
               series={[
                 { name: "Page views", color: "#ff2382", values: traffic.daily.map(day => day.views), format: count },
-                { name: "Visitors", color: "#070f4c", values: traffic.daily.map(day => day.visitors), format: count },
+                { name: "Visitors", color: "#185174", values: traffic.daily.map(day => day.visitors), format: count },
               ]}
             />
             <div className="min-w-0">

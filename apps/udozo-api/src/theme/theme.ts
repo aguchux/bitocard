@@ -17,8 +17,14 @@ export const themeColorKeys = ['primary', 'accent', 'ink', 'page'] as const sati
 
 export type ThemePreset = { key: string; name: string; colors: ThemeColors };
 
-/** Ready-made themes; the first is the default until the admins choose (BitoCard's navy and pink). */
+/**
+ * Ready-made themes; the first is the default until the admins choose. The first three come from Udozo's logo (the blue
+ * script "u", #185174, on a grey disc): its blue with a brighter blue, with orange, or on a page tinted with its grey.
+ */
 export const themePresets: ThemePreset[] = [
+  { key: 'udozo_blue', name: 'Udozo blue', colors: { primary: '#185174', accent: '#0e7cc0', ink: '#10212e', page: '#ffffff' } },
+  { key: 'udozo_orange', name: 'Udozo blue and orange', colors: { primary: '#185174', accent: '#c2560f', ink: '#10212e', page: '#ffffff' } },
+  { key: 'udozo_grey', name: 'Udozo blue on grey', colors: { primary: '#185174', accent: '#0e72b0', ink: '#10212e', page: '#f3f5f6' } },
   { key: 'navy_pink', name: 'Navy and pink', colors: { primary: '#070f4c', accent: '#d6136a', ink: '#0f172a', page: '#ffffff' } },
   { key: 'forest', name: 'Forest', colors: { primary: '#14532d', accent: '#b45309', ink: '#111827', page: '#ffffff' } },
   { key: 'ocean', name: 'Ocean', colors: { primary: '#0c4a6e', accent: '#0e7490', ink: '#0f172a', page: '#ffffff' } },

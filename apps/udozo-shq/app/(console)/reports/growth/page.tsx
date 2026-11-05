@@ -49,7 +49,7 @@ export default function ResellerGrowthPage() {
       <Card>
         <CardHeader title={chosen.label} description={projectedFrom ? `The trend continues past ${shortDate(projectedFrom)} (dates after it are projected).` : "Daily values for the range."} />
         <div className="px-3 pb-5 sm:px-5">
-          {data ? <LineChart label={chosen.label} labels={data.points.map(point => shortDate(point.date))} series={[{ name: chosen.label, color: "#ec4899", values: data.points.map(point => point.value), format: chosen.format }]} /> : null}
+          {data ? <LineChart label={chosen.label} labels={data.points.map(point => shortDate(point.date))} series={[{ name: chosen.label, color: "#0e7cc0", values: data.points.map(point => point.value), format: chosen.format }]} /> : null}
         </div>
       </Card>
     </ShqShell>

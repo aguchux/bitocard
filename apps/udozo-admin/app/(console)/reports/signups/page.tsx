@@ -166,7 +166,7 @@ function Overview({ data, onPick }: { data: SignupSummary; onPick: (filter: { st
             labels={data.daily.map(row => shortDate(row.day))}
             series={[
               { name: "Opened sign-up", color: "#94a3b8", values: data.daily.map(row => row.visits), format: formatNumber },
-              { name: "Started", color: "#ec4899", values: data.daily.map(row => row.started), format: formatNumber },
+              { name: "Started", color: "#0e7cc0", values: data.daily.map(row => row.started), format: formatNumber },
               { name: "Ready to use", color: "#10b981", values: data.daily.map(row => row.completed), format: formatNumber },
             ]}
           />

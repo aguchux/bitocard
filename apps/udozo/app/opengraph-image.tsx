@@ -7,8 +7,8 @@ export const alt = "Udozo – buy and sell near you, protected by Safe pay";
 export const size = ogImageSize;
 export const contentType = "image/png";
 
-const navy = "#070f4c";
-const pink = "#d6136a";
+const navy = "#185174";
+const pink = "#0e7cc0";
 
 /** Inter 600 and 800 (SIL OFL, shared with every app); the built-in font if they cannot be read. */
 async function fonts() {
@@ -32,7 +32,7 @@ export default async function OpenGraphImage() {
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: "#ffffff", color: navy, fontFamily: "Inter, sans-serif" }}>
-        <div style={{ position: "absolute", right: -160, top: 150, width: 720, height: 560, borderRadius: 400, background: "linear-gradient(110deg, #fdeaf2, #f9c2d9)", transform: "rotate(-25deg)" }} />
+        <div style={{ position: "absolute", right: -160, top: 150, width: 720, height: 560, borderRadius: 400, background: "linear-gradient(110deg, #eef2f4, #cfdde6)", transform: "rotate(-25deg)" }} />
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "64px 72px", width: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 64, fontWeight: 800, letterSpacing: -2, lineHeight: 1 }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain img elements */}
@@ -42,7 +42,7 @@ export default async function OpenGraphImage() {
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05 }}>Buy and sell near you.</div>
             <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05, color: pink }}>Protected by Safe pay.</div>
-            <div style={{ display: "flex", marginTop: 26, fontSize: 28, fontWeight: 600, color: "#414f77" }}>Phones · Electronics · Vehicles · Property · Fashion · Home</div>
+            <div style={{ display: "flex", marginTop: 26, fontSize: 28, fontWeight: 600, color: "#5f6b73" }}>Phones · Electronics · Vehicles · Property · Fashion · Home</div>
           </div>
         </div>
       </div>

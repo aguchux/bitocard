@@ -111,7 +111,7 @@ describe("the app", () => {
     });
     const app = await manifest();
     vi.unstubAllGlobals();
-    expect([app.display, app.start_url, app.scope, app.id, app.theme_color, app.name]).toEqual(["standalone", "/", "/", "/", "#070f4c", "Udozo – Buy and sell near you"]);
+    expect([app.display, app.start_url, app.scope, app.id, app.theme_color, app.name]).toEqual(["standalone", "/", "/", "/", "#185174", "Udozo – Buy and sell near you"]);
     expect(app.icons?.some(icon => icon.sizes === "512x512")).toBe(true);
     const res = GET();
     expect(res.headers.get("content-type")).toContain("javascript");

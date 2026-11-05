@@ -29,7 +29,7 @@ export const sameColors = (a: ThemeColors, b: ThemeColors) => colorFields.every(
 /** A small mock of a Udozo page in the given colours, drawn as the admin types. */
 export function ThemeSwatch({ colors, label }: { colors: ThemeColors; label: string }) {
   const valid = colorFields.every(({ key }) => hexColor.test(colors[key]));
-  const safe = valid ? colors : { primary: "#070f4c", accent: "#d6136a", ink: "#0f172a", page: "#ffffff" };
+  const safe = valid ? colors : { primary: "#185174", accent: "#0e7cc0", ink: "#10212e", page: "#ffffff" };
   return (
     <figure aria-label={label} className="overflow-hidden rounded-2xl border border-line" style={{ background: safe.page, color: safe.ink }} data-testid="theme-swatch">
       <div className="flex items-center justify-between px-4 py-3" style={{ background: safe.primary, color: "#ffffff" }}>

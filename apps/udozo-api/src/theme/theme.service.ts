@@ -28,7 +28,7 @@ const present = (theme: StoredTheme) => ({ preset: theme.preset, colors: theme.c
  * The product's colour theme (docs/UDOZO_SPINOFF_PLAN.md, step 3): the admins save a draft (a ready-made theme or their
  * own colours, each checked for readable contrast), preview it with a 30-minute link, then publish it. Every app reads
  * the published theme (`GET /v1/theme`, cached) and applies it as its colour variables. Until something is published,
- * the default theme (BitoCard's navy and pink) applies.
+ * the default theme (Udozo blue, from its logo) applies.
  */
 @Injectable()
 export class ThemeService {

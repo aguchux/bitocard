@@ -27,7 +27,7 @@ export async function listingGone(country: string, ref: string, now = Date.now()
 }
 
 const goneHtml = (cc: string) =>
-  `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>This listing is no longer on Udozo</title></head><body style="margin:0;font-family:Inter,system-ui,sans-serif;background:#fcfdff;color:#070f4c"><main style="max-width:28rem;margin:0 auto;padding:4rem 1rem;text-align:center"><h1 style="font-size:1.5rem">This listing is no longer on Udozo</h1><p style="color:#414f77">It was sold, or the seller took it down.</p><a href="/${cc}" style="display:inline-block;margin-top:1rem;padding:0.75rem 1.25rem;border-radius:0.75rem;background:#070f4c;color:#fff;font-weight:700;text-decoration:none">See what is for sale</a></main></body></html>`;
+  `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>This listing is no longer on Udozo</title></head><body style="margin:0;font-family:Inter,system-ui,sans-serif;background:#ffffff;color:#10212e"><main style="max-width:28rem;margin:0 auto;padding:4rem 1rem;text-align:center"><h1 style="font-size:1.5rem">This listing is no longer on Udozo</h1><p style="color:#5f6b73">It was sold, or the seller took it down.</p><a href="/${cc}" style="display:inline-block;margin-top:1rem;padding:0.75rem 1.25rem;border-radius:0.75rem;background:#185174;color:#fff;font-weight:700;text-decoration:none">See what is for sale</a></main></body></html>`;
 
 /** Headers only this proxy may set: whatever the browser sent under these names is removed from every request. */
 function cleaned(request: NextRequest) {
@@ -90,7 +90,7 @@ function remember(key: string, found: Found, now: number) {
 
 const page = (title: string, text: string, status: number) =>
   new NextResponse(
-    `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title></head><body style="margin:0;font-family:Inter,system-ui,sans-serif;background:#fcfdff;color:#070f4c"><main style="max-width:28rem;margin:0 auto;padding:4rem 1rem;text-align:center"><h1 style="font-size:1.5rem">${title}</h1><p style="color:#414f77">${text}</p></main></body></html>`,
+    `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title></head><body style="margin:0;font-family:Inter,system-ui,sans-serif;background:#ffffff;color:#10212e"><main style="max-width:28rem;margin:0 auto;padding:4rem 1rem;text-align:center"><h1 style="font-size:1.5rem">${title}</h1><p style="color:#5f6b73">${text}</p></main></body></html>`,
     { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": status === 404 ? "public, max-age=60" : "no-store", "x-robots-tag": "noindex" } },
   );
 
