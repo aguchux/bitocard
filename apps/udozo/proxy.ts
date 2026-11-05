@@ -126,5 +126,6 @@ export async function proxy(request: NextRequest) {
 // Every page and route handler (never `_next`'s files or this site's static files), so the headers above can never be
 // sent around the proxy, and every store's address is routed. robots.txt and the sitemaps go through it too. Listing
 // photos (`/img/<id>.jpg`, the watermark route) and anything under `/store/` go through it whatever their ending: a store's
-// photos need the store named, and `/store/…` is never served on udozo.com itself.
-export const config = { matcher: ["/((?!_next/|flags/|sw\.js|favicon\.ico|icon|apple-icon|.*\.(?:png|svg|webp|jpg|ico|json)$).*)", "/img/:path*", "/store/:path*"] };
+// photos need the store named, and `/store/…` is never served on udozo.com itself. Seller pages' share images
+// (`/seller-card/<handle>.jpg`) too: they are udozo.com's only, so on a store they go to its folder, where nothing answers.
+export const config = { matcher: ["/((?!_next/|flags/|sw\.js|favicon\.ico|icon|apple-icon|.*\.(?:png|svg|webp|jpg|ico|json)$).*)", "/img/:path*", "/seller-card/:path*", "/store/:path*"] };

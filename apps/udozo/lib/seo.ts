@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { conditionLabels, listingPath, type ShopListingCard, type ShopListingPage, type ShopMarket } from "@bitocard/api-client/classifieds";
+import { conditionLabels, listingPath, type ShopListingCard, type ShopListingPage, type ShopMarket, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
 import type { FaqGroup } from "./help";
 import { supportEmail, supportPhone } from "./help";
 
@@ -128,6 +128,29 @@ export function productMetaTags(listing: ShopListingPage): Record<string, string
   if (listing.condition) tags["product:condition"] = listing.condition === "new" ? "new" : "used";
   tags["product:category"] = listing.category.name;
   return tags;
+}
+
+/**
+ * A seller page's ProfilePage (Google's profile page rich result): when the account was made, and the seller as a Person
+ * with their handle, their page, their photo (else their share card) and, while they have something for sale, how many
+ * listings they have posted that are live (a WriteAction count, as Google reads posts).
+ */
+export function sellerJsonLd(profile: ShopSellerProfile, url: string, card: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url,
+    dateCreated: profile.member_since,
+    mainEntity: {
+      "@type": "Person",
+      "@id": `${url}#seller`,
+      name: profile.name,
+      identifier: profile.handle,
+      url,
+      image: profile.avatar_url?.startsWith("https://") ? profile.avatar_url : card,
+      ...(profile.active_listings > 0 ? { agentInteractionStatistic: { "@type": "InteractionCounter", interactionType: "https://schema.org/WriteAction", userInteractionCount: profile.active_listings } } : {}),
+    },
+  };
 }
 
 /** Breadcrumb JSON-LD from the trail a page shows. */

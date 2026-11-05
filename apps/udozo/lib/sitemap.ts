@@ -1,4 +1,4 @@
-import { categoryPath, listingPath, placePath, type ShopSitemap, type ShopSitemapListings } from "@bitocard/api-client/classifieds";
+import { categoryPath, listingPath, placePath, sellerPath, type ShopSitemap, type ShopSitemapListings } from "@bitocard/api-client/classifieds";
 import type { ResaleStoreSitemap } from "@bitocard/api-client/storefront";
 import { legalDocuments } from "./legal";
 import { resaleListingPath } from "./resale-links";
@@ -32,8 +32,9 @@ export function sitemapIndex(locations: Array<string | SitemapEntry>) {
 }
 
 /**
- * A country's pages: its home, every category open there (an empty one is still an indexed page), and every state, area
- * and category in a place with enough listings to be indexed (thinner ones are `noindex`, so a sitemap never names them).
+ * A country's pages: its home, every category open there (an empty one is still an indexed page), every state, area
+ * and category in a place with enough listings to be indexed (thinner ones are `noindex`, so a sitemap never names them),
+ * and the seller pages of its sellers with something for sale.
  * Its listings are separate (`listingEntries`), and past one file's limit `countryFiles` makes as many as both need.
  */
 export function countryEntries(origin: string, cc: string, sitemap: ShopSitemap) {
@@ -42,6 +43,8 @@ export function countryEntries(origin: string, cc: string, sitemap: ShopSitemap)
   for (const category of sitemap.categories) entries.push({ loc: at(categoryPath(cc, category.slug)), lastmod: category.updated_at });
   for (const place of sitemap.places) if (place.listings >= indexFrom) entries.push({ loc: at(placePath(cc, { state: place.state, area: place.area })), lastmod: place.updated_at });
   for (const place of sitemap.category_places) if (place.listings >= indexFrom) entries.push({ loc: at(placePath(cc, place)), lastmod: place.updated_at });
+  // Seller pages are indexed while they have something for sale (`noindex` otherwise), dated by their newest listing change.
+  for (const seller of sitemap.sellers ?? []) if (seller.listings > 0) entries.push({ loc: at(sellerPath(cc, seller.handle)), lastmod: seller.updated_at });
   return entries;
 }
 

@@ -12,8 +12,9 @@ import { SellerContactPanel } from "@/components/seller-contact";
 import { SellerShare } from "@/components/seller-share";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
+import { gifSizes, sellerCardUrl } from "@/lib/seller-card";
 import { placesText, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
-import { breadcrumbJsonLd, itemListJsonLd, noindexFollow } from "@/lib/seo";
+import { breadcrumbJsonLd, itemListJsonLd, noindexFollow, sellerJsonLd } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string; handle: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -39,12 +40,16 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const query = await searchParams;
   // Indexed while they have something for sale, and only the page itself (not filtered or later pages).
   const filtered = Object.keys(query).some(key => ["category", "sort", "page"].includes(key));
+  // The animated card first (WhatsApp and others show its first frame, the same card), then the still one, which X uses.
+  const origin = siteOrigin();
+  const alt = `${profile.name} on Udozo: ${profile.active_listings} listing${profile.active_listings === 1 ? "" : "s"} for sale`;
+  const still = { url: sellerCardUrl(origin, handle, "jpg"), width: 1200, height: 630, type: "image/jpeg", alt };
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type: "profile", url: path, title, description, siteName: "Udozo" },
-    twitter: { card: "summary", title, description },
+    openGraph: { type: "profile", url: path, title, description, siteName: "Udozo", images: [{ url: sellerCardUrl(origin, handle, "gif"), ...gifSizes[0], type: "image/gif", alt }, still] },
+    twitter: { card: "summary_large_image", title, description, images: [still] },
     ...(profile.active_listings === 0 || filtered ? { robots: noindexFollow } : {}),
   };
 }
@@ -295,7 +300,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
         </aside>
       </div>
 
-      <JsonLd data={{ "@context": "https://schema.org", "@type": "ProfilePage", url: new URL(path, origin).href, mainEntity: { "@type": "Person", name: profile.name, url: new URL(path, origin).href } }} />
+      <JsonLd data={sellerJsonLd(profile, new URL(path, origin).href, sellerCardUrl(origin, handle, "jpg"))} />
       <JsonLd data={breadcrumbJsonLd(trail, origin)} />
       {cards.length ? <JsonLd data={itemListJsonLd(`Listings by ${profile.name}`, cards, origin, cc)} /> : null}
     </div>

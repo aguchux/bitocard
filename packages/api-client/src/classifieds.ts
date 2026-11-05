@@ -211,6 +211,8 @@ export type ShopSitemap = {
   category_places: Array<{ state: string; area: string | null; category: string; listings: number; updated_at: string | null }>;
   /** The files its listings come in: each starts after a listing number. */
   listing_pages: Array<{ after: number; listings: number; updated_at: string }>;
+  /** Udozo: sellers of this market with a live listing here (their page is indexed only then), with that count and their newest listing change. */
+  sellers?: Array<{ handle: string; listings: number; updated_at: string }>;
 };
 
 /** One file of a country's listings, each with its title and up to five photos (for the image sitemap). */

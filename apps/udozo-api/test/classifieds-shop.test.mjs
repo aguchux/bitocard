@@ -207,6 +207,25 @@ describe('sitemap data', () => {
     assert.equal((await get('/v1/classifieds/sitemap/listings?country=KE')).json.error.code, 'classifieds_unavailable');
   });
 
+  test("seller pages: each usable seller of the market with a live listing, with that count and their newest change", async () => {
+    const { json } = await get('/v1/classifieds/sitemap?country=NG');
+    const owner = await prisma.customer.findUniqueOrThrow({ where: { id: made.seller.id }, select: { sellerHandle: true } });
+    const row = json.sellers.find(seller => seller.handle === owner.sellerHandle);
+    const live = await prisma.classifiedListing.findMany({ where: { customerId: made.seller.id, country: 'NG', status: 'active', onShop: true }, select: { updatedAt: true } });
+    assert.equal(row.listings, live.length, 'only live listings count (the sold one does not)');
+    assert.equal(row.updated_at, live.map(listing => listing.updatedAt.toISOString()).sort().at(-1));
+    const buyer = await prisma.customer.findUniqueOrThrow({ where: { id: made.buyer.id }, select: { sellerHandle: true } });
+    assert.ok(!json.sellers.some(seller => seller.handle === buyer.sellerHandle), 'nothing for sale, no page in the sitemap');
+    assert.deepEqual(json.sellers.map(seller => seller.handle), [...json.sellers.map(seller => seller.handle)].sort());
+    await prisma.customer.update({ where: { id: made.seller.id }, data: { status: 'disabled' } });
+    try {
+      const suspended = (await get('/v1/classifieds/sitemap?country=NG')).json;
+      assert.ok(!suspended.sellers.some(seller => seller.handle === owner.sellerHandle), 'a suspended account has no page');
+    } finally {
+      await prisma.customer.update({ where: { id: made.seller.id }, data: { status: 'active' } });
+    }
+  });
+
   test('files start where the one before ended, so listings past any one file are still listed', async () => {
     const { listingPages } = await import('../dist/classifieds/directory.service.js');
     const updated_at = new Date('2026-11-01T00:00:00.000Z');

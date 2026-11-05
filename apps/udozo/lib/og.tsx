@@ -12,7 +12,7 @@ import { ogImageSize, pngRatio } from "@bitocard/ui/og-image";
 /** Udozo's logo blue, for headings, and the brighter blue of its default theme, for prices and highlights. */
 export const navy = "#185174";
 export const pink = "#0e7cc0";
-const slate = "#5f6b73";
+export const slate = "#5f6b73";
 
 /** Inter 600 and 800; the built-in font if they cannot be read. */
 export async function ogFonts() {
@@ -73,7 +73,7 @@ export async function ogPhoto(url: string | null | undefined): Promise<string | 
   }
 }
 
-function Lockup({ mark, size = 52 }: { mark: string; size?: number }) {
+export function Lockup({ mark, size = 52 }: { mark: string; size?: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: size * 0.86, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1, color: navy }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain img elements */}

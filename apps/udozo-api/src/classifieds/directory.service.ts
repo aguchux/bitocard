@@ -17,6 +17,7 @@ export const sitemapPage = 5000;
 export const sitemapPlaceFrom = 5;
 
 type ListingPageRow = { last_ref: bigint | number; listings: bigint | number; updated_at: Date };
+type SellerRow = { handle: string; listings: bigint | number; updated_at: Date };
 
 /** Each file of a country's listings: the number it starts after (the last one of the file before), its size and its newest change. */
 export const listingPages = (rows: ListingPageRow[]) => rows.map((row, index) => ({ after: index ? Number(rows[index - 1]!.last_ref) : 0, listings: Number(row.listings), updated_at: row.updated_at.toISOString() }));
@@ -203,12 +204,14 @@ export class ShopDirectoryService {
    * What a country's sitemap lists, each with its count of live listings and when they last changed: its categories (a
    * top category counts its subcategories), states and areas, a category in a state or area once it has enough there to
    * be indexed, and the files its listings come in (`sitemapListings`). Places count as their pages do, so the two agree
-   * on what is indexed: a state's page also shows listings delivered nationwide, an area's only its own.
+   * on what is indexed: a state's page also shows listings delivered nationwide, an area's only its own. Seller pages
+   * (`/<cc>/seller/<handle>`) are listed for every usable account of this market with a live listing here (their page
+   * is indexed only then), each with that count and their newest listing change.
    */
   async sitemap(country: string) {
     const code = country.toUpperCase();
     await this.listings.requireOpen(code);
-    const [categories, groups, areas, pages] = await Promise.all([
+    const [categories, groups, areas, pages, sellers] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { enabled: true, countries: { some: { country: code, enabled: true } } }, select: { id: true, slug: true, parentId: true } }),
       this.prisma.classifiedListing.groupBy({ by: ['categoryId', 'stateId', 'areaId', 'delivery'], where: { country: code, ...onShopWhere }, _count: { _all: true }, _max: { updatedAt: true } }),
       this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true, parentId: true } }),
@@ -220,6 +223,15 @@ export class ShopDirectoryService {
           WHERE "country" = ${code} AND "on_shop" AND ("status" = 'active' OR ("status" = 'sold' AND "sold_at" > ${new Date(Date.now() - soldVisibleMs)}::timestamptz))
         ) listed
         GROUP BY (place - 1) / ${sitemapPage}::bigint
+        ORDER BY 1`,
+      // A seller's page lives in their own market and counts only their live listings there (`SellerProfilesService`);
+      // a suspended account has no page.
+      this.prisma.$queryRaw<SellerRow[]>`
+        SELECT c."seller_handle" AS handle, count(*) AS listings, max(l."updated_at") AS updated_at
+        FROM "classified_listings" l
+        JOIN "customers" c ON c."id" = l."customer_id"
+        WHERE l."country" = ${code} AND l."status" = 'active' AND l."on_shop" AND c."status" = 'active' AND c."country" = ${code}
+        GROUP BY c."seller_handle"
         ORDER BY 1`,
     ]);
     const categoryOf = new Map(categories.map(category => [category.id, category]));
@@ -269,6 +281,7 @@ export class ShopDirectoryService {
       places: places.filter(place => !place.category).map(({ state, area, listings, updated_at }) => ({ state, area, listings, updated_at })).sort((a, b) => a.state.localeCompare(b.state) || (a.area ?? '').localeCompare(b.area ?? '')),
       category_places: places.filter(place => place.category && place.listings >= sitemapPlaceFrom && (place.area || !areaNames.has(`${place.state}/${place.category}`))).sort(byPlace),
       listing_pages: listingPages(pages),
+      sellers: sellers.map(row => ({ handle: row.handle, listings: Number(row.listings), updated_at: row.updated_at.toISOString() })),
     };
   }
 
