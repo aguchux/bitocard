@@ -558,5 +558,10 @@
   "3m": {
     "icon": "3m",
     "hex": "FF0000"
+  },
+  "cantrack": {
+    "own": true,
+    "hex": "376AB3",
+    "source": "https://www.cantrackgps.com/favicon.ico"
   }
 }

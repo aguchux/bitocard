@@ -7,6 +7,8 @@
 //
 // The brands come from the API's registry (migration 20270204000000_classified_brands sets `logo_file` to the slug); a
 // brand added later gets its logo by an admin's upload, or an entry here and a migration setting its `logo_file`.
+// An entry with `own` is a mark the brand publishes itself (its `source`), not in Simple Icons: its file is kept as
+// committed, never rewritten or removed.
 import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +25,8 @@ const luminance = hex => {
 };
 
 for (const file of readdirSync(out)) if (!(file.replace(/\.svg$/, '') in map)) rmSync(join(out, file));
-for (const [slug, { icon, hex }] of Object.entries(map)) {
+for (const [slug, { icon, hex, own }] of Object.entries(map)) {
+  if (own) continue;
   const fill = luminance(hex) > 0.7 ? '#1F2937' : `#${hex.toUpperCase()}`;
   const svg = readFileSync(join(source, 'icons', `${icon}.svg`), 'utf8')
     .replace(/<title>[^<]*<\/title>/, '')
