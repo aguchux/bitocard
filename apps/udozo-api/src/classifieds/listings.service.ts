@@ -67,7 +67,21 @@ export const renewWindowMs = 3 * dayMs;
 /** The limit on new listings counts those submitted in the last 30 days. */
 const limitWindowMs = 30 * dayMs;
 
-const defaults = { listingDays: 30, monthlyListingLimit: 10, firstListingsReviewed: 3, minPhotos: 4, maxPhotos: 12, usernameMinListings: 5, buyRequestHours: 48, buyMeetDays: 7, buyOpenPerBuyer: 10, buyRequestsPerDay: 20, reviewsNeutral: false, reviewWindowDays: 30, reviewMinShown: 3 };
+/** What submitting an ad needs filled in. */
+export type ListingParts = { categoryId: string | null; areaId: string | null; title: string | null; condition: string | null; priceKind: string; priceMinor: bigint | null };
+
+/** What a draft still lacks before it can be submitted (photos apart), as the field and how a seller reads it. */
+export function missingParts(listing: ListingParts): [string, string][] {
+  const missing: [string, string][] = [];
+  if (!listing.title) missing.push(['title', 'a title']);
+  if (!listing.categoryId) missing.push(['category_id', 'a category']);
+  if (!listing.condition) missing.push(['condition', 'its condition']);
+  if (listing.priceKind !== 'on_request' && listing.priceMinor === null) missing.push(['price', 'a price']);
+  if (!listing.areaId) missing.push(['area_id', 'where it is']);
+  return missing;
+}
+
+const defaults = { listingDays: 30, monthlyListingLimit: 10, firstListingsReviewed: 3, minPhotos: 4, maxPhotos: 12, usernameMinListings: 5, buyRequestHours: 48, buyMeetDays: 7, buyOpenPerBuyer: 10, buyRequestsPerDay: 20, reviewsNeutral: false, reviewWindowDays: 30, reviewMinShown: 3, unfinishedReminderHours: 24, readyReminder1Hours: 24, readyReminder2Hours: 72, readyReminder3Hours: 168 };
 
 const listingInclude = {
   category: { include: { parent: true } },
@@ -389,13 +403,8 @@ export class ListingsService {
   }
 
   /** Everything a listing past draft must have. */
-  private requireComplete(listing: { categoryId: string | null; areaId: string | null; title: string | null; condition: string | null; priceKind: string; priceMinor: bigint | null }) {
-    const missing: [string, string][] = [];
-    if (!listing.title) missing.push(['title', 'a title']);
-    if (!listing.categoryId) missing.push(['category_id', 'a category']);
-    if (!listing.condition) missing.push(['condition', 'its condition']);
-    if (listing.priceKind !== 'on_request' && listing.priceMinor === null) missing.push(['price', 'a price']);
-    if (!listing.areaId) missing.push(['area_id', 'where it is']);
+  private requireComplete(listing: ListingParts) {
+    const missing = missingParts(listing);
     if (missing.length) throw invalid('listing_incomplete', `Add ${missing.map(([, label]) => label).join(', ')}.`, missing[0][0]);
   }
 

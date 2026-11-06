@@ -172,6 +172,20 @@ export class PostingJourneysService {
     this.run('review_requeued', () => this.writeRequeued(listingId, reason, flags));
   }
 
+  /** Its seller was reminded to finish the draft (`unfinished`) or to post it (`ready_1` to `ready_3`). */
+  reminded(listingId: string, kind: 'unfinished' | 'ready_1' | 'ready_2' | 'ready_3') {
+    this.run(`reminder_${kind}`, async () => {
+      // On its timeline only: a reminder is not the seller's step, so the journey's last activity (and whether it is
+      // stuck) is left as it was.
+      const journey = await this.prisma.postingJourney.findUnique({ where: { listingId }, select: { id: true, eventCount: true } });
+      if (!journey || journey.eventCount >= maxJourneyEvents) return;
+      await this.prisma.$transaction([
+        this.prisma.postingJourney.update({ where: { id: journey.id }, data: { eventCount: { increment: 1 } } }),
+        this.prisma.postingJourneyEvent.create({ data: { journeyId: journey.id, origin: 'system', step: `reminder_${kind}`, outcome: 'ok', createdAt: new Date() } }),
+      ]);
+    });
+  }
+
   /** The ad's first view (called only when its count was 0, so this costs nothing after). */
   firstView(listingId: string) {
     this.run('first_view', async () => {

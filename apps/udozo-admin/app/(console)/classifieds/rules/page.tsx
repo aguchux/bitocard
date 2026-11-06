@@ -36,6 +36,17 @@ const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: 
   { key: "buy_requests_per_day", label: "Buy orders a buyer may send a day", hint: "1 to 200.", min: 1, max: 200, fallback: 20 },
   { key: "review_window_days", label: "Days to review a purchase", hint: "From the purchase completing; reminders go on days 2 and 7. 1 to 180.", min: 1, max: 180, fallback: 30 },
   { key: "review_min_shown", label: "Reviews before the positive share shows", hint: "Counted reviews (positive and negative) in the last 12 months. 1 to 50.", min: 1, max: 50, fallback: 3 },
+  {
+    key: "unfinished_reminder_hours",
+    label: "Hours before reminding an unfinished ad",
+    hint: "An ad with its title, category and a photo but not finished: one reminder this long after the seller last changed it. Needs the post reminders switch. 1 to 720.",
+    min: 1,
+    max: 720,
+    fallback: 24,
+  },
+  { key: "ready_reminder_1_hours", label: "Hours before the first reminder to post", hint: "An ad with everything filled in but not posted: this long after the seller last changed it. 1 to 720.", min: 1, max: 720, fallback: 24 },
+  { key: "ready_reminder_2_hours", label: "Hours from the first to the second", hint: "The second reminder to post, this long after the first. 1 to 720.", min: 1, max: 720, fallback: 72 },
+  { key: "ready_reminder_3_hours", label: "Hours from the second to the last", hint: "The third and last reminder, this long after the second. 1 to 720.", min: 1, max: 720, fallback: 168 },
 ];
 
 /** What the market has saved for a field; a setting the API does not send yet reads as its default. */
@@ -51,7 +62,7 @@ export default function ClassifiedRulesPage() {
   const changes = can(admin, "operations");
   return (
     <UdozoShell section="marketplace" current="/classifieds/rules" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Limits and words" }]}>
-      <PageHeader title="Limits and words" description="Posting rules per market, when sellers may choose a username, and the words that stop an ad or send it to a moderator. Whole words and phrases match, in any letter case." />
+      <PageHeader title="Limits and words" description="Posting rules per market, when sellers may choose a username, when sellers are reminded to finish and post their ads, and the words that stop an ad or send it to a moderator. Whole words and phrases match, in any letter case." />
       <div className="mt-6 flex flex-wrap gap-3">
         <MarketFilter id="rules-market" value={country} onChange={setCountry} all={false} />
       </div>

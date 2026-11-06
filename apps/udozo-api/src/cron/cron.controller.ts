@@ -1,6 +1,7 @@
 import { P2pMerchantsService } from '../afrippa/merchants.service.js';
 import { P2pOrdersService } from '../afrippa/orders.service.js';
 import { ListingsService } from '../classifieds/listings.service.js';
+import { PostingRemindersService } from '../classifieds/posting-reminders.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
@@ -122,6 +123,7 @@ export class CronController {
     interactionRatings: InteractionRatingsService,
     sellerScores: SellerScoresService,
     postingJourneys: PostingJourneysService,
+    postingReminders: PostingRemindersService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -231,6 +233,7 @@ export class CronController {
         buy_orders: await buyOrders.job(),
         reviews: await reviews.remind(),
         listings: await listings.expireDue(),
+        posting_reminders: await postingReminders.run(),
         stale_videos: await listingMedia.failStale(),
         offers: await conversations.expireOffers(),
         unread: await conversations.emailUnread(),

@@ -273,6 +273,13 @@ export type ClassifiedMarketSettings = {
   reviews_neutral?: boolean;
   review_window_days?: number;
   review_min_shown?: number;
+  /** Reminders to finish posting (the `classifieds_post_reminders` switch): hours after an unfinished draft was last
+   * changed (one reminder), then for a complete draft not posted, hours to the first reminder and between the next two
+   * (1 to 720 each; defaults 24, 24, 72 and 168). */
+  unfinished_reminder_hours?: number;
+  ready_reminder_1_hours?: number;
+  ready_reminder_2_hours?: number;
+  ready_reminder_3_hours?: number;
 };
 
 /** A reported chat, read in full (every read is audited). */

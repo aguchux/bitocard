@@ -4671,6 +4671,12 @@ model ClassifiedMarketSettings {
   reviewsNeutral        Boolean  @default(false) @map("reviews_neutral")
   reviewWindowDays      Int      @default(30) @map("review_window_days")
   reviewMinShown        Int      @default(3) @map("review_min_shown")
+  /// Reminders to finish posting (`classifieds_post_reminders`): hours after an unfinished draft was last changed, then
+  /// for a complete draft not posted, hours to the first reminder and between the next two.
+  unfinishedReminderHours Int    @default(24) @map("unfinished_reminder_hours")
+  readyReminder1Hours   Int      @default(24) @map("ready_reminder_1_hours")
+  readyReminder2Hours   Int      @default(72) @map("ready_reminder_2_hours")
+  readyReminder3Hours   Int      @default(168) @map("ready_reminder_3_hours")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("classified_market_settings")
@@ -4735,6 +4741,10 @@ model ClassifiedListing {
   /// When a moderator last decided it (approved, sent back or removed), and who (an admin's id; admins are never deleted).
   reviewedAt   DateTime?                  @map("reviewed_at")
   reviewedById String?                    @map("reviewed_by_id") @db.Uuid
+  /// When its seller was reminded to finish it (once), and how many reminders to post it, the latest when.
+  unfinishedRemindedAt DateTime? @map("unfinished_reminded_at")
+  readyReminders  Int            @default(0) @map("ready_reminders")
+  readyRemindedAt DateTime?      @map("ready_reminded_at")
   submittedAt  DateTime?                  @map("submitted_at")
   publishedAt  DateTime?                  @map("published_at")
   expiresAt    DateTime?                  @map("expires_at")
@@ -4791,6 +4801,7 @@ model ClassifiedListing {
   @@index([categoryId, status])
   @@index([country, status, publishedAt])
   @@index([status, expiresAt])
+  @@index([status, updatedAt])
   @@index([status, reviewedAt])
   @@map("classified_listings")
 }

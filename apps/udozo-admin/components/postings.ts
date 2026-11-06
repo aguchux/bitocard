@@ -92,6 +92,10 @@ const stepLabels: Record<string, string> = {
   removed: "Removed by a moderator",
   went_live: "Went live",
   first_view: "First view",
+  reminder_unfinished: "Reminded to finish it",
+  reminder_ready_1: "Reminded to post it (1 of 3)",
+  reminder_ready_2: "Reminded to post it (2 of 3)",
+  reminder_ready_3: "Reminded to post it (3 of 3)",
   sold: "Marked sold",
   delete: "Deleted",
 };

@@ -156,6 +156,11 @@ export const switchDefinitions = {
     description:
       "Buy orders on Udozo: a buyer asks to buy a listing at a price, the seller accepts (holding it for them) or offers another price before they meet, they pay each other in person off Udozo, and the seller marks it sold. The record of who bought what, which reviews will use. Needs classifieds on. Off: listings show no Buy this.",
   },
+  classifieds_post_reminders: {
+    scopes: ['global', 'country'],
+    description:
+      "Reminders to finish posting on Udozo: a seller whose ad has its title, category and a photo but is not finished is emailed and notified once; one whose ad is complete but not posted, up to three times. The hours are each market's, on Limits and words. Off: no reminders.",
+  },
   classifieds_reviews: {
     scopes: ['global', 'country'],
     description:
@@ -246,6 +251,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_safe_pay',
   'classifieds_assistant',
   'classifieds_buy_orders',
+  'classifieds_post_reminders',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',

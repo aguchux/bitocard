@@ -164,6 +164,19 @@ class MarketSettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(50)
   review_min_shown?: number;
+
+  /** Reminders to finish posting (`classifieds_post_reminders`): hours, 1 to 720 each. */
+  @IsOptional() @IsInt() @Min(1) @Max(720)
+  unfinished_reminder_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(720)
+  ready_reminder_1_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(720)
+  ready_reminder_2_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(720)
+  ready_reminder_3_hours?: number;
 }
 
 class SellersDto {
@@ -505,7 +518,8 @@ export class ClassifiedsAdminService {
     const row = await this.listings.marketSettings(country);
     return { object: 'classified_market_settings' as const, country, listing_days: row.listingDays, monthly_listing_limit: row.monthlyListingLimit, first_listings_reviewed: row.firstListingsReviewed, min_photos: row.minPhotos, max_photos: row.maxPhotos, username_min_listings: row.usernameMinListings,
       buy_request_hours: row.buyRequestHours, buy_meet_days: row.buyMeetDays, buy_open_per_buyer: row.buyOpenPerBuyer, buy_requests_per_day: row.buyRequestsPerDay,
-      reviews_neutral: row.reviewsNeutral, review_window_days: row.reviewWindowDays, review_min_shown: row.reviewMinShown };
+      reviews_neutral: row.reviewsNeutral, review_window_days: row.reviewWindowDays, review_min_shown: row.reviewMinShown,
+      unfinished_reminder_hours: row.unfinishedReminderHours, ready_reminder_1_hours: row.readyReminder1Hours, ready_reminder_2_hours: row.readyReminder2Hours, ready_reminder_3_hours: row.readyReminder3Hours };
   }
 
   async setMarketSettings(actorId: string | null, country: string, input: MarketSettingsDto) {
@@ -528,6 +542,10 @@ export class ClassifiedsAdminService {
       ...(input.reviews_neutral !== undefined ? { reviewsNeutral: input.reviews_neutral } : {}),
       ...(input.review_window_days !== undefined ? { reviewWindowDays: input.review_window_days } : {}),
       ...(input.review_min_shown !== undefined ? { reviewMinShown: input.review_min_shown } : {}),
+      ...(input.unfinished_reminder_hours !== undefined ? { unfinishedReminderHours: input.unfinished_reminder_hours } : {}),
+      ...(input.ready_reminder_1_hours !== undefined ? { readyReminder1Hours: input.ready_reminder_1_hours } : {}),
+      ...(input.ready_reminder_2_hours !== undefined ? { readyReminder2Hours: input.ready_reminder_2_hours } : {}),
+      ...(input.ready_reminder_3_hours !== undefined ? { readyReminder3Hours: input.ready_reminder_3_hours } : {}),
     };
     await this.prisma.classifiedMarketSettings.upsert({ where: { country }, create: { country, ...data }, update: data });
     const after = await this.marketSettings(country);
