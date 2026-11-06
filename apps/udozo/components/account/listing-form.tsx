@@ -25,6 +25,7 @@ import {
   type ShopResaleAvailability,
   type ShopState,
   type ShopTopCategory,
+  matchCategories,
 } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { featureValue, fromMinor, toMinor, toggleList, wrapSelection } from "@/lib/shop";
@@ -1053,9 +1054,8 @@ function CategoryPicker({ categories, value, invalid, onChange }: { categories: 
   const [q, setQ] = useState("");
   const [top, setTop] = useState<string | null>(null);
   const words = q.trim().toLowerCase();
-  const matches = words
-    ? categories.flatMap(parent => parent.children.filter(child => `${child.name} ${parent.name}`.toLowerCase().includes(words)).map(child => ({ parent, child }))).slice(0, 20)
-    : [];
+  // Names and search words alike, best first: "carpet", "plastic chairs" or "cups" each find their place.
+  const matches = words ? matchCategories(categories, words) : [];
   if (!open && value) {
     return (
       <div className="grid gap-1.5">

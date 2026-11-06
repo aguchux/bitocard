@@ -241,6 +241,8 @@ export type AdminClassifiedCategory = {
   enabled: boolean;
   /** Three letters starting its new listings' SKUs (PHN). */
   sku_prefix: string;
+  /** What people call the things sold here, matched as typed on Post an ad, in search suggestions and by the assistants. */
+  keywords: string[];
   /** Open in the country asked for. */
   open: boolean;
   active_listings: number;
@@ -572,6 +574,11 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ id, sku_prefix }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}`, method: 'PATCH', body: { sku_prefix } }),
       invalidatesTags: ['ClassifiedCategory', 'Activity'],
     }),
+    /** A category's search words (trimmed, lower case, each once); the saved list is returned. */
+    setClassifiedCategoryKeywords: build.mutation<{ object: 'classified_admin_category'; id: string; slug: string; enabled: boolean; sku_prefix: string; keywords: string[] }, { id: string; keywords: string[] }>({
+      query: ({ id, keywords }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}`, method: 'PATCH', body: { keywords } }),
+      invalidatesTags: ['ClassifiedCategory', 'Activity'],
+    }),
     /** Shown at once; a refusal undoes it and reloads the market's list. */
     setClassifiedCategoryCountry: build.mutation<unknown, { id: string; country: string; open: boolean }>({
       query: ({ id, country, open }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}/countries/${country}`, method: 'PUT', body: { open } }),
@@ -772,6 +779,7 @@ export const {
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,
   useSetClassifiedCategorySkuPrefixMutation,
+  useSetClassifiedCategoryKeywordsMutation,
   useSetClassifiedCategoryCountryMutation,
   useClassifiedFeaturesQuery,
   useCreateClassifiedFeatureMutation,

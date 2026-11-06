@@ -65,7 +65,7 @@ export class ShopKnowledgeService {
         where: { enabled: true, parentId: null, countries: { some: { country, enabled: true } } },
         orderBy: { position: 'asc' },
         include: {
-          children: { where: { enabled: true, countries: { some: { country, enabled: true } } }, orderBy: { position: 'asc' }, select: { name: true, safetyChecklist: true } },
+          children: { where: { enabled: true, countries: { some: { country, enabled: true } } }, orderBy: { position: 'asc' }, select: { name: true, safetyChecklist: true, keywords: true } },
           features: { orderBy: { position: 'asc' }, take: 8, include: { feature: { select: { name: true, enabled: true } } } },
         },
       }),
@@ -96,6 +96,8 @@ export class ShopKnowledgeService {
         name: category.name,
         b2b: category.b2b,
         children: category.children.map(child => child.name),
+        /** Each subcategory with a few of the things sold there, so the assistant sends sellers and buyers to the right one. */
+        includes: category.children.filter(child => child.keywords.length).map(child => `${child.name}: ${child.keywords.slice(0, 8).join(', ')}`),
         features: category.features.filter(link => link.feature.enabled).map(link => link.feature.name),
         checks: category.safetyChecklist,
       })),
@@ -118,7 +120,7 @@ export class ShopKnowledgeService {
       categories: [
         `# ${shopKnowledgeTitles.categories}`,
         ...(data.categories.length
-          ? data.categories.map(category => `## ${category.name}${category.b2b ? ' (business)' : ''}\n${category.children.length ? `- Includes: ${category.children.join(', ')}.\n` : ''}${category.features.length ? `- Sellers fill in: ${category.features.join(', ')}.` : '- No suggested features.'}`)
+          ? data.categories.map(category => `## ${category.name}${category.b2b ? ' (business)' : ''}\n${category.children.length ? `- Includes: ${category.children.join(', ')}.\n` : ''}${category.includes.length ? `- What goes where: ${category.includes.join('; ')}.\n` : ''}${category.features.length ? `- Sellers fill in: ${category.features.join(', ')}.` : '- No suggested features.'}`)
           : ['No categories are open yet.']),
       ].join('\n\n'),
       posting: [

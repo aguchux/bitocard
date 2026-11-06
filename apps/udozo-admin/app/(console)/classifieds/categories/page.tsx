@@ -4,14 +4,23 @@ import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, errorMessage, formatNumber, Input, Notice, PageHeader, QueryView, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
-import { type AdminClassifiedCategory, useClassifiedCategoriesQuery, useSetClassifiedCategoryCountryMutation, useSetClassifiedCategoryMutation, useSetClassifiedCategorySkuPrefixMutation } from "@bitocard/api-client/admin";
+import {
+  type AdminClassifiedCategory,
+  useClassifiedCategoriesQuery,
+  useSetClassifiedCategoryCountryMutation,
+  useSetClassifiedCategoryKeywordsMutation,
+  useSetClassifiedCategoryMutation,
+  useSetClassifiedCategorySkuPrefixMutation,
+} from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
+import { textWords, wordsText } from "@/components/category-words";
 
 /**
  * Udozo > Categories: which categories are open in each market (closing a top category closes its
  * subcategories there), and switching one off everywhere. Closing stops new ads; live ones stay until they end.
- * Each category's SKU prefix starts its ads' SKUs (PHN-000123). Operations change them (switches shown at once,
- * undone if refused); each change is audited.
+ * Each category's SKU prefix starts its ads' SKUs (PHN-000123), and its search words (what people call the things
+ * sold there) send "carpet" or "plastic chairs" to the right subcategory on Post an ad, in search suggestions and in
+ * the assistants. Operations change them (switches shown at once, undone if refused); each change is audited.
  */
 export default function ClassifiedCategoriesPage() {
   const admin = useAdmin();
@@ -35,7 +44,7 @@ export default function ClassifiedCategoriesPage() {
 
   return (
     <UdozoShell section="marketplace" current="/classifieds/categories" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Categories" }]}>
-      <PageHeader title="Categories" description="What sellers can post in each market. Closing a category stops new ads in it; ads already live stay until they end or are removed. Each category's three letters start its ads' SKUs." />
+      <PageHeader title="Categories" description="What sellers can post in each market. Closing a category stops new ads in it; ads already live stay until they end or are removed. Each category's three letters start its ads' SKUs, and its search words send what people type to it." />
       <div className="mt-6 flex flex-wrap gap-3">
         <MarketFilter id="categories-market" value={country} onChange={setCountry} all={false} />
       </div>
@@ -89,6 +98,7 @@ function CategoryRow({
       </span>
       {!category.enabled ? <Badge tone="grey">Off everywhere</Badge> : null}
       <SkuPrefix category={category} changes={changes} />
+      {top ? null : <SearchWords category={category} changes={changes} />}
       <span className="flex items-center gap-2 text-xs font-semibold text-muted">
         Open in {country}
         <Toggle label={`${category.name}: open in ${country}`} checked={category.open} disabled={!changes} onChange={onOpen} />
@@ -158,6 +168,79 @@ function SkuPrefix({ category, changes }: { category: AdminClassifiedCategory; c
         Cancel
       </Button>
       <span className="basis-full text-xs text-muted">{error ?? "Three letters. New ads take it; SKUs already given keep theirs."}</span>
+    </form>
+  );
+}
+
+/**
+ * A subcategory's search words: what people call the things sold there, matched as typed. Shown as a count; operations
+ * edit them one a line (or separated by commas). Singular is enough: "plastic chairs" holds "plastic chair".
+ */
+function SearchWords({ category, changes }: { category: AdminClassifiedCategory; changes: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [save, saving] = useSetClassifiedCategoryKeywordsMutation();
+  const [error, setError] = useState<string | null>(null);
+  const saved = category.keywords ?? [];
+  const words = textWords(value);
+  const tooMany = words.length > 60;
+  const tooLong = words.some(word => word.length > 40);
+  const count = saved.length;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (tooMany || tooLong) return;
+    setError(null);
+    try {
+      await save({ id: category.id, keywords: words }).unwrap();
+      setEditing(false);
+    } catch (problem) {
+      setError(errorMessage(problem));
+    }
+  };
+  const label = count ? `${count} search word${count === 1 ? "" : "s"}` : "No search words";
+  if (!editing) {
+    return changes ? (
+      <button
+        type="button"
+        onClick={() => (setValue(wordsText(saved)), setError(null), setEditing(true))}
+        aria-label={`${category.name}: ${label}, change them`}
+        title={saved.slice(0, 12).join(", ")}
+        className={`rounded-lg border px-2 py-1 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 ${count ? "border-line bg-white text-ink" : "border-amber-300 bg-amber-50 text-amber-900"}`}
+      >
+        {label}
+      </button>
+    ) : (
+      <span title={saved.slice(0, 12).join(", ")} className="rounded-lg bg-canvas px-2 py-1 text-xs font-semibold text-ink">
+        {label}
+      </span>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="grid w-full gap-2">
+      <label className="text-xs font-semibold text-muted" htmlFor={`words-${category.id}`}>
+        {category.name}: search words, one a line
+      </label>
+      <textarea
+        id={`words-${category.id}`}
+        value={value}
+        rows={6}
+        autoFocus
+        onChange={event => setValue(event.target.value)}
+        onKeyDown={event => event.key === "Escape" && setEditing(false)}
+        aria-invalid={tooMany || tooLong}
+        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none"
+      />
+      <span className="text-xs text-muted">
+        {error ?? (tooMany ? `At most 60 words (${words.length} now).` : tooLong ? "Each word at most 40 characters." : `${words.length} words. What people call the things sold here; singular is enough ("plastic chair" also finds "plastic chairs").`)}
+      </span>
+      <span className="flex gap-2">
+        <Button type="submit" size="sm" loading={saving.isLoading} disabled={tooMany || tooLong || wordsText(words) === wordsText(saved)}>
+          Save
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          Cancel
+        </Button>
+      </span>
     </form>
   );
 }

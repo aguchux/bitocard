@@ -352,13 +352,22 @@ export class ListingSearchService {
     await this.listings.requireOpen(code);
     const words = q.trim().toLowerCase().slice(0, 60);
     if (words.length < 2) return { object: 'list' as const, categories: [], queries: [] };
+    const escaped = words.replace(/[%_\\]/g, '\\$&');
+    const like = `%${escaped}%`;
     const [categories, titles] = await Promise.all([
-      this.prisma.classifiedCategory.findMany({
-        where: { enabled: true, parentId: { not: null }, countries: { some: { country: code, enabled: true } }, name: { contains: words, mode: 'insensitive' } },
-        include: { parent: true },
-        take: 3,
-        orderBy: { name: 'asc' },
-      }),
+      // A subcategory whose name has the words, then one whose search words do ("carpet" is Carpets, rugs and
+      // curtains; "plastic chairs" holds "plastic chair"), at most three.
+      this.prisma.$queryRaw<{ slug: string; name: string; parent_slug: string | null; parent_name: string | null }[]>`
+        SELECT c."slug", c."name", p."slug" AS "parent_slug", p."name" AS "parent_name"
+        FROM "classified_categories" c
+        LEFT JOIN "classified_categories" p ON p."id" = c."parent_id"
+        WHERE c."enabled" AND c."parent_id" IS NOT NULL
+          AND EXISTS (SELECT 1 FROM "classified_category_countries" cc WHERE cc."category_id" = c."id" AND cc."country" = ${code} AND cc."enabled")
+          AND (lower(c."name") LIKE ${like} OR EXISTS (
+            SELECT 1 FROM unnest(c."keywords") AS k WHERE k LIKE ${`${escaped}%`} OR k LIKE ${`% ${escaped}%`} OR (length(k) >= 3 AND ${` ${words} `} LIKE '% ' || k || '%')
+          ))
+        ORDER BY (lower(c."name") LIKE ${like}) DESC, c."position", c."name"
+        LIMIT 3`,
       this.prisma.$queryRaw<{ title: string }[]>`
         SELECT t."title" FROM (
           SELECT DISTINCT ON (lower(l."title")) l."title", word_similarity(${words}, lower(l."title")) AS score
@@ -369,7 +378,7 @@ export class ListingSearchService {
     ]);
     return {
       object: 'list' as const,
-      categories: categories.map(category => ({ slug: category.slug, name: category.name, parent: category.parent ? { slug: category.parent.slug, name: category.parent.name } : null })),
+      categories: categories.map(category => ({ slug: category.slug, name: category.name, parent: category.parent_slug ? { slug: category.parent_slug, name: category.parent_name! } : null })),
       queries: titles.map(row => row.title),
     };
   }

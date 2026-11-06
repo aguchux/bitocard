@@ -389,9 +389,10 @@ export class ShopAssistantTools {
     const rows = await this.prisma.classifiedCategory.findMany({
       where: { enabled: true, parentId: null, countries: { some: { country: scope.country, enabled: true } } },
       orderBy: { position: 'asc' },
-      include: { children: { where: { enabled: true, countries: { some: { country: scope.country, enabled: true } } }, orderBy: { position: 'asc' }, select: { slug: true, name: true } } },
+      include: { children: { where: { enabled: true, countries: { some: { country: scope.country, enabled: true } } }, orderBy: { position: 'asc' }, select: { slug: true, name: true, keywords: true } } },
     });
-    return { result: json(rows.map(row => ({ slug: row.slug, name: row.name, subcategories: row.children }))) };
+    // A few of each subcategory's search words, so a question about "plastic chairs" or "carpets" finds its place.
+    return { result: json(rows.map(row => ({ slug: row.slug, name: row.name, subcategories: row.children.map(child => ({ slug: child.slug, name: child.name, includes: child.keywords.slice(0, 8) })) }))) };
   }
 
   private async features(args: Record<string, unknown>): Promise<ToolOutcome> {

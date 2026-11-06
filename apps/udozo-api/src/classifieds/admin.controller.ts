@@ -189,6 +189,17 @@ class CategoriesDto {
   country: string;
 }
 
+/** Search words as stored: trimmed, lower case, single spaces, without LIKE's wildcards, each once, in the order given. */
+export function categoryKeywords(words: string[]) {
+  const seen = new Set<string>();
+  for (const word of words) {
+    // Matched with LIKE, so its wildcards are never kept.
+    const clean = word.replace(/[%_\\]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (clean.length >= 2) seen.add(clean);
+  }
+  return [...seen];
+}
+
 class CategoryDto {
   @IsOptional() @IsBoolean()
   enabled?: boolean;
@@ -196,6 +207,10 @@ class CategoryDto {
   /** Three capital letters starting the SKUs of its new listings; SKUs already given keep theirs. */
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, { message: 'A SKU prefix is three letters.' })
   sku_prefix?: string;
+
+  /** What people call the things sold here, matched as typed (at most 60, each 2 to 40 characters). */
+  @IsOptional() @IsArray() @ArrayMaxSize(60) @IsString({ each: true }) @Length(2, 40, { each: true })
+  keywords?: string[];
 }
 
 class CategoryCountryDto {
@@ -426,6 +441,7 @@ export class ClassifiedsAdminService {
       b2b: row.b2b,
       enabled: row.enabled,
       sku_prefix: row.skuPrefix,
+      keywords: row.keywords,
       open: row.countries[0]?.enabled ?? false,
       active_listings: live.get(row.id) ?? 0,
     });
@@ -443,10 +459,12 @@ export class ClassifiedsAdminService {
    * another SKU prefix: its new listings' SKUs start with it, those given keep theirs, and a prefix any category has had
    * stays that category's, so no other can take it and no SKU is ever given twice.
    */
-  async setCategory(actorId: string | null, id: string, input: { enabled?: boolean; sku_prefix?: string }) {
+  async setCategory(actorId: string | null, id: string, input: { enabled?: boolean; sku_prefix?: string; keywords?: string[] }) {
     const row = await this.prisma.classifiedCategory.findUnique({ where: { id } });
     if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such category.');
-    if (input.enabled === undefined && input.sku_prefix === undefined) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Say what to change.', 'enabled');
+    if (input.enabled === undefined && input.sku_prefix === undefined && input.keywords === undefined) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Say what to change.', 'enabled');
+    const keywords = input.keywords === undefined ? undefined : categoryKeywords(input.keywords);
+    const keywordsChanged = keywords !== undefined && keywords.join('\n') !== row.keywords.join('\n');
     const prefix = input.sku_prefix !== undefined && input.sku_prefix !== row.skuPrefix ? input.sku_prefix : undefined;
     if (prefix !== undefined) {
       if (!skuPrefixPattern.test(prefix)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A SKU prefix is three letters.', 'sku_prefix');
@@ -455,7 +473,7 @@ export class ClassifiedsAdminService {
     }
     const enabled = input.enabled ?? row.enabled;
     await this.prisma.$transaction(async tx => {
-      await tx.classifiedCategory.update({ where: { id }, data: { enabled, ...(prefix ? { skuPrefix: prefix } : {}) } });
+      await tx.classifiedCategory.update({ where: { id }, data: { enabled, ...(prefix ? { skuPrefix: prefix } : {}), ...(keywordsChanged ? { keywords } : {}) } });
       if (prefix) await tx.classifiedCategorySkuPrefix.upsert({ where: { prefix }, create: { prefix, categoryId: id }, update: {} });
     });
     await this.audit.record({
@@ -463,10 +481,10 @@ export class ClassifiedsAdminService {
       action: 'classifieds.category_changed',
       targetType: 'classified_category',
       targetId: id,
-      before: { enabled: row.enabled, ...(prefix ? { sku_prefix: row.skuPrefix } : {}) },
-      after: { enabled, ...(prefix ? { sku_prefix: prefix } : {}) },
+      before: { enabled: row.enabled, ...(prefix ? { sku_prefix: row.skuPrefix } : {}), ...(keywordsChanged ? { keywords: row.keywords } : {}) },
+      after: { enabled, ...(prefix ? { sku_prefix: prefix } : {}), ...(keywordsChanged ? { keywords } : {}) },
     });
-    return { object: 'classified_admin_category' as const, id, slug: row.slug, enabled, sku_prefix: prefix ?? row.skuPrefix };
+    return { object: 'classified_admin_category' as const, id, slug: row.slug, enabled, sku_prefix: prefix ?? row.skuPrefix, keywords: keywordsChanged ? keywords : row.keywords };
   }
 
   /** Opens or closes a category in one country (a top category closes all of its subcategories there). */

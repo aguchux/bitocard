@@ -65,6 +65,8 @@ export class ClassifiedReferenceService {
       name: category.name,
       icon: category.icon,
       b2b: category.b2b,
+      /** What people call the things sold here, for matching what they type. */
+      keywords: category.keywords,
       safety_checklist: category.safetyChecklist.length ? category.safetyChecklist : checklist,
       features: category.features
         .filter(link => link.feature.enabled)

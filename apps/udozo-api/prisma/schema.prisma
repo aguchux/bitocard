@@ -4357,6 +4357,8 @@ model ClassifiedCategory {
   skuPrefix       String                      @unique @map("sku_prefix") @db.Char(3)
   /// The number the next listing's SKU takes (claimed with an UPDATE … RETURNING, so two ads never share one).
   skuNext         Int                         @default(1) @map("sku_next")
+  /// What people call the things sold here ("plastic chair", "carpet"), matched as typed on Post an ad, in search suggestions and by the assistants.
+  keywords        String[]                    @default([])
   createdAt       DateTime                    @default(now()) @map("created_at")
   updatedAt       DateTime                    @updatedAt @map("updated_at")
   parent          ClassifiedCategory?         @relation("ClassifiedCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)

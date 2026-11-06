@@ -88,11 +88,46 @@ export type ShopCategory = {
   name: string;
   icon: string;
   b2b: boolean;
+  /** What people call the things sold here ("plastic chair", "carpet"), matched as typed. */
+  keywords?: string[];
   safety_checklist: string[];
   /** The keys the category suggests, in order; `filter` marks those buyers filter by. */
   features: Array<ShopFeature & { filter: boolean }>;
 };
 export type ShopTopCategory = ShopCategory & { children: ShopCategory[] };
+
+/**
+ * How well what someone typed fits a subcategory, 0 for not at all: its name (or its top category's) holding the words
+ * is best, then a search word starting with them or one of its words doing so ("carp" is "carpet"), then the words
+ * holding a whole search word ("plastic chairs for events" holds "plastic chair"), then every word found somewhere.
+ */
+export function categoryMatch(category: Pick<ShopCategory, 'name' | 'keywords'>, parentName: string, typed: string): number {
+  const words = typed.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (words.length < 2) return 0;
+  const name = `${category.name} ${parentName}`.toLowerCase();
+  if (name.includes(words)) return 4;
+  const keywords = (category.keywords ?? []).map(word => word.toLowerCase());
+  if (keywords.some(word => word.startsWith(words) || word.includes(` ${words}`))) return 3;
+  const padded = ` ${words} `;
+  if (keywords.some(word => word.length >= 3 && padded.includes(` ${word}`))) return 2;
+  const haystack = `${name} ${keywords.join(' ')}`;
+  const parts = words.split(' ').filter(part => part.length >= 2);
+  return parts.length > 1 && parts.every(part => haystack.includes(part)) ? 1 : 0;
+}
+
+/** The subcategories that fit what was typed, best first, keeping the menu's order among equals. */
+export function matchCategories<T extends ShopTopCategory>(categories: T[], typed: string, limit = 20): Array<{ parent: T; child: T['children'][number] }> {
+  const found: Array<{ parent: T; child: T['children'][number]; score: number; order: number }> = [];
+  let order = 0;
+  for (const parent of categories) {
+    for (const child of parent.children) {
+      const score = categoryMatch(child, parent.name, typed);
+      if (score) found.push({ parent, child, score, order });
+      order += 1;
+    }
+  }
+  return found.sort((a, b) => b.score - a.score || a.order - b.order).slice(0, limit).map(({ parent, child }) => ({ parent, child }));
+}
 
 /** A country's category for bitocard.com's Shop band: its live listings and a random live listing's cover photo. */
 export type ShopCategoryCover = {
