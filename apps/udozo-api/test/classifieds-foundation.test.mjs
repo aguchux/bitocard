@@ -75,7 +75,7 @@ describe('categories', () => {
     const categories = await prisma.classifiedCategory.findMany({ include: { features: { include: { feature: true } }, countries: true } });
     const top = categories.filter(c => !c.parentId);
     const subs = categories.filter(c => c.parentId);
-    assert.equal(top.length, 15);
+    assert.equal(top.length, 16);
     assert.ok(subs.length >= 50);
     const ids = new Map(categories.map(c => [c.id, c]));
     for (const sub of subs) {
@@ -106,7 +106,7 @@ describe('categories', () => {
       ['home-garden', 'Home and living'], ['fashion', 'Fashion'], ['health-beauty', 'Beauty and personal care'],
       ['medical-equipment', 'Hospital and medical equipment'], ['babies-kids', 'Kids and baby'],
       ['sports-leisure', 'Sports and hobbies'], ['animals-pets', 'Pets'], ['agriculture-food', 'Farm and food'], ['repair-construction', 'Building and tools'],
-      ['business-industrial', 'Wholesale and business'], ['services', 'Services'],
+      ['business-industrial', 'Wholesale and business'], ['services', 'Services'], ['everything-else', 'Everything else'],
     ]);
     for (const c of categories) assert.match(c.icon, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${c.slug} has a lucide icon name`);
     const bySlug = new Map(categories.map(c => [c.slug, c]));

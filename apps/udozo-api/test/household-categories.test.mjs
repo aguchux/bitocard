@@ -143,3 +143,27 @@ describe('search words', () => {
     assert.equal((await support.patch(`/v1/admin/classifieds/categories/${furniture.id}`, { keywords: ['sofa'] })).status, 403);
   });
 });
+
+describe('somewhere for what fits no category', () => {
+  test('Other services last under Services, as Jiji has it, and Everything else last of all with Other items', async () => {
+    const services = await prisma.classifiedCategory.findMany({ where: { parent: { slug: 'services' } }, orderBy: { position: 'asc' } });
+    assert.deepEqual([services.at(-1).slug, services.at(-1).name], ['other-services', 'Other services']);
+    const tops = await prisma.classifiedCategory.findMany({ where: { parentId: null }, orderBy: { position: 'asc' }, include: { children: true, countries: true } });
+    const last = tops.at(-1);
+    assert.deepEqual([last.slug, last.name, last.b2b], ['everything-else', 'Everything else', false]);
+    assert.deepEqual(last.children.map(c => [c.slug, c.name]), [['other-items', 'Other items']]);
+    assert.ok(last.safetyChecklist.length >= 3, 'with the general checks');
+    const servicesTop = tops.find(top => top.slug === 'services');
+    assert.deepEqual(last.countries.map(c => `${c.country}:${c.enabled}`).sort(), servicesTop.countries.map(c => `${c.country}:${c.enabled}`).sort(), 'open where Services is');
+    const tree = (await visitor.get('/v1/classifieds/categories?country=NG')).json.data;
+    assert.equal(tree.at(-1).slug, 'everything-else', 'last in the menu');
+  });
+
+  test('found by what people call such things', async () => {
+    const suggest = async q => (await visitor.get(`/v1/classifieds/search/suggest?country=NG&q=${encodeURIComponent(q)}`)).json.categories.map(row => row.slug);
+    assert.ok((await suggest('house sitting')).includes('other-services'));
+    assert.ok((await suggest('borehole drilling')).includes('other-services'));
+    assert.ok((await suggest('miscellaneous')).includes('other-items'));
+    assert.ok((await suggest('antique')).includes('other-items'));
+  });
+});

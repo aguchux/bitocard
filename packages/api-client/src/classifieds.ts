@@ -115,6 +115,20 @@ export function categoryMatch(category: Pick<ShopCategory, 'name' | 'keywords'>,
   return parts.length > 1 && parts.every(part => haystack.includes(part)) ? 1 : 0;
 }
 
+/** Where what fits no category goes: goods under Everything else, and Services' last place. */
+export const catchAllCategories = ['other-items', 'other-services'] as const;
+
+/** The catch-all subcategories open in the market, goods first, for when nothing typed finds a category. */
+export function catchAllsOf<T extends ShopTopCategory>(categories: T[]): Array<{ parent: T; child: T['children'][number] }> {
+  return catchAllCategories.flatMap(slug => {
+    for (const parent of categories) {
+      const child = parent.children.find(candidate => candidate.slug === slug);
+      if (child) return [{ parent, child }];
+    }
+    return [];
+  });
+}
+
 /** The subcategories that fit what was typed, best first, keeping the menu's order among equals. */
 export function matchCategories<T extends ShopTopCategory>(categories: T[], typed: string, limit = 20): Array<{ parent: T; child: T['children'][number] }> {
   const found: Array<{ parent: T; child: T['children'][number]; score: number; order: number }> = [];

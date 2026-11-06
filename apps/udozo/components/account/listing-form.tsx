@@ -25,6 +25,7 @@ import {
   type ShopResaleAvailability,
   type ShopState,
   type ShopTopCategory,
+  catchAllsOf,
   matchCategories,
 } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
@@ -1056,6 +1057,8 @@ function CategoryPicker({ categories, value, invalid, onChange }: { categories: 
   const words = q.trim().toLowerCase();
   // Names and search words alike, best first: "carpet", "plastic chairs" or "cups" each find their place.
   const matches = words ? matchCategories(categories, words) : [];
+  // What fits no category still has a place: Other items, or Other services.
+  const catchAlls = catchAllsOf(categories);
   if (!open && value) {
     return (
       <div className="grid gap-1.5">
@@ -1124,7 +1127,27 @@ function CategoryPicker({ categories, value, invalid, onChange }: { categories: 
                 ) : null}
               </li>
             ))}
-        {words && !matches.length ? <li className="px-2 py-3 text-sm text-slate-600">No category matches “{q}”.</li> : null}
+        {words && !matches.length ? (
+          <li className="grid gap-1 px-2 py-3 text-sm text-slate-600">
+            <span>No category matches “{q}”.{catchAlls.length ? " If nothing else fits, post it under:" : ""}</span>
+            {catchAlls.map(({ parent, child }) => (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => {
+                  onChange(child);
+                  setOpen(false);
+                }}
+                className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-left text-sm text-navy-900 hover:bg-slate-50"
+              >
+                <ShopIcon name={child.icon} className="size-4 text-slate-500" />
+                <span>
+                  {child.name} <span className="text-slate-500">in {parent.name}</span>
+                </span>
+              </button>
+            ))}
+          </li>
+        ) : null}
       </ul>
     </div>
   );
