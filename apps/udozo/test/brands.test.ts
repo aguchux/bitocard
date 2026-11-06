@@ -145,12 +145,18 @@ describe("the brand filter", () => {
 });
 
 describe("the bundled logos", () => {
-  it("are exactly the brands listed for them, each a plain coloured mark", () => {
-    const map = JSON.parse(readFileSync(join(process.cwd(), "scripts/brand-logos.json"), "utf8")) as Record<string, { icon: string; hex: string }>;
+  it("are exactly the brands listed for them, each a plain coloured mark (or a brand's own, embedded as a picture)", () => {
+    const map = JSON.parse(readFileSync(join(process.cwd(), "scripts/brand-logos.json"), "utf8")) as Record<string, { icon?: string; hex: string; own?: boolean }>;
     const files = readdirSync(join(process.cwd(), "public/brand-logos"));
     expect(files.sort()).toEqual(Object.keys(map).map(slug => `${slug}.svg`).sort());
     for (const file of files) {
       const svg = readFileSync(join(process.cwd(), "public/brand-logos", file), "utf8");
+      // A brand's own mark (`own`) is its picture inside an SVG: never a script, handler or outside address.
+      if (map[file.replace(/\.svg$/, "")]?.own) {
+        expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+        expect(svg).not.toMatch(/<script|on[a-z]+=|href="(?!data:image\/(png|jpeg);base64,)/i);
+        continue;
+      }
       expect(svg).toMatch(/^<svg fill="#[0-9A-F]{6}" /);
       expect(svg).not.toMatch(/<script|on[a-z]+=|href=/i);
     }

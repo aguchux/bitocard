@@ -1,4 +1,4 @@
-import { categoryPath, listingPath, placePath, sellerPath, sellerSlug, type ShopSitemap, type ShopSitemapListings } from "@bitocard/api-client/classifieds";
+import { brandPath, categoryPath, listingPath, placePath, sellerPath, sellerSlug, type ShopSitemap, type ShopSitemapListings } from "@bitocard/api-client/classifieds";
 import type { ResaleStoreSitemap } from "@bitocard/api-client/storefront";
 import { legalDocuments } from "./legal";
 import { resaleListingPath } from "./resale-links";
@@ -34,7 +34,7 @@ export function sitemapIndex(locations: Array<string | SitemapEntry>) {
 /**
  * A country's pages: its home, every category open there (an empty one is still an indexed page), every state, area
  * and category in a place with enough listings to be indexed (thinner ones are `noindex`, so a sitemap never names them),
- * and the seller pages of its sellers with something for sale.
+ * the seller pages of its sellers with something for sale, and the brand pages of brands with enough for sale.
  * Its listings are separate (`listingEntries`), and past one file's limit `countryFiles` makes as many as both need.
  */
 export function countryEntries(origin: string, cc: string, sitemap: ShopSitemap) {
@@ -45,6 +45,8 @@ export function countryEntries(origin: string, cc: string, sitemap: ShopSitemap)
   for (const place of sitemap.category_places) if (place.listings >= indexFrom) entries.push({ loc: at(placePath(cc, place)), lastmod: place.updated_at });
   // Seller pages (at their username once they chose one) are indexed while they have something for sale (`noindex` otherwise), dated by their newest listing change.
   for (const seller of sitemap.sellers ?? []) if (seller.listings > 0) entries.push({ loc: at(sellerPath(cc, sellerSlug(seller))), lastmod: seller.updated_at });
+  // Brand pages are indexed once they have as many for sale as a location page needs (`noindex` below it).
+  for (const brand of sitemap.brands ?? []) if (brand.listings >= indexFrom) entries.push({ loc: at(brandPath(cc, brand.slug)), lastmod: brand.updated_at });
   return entries;
 }
 

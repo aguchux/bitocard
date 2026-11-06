@@ -5,6 +5,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
+import { ClassifiedBrandsService } from './brands.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { onShopWhere } from './rules.js';
 import { ListingSearchService, soldVisibleMs } from './search.service.js';
@@ -41,6 +42,7 @@ export class ShopDirectoryService {
     private readonly listings: ListingsService,
     private readonly search: ListingSearchService,
     private readonly watermarks: WatermarkService,
+    private readonly brands: ClassifiedBrandsService,
   ) {}
 
   /**
@@ -214,7 +216,7 @@ export class ShopDirectoryService {
   async sitemap(country: string) {
     const code = country.toUpperCase();
     await this.listings.requireOpen(code);
-    const [categories, groups, areas, pages, sellers] = await Promise.all([
+    const [categories, groups, areas, pages, sellers, brands] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { enabled: true, countries: { some: { country: code, enabled: true } } }, select: { id: true, slug: true, parentId: true } }),
       this.prisma.classifiedListing.groupBy({ by: ['categoryId', 'stateId', 'areaId', 'delivery'], where: { country: code, ...onShopWhere }, _count: { _all: true }, _max: { updatedAt: true } }),
       this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true, parentId: true } }),
@@ -236,6 +238,7 @@ export class ShopDirectoryService {
         WHERE l."country" = ${code} AND l."status" = 'active' AND l."on_shop" AND c."status" = 'active' AND c."country" = ${code}
         GROUP BY c."seller_handle", c."username"
         ORDER BY 1`,
+      this.brands.liveBySlug(code),
     ]);
     const categoryOf = new Map(categories.map(category => [category.id, category]));
     const areaOf = new Map(areas.map(area => [area.id, area]));
@@ -285,6 +288,8 @@ export class ShopDirectoryService {
       category_places: places.filter(place => place.category && place.listings >= sitemapPlaceFrom && (place.area || !areaNames.has(`${place.state}/${place.category}`))).sort(byPlace),
       listing_pages: listingPages(pages),
       sellers: sellers.map(row => ({ handle: row.handle, username: row.username, listings: Number(row.listings), updated_at: row.updated_at.toISOString() })),
+      /** Brand pages (`/<cc>/brand/<slug>`) of registry brands with live listings here, with that count and their newest listing change. */
+      brands: [...brands].map(([slug, seen]) => ({ slug, listings: seen.listings, updated_at: seen.updated.toISOString() })).sort((a, b) => a.slug.localeCompare(b.slug)),
     };
   }
 

@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { BadgeCheck, ChevronRight, MapPin, ShieldCheck, Star } from "lucide-react";
 import {
   brandFeatureKey,
+  brandPath,
   badgeLabels,
   categoryPath,
   conditionLabels,
@@ -199,7 +200,15 @@ export default async function ListingPage({ params }: Props) {
                     )}
                     <span className="grid min-w-0">
                       <dt className="truncate text-xs text-navy-600">{feature.name}</dt>
-                      <dd className="truncate text-sm font-bold">{featureValueText(feature)}</dd>
+                      <dd className="truncate text-sm font-bold">
+                        {feature.key === brandFeatureKey && listing.brand ? (
+                          <Link href={brandPath(cc, listing.brand.slug)} className="hover:underline">
+                            {featureValueText(feature)}
+                          </Link>
+                        ) : (
+                          featureValueText(feature)
+                        )}
+                      </dd>
                     </span>
                   </div>
                 ))}

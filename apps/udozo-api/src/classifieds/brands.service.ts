@@ -20,6 +20,14 @@ const conflict = (code: string, message: string, param?: string) => new ApiError
 export const brandKeySql = (column: Prisma.Sql) =>
   Prisma.sql`regexp_replace(translate(lower(${column}), 'àáâäãåçèéêëìíîïñòóôöõùúûüýÿšžčćœ', 'aaaaaaceeeeiiiinooooouuuuyyszcco'), '[^a-z0-9]', '', 'g')`;
 
+/**
+ * A listing (aliased `l`) whose brand feature is one of these keys: the brand's own name or any of its words, so a
+ * listing saved before the registry knew a spelling still counts.
+ */
+export const brandListingSql = (keys: string[]) =>
+  Prisma.sql`EXISTS (SELECT 1 FROM "classified_listing_features" blf JOIN "classified_features" bf ON bf."id" = blf."feature_id" AND bf."key" = ${brandFeatureKey}
+    WHERE blf."listing_id" = l."id" AND blf."value_text" IS NOT NULL AND ${brandKeySql(Prisma.sql`blf."value_text"`)} = ANY(${keys}::text[]))`;
+
 /** A seller's new brands are noted at most this many times a day (the rest are still saved, just not counted). */
 export const brandSuggestionsPerDay = 20;
 /** How long each instance keeps its copy of the registry (admins' changes clear it at once on their instance). */
@@ -151,6 +159,32 @@ export class ClassifiedBrandsService {
   async card(id: string) {
     const row = (await this.registry()).byId.get(id);
     return row ? this.present(row) : null;
+  }
+
+  /** An enabled brand by its address (`/<cc>/brand/<slug>`), with every key its listings may be saved under; null when there is none or it is off. */
+  async bySlug(slug: string) {
+    const row = (await this.registry()).rows.find(brand => brand.slug === slug);
+    return row ? { row, keys: [...new Set([row.nameKey, ...row.matchKeys])], card: this.present(row) } : null;
+  }
+
+  /** Live listings and their newest change per enabled brand in a country, by the brand's slug (its sitemap entries). */
+  async liveBySlug(country: string) {
+    const rows = await this.prisma.$queryRaw<{ value: string; n: number; updated_at: Date }[]>`
+      SELECT lf."value_text" AS "value", count(*)::int AS "n", max(l."updated_at") AS "updated_at"
+      FROM "classified_listing_features" lf
+      JOIN "classified_features" f ON f."id" = lf."feature_id" AND f."key" = ${brandFeatureKey}
+      JOIN "classified_listings" l ON l."id" = lf."listing_id"
+      WHERE l."country" = ${country} AND l."status" = 'active' AND l."on_shop" = true AND lf."value_text" IS NOT NULL
+      GROUP BY lf."value_text"`;
+    const { byKey } = await this.registry();
+    const found = new Map<string, { listings: number; updated: Date }>();
+    for (const row of rows) {
+      const brand = byKey.get(brandKey(row.value));
+      if (!brand) continue;
+      const seen = found.get(brand.slug);
+      found.set(brand.slug, { listings: (seen?.listings ?? 0) + row.n, updated: seen && seen.updated > row.updated_at ? seen.updated : row.updated_at });
+    }
+    return found;
   }
 
   /** The brands these categories sell. */

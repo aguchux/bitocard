@@ -76,6 +76,10 @@ class SearchDto extends CountryDto {
   @IsOptional() @Matches(sellerKeyPattern)
   seller?: string;
 
+  /** One brand's listings (the slug of its page, `/<cc>/brand/<slug>`), under any of its words. */
+  @IsOptional() @Matches(slug) @MaxLength(80)
+  brand?: string;
+
   @IsOptional() @IsIn(searchSorts)
   sort?: SearchSort;
 

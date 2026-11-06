@@ -5,7 +5,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
-import { ClassifiedBrandsService } from './brands.service.js';
+import { brandListingSql, ClassifiedBrandsService } from './brands.service.js';
 import { brandFeatureKey, conditions, featureValueOut, heldUnits, invalid, onShopWhere, readSku } from './rules.js';
 import { ReviewStatsService } from './reviews/stats.service.js';
 
@@ -34,6 +34,8 @@ export type SearchInput = {
   f?: string[];
   /** One seller's listings only (their username or handle, as on their seller page). */
   seller?: string;
+  /** One brand's listings only (its slug, as on its brand page), under any of the registry's words for it. */
+  brand?: string;
   sort?: SearchSort;
   offset?: number;
   limit?: number;
@@ -152,9 +154,12 @@ export class ListingSearchService {
       input.seller ? this.prisma.customer.findFirst({ where: { OR: [{ username: input.seller.toLowerCase() }, { sellerHandle: input.seller.toLowerCase() }] }, select: { id: true, status: true } }) : null,
     ]);
     if (input.seller && (!seller || seller.status !== 'active')) throw invalid('parameter_invalid', 'No such seller.', 'seller');
+    const brand = input.brand ? await this.brands.bySlug(input.brand) : null;
+    if (input.brand && !brand) throw invalid('parameter_invalid', 'No such brand.', 'brand');
 
     const where: Prisma.Sql[] = [Prisma.sql`l."country" = ${country}`, Prisma.sql`l."status" = 'active'`, Prisma.sql`l."on_shop"`];
     if (seller) where.push(Prisma.sql`l."customer_id" = ${seller.id}::uuid`);
+    if (brand) where.push(brandListingSql(brand.keys));
     if (categoryIds) where.push(Prisma.sql`l."category_id" IN (${Prisma.join(categoryIds.map(id => Prisma.sql`${id}::uuid`))})`);
     if (input.price_min !== undefined) where.push(Prisma.sql`l."price_minor" >= ${BigInt(input.price_min)}`);
     if (input.price_max !== undefined) where.push(Prisma.sql`l."price_minor" <= ${BigInt(input.price_max)}`);

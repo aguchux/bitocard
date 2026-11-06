@@ -52,6 +52,23 @@ export const modelFeatureKey = 'model';
 /** A brand in Udozo's registry; `listings` (live ones in the country asked for) only when a country was given. */
 export type ShopBrand = { object: 'classified_brand'; slug: string; name: string; logo_url: string | null; color: string | null; listings?: number };
 
+/**
+ * A brand's public page in a market (Udozo, `/<cc>/brand/<slug>`): the registry's brand with what is for sale under it
+ * there. `categories` are where its live listings are, or the categories it sells in while it has none (each 0). Its
+ * listings come from the search with `brand=<slug>`.
+ */
+export type ShopBrandPage = Omit<ShopBrand, 'object' | 'listings'> & {
+  object: 'classified_brand_page';
+  country: string;
+  url: string;
+  listings: number;
+  sellers: number;
+  updated_at: string | null;
+  categories: Array<{ slug: string; name: string; icon: string; parent: { slug: string; name: string } | null; listings: number }>;
+  models: Array<{ name: string; listings: number }>;
+  states: Array<{ slug: string; name: string; listings: number }>;
+};
+
 /** A brand's model in a category; `brand` when searched across brands, `listings` when a country was given. */
 export type ShopModel = { object: 'classified_model'; name: string; brand?: ShopBrand; listings?: number };
 
@@ -276,6 +293,8 @@ export type ShopSitemap = {
   listing_pages: Array<{ after: number; listings: number; updated_at: string }>;
   /** Udozo: sellers of this market with a live listing here (their page is indexed only then), with that count and their newest listing change. */
   sellers?: Array<{ handle: string; username?: string | null; listings: number; updated_at: string }>;
+  /** Udozo: registry brands with live listings here (their brand pages), with that count and their newest listing change. */
+  brands?: Array<{ slug: string; listings: number; updated_at: string }>;
 };
 
 /** One file of a country's listings, each with its title and up to five photos (for the image sitemap). */
@@ -781,6 +800,11 @@ export const sellerSlug = (seller: { handle?: string | null; username?: string |
 
 export function sellerPath(country: string, handle: string) {
   return `/${country.toLowerCase()}/seller/${handle}`;
+}
+
+/** A brand's public page (Udozo): `/ng/brand/hp`. */
+export function brandPath(country: string, slug: string) {
+  return `/${country.toLowerCase()}/brand/${slug}`;
 }
 
 export function categoryPath(country: string, slug: string) {

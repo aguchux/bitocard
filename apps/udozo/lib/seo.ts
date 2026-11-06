@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { conditionLabels, listingPath, sellerSlug, type ShopListingCard, type ShopListingPage, type ShopMarket, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
+import { conditionLabels, listingPath, sellerSlug, type ShopBrandPage, type ShopListingCard, type ShopListingPage, type ShopMarket, type ShopSellerProfile } from "@bitocard/api-client/classifieds";
 import type { FaqGroup } from "./help";
 import { supportEmail, supportPhone } from "./help";
 
@@ -150,6 +150,21 @@ export function sellerJsonLd(profile: ShopSellerProfile, url: string, card: stri
       image: profile.avatar_url?.startsWith("https://") ? profile.avatar_url : card,
       ...(profile.active_listings > 0 ? { agentInteractionStatistic: { "@type": "InteractionCounter", interactionType: "https://schema.org/WriteAction", userInteractionCount: profile.active_listings } } : {}),
     },
+  };
+}
+
+/**
+ * A brand page's JSON-LD: a CollectionPage about the brand (its name, and its logo when it is on https), with how many
+ * of its listings are for sale. Never an Organization: the page is Udozo's, not the brand's.
+ */
+export function brandJsonLd(brand: ShopBrandPage, marketName: string, url: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    url,
+    name: `${brand.name} for sale in ${marketName}`,
+    about: { "@type": "Brand", "@id": `${url}#brand`, name: brand.name, ...(brand.logo_url?.startsWith("https://") ? { logo: brand.logo_url } : {}) },
+    ...(brand.listings > 0 ? { mainEntity: { "@type": "ItemList", numberOfItems: brand.listings } } : {}),
   };
 }
 
