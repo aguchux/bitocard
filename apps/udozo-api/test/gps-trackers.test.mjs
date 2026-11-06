@@ -68,5 +68,10 @@ describe('GPS trackers', () => {
     assert.ok(['G900LM', 'TK100', 'C32Plus', 'G08L tail light tracker', 'NB20 pet tracker'].every(name => models.includes(name)), JSON.stringify(models));
     const found = (await visitor.get('/v1/classifieds/models?category=gps-trackers&brand=cantrack&q=gt06&country=NG')).json.data.map(m => m.name);
     assert.ok(found.includes('TK100'), 'GT06 is TK100');
+    // Every model on its site, the asset and OBD trackers included.
+    assert.equal(models.filter(Boolean).length, 38);
+    assert.ok(['G200L magnetic tracker', 'GF20 mini magnetic tracker', 'TK200AM disposable tracker', 'G500L OBD tracker', 'G183 OBD tracker', 'G03'].every(name => models.includes(name)), JSON.stringify(models));
+    const obd = (await visitor.get('/v1/classifieds/models?category=gps-trackers&brand=cantrack&q=g500l&country=NG')).json.data.map(m => m.name);
+    assert.ok(obd.includes('G500L OBD tracker'), 'found by its code alone');
   });
 });
