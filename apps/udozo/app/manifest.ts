@@ -17,7 +17,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     dir: "ltr",
     categories: ["shopping"],
     shortcuts: [
-      { name: "Sell something", short_name: "Sell", url: "/sell", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Sell something", short_name: "Sell", url: "/sell?from=pwa", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
       { name: "Messages", url: "/account/messages", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
       { name: "My listings", short_name: "Listings", url: "/account/listings", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
     ],

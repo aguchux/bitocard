@@ -2783,6 +2783,7 @@ model Customer {
   classifiedCallsTaken      ClassifiedCall[]           @relation("ClassifiedCallsTaken")
   presence                  CustomerPresence?
   contactMessages           ContactMessage[]
+  postingJourneys           PostingJourney[]
 
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
@@ -4726,6 +4727,12 @@ model ClassifiedListing {
   reviewReason String?                    @map("review_reason")
   /// Every reason it was sent to review: first_listings, prohibited_words, price_low, photo_reused, posting_fast, reported.
   reviewFlags  String[]                   @default([]) @map("review_flags")
+  /// Udozo: the moderator's reason as a code (photos, wrong_category, prohibited_item, misleading, contact_details,
+  /// duplicate, other) when they sent it back or removed it; `reviewReason` holds what the seller reads.
+  reviewReasonCode String?                @map("review_reason_code") @db.VarChar(20)
+  /// When a moderator last decided it (approved, sent back or removed), and who (an admin's id; admins are never deleted).
+  reviewedAt   DateTime?                  @map("reviewed_at")
+  reviewedById String?                    @map("reviewed_by_id") @db.Uuid
   submittedAt  DateTime?                  @map("submitted_at")
   publishedAt  DateTime?                  @map("published_at")
   expiresAt    DateTime?                  @map("expires_at")
@@ -4782,6 +4789,7 @@ model ClassifiedListing {
   @@index([categoryId, status])
   @@index([country, status, publishedAt])
   @@index([status, expiresAt])
+  @@index([status, reviewedAt])
   @@map("classified_listings")
 }
 
@@ -6598,4 +6606,168 @@ model SignupBlockerDay {
 
   @@id([surface, day, step, code, country])
   @@map("signup_blocker_days")
+}
+
+/// Udozo: one ad's way from the seller pressing Sell to the ad live and its first results (a view, a chat or call, a
+/// lead, sold), so admins can see where sellers get stuck posting (Reports > Posting journeys). A journey starts before
+/// its listing exists and is tied to it once the draft is made (`listing_id`, no foreign key: a deleted draft leaves
+/// the journey, marked abandoned). One open journey per seller not yet tied to a listing (a partial unique index).
+/// Deleted 30 days after the last step of one that never went live, or 90 days after it went live (30 after it sold,
+/// if sooner), once rolled into daily counts (the daily `marketing` job).
+model PostingJourney {
+  id             String                @id @default(uuid()) @db.Uuid
+  customerId     String                @map("customer_id") @db.Uuid
+  listingId      String?               @unique @map("listing_id") @db.Uuid
+  /// The listing's number and SKU, kept once tied, for the report after a draft is deleted.
+  listingRef     BigInt?               @map("listing_ref")
+  sku            String?               @db.VarChar(16)
+  /// Where Sell was pressed: header, header_phone, my_listings, empty_state, start_here, invite, pwa, reseller,
+  /// username, direct; api for a draft made without Sell, resumed for one reopened from before.
+  source         String                @default("unknown") @db.VarChar(20)
+  country        String?               @db.Char(2)
+  categoryId     String?               @map("category_id") @db.Uuid
+  topCategoryId  String?               @map("top_category_id") @db.Uuid
+  /// "Chrome on Android", from the first step.
+  device         String?               @db.VarChar(60)
+  /// composing, in_review, sent_back, live, abandoned or removed.
+  stage          String                @default("composing") @db.VarChar(12)
+  /// The furthest step of Post an ad's wizard reached (0 basics to 5 post), or -1.
+  furthestStep   Int                   @default(-1) @map("furthest_step") @db.SmallInt
+  openedAt       DateTime?             @map("opened_at")
+  draftAt        DateTime?             @map("draft_at")
+  firstPhotoAt   DateTime?             @map("first_photo_at")
+  submittedAt    DateTime?             @map("submitted_at")
+  reviewQueuedAt DateTime?             @map("review_queued_at")
+  reviewedAt     DateTime?             @map("reviewed_at")
+  sentBackAt     DateTime?             @map("sent_back_at")
+  resubmittedAt  DateTime?             @map("resubmitted_at")
+  liveAt         DateTime?             @map("live_at")
+  /// direct (live at once) or review (after a moderator).
+  liveVia        String?               @map("live_via") @db.VarChar(10)
+  firstViewAt    DateTime?             @map("first_view_at")
+  firstChatAt    DateTime?             @map("first_chat_at")
+  firstCallAt    DateTime?             @map("first_call_at")
+  firstLeadAt    DateTime?             @map("first_lead_at")
+  soldAt         DateTime?             @map("sold_at")
+  endedAt        DateTime?             @map("ended_at")
+  /// never_drafted, draft_deleted, deleted or removed.
+  endedReason    String?               @map("ended_reason") @db.VarChar(20)
+  /// Why it was sent to a moderator, as first queued (approving clears the listing's own).
+  reviewFlags    String[]              @default([]) @map("review_flags")
+  reviews        Int                   @default(0)
+  sentBackCount  Int                   @default(0) @map("sent_back_count")
+  submitAttempts Int                   @default(0) @map("submit_attempts")
+  refusals       Int                   @default(0)
+  eventCount     Int                   @default(0) @map("event_count")
+  lastErrorStep  String?               @map("last_error_step") @db.VarChar(30)
+  lastErrorCode  String?               @map("last_error_code") @db.VarChar(60)
+  lastRejectCode String?               @map("last_reject_code") @db.VarChar(20)
+  startedAt      DateTime              @default(now()) @map("started_at")
+  lastEventAt    DateTime              @default(now()) @map("last_event_at")
+  customer       Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  events         PostingJourneyEvent[]
+
+  @@index([startedAt])
+  @@index([lastEventAt])
+  @@index([stage, lastEventAt])
+  @@index([customerId, lastEventAt])
+  @@index([country, startedAt])
+  @@map("posting_journeys")
+}
+
+/// One step of a posting journey: from the API (a route asked), the wizard on udozo.com (a step reached or refused,
+/// never what was typed) or the system (a review, a first result).
+model PostingJourneyEvent {
+  id        String         @id @default(uuid()) @db.Uuid
+  journeyId String         @map("journey_id") @db.Uuid
+  /// api, client or system.
+  origin    String         @db.VarChar(6)
+  step      String         @db.VarChar(30)
+  /// ok or refused.
+  outcome   String         @db.VarChar(10)
+  code      String?        @db.VarChar(60)
+  param     String?        @db.VarChar(40)
+  device    String?        @db.VarChar(60)
+  createdAt DateTime       @default(now()) @map("created_at")
+  journey   PostingJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@index([journeyId, createdAt])
+  @@map("posting_journey_events")
+}
+
+/// Udozo: how many times Post an ad (or sign-in on the way to it) was opened a day, by where Sell was pressed. Counted only.
+model PostingVisitDay {
+  day      DateTime @db.Date
+  source   String   @db.VarChar(20)
+  signedIn Boolean  @map("signed_in")
+  visits   Int      @default(0)
+
+  @@id([day, source, signedIn])
+  @@map("posting_visit_days")
+}
+
+/// Udozo: posting journeys counted by the day they started, once deleted (`purge` rolls each in first). Nobody's details.
+model PostingFunnelDay {
+  day                   DateTime @db.Date
+  country               String   @default("") @db.VarChar(2)
+  source                String   @db.VarChar(20)
+  /// The top category's id, or "".
+  topCategoryId         String   @default("") @map("top_category_id") @db.VarChar(36)
+  started               Int      @default(0)
+  opened                Int      @default(0)
+  draft                 Int      @default(0)
+  stepMedia             Int      @default(0) @map("step_media")
+  stepDetails           Int      @default(0) @map("step_details")
+  stepWhere             Int      @default(0) @map("step_where")
+  stepPlace             Int      @default(0) @map("step_place")
+  stepPost              Int      @default(0) @map("step_post")
+  submitted             Int      @default(0)
+  reviewQueued          Int      @default(0) @map("review_queued")
+  sentBack              Int      @default(0) @map("sent_back")
+  live                  Int      @default(0)
+  liveDirect            Int      @default(0) @map("live_direct")
+  liveAfterReview       Int      @default(0) @map("live_after_review")
+  firstView             Int      @default(0) @map("first_view")
+  firstContact          Int      @default(0) @map("first_contact")
+  firstLead             Int      @default(0) @map("first_lead")
+  sold                  Int      @default(0)
+  abandoned             Int      @default(0)
+  removed               Int      @default(0)
+  /// Summed minutes, for averages: start to submitted, start to live, live to first contact.
+  minutesToSubmit       BigInt   @default(0) @map("minutes_to_submit")
+  minutesToLive         BigInt   @default(0) @map("minutes_to_live")
+  minutesToFirstContact BigInt   @default(0) @map("minutes_to_first_contact")
+
+  @@id([day, country, source, topCategoryId])
+  @@map("posting_funnel_days")
+}
+
+/// Udozo: refused posting steps counted by day, where (api or client), step, code and field, once the journeys are deleted.
+model PostingBlockerDay {
+  day      DateTime @db.Date
+  origin   String   @db.VarChar(6)
+  step     String   @db.VarChar(30)
+  code     String   @db.VarChar(60)
+  param    String   @default("") @db.VarChar(40)
+  country  String   @default("") @db.VarChar(2)
+  refusals Int      @default(0)
+  journeys Int      @default(0)
+
+  @@id([day, origin, step, code, param, country])
+  @@map("posting_blocker_days")
+}
+
+/// Udozo: moderators' work counted by day: why ads were sent to review (`flag`), why they were sent back or removed
+/// (`reason`) and how reviews ended (`outcome`: approved, sent_back, removed, with the minutes from queued to decided),
+/// once the journeys are deleted.
+model PostingReviewDay {
+  day     DateTime @db.Date
+  country String   @default("") @db.VarChar(2)
+  kind    String   @db.VarChar(10)
+  value   String   @db.VarChar(30)
+  count   Int      @default(0)
+  minutes BigInt   @default(0)
+
+  @@id([day, country, kind, value])
+  @@map("posting_review_days")
 }

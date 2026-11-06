@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
 import { ListingForm } from "@/components/account/listing-form";
+import { SellVisit } from "@/components/account/sell-visit";
 import { requireSeller, sellerAssistant, sellReference, resaleAvailability } from "@/lib/account";
+import { cleanSellSource, sellHref } from "@/lib/sell-sources";
 
 export const metadata: Metadata = { title: "Post an ad" };
 
-/** Post an ad: nothing is made until the seller's first change, then the draft carries on at `/account/listings/<id>`. */
-export default async function PostAd() {
-  const { customer, market } = await requireSeller("/sell");
+/**
+ * Post an ad: nothing is made until the seller's first change, then the draft carries on at `/account/listings/<id>`.
+ * Where Sell was pressed (`?from=`) goes with the seller through sign-in and confirming their email, for their posting
+ * journey in Udozo's admin.
+ */
+export default async function PostAd({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
+  const source = cleanSellSource((await searchParams).from);
+  const { customer, market } = await requireSeller(sellHref(source));
   const [{ categories, states }, assistant, resale] = await Promise.all([sellReference(market.country), sellerAssistant(market.country), resaleAvailability()]);
-  return <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} />;
+  return (
+    <>
+      <SellVisit source={source} signedIn />
+      <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} source={source} />
+    </>
+  );
 }

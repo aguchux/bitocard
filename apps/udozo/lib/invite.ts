@@ -13,4 +13,4 @@ export const cleanRef = (raw: string | string[] | undefined | null) => {
 };
 
 /** Where an invite link leads: sign-up with the code, then on to posting a first listing. */
-export const inviteSignupPath = (code: string) => `/signup?${new URLSearchParams({ next: "/sell", ref: code }).toString()}`;
+export const inviteSignupPath = (code: string) => `/signup?${new URLSearchParams({ next: "/sell?from=invite", ref: code }).toString()}`;

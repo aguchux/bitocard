@@ -4,6 +4,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { type ListingReviewCode, PostingJourneysService } from '../postings/journeys.service.js';
 import { ShopEmails } from './shop-emails.service.js';
 import { invalid } from './rules.js';
 
@@ -42,6 +43,7 @@ export class ModerationService {
     private readonly audit: AuditService,
     private readonly inbox: InboxService,
     private readonly emails: ShopEmails,
+    private readonly postings: PostingJourneysService,
   ) {}
 
   /** `classifieds_suspended` for a suspended seller. */
@@ -98,7 +100,8 @@ export class ModerationService {
     }
     const reporters = await this.prisma.classifiedReport.count({ where: { listingId: listing.id, status: 'open' } });
     if (reporters >= reportsToReview && listing.status === 'active') {
-      await this.prisma.classifiedListing.updateMany({ where: { id: listing.id, status: 'active' }, data: { status: 'pending_review', reviewReason: 'reported', reviewFlags: { push: 'reported' } } });
+      const moved = await this.prisma.classifiedListing.updateMany({ where: { id: listing.id, status: 'active' }, data: { status: 'pending_review', reviewReason: 'reported', reviewFlags: { push: 'reported' } } });
+      if (moved.count) this.postings.requeued(listing.id, 'reported', ['reported']);
     }
     return { object: 'classified_report' as const, id: report.id, status: report.status, reason: report.reason, created_at: report.createdAt.toISOString() };
   }
@@ -124,34 +127,37 @@ export class ModerationService {
     const now = new Date();
     const claimed = await this.prisma.classifiedListing.updateMany({
       where: { id, status: 'pending_review' },
-      data: { status: 'active', reviewReason: null, reviewFlags: [], publishedAt: listing.publishedAt ?? now, expiresAt: listing.expiresAt && listing.expiresAt > now ? listing.expiresAt : new Date(now.getTime() + (settings?.listingDays ?? 30) * 86_400_000) },
+      data: { status: 'active', reviewReason: null, reviewReasonCode: null, reviewedAt: now, reviewedById: actorId, reviewFlags: [], publishedAt: listing.publishedAt ?? now, expiresAt: listing.expiresAt && listing.expiresAt > now ? listing.expiresAt : new Date(now.getTime() + (settings?.listingDays ?? 30) * 86_400_000) },
     });
     if (!claimed.count) throw conflict('listing_not_in_review', 'This listing is not waiting for review.');
     await this.prisma.classifiedReport.updateMany({ where: { listingId: id, status: 'open' }, data: { status: 'dismissed', decidedById: actorId, decidedAt: now, note: note ?? 'Listing approved' } });
     await this.audit.record({ actorId, action: 'classifieds.listing_approved', targetType: 'classified_listing', targetId: id, before: { status: 'pending_review', flags: listing.reviewFlags }, after: { status: 'active', note: note ?? null } });
+    this.postings.reviewed(id, 'approved');
     await this.notify(listing, 'customer.classifieds.listing_live', 'Your ad is live', `"${listing.title}" is now on Udozo.`);
   }
 
-  /** A listing waiting for review is sent back: the seller fixes it and submits again. */
-  async reject(actorId: string | null, id: string, reason: string) {
+  /** A listing waiting for review is sent back: the seller fixes it and submits again. `reason` is what the seller reads. */
+  async reject(actorId: string | null, id: string, reason: string, code: ListingReviewCode = 'other') {
     const listing = await this.listingFor(id);
     if (listing.status !== 'pending_review') throw conflict('listing_not_in_review', 'This listing is not waiting for review.');
-    const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: 'pending_review' }, data: { status: 'rejected', reviewReason: reason } });
+    const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: 'pending_review' }, data: { status: 'rejected', reviewReason: reason, reviewReasonCode: code, reviewedAt: new Date(), reviewedById: actorId } });
     if (!claimed.count) throw conflict('listing_not_in_review', 'This listing is not waiting for review.');
-    await this.audit.record({ actorId, action: 'classifieds.listing_rejected', targetType: 'classified_listing', targetId: id, before: { status: 'pending_review', flags: listing.reviewFlags }, after: { status: 'rejected', reason } });
+    await this.audit.record({ actorId, action: 'classifieds.listing_rejected', targetType: 'classified_listing', targetId: id, before: { status: 'pending_review', flags: listing.reviewFlags }, after: { status: 'rejected', reason, code } });
+    this.postings.reviewed(id, 'sent_back', code);
     await this.notify(listing, 'customer.classifieds.listing_rejected', 'Your ad needs changes', `"${listing.title}": ${reason}`);
   }
 
   /** A listing is taken off BitoCard Shop for good (banned goods, a scam), live or not. */
-  async remove(actorId: string | null, id: string, reason: string) {
+  async remove(actorId: string | null, id: string, reason: string, code: ListingReviewCode = 'other') {
     const listing = await this.listingFor(id);
     if (['removed', 'deleted'].includes(listing.status)) throw conflict('listing_closed', 'This listing is already off Udozo.');
     const now = new Date();
-    const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: listing.status }, data: { status: 'removed', reviewReason: reason, closedAt: now } });
+    const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: listing.status }, data: { status: 'removed', reviewReason: reason, reviewReasonCode: code, reviewedAt: now, reviewedById: actorId, closedAt: now } });
     if (!claimed.count) throw conflict('listing_closed', 'This listing changed: refresh and try again.');
     await this.prisma.classifiedPriceHistory.updateMany({ where: { listingId: id, to: null }, data: { to: now } });
     await this.prisma.classifiedReport.updateMany({ where: { listingId: id, status: 'open' }, data: { status: 'actioned', decidedById: actorId, decidedAt: now, note: reason } });
-    await this.audit.record({ actorId, action: 'classifieds.listing_removed', targetType: 'classified_listing', targetId: id, before: { status: listing.status }, after: { status: 'removed', reason } });
+    await this.audit.record({ actorId, action: 'classifieds.listing_removed', targetType: 'classified_listing', targetId: id, before: { status: listing.status }, after: { status: 'removed', reason, code } });
+    this.postings.reviewed(id, 'removed', code);
     if (listing.status !== 'draft') await this.notify(listing, 'customer.classifieds.listing_removed', 'Your ad was removed', `"${listing.title}" was removed from Udozo: ${reason}`);
   }
 

@@ -16,13 +16,13 @@ vi.mock("@/lib/reference", () => ({
 describe("Start here's links", () => {
   it("carry a campaign's referral and tags on to sign-up, then posting a listing", () => {
     const links = startLinks(campaignOf({ ref: "ada-01", utm_source: "facebook", utm_campaign: "launch_ng", other: "dropped" }));
-    expect(links.sell).toBe("/signup?next=%2Fsell&ref=ada-01&utm_source=facebook&utm_campaign=launch_ng");
+    expect(links.sell).toBe("/signup?next=%2Fsell%3Ffrom%3Dstart_here&ref=ada-01&utm_source=facebook&utm_campaign=launch_ng");
     expect(links.store).toBe("https://shq.udozo.com/signup?ref=ada-01&utm_source=facebook&utm_campaign=launch_ng");
   });
 
   it("leave out tags that are long, repeated or carry odd characters", () => {
     expect(campaignOf({ ref: "x".repeat(65), utm_source: "<script>", utm_medium: ["cpc", "second"], utm_term: "" })).toEqual([["utm_medium", "cpc"]]);
-    expect(startLinks([])).toEqual({ sell: "/signup?next=%2Fsell", store: "https://shq.udozo.com/signup", signIn: "/signin?next=/sell" });
+    expect(startLinks([])).toEqual({ sell: "/signup?next=%2Fsell%3Ffrom%3Dstart_here", store: "https://shq.udozo.com/signup", signIn: "/signin?next=%2Fsell%3Ffrom%3Dstart_here" });
   });
 });
 
@@ -42,7 +42,7 @@ describe("the Start here page", async () => {
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]!.replaceAll("&amp;", "&"));
     const signUps = hrefs.filter(href => href.startsWith("/signup"));
     expect(signUps.length).toBeGreaterThanOrEqual(4);
-    expect(new Set(signUps)).toEqual(new Set(["/signup?next=%2Fsell&ref=ada-01"]));
+    expect(new Set(signUps)).toEqual(new Set(["/signup?next=%2Fsell%3Ffrom%3Dstart_here&ref=ada-01"]));
     expect(hrefs).toContain("https://shq.udozo.com/signup?ref=ada-01");
   });
 

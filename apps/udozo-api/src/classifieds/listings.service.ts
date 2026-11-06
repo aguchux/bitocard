@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { PostingJourneysService } from '../postings/journeys.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -122,6 +123,7 @@ export class ListingsService {
     private readonly brands: ClassifiedBrandsService,
     private readonly models: ClassifiedModelsService,
     private readonly watermarks: WatermarkService,
+    private readonly postings: PostingJourneysService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -254,7 +256,9 @@ export class ListingsService {
       if ((error as { code?: string }).code === 'listing_prohibited') return ['prohibited_words'] as ReviewFlag[];
       throw error;
     });
-    if (flags.length) await this.prisma.classifiedListing.updateMany({ where: { id, status: 'active' }, data: { status: 'pending_review', reviewReason: flags[0], reviewFlags: flags } });
+    if (!flags.length) return;
+    const moved = await this.prisma.classifiedListing.updateMany({ where: { id, status: 'active' }, data: { status: 'pending_review', reviewReason: flags[0], reviewFlags: flags } });
+    if (moved.count) this.postings.requeued(id, 'edited', flags);
   }
 
   /**
@@ -486,6 +490,7 @@ export class ListingsService {
       sku: listing.sku,
       status: listing.status,
       review_reason: listing.reviewReason,
+      review_reason_code: listing.reviewReasonCode,
       review_flags: listing.reviewFlags,
       title: listing.title,
       description: listing.description,

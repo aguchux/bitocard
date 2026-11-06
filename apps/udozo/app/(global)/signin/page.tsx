@@ -5,6 +5,8 @@ import { GoogleButton, OrDivider } from "@/components/account/google-button";
 import { SignInForm } from "@/components/account/sign-in-up";
 import { currentCustomer, safeNext } from "@/lib/customer";
 import { googleErrorText } from "@/lib/google";
+import { SellVisit } from "@/components/account/sell-visit";
+import { sellSourceOf } from "@/lib/sell-sources";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: true }, alternates: { canonical: "/signin" } };
 
@@ -23,8 +25,11 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const next = safeNext(params.next);
   if (await currentCustomer()) redirect(next);
+  // Sell pressed while signed out: counted on the way to Post an ad (nothing about the visitor kept).
+  const selling = params.for === "sell" ? sellSourceOf(next) : null;
   return (
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
+      {selling ? <SellVisit source={selling} signedIn={false} /> : null}
       <h1 className="text-2xl leading-tight font-extrabold">{reasons[params.for ?? ""] ?? "Sign in to Udozo"}</h1>
       <p className="text-sm text-navy-600">One Udozo account for buying and selling here and on every Udozo store.</p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">

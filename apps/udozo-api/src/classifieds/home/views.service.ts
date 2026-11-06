@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
+import { PostingJourneysService } from '../../postings/journeys.service.js';
 import { isOnShop } from '../rules.js';
 
 /** One view per visitor and listing in this window (per server instance). */
@@ -18,14 +19,17 @@ const robots = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|head
 export class ListingViewsService {
   private readonly seen = new Map<string, number>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly postings: PostingJourneysService,
+  ) {}
 
   async record(ref: number, visitor: { address: string; userAgent: string; customerId: string | null }, now = Date.now()) {
     if (!visitor.userAgent || robots.test(visitor.userAgent)) return false;
     const key = createHash('sha256').update(`${visitor.address}|${visitor.userAgent}|${ref}`).digest('base64url');
     const last = this.seen.get(key);
     if (last && now - last < windowMs) return false;
-    const listing = await this.prisma.classifiedListing.findUnique({ where: { ref: BigInt(ref) }, select: { id: true, customerId: true, status: true, onShop: true } });
+    const listing = await this.prisma.classifiedListing.findUnique({ where: { ref: BigInt(ref) }, select: { id: true, customerId: true, status: true, onShop: true, views: true } });
     if (!listing || !isOnShop(listing) || listing.customerId === visitor.customerId) return false;
     if (this.seen.size >= rememberAtMost) this.seen.clear();
     this.seen.set(key, now);
@@ -35,6 +39,8 @@ export class ListingViewsService {
       // Raw, so a view never touches the listing's updated time.
       this.prisma.$executeRaw`UPDATE "classified_listings" SET "views" = "views" + 1 WHERE "id" = ${listing.id}::uuid`,
     ]);
+    // Its first view, for the seller's posting journey (only ever the first, so it costs nothing after).
+    if (listing.views === 0) this.postings.firstView(listing.id);
     return true;
   }
 }

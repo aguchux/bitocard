@@ -24,6 +24,7 @@ import {
   currentPlace,
   type PlaceCounts,
 } from "@/lib/account-places";
+import { sellHref } from "@/lib/sell-sources";
 
 const icons = {
   listings: LayoutList,
@@ -121,7 +122,7 @@ export function PageTitle({
       </div>
       {post ? (
         <Link
-          href="/sell"
+          href={sellHref("my_listings")}
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-brand-700 px-4 text-sm font-bold text-white hover:bg-brand-600"
         >
           <Plus className="size-4" strokeWidth={2.6} aria-hidden="true" />

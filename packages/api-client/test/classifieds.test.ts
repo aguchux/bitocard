@@ -27,11 +27,16 @@ describe('admin classifieds', () => {
     await store.dispatch(adminClassifiedsApi.endpoints.moderateClassifiedListing.initiate({ id: 'l1', action: 'approve', note: '' }));
     await store.dispatch(adminClassifiedsApi.endpoints.moderateClassifiedListing.initiate({ id: 'l1', action: 'reject', note: 'Blurry photos.' }));
     await store.dispatch(adminClassifiedsApi.endpoints.moderateClassifiedListing.initiate({ id: 'l1', action: 'remove', note: 'Scam.' }));
+    // Udozo's reason codes: the note only when written (the seller reads the code's own words otherwise).
+    await store.dispatch(adminClassifiedsApi.endpoints.moderateClassifiedListing.initiate({ id: 'l1', action: 'reject', note: '', reason_code: 'photos' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.moderateClassifiedListing.initiate({ id: 'l1', action: 'remove', note: ' Fake goods. ', reason_code: 'prohibited_item' }));
     await store.dispatch(adminClassifiedsApi.endpoints.resolveClassifiedReport.initiate({ id: 'r1', action: 'remove_listing', note: 'Confirmed.' }));
     expect(sent()).toEqual([
       ['POST', 'http://api.test/v1/admin/classifieds/listings/l1/approve', {}],
       ['POST', 'http://api.test/v1/admin/classifieds/listings/l1/reject', { reason: 'Blurry photos.' }],
       ['POST', 'http://api.test/v1/admin/classifieds/listings/l1/remove', { reason: 'Scam.' }],
+      ['POST', 'http://api.test/v1/admin/classifieds/listings/l1/reject', { reason_code: 'photos' }],
+      ['POST', 'http://api.test/v1/admin/classifieds/listings/l1/remove', { reason_code: 'prohibited_item', note: 'Fake goods.' }],
       ['POST', 'http://api.test/v1/admin/classifieds/reports/r1/resolve', { action: 'remove_listing', note: 'Confirmed.' }],
     ]);
     // A decision refreshes the queue.

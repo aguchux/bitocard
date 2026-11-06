@@ -5,6 +5,7 @@ import type { ShopReseller } from "@bitocard/api-client/classifieds";
 import { AutoAccept } from "@/components/account/resellers";
 import { customerApi } from "@/lib/customer";
 import { requireSeller } from "@/lib/account";
+import { sellHref } from "@/lib/sell-sources";
 
 export const metadata: Metadata = { title: "My Resellers" };
 
@@ -69,7 +70,7 @@ export default async function ResellersPage() {
           <strong>No resellers yet</strong>
           <p className="text-sm text-slate-600">
             Open a listing to resellers in{" "}
-            <Link href="/sell" className="font-semibold text-brand-700 underline">
+            <Link href={sellHref("reseller")} className="font-semibold text-brand-700 underline">
               Post an ad
             </Link>{" "}
             (Where to sell). Resellers who add it to their stores show up here.

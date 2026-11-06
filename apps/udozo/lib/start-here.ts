@@ -23,12 +23,12 @@ export function campaignOf(params: Record<string, string | string[] | undefined>
 
 /** Where the page's buttons go: a Udozo account then posting a listing, or Seller HQ's sign-up for a store. */
 export function startLinks(campaign: [string, string][]) {
-  const sell = new URLSearchParams([["next", "/sell"], ...campaign]);
+  const sell = new URLSearchParams([["next", "/sell?from=start_here"], ...campaign]);
   const store = new URLSearchParams(campaign);
   return {
     sell: `/signup?${sell.toString()}`,
     store: `${sellerHqUrl}/signup${store.size ? `?${store.toString()}` : ""}`,
-    signIn: "/signin?next=/sell",
+    signIn: `/signin?next=${encodeURIComponent("/sell?from=start_here")}`,
   };
 }
 

@@ -54,6 +54,7 @@ import { RepliesService } from '../support/replies.service.js';
 import { TicketsService } from '../support/tickets.service.js';
 import { ContactMessagesService } from '../support/contact-messages.service.js';
 import { SignupJourneysService } from '../signups/journeys.service.js';
+import { PostingJourneysService } from '../postings/journeys.service.js';
 import { ShopAssistantsService } from '../classifieds/assistant/shop-assistants.service.js';
 import { jobRunsFor } from '../products/jobs.js';
 
@@ -120,6 +121,7 @@ export class CronController {
     reviews: ReviewsService,
     interactionRatings: InteractionRatingsService,
     sellerScores: SellerScoresService,
+    postingJourneys: PostingJourneysService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -197,7 +199,7 @@ export class CronController {
        */
       /** Hourly 01:17 to 04:17 UTC (Udozo): Anjio's seller scores, summaries and the month's snapshot, carrying on where it stopped. */
       'seller-scores': () => sellerScores.run(),
-      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld(), reviews: await reviews.purge(), interaction_ratings: await interactionRatings.purge() }),
+      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), posting_journeys: { ...(await postingJourneys.reconcile()), ...(await postingJourneys.purge()) }, discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld(), reviews: await reviews.purge(), interaction_ratings: await interactionRatings.purge() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the
@@ -238,6 +240,7 @@ export class CronController {
         calls: await calls.job(),
         listing_signals: await discovery.refreshSignals(),
         private_photos: await watermarks.privatise(),
+        posting_results: await postingJourneys.syncResults(),
       }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),

@@ -14,7 +14,8 @@ import { ConversationsService } from './conversations.service.js';
 import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
-import { type ListingStatus, listingStatuses, readSku, skuPrefixPattern } from './rules.js';
+import { invalid, type ListingStatus, listingStatuses, readSku, skuPrefixPattern } from './rules.js';
+import { type ListingReviewCode, listingReviewCodes, reviewCodeText } from '../postings/journeys.service.js';
 import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFaults, SafePayService } from './safe-pay.service.js';
 import { ResaleService } from './resale.service.js';
 import { ProductOnly } from '../products/product.js';
@@ -46,6 +47,27 @@ class AdminListingsDto {
 class ReasonDto {
   @IsString() @Length(3, 500)
   reason: string;
+}
+
+/** A moderator sends an ad back or removes it: why, as a code, and what the seller reads (`note`; `reason` from before). */
+class ModerateDto {
+  @IsOptional() @IsIn(listingReviewCodes)
+  reason_code?: ListingReviewCode;
+
+  @IsOptional() @IsString() @Length(3, 500)
+  note?: string;
+
+  @IsOptional() @IsString() @Length(3, 500)
+  reason?: string;
+}
+
+/** The code and what the seller reads: the note, else the code's own sentence; a note alone (from before codes) is `other`. */
+function moderation(body: ModerateDto) {
+  const note = body.note?.trim() || body.reason?.trim() || null;
+  const code = body.reason_code ?? 'other';
+  if (!note && !body.reason_code) throw invalid('parameter_missing', 'Choose why, or write a note for the seller.', 'reason_code');
+  if (!note && code === 'other') throw invalid('parameter_missing', 'Write a note saying what the seller should change.', 'note');
+  return { code, text: note ?? reviewCodeText[code] };
 }
 
 class NoteDto {
@@ -204,6 +226,8 @@ export class ClassifiedsAdminService {
   private present(row: Prisma.ClassifiedListingGetPayload<{ include: typeof adminInclude }>, counts?: Map<string, number>) {
     return {
       ...this.listings.present(row),
+      reviewed_at: row.reviewedAt?.toISOString() ?? null,
+      reviewed_by: row.reviewedById,
       seller: {
         id: row.customer.id,
         name: row.customer.name,
@@ -570,16 +594,18 @@ export class AdminClassifiedsController {
   @Post('listings/:id/reject')
   @HttpCode(HttpStatus.OK)
   @AdminRoles('operations')
-  async reject(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
-    await this.moderation.reject(adminId(caller), id, body.reason);
+  async reject(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ModerateDto) {
+    const { code, text } = moderation(body);
+    await this.moderation.reject(adminId(caller), id, text, code);
     return this.admin.get(id);
   }
 
   @Post('listings/:id/remove')
   @HttpCode(HttpStatus.OK)
   @AdminRoles('operations')
-  async remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
-    await this.moderation.remove(adminId(caller), id, body.reason);
+  async remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ModerateDto) {
+    const { code, text } = moderation(body);
+    await this.moderation.remove(adminId(caller), id, text, code);
     return this.admin.get(id);
   }
 

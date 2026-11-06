@@ -19,6 +19,8 @@ export type ClassifiedListing = {
   sku: string | null;
   status: ClassifiedListingStatus;
   review_reason: string | null;
+  /** Udozo: why a moderator sent it back or removed it, as a code (`listingReviewCodes`). */
+  review_reason_code?: ListingReviewCode | null;
   review_flags: ClassifiedReviewFlag[];
   title: string | null;
   description: string | null;
@@ -44,7 +46,33 @@ export type ClassifiedListing = {
 };
 
 /** A listing as moderators see it: with its seller (email included) and open reports. */
+/** Udozo's reasons for sending an ad back or removing it; the seller reads the moderator's note, else the code's own sentence. */
+export const listingReviewCodes = ['photos', 'wrong_category', 'prohibited_item', 'misleading', 'contact_details', 'duplicate', 'other'] as const;
+export type ListingReviewCode = (typeof listingReviewCodes)[number];
+export const listingReviewCodeLabels: Record<ListingReviewCode, string> = {
+  photos: 'Photos',
+  wrong_category: 'Wrong category',
+  prohibited_item: 'Prohibited item',
+  misleading: 'Misleading',
+  contact_details: 'Contact details in the ad',
+  duplicate: 'Duplicate',
+  other: 'Other',
+};
+/** What the seller reads when the moderator writes no note (kept in step with `reviewCodeText` in Udozo's API). */
+export const listingReviewCodeText: Record<ListingReviewCode, string> = {
+  photos: 'The photos need to show the item clearly: your own photos of it, well lit, nothing else in them.',
+  wrong_category: 'This ad is in the wrong category: choose the one that fits the item.',
+  prohibited_item: 'This item cannot be sold on Udozo. See the prohibited items in the marketplace terms.',
+  misleading: 'The title, price or description does not match the item: say exactly what it is.',
+  contact_details: 'Take your phone number, email or links out of the ad: buyers reach you through Udozo.',
+  duplicate: 'You already have an ad for this item: keep one ad for it.',
+  other: 'This ad needs changes before it can go live.',
+};
+
 export type AdminClassifiedListing = ClassifiedListing & {
+  /** When a moderator last decided it, and who (an admin's id). */
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
   seller: { id: string; name: string; email: string; member_since: string; phone_confirmed: boolean; suspended: boolean; published_listings: number | null };
   open_reports: Array<{ id: string; reason: ClassifiedReportReason; details: string | null; created_at: string }>;
 };
@@ -472,8 +500,13 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: id => `/v1/admin/classifieds/listings/${encodeURIComponent(id)}`,
       providesTags: (_result, _error, id) => [{ type: 'ClassifiedListing', id }],
     }),
-    moderateClassifiedListing: build.mutation<AdminClassifiedListing, { id: string; action: 'approve' | 'reject' | 'remove'; note: string }>({
-      query: ({ id, action, note }) => ({ url: `/v1/admin/classifieds/listings/${encodeURIComponent(id)}/${action}`, method: 'POST', body: action === 'approve' ? (note ? { note } : {}) : { reason: note } }),
+    /** Approve (an optional note), or send back or remove: with Udozo's reason code and the note the seller reads (else the code's own sentence). */
+    moderateClassifiedListing: build.mutation<AdminClassifiedListing, { id: string; action: 'approve' | 'reject' | 'remove'; note: string; reason_code?: ListingReviewCode }>({
+      query: ({ id, action, note, reason_code }) => ({
+        url: `/v1/admin/classifieds/listings/${encodeURIComponent(id)}/${action}`,
+        method: 'POST',
+        body: action === 'approve' ? (note ? { note } : {}) : reason_code ? { reason_code, ...(note.trim() ? { note: note.trim() } : {}) } : { reason: note },
+      }),
       invalidatesTags: (_result, _error, { id }) => [...listingTags(id), { type: 'ClassifiedReport', id: 'LIST' }],
     }),
     classifiedReports: build.query<List<AdminClassifiedReport>, { status?: ClassifiedReportStatus; offset?: number }>({

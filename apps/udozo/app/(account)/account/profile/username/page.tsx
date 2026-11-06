@@ -7,6 +7,7 @@ import { CopyAddress, UsernameForm } from "@/components/account/username-form";
 import { requireCustomer } from "@/lib/account";
 import { customerApi, siteOrigin } from "@/lib/customer";
 import { changeAfterText, moreAdsText, usernameScreen } from "@/lib/username";
+import { sellHref } from "@/lib/sell-sources";
 
 export const metadata: Metadata = { title: "Username" };
 
@@ -80,7 +81,7 @@ export default async function UsernamePage() {
               <p className="text-sm text-navy-600">
                 You have posted {data.posted} of the {data.required} ads needed. Once you reach {data.required}, you can choose a username here.
               </p>
-              <Link href="/sell" className="inline-flex h-10 w-fit items-center gap-1.5 rounded-xl bg-brand-700 px-4 text-sm font-bold text-white hover:bg-brand-600">
+              <Link href={sellHref("username")} className="inline-flex h-10 w-fit items-center gap-1.5 rounded-xl bg-brand-700 px-4 text-sm font-bold text-white hover:bg-brand-600">
                 <Plus className="size-4" strokeWidth={2.6} aria-hidden="true" /> Post an ad
               </Link>
             </section>

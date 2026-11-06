@@ -35,6 +35,10 @@ vi.mock("@/lib/shop-actions", () => ({
   videoUploadUrl: async () => ({ ok: false, message: "", code: null, param: null, signIn: false }),
 }));
 
+// The posting journey's steps, as the form tells them (never what was typed).
+const told: unknown[] = [];
+vi.mock("@/lib/posting-actions", () => ({ recordPostingStep: async (step: unknown) => void told.push(step) }));
+
 const { ListingForm } = await import("@/components/account/listing-form");
 const { firstIncomplete, stepOf, stepProblem } = await import("@/lib/post-steps");
 
@@ -95,6 +99,7 @@ beforeEach(() => {
   submitAnswer = { ok: true, data: { status: "active" } };
 });
 afterEach(() => {
+  told.length = 0;
   for (const unmount of mounted.splice(0)) unmount();
   document.body.innerHTML = "";
   vi.clearAllMocks();
@@ -203,5 +208,43 @@ describe("posting an ad", () => {
     expect(acceptShopTerms).not.toHaveBeenCalled();
     expect(stepLine(host)).toBe("Step 2 of 6: Photos and video");
     expect(alert(host)).toBe("Remove the photo that could not be used, or add it again.");
+  });
+});
+
+describe("the posting journey", () => {
+  it("tells Udozo Sell was opened, each step reached and what a step still needed, never what was typed", async () => {
+    const host = mount(null);
+    await click(button(host, /^Next: Photos/));
+    await type(host.querySelector("input[placeholder^='e.g. iPhone']")!, "Three-seat sofa");
+    await click(button(host, "Phones and tablets"));
+    await click(button(host, "Mobile phones"));
+    await click(button(host, /^Next: Photos/));
+    await click(button(host, /Previous/));
+    await click(button(host, /^Next: Photos/));
+    await act(async () => void (await new Promise(resolve => setTimeout(resolve, 0))));
+    expect(told).toEqual([
+      { type: "sell_opened", source: "direct" },
+      { type: "step_refused", step: "basics", param: "title", listing_id: null },
+      // Told as the draft is being made: the API adds it to the seller's open journey.
+      { type: "step_reached", step: "media", listing_id: null },
+    ]);
+    expect(JSON.stringify(told)).not.toContain("sofa");
+  });
+
+  it("a draft reopened says so; the terms box unticked is told as the post step's field", async () => {
+    const host = mount(draft({ area: { id: "33333333-3333-4333-8333-333333333333", state: { slug: "lagos" } } }));
+    await act(async () => void (await new Promise(resolve => setTimeout(resolve, 0))));
+    await click(button(host, "Post ad"));
+    expect(told).toEqual([
+      { type: "form_resumed", listing_id: "11111111-1111-4111-8111-111111111111" },
+      { type: "post_pressed", listing_id: "11111111-1111-4111-8111-111111111111" },
+      { type: "step_refused", step: "post", param: "terms", listing_id: "11111111-1111-4111-8111-111111111111" },
+    ]);
+  });
+
+  it("editing a live ad tells nothing", async () => {
+    mount(draft({ status: "active" }));
+    await act(async () => void (await new Promise(resolve => setTimeout(resolve, 0))));
+    expect(told).toEqual([]);
   });
 });

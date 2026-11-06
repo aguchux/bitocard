@@ -16,6 +16,7 @@ import { Flag } from "./flag";
 import { type ContinueTo, HeaderSearch, SearchBlend } from "./header-search";
 import { HelpMenu } from "./help-menu";
 import { SignInHere } from "./sign-in-here";
+import { sellHref } from "@/lib/sell-sources";
 
 /** Udozo's lockup on white: the "u" mark, then the name. */
 export function UdozoWordmark({ href = "/" }: { href?: string }) {
@@ -93,11 +94,11 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
             </SignInHere>
           )}
           {customer ? (
-            <Link href="/sell" className={sellClass}>
+            <Link href={sellHref("header")} className={sellClass}>
               <Plus className="size-5" aria-hidden="true" /> Sell
             </Link>
           ) : (
-            <SignInHere reason="sell" className={sellClass}>
+            <SignInHere reason="sell" next={sellHref("header")} className={sellClass}>
               <Plus className="size-5" aria-hidden="true" /> Sell
             </SignInHere>
           )}
@@ -171,11 +172,11 @@ export function SellButton({ customer }: { customer: Customer | null }) {
     </>
   );
   return customer ? (
-    <Link href="/sell" className={className}>
+    <Link href={sellHref("header_phone")} className={className}>
       {label}
     </Link>
   ) : (
-    <SignInHere reason="sell" className={className}>
+    <SignInHere reason="sell" next={sellHref("header_phone")} className={className}>
       {label}
     </SignInHere>
   );

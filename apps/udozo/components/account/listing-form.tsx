@@ -37,6 +37,8 @@ import { BrandField, brandMatchKey } from "./brand-field";
 import { ModelField } from "./model-field";
 import { ShopIcon } from "./icon";
 import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom } from "./resale-fields";
+import { type PostingStep, recordPostingStep } from "@/lib/posting-actions";
+import type { SellSource } from "@/lib/sell-sources";
 
 const maxPhotos = 12;
 const maxVideoBytes = 50 * 1024 * 1024;
@@ -116,6 +118,7 @@ export function ListingForm({
   minPhotos,
   assistant = null,
   resale = null,
+  source = "direct",
 }: {
   listing: ShopMyListing | null;
   categories: ShopTopCategory[];
@@ -128,6 +131,8 @@ export function ListingForm({
   assistant?: { name: string } | null;
   /** Whether the seller can open listings to resellers, and Udozo's limits (null: not known). */
   resale?: ShopResaleAvailability | null;
+  /** Where Sell was pressed (`/sell?from=`), for the seller's posting journey. */
+  source?: SellSource;
 }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(listing?.id ?? null);
@@ -192,6 +197,24 @@ export function ListingForm({
   const pending = useRef<ListingFields>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
+
+  // The posting journey (Udozo's Reports > Posting journeys): the steps reached and what a step still needed, never
+  // anything typed. Only while the ad is being posted (new, a draft, or sent back), never for edits of a live ad.
+  const tracking = !listing || listing.status === "draft" || listing.status === "rejected";
+  const told = useRef({ opened: false, step });
+  const track = (event: PostingStep) => {
+    if (tracking) void recordPostingStep(event).catch(() => undefined);
+  };
+  useEffect(() => {
+    if (told.current.opened || !tracking) return;
+    told.current.opened = true;
+    void recordPostingStep(listing ? { type: "form_resumed", listing_id: listing.id } : { type: "sell_opened", source }).catch(() => undefined);
+  }, [listing, source, tracking]);
+  useEffect(() => {
+    if (step <= told.current.step || !tracking) return;
+    told.current.step = step;
+    void recordPostingStep({ type: "step_reached", step: postSteps[step]!.key, listing_id: idRef.current }).catch(() => undefined);
+  }, [step, tracking]);
 
   const flush = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -350,10 +373,12 @@ export function ListingForm({
   // ---- Posting ----
   const live = status === "active" || status === "pending_review";
   const post = async () => {
+    if (!live) track({ type: "post_pressed", listing_id: idRef.current });
     // Every step must be complete: the first one that is not opens, saying what it needs.
     for (let index = 0; index < lastPostStep; index++) {
       const missing = stepProblem(index, valuesNow());
       if (missing) {
+        track({ type: "step_refused", step: postSteps[index]!.key, param: missing.param, listing_id: idRef.current });
         goTo(index);
         return setProblem(missing);
       }
@@ -375,6 +400,7 @@ export function ListingForm({
     if (terms && !terms.accepted) {
       if (!agreed) {
         setSubmitting(false);
+        track({ type: "step_refused", step: "post", param: "terms", listing_id: idRef.current });
         return setProblem({ message: "Tick the box to accept Udozo's terms, then post your ad.", param: "terms_box" });
       }
       const accepted = await acceptShopTerms(terms.version);
@@ -383,6 +409,7 @@ export function ListingForm({
         return setProblem({ message: accepted.message, param: "terms_box" });
       }
       setTerms(accepted.data);
+      track({ type: "terms_ticked", listing_id: idRef.current });
     }
     const result = await submitListing(idRef.current);
     setSubmitting(false);
@@ -414,7 +441,10 @@ export function ListingForm({
   /** On to the next step once this one has what it needs; what it is missing is said and marked otherwise. */
   const next = () => {
     const missing = stepProblem(step, valuesNow());
-    if (missing) return setProblem(missing);
+    if (missing) {
+      track({ type: "step_refused", step: postSteps[step]!.key, param: missing.param, listing_id: idRef.current });
+      return setProblem(missing);
+    }
     void flush();
     goTo(step + 1);
   };

@@ -340,7 +340,7 @@ describe("Profile > Username", () => {
     const html = await screen();
     expect(html.textContent).toContain("Post 3 more ads to choose a username");
     expect(html.textContent).toContain("You have posted 2 of the 5 ads needed.");
-    expect(html.querySelector('a[href="/sell"]')?.textContent).toContain("Post an ad");
+    expect(html.querySelector('a[href="/sell?from=username"]')?.textContent).toContain("Post an ad");
     expect(html.querySelector("input")).toBeNull();
   });
 

@@ -7,6 +7,7 @@ import { Thumb } from "@/components/account/thumb";
 import { customerApi } from "@/lib/customer";
 import { listingActions, listingChannelTags, listingFilters, listingMeta, listingTones } from "@/lib/shop";
 import { requireSeller, sellerAssistant, listingHref } from "@/lib/account";
+import { sellHref } from "@/lib/sell-sources";
 
 export const metadata: Metadata = { title: "My listings" };
 
@@ -115,7 +116,7 @@ export default async function MyListings({ searchParams }: Props) {
           <div className="grid justify-items-center gap-3 rounded-2xl border border-dashed border-slate-300 p-8 text-center">
             <p className="font-semibold">{filter.status ? `No ${filter.label.toLowerCase()} listings.` : "Sell what you don’t use."}</p>
             <p className="max-w-sm text-sm text-slate-600">Post an ad in about a minute: four photos, a title and a price. Buyers chat with you here, and can pay safely with Safe pay.</p>
-            <Link href="/sell" className="flex h-11 items-center rounded-full bg-brand-700 px-5 font-bold text-white hover:bg-brand-600">
+            <Link href={sellHref("empty_state")} className="flex h-11 items-center rounded-full bg-brand-700 px-5 font-bold text-white hover:bg-brand-600">
               Post an ad
             </Link>
           </div>

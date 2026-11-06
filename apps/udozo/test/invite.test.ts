@@ -34,7 +34,7 @@ describe("an invite link", () => {
     const response = await open("abc123def0");
     expect(calls).toEqual([{ url: "https://api.test/v1/marketing/invites/abc123def0/open", method: "POST", body: null }]);
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://udozo.com/signup?next=%2Fsell&ref=abc123def0");
+    expect(response.headers.get("location")).toBe("https://udozo.com/signup?next=%2Fsell%3Ffrom%3Dinvite&ref=abc123def0");
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
@@ -42,7 +42,7 @@ describe("an invite link", () => {
     reply = () => {
       throw new Error("offline");
     };
-    expect((await open("abc123def0")).headers.get("location")).toBe("https://udozo.com/signup?next=%2Fsell&ref=abc123def0");
+    expect((await open("abc123def0")).headers.get("location")).toBe("https://udozo.com/signup?next=%2Fsell%3Ffrom%3Dinvite&ref=abc123def0");
     calls = [];
     expect((await open("NOT-A-CODE")).headers.get("location")).toBe("https://udozo.com/start-here");
     expect(calls).toEqual([]);
@@ -51,7 +51,7 @@ describe("an invite link", () => {
   test("codes and refs are checked", () => {
     expect([isInviteCode("abc123def0"), isInviteCode("ABC"), isInviteCode("a/b")]).toEqual([true, false, false]);
     expect([cleanRef("ada-01"), cleanRef(["mk1", "x"]), cleanRef("<script>"), cleanRef(undefined)]).toEqual(["ada-01", "mk1", null, null]);
-    expect(inviteSignupPath("abc123def0")).toBe("/signup?next=%2Fsell&ref=abc123def0");
+    expect(inviteSignupPath("abc123def0")).toBe("/signup?next=%2Fsell%3Ffrom%3Dinvite&ref=abc123def0");
   });
 });
 

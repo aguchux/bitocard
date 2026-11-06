@@ -27,6 +27,7 @@ import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, invalid, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
 import { ProductOnly } from '../products/product.js';
+import { TrackPosting } from '../postings/track.js';
 import { SellerProfilesService } from './sellers.service.js';
 import { sellerKeyPattern } from './usernames.service.js';
 import { BuyOrdersService } from './buy-orders/buy-orders.service.js';
@@ -470,16 +471,19 @@ export class ClassifiedListingsController {
   }
 
   @Post('listings')
+  @TrackPosting('create')
   create(@CurrentCustomer() caller: CustomerCaller, @Body() body: ListingDto) {
     return this.listings.create(caller.customer, body);
   }
 
   @Patch('listings/:id')
+  @TrackPosting('save')
   update(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ListingDto) {
     return this.listings.update(caller.customer, id, body);
   }
 
   @Post('listings/:id/submit')
+  @TrackPosting('submit')
   @HttpCode(HttpStatus.OK)
   submit(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.listings.submit(caller.customer, id);
@@ -492,12 +496,14 @@ export class ClassifiedListingsController {
   }
 
   @Post('listings/:id/sold')
+  @TrackPosting('sold')
   @HttpCode(HttpStatus.OK)
   sold(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.listings.markSold(caller.customer, id);
   }
 
   @Delete('listings/:id')
+  @TrackPosting('delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     await this.listings.remove(caller.customer, id);
@@ -505,6 +511,7 @@ export class ClassifiedListingsController {
 
   /** A photo (JPEG or PNG, at most 4 MB), its metadata removed. Sending the same photo again returns it. */
   @Post('listings/:id/photos')
+  @TrackPosting('photo')
   @SkipIdempotency()
   @UseInterceptors(photoUpload)
   addPhoto(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file?: MediaUpload) {
@@ -513,6 +520,7 @@ export class ClassifiedListingsController {
 
   /** The video (MP4, MOV or WebM, at most 50 MB and 60 seconds): accepted as processing, re-encoded after the reply. */
   @Post('listings/:id/video')
+  @TrackPosting('video')
   @HttpCode(HttpStatus.ACCEPTED)
   @SkipIdempotency()
   @UseInterceptors(videoUpload)
@@ -522,6 +530,7 @@ export class ClassifiedListingsController {
 
   /** A 15-minute link for the browser to send the video to the API directly (`POST video-uploads/<token>`). */
   @Post('listings/:id/video-upload')
+  @TrackPosting('video')
   @HttpCode(HttpStatus.OK)
   videoUploadLink(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.media.videoUploadLink(caller.customer, caller.sessionId, id);

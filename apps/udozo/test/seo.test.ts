@@ -184,6 +184,6 @@ describe("social preview cards", () => {
     const data = await manifest();
     vi.unstubAllGlobals();
     expect(data.lang).toBe("en-GB");
-    expect(data.shortcuts?.map(item => item.url)).toEqual(["/sell", "/account/messages", "/account/listings"]);
+    expect(data.shortcuts?.map(item => item.url)).toEqual(["/sell?from=pwa", "/account/messages", "/account/listings"]);
   });
 });

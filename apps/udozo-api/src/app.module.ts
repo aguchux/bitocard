@@ -45,6 +45,7 @@ import { ClassifiedsModule } from './classifieds/classifieds.module.js';
 import { WatermarksModule } from './watermarks/watermarks.module.js';
 import { MarketingModule } from './marketing/marketing.controller.js';
 import { SignupsModule } from './signups/signups.module.js';
+import { PostingsModule } from './postings/postings.module.js';
 import { ResaleModule } from './resale/resale.module.js';
 import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
 import { SellerScoresModule } from './classifieds/scores/scores.module.js';
@@ -123,6 +124,7 @@ export class AppModule {
         ClassifiedsModule,
         MarketingModule,
         SignupsModule,
+        PostingsModule,
         ResaleModule,
         ShopAssistantModule,
         SellerScoresModule,

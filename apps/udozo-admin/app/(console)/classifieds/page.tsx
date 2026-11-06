@@ -7,6 +7,7 @@ import { UdozoShell } from "@/components/shell";
 import { type AdminClassifiedListing, type ClassifiedQueueView, useClassifiedQueueQuery, useModerateClassifiedListingMutation } from "@bitocard/api-client/admin";
 import { CheckCircle2, Clock, Inbox, XCircle } from "lucide-react";
 import { flagLabels, ListingCell, listingPrice, MarketFilter } from "@/components/classifieds";
+import { ModerateDialog } from "@/components/moderate-dialog";
 
 type Decision = { listing: AdminClassifiedListing; action: "approve" | "reject" | "remove" };
 
@@ -138,16 +139,25 @@ export default function ClassifiedQueuePage() {
           empty="Nothing waiting here."
         />
       </Card>
-      {open ? (
+      {open?.action === "approve" ? (
         <ActionDialog
           open
+          onClose={() => setOpen(null)}
+          title={dialogs.approve.title}
+          description={dialogs.approve.description}
+          confirmLabel={dialogs.approve.confirm}
+          tone={dialogs.approve.tone}
+          requireReason={false}
+          onConfirm={note => moderate({ id: open.listing.id, action: "approve", note }).unwrap()}
+        />
+      ) : open ? (
+        <ModerateDialog
           onClose={() => setOpen(null)}
           title={dialogs[open.action].title}
           description={dialogs[open.action].description}
           confirmLabel={dialogs[open.action].confirm}
           tone={dialogs[open.action].tone}
-          requireReason={open.action !== "approve"}
-          onConfirm={note => moderate({ id: open.listing.id, action: open.action, note }).unwrap()}
+          onConfirm={({ reason_code, note }) => moderate({ id: open.listing.id, action: open.action, reason_code, note }).unwrap()}
         />
       ) : null}
     </UdozoShell>

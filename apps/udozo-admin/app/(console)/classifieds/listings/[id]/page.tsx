@@ -5,9 +5,10 @@ import { useState } from "react";
 import { ActionDialog, Badge, Button, Card, CardHeader, formatDateTime, formatNumber, KeyValue, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
-import { type AdminClassifiedListing, useClassifiedListingQuery, useModerateClassifiedListingMutation } from "@bitocard/api-client/admin";
+import { type AdminClassifiedListing, listingReviewCodeLabels, useClassifiedListingQuery, useModerateClassifiedListingMutation } from "@bitocard/api-client/admin";
 import { conditionLabels } from "@bitocard/api-client/classifieds";
 import { flagLabels, ListingStatus, listingPrice, reportReasonLabels } from "@/components/classifieds";
+import { ModerateDialog } from "@/components/moderate-dialog";
 
 type Action = "approve" | "reject" | "remove";
 
@@ -114,7 +115,9 @@ export default function ClassifiedListingPage() {
                           </Badge>
                         ))}
                       </div>
+                      {data.review_reason_code ? <p className="font-semibold text-ink">{listingReviewCodeLabels[data.review_reason_code]}</p> : null}
                       {data.review_reason ? <p className="text-muted">{data.review_reason}</p> : null}
+                      {data.reviewed_at ? <p className="text-xs text-muted">Reviewed {formatDateTime(data.reviewed_at)}</p> : null}
                     </div>
                   </Card>
                 ) : null}
@@ -157,22 +160,30 @@ export default function ClassifiedListingPage() {
                 </Card>
               </div>
             </div>
-            {action ? (
+            {action && action !== "approve" ? (
+              <ModerateDialog
+                onClose={() => setAction(null)}
+                title={{ reject: "Send this ad back?", remove: "Remove this ad for good?" }[action]}
+                description={
+                  {
+                    reject: "The seller sees why, fixes the ad and submits it again.",
+                    remove: "It leaves Udozo and can never go live again. Open reports are closed with your note, and the seller is told why.",
+                  }[action]
+                }
+                confirmLabel={{ reject: "Send back", remove: "Remove" }[action]}
+                tone={action === "remove" ? "danger" : "primary"}
+                onConfirm={({ reason_code, note }) => moderate({ id, action, reason_code, note }).unwrap()}
+              />
+            ) : action ? (
               <ActionDialog
                 open
                 onClose={() => setAction(null)}
-                title={{ approve: "Put this ad live?", reject: "Send this ad back?", remove: "Remove this ad for good?" }[action]}
-                description={
-                  {
-                    approve: "It goes on Udozo now and the seller is told.",
-                    reject: "The seller sees your reason, fixes the ad and submits it again.",
-                    remove: "It leaves Udozo and can never go live again. Open reports are closed with your reason, and the seller is told.",
-                  }[action]
-                }
-                confirmLabel={{ approve: "Approve", reject: "Send back", remove: "Remove" }[action]}
-                tone={action === "remove" ? "danger" : "primary"}
-                requireReason={action !== "approve"}
-                onConfirm={note => moderate({ id, action, note }).unwrap()}
+                title="Put this ad live?"
+                description="It goes on Udozo now and the seller is told."
+                confirmLabel="Approve"
+                tone="primary"
+                requireReason={false}
+                onConfirm={note => moderate({ id, action: "approve", note }).unwrap()}
               />
             ) : null}
           </>
