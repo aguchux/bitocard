@@ -109,7 +109,11 @@ export function passwordChangedEmail(to: string, product: EmailProduct = 'BitoCa
       'Your password was changed',
       [
         `Your ${product} password was just changed and your other sessions were signed out.`,
-        product === 'BitoCard' ? 'If you did not make this change, reset your password and contact support@bitocard.com.' : 'If you did not make this change, reset your password and tell the Afrippa team at once.',
+        product === 'BitoCard'
+          ? 'If you did not make this change, reset your password and contact support@bitocard.com.'
+          : product === 'Udozo'
+            ? 'If you did not make this change, reset your password and contact support@udozo.com.'
+            : 'If you did not make this change, reset your password and tell the Afrippa team at once.',
       ],
       undefined,
       product,
@@ -736,6 +740,22 @@ export function shopMessagesEmail(to: string, input: { name: string; chats: { ti
     '</div>',
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', 'BitoCard, a Golojan Ltd venture.'].join('\n') };
+}
+
+/**
+ * A plain notice about someone's account (a suspension, a role, a store taken offline): what happened, what to do, and a
+ * link to the page. Never carries codes, contact details or anyone's message.
+ */
+export function noticeEmail(to: string, input: { title: string; body: string; link?: string | null; action?: string; signature: string }): EmailMessage {
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10212e">',
+    `<h1 style="font-size:20px;color:#185174">${escape(input.title)}</h1>`,
+    `<p style="font-size:15px;line-height:1.5">${escape(input.body)}</p>`,
+    input.link ? `<p><a href="${escape(input.link)}" style="display:inline-block;background:#185174;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">${escape(input.action ?? 'Open it')}</a></p>` : '',
+    `<p style="font-size:13px;color:#5f6b73">${escape(input.signature)}</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: input.title, html, text: [input.title, '', input.body, ...(input.link ? ['', `${input.action ?? 'Open it'}: ${input.link}`] : []), '', input.signature].join('\n') };
 }
 
 /**

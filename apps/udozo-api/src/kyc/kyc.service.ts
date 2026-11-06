@@ -516,6 +516,17 @@ export class KycService {
     return { contentType: document.contentType, bytes, name: `${document.kind}.${document.contentType === 'application/pdf' ? 'pdf' : document.contentType === 'image/png' ? 'png' : 'jpg'}` };
   }
 
+  /** The applicant's inbox: a customer on their account, a reseller on Seller HQ (Afrippa's traders have their own). */
+  private async notice(c: KycCase, title: string, body: string) {
+    if (kycPlatform(c.resellerId) !== 'bitocard') return;
+    if (c.subject === 'reseller') {
+      await this.inbox.reseller(c.resellerId, 'verification.updated', { subject: `${c.id}:${Date.now()}`, title, body, link: '/verification', mode: c.mode });
+      return;
+    }
+    const customer = c.customerReference && /^[0-9a-f-]{36}$/i.test(c.customerReference) ? await this.prisma.customer.findUnique({ where: { id: c.customerReference }, select: { id: true, storeId: true } }) : null;
+    if (customer) await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.verification.updated', { subject: `${c.id}:${Date.now()}`, title, body, link: '/account/verification', mode: c.mode });
+  }
+
   /** Where the applicant continues: the store's verification page, SHQ, or (resellers' own systems) nowhere we know. */
   private continueUrl(c: KycCase) {
     if (c.subject === 'reseller') return `${this.integrations.config.DASHBOARD_URL}/verification`;
@@ -595,6 +606,8 @@ export class KycService {
     }
     await this.audit.record({ actorId: reviewer.userId, action: revoking ? 'kyc.revoked' : 'kyc.declined', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'declined', reason: input.reason, realm: reviewer.realm }, platform: kycPlatform(c.resellerId) });
     await this.tell(c, 'declined', input.reason, input.note ?? null);
+    // A revoked check never passes through the identity service's own notices.
+    if (revoking) await this.notice(c, 'Your identity check was withdrawn', 'Udozo reviewed it again and it no longer counts. Start a new check from your account.');
     return this.detail(id, reviewer);
   }
 
@@ -618,6 +631,7 @@ export class KycService {
     await this.prisma.identityVerification.updateMany({ where: { id: c.verificationId, status: 'in_review' }, data: { status: 'in_progress', createdAt: new Date() } });
     await this.audit.record({ actorId: reviewer.userId, action: 'kyc.resubmit_requested', targetType: 'kyc_case', targetId: c.id, before: { status: c.status }, after: { status: 'resubmit', items, realm: reviewer.realm }, platform: kycPlatform(c.resellerId) });
     await this.tell(c, 'resubmit', null, input.note);
+    await this.notice(c, 'Send part of your identity check again', 'A reviewer asked for some items again. Open the check to see what, and send them.');
     return this.detail(id, reviewer);
   }
 

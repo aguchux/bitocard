@@ -357,6 +357,7 @@ export class BuyOrdersService {
       await this.prisma.classifiedSeller.upsert({ where: { customerId: order.sellerId }, create: { customerId: order.sellerId, buyOrdersPausedUntil: pausedUntil, buyOrdersPausedReason: why }, update: { buyOrdersPausedUntil: pausedUntil, buyOrdersPausedReason: why } });
       await this.audit.record({ actorId: null, action: 'classifieds.buy_orders_paused', targetType: 'customer', targetId: order.sellerId, before: null, after: { until: pausedUntil.toISOString(), reason: why } });
       await this.inbox.admins('admin.classifieds.buy_orders_paused', { subject: `${order.sellerId}:${pausedUntil.toISOString().slice(0, 10)}`, title: 'A seller’s buy orders were paused', body: `${why}. New buy orders on their listings are refused until ${dateText(pausedUntil)}.`, link: `/classifieds/sellers/${order.sellerId}` });
+      await this.tellPaused(order.sellerId, pausedUntil, `${voids} buyers said they did not buy from you in 90 days.`);
     }
     return this.present(done, customer.id);
   }
@@ -467,7 +468,17 @@ export class BuyOrdersService {
       before: { until: before?.buyOrdersPausedUntil?.toISOString() ?? null, reason: before?.buyOrdersPausedReason ?? null },
       after: { until: until?.toISOString() ?? null, reason },
     });
+    await this.tellPaused(sellerId, until, reason);
     return { paused_until: until?.toISOString() ?? null, reason: paused ? reason : null };
+  }
+
+  /** Tells the seller their buy orders were paused (until a date, with why) or can be taken again. */
+  private async tellPaused(sellerId: string, until: Date | null, why: string) {
+    const seller = await this.prisma.customer.findUnique({ where: { id: sellerId }, select: { id: true, storeId: true } });
+    if (!seller) return;
+    await this.inbox.customer({ customerId: seller.id, storeId: seller.storeId }, 'customer.classifieds.buy_orders_paused', until
+      ? { subject: `paused:${until.toISOString()}`, title: 'Buy orders on your listings are paused', body: `Buyers cannot send you buy orders until ${dateText(until)}. ${why} They can still chat with you.`, link: '/account/buy-orders' }
+      : { subject: `unpaused:${Date.now()}`, title: 'You can take buy orders again', body: 'Buyers can send you buy orders on your listings again.', link: '/account/buy-orders' });
   }
 
   presentAdmin(row: OrderRow) {
@@ -553,7 +564,7 @@ export class BuyOrdersService {
     const reason = await this.guards.samePerson(buyerId, sellerId);
     if (!reason) return;
     const [first, second] = [buyerId, sellerId].sort();
-    await this.inbox.admins('admin.classifieds.same_person', { subject: `buy:${first}:${second}`, title: 'Buy order refused: one person on both sides', body: `A buyer and seller on Udozo matched by ${reason.replace(/_/g, ' ')}. Their buy order was refused; check both accounts.`, link: `/storefront/customers/${buyerId}` });
+    await this.inbox.admins('admin.classifieds.same_person', { subject: `buy:${first}:${second}`, title: 'Buy order refused: one person on both sides', body: `A buyer and seller on Udozo matched by ${reason.replace(/_/g, ' ')}. Their buy order was refused; check both accounts.`, link: `/customers/${buyerId}` });
     throw forbidden('same_person', 'A buy order is between two different people, so it cannot be used here.');
   }
 

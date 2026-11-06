@@ -583,7 +583,7 @@ export class TicketsService {
   }
 
   private tellReseller(ticket: SupportTicket, type: 'support.ticket_created' | 'support.ticket_replied' | 'support.ticket_updated', title: string, body: string) {
-    return this.inbox.reseller(ticket.resellerId, type, { subject: `${ticket.id}:${Date.now()}`, title, body, link: `/support/tickets/${ticket.id}`, mode: ticket.mode });
+    return this.inbox.reseller(ticket.resellerId, type, { subject: `${ticket.id}:${Date.now()}`, title, body, link: `/support/${ticket.id}`, mode: ticket.mode });
   }
 
   private tellAdmins(ticket: SupportTicket, type: 'admin.support.ticket_created' | 'admin.support.ticket_replied', body: string) {
@@ -591,7 +591,7 @@ export class TicketsService {
       subject: `${ticket.id}:${Date.now()}`,
       title: type === 'admin.support.ticket_created' ? 'A support ticket needs an answer' : 'A support ticket has a reply',
       body,
-      link: `/support/tickets/${ticket.id}`,
+      link: `/support/${ticket.id}`,
       mode: ticket.mode,
     });
   }
@@ -602,8 +602,8 @@ export class TicketsService {
       subject: `${ticket.id}:${Date.now()}`,
       title,
       body: `${ticketReference(ticket.number)}: ${ticket.subject}`,
-      // Afrippa's site keeps help at /help; stores at the account's Help & support.
-      link: ticket.queue === afrippaQueue ? `/help/${ticket.id}` : `/account/support/${ticket.id}`,
+      // Afrippa's site keeps help at /help; udozo.com has no ticket pages for customers yet, so Contact us.
+      link: ticket.queue === afrippaQueue ? `/help/${ticket.id}` : '/help/contact',
     });
   }
 

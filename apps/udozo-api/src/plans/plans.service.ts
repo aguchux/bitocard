@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { AccountNotices } from '../notifications/account-notices.service.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { apiKeyScopes } from '../api-keys/api-keys.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -58,7 +59,15 @@ export class PlansService {
     private readonly fx: FxService,
     private readonly access: PlanAccessService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly notices: AccountNotices,
   ) {}
+
+  /** The whole team is told the account is live (by an admin, after the identity check or with it waived), and the owner by email. */
+  private async tellActivated(id: string) {
+    const notice = { title: 'Your account is active', body: 'You can take live orders, publish your stores and use live API keys.' };
+    await this.inbox.reseller(id, 'account.activated', { subject: `activated:${Date.now()}`, ...notice, link: '/settings' });
+    this.notices.owner(id, { ...notice, path: '/', action: 'Open Seller HQ' });
+  }
 
   /** Every limit's value for a plan: what it sets, else the default. */
   /** This product's limits (Udozo's plans have `free_domains`, BitoCard's never). */
@@ -390,12 +399,17 @@ export class PlansService {
       return tx.reseller.update({ where: { id }, data: { status: input.status, planCode: input.plan, ...(input.plan ? { planRenewsAt: null, planCancelAtPeriodEnd: false, planPastDueSince: null } : {}) } });
     });
     await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
+    if (after.status === 'active' && before.status === 'pending') await this.tellActivated(id);
+    if (input.plan && input.plan !== before.planCode) {
+      const plan = await this.prisma.plan.findUnique({ where: { code: input.plan }, select: { name: true } });
+      await this.inbox.reseller(id, 'plan.store_assigned', { subject: `plan:${input.plan}:${Date.now()}`, title: `Your stores are on ${plan?.name ?? input.plan}`, body: input.plan === freePlanCode ? 'Udozo moved your stores to the free plan.' : 'Udozo put every store on this plan, without charging you.', link: '/settings/plan' });
+    }
     if (after.status === 'suspended' && before.status !== 'suspended') {
       await this.inbox.reseller(id, 'account.suspended', {
         subject: `suspended:${after.updatedAt.toISOString()}`,
         title: 'Your account is suspended',
         body: 'Live orders and your store are paused, and your API keys stop working. Contact support to find out why and what to do next.',
-        link: '/settings/business',
+        link: '/settings',
       });
     }
     return this.resellerDetail(id);
@@ -419,7 +433,7 @@ export class PlansService {
       subject: `reinstated:${after.updatedAt.toISOString()}`,
       title: 'Your account is no longer suspended',
       body: status === 'active' ? 'You can take live orders again, and your store and API keys work again.' : 'Finish the identity check to take live orders again.',
-      link: status === 'active' ? '/settings/business' : '/settings/verification',
+      link: status === 'active' ? '/settings' : '/settings/verification',
     });
     return this.resellerDetail(id);
   }
@@ -439,6 +453,7 @@ export class PlansService {
       data: { identityWaivedAt: before.identityWaivedAt ?? new Date(), identityWaivedBy: actorId, identityWaiverReason: input.reason.trim(), status: activate ? 'active' : undefined },
     });
     await this.audit.record({ actorId, action: 'reseller.identity_waived', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    if (activate) await this.tellActivated(id);
     return this.resellerDetail(id);
   }
 
@@ -452,6 +467,11 @@ export class PlansService {
       data: { identityWaivedAt: null, identityWaivedBy: null, identityWaiverReason: null, status: !before.verifiedAt && before.status === 'active' ? 'pending' : undefined },
     });
     await this.audit.record({ actorId, action: 'reseller.identity_waiver_removed', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    if (after.status === 'pending' && before.status === 'active') {
+      const notice = { title: 'Finish your identity check to sell live again', body: 'Udozo now needs the owner’s identity check before your account takes live orders. Start it from Seller HQ.' };
+      await this.inbox.reseller(id, 'account.identity_required', { subject: `identity_required:${Date.now()}`, ...notice, link: '/verification' });
+      this.notices.owner(id, { ...notice, path: '/verification', action: 'Start the check' });
+    }
     return this.resellerDetail(id);
   }
 

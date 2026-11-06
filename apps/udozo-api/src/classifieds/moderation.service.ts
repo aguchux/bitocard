@@ -101,8 +101,21 @@ export class ModerationService {
     const reporters = await this.prisma.classifiedReport.count({ where: { listingId: listing.id, status: 'open' } });
     if (reporters >= reportsToReview && listing.status === 'active') {
       const moved = await this.prisma.classifiedListing.updateMany({ where: { id: listing.id, status: 'active' }, data: { status: 'pending_review', reviewReason: 'reported', reviewFlags: { push: 'reported' } } });
-      if (moved.count) this.postings.requeued(listing.id, 'reported', ['reported']);
+      if (moved.count) {
+        this.postings.requeued(listing.id, 'reported', ['reported']);
+        const seller = await this.prisma.customer.findUnique({ where: { id: listing.customerId }, select: { id: true, storeId: true } });
+        if (seller) {
+          const body = `"${listing.title}" is off Udozo while a moderator checks it after buyers reported it. You will hear the outcome.`;
+          await this.inbox.customer({ customerId: seller.id, storeId: seller.storeId }, 'customer.classifieds.listing_in_review', { subject: `${listing.id}:reported`, title: 'Your ad is being checked', body, link: '/account/listings' });
+        }
+      }
     }
+    await this.inbox.admins('admin.classifieds.listing_reported', {
+      subject: `listing_report:${report.id}`,
+      title: reporters >= reportsToReview ? 'A reported listing went back to review' : 'A listing was reported',
+      body: `"${listing.title ?? 'A listing'}": ${input.reason.replace(/_/g, ' ')}${reporters > 1 ? ` (${reporters} open reports)` : ''}.`,
+      link: `/classifieds/listings/${listing.id}`,
+    });
     return { object: 'classified_report' as const, id: report.id, status: report.status, reason: report.reason, created_at: report.createdAt.toISOString() };
   }
 
@@ -172,6 +185,15 @@ export class ModerationService {
     }
     await this.prisma.classifiedReport.updateMany({ where: { id, status: 'open' }, data: { status: input.action === 'dismiss' ? 'dismissed' : 'actioned', decidedById: actorId, decidedAt: new Date(), note: input.note } });
     await this.audit.record({ actorId, action: `classifieds.report_${input.action === 'dismiss' ? 'dismissed' : 'actioned'}`, targetType: 'classified_report', targetId: id, before: { status: 'open' }, after: { note: input.note } });
+    const reporter = report.reporterId ? await this.prisma.customer.findUnique({ where: { id: report.reporterId }, select: { id: true, storeId: true } }) : null;
+    if (reporter) {
+      await this.inbox.customer({ customerId: reporter.id, storeId: reporter.storeId }, 'customer.classifieds.report_decided', {
+        subject: `report:${id}:decided`,
+        title: 'Thanks for your report',
+        body: input.action === 'remove_listing' ? 'A moderator checked it and removed the listing.' : 'A moderator checked it and found nothing against the rules this time.',
+        link: '/account',
+      });
+    }
     return this.presentReport(await this.prisma.classifiedReport.findUniqueOrThrow({ where: { id } }));
   }
 
@@ -183,6 +205,9 @@ export class ModerationService {
     await this.prisma.classifiedSeller.upsert({ where: { customerId }, create: { customerId, suspendedAt: now, suspendedReason: reason, suspendedById: actorId }, update: { suspendedAt: now, suspendedReason: reason, suspendedById: actorId } });
     const removed = await this.prisma.classifiedListing.updateMany({ where: { customerId, status: { in: ['active', 'pending_review'] } }, data: { status: 'removed', reviewReason: 'seller_suspended', closedAt: now } });
     await this.audit.record({ actorId, action: 'classifieds.seller_suspended', targetType: 'customer', targetId: customerId, before: null, after: { reason, listings_removed: removed.count } });
+    const suspended = { title: 'Your selling on Udozo was suspended', body: `Your ads are off Udozo and you cannot post new ones. Why: ${reason}` };
+    await this.inbox.customer({ customerId, storeId: customer.storeId }, 'customer.classifieds.account_suspended', { subject: `suspended:${now.toISOString()}`, ...suspended, link: '/account/listings' });
+    this.emails.customer(customerId, { ...suspended, path: '/help/contact', action: 'Contact Udozo' });
     return { object: 'classified_seller' as const, customer_id: customerId, suspended: true, suspended_reason: reason, listings_removed: removed.count };
   }
 
@@ -191,6 +216,12 @@ export class ModerationService {
     if (!seller?.suspendedAt) throw conflict('not_suspended', 'This seller is not suspended.');
     await this.prisma.classifiedSeller.update({ where: { customerId }, data: { suspendedAt: null, suspendedReason: null, suspendedById: null } });
     await this.audit.record({ actorId, action: 'classifieds.seller_unsuspended', targetType: 'customer', targetId: customerId, before: { reason: seller.suspendedReason }, after: { reason } });
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { storeId: true } });
+    if (customer) {
+      const restored = { title: 'You can sell on Udozo again', body: 'Your suspension was lifted. Ads removed then stay removed: post them again from My listings.' };
+      await this.inbox.customer({ customerId, storeId: customer.storeId }, 'customer.classifieds.account_restored', { subject: `restored:${Date.now()}`, ...restored, link: '/account/listings' });
+      this.emails.customer(customerId, { ...restored, path: '/account/listings', action: 'Open My listings' });
+    }
     return { object: 'classified_seller' as const, customer_id: customerId, suspended: false, suspended_reason: null, listings_removed: 0 };
   }
 

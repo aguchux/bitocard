@@ -47,9 +47,9 @@ describe("the header", () => {
     expect(html.slice(country, profile)).not.toMatch(/<a /);
   });
 
-  it("has the Get help menu before the country, its open places as links; the profile menu holds only the account", () => {
+  it("has the Get help menu and the notifications bell before the country, its open places as links; the profile menu holds only the account", () => {
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]).filter(href => !href.startsWith("/ng/c/") && href !== "/ng/search" && href !== "/ng/areas");
-    expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/help/faqs", "/start-here", "/help/contact", "/account", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell?from=header"]);
+    expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/help/faqs", "/start-here", "/help/contact", "/account/notifications", "/account", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell?from=header"]);
     expect(html.indexOf('aria-label="Get help"')).toBeLessThan(html.indexOf('href="/safe-trade#safe-pay"'));
     expect(html.indexOf('href="/help/contact"')).toBeLessThan(html.indexOf('title="Nigeria"'));
     expect(html).toContain("Sign out");

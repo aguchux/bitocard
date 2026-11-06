@@ -1,4 +1,6 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { InboxService } from '../notifications/inbox.service.js';
+import { AccountNotices } from '../notifications/account-notices.service.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { setupFeeOf } from '../billing/setup-fee.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -133,6 +135,8 @@ export class StoresService {
     private readonly planAccess: PlanAccessService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly watermarks: WatermarkService,
+    private readonly inbox: InboxService,
+    private readonly notices: AccountNotices,
   ) {}
 
   /** The store as shown to its reseller, with whether they may give it its own photo watermark. */
@@ -356,6 +360,14 @@ export class StoresService {
     if (!before) throw missing();
     const after = await this.prisma.store.update({ where: { id }, data: { status } });
     await this.audit.record({ actorId, action: `store.${status}`, targetType: 'store', targetId: id, before, after });
+    if (before.status !== status) {
+      const notice =
+        status === 'suspended'
+          ? { title: `${after.name} was suspended`, body: 'Its shoppers can no longer buy there. Contact support to find out why and what to do next.' }
+          : { title: `${after.name} was taken offline`, body: 'It is back to a draft: publish it again from Seller HQ once it is ready, or contact support.' };
+      await this.inbox.reseller(after.resellerId, 'store.status_changed', { subject: `${id}:${status}:${Date.now()}`, ...notice, link: `/store/${id}` });
+      this.notices.owner(after.resellerId, { ...notice, path: `/store/${id}`, action: 'Open the store' });
+    }
     return this.present(after);
   }
 

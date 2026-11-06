@@ -253,7 +253,7 @@ export class ManualTopUpsService {
       subject: row.id,
       title: `${amount} added by hand to ${row.reseller?.name ?? row.customer?.name ?? 'a wallet'}`,
       body: `${this.number(row)} (${row.source === 'received' ? 'money received' : 'goodwill credit'}): ${row.reason}`,
-      link: row.resellerId ? `/resellers/${row.resellerId}` : `/storefront/customers/${row.customerId}`,
+      link: row.resellerId ? `/resellers/${row.resellerId}` : `/customers/${row.customerId}`,
       mode: row.mode,
     });
   }

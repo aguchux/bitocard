@@ -470,6 +470,15 @@ export class InvoicesService {
     if (!before) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such reseller.');
     await this.prisma.reseller.update({ where: { id: resellerId }, data: { creditLimitCents: cents } });
     await this.audit.record({ actorId, action: 'reseller.credit_limit_set', targetType: 'reseller', targetId: resellerId, before: { cents: before.creditLimitCents }, after: { cents, reason } });
+    if (before.creditLimitCents !== cents) {
+      const dollars = `US$${(cents / 100).toFixed(2)}`;
+      await this.inbox.reseller(resellerId, 'billing.credit_limit_changed', {
+        subject: `credit:${cents}:${Date.now()}`,
+        title: `Your credit limit is now ${dollars}`,
+        body: cents > before.creditLimitCents ? 'Usage can run up to this much before it must be paid.' : 'Usage past this much stops until what is owed is paid.',
+        link: '/wallet/invoices',
+      });
+    }
     return this.credit(resellerId);
   }
 }

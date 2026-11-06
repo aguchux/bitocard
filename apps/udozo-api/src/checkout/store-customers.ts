@@ -6,6 +6,7 @@ import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, S
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { AccountNotices } from '../notifications/account-notices.service.js';
 import type { Customer, Prisma } from '../generated/prisma/client.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -53,6 +54,7 @@ export class StoreCustomersService {
     private readonly house: HouseService,
     private readonly settings: SettingsService,
     private readonly wallets: CustomerWalletsService,
+    private readonly notices: AccountNotices,
   ) {}
 
   async list(storeId: string, filter: { q?: string; limit?: number; starting_after?: string }) {
@@ -129,6 +131,12 @@ export class StoreCustomersService {
       for (const [action, from, to] of changes) {
         await this.audit.record({ actorId: actor.adminId, action, targetType: 'customer', targetId: id, before: { value: from }, after: { value: to } });
       }
+    }
+    // Told by email: a suspended account can no longer sign in to read its inbox.
+    if (input.status !== undefined && before.status !== after.status) {
+      this.notices.customer(id, after.status === 'disabled'
+        ? { title: 'Your account was suspended', body: 'You were signed out and cannot sign in or buy until the store lifts the suspension. Contact the store if you think this is a mistake.' }
+        : { title: 'Your account is open again', body: 'You can sign in and buy again.', path: '/signin', action: 'Sign in' });
     }
     return this.get(storeId, id);
   }

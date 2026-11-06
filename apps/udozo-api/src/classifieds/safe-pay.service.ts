@@ -434,7 +434,7 @@ export class SafePayService {
     const disputed = await this.reload(order.id);
     await this.tellReseller(disputed, `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides.`);
     await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides; add your side in the dispute.`);
-    await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `Safe pay dispute on SP-${disputed.number}`, body: `${input.reason.replace(/_/g, ' ')}: ${details.slice(0, 120)}`, link: `/classifieds/disputes/${disputed.dispute!.id}` });
+    await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `Safe pay dispute on SP-${disputed.number}`, body: `${input.reason.replace(/_/g, ' ')}: ${details.slice(0, 120)}`, link: `/classifieds/orders/${disputed.id}` });
     return this.present(disputed, 'buyer');
   }
 
@@ -823,7 +823,7 @@ export class SafePayService {
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: side, authorId: customer.id, body: text, ...photo } });
     await this.tell(order, side === 'buyer' ? 'seller' : 'buyer', 'customer.classifieds.dispute_message', `New message on the dispute for SP-${order.number}`, text.slice(0, 140) || 'A photo');
     await this.tellReseller(order, `New message on the dispute for SP-${order.number}`, `From the ${side === 'buyer' ? 'buyer' : 'supplier'}: ${text.slice(0, 140) || 'a photo'}`, true);
-    await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: `From the ${side}.`, link: `/classifieds/disputes/${order.dispute.id}` });
+    await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: `From the ${side}.`, link: `/classifieds/orders/${order.id}` });
     return this.presentDisputeMessage(message, order, side);
   }
 
@@ -920,7 +920,7 @@ export class SafePayService {
     if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: 'reseller', authorId: userId, body: text } });
     for (const side of ['buyer', 'seller'] as const) await this.tell(order, side, 'customer.classifieds.dispute_message', `New message on the dispute for SP-${order.number}`, text.slice(0, 140));
-    await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: 'From the reseller.', link: `/classifieds/disputes/${order.dispute.id}` });
+    await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: 'From the reseller.', link: `/classifieds/orders/${order.id}` });
     return this.presentDisputeMessage(message, order, 'reseller');
   }
 
@@ -985,6 +985,8 @@ export class SafePayService {
     await this.audit.record({ actorId, action: 'classifieds.payout_review_decided', targetType: 'classified_order', targetId: id, before: { payout_review: order.payoutReview }, after: { payout_review: outcome, note: input.note } });
     if (outcome === 'approved') {
       await this.tell(order, 'seller', 'customer.classifieds.order_released', `Your payment for SP-${order.number} is checked`, `${priceText(order.sellerPayoutMinor ?? 0n, order.currency)} can be withdrawn once the payout hold ends.`);
+    } else {
+      await this.tell(order, 'seller', 'customer.classifieds.payout_held', `Your payment for SP-${order.number} stays held`, `${priceText(order.sellerPayoutMinor ?? 0n, order.currency)} cannot be withdrawn for now while Udozo checks the buyer's payment. Contact Udozo if you have questions.`);
     }
     return this.adminGet(id);
   }
@@ -1002,6 +1004,10 @@ export class SafePayService {
     const now = new Date();
     await this.prisma.classifiedSeller.upsert({ where: { customerId }, create: { customerId, safePayClearedAt: now }, update: { safePayClearedAt: now } });
     await this.audit.record({ actorId, action: 'classifieds.safe_pay_limit_cleared', targetType: 'customer', targetId: customerId, before: { strikes: before.strikes, limited: before.limited }, after: { reason } });
+    if (before.limited) {
+      const seller = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { storeId: true } });
+      if (seller) await this.inbox.customer({ customerId, storeId: seller.storeId }, 'customer.classifieds.safe_pay_restored', { subject: `safe_pay_restored:${now.toISOString()}`, title: 'You can take Safe pay orders again', body: 'Udozo lifted the limit on your Safe pay orders. Earlier strikes no longer count.', link: '/account/safe-pay' });
+    }
     return this.sellerStanding(customerId);
   }
 

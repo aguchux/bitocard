@@ -412,6 +412,13 @@ export class ResaleTradeService {
           body: 'Their listings are off your stores. Your chat with them is closed.',
           link: `/resale/suppliers/${row.id}`,
         });
+      } else {
+        await this.tellReseller(row.resellerId, 'resale.supplier_restored', {
+          subject: `${row.id}:restored:${Date.now()}`,
+          title: `${publicName(row.supplier.name)} lets you resell their listings again`,
+          body: 'Add their listings to your stores again from Browse. Your chat with them is open.',
+          link: `/resale/suppliers/${row.id}`,
+        });
       }
     }
     return this.reseller(customer, id);

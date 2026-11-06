@@ -60,7 +60,7 @@ export class ResaleStoreReportsService {
   private async open(input: { storeId: string; resellerId: string; reporterId: string; reporterKind: 'buyer' | 'supplier'; orderId: string | null; reason: StoreReportReason; details: string }) {
     try {
       const report = await this.prisma.resaleStoreReport.create({ data: { ...input, details: this.details(input.details) }, include: reportInclude });
-      await this.inbox.admins('admin.classifieds.resale_store_report', { subject: `resale_store_report:${report.id}`, title: `A Resale shop was reported: ${report.store.name}`, body: `By a ${input.reporterKind}: it ${reasonText[input.reason]}.`, link: `/classifieds/resale-reports/${report.id}` });
+      await this.inbox.admins('admin.classifieds.resale_store_report', { subject: `resale_store_report:${report.id}`, title: `A Resale shop was reported: ${report.store.name}`, body: `By a ${input.reporterKind}: it ${reasonText[input.reason]}.`, link: '/classifieds/resale-reports' });
       return this.present(report, 'reporter');
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') throw conflict('report_open', 'You have already reported this store; Udozo is looking at it.');

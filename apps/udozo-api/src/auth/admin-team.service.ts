@@ -2,6 +2,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { AccountNotices } from '../notifications/account-notices.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { Prisma, type User } from '../generated/prisma/client.js';
 import { AdminAuthService, adminRoles } from './admin-auth.service.js';
 import { namesOf } from './names.js';
@@ -47,6 +49,8 @@ export class AdminTeamService {
     private readonly prisma: PrismaService,
     private readonly auth: AdminAuthService,
     private readonly audit: AuditService,
+    private readonly inbox: InboxService,
+    private readonly notices: AccountNotices,
   ) {}
 
   private readonly realm = 'admin' as const;
@@ -101,6 +105,9 @@ export class AdminTeamService {
     if (member.adminRoles.includes('super_admin') && !next.includes('super_admin') && member.status === 'active' && (await this.otherSuperAdmins(id)) === 0) throw lastSuperAdmin();
     const updated = await this.prisma.user.update({ where: { id }, data: { adminRoles: next }, include: { totp: { select: { confirmedAt: true } } } });
     await this.audit.record({ actorId, action: 'admin.roles_changed', targetType: 'user', targetId: id, before: { roles: member.adminRoles }, after: { roles: next } });
+    if (id !== actorId && (next.length !== member.adminRoles.length || next.some(role => !member.adminRoles.includes(role)))) {
+      await this.inbox.person(id, 'team.role_changed', { subject: `roles:${next.join()}:${Date.now()}`, title: 'Your admin roles changed', body: `You now have: ${next.map(role => role.replace('_', ' ')).join(', ') || 'no roles'}. What you can see and do changed with it.`, link: '/' });
+    }
     return present(updated);
   }
 
@@ -122,6 +129,9 @@ export class AdminTeamService {
       this.prisma.session.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
     ]);
     await this.audit.record({ actorId, action: 'admin.authenticator_reset', targetType: 'user', targetId: id, after: { reason } });
+    const reset = { title: 'Your authenticator app was reset', body: 'A super admin removed your authenticator and signed you out. Set it up again when you next sign in. If you did not ask for this, tell a super admin at once.' };
+    await this.inbox.person(id, 'security.two_step_changed', { subject: `authenticator_reset:${Date.now()}`, ...reset, link: '/account' });
+    this.notices.person(id, { ...reset, path: '/signin', action: 'Sign in' });
     return present({ ...member, totp: null });
   }
 
@@ -135,6 +145,7 @@ export class AdminTeamService {
       this.prisma.session.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
     ]);
     await this.audit.record({ actorId, action: 'admin.suspended', targetType: 'user', targetId: id, after: { reason } });
+    this.notices.person(id, { title: 'Your admin access was suspended', body: 'You were signed out and cannot sign in to the admin until a super admin restores you.' });
     return present(updated);
   }
 
@@ -142,6 +153,7 @@ export class AdminTeamService {
     await this.member(id);
     const updated = await this.prisma.user.update({ where: { id }, data: { status: 'active', failedSignIns: 0, lockedUntil: null }, include: { totp: { select: { confirmedAt: true } } } });
     await this.audit.record({ actorId, action: 'admin.restored', targetType: 'user', targetId: id, after: { reason } });
+    this.notices.person(id, { title: 'Your admin access was restored', body: 'You can sign in to the admin again.', path: '/signin', action: 'Sign in' });
     return present(updated);
   }
 }

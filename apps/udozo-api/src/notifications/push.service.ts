@@ -170,7 +170,7 @@ export class PushService {
       title: 'Push notifications are on',
       body: `${device.label} will get your notifications.`,
       severity: 'info',
-      link: '/notifications',
+      link: device.audience === 'customer' ? '/account/notifications' : '/notifications',
       mode: null,
       account: null,
       icon: await this.iconFor(device.storeId),
@@ -272,8 +272,10 @@ export class PushService {
         const { push, locked } = pushDefault(type);
         return locked || (preferences.find(item => ownerKey(item) === ownerKey(row) && item.type === type)?.push ?? push);
       };
-      // A customer's device only gets their notifications from the store it subscribed on.
-      const matches = (row: Notification, device: (typeof devices)[number]) => ownerKey(device) === ownerKey(row) && (!row.customerId || device.storeId === row.storeId);
+      // A customer's device only gets their notifications from the store it subscribed on; on Udozo one account is the
+      // customer's on udozo.com and every store, so their browser gets all of theirs.
+      const shared = this.integrations.config.APP_PRODUCT === 'udozo';
+      const matches = (row: Notification, device: (typeof devices)[number]) => ownerKey(device) === ownerKey(row) && (!row.customerId || shared || device.storeId === row.storeId);
       const data = notifications.filter(pushed).flatMap(row => devices.filter(device => matches(row, device)).map(device => ({ notificationId: row.id, deviceId: device.id })));
       if (data.length === 0) return;
       const created = await this.prisma.pushDelivery.createManyAndReturn({ data, skipDuplicates: true, select: { id: true } });
@@ -340,12 +342,16 @@ export class PushService {
   }
 
   /**
-   * Whether the session that registered the device is still signed in. Staff sessions are in `sessions`. Storefront
-   * customers have no sign-in yet (it comes with hosted checkout): until it exists and is checked here, their devices
-   * are treated as signed out, so nothing is ever pushed to a customer device that could not be verified.
+   * Whether the session that registered the device is still signed in: staff sessions are in `sessions`, customers' in
+   * `customer_sessions` (Udozo's customers on udozo.com). Elsewhere customer devices are still treated as signed out,
+   * so nothing is pushed to a customer device that could not be verified.
    */
   private async signedIn(device: Device, now: Date) {
-    if (device.audience === 'customer') return false;
+    if (device.audience === 'customer') {
+      if (this.integrations.config.APP_PRODUCT !== 'udozo' || !device.customerId) return false;
+      const session = await this.prisma.customerSession.findUnique({ where: { id: device.sessionId }, select: { revokedAt: true, expiresAt: true, customerId: true } });
+      return Boolean(session && !session.revokedAt && session.expiresAt > now && session.customerId === device.customerId);
+    }
     const session = await this.prisma.session.findUnique({ where: { id: device.sessionId }, select: { revokedAt: true, expiresAt: true, userId: true } });
     return Boolean(session && !session.revokedAt && session.expiresAt > now && session.userId === device.userId);
   }
@@ -353,7 +359,9 @@ export class PushService {
   /** The notification icon: Bitocard's app icon (public/icon-192.png) for staff; for customers their store's logo (never BitoCard's brand), if any. */
   private async iconFor(storeId: string | null) {
     if (!storeId) return '/icon-192.png';
-    return (await this.prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true } }))?.logoUrl ?? null;
+    const logo = (await this.prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true } }))?.logoUrl ?? null;
+    // Udozo's customers are pushed by udozo.com's own worker: its app icon when the store has no logo.
+    return logo ?? (this.integrations.config.APP_PRODUCT === 'udozo' ? '/icon-192.png' : null);
   }
 
   /** Keeps the device's record: last push, failures; drops it when the push service says it is gone or keeps refusing. */

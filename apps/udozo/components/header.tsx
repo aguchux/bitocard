@@ -15,6 +15,7 @@ import { Dropdown } from "./dropdown";
 import { Flag } from "./flag";
 import { type ContinueTo, HeaderSearch, SearchBlend } from "./header-search";
 import { HelpMenu } from "./help-menu";
+import { NotificationBell } from "./notifications/bell";
 import { SignInHere } from "./sign-in-here";
 import { sellHref } from "@/lib/sell-sources";
 
@@ -86,6 +87,7 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
         </div>
         <div className="-mr-2 ml-auto flex items-center gap-0.5 sm:mr-0 sm:gap-2">
           <HelpMenu />
+          {customer ? <NotificationBell /> : null}
           {country}
           <ProfileMenu customer={customer} />
           {customer ? null : (

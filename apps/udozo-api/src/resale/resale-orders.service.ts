@@ -404,6 +404,11 @@ export class ResaleOrdersService implements OnModuleInit {
     const before = await this.standing(resellerId, reseller.country);
     await this.prisma.reseller.update({ where: { id: resellerId }, data: { resaleStrikesClearedAt: new Date() } });
     await this.audit.record({ actorId, action: 'resale.strikes_cleared', targetType: 'reseller', targetId: resellerId, before: { strikes: before.strikes, limited: before.limited }, after: { reason } });
+    if (before.limited) {
+      const restored = { title: 'Your Resale shops can take orders again', body: 'The limit on your Resale shops was lifted, and earlier strikes no longer count.' };
+      await this.inbox.reseller(resellerId, 'resale.checkout_restored', { subject: `resale_restored:${Date.now()}`, ...restored, link: '/resale/orders' });
+      this.emails.reseller(resellerId, { ...restored, path: '/resale/orders' });
+    }
     return { object: 'resale_standing' as const, reseller_id: resellerId, ...(await this.standing(resellerId, reseller.country)) };
   }
 

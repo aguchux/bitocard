@@ -522,10 +522,16 @@ export class IdentityService {
         await this.inbox.reseller(record.resellerId, 'verification.updated', {
           subject: `${record.id}:${status}`,
           ...outcome,
-          link: ownerBvn ? '/wallet/reserved-accounts' : '/verification',
+          // Udozo's Seller HQ has no reserved accounts: the verification page either way.
+          link: '/verification',
           mode: record.mode,
         });
       }
+    }
+    if (record.subject === 'customer' && kycPlatform(record.resellerId) === 'bitocard') await this.tellCustomer(record, status, reason);
+    // Manual approval: the owner passed, and someone has to activate the account.
+    if (ownerDocument && status === 'approved' && !autoApprove && record.mode === 'live') {
+      await this.inbox.admins('admin.reseller.awaiting_activation', { subject: `activate:${record.resellerId}`, title: 'A verified reseller is waiting to be activated', body: 'The owner passed the identity check. Review the account and activate it.', link: `/resellers/${record.resellerId}` });
     }
     if (status === 'in_review' && record.mode === 'live') {
       await this.inbox.admins('admin.verification.review', {
@@ -543,6 +549,23 @@ export class IdentityService {
           .catch(error => this.logger.warn({ err: error }, 'Could not send the email'));
       }
     }
+  }
+
+  /** A customer's own check, decided or moved on: told in their inbox (their account's store), with what to do next. */
+  private async tellCustomer(record: IdentityVerification, status: string, reason: string | null) {
+    const id = record.customerReference;
+    if (!id || !uuidPattern.test(id)) return;
+    const customer = await this.prisma.customer.findUnique({ where: { id }, select: { id: true, storeId: true } });
+    if (!customer) return;
+    const outcomes: Record<string, { title: string; body: string }> = {
+      approved: { title: 'Your identity check was approved', body: 'You are verified: what needed the check is open to you now.' },
+      declined: { title: 'Your identity check was declined', body: reason === 'name_mismatch' ? 'The name on the record did not match your name. Start a new check from your account.' : 'Start a new check from your account when you are ready.' },
+      in_review: { title: 'Your identity check is being reviewed', body: 'A person is checking it; we will tell you the outcome.' },
+      expired: { title: 'Your identity check expired', body: 'It was not finished in time. Start a new one when you are ready.' },
+    };
+    const outcome = outcomes[status];
+    if (!outcome) return;
+    await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.verification.updated', { subject: `${record.id}:${status}`, ...outcome, link: '/account/verification', mode: record.mode });
   }
 
   /** Re-reads unfinished live checks the providers have not told us about, and closes those nobody finished. Run on a schedule. */

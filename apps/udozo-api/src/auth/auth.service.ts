@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PrismaService } from '../database/prisma.service.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { Prisma, type User } from '../generated/prisma/client.js';
 import { parsePhoneNumberFromString, type CountryCode, getCountryCallingCode } from 'libphonenumber-js/max';
@@ -82,7 +83,27 @@ export class AuthService {
     private readonly signupVerification: SignupVerificationService,
     private readonly inbox: InboxService,
     private readonly twoStep: TwoStepService,
+    private readonly integrations: IntegrationsService,
   ) {}
+
+  private get product() {
+    return this.integrations.config.APP_PRODUCT === 'udozo' ? ('Udozo' as const) : ('BitoCard' as const);
+  }
+
+  private get supportEmail() {
+    return this.product === 'Udozo' ? 'support@udozo.com' : 'support@bitocard.com';
+  }
+
+  /** The password-changed email and notice, after a change or a reset. */
+  private async passwordChanged(user: { id: string; email: string }, others: string) {
+    await this.email.send(passwordChangedEmail(user.email, this.product)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the password changed notice'));
+    await this.inbox.person(user.id, 'security.password_changed', {
+      subject: String(Date.now()),
+      title: 'Your password was changed',
+      body: `${others} If this was not you, reset your password and contact ${this.supportEmail}.`,
+      link: '/settings/profile',
+    });
+  }
 
   async signUp(input: SignUpDto, req: Request, res: Response) {
     const invitation = input.invitation_token ? await this.team.findValid(input.invitation_token, input.email) : null;
@@ -333,6 +354,7 @@ export class AuthService {
       },
     });
     await this.sessions.revokeAllForUser(user.id);
+    await this.passwordChanged(user, 'You reset it with an emailed code, and every session was signed out.');
   }
 
   /** The person's first and last name (saving both confirms them), or, from an older client, their whole name. */
@@ -366,13 +388,7 @@ export class AuthService {
     await this.passwords.assertAcceptable(next);
     await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await this.passwords.hash(next) } });
     await this.prisma.session.updateMany({ where: { userId, revokedAt: null, id: { not: sessionId } }, data: { revokedAt: new Date() } });
-    await this.email.send(passwordChangedEmail(user.email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the password changed notice'));
-    await this.inbox.person(userId, 'security.password_changed', {
-      subject: String(Date.now()),
-      title: 'Your password was changed',
-      body: 'Your other sessions were signed out. If this was not you, reset your password and contact support@bitocard.com.',
-      link: '/settings/profile',
-    });
+    await this.passwordChanged(user, 'Your other sessions were signed out.');
   }
 
   // -- Email addresses --------------------------------------------------------------------------------------------

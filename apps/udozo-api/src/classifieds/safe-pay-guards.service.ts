@@ -43,7 +43,7 @@ export class SafePayGuardsService {
       subject: `${first}:${second}`,
       title: 'Safe pay refused: one person on both sides',
       body: `A buyer and seller on Udozo matched by ${reason.replace(/_/g, ' ')}. Their order was refused; check both accounts.`,
-      link: `/storefront/customers/${buyerId}`,
+      link: `/customers/${buyerId}`,
     });
     throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'same_person', 'Safe pay is for trades between two different people, so it cannot be used here.');
   }
@@ -121,7 +121,7 @@ export class SafePayGuardsService {
       link: '/account/orders',
     });
     this.emails.customer(seller.id, { title: 'You cannot take Safe pay orders for now', body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you. Contact Udozo to have it reviewed.`, path: '/account/orders' });
-    await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A Udozo seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/storefront/customers/${seller.id}` });
+    await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A Udozo seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/classifieds/sellers/${seller.id}` });
   }
 
   /** `safe_pay_limited` once a seller has reached the strike limit. */

@@ -1037,7 +1037,7 @@ export class PaymentsService {
           reason === 'late'
             ? `${paid} was paid through ${where} after the payment had closed. It is being refunded to the payer.`
             : `${paid} was paid through ${where} for a payment of ${formatMoney(payment.amountMinor, payment.currency)}. It is being refunded to the payer.`,
-        link: '/orders',
+        link: '/money/top-ups',
         mode: payment.mode,
       });
     }
@@ -1085,7 +1085,7 @@ export class PaymentsService {
         subject: payment.id,
         title: 'A refund of an uncredited payment needs attention',
         body: `Refunding ${formatMoney(payment.unmatchedAmountMinor, payment.unmatchedCurrency)} through ${payment.provider} failed ${maxUnmatchedRefundAttempts} times. Refund the payer by hand.`,
-        link: '/orders',
+        link: '/money/top-ups',
         mode: payment.mode,
       });
     }

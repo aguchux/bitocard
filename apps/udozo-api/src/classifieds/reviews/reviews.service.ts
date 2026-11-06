@@ -532,6 +532,12 @@ export class ReviewsService {
     const until = blocked ? new Date(Date.now() + days * dayMs) : null;
     await this.prisma.classifiedSeller.upsert({ where: { customerId }, create: { customerId, reviewsBlockedUntil: until }, update: { reviewsBlockedUntil: until } });
     await this.audit.record({ actorId, action: blocked ? 'classifieds.reviewer_blocked' : 'classifieds.reviewer_unblocked', targetType: 'customer', targetId: customerId, before: null, after: { until: until?.toISOString() ?? null, reason } });
+    const reviewer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { storeId: true } });
+    if (reviewer) {
+      await this.inbox.customer({ customerId, storeId: reviewer.storeId }, 'customer.classifieds.reviews_blocked', until
+        ? { subject: `reviews_blocked:${until.toISOString()}`, title: 'You cannot write reviews for now', body: `Udozo paused your reviews and replies until ${until.toISOString().slice(0, 10)}. Why: ${reason}`, link: '/account/reviews' }
+        : { subject: `reviews_unblocked:${Date.now()}`, title: 'You can write reviews again', body: 'Udozo lifted the pause on your reviews and replies.', link: '/account/reviews' });
+    }
     return { reviews_blocked_until: until?.toISOString() ?? null };
   }
 

@@ -286,6 +286,12 @@ export class ConversationsService {
       const report = await this.prisma.classifiedReport.create({
         data: { conversationId: chat.id, reportedCustomerId: side === 'buyer' ? chat.sellerId : chat.buyerId, reporterId: customer.id, reason: input.reason, details: input.details?.trim() || null },
       });
+      await this.inbox.admins('admin.classifieds.chat_reported', {
+        subject: `chat_report:${report.id}`,
+        title: input.reason === 'review_pressure' ? 'A chat was reported for pressure over a review' : 'A chat was reported',
+        body: `The ${side} reported the other side: ${input.reason.replace(/_/g, ' ')}.`,
+        link: `/classifieds/conversations/${chat.id}`,
+      });
       return { object: 'classified_report' as const, id: report.id, status: report.status, reason: report.reason, created_at: report.createdAt.toISOString() };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') throw conflict('already_reported', 'You have already reported this chat. A moderator will look at it.');

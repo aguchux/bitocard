@@ -39,7 +39,7 @@ function storeServer() {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), patch: (path, body) => request('PATCH', path, body) };
+  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), patch: (path, body) => request('PATCH', path, body), put: (path, body) => request('PUT', path, body) };
 }
 
 let counter = 0;
@@ -369,5 +369,79 @@ describe('reference data and the queue', () => {
     assert.equal(refused.json.error?.param, 'area_id', 'no new ads in a switched-off area');
     assert.equal(await prisma.auditLog.count({ where: { action: { in: ['classifieds.area_created', 'classifieds.area_changed'] }, targetId: added.json.id } }), 3);
     assert.equal((await support.patch(`/v1/admin/classifieds/areas/${added.json.id}`, { enabled: true })).status, 403);
+  });
+});
+
+describe("what sellers, reporters and moderators are told", () => {
+  const types = async shopper => (await shopper.get('/v1/store/account/notifications?limit=50')).json.data.map(row => row.type);
+
+  test("a customer's inbox on udozo.com: listed newest first, counted, read one at a time or all", async () => {
+    const seller = await customer();
+    const live = (await submit(seller, await draft(seller, { title: 'Chest freezer 300 litres', category: 'kitchen' }))).json;
+    const reporters = [await customer(), await customer(), await customer()];
+    for (const reporter of reporters) await reporter.post('/v1/classifieds/reports', { listing_id: live.id, reason: 'scam' });
+
+    // Three reports put it in review: the seller hears once, and moderators hear of each report.
+    const inbox = (await seller.get('/v1/store/account/notifications')).json;
+    const checked = inbox.data.filter(row => row.type === 'customer.classifieds.listing_in_review');
+    assert.equal(checked.length, 1, JSON.stringify(inbox.data.map(row => row.type)));
+    assert.deepEqual([checked[0].link, checked[0].read], ['/account/listings', false]);
+    const unread = (await seller.get('/v1/store/account/notifications/unread-count')).json.count;
+    assert.ok(unread >= 1);
+    const read = await seller.post(`/v1/store/account/notifications/${checked[0].id}/read`);
+    assert.deepEqual([read.status, read.json.read], [200, true]);
+    assert.equal((await seller.get('/v1/store/account/notifications/unread-count')).json.count, unread - 1);
+    assert.equal((await seller.post('/v1/store/account/notifications/read-all')).status, 200);
+    assert.equal((await seller.get('/v1/store/account/notifications/unread-count')).json.count, 0);
+    // Another customer's notice is not theirs to read.
+    assert.equal((await reporters[0].post(`/v1/store/account/notifications/${checked[0].id}/read`)).status, 404);
+    // Signed out, nothing.
+    assert.equal((await storeServer().get('/v1/store/account/notifications')).status, 401);
+
+    const reported = await prisma.notification.findMany({ where: { type: 'admin.classifieds.listing_reported', link: `/classifieds/listings/${live.id}` } });
+    assert.ok(reported.length >= 3, 'every report reaches moderators');
+  });
+
+  test('suspending and restoring a seller tells them in the inbox and by email; a decided report tells its reporter', async () => {
+    const seller = await customer();
+    const live = (await submit(seller, await draft(seller, { title: 'Sewing machine, Butterfly', category: 'kitchen' }))).json;
+    const reporter = await customer();
+    const report = (await reporter.post('/v1/classifieds/reports', { listing_id: live.id, reason: 'scam' })).json;
+    assert.equal((await admin.post(`/v1/admin/classifieds/reports/${report.id}/resolve`, { action: 'dismiss', note: 'Looks fine.' })).status, 200);
+    assert.ok((await types(reporter)).includes('customer.classifieds.report_decided'));
+
+    assert.equal((await admin.post(`/v1/admin/classifieds/sellers/${seller.id}/suspend`, { reason: 'Repeated scam reports.' })).status, 200);
+    const suspended = (await seller.get('/v1/store/account/notifications')).json.data.find(row => row.type === 'customer.classifieds.account_suspended');
+    assert.match(suspended?.body ?? '', /Repeated scam reports/);
+    assert.equal((await admin.post(`/v1/admin/classifieds/sellers/${seller.id}/unsuspend`, { reason: 'Appeal accepted.' })).status, 200);
+    assert.ok((await types(seller)).includes('customer.classifieds.account_restored'));
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const { EmailService } = await import('../dist/notifications/email.service.js');
+    const subjects = server.app.get(EmailService).outbox.filter(item => item.to === seller.email).map(item => item.subject);
+    assert.ok(subjects.some(subject => /suspended/i.test(subject)) && subjects.some(subject => /sell on Udozo again/i.test(subject)), JSON.stringify(subjects));
+  });
+
+  test('an expired ad tells its seller once', async () => {
+    const seller = await customer();
+    const live = (await submit(seller, await draft(seller, { title: 'Water dispenser, cold and hot', category: 'kitchen' }))).json;
+    await prisma.classifiedListing.update({ where: { id: live.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    const listings = server.app.get((await import('../dist/classifieds/listings.service.js')).ListingsService);
+    assert.ok((await listings.expireDue()).expired >= 1);
+    await listings.expireDue();
+    const expired = (await seller.get('/v1/store/account/notifications')).json.data.filter(row => row.type === 'customer.classifieds.listing_expired');
+    assert.equal(expired.length, 1);
+  });
+
+  test("a customer's browsers and push choices on udozo.com", async () => {
+    const shopper = await customer();
+    assert.equal((await shopper.get('/v1/store/account/devices/push-settings')).status, 200);
+    assert.deepEqual((await shopper.get('/v1/store/account/devices')).json.data, []);
+    const prefs = (await shopper.get('/v1/store/account/notification-preferences')).json.data;
+    const security = prefs.find(row => row.type === 'customer.classifieds.account_suspended');
+    assert.deepEqual([security?.push, security?.locked], [true, true]);
+    assert.ok(!prefs.some(row => row.type.startsWith('customer.crypto.')), "BitoCard's own notices are not offered on Udozo");
+    const off = await shopper.put('/v1/store/account/notification-preferences/customer.classifieds.listing_expired', { push: false });
+    assert.deepEqual([off.status, off.json.push], [200, false]);
+    assert.equal((await shopper.put('/v1/store/account/notification-preferences/customer.classifieds.account_suspended', { push: false })).json.error?.code, 'preference_locked');
   });
 });

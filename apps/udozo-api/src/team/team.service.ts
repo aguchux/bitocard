@@ -7,6 +7,7 @@ import type { Invitation, ResellerRole } from '../generated/prisma/client.js';
 import { EmailService } from '../notifications/email.service.js';
 import { invitationEmail } from '../notifications/templates.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { AccountNotices } from '../notifications/account-notices.service.js';
 import { PlanAccessService } from '../plans/plan-access.js';
 
 export const staffRoles = ['admin', 'developer', 'finance', 'support'] as const;
@@ -41,6 +42,7 @@ export class TeamService {
     private readonly integrations: IntegrationsService,
     private readonly inbox: InboxService,
     private readonly planAccess: PlanAccessService,
+    private readonly notices: AccountNotices,
   ) {}
 
   async team(resellerId: string) {
@@ -138,6 +140,10 @@ export class TeamService {
     if (!member) throw memberMissing();
     if (member.role === 'owner') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'owner_protected', "The owner's role cannot be changed.");
     await this.prisma.resellerMember.update({ where: { resellerId_userId: { resellerId, userId } }, data: { role } });
+    if (member.role !== role) {
+      const business = await this.businessName(resellerId);
+      await this.inbox.person(userId, 'team.role_changed', { subject: `${resellerId}:${role}:${Date.now()}`, title: `Your role at ${business} changed`, body: `You are now ${roleWord(role)} on ${business}'s team. What you can see and do there changed with it.`, link: '/' });
+    }
     return this.team(resellerId);
   }
 
@@ -146,5 +152,15 @@ export class TeamService {
     if (!member) throw memberMissing();
     if (member.role === 'owner') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'owner_protected', 'The owner cannot be removed.');
     await this.prisma.resellerMember.delete({ where: { resellerId_userId: { resellerId, userId } } });
+    const business = await this.businessName(resellerId);
+    const notice = { title: `You were removed from ${business}`, body: `You are no longer on ${business}'s team and cannot open its stores, orders or wallet. Ask its owner if this is a mistake.` };
+    await this.inbox.person(userId, 'team.removed', { subject: `${resellerId}:removed:${Date.now()}`, ...notice, link: '/' });
+    this.notices.person(userId, notice);
+  }
+
+  private async businessName(resellerId: string) {
+    return (await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { name: true } }))?.name ?? 'a business';
   }
 }
+
+const roleWord = (role: ResellerRole) => (role === 'admin' ? 'an admin' : `a ${role} member`);

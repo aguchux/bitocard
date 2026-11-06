@@ -20,6 +20,7 @@ import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFault
 import { ResaleService } from './resale.service.js';
 import { ProductOnly } from '../products/product.js';
 import { AvatarsService } from '../media/avatars.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { UsernamesService } from './usernames.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
@@ -531,6 +532,8 @@ export class AdminClassifiedsController {
     private readonly avatars: AvatarsService,
     private readonly audit: AuditService,
     private readonly usernames: UsernamesService,
+    private readonly inbox: InboxService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -554,6 +557,8 @@ export class AdminClassifiedsController {
     const row = await this.admin.seller(customer);
     await this.avatars.remove({ kind: 'customer', id: customer });
     await this.audit.record({ actorId: adminId(caller), action: 'classifieds.seller_avatar_removed', targetType: 'customer', targetId: customer, before: { avatar_url: row.avatar_url }, after: { avatar_url: null, reason: body.reason } });
+    const seller = await this.prisma.customer.findUnique({ where: { id: customer }, select: { storeId: true } });
+    if (seller) await this.inbox.customer({ customerId: customer, storeId: seller.storeId }, 'customer.classifieds.avatar_removed', { subject: `avatar_removed:${Date.now()}`, title: 'Udozo removed your profile photo', body: `Why: ${body.reason} You can choose another that follows Udozo’s rules.`, link: '/account/profile' });
     return this.admin.seller(customer);
   }
 

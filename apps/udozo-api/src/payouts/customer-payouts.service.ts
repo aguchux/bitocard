@@ -346,10 +346,19 @@ export class CustomerPayoutsService {
         title: paid ? `${amount} sent to your bank` : `${amount} payout failed`,
         body: paid
           ? `Your money was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
-          : `The payout to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your P2P balance.`,
+          : `The payout to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your payouts balance.`,
         link: '/account/payouts',
         mode: updated.mode,
       });
+      if (!paid) {
+        await this.inbox.admins('admin.customer_payout.failed', {
+          subject: updated.id,
+          title: `A customer's ${amount} payout failed`,
+          body: `The bank transfer was refused: ${(updated.failureReason ?? 'no reason given').replace(/\.+$/, '')}. The money went back to their balance.`,
+          link: `/customers/${updated.customerId}`,
+          mode: updated.mode,
+        });
+      }
     }
     return updated;
   }
@@ -387,7 +396,7 @@ export class CustomerPayoutsService {
         subject: payout.id,
         title: `${formatMoney(payout.amountMinor, payout.currency)} customer payout unclear`,
         body: `The bank transfer ${payout.reference} (${payout.provider}) has no outcome after an hour. Check it with the provider; the money stays set aside.`,
-        link: `/crypto/customers/${payout.customerId}`,
+        link: `/customers/${payout.customerId}`,
         mode: payout.mode,
       });
     }

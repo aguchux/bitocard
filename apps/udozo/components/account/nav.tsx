@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
+  Bell,
   HandCoins,
   Heart,
   Landmark,
@@ -29,6 +30,7 @@ import { sellHref } from "@/lib/sell-sources";
 const icons = {
   listings: LayoutList,
   messages: MessagesSquare,
+  notifications: Bell,
   requests: PhoneCall,
   "buy-orders": HandCoins,
   orders: ReceiptText,

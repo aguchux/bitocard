@@ -697,7 +697,7 @@ export class ChatsService {
         subject: `${chat.id}:${bucket}`,
         title: afrippa ? 'Afrippa replied in chat' : 'The store replied in chat',
         body: 'Open the chat to read it.',
-        link: afrippa ? '/help?chat=1' : '/account/support?chat=1',
+        link: afrippa ? '/help?chat=1' : '/help/contact',
       });
     } else if (chat.visitorId && chat.storeId) {
       const now = new Date();

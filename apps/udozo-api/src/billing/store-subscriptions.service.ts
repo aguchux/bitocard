@@ -230,6 +230,15 @@ export class StoreSubscriptionsService {
     }
     await this.syncAccountPlan(store.resellerId);
     await this.audit.record({ actorId, action: 'store.plan_assigned', targetType: 'store', targetId: storeId, before: { plan: store.subscription?.planCode ?? freePlanCode }, after: { plan: planCode, billed: false } });
+    if ((store.subscription?.planCode ?? freePlanCode) !== planCode) {
+      const plan = await this.prisma.plan.findUnique({ where: { code: planCode }, select: { name: true } });
+      await this.inbox.reseller(store.resellerId, 'plan.store_assigned', {
+        subject: `${storeId}:${planCode}:${Date.now()}`,
+        title: `${store.name} is now on ${plan?.name ?? planCode}`,
+        body: 'Our team changed this store’s plan. It is not billed for it.',
+        link: '/settings/plan',
+      });
+    }
     return this.view(store.resellerId, storeId);
   }
 

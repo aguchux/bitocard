@@ -5,6 +5,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import type { AppConfig } from '../config/config.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { originAllowed } from './auth.guard.js';
@@ -114,6 +115,7 @@ export class GoogleService {
     private readonly sessions: SessionsService,
     private readonly integrations: IntegrationsService,
     @Optional() private readonly journeys?: SignupJourneysService,
+    @Optional() private readonly inbox?: InboxService,
   ) {}
 
   /** Starts the flow and returns the Google URL to redirect to. */
@@ -202,7 +204,10 @@ export class GoogleService {
 
     if (intent === 'link' && linkUserId) {
       if (linked && linked.userId !== linkUserId) throw new GoogleSignInError('google_account_in_use');
-      if (!linked) await this.prisma.oAuthAccount.create({ data: { userId: linkUserId, provider: 'google', providerUserId: sub, email } });
+      if (!linked) {
+        await this.prisma.oAuthAccount.create({ data: { userId: linkUserId, provider: 'google', providerUserId: sub, email } });
+        await this.inbox?.person(linkUserId, 'security.google_linked', { subject: `google:${sub}`, title: 'Google sign-in was added', body: `You can now sign in with the Google account ${email}. If this was not you, remove it and change your password.`, link: '/settings/security' });
+      }
       return linkUserId;
     }
 

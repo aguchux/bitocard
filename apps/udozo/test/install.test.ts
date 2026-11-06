@@ -6,6 +6,7 @@ import manifest from "@/app/manifest";
 import { InstallSheet } from "@bitocard/ui/install-ui";
 import { offlineWorker } from "@bitocard/ui/offline-worker";
 import { GET } from "@/app/sw.js/route";
+import { udozoPushWorker } from "@/lib/push-worker";
 import { installCaptureScript, installed, installRoute, readInstallState, reminded, reminderGapMs, remindersAtMost, shouldRemind } from "@bitocard/ui/install";
 
 const hour = reminderGapMs;
@@ -116,7 +117,8 @@ describe("the app", () => {
     const res = GET();
     expect(res.headers.get("content-type")).toContain("javascript");
     expect(res.headers.get("cache-control")).toContain("no-cache");
-    expect(await res.text()).toBe(offlineWorker("Udozo"));
+    // The offline page, then udozo.com's push notifications.
+    expect(await res.text()).toBe(offlineWorker("Udozo") + udozoPushWorker);
   });
 
   it("the worker serves pages from the network, and its own page only when there is no connection", async () => {

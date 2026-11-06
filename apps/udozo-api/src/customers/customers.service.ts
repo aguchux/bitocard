@@ -10,7 +10,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { type Country, type Customer, type CustomerCodePurpose, Prisma, type Store } from '../generated/prisma/client.js';
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
-import { customerCodeEmail } from '../notifications/templates.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { customerCodeEmail, passwordChangedEmail } from '../notifications/templates.js';
 import { houseSubdomain } from './store-key.js';
 
 const minute = 60 * 1000;
@@ -121,7 +122,20 @@ export class CustomersService {
     private readonly sms: SmsService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly signups: SignupVerificationService,
+    private readonly inbox: InboxService,
   ) {}
+
+  /**
+   * A change to the customer's own sign-in (password, mobile): told in their inbox (always pushed) and, for the
+   * password, by email, so someone else making it is noticed. Udozo's customers only; never fails the change.
+   */
+  private async tellSecurity(customer: Pick<Customer, 'id' | 'email' | 'storeId'>, type: 'customer.security.password_changed' | 'customer.security.phone_changed', title: string, body: string) {
+    if (this.config.APP_PRODUCT !== 'udozo') return;
+    await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, type, { subject: `${type}:${Date.now()}`, title, body, link: '/account/profile' });
+    if (type === 'customer.security.password_changed') {
+      await this.email.send(passwordChangedEmail(customer.email, 'Udozo')).catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not send the password email'));
+    }
+  }
 
   /** Which product this instance serves (Udozo's customers confirm their mobile number at sign-up). */
   get product() {
@@ -385,6 +399,7 @@ export class CustomersService {
       this.prisma.customer.update({ where: { id: customer.id }, data: { passwordHash: await this.passwords.hash(input.password) } }),
       this.prisma.customerSession.updateMany({ where: { customerId: customer.id, revokedAt: null, id: { not: sessionId } }, data: { revokedAt: new Date() } }),
     ]);
+    await this.tellSecurity(customer, 'customer.security.password_changed', 'Your password was changed', 'Your other sessions were signed out. If you did not do this, reset your password now.');
     return this.present(customer);
   }
 
@@ -515,6 +530,10 @@ export class CustomersService {
     if (!phone) throw codeInvalid();
     try {
       const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: { phone, phoneVerifiedAt: new Date() }, include: { market: true } });
+      // A confirmed number replaced by another: the customer hears of it, in case it was not them.
+      if (customer.phoneVerifiedAt && customer.phone && customer.phone !== phone) {
+        await this.tellSecurity(customer, 'customer.security.phone_changed', 'Your mobile number changed', `Your account now uses a number ending ${phone.slice(-4)}. If you did not do this, reset your password now.`);
+      }
       return presentCustomer(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
@@ -559,6 +578,7 @@ export class CustomersService {
         data: { passwordHash: await this.passwords.hash(input.password), failedSignIns: 0, lockedUntil: null, emailVerifiedAt: customer.emailVerifiedAt ?? new Date() },
       });
     });
+    await this.tellSecurity(customer, 'customer.security.password_changed', 'Your password was reset', 'It was set with the code emailed to you, and every other session was signed out. If you did not do this, reset it again now.');
     return { customer: await this.present(updated), session: await this.startSession(customer.id) };
   }
 }

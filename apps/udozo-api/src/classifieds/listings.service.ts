@@ -4,6 +4,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { MediaStorage } from '../media/storage.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
@@ -124,6 +125,7 @@ export class ListingsService {
     private readonly models: ClassifiedModelsService,
     private readonly watermarks: WatermarkService,
     private readonly postings: PostingJourneysService,
+    private readonly inbox: InboxService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -371,7 +373,18 @@ export class ListingsService {
 
   /** The scheduled job: live listings past their time expire. */
   async expireDue(now = new Date()) {
-    const expired = await this.prisma.classifiedListing.updateMany({ where: { status: 'active', expiresAt: { lte: now } }, data: { status: 'expired' } });
+    const due = await this.prisma.classifiedListing.findMany({ where: { status: 'active', expiresAt: { lte: now } }, select: { id: true, title: true, expiresAt: true, customer: { select: { id: true, storeId: true } } }, take: 2000 });
+    if (!due.length) return { expired: 0 };
+    const expired = await this.prisma.classifiedListing.updateMany({ where: { id: { in: due.map(row => row.id) }, status: 'active' }, data: { status: 'expired' } });
+    // Each seller hears once per period (the subject is the listing and its expiry), so a run twice tells nobody twice.
+    for (const row of due) {
+      await this.inbox.customer({ customerId: row.customer.id, storeId: row.customer.storeId }, 'customer.classifieds.listing_expired', {
+        subject: `${row.id}:expired:${row.expiresAt?.toISOString()}`,
+        title: 'Your ad expired',
+        body: `"${row.title}" is off Udozo. Renew it from My listings to show it again.`,
+        link: '/account/listings',
+      });
+    }
     return { expired: expired.count };
   }
 
