@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { storeRoute } from "@/lib/store-host";
-import { photoIdOf, photoWidthOf, servePhoto, signMedia, watermarkPhoto } from "@/lib/watermark";
+import { centreText, ownerOf, photoIdOf, photoWidthOf, servePhoto, signMedia, watermarkPhoto } from "@/lib/watermark";
 import { config } from "@/proxy";
 
 const id = "0f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b";
@@ -46,22 +46,25 @@ describe("routing", () => {
 
 describe("the route", () => {
   let calls: Array<{ url: string; headers: Headers }>;
-  let api: { mark: () => Response | Promise<Response>; original: () => Response | Promise<Response> };
+  let api: { mark: () => Response | Promise<Response>; original: () => Response | Promise<Response>; owner: () => Response | Promise<Response> };
+  let seller: string;
 
   beforeEach(async () => {
     process.env.STORE_SERVER_SECRET = secret;
     process.env.API_URL = "https://api.udozo.test";
     calls = [];
     const original = await photo();
+    seller = "";
     api = {
       mark: () => Response.json({ object: "watermark", text: "udozo.com", version: "u3" }),
-      original: () => new Response(new Uint8Array(original), { headers: { "content-type": "image/jpeg" } }),
+      original: () => new Response(new Uint8Array(original), { headers: { "content-type": "image/jpeg", "udozo-photo-owner": seller } }),
+      owner: () => Response.json({ object: "photo_owner", username: seller || null }),
     };
     // Only the API is faked: the renderer loads its own files with fetch too.
     vi.stubGlobal("fetch", async (input: string | URL | Request, init: RequestInit = {}) => {
       if (!String(input).startsWith("https://api.udozo.test/")) return realFetch(input, init);
       calls.push({ url: String(input), headers: new Headers(init.headers) });
-      return String(input).includes("/original") ? api.original() : api.mark();
+      return String(input).includes("/original") ? api.original() : String(input).includes("/owner") ? api.owner() : api.mark();
     });
   });
 
@@ -71,7 +74,7 @@ describe("the route", () => {
   });
 
   test("a photo: Udozo's mark, the signed original, a JPEG cached for good", async () => {
-    const res = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&w=480"), null);
+    const res = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o=&w=480"), null);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/jpeg");
     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
@@ -96,23 +99,66 @@ describe("the route", () => {
     expect(calls.some(call => call.url.includes("/original"))).toBe(false);
   });
 
+  test("the address the API gives goes once to one naming the seller's username (empty without one), never drawn yet", async () => {
+    seller = "chinedu";
+    const named = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&w=960"), null);
+    expect([named.status, named.headers.get("location"), named.headers.get("cache-control")]).toEqual([307, `/img/${id}.jpg?m=u3&o=chinedu&w=960`, "public, max-age=60"]);
+    expect(calls.map(call => call.url)).toEqual(["https://api.udozo.test/v1/classifieds/watermark", `https://api.udozo.test/v1/classifieds/media/${id}/owner`]);
+    expect(calls[1]!.headers.get("udozo-media-signature")).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+    seller = "";
+    const none = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), null);
+    expect(none.headers.get("location")).toBe(`/img/${id}.jpg?m=u3&o=`);
+    // On a store, its own mark as before: no username lookup.
+    calls = [];
+    expect((await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), "gadgets")).status).toBe(200);
+    expect(calls.some(call => call.url.includes("/owner"))).toBe(false);
+  }, 60_000);
+
+  test("the seller's @username is drawn across the middle, only when it is theirs; a changed or forged name goes to theirs", async () => {
+    seller = "chinedu";
+    const drawn = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o=chinedu&w=480"), null);
+    expect([drawn.status, drawn.headers.get("cache-control")]).toEqual([200, "public, max-age=31536000, immutable"]);
+    const plain = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o=&w=480"), null);
+    expect(plain.status).toBe(307);
+    expect(plain.headers.get("location")).toBe(`/img/${id}.jpg?m=u3&o=chinedu&w=480`);
+    const forged = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o=call_0803&w=480"), null);
+    expect(forged.headers.get("location")).toBe(`/img/${id}.jpg?m=u3&o=chinedu&w=480`);
+    const odd = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o=Call%20me%200803"), null);
+    expect([odd.status, odd.headers.get("location")]).toEqual([307, `/img/${id}.jpg?m=u3&o=chinedu`]);
+    // What is drawn: the username large across the middle, Udozo's text kept in the corner.
+    expect([centreText("udozo.com", "chinedu"), centreText("udozo.com", "")]).toEqual(["@chinedu", "udozo.com"]);
+    expect([ownerOf("chinedu"), ownerOf("Chinedu"), ownerOf("ab"), ownerOf("call me"), ownerOf(null)]).toEqual(["chinedu", "", "", "", ""]);
+    const withName = await sharp(Buffer.from(await drawn.arrayBuffer())).raw().toBuffer();
+    seller = "";
+    const withText = await sharp(Buffer.from(await (await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o=&w=480"), null)).arrayBuffer())).raw().toBuffer();
+    expect(withName.equals(withText), "a different mark across the middle").toBe(false);
+  }, 60_000);
+
   test("failures are never cached: a bad address, a missing photo, the API down", async () => {
-    const bad = await servePhoto("photo.jpg", new URLSearchParams("m=u3"), null);
+    const bad = await servePhoto("photo.jpg", new URLSearchParams("m=u3&o="), null);
     expect([bad.status, bad.headers.get("cache-control")]).toEqual([404, "no-store"]);
     expect(calls).toEqual([]);
 
     api.original = () => new Response(null, { status: 404 });
-    const missing = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), null);
+    const missing = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o="), null);
     expect([missing.status, missing.headers.get("cache-control")]).toEqual([404, "no-store"]);
 
     api.original = () => new Response(null, { status: 500 });
-    const broken = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), null);
+    const broken = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o="), null);
     expect([broken.status, broken.headers.get("cache-control")]).toEqual([502, "no-store"]);
 
+    // The seller's username cannot be found: not found or 502, never cached either.
+    api.mark = () => Response.json({ object: "watermark", text: "udozo.com", version: "u3" });
+    api.owner = () => new Response(null, { status: 404 });
+    const gone = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), null);
+    expect([gone.status, gone.headers.get("cache-control")]).toEqual([404, "no-store"]);
+    api.owner = () => new Response(null, { status: 500 });
+    const unknown = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), null);
+    expect([unknown.status, unknown.headers.get("cache-control")]).toEqual([502, "no-store"]);
     api.mark = () => {
       throw new TypeError("fetch failed");
     };
-    const down = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3"), null);
+    const down = await servePhoto(`${id}.jpg`, new URLSearchParams("m=u3&o="), null);
     expect([down.status, down.headers.get("cache-control")]).toEqual([502, "no-store"]);
   });
 

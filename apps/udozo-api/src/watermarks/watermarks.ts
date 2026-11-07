@@ -51,6 +51,9 @@ export function signMedia(secret: string, id: string, now = Date.now()) {
 }
 
 /** Whether a request for an original carries a fresh signature for that photo (five minutes either side). */
+/** The original's header naming its seller's username (empty when they have none), for the mark across the middle. */
+export const photoOwnerHeader = 'udozo-photo-owner';
+
 export function mediaSignatureValid(header: string | undefined, secret: string | undefined, id: string, now = Date.now()) {
   if (!header || !secret) return false;
   const parts = Object.fromEntries(header.split(',').map(part => [part.slice(0, part.indexOf('=')).trim(), part.slice(part.indexOf('=') + 1).trim()]));

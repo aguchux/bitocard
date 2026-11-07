@@ -227,15 +227,31 @@ export class WatermarkService implements OnModuleInit {
     return { object: 'watermark' as const, text: own?.text ?? row.text, version: markVersion(row.version, own?.version) };
   }
 
-  /** A photo's original bytes, read with credentials: never a video, never a removed or deleted listing's. Null: not found. */
-  async original(id: string) {
+  /**
+   * Whose photo it is, for the mark across its middle: the seller's username once they chose one (udozo.com draws
+   * `@username` there and keeps Udozo's text in the corner), else null (Udozo's text in both). Not found: undefined.
+   */
+  async owner(id: string): Promise<{ username: string | null } | undefined> {
+    const media = await this.photo(id);
+    return media ? { username: media.listing.customer.username ?? null } : undefined;
+  }
+
+  /** A listing photo still on Udozo (never a video, never a removed or deleted listing's), with its seller's username. */
+  private async photo(id: string) {
     if (!uuid.test(id)) return null;
-    const media = await this.prisma.classifiedMedia.findUnique({ where: { id }, select: { kind: true, status: true, storageKey: true, listing: { select: { status: true } } } });
+    const media = await this.prisma.classifiedMedia.findUnique({ where: { id }, select: { kind: true, status: true, storageKey: true, listing: { select: { status: true, customer: { select: { username: true } } } } } });
     if (!media || media.kind !== 'photo' || media.status !== 'ready' || !media.storageKey || ['removed', 'deleted'].includes(media.listing.status)) return null;
+    return media as typeof media & { storageKey: string };
+  }
+
+  /** A photo's original bytes, read with credentials, and its seller's username (`owner`). Null: not found. */
+  async original(id: string) {
+    const media = await this.photo(id);
+    if (!media) return null;
     const stored = await this.storage.get(media.storageKey);
     if (!stored) return null;
     const contentType = ['image/jpeg', 'image/png'].includes(stored.contentType) ? stored.contentType : media.storageKey.endsWith('.png') ? 'image/png' : 'image/jpeg';
-    return { bytes: stored.bytes, contentType };
+    return { bytes: stored.bytes, contentType, username: media.listing.customer.username ?? null };
   }
 
   // ---- Stored originals ----

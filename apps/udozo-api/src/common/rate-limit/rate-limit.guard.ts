@@ -82,10 +82,10 @@ const rateLimited = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit
  * (`/v1/afrippa/`) with its own secret, the stores' servers for everything else with theirs, so neither can vouch for
  * the other's visitors.
  */
-const originalPath = /^\/v1\/classifieds\/media\/([0-9a-f-]{36})\/original(?:\?|$)/;
+const originalPath = /^\/v1\/classifieds\/media\/([0-9a-f-]{36})\/(?:original|owner)(?:\?|$)/;
 
 /**
- * udozo.com's image route reading a photo's original (signed with STORE_SERVER_SECRET for that photo): never limited,
+ * udozo.com's image route reading a photo's original or its owner (signed with STORE_SERVER_SECRET for that photo): never limited,
  * as every visitor's photos come through udozo.com's few servers, and a CDN miss must not turn into a broken photo.
  * Anything unsigned or wrongly signed is limited as usual.
  */

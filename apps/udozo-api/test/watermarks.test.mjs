@@ -361,8 +361,18 @@ describe('originals', () => {
     const video = await prisma.classifiedMedia.create({ data: { listingId: listing.id, kind: 'video', status: 'ready', url: 'https://media.udozo.test/v.mp4', storageKey: media.storageKey } });
     assert.equal((await get(`/v1/classifieds/media/${video.id}/original`, { 'udozo-media-signature': sign(video.id) })).status, 404, 'never a video');
 
+    // Whose photo it is: the seller's username once chosen, for the mark across the middle.
+    assert.equal(good.headers.get('udozo-photo-owner'), '', 'no username yet');
+    const owner = `/v1/classifieds/media/${media.id}/owner`;
+    assert.equal((await get(owner, {})).status, 404, 'signed only');
+    assert.equal((await get(owner, { 'udozo-media-signature': sign(media.id) })).json.username, null);
+    await prisma.customer.update({ where: { id: customer.id }, data: { username: 'tvdealer' } });
+    assert.equal((await get(owner, { 'udozo-media-signature': sign(media.id) })).json.username, 'tvdealer');
+    assert.equal((await get(path, { 'udozo-media-signature': sign(media.id) })).headers.get('udozo-photo-owner'), 'tvdealer');
+
     await prisma.classifiedListing.update({ where: { id: listing.id }, data: { status: 'removed' } });
     assert.equal((await get(path, { 'udozo-media-signature': sign(media.id) })).status, 404, 'never a removed listing’s');
+    assert.equal((await get(owner, { 'udozo-media-signature': sign(media.id) })).status, 404);
   });
 
   test('udozo.com’s signed requests are never rate limited; unsigned ones are', async () => {

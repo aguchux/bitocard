@@ -7,7 +7,7 @@ import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../au
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { adminId } from '../countries/countries.controller.js';
 import { ProductOnly } from '../products/product.js';
-import { mediaSignatureHeader, mediaSignatureValid } from './watermarks.js';
+import { mediaSignatureHeader, mediaSignatureValid, photoOwnerHeader } from './watermarks.js';
 import { WatermarkService } from './watermarks.service.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -61,7 +61,19 @@ export class ClassifiedWatermarkController {
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Type', original.contentType);
     res.setHeader('Content-Length', String(original.bytes.length));
+    // The seller's username, for the mark across the photo's middle (empty: none chosen yet).
+    res.setHeader(photoOwnerHeader, original.username ?? '');
     res.end(original.bytes);
+  }
+
+  /** Whose photo it is (`{ username }`, null before they choose one): what udozo.com's image route puts in its address. */
+  @Get('media/:id/owner')
+  async owner(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Param('id') id: string) {
+    if (!mediaSignatureValid(req.get(mediaSignatureHeader), this.config.STORE_SERVER_SECRET, id)) throw new NotFoundException();
+    const owner = await this.watermarks.owner(id);
+    if (!owner) throw new NotFoundException();
+    res.setHeader('Cache-Control', 'private, no-store');
+    return { object: 'photo_owner' as const, username: owner.username };
   }
 }
 
