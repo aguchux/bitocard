@@ -11,9 +11,14 @@ export type TemplateDefinition = {
   /** Its body, with {{1}}, {{2}} as Meta numbers them, and an example of each for Meta's review. */
   body: string;
   examples: string[];
-  /** The quick-reply button's text (its payload is set on each message). */
+  /** The quick-reply button's text (its payload is set on each message); for a verification template, its copy button. */
   button: string;
+  /** Meta's category: utility (the default) or authentication (codes, whose words Meta writes). */
+  category?: 'UTILITY' | 'AUTHENTICATION';
 };
+
+/** How long a verification code works, as Meta's verification template says under it. */
+export const codeExpiryMinutes = 30;
 
 export const whatsappTemplates = {
   udozo_new_message: {
@@ -40,6 +45,13 @@ export const whatsappTemplates = {
     examples: ['Kemi accepted your buy order for the Hisense 50 inch TV'],
     button: 'Open',
   },
+  udozo_verification_code: {
+    purpose: "A code to confirm a mobile number (sign-up, the profile, Seller HQ's numbers), when it goes by WhatsApp. Meta writes its words.",
+    body: '{{1}} is your verification code. For your security, do not share this code.',
+    examples: ['123456'],
+    button: 'Copy code',
+    category: 'AUTHENTICATION',
+  },
   udozo_link_confirmed: {
     purpose: 'Sent once when a number is connected to an account from udozo.com.',
     body: 'Your WhatsApp is now connected to your Udozo account, {{1}}. Tap Menu to find, sell or ask for something.',
@@ -56,7 +68,19 @@ export type TemplateCall = { name: TemplateName; params: string[]; payload: stri
 
 /** The body Meta's template API takes to create one. */
 export function templateSubmission(name: TemplateName) {
-  const template = whatsappTemplates[name];
+  const template: TemplateDefinition = whatsappTemplates[name];
+  if (template.category === 'AUTHENTICATION') {
+    return {
+      name,
+      language: templateLanguage,
+      category: 'AUTHENTICATION',
+      components: [
+        { type: 'BODY', add_security_recommendation: true },
+        { type: 'FOOTER', code_expiration_minutes: codeExpiryMinutes },
+        { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE', text: template.button }] },
+      ],
+    };
+  }
   return {
     name,
     language: templateLanguage,

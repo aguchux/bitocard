@@ -95,7 +95,7 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
           <Choice id="wa-alerts" label="Notices on WhatsApp" note="Requests that fit what you sell, answers to yours, buy orders and contact requests." on={connection.alerts} busy={busy} onChange={alerts => choose({ alerts })} />
           <div className="flex flex-wrap gap-2">
             {connection.chat_link ? (
-              <a href={connection.chat_link} target="_blank" rel="noopener" className={`${button} bg-mint-700 text-white hover:bg-mint-600`}>
+              <a href={connection.chat_link} target="_blank" rel="noopener" className={`${button} bg-mint-700 text-white hover:bg-mint-500`}>
                 <MessageCircle className="size-4" aria-hidden="true" /> Open Udozo on WhatsApp
               </a>
             ) : null}
@@ -111,7 +111,7 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
           </p>
           <div className="flex flex-wrap gap-2">
             {link.link ? (
-              <a href={link.link} target="_blank" rel="noopener" className={`${button} bg-mint-700 text-white hover:bg-mint-600`}>
+              <a href={link.link} target="_blank" rel="noopener" className={`${button} bg-mint-700 text-white hover:bg-mint-500`}>
                 <MessageCircle className="size-4" aria-hidden="true" /> Open WhatsApp
               </a>
             ) : null}
@@ -125,7 +125,7 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
           <p className="text-[15px] text-navy-700">
             Find things, chat with buyers and sellers, post ads and ask for what you need, from WhatsApp. Messages go through Udozo&apos;s number, so nobody sees yours.
           </p>
-          <button type="button" onClick={connect} disabled={busy} className={`${button} bg-mint-700 text-white hover:bg-mint-600`}>
+          <button type="button" onClick={connect} disabled={busy} className={`${button} bg-mint-700 text-white hover:bg-mint-500`}>
             <MessageCircle className="size-4" aria-hidden="true" /> Connect WhatsApp
           </button>
           <p className="text-xs text-navy-500">If WhatsApp uses the mobile number confirmed on your account, just send Udozo a message: it connects by itself.</p>

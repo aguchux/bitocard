@@ -268,7 +268,7 @@ export class AuthController {
   @HttpCode(HttpStatus.ACCEPTED)
   async addPhone(@CurrentCaller() caller: Caller, @Body() body: PhoneDto) {
     const country = caller.kind === 'session' && caller.resellerId ? await this.auth.resellerCountry(caller.resellerId) : null;
-    return this.auth.addPhone(caller.kind === 'session' ? caller.userId : '', body.phone, country);
+    return this.auth.addPhone(caller.kind === 'session' ? caller.userId : '', body.phone, country, body.channel);
   }
 
   /** Confirm your mobile number. You can then sign in with it. */
@@ -293,7 +293,7 @@ export class AuthController {
   @HttpCode(HttpStatus.ACCEPTED)
   async addAdditionalPhone(@CurrentCaller() caller: Caller, @Body() body: PhoneDto) {
     const country = caller.kind === 'session' && caller.resellerId ? await this.auth.resellerCountry(caller.resellerId) : null;
-    return this.auth.addAdditionalPhone(caller.kind === 'session' ? caller.userId : '', body.phone, country);
+    return this.auth.addAdditionalPhone(caller.kind === 'session' ? caller.userId : '', body.phone, country, body.channel);
   }
 
   @SessionOnly()

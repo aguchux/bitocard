@@ -1,3 +1,4 @@
+import { type CodeChannel, codeNotice } from '../notifications/sms.service.js';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PasswordsService } from '../auth/passwords.service.js';
@@ -250,13 +251,13 @@ export class CustomersService {
    * store) through the country's SMS provider. `phone_verification_unavailable` where it has none: the number is then
    * kept unconfirmed and nothing waits for it.
    */
-  async startSignupPhone(store: Store & { reseller: { house: boolean } }, input: { email: string; signup_token: string; country?: string; phone: string }) {
+  async startSignupPhone(store: Store & { reseller: { house: boolean } }, input: { email: string; signup_token: string; country?: string; phone: string; channel?: CodeChannel }) {
     const country = await this.signupCountry(store, input.country);
     if (!country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Choose your country.', 'country');
     const phone = normalisePhone(input.phone, country);
     if (await this.prisma.customer.findFirst({ where: { storeId: store.id, phone }, select: { id: true } })) throw phoneInUse();
-    await this.signups.startPhone(input.email.trim().toLowerCase(), input.signup_token, country, phone, store.id);
-    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+    const channel = await this.signups.startPhone(input.email.trim().toLowerCase(), input.signup_token, country, phone, store.id, input.channel);
+    return { object: 'notice' as const, message: codeNotice(phone, channel), phone, channel };
   }
 
   verifySignupPhone(store: Store, input: { email: string; signup_token: string; code: string }) {
@@ -468,7 +469,7 @@ export class CustomersService {
   }
 
   /** A customer has one confirmed number. Changing it leaves the old number in place until the new one is confirmed. */
-  async addPhone(customer: Customer & { store?: Pick<Store, 'platform'> }, raw: string) {
+  async addPhone(customer: Customer & { store?: Pick<Store, 'platform'> }, raw: string, via?: CodeChannel) {
     // A number from the customer's own country only (normalisePhone refuses others, and asks for the country first).
     const phone = normalisePhone(raw, customer.country);
     const taken = await this.prisma.customer.findFirst({ where: { storeId: customer.storeId, phone, id: { not: customer.id } } });
@@ -485,17 +486,18 @@ export class CustomersService {
       this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } }),
       this.prisma.customerCode.create({ data: { customerId: customer.id, purpose, target: phone, codeHash: digest(customer.id, purpose, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
     ]);
+    let channel: CodeChannel = 'sms';
     try {
       // Afrippa's traders get Afrippa's text, through Afrippa's own SMS account.
       const afrippa = customer.store?.platform === 'afrippa';
-      await this.sms.sendForCountry(customer.country, { to: phone, text: `Your ${afrippa ? 'Afrippa' : 'BitoCard'} code is ${code}. It expires in 30 minutes. Never share it.` }, afrippa ? 'afrippa' : 'bitocard', { attempt });
+      channel = await this.sms.sendCode(customer.country, { to: phone, code, text: `Your ${afrippa ? 'Afrippa' : 'BitoCard'} code is ${code}. It expires in 30 minutes. Never share it.` }, afrippa ? 'afrippa' : 'bitocard', { attempt, via });
     } catch (error) {
       await this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
       if (error instanceof ApiError) throw error;
       this.logger.error({ err: error }, 'Could not send the customer phone confirmation code');
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
     }
-    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+    return { object: 'notice' as const, message: codeNotice(phone, channel), phone, channel };
   }
 
   /**

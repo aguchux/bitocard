@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { PhoneInput } from "@bitocard/ui/phone-input";
-import { FormMessage, Submit, TextField } from "@/components/account-forms";
+import { FormMessage, Submit, TextField, WhatsappSubmit } from "@/components/account-forms";
 import {
   confirmMobile,
   confirmMobileLater,
@@ -10,7 +10,7 @@ import {
   textMobileCode,
 } from "@/lib/account-actions";
 
-type Sent = FormState & { phone?: string };
+type Sent = FormState & { phone?: string; channel?: "sms" | "whatsapp" };
 const empty: Sent = {};
 
 /** Carry on without the code: the account is usable, and the profile confirms the number any time. */
@@ -47,10 +47,13 @@ export function MobileConfirmForm({
   next,
   phone,
   country,
+  whatsapp = false,
 }: {
   next: string;
   phone: string | null;
   country: string;
+  /** Codes can also go on WhatsApp (Udozo is on WhatsApp in the country). */
+  whatsapp?: boolean;
 }) {
   const [state, confirm, confirming] = useActionState(confirmMobile, empty);
   // A typed number and a new code to the same one are separate, so each answer is read by the form that asked.
@@ -83,10 +86,13 @@ export function MobileConfirmForm({
             errorClassName="text-brand-700"
           />
           <p className="text-xs text-navy-500">
-            A mobile number from your country. We text it a 6-digit code.
+            A mobile number from your country. We send it a 6-digit code{whatsapp ? ", by text or on WhatsApp" : ""}.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Submit pending={textingTyped}>Text me a code</Submit>
+            {whatsapp ? (
+              <WhatsappSubmit pending={textingTyped}>Send it on WhatsApp</WhatsappSubmit>
+            ) : null}
             {number ? (
               <button
                 type="button"
@@ -122,7 +128,7 @@ export function MobileConfirmForm({
           maxLength={6}
           required
           state={state}
-          hint={`We texted it to ${number}. It expires in 30 minutes.`}
+          hint={`${(resent.notice ? resent.channel : typed.channel) === "whatsapp" ? `We sent it to ${number} on WhatsApp` : `We texted it to ${number}`}. It expires in 30 minutes.`}
         />
         <Submit pending={confirming} className="w-full">
           Confirm my mobile
@@ -138,6 +144,17 @@ export function MobileConfirmForm({
           >
             Send me a new code
           </button>
+          {whatsapp ? (
+            <button
+              type="submit"
+              name="channel"
+              value="whatsapp"
+              disabled={resending}
+              className="ml-4 min-h-11 text-sm font-semibold text-mint-700 hover:underline disabled:opacity-60"
+            >
+              Send it on WhatsApp
+            </button>
+          ) : null}
         </form>
         <button
           type="button"

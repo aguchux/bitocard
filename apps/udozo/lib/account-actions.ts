@@ -124,10 +124,15 @@ export async function confirmMobileLater(_state: FormState, form: FormData): Pro
   redirect(confirmationPending(result.data) ? `/verify?next=${encodeURIComponent(next)}` : next);
 }
 
-/** Texts a new code: to the number on the account, or to another one typed in its place. */
-export async function textMobileCode(_state: FormState & { phone?: string }, form: FormData): Promise<FormState & { phone?: string }> {
-  const result = await customerApi<{ object: "notice"; phone: string }>("POST", "/v1/store/account/phone", { phone: text(form, "phone") });
-  return result.ok ? { notice: `We sent a new code to ${result.data.phone}.`, phone: result.data.phone } : failed(result);
+/** How a mobile's code goes: on WhatsApp when the button pressed says so (`name="channel" value="whatsapp"`), else by text. */
+const codeChannel = (form: FormData) => (form.get("channel") === "whatsapp" ? { channel: "whatsapp" as const } : {});
+type CodeSent = { object: "notice"; phone: string; channel?: "sms" | "whatsapp" };
+const sentWhere = (data: CodeSent) => (data.channel === "whatsapp" ? `${data.phone} on WhatsApp` : data.phone);
+
+/** Sends a new code (by text, or on WhatsApp): to the number on the account, or to another one typed in its place. */
+export async function textMobileCode(_state: FormState & { phone?: string; channel?: "sms" | "whatsapp" }, form: FormData): Promise<FormState & { phone?: string; channel?: "sms" | "whatsapp" }> {
+  const result = await customerApi<CodeSent>("POST", "/v1/store/account/phone", { phone: text(form, "phone"), ...codeChannel(form) });
+  return result.ok ? { notice: `We sent a new code to ${sentWhere(result.data)}.`, phone: result.data.phone, channel: result.data.channel ?? "sms" } : failed(result);
 }
 
 export async function resendCode(): Promise<FormState> {
@@ -203,10 +208,10 @@ export async function setCountry(_state: FormState, form: FormData): Promise<For
   return { notice: "Saved. Your wallet and payouts are now in your country's currency." };
 }
 
-/** Texts a code to a mobile number of the account's country (written in E.164 by the PhoneInput). */
+/** Sends a code (by text, or on WhatsApp) to a mobile number of the account's country (written in E.164 by the PhoneInput). */
 export async function addPhone(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi<{ object: "notice"; phone: string }>("POST", "/v1/store/account/phone", { phone: text(form, "phone") });
-  return result.ok ? { notice: `We sent a code to ${result.data.phone}.` } : failed(result);
+  const result = await customerApi<CodeSent>("POST", "/v1/store/account/phone", { phone: text(form, "phone"), ...codeChannel(form) });
+  return result.ok ? { notice: `We sent a code to ${sentWhere(result.data)}.` } : failed(result);
 }
 
 export async function verifyPhone(_state: FormState, form: FormData): Promise<FormState> {

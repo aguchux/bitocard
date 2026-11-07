@@ -197,6 +197,11 @@ export class SignupPhoneDto extends SignupEmailDto {
   @IsString()
   @Length(5, 20)
   phone: string;
+
+  @ApiPropertyOptional({ description: 'How the code goes: `sms` (the default) or `whatsapp`, where Udozo is on WhatsApp in the country. A text that cannot be sent goes by WhatsApp where it can.', enum: ['sms', 'whatsapp'] })
+  @IsOptional()
+  @IsIn(['sms', 'whatsapp'])
+  channel?: 'sms' | 'whatsapp';
 }
 
 export class SignupPhoneVerifyDto extends SignupEmailDto {
@@ -297,6 +302,11 @@ export class PhoneDto {
   @IsString()
   @Length(6, 20)
   phone: string;
+
+  @ApiPropertyOptional({ description: 'How the code goes: `sms` (the default) or `whatsapp`, where Udozo is on WhatsApp in the country.', enum: ['sms', 'whatsapp'] })
+  @IsOptional()
+  @IsIn(['sms', 'whatsapp'])
+  channel?: 'sms' | 'whatsapp';
 }
 
 export class PrimaryPhoneDto extends PhoneDto {

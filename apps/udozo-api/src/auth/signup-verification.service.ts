@@ -1,3 +1,4 @@
+import { type CodeChannel } from '../notifications/sms.service.js';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
@@ -151,7 +152,7 @@ export class SignupVerificationService {
    * country's SMS provider. Only after the email is confirmed, so texts cannot be sent without a real inbox: one a
    * minute, five per sign-up and `maxCodesPerDay` a day per number. Hashed, 30 minutes, 5 attempts.
    */
-  async startPhone(email: string, token: string, country: string, phone: string, storeId: string | null = null) {
+  async startPhone(email: string, token: string, country: string, phone: string, storeId: string | null = null, via?: CodeChannel): Promise<CodeChannel> {
     const signup = await this.openSignup(email, token, storeId);
     const latest = await this.prisma.signupPhoneVerification.findFirst({ where: { signupVerificationId: signup.id, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
@@ -174,7 +175,7 @@ export class SignupVerificationService {
     ]);
     try {
       // A resend in the same sign-up goes through the market's other provider first.
-      await this.sms.sendForCountry(country, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt: forSignup });
+      return await this.sms.sendCode(country, { to: phone, code, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt: forSignup, via });
     } catch (error) {
       // Lets the person ask again at once (or carry on without it where the country has no SMS provider).
       await this.prisma.signupPhoneVerification.update({ where: { id: created.id }, data: { consumedAt: new Date() } });

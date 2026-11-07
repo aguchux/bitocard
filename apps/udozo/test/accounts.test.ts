@@ -127,7 +127,12 @@ describe("signing in and out", () => {
     reply = () => Response.json(customer);
     await expect(actions.confirmMobile({}, form({ code: "222222", next: "/sell" }))).rejects.toThrow("redirect:/sell");
     reply = () => Response.json({ object: "notice", phone: "+2348039998877" });
-    expect(await actions.textMobileCode({}, form({ phone: "+2348039998877" }))).toEqual({ notice: "We sent a new code to +2348039998877.", phone: "+2348039998877" });
+    expect(await actions.textMobileCode({}, form({ phone: "+2348039998877" }))).toEqual({ notice: "We sent a new code to +2348039998877.", phone: "+2348039998877", channel: "sms" });
+    // Send it on WhatsApp: the button's channel goes to the API, and the notice says where it went.
+    reply = () => Response.json({ object: "notice", phone: "+2348039998877", channel: "whatsapp" });
+    expect(await actions.textMobileCode({}, form({ phone: "+2348039998877", channel: "whatsapp" }))).toEqual({ notice: "We sent a new code to +2348039998877 on WhatsApp.", phone: "+2348039998877", channel: "whatsapp" });
+    expect(calls.at(-1)!.body).toEqual({ phone: "+2348039998877", channel: "whatsapp" });
+    calls.pop();
     expect(calls.map(call => call.url.replace("https://api.test", ""))).toEqual(["/v1/store/account/email/verify", "/v1/store/account/phone/verify", "/v1/store/account/phone"]);
     expect(calls[1]!.body).toEqual({ code: "222222" });
   });

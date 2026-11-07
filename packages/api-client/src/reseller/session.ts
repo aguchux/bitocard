@@ -62,6 +62,11 @@ export type Account = {
 };
 export type Notice = { object: 'notice'; message: string };
 
+/** How a mobile's code goes: by text, or on Udozo's WhatsApp number (Udozo only, where it is on WhatsApp there). */
+export type CodeChannel = 'sms' | 'whatsapp';
+/** Udozo: whether its WhatsApp number is open in a country (`GET /v1/classifieds/channels`, public). */
+export type CodeChannels = { object: 'classified_channels'; country: string; whatsapp: { available: boolean; number: string | null }; wanted: boolean };
+
 /** One of a person's email addresses. Exactly one is primary: it signs in and gets notices, and cannot be removed. */
 export type UserEmail = { object: 'user_email'; email: string; primary: boolean; verified: boolean; added_at: string };
 export type UserPhone = { object: 'user_phone'; phone: string; primary: boolean; verified: boolean; added_at: string };
@@ -112,7 +117,9 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     addPhone: build.mutation<Notice, { phone: string }>({ query: body => ({ url: '/v1/auth/phone', method: 'POST', body }) }),
     verifyPhone: build.mutation<Session, { code: string }>({ query: body => ({ url: '/v1/auth/phone/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
     phones: build.query<{ object: 'list'; data: UserPhone[] }, void>({ query: () => '/v1/auth/phones', providesTags: ['Session'] }),
-    addAdditionalPhone: build.mutation<Notice & { phone: string }, { phone: string }>({ query: body => ({ url: '/v1/auth/phones', method: 'POST', body }) }),
+    addAdditionalPhone: build.mutation<Notice & { phone: string; channel?: CodeChannel }, { phone: string; channel?: CodeChannel }>({ query: body => ({ url: '/v1/auth/phones', method: 'POST', body }) }),
+    /** Udozo's Seller HQ: whether codes can also go on WhatsApp in the business country. */
+    codeChannels: build.query<CodeChannels, string>({ query: country => `/v1/classifieds/channels?country=${encodeURIComponent(country)}` }),
     confirmAdditionalPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, { code: string }>({ query: body => ({ url: '/v1/auth/phones/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
     makePrimaryPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, { phone: string; password?: string }>({ query: body => ({ url: '/v1/auth/phones/primary', method: 'POST', body }), invalidatesTags: ['Session'] }),
     removeAdditionalPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, string>({ query: phone => ({ url: `/v1/auth/phones/${encodeURIComponent(phone)}`, method: 'DELETE' }), invalidatesTags: ['Session'] }),
@@ -172,6 +179,7 @@ export const {
   useVerifyPhoneMutation,
   usePhonesQuery,
   useAddAdditionalPhoneMutation,
+  useCodeChannelsQuery,
   useConfirmAdditionalPhoneMutation,
   useMakePrimaryPhoneMutation,
   useRemoveAdditionalPhoneMutation,

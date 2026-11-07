@@ -54,7 +54,7 @@ export type OutgoingMessage =
   | { type: 'image'; link?: string; id?: string; caption?: string }
   | { type: 'buttons'; body: string; buttons: Button[]; header?: string; footer?: string }
   | { type: 'list'; body: string; button: string; rows: Row[]; header?: string; footer?: string }
-  | { type: 'template'; name: string; language: string; params: string[]; buttonParam?: string };
+  | { type: 'template'; name: string; language: string; params: string[]; buttonParam?: string; /** A verification template's code (its copy button). */ otp?: string };
 
 const cut = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`);
 
@@ -103,6 +103,7 @@ export function messageBody(to: string, message: OutgoingMessage, replyTo?: stri
           components: [
             ...(message.params.length ? [{ type: 'body', parameters: message.params.map(text => ({ type: 'text', text: cut(text.replace(/\s+/g, ' ').trim() || '-', 900) })) }] : []),
             ...(message.buttonParam ? [{ type: 'button', sub_type: 'quick_reply', index: '0', parameters: [{ type: 'payload', payload: message.buttonParam }] }] : []),
+            ...(message.otp ? [{ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: message.otp }] }] : []),
           ],
         },
       };

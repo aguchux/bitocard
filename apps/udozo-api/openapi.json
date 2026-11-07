@@ -30279,6 +30279,14 @@
             "minLength": 5,
             "maxLength": 20,
             "example": "+2348031234567"
+          },
+          "channel": {
+            "type": "string",
+            "description": "How the code goes: `sms` (the default) or `whatsapp`, where Udozo is on WhatsApp in the country. A text that cannot be sent goes by WhatsApp where it can.",
+            "enum": [
+              "sms",
+              "whatsapp"
+            ]
           }
         },
         "required": [
@@ -30595,6 +30603,14 @@
             "minLength": 6,
             "maxLength": 20,
             "example": "+2348012345678"
+          },
+          "channel": {
+            "type": "string",
+            "description": "How the code goes: `sms` (the default) or `whatsapp`, where Udozo is on WhatsApp in the country.",
+            "enum": [
+              "sms",
+              "whatsapp"
+            ]
           }
         },
         "required": [
@@ -30610,6 +30626,14 @@
             "minLength": 6,
             "maxLength": 20,
             "example": "+2348012345678"
+          },
+          "channel": {
+            "type": "string",
+            "description": "How the code goes: `sms` (the default) or `whatsapp`, where Udozo is on WhatsApp in the country.",
+            "enum": [
+              "sms",
+              "whatsapp"
+            ]
           },
           "password": {
             "type": "string",

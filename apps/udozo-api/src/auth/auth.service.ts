@@ -1,3 +1,4 @@
+import { type CodeChannel, codeNotice } from '../notifications/sms.service.js';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PrismaService } from '../database/prisma.service.js';
@@ -182,12 +183,12 @@ export class AuthService {
    * not already someone's sign-in number) through the country's SMS provider. `phone_verification_unavailable` where
    * the country has none: sign-up then carries on with the number unconfirmed.
    */
-  async startSignupPhone(input: { email: string; signup_token: string; country: string; phone: string }) {
+  async startSignupPhone(input: { email: string; signup_token: string; country: string; phone: string; channel?: CodeChannel }) {
     await this.countries.assertSignupOpen(input.country);
     const phone = normalisePhone(input.phone, input.country);
     if (await this.phoneTaken(this.prisma, phone)) throw phoneInUse();
-    await this.signupVerification.startPhone(input.email, input.signup_token, input.country, phone);
-    return { object: 'notice' as const, message: `A code is on its way to ${phone}.` };
+    const channel = await this.signupVerification.startPhone(input.email, input.signup_token, input.country, phone, null, input.channel);
+    return { object: 'notice' as const, message: codeNotice(phone, channel), channel };
   }
 
   verifySignupPhone(input: { email: string; signup_token: string; code: string }) {
@@ -500,21 +501,22 @@ export class AuthService {
   }
 
   /** Sends a code to a mobile number; it becomes the account's sign-in number once confirmed. */
-  async addPhone(userId: string, raw: string, resellerCountry: string | null) {
+  async addPhone(userId: string, raw: string, resellerCountry: string | null, via?: CodeChannel) {
     const phone = normalisePhone(raw, resellerCountry);
     const taken = await this.prisma.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null }, id: { not: userId } } });
     if (taken || await this.prisma.userPhone.findFirst({ where: { realm: 'reseller', phone, userId: { not: userId } } })) throw phoneInUse();
     const attempt = await this.codes.sentToday(userId, 'phone_verification', phone);
     const code = await this.codes.issue(userId, 'phone_verification', phone);
+    let channel: CodeChannel = 'sms';
     try {
-      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt });
+      channel = await this.sms.sendCode(resellerCountry, { to: phone, code, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt, via });
     } catch (error) {
       await this.codes.cancel(userId, 'phone_verification');
       if (error instanceof ApiError) throw error;
       this.logger.error({ err: error }, 'Could not send the phone confirmation code');
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
     }
-    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+    return { object: 'notice' as const, message: codeNotice(phone, channel), phone, channel };
   }
 
   async verifyPhone(userId: string, code: string) {
@@ -544,7 +546,7 @@ export class AuthService {
     ] };
   }
 
-  async addAdditionalPhone(userId: string, raw: string, resellerCountry: string | null) {
+  async addAdditionalPhone(userId: string, raw: string, resellerCountry: string | null, via?: CodeChannel) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const phone = normalisePhone(raw, resellerCountry);
     if (user.phone === phone || await this.prisma.userPhone.findFirst({ where: { userId, phone } })) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_already_added', 'This number is already on your account.', 'phone');
@@ -552,15 +554,16 @@ export class AuthService {
     if (await this.prisma.userPhone.count({ where: { userId } }) >= 5) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_limit', 'You can have up to five phone numbers.');
     const attempt = await this.codes.sentToday(userId, 'phone_add', phone);
     const code = await this.codes.issue(userId, 'phone_add', phone);
+    let channel: CodeChannel = 'sms';
     try {
-      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt });
+      channel = await this.sms.sendCode(resellerCountry, { to: phone, code, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` }, 'bitocard', { attempt, via });
     } catch (error) {
       await this.codes.cancel(userId, 'phone_add');
       if (error instanceof ApiError) throw error;
       this.logger.error({ err: error }, 'Could not send the phone confirmation code');
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
     }
-    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+    return { object: 'notice' as const, message: codeNotice(phone, channel), phone, channel };
   }
 
   async confirmAdditionalPhone(userId: string, code: string) {

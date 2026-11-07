@@ -8,6 +8,21 @@ import type { AppConfig } from '../config/config.js';
 
 export type SmsMessage = { to: string; text: string };
 
+/** How a code to confirm a mobile number goes: a text, or Udozo's WhatsApp number. */
+export const codeChannels = ['sms', 'whatsapp'] as const;
+export type CodeChannel = (typeof codeChannels)[number];
+
+/** What a person is told once a code is on its way. */
+export const codeNotice = (phone: string, channel: CodeChannel) => (channel === 'whatsapp' ? `A code is on its way to ${phone} on WhatsApp.` : `A code is on its way to ${phone}.`);
+
+/** Udozo's WhatsApp number sending verification codes (registered by the WhatsApp module, so this one never imports it). */
+export type WhatsappCodeSender = {
+  /** Whether codes can go by WhatsApp to a country's numbers (Udozo's number set up and WhatsApp open there). */
+  open(country: string | null): Promise<boolean>;
+  /** Sends the code with Meta's verification template; throws when Meta refuses it or cannot be reached. */
+  send(to: string, code: string): Promise<void>;
+};
+
 /** The SMS providers a message can be sent through by name (Udozo's Marketing chooses one per message). */
 export const smsProviders = ['africas_talking', 'termii'] as const;
 export type SmsProvider = (typeof smsProviders)[number];
@@ -50,6 +65,58 @@ export class SmsService {
   }
 
   constructor(private readonly integrations: IntegrationsService, private readonly prisma: PrismaService) {}
+
+  private whatsapp: WhatsappCodeSender | null = null;
+
+  useWhatsapp(sender: WhatsappCodeSender) {
+    this.whatsapp = sender;
+  }
+
+  /** How codes can reach a country's numbers: by text where it has an SMS provider, by WhatsApp where that is open. */
+  async codeChannelsFor(countryCode: string | null, platform: Platform = 'bitocard') {
+    const country = countryCode ? await this.prisma.country.findUnique({ where: { code: countryCode }, select: { smsProvider: true } }) : null;
+    const whatsapp = platform === 'bitocard' && this.whatsapp ? await this.whatsapp.open(countryCode).catch(() => false) : false;
+    return { sms: Boolean(country?.smsProvider), whatsapp };
+  }
+
+  /**
+   * A code that confirms a mobile number: by text through the market's providers (`sendForCountry`), or by WhatsApp
+   * with Meta's verification template when the person chose it (`via: 'whatsapp'`), when the country cannot text, or
+   * when the text could not be sent. Which way it went. `whatsapp_unavailable` when WhatsApp was asked for and is not
+   * open there; `phone_verification_unavailable` when neither way is.
+   */
+  async sendCode(countryCode: string | null, message: SmsMessage & { code: string }, platform: Platform = 'bitocard', options: { attempt?: number; via?: CodeChannel } = {}): Promise<CodeChannel> {
+    const whatsappOpen = () => (platform === 'bitocard' && this.whatsapp ? this.whatsapp.open(countryCode).catch(() => false) : Promise.resolve(false));
+    const byWhatsapp = async () => {
+      try {
+        await this.whatsapp!.send(message.to, message.code);
+        return 'whatsapp' as const;
+      } catch (error) {
+        this.logger.warn({ err: error, country: countryCode }, 'Could not send a code on WhatsApp');
+        throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'whatsapp_delivery_failed', 'We could not send the code on WhatsApp. Check the number, or ask for a text instead.');
+      }
+    };
+    if (options.via === 'whatsapp') {
+      if (!(await whatsappOpen())) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'whatsapp_unavailable', 'Codes by WhatsApp are not available in your country yet. Ask for a text instead.', 'channel');
+      return byWhatsapp();
+    }
+    const country = countryCode ? await this.prisma.country.findUnique({ where: { code: countryCode }, select: { smsProvider: true } }) : null;
+    if (countryCode && !country?.smsProvider) {
+      if (await whatsappOpen()) return byWhatsapp();
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_verification_unavailable', 'Phone verification is not available in your country yet.');
+    }
+    try {
+      await this.sendForCountry(countryCode, { to: message.to, text: message.text }, platform, { attempt: options.attempt });
+      return 'sms';
+    } catch (error) {
+      // A text that could not go may still arrive on WhatsApp.
+      if (await whatsappOpen()) {
+        this.logger.warn({ err: error, country: countryCode }, 'The code could not be texted; sending it on WhatsApp');
+        return byWhatsapp();
+      }
+      throw error;
+    }
+  }
 
   private words(original: SmsMessage, platform: Platform) {
     return platform === 'bitocard' ? { ...original, text: inProductWords(original.text, this.integrations.config.APP_PRODUCT) } : original;

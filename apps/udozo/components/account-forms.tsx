@@ -91,10 +91,27 @@ export function TextField({
   );
 }
 
-export function Submit({ pending, children, className = "" }: { pending: boolean; children: ReactNode; className?: string }) {
+/** The second send button where a code can go on WhatsApp: it submits the form with `channel=whatsapp`. */
+export function WhatsappSubmit({ pending, children }: { pending: boolean; children: ReactNode }) {
   return (
     <button
       type="submit"
+      name="channel"
+      value="whatsapp"
+      disabled={pending}
+      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-mint-700 px-5 font-bold text-white hover:bg-mint-500 disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+export function Submit({ pending, children, className = "", name, value }: { pending: boolean; children: ReactNode; className?: string; name?: string; value?: string }) {
+  return (
+    <button
+      type="submit"
+      name={name}
+      value={value}
       disabled={pending}
       className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-navy-900 px-5 font-bold text-white hover:bg-navy-800 disabled:opacity-60 ${className}`}
     >

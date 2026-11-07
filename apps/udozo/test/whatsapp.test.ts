@@ -146,3 +146,17 @@ describe("wanted requests", () => {
     expect(wantedWhen({ status: "fulfilled", expires_at: "2026-11-08T09:00:00.000Z" }, now)).toBe("Found it");
   });
 });
+
+describe("codes on WhatsApp", () => {
+  it("the profile's phone form offers Send it on WhatsApp beside the text where Udozo is on WhatsApp, and only WhatsApp where the country cannot text", async () => {
+    const { PhoneForm } = await import("@/components/account/phone-form");
+    const both = renderToStaticMarkup(createElement(PhoneForm, { phone: "+2348031234567", verified: false, country: "NG", available: true, whatsapp: true }));
+    expect(both).toContain("Verify this number");
+    expect(both).toMatch(/<button type="submit" value="whatsapp"[^>]*name="channel">Send it on WhatsApp/);
+    const onlyWhatsapp = renderToStaticMarkup(createElement(PhoneForm, { phone: "+2348031234567", verified: false, country: "NG", available: false, whatsapp: true }));
+    expect(onlyWhatsapp).toContain("Verify this number on WhatsApp");
+    expect(onlyWhatsapp).not.toContain("not available in your country");
+    const textOnly = renderToStaticMarkup(createElement(PhoneForm, { phone: "+2348031234567", verified: false, country: "NG", available: true }));
+    expect(textOnly).not.toContain("WhatsApp");
+  });
+});

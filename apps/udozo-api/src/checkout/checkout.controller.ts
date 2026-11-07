@@ -87,6 +87,10 @@ class SignupPhoneDto extends AccountEmailDto {
 
   @IsString() @Length(6, 25)
   phone: string;
+
+  /** How the code goes: by text (the default) or on WhatsApp, where Udozo is on WhatsApp in the country. */
+  @IsOptional() @IsIn(['sms', 'whatsapp'])
+  channel?: 'sms' | 'whatsapp';
 }
 
 class SignupPhoneCodeDto extends SignupEmailCodeDto {
@@ -127,6 +131,9 @@ class CodeDto {
 class ProfilePhoneDto {
   @IsString() @Length(6, 25)
   phone: string;
+
+  @IsOptional() @IsIn(['sms', 'whatsapp'])
+  channel?: 'sms' | 'whatsapp';
 }
 
 class ForgotDto {
@@ -552,7 +559,7 @@ export class CustomerAccountController {
   @Post('phone')
   @HttpCode(HttpStatus.ACCEPTED)
   addPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
-    return this.customers.addPhone(caller.customer, body.phone);
+    return this.customers.addPhone(caller.customer, body.phone, body.channel);
   }
 
   /** Udozo: confirm the mobile later. The account is usable without it (the profile confirms it any time). */

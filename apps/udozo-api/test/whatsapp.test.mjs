@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, confirmMobile, fakeService, lastEmailCode, startApp, testMobile } from './helpers.mjs';
+import { adminClient, confirmMobile, fakeService, lastEmailCode, resellerClient, startApp, testMobile } from './helpers.mjs';
 import { fakeAi } from './fakes.mjs';
 
 let server;
@@ -390,7 +390,7 @@ describe('admins', () => {
     const before = await admin.get('/v1/admin/whatsapp/templates');
     assert.ok(before.json.data.every(item => item.status === 'not_submitted'));
     const submitted = await admin.post('/v1/admin/whatsapp/templates/submit', {});
-    assert.equal(submitted.json.submitted.length, 5);
+    assert.equal(submitted.json.submitted.length, 6);
     assert.ok(submitted.json.templates.every(item => item.status === 'pending'));
     const contact = await admin.get('/v1/admin/whatsapp/contacts?phone=%2B2348022223333');
     assert.equal(contact.status, 200);
@@ -498,5 +498,87 @@ describe('Anjio on WhatsApp', () => {
     const threads = await admin.get(`/v1/admin/support/bots/${anjio}/threads`);
     assert.ok(threads.json.data.some(row => row.channel === 'whatsapp'));
     assert.equal((await admin.put('/v1/admin/switches/whatsapp_assistant', { country_code: 'NG', enabled: false })).status, 200);
+  });
+});
+
+describe('verification codes on WhatsApp', () => {
+  /** The code in the last verification template sent to a number (its body's value, the same as its copy button's). */
+  const lastCode = (waId, since) => {
+    const call = sentTo(waId, since).filter(body => body.type === 'template' && body.template.name === 'udozo_verification_code').at(-1);
+    if (!call) return null;
+    const [body, button] = call.template.components;
+    assert.deepEqual([button.type, button.sub_type, button.index], ['button', 'url', '0']);
+    assert.equal(button.parameters[0].text, body.parameters[0].text, 'the copy button carries the code');
+    return body.parameters[0].text;
+  };
+
+  test("a customer's mobile is confirmed with a code sent on WhatsApp, by choice or where the country cannot text", async () => {
+    const kemi = await customer('Kemi Bello');
+    const number = testMobile('NG');
+    const waId = number.replace(/\D/g, '');
+
+    // Chosen: the code goes with Meta's verification template, and the answer says so.
+    let since = graph.calls.length;
+    const sent = await kemi.post('/v1/store/account/phone', { phone: number, channel: 'whatsapp' });
+    assert.equal(sent.status, 202, JSON.stringify(sent.json));
+    assert.deepEqual([sent.json.channel, sent.json.message], ['whatsapp', `A code is on its way to ${number} on WhatsApp.`]);
+    const code = lastCode(waId, since);
+    assert.match(code, /^\d{6}$/);
+    // Logged without the code.
+    const row = await prisma.whatsappMessage.findFirstOrThrow({ where: { template: 'udozo_verification_code', contact: { waId } } });
+    assert.deepEqual([row.direction, row.status, row.payloadEncrypted], ['out', 'sent', null]);
+    const confirmed = await kemi.post('/v1/store/account/phone/verify', { code });
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
+    assert.deepEqual([confirmed.json.phone, confirmed.json.phone_verified], [number, true]);
+
+    // By text unless asked.
+    await prisma.customerCode.updateMany({ where: { customerId: kemi.id }, data: { createdAt: new Date(Date.now() - 5 * 60_000) } });
+    const texted = await kemi.post('/v1/store/account/phone', { phone: testMobile('NG') });
+    assert.deepEqual([texted.status, texted.json.channel], [202, 'sms']);
+
+    // A country that cannot text sends it on WhatsApp by itself.
+    const sms = (await prisma.country.findUniqueOrThrow({ where: { code: 'NG' } })).smsProvider;
+    await prisma.country.update({ where: { code: 'NG' }, data: { smsProvider: null } });
+    try {
+      const other = testMobile('NG');
+      await prisma.customerCode.updateMany({ where: { customerId: kemi.id }, data: { createdAt: new Date(Date.now() - 5 * 60_000) } });
+      since = graph.calls.length;
+      const fallback = await kemi.post('/v1/store/account/phone', { phone: other });
+      assert.equal(fallback.status, 202, JSON.stringify(fallback.json));
+      assert.equal(fallback.json.channel, 'whatsapp');
+      assert.ok(lastCode(other.replace(/\D/g, ''), since));
+    } finally {
+      await prisma.country.update({ where: { code: 'NG' }, data: { smsProvider: sms } });
+    }
+
+    // WhatsApp closed in the market: asking for it is refused, a text still works.
+    assert.equal((await admin.put('/v1/admin/switches/whatsapp_channel', { country_code: 'NG', enabled: false })).status, 200);
+    try {
+      await prisma.customerCode.updateMany({ where: { customerId: kemi.id }, data: { createdAt: new Date(Date.now() - 5 * 60_000) } });
+      const closed = await kemi.post('/v1/store/account/phone', { phone: testMobile('NG'), channel: 'whatsapp' });
+      assert.deepEqual([closed.status, closed.json.error.code, closed.json.error.param], [409, 'whatsapp_unavailable', 'channel']);
+      assert.equal((await kemi.post('/v1/store/account/phone', { phone: testMobile('NG'), channel: 'fax' })).status, 400);
+    } finally {
+      assert.equal((await admin.put('/v1/admin/switches/whatsapp_channel', { country_code: 'NG', enabled: true })).status, 200);
+    }
+  });
+
+  test("Seller HQ's numbers take a code on WhatsApp; the template is submitted as Meta's authentication kind", async () => {
+    const owner = await resellerClient(server);
+    const number = testMobile('NG');
+    const since = graph.calls.length;
+    const sent = await owner.browser.post('/v1/auth/phones', { phone: number, channel: 'whatsapp' });
+    assert.equal(sent.status, 202, JSON.stringify(sent.json));
+    assert.equal(sent.json.channel, 'whatsapp');
+    const code = lastCode(number.replace(/\D/g, ''), since);
+    const confirmed = await owner.browser.post('/v1/auth/phones/verify', { code });
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
+    assert.ok(confirmed.json.data.some(item => item.phone === number));
+
+    const { templateSubmission } = await import('../dist/whatsapp/templates.js');
+    const auth = templateSubmission('udozo_verification_code');
+    assert.equal(auth.category, 'AUTHENTICATION');
+    assert.deepEqual(auth.components.map(item => item.type), ['BODY', 'FOOTER', 'BUTTONS']);
+    assert.deepEqual([auth.components[1].code_expiration_minutes, auth.components[2].buttons[0].otp_type], [30, 'COPY_CODE']);
   });
 });

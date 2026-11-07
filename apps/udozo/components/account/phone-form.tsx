@@ -4,15 +4,27 @@ import { useActionState, useState } from "react";
 import { Phone } from "lucide-react";
 import { addPhone, verifyPhone } from "@/lib/account-actions";
 import { PhoneInput } from "@bitocard/ui/phone-input";
-import { FormMessage, Submit, TextField } from "@/components/account-forms";
+import { FormMessage, Submit, TextField, WhatsappSubmit } from "@/components/account-forms";
 
 /**
  * The customer's mobile number, from their own (fixed) country only: the field is locked to it and the API checks it
  * again. A number saved unverified (for example, added at sign-up) gets its own "Verify this number" action that
  * sends the code straight away, without retyping it; "Use a different number" still opens the typed field.
  */
-export function PhoneForm({ phone, verified, country, available }: { phone: string | null; verified: boolean; country: string | null; available: boolean }) {
+export function PhoneForm({ phone, verified, country, available: sms, whatsapp = false }: { phone: string | null; verified: boolean; country: string | null; available: boolean; whatsapp?: boolean }) {
   const countrySet = Boolean(country);
+  // A code goes by text where the country can text, and on WhatsApp where Udozo is on WhatsApp there.
+  const available = sms || whatsapp;
+  const send = (label: string) => (
+    <>
+      {sms ? <Submit pending={sendPending}>{label}</Submit> : null}
+      {whatsapp ? (
+        <WhatsappSubmit pending={sendPending}>
+          {sms ? "Send it on WhatsApp" : `${label} on WhatsApp`}
+        </WhatsappSubmit>
+      ) : null}
+    </>
+  );
   const [adding, setAdding] = useState(false);
   const [sendState, sendAction, sendPending] = useActionState(addPhone, {});
   const [verifyState, verifyAction, verifyPending] = useActionState(verifyPhone, {});
@@ -45,7 +57,7 @@ export function PhoneForm({ phone, verified, country, available }: { phone: stri
         <FormMessage state={sendState} />
         <input type="hidden" name="phone" value={phone!} />
         <div className="flex flex-wrap gap-3">
-          <Submit pending={sendPending}>Verify this number</Submit>
+          {send("Verify this number")}
           <button type="button" onClick={() => setAdding(true)} className="text-sm font-semibold text-brand-600 hover:underline">
             Use a different number
           </button>
@@ -71,7 +83,7 @@ export function PhoneForm({ phone, verified, country, available }: { phone: stri
       />
       <p className="text-xs text-slate-500">A mobile number from your country. Type it the way you dial it locally.</p>
       <div className="flex flex-wrap gap-3">
-        <Submit pending={sendPending}>Send verification code</Submit>
+        {send("Send verification code")}
         {pendingVerify ? (
           <button type="button" onClick={() => setAdding(false)} className="text-sm font-semibold text-slate-500 hover:underline">
             Cancel
@@ -81,7 +93,7 @@ export function PhoneForm({ phone, verified, country, available }: { phone: stri
     </form> : null}
     {countrySet && available && showCode ? <form action={verifyAction} className="space-y-3">
       <FormMessage state={verifyState} />
-      <TextField label="6-digit SMS code" name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required state={verifyState} />
+      <TextField label="6-digit code" name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required state={verifyState} />
       <Submit pending={verifyPending}>Verify phone</Submit>
     </form> : null}
   </div>;

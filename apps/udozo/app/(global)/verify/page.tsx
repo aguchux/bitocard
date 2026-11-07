@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ProfileStartForm, VerifyForm } from "@/components/account-forms";
 import { MobileConfirmForm } from "@/components/account/mobile-confirm";
 import { countries } from "@/lib/countries";
+import { channelsFor } from "@/lib/whatsapp";
 import { confirmationPending, currentCustomer, safeNext, signInPath } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Confirm your account", robots: { index: false, follow: false } };
@@ -31,6 +32,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
       </div>
     );
   }
+  const whatsapp = !email && (await channelsFor(customer.country)).whatsapp.available;
   return (
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
       <h1 className="text-2xl font-extrabold">{email ? "Confirm your email" : "Confirm your mobile number"}</h1>
@@ -39,10 +41,10 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
           ? `We sent a 6-digit code to ${customer.email}. Enter it to carry on.`
           : customer.phone
             ? `We texted a 6-digit code to ${customer.phone}. Enter it to finish setting up your account.`
-            : "Add your mobile number: we text it a 6-digit code to finish setting up your account."}
+            : `Add your mobile number: we ${whatsapp ? "send" : "text"} it a 6-digit code to finish setting up your account.`}
       </p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">
-        {email ? <VerifyForm next={next} email={customer.email} /> : <MobileConfirmForm next={next} phone={customer.phone} country={customer.country ?? ""} />}
+        {email ? <VerifyForm next={next} email={customer.email} /> : <MobileConfirmForm next={next} phone={customer.phone} country={customer.country ?? ""} whatsapp={whatsapp} />}
       </section>
     </div>
   );

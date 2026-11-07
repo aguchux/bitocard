@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, format
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   useAddAdditionalPhoneMutation,
+  useCodeChannelsQuery,
   useChangePasswordMutation,
   useAddEmailMutation,
   useConfirmEmailMutation,
@@ -30,8 +31,11 @@ function MobileNumber() {
   const [editing, setEditing] = useState(!user.phone_verified);
   const [phone, setPhone] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sentBy, setSentBy] = useState<"sms" | "whatsapp">("sms");
   const [code, setCode] = useState("");
   const phones = usePhonesQuery();
+  // Codes can also go on Udozo's WhatsApp number where it is open in the business country.
+  const whatsapp = useCodeChannelsQuery(country ?? "", { skip: !country }).data?.whatsapp.available ?? false;
   const [addPhone, addState] = useAddAdditionalPhoneMutation();
   const [verifyPhone, verifyState] = useConfirmAdditionalPhoneMutation();
   const [makePrimary, primaryState] = useMakePrimaryPhoneMutation();
@@ -40,14 +44,15 @@ function MobileNumber() {
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
 
-  const send = async (event: FormEvent) => {
+  const send = async (event: FormEvent, channel: "sms" | "whatsapp" = "sms") => {
     event.preventDefault();
     setDone(false);
-    const notice = await addPhone({ phone: phone.trim() })
+    const notice = await addPhone({ phone: phone.trim(), ...(channel === "whatsapp" ? { channel } : {}) })
       .unwrap()
       .catch(() => null);
     if (notice) {
       setSentTo(phone.trim());
+      setSentBy(notice.channel ?? "sms");
       setCode("");
     }
   };
@@ -108,7 +113,7 @@ function MobileNumber() {
             className="space-y-4"
           >
             <p className="text-sm text-muted">
-              Enter the 6-digit code we texted to <span className="font-semibold text-ink">{sentTo}</span>. It expires in 30 minutes.
+              Enter the 6-digit code we {sentBy === "whatsapp" ? "sent on WhatsApp" : "texted"} to <span className="font-semibold text-ink">{sentTo}</span>. It expires in 30 minutes.
             </p>
             {verifyState.error ? <Notice tone="red">{errorMessage(verifyState.error)}</Notice> : null}
             <CodeInput label="Confirmation code" value={code} onChange={setCode} onComplete={confirm} autoFocus disabled={verifyState.isLoading} invalid={Boolean(verifyState.error)} />
@@ -141,6 +146,11 @@ function MobileNumber() {
               <Button type="submit" loading={addState.isLoading} disabled={!phone}>
                 Send code
               </Button>
+              {whatsapp ? (
+                <Button type="button" variant="secondary" disabled={!phone || addState.isLoading} onClick={event => void send(event, "whatsapp")}>
+                  Send it on WhatsApp
+                </Button>
+              ) : null}
               {user.phone_verified ? (
                 <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
                   Cancel
