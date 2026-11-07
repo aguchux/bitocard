@@ -85,7 +85,7 @@ async function customer(name = 'Kemi Adeyemi', { phone } = {}) {
 
 async function live(seller, title, { price = 25000000, contact = 'both' } = {}) {
   const [cat, area] = await Promise.all([prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } }), prisma.classifiedArea.findFirstOrThrow({ where: { slug: 'gwarinpa' } })]);
-  const draft = (await seller.post('/v1/classifieds/listings', { title, price, condition: 'used', category_id: cat.id, area_id: area.id, contact })).json;
+  const draft = (await seller.post('/v1/classifieds/listings', { title, price, condition: 'used', category_id: cat.id, area_id: area.id, contact, stock: 1 })).json;
   await prisma.classifiedMedia.createMany({ data: [0, 1, 2, 3].map(position => ({ listingId: draft.id, kind: 'photo', position, url: `https://media.test/${draft.id}-${position}.jpg` })) });
   const submitted = (await seller.post(`/v1/classifieds/listings/${draft.id}/submit`)).json;
   assert.equal(submitted.status, 'active', JSON.stringify(submitted));

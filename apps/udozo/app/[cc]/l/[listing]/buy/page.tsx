@@ -19,6 +19,7 @@ const unavailable: Record<string, string> = {
   price_required: "This listing has no price: agree one by offer in the chat first, then buy at that price.",
   offer_not_accepted: "Use an offer the seller accepted in the last 7 days.",
   listing_reserved: "Someone has already paid for this with Safe pay.",
+  out_of_stock: "This is out of stock: the seller has none to sell right now. Chat with them to ask when more come in.",
   safe_pay_limited: "This seller cannot take Safe pay orders right now. You can still chat with them.",
   classifieds_unavailable: "Udozo is not open in your country yet.",
 };

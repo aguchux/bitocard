@@ -89,7 +89,7 @@ const balance = async (kind, customerId) => (await prisma.ledgerAccount.findFirs
 
 async function live(seller, title, { price = 25000000, delivery = 'none' } = {}) {
   const [cat, area] = await Promise.all([prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } }), prisma.classifiedArea.findFirstOrThrow({ where: { slug: 'gwarinpa' } })]);
-  const draft = (await seller.post('/v1/classifieds/listings', { title, price, condition: 'used', category_id: cat.id, area_id: area.id, delivery })).json;
+  const draft = (await seller.post('/v1/classifieds/listings', { title, price, condition: 'used', category_id: cat.id, area_id: area.id, delivery, stock: 1 })).json;
   await prisma.classifiedMedia.createMany({ data: [0, 1, 2, 3].map(position => ({ listingId: draft.id, kind: 'photo', position, url: `https://media.test/${draft.id}-${position}.jpg` })) });
   const submitted = (await seller.post(`/v1/classifieds/listings/${draft.id}/submit`)).json;
   assert.equal(submitted.status, 'active', JSON.stringify(submitted));
@@ -183,7 +183,10 @@ describe('Safe pay', () => {
     assert.equal(await balance('customer_withdrawable', seller.id), 24500000n, 'the price less the seller\'s fee, withdrawable after the payout hold');
     assert.equal((await balance('classifieds_revenue')) - revenueBefore, 600000n, 'both fees');
     assert.equal((await balance('classified_escrow')) - escrowBefore, 0n);
-    assert.equal((await prisma.classifiedListing.findUniqueOrThrow({ where: { id: listing.id } })).status, 'sold');
+    // Its one unit sold: live but out of stock (never marked sold by the sale), its seller told.
+    const after = await prisma.classifiedListing.findUniqueOrThrow({ where: { id: listing.id } });
+    assert.deepEqual([after.status, after.stock, Boolean(after.outOfStockAt)], ['active', 0, true]);
+    assert.equal(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.classifieds.out_of_stock' } }), 1);
     assert.equal(await prisma.journalEntry.count({ where: { reference: `classified_order:${order.json.id}:released`, type: 'classified_release' } }), 1);
     assert.equal(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.classifieds.order_released' } }), 1);
   });

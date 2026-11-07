@@ -180,8 +180,8 @@ class ListingDto {
   @IsOptional() @IsBoolean()
   resale_paused?: boolean;
 
-  /** Units to sell, shared by BitoCard Shop and resellers' stores. */
-  @IsOptional() @IsInt() @Min(1) @Max(maxStock)
+  /** Units to sell, shared by Udozo and resellers' stores; 0 is out of stock (live 90 days, nobody can buy it). */
+  @IsOptional() @IsInt() @Min(0) @Max(maxStock)
   stock?: number;
 }
 

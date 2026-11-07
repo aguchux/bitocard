@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Contact, Flag as FlagIcon, HandCoins, Heart, Mail, MessageCircle, Phone, PhoneCall, PhoneIncoming, Share2, ShieldCheck, X } from "lucide-react";
+import { Check, Contact, Flag as FlagIcon, HandCoins, Heart, Mail, MessageCircle, PackageX, Phone, PhoneCall, PhoneIncoming, Share2, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
 import { buyOrderLabels, type ShopBuyOrderSummary } from "@bitocard/api-client/classifieds";
 import { BuyOrderSheet } from "./buy-order";
@@ -28,6 +28,8 @@ type Listing = {
   /** Its asking price (minor units) and units still to be had, for the buy form. */
   price?: number | null;
   available?: number;
+  /** The seller has some (false: out of stock, so buying is closed; chatting stays open). */
+  inStock?: boolean;
   /** Buy orders are open in its market (signed out: from the market; signed in: the viewer says). */
   buyOrders?: boolean;
   /** The seller's public name, for rating how they dealt with the buyer. */
@@ -244,7 +246,8 @@ export function ListingActions({
   // Buy this: where buy orders are open, the listing is priced or not, and units are left (or the buyer has an order).
   const buyOrders = signedIn ? Boolean(viewer?.buy_orders) : Boolean(listing.buyOrders);
   const openOrder = buyOrder && ["requested", "countered", "accepted"].includes(buyOrder.status) ? buyOrder : null;
-  const offersBuy = buyOrders && canContact && (openOrder || (listing.available ?? 1) > 0);
+  const outOfStock = listing.inStock === false;
+  const offersBuy = buyOrders && canContact && (openOrder || (!outOfStock && (listing.available ?? 1) > 0));
 
   const report = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -265,6 +268,14 @@ export function ListingActions({
         <a href={listing.buyHref} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 px-4 text-[15px] font-bold text-white hover:bg-mint-500">
           <ShieldCheck className="size-5" aria-hidden="true" /> {listing.buyLabel}
         </a>
+      ) : null}
+      {outOfStock && !openOrder && !listing.buyHref ? (
+        <div className="grid gap-1.5">
+          <button type="button" disabled className="flex h-13 cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-4 text-[15px] font-bold text-slate-500">
+            <PackageX className="size-5" aria-hidden="true" /> Out of stock
+          </button>
+          <p className="text-center text-xs text-navy-600">The seller has none to sell right now. {listing.chat ? "Chat with them to ask when more come in." : "Check back later."}</p>
+        </div>
       ) : null}
       {offersBuy ? (
         openOrder ? (
@@ -338,7 +349,7 @@ export function ListingActions({
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
       {signedIn && viewer && canContact ? <RateSellerButton listingId={listing.id} seller={listing.seller ?? "the seller"} ask={Boolean(shared || viewer?.callback?.request?.status === "done")} /> : null}
-      {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} /> : null}
+      {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} offers={!outOfStock} /> : null}
       <div className={variant === "seller" ? "hidden" : "text-center"}>
         {signedIn ? (
           <button type="button" onClick={() => reportSheet.current?.showModal()} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy-600 hover:underline">
@@ -351,7 +362,7 @@ export function ListingActions({
         )}
       </div>
 
-      {signedIn && buyOrders ? <BuyOrderSheet dialog={buySheet} listing={{ id: listing.id, title: listing.title, currency: listing.currency, price: listing.price ?? null, available: listing.available ?? 1 }} onSent={setBuyOrder} /> : null}
+      {signedIn && buyOrders && !outOfStock ? <BuyOrderSheet dialog={buySheet} listing={{ id: listing.id, title: listing.title, currency: listing.currency, price: listing.price ?? null, available: listing.available ?? 1 }} onSent={setBuyOrder} /> : null}
       {signedIn ? <RequestSheet dialog={callbackSheet} kind="callback" listingId={listing.id} myPhone={myPhone} onSent={setCallbackSent} /> : null}
       {signedIn ? <RequestSheet dialog={contactSheet} kind="contact" listingId={listing.id} myPhone={myPhone} onSent={setContactSent} /> : null}
 

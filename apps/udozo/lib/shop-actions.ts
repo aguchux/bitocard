@@ -152,6 +152,19 @@ export async function listingAction(listingId: string, action: "renew" | "sold" 
   return result;
 }
 
+/**
+ * Adds stock to a listing that ran out (My listings' Restock): live, it stays on Udozo for a listing period again;
+ * taken off by Anjio, it is renewed and back for a listing period.
+ */
+export async function restockListing(listingId: string, stock: number): Promise<ShopResult<ShopMyListing>> {
+  if (!id(listingId) || !Number.isInteger(stock) || stock < 1 || stock > 100000) return refused("Say how many you have: from 1 to 100,000.");
+  const changed = answer(await customerApi<ShopMyListing>("PATCH", `/v1/classifieds/listings/${listingId}`, { stock }));
+  if (!changed.ok) return changed;
+  const result = changed.data.status === "expired" ? answer(await customerApi<ShopMyListing>("POST", `/v1/classifieds/listings/${listingId}/renew`, {})) : changed;
+  revalidatePath("/account");
+  return result;
+}
+
 /** The photos in their new order: the first is the cover. */
 export async function reorderPhotos(listingId: string, order: string[]): Promise<ShopResult<unknown>> {
   if (!id(listingId) || !order.length || order.length > 20 || !order.every(id)) return refused("No such photos.");

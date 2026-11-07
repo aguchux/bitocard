@@ -7,14 +7,14 @@ import { shopMoney, type ShopBuyOrder } from "@bitocard/api-client/classifieds";
 import { acceptedBuyOrders, buyOrderStep } from "@/lib/buy-order-actions";
 import type { ListingAction } from "@/lib/shop";
 import { type ConfirmOptions, useConfirm } from "@/components/confirm-dialog";
-import { listingAction } from "@/lib/shop-actions";
+import { listingAction, restockListing } from "@/lib/shop-actions";
 
 const questions: Partial<Record<ListingAction, ConfirmOptions>> = {
   sold: { title: "Mark it sold?", body: "It leaves the market and shows as sold for 30 days.", action: "Mark sold" },
   delete: { title: "Delete this listing for good?", body: "Its photos and video go too. This cannot be undone.", action: "Delete listing", dismiss: "Keep it", tone: "danger" },
 };
 
-/** A listing's buttons on My listings: edit, mark sold, renew, open its public page, delete. */
+/** A listing's buttons on My listings: edit, mark sold, renew, restock (out of stock), open its public page, delete. */
 export function ListingButtons({ id, actions, publicHref, improve = null }: { id: string; actions: ListingAction[]; publicHref: string | null; improve?: string | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +22,18 @@ export function ListingButtons({ id, actions, publicHref, improve = null }: { id
   const [confirm, confirmDialog] = useConfirm();
   const [buyers, setBuyers] = useState<ShopBuyOrder[]>([]);
   const soldTo = useRef<HTMLDialogElement>(null);
+  const restock = useRef<HTMLDialogElement>(null);
+  const [count, setCount] = useState("1");
+  const addStock = (event: React.FormEvent) => {
+    event.preventDefault();
+    restock.current?.close();
+    setError(null);
+    start(async () => {
+      const result = await restockListing(id, Math.floor(Number(count)));
+      if (!result.ok) setError(result.message);
+      else router.refresh();
+    });
+  };
   const run = async (action: "renew" | "sold" | "delete") => {
     // Sold to a buyer who sent a buy order you accepted? Mark it sold to them, so the sale is recorded with them.
     if (action === "sold") {
@@ -72,6 +84,19 @@ export function ListingButtons({ id, actions, publicHref, improve = null }: { id
           </button>
         </div>
       </dialog>
+      <dialog ref={restock} aria-label="Restock" className="sheet m-0 mt-auto w-full max-w-none rounded-t-3xl bg-white p-0 text-navy-900 sm:m-auto sm:max-w-md sm:rounded-3xl" onClick={event => event.target === event.currentTarget && event.currentTarget.close()}>
+        <form onSubmit={addStock} className="grid gap-3 p-5">
+          <h2 className="text-lg font-bold">How many do you have now?</h2>
+          <p className="text-sm text-slate-600">Buyers can buy it again, and it stays on Udozo for a full listing period.</p>
+          <input type="number" inputMode="numeric" min={1} max={100000} required value={count} onChange={event => setCount(event.target.value)} aria-label="How many in stock" className="h-12 rounded-xl border border-slate-200 px-3 text-base" />
+          <button type="submit" disabled={pending} className="min-h-12 rounded-2xl bg-navy-900 px-4 text-sm font-bold text-white hover:bg-navy-700 disabled:opacity-60">
+            Restock
+          </button>
+          <button type="button" onClick={() => restock.current?.close()} className="min-h-11 text-sm font-semibold text-slate-600 hover:underline">
+            Cancel
+          </button>
+        </form>
+      </dialog>
       <div className="flex gap-2">
         {actions.map(action => {
           if (action === "edit") {
@@ -89,6 +114,13 @@ export function ListingButtons({ id, actions, publicHref, improve = null }: { id
             ) : null;
           }
           if (action === "submit") return null;
+          if (action === "restock") {
+            return (
+              <button key={action} type="button" disabled={pending} onClick={() => restock.current?.showModal()} className={`${button} border-navy-900 font-bold`}>
+                Restock
+              </button>
+            );
+          }
           return (
             <button key={action} type="button" disabled={pending} onClick={() => run(action)} className={`${button} ${action === "delete" ? "text-brand-700" : ""}`}>
               {action === "sold" ? "Mark sold" : action === "renew" ? "Renew" : "Delete"}

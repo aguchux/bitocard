@@ -40,6 +40,7 @@ import { breadcrumbJsonLd, listingJsonLd, productMetaTags } from "@/lib/seo";
 import type { ShopViewer } from "@bitocard/api-client/classifieds";
 import type { HomeCard } from "@bitocard/api-client/home";
 import { ListingView } from "@/components/listing-view";
+import { StockLine } from "@/components/stock";
 import { ReviewCard } from "@/components/reviews/review-view";
 import { reviewPath, reviewsHref, summaryText } from "@/lib/reviews";
 
@@ -160,7 +161,8 @@ export default async function ListingPage({ params }: Props) {
           <Gallery title={listing.title} photos={listing.photos} video={listing.video} />
           <section className="grid gap-2 px-4 sm:px-0">
             {sold ? <span className="w-fit rounded-full bg-navy-900 px-3 py-1 text-xs font-bold text-white">Sold</span> : null}
-            {listing.reserved && !sold ? <span className="w-fit rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700">Reserved with Safe pay</span> : null}
+            {listing.reserved && !sold && listing.in_stock !== false ? <span className="w-fit rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700">Reserved with Safe pay</span> : null}
+            {!sold && listing.status === "active" ? <StockLine inStock={listing.in_stock} available={listing.available} /> : null}
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-x-2.5">
                 <strong className={`text-[26px] font-extrabold tracking-tight ${sold ? "text-navy-500 line-through" : ""}`}>{shopPriceText(listing.price)}</strong>
@@ -229,7 +231,7 @@ export default async function ListingPage({ params }: Props) {
             <p className="rounded-2xl bg-navy-50 p-4 text-sm text-navy-700">This was sold{listing.sold_at ? ` ${postedAgo(listing.sold_at).toLowerCase()}` : ""}. Similar listings are below.</p>
           ) : (
             <ListingActions
-              listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href, currency: listing.price.currency, active: listing.status === "active", chat: listing.contact.chat, phone: listing.contact.phone, buyPath: `/${cc}/l/${listing.ref}/buy`, buyHref: buy?.href ?? null, buyLabel: buy?.label ?? "", price: listing.price.amount, available: listing.available, buyOrders: Boolean(market.buy_orders), seller: listing.seller.name }}
+              listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href, currency: listing.price.currency, active: listing.status === "active", chat: listing.contact.chat, phone: listing.contact.phone, buyPath: `/${cc}/l/${listing.ref}/buy`, buyHref: buy?.href ?? null, buyLabel: buy?.label ?? "", price: listing.price.amount, available: listing.available, inStock: listing.in_stock !== false, buyOrders: Boolean(market.buy_orders), seller: listing.seller.name }}
               viewer={viewer}
               signedIn={Boolean(customer)}
               chat={chatResult?.ok ? chatResult.data : null}

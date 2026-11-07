@@ -36,7 +36,7 @@ export function listingJsonLd(listing: ShopListingPage, origin: string, country:
           url,
           price: schemaPrice(listing.price.amount),
           priceCurrency: listing.price.currency,
-          availability: listing.reserved ? "https://schema.org/LimitedAvailability" : "https://schema.org/InStock",
+          availability: listing.in_stock === false ? "https://schema.org/OutOfStock" : listing.reserved ? "https://schema.org/LimitedAvailability" : "https://schema.org/InStock",
           ...(listing.condition ? { itemCondition: itemCondition[listing.condition] } : {}),
           areaServed: { "@type": "Place", name: `${listing.area.name}, ${listing.area.state.name}` },
           seller: { "@type": "Person", name: listing.seller.name },
@@ -120,7 +120,7 @@ export function faqJsonLd(groups: FaqGroup[]) {
  * one, availability and condition.
  */
 export function productMetaTags(listing: ShopListingPage): Record<string, string> {
-  const tags: Record<string, string> = { "product:availability": listing.status === "sold" ? "out of stock" : "in stock" };
+  const tags: Record<string, string> = { "product:availability": listing.status === "sold" || listing.in_stock === false ? "out of stock" : "in stock" };
   if (listing.price.kind !== "on_request" && listing.price.amount !== null) {
     tags["product:price:amount"] = schemaPrice(listing.price.amount);
     tags["product:price:currency"] = listing.price.currency;

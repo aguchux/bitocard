@@ -194,6 +194,8 @@ export type ShopListingCard = {
   /** The first few feature values, as people read them ("256 GB"). */
   highlights: string[];
   delivery: ShopDelivery;
+  /** Some to buy (Udozo); out of stock, buying is closed and it comes after those in stock. */
+  in_stock?: boolean;
   /** The seller by their public name; `handle` names their seller page (Udozo). */
   seller: { name: string; handle?: string; username?: string | null; badges: ShopBadge[]; rating?: { positive_pct: number; counted: number } | null };
   published_at: string | null;
@@ -226,6 +228,8 @@ export type ShopListingPage = {
   reserved: boolean;
   /** Units still to be had: its stock less those held for buyers (Safe pay, or buy orders the seller accepted). */
   available?: number;
+  /** The seller has some (Udozo); out of stock, nobody can buy it until they restock. */
+  in_stock?: boolean;
   contact: { chat: boolean; phone: boolean };
   seller: { name: string; handle?: string; username?: string | null; avatar_url?: string | null; member_since: string; badges: ShopBadge[]; active_listings: number; response_rate: number | null; reviews?: ShopReviewSummary | null };
   /** Udozo: the latest reviews of this product (same brand and model) from this seller, when reviews are open. */
@@ -686,8 +690,15 @@ export type ShopMyListing = {
   on_shop: boolean;
   /** Open to resellers' stores, with the discount they earn and how far above the price they may sell (basis points). */
   resale: { enabled: boolean; discount_bps: number | null; markup_max_bps: number | null; paused: boolean };
-  /** Units left to sell, shared by every channel. */
+  /** Units left to sell, shared by every channel (none until the seller says how many). */
   stock: number;
+  /** Udozo: whether any are left; out of stock, it stays live 90 days (`delist_at`), then Anjio takes it off. */
+  in_stock?: boolean;
+  out_of_stock_at?: string | null;
+  /** When Anjio takes it off Udozo if it is not restocked (live and out of stock only). */
+  delist_at?: string | null;
+  /** Why it was taken off: `out_of_stock` when Anjio took it off, so restocking and renewing brings it back. */
+  expired_reason?: 'out_of_stock' | null;
   /** Its public page on shop.bitocard.com, while live or recently sold (none for a resale-only listing). */
   url: string | null;
   created_at: string;

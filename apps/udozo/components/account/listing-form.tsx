@@ -38,7 +38,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { BrandField, brandMatchKey } from "./brand-field";
 import { ModelField } from "./model-field";
 import { ShopIcon } from "./icon";
-import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom } from "./resale-fields";
+import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom, stockText } from "./resale-fields";
 import { type PostingStep, recordPostingStep } from "@/lib/posting-actions";
 import type { SellSource } from "@/lib/sell-sources";
 
@@ -517,7 +517,7 @@ export function ListingForm({
     [0, "Title and category", `${title.trim() || "No title yet"}${found ? ` · ${found.top.name} › ${found.category.name}` : ""}`],
     [1, "Photos and video", `${ready} photo${ready === 1 ? "" : "s"}${video && video.status !== "failed" ? " and a video" : ""}`],
     [2, "Price and condition", `${priceLine}${condition ? ` · ${conditionLabels[condition]}` : ""}`],
-    [3, "Where to sell", `${places || "Nowhere yet"} · ${sellWhere.stock} available`],
+    [3, "Where to sell", `${places || "Nowhere yet"} · ${stockText(sellWhere.stock)}`],
     [4, "Location and delivery", `${areaName && state ? `${areaName}, ${state.name}` : "No area yet"} · ${delivery === "none" ? "No delivery" : delivery === "state" ? `Delivers in the ${region}` : "Delivers nationwide"}`],
   ];
 

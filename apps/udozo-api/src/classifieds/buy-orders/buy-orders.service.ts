@@ -37,6 +37,7 @@ import {
   voidUntil,
   voidWindowCountMs,
 } from './present.js';
+import { outOfStockNotice, takeStock } from '../stock.js';
 
 const hourMs = 3_600_000;
 const dayMs = 24 * hourMs;
@@ -118,6 +119,7 @@ export class BuyOrdersService {
     if (!customer.phone || !customer.phoneVerifiedAt) throw conflict('phone_required', 'Confirm your mobile number on your profile first: the seller needs to know they can reach you.', 'phone');
     if (await this.contacts.blocked(listing.customerId, customer.id)) throw forbidden('seller_unavailable', 'You cannot buy from this seller.');
     await this.requireNotPaused(listing.customerId);
+    if (listing.stock === 0) throw conflict('out_of_stock', 'This is out of stock: the seller has none to sell right now.', 'quantity');
     const quantity = input.quantity ?? 1;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > Math.min(listing.stock, 100)) throw invalid('parameter_invalid', listing.stock === 1 ? 'There is one of these.' : `Choose 1 to ${Math.min(listing.stock, 100)}.`, 'quantity');
     const price = this.checkPrice(input.price);
@@ -278,6 +280,7 @@ export class BuyOrdersService {
       // Locked against a Safe pay payment or another acceptance taking the same units.
       const [listing] = await tx.$queryRaw<{ stock: number; status: string; on_shop: boolean }[]>`SELECT "stock", "status", "on_shop" FROM "classified_listings" WHERE "id" = ${order.listingId}::uuid FOR UPDATE`;
       if (!listing || listing.status !== 'active' || !listing.on_shop) throw conflict('listing_unavailable', 'This listing is no longer live.');
+      if (listing.stock === 0) throw conflict('out_of_stock', 'This is out of stock: add stock to the listing before accepting.');
       if ((await heldUnits(tx, order.listingId, order.id)) + order.quantity > listing.stock) throw conflict('out_of_stock', 'Every one of these is already held for other buyers.');
       const claimed = await tx.classifiedBuyOrder.updateMany({ where: { id: order.id, status: from }, data: { status: 'accepted', priceMinor: price, counterMinor: null, respondBy: null, acceptedAt: now, meetBy } });
       if (!claimed.count) throw this.changed();
@@ -303,30 +306,27 @@ export class BuyOrdersService {
   }
 
   /**
-   * Completes an accepted order, once: its units are sold (the listing sold with none left), and the buyer is told. The
+   * Completes an accepted order, once: its units are sold (with none left, the listing is out of stock and its seller
+   * told), and the buyer is told. The
    * record of who bought what that reviews read.
    */
   private async complete(order: OrderRow, by: 'seller' | 'buyer' | 'auto', actorId: string | null) {
     const now = new Date();
+    let ranOut = false;
     await this.prisma.$transaction(async tx => {
       const claimed = await tx.classifiedBuyOrder.updateMany({
         where: { id: order.id, status: 'accepted', ...(by === 'auto' ? { boughtAt: { lte: new Date(now.getTime() - autoCompleteMs) } } : {}) },
         data: { status: 'completed', completedAt: now, completedBy: by, closedAt: now, ...(order.boughtAt ? { buyerConfirmedAt: order.boughtAt } : {}) },
       });
       if (!claimed.count) throw this.changed();
-      await tx.$executeRaw`
-        UPDATE "classified_listings" SET
-          "stock" = GREATEST("stock" - ${order.quantity}, 0),
-          "status" = CASE WHEN "stock" <= ${order.quantity} AND "status" = 'active' THEN 'sold' ELSE "status" END,
-          "sold_at" = CASE WHEN "stock" <= ${order.quantity} AND "status" = 'active' THEN ${now} ELSE "sold_at" END,
-          "updated_at" = ${now}
-        WHERE "id" = ${order.listingId}::uuid`;
-      await tx.classifiedPriceHistory.updateMany({ where: { listingId: order.listingId, to: null, listing: { status: 'sold' } }, data: { to: now } });
+      // Its units are sold; with none left, the listing is out of stock (live 90 days, never marked sold by this).
+      ranOut = (await takeStock(tx, order.listingId, order.quantity, now)).ranOut;
       // The record of who bought what: the buyer's right to review the seller.
       await recordPurchase(tx, { source: 'buy_order', buyOrderId: order.id, listingId: order.listingId, sellerId: order.sellerId, buyerId: order.buyerId, country: order.country, completedAt: now });
       await this.card(tx, order, actorId, by === 'auto' ? 'Recorded as sold: the buyer said they bought it and the seller did not answer.' : 'Marked sold. Thank you for trading on Udozo.', now);
     });
     const done = await this.reload(order.id);
+    if (ranOut) await this.inbox.customer({ customerId: order.seller.id, storeId: order.seller.storeId }, 'customer.classifieds.out_of_stock', outOfStockNotice({ id: order.listingId, title: order.listing.title }, now));
     const title = order.listing.title ?? 'the listing';
     const seller = publicName(order.seller.name);
     if (by === 'seller') {
@@ -392,6 +392,14 @@ export class BuyOrdersService {
       if (!claimed) continue;
       result.closed += 1;
       await this.tell(await this.reload(row.id), 'buyer', 'customer.classifieds.buy_cancelled', 'A buy order ended', `“${row.listing.title ?? 'The listing'}” is no longer for sale.`);
+    }
+    // Requests waiting on a listing that is out of stock end too (accepted ones hold units, so they are never here).
+    const soldOut = await this.prisma.classifiedBuyOrder.findMany({ where: { status: { in: ['requested', 'countered'] }, listing: { status: 'active', stock: 0 } }, include: orderInclude, take });
+    for (const row of soldOut) {
+      const claimed = await this.claim(row, [row.status as BuyOrderStatus], { status: 'cancelled', endedBy: 'udozo', endReason: 'out_of_stock', closedAt: now, respondBy: null }, null, 'The listing is out of stock, so this buy order ended.', now);
+      if (!claimed) continue;
+      result.closed += 1;
+      await this.tell(await this.reload(row.id), 'buyer', 'customer.classifieds.buy_cancelled', 'A buy order ended', `“${row.listing.title ?? 'The listing'}” is out of stock. You can ask again once the seller restocks it.`);
     }
     for (const row of await this.prisma.classifiedBuyOrder.findMany({ where: { status: 'accepted', boughtAt: { lte: new Date(now.getTime() - autoCompleteMs) } }, include: orderInclude, take })) {
       try {

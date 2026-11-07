@@ -199,7 +199,7 @@ export class ListingSearchService {
     const [rows, tiers] = await Promise.all([
       this.prisma.$queryRaw<{ id: string; tier: number; delivers: boolean; rank: number }[]>`
         SELECT l."id", (${tier})::int AS tier, ${delivers} AS delivers, (${rank})::float8 AS rank ${from}
-        ORDER BY tier, ${order}, l."id" OFFSET ${offset} LIMIT ${limit}`,
+        ORDER BY tier, (l."stock" = 0), ${order}, l."id" OFFSET ${offset} LIMIT ${limit}`,
       this.prisma.$queryRaw<{ tier: number; count: bigint }[]>`SELECT (${tier})::int AS tier, count(*) AS count ${from} GROUP BY 1`,
     ]);
     const cards = await this.cards(rows.map(row => row.id));
@@ -256,6 +256,8 @@ export class ListingSearchService {
             has_video: row.media.some(item => item.kind === 'video'),
             highlights: highlights(row.features, row.category?.features ?? []),
             delivery: row.delivery,
+            /** Some to buy; out of stock, buying is closed (it stays live 90 days, after those in stock in results). */
+            in_stock: row.stock > 0,
             seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, badges: this.badges(row.customer, checked), rating: ratings.get(`${row.country}:${row.customerId}`) ?? null },
             published_at: row.publishedAt?.toISOString() ?? null,
           },
@@ -340,9 +342,11 @@ export class ListingSearchService {
       photos: photos.map(item => ({ url: this.watermarks.url(item, 1600), width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
-      /** Paid for with Safe pay and waiting for the hand-over. */
-      reserved: holding >= row.stock,
-      /** Units still to be had: its stock less those paid for and waiting to be handed over. */
+      /** In stock, but every unit is held for buyers (paid with Safe pay, or buy orders the seller accepted). */
+      reserved: row.stock > 0 && holding >= row.stock,
+      /** The seller has some: out of stock (none), buying is closed until they restock. */
+      in_stock: row.stock > 0,
+      /** Units still to be had: its stock less those held for buyers. */
       available: Math.max(row.stock - holding, 0),
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
       seller: { name: publicName(row.customer.name), handle: row.customer.sellerHandle, username: row.customer.username, avatar_url: row.customer.avatarUrl, member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate, reviews },

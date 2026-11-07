@@ -276,6 +276,8 @@ export class ShopAssistantTools {
       features: Object.fromEntries(page.features.map(feature => [feature.name, feature.value === null ? null : `${feature.value}${feature.unit && typeof feature.value === 'number' ? ` ${feature.unit}` : ''}`])),
       delivery: page.delivery,
       reserved: page.reserved,
+      // In stock (how many can still be bought) or out of stock: buying is closed until the seller restocks.
+      stock: page.in_stock ? `${page.available} in stock` : 'out of stock',
       seller: { badges: page.seller.badges, active_listings: page.seller.active_listings, member_since: page.seller.member_since.slice(0, 7) },
       photos: page.photos.length,
       has_video: Boolean(page.video),

@@ -7,6 +7,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { type ListingReviewCode, PostingJourneysService } from '../postings/journeys.service.js';
 import { ShopEmails } from './shop-emails.service.js';
 import { invalid } from './rules.js';
+import { liveUntil } from './stock.js';
 
 /** Why a listing was sent to a moderator. */
 export const reviewFlags = ['first_listings', 'prohibited_words', 'price_low', 'photo_reused', 'posting_fast', 'reported'] as const;
@@ -140,7 +141,7 @@ export class ModerationService {
     const now = new Date();
     const claimed = await this.prisma.classifiedListing.updateMany({
       where: { id, status: 'pending_review' },
-      data: { status: 'active', reviewReason: null, reviewReasonCode: null, reviewedAt: now, reviewedById: actorId, reviewFlags: [], publishedAt: listing.publishedAt ?? now, expiresAt: listing.expiresAt && listing.expiresAt > now ? listing.expiresAt : new Date(now.getTime() + (settings?.listingDays ?? 30) * 86_400_000) },
+      data: { status: 'active', reviewReason: null, reviewReasonCode: null, reviewedAt: now, reviewedById: actorId, reviewFlags: [], publishedAt: listing.publishedAt ?? now, expiresAt: listing.expiresAt && listing.expiresAt > now ? listing.expiresAt : liveUntil(listing, settings?.listingDays ?? 30, now), outOfStockAt: listing.stock > 0 ? null : (listing.outOfStockAt ?? now) },
     });
     if (!claimed.count) throw conflict('listing_not_in_review', 'This listing is not waiting for review.');
     await this.prisma.classifiedReport.updateMany({ where: { listingId: id, status: 'open' }, data: { status: 'dismissed', decidedById: actorId, decidedAt: now, note: note ?? 'Listing approved' } });

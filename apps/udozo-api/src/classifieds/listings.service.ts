@@ -33,6 +33,7 @@ import {
   type priceKinds,
   slugify,
 } from './rules.js';
+import { liveUntil, outOfStockDays, stockChange } from './stock.js';
 
 export type ListingInput = {
   category_id?: string | null;
@@ -210,9 +211,12 @@ export class ListingsService {
   async update(customer: CustomerWithStore, id: string, input: ListingInput) {
     const country = await this.sellerCountry(customer);
     const listing = await this.own(customer, id);
-    if (!['draft', 'pending_review', 'active', 'rejected'].includes(listing.status)) throw conflict('listing_closed', 'This listing can no longer be changed.');
+    // An expired listing can only be restocked (then renewed); anything else past live is closed.
+    const sent = Object.entries(input).filter(([, value]) => value !== undefined).map(([key]) => key);
+    const restocking = listing.status === 'expired' && sent.length === 1 && sent[0] === 'stock';
+    if (!['draft', 'pending_review', 'active', 'rejected'].includes(listing.status) && !restocking) throw conflict('listing_closed', 'This listing can no longer be changed.');
     const data = await this.changes(country, input, listing);
-    if (listing.status !== 'draft') {
+    if (listing.status !== 'draft' && !restocking) {
       this.requireComplete({ ...listing, ...data.fields });
       // Opening a submitted listing to resellers needs what submitting one does.
       if (data.fields.resale && !listing.resale) {
@@ -220,12 +224,16 @@ export class ListingsService {
         await this.resale.requireSupplier(customer, country);
       }
     }
+    const listingDays = data.fields.stock !== undefined && listing.status !== 'draft' ? (await this.marketSettings(country)).listingDays : 0;
     await this.prisma.$transaction(async tx => {
       if (data.fields.stock !== undefined && listing.status !== 'draft') {
         // Units paid for and waiting to be handed over stay: stock cannot go below them (the row locked against a payment).
         await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ${id}::uuid FOR UPDATE`;
         const held = await heldUnits(tx, id);
         if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are held for buyers (paid with Safe pay, or buy orders you accepted): stock cannot go below that.`);
+        // Running out starts the 90 days out of stock; restocking ends them (the stock as it is now, read under the lock).
+        const current = await tx.classifiedListing.findUniqueOrThrow({ where: { id }, select: { status: true, stock: true, outOfStockAt: true, expiresAt: true } });
+        Object.assign(data.fields, stockChange(current, data.fields.stock, listingDays, new Date()));
       }
       // A listing in another category takes a SKU there, so its prefix is always its category's.
       const moved = data.fields.categoryId !== undefined && data.fields.categoryId !== listing.categoryId;
@@ -335,8 +343,8 @@ export class ListingsService {
       const claimed = await tx.classifiedListing.updateMany({
         where: { id, status: listing.status },
         data: review.length
-          ? { status: 'pending_review', reviewReason: review[0], reviewFlags: review, submittedAt: listing.submittedAt ?? now }
-          : { status: 'active', reviewReason: null, reviewFlags: [], submittedAt: listing.submittedAt ?? now, publishedAt: listing.publishedAt ?? now, expiresAt: new Date(now.getTime() + settings.listingDays * dayMs) },
+          ? { status: 'pending_review', reviewReason: review[0], reviewFlags: review, submittedAt: listing.submittedAt ?? now, outOfStockAt: listing.stock > 0 ? null : (listing.outOfStockAt ?? now) }
+          : { status: 'active', reviewReason: null, reviewFlags: [], submittedAt: listing.submittedAt ?? now, publishedAt: listing.publishedAt ?? now, expiresAt: liveUntil(listing, settings.listingDays, now), outOfStockAt: listing.stock > 0 ? null : now },
       });
       if (!claimed.count) throw conflict('listing_not_draft', 'This listing was already submitted.');
       if (!(await tx.classifiedPriceHistory.count({ where: { listingId: id } })) && listing.priceMinor !== null) await this.recordPrice(tx, id, listing.priceMinor);
@@ -351,9 +359,14 @@ export class ListingsService {
     const settings = await this.marketSettings(country);
     const listing = await this.own(customer, id);
     const now = Date.now();
-    if (listing.status === 'active' && listing.expiresAt && listing.expiresAt.getTime() - now > renewWindowMs) throw conflict('renew_not_due', 'You can renew a listing from 3 days before it expires.');
     if (!['active', 'expired'].includes(listing.status)) throw conflict('listing_not_renewable', 'Only live or expired listings are renewed.');
-    const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: listing.status }, data: { status: 'active', expiresAt: new Date(now + settings.listingDays * dayMs) } });
+    // Out of stock, a listing is live 90 days at most: restock it first.
+    if (listing.stock === 0) throw conflict('restock_required', `Add stock first: a listing out of stock stays on Udozo for ${outOfStockDays} days at most.`);
+    if (listing.status === 'active' && listing.expiresAt && listing.expiresAt.getTime() - now > renewWindowMs) throw conflict('renew_not_due', 'You can renew a listing from 3 days before it expires.');
+    const claimed = await this.prisma.classifiedListing.updateMany({
+      where: { id, status: listing.status, stock: { gt: 0 } },
+      data: { status: 'active', expiresAt: new Date(now + settings.listingDays * dayMs), outOfStockAt: null, expiredReason: null },
+    });
     if (!claimed.count) throw conflict('listing_not_renewable', 'This listing changed: refresh and try again.');
     return this.present(await this.own(customer, id));
   }
@@ -385,21 +398,34 @@ export class ListingsService {
     await this.prisma.classifiedPriceHistory.updateMany({ where: { listingId: id, to: null }, data: { to: now } });
   }
 
-  /** The scheduled job: live listings past their time expire. */
+  /**
+   * The scheduled job: live listings past their time expire, and Anjio takes off those out of stock for 90 days
+   * (`expired_reason: out_of_stock`; restocking and renewing shows them again).
+   */
   async expireDue(now = new Date()) {
-    const due = await this.prisma.classifiedListing.findMany({ where: { status: 'active', expiresAt: { lte: now } }, select: { id: true, title: true, expiresAt: true, customer: { select: { id: true, storeId: true } } }, take: 2000 });
-    if (!due.length) return { expired: 0 };
-    const expired = await this.prisma.classifiedListing.updateMany({ where: { id: { in: due.map(row => row.id) }, status: 'active' }, data: { status: 'expired' } });
+    const due = await this.prisma.classifiedListing.findMany({
+      where: { status: 'active', expiresAt: { lte: now } },
+      select: { id: true, title: true, stock: true, expiresAt: true, customer: { select: { id: true, storeId: true } } },
+      take: 2000,
+    });
+    if (!due.length) return { expired: 0, out_of_stock: 0 };
+    const ran = due.filter(row => row.stock === 0);
+    const rest = due.filter(row => row.stock > 0);
+    const delisted = ran.length ? await this.prisma.classifiedListing.updateMany({ where: { id: { in: ran.map(row => row.id) }, status: 'active', stock: 0 }, data: { status: 'expired', expiredReason: 'out_of_stock' } }) : { count: 0 };
+    const expired = rest.length ? await this.prisma.classifiedListing.updateMany({ where: { id: { in: rest.map(row => row.id) }, status: 'active' }, data: { status: 'expired', expiredReason: null } }) : { count: 0 };
     // Each seller hears once per period (the subject is the listing and its expiry), so a run twice tells nobody twice.
     for (const row of due) {
+      const outOfStock = row.stock === 0;
       await this.inbox.customer({ customerId: row.customer.id, storeId: row.customer.storeId }, 'customer.classifieds.listing_expired', {
         subject: `${row.id}:expired:${row.expiresAt?.toISOString()}`,
-        title: 'Your ad expired',
-        body: `"${row.title}" is off Udozo. Renew it from My listings to show it again.`,
-        link: '/account/listings',
+        title: outOfStock ? 'Anjio took your ad off Udozo' : 'Your ad expired',
+        body: outOfStock
+          ? `"${row.title}" was out of stock for ${outOfStockDays} days, so it is off Udozo. Add stock and renew it from My listings to show it again.`
+          : `"${row.title}" is off Udozo. Renew it from My listings to show it again.`,
+        link: outOfStock ? `/account/listings/${row.id}` : '/account/listings',
       });
     }
-    return { expired: expired.count };
+    return { expired: expired.count + delisted.count, out_of_stock: delisted.count };
   }
 
   /** Everything a listing past draft must have. */
@@ -486,7 +512,7 @@ export class ListingsService {
     if (input.resale_markup_max_bps !== undefined) fields.resaleMarkupMaxBps = input.resale_markup_max_bps;
     if (input.resale_paused !== undefined) fields.resalePausedAt = input.resale_paused ? (current?.resalePausedAt ?? new Date()) : null;
     if (input.stock !== undefined) {
-      if (!Number.isInteger(input.stock) || input.stock < 1 || input.stock > maxStock) throw invalid('parameter_invalid', `Stock is a whole number from 1 to ${maxStock.toLocaleString('en-GB')}.`, 'stock');
+      if (!Number.isInteger(input.stock) || input.stock < 0 || input.stock > maxStock) throw invalid('parameter_invalid', `Stock is a whole number from 0 (out of stock) to ${maxStock.toLocaleString('en-GB')}.`, 'stock');
       fields.stock = input.stock;
     }
     const onShop = fields.onShop ?? current?.onShop ?? true;
@@ -541,6 +567,13 @@ export class ListingsService {
         paused: listing.resalePausedAt !== null,
       },
       stock: listing.stock,
+      /** Some to sell (units held for buyers count: they are theirs). Out of stock, buying is closed. */
+      in_stock: listing.stock > 0,
+      /** When a posted listing ran out, and, while it is live, when Anjio takes it off unless it is restocked. */
+      out_of_stock_at: listing.outOfStockAt?.toISOString() ?? null,
+      delist_at: listing.status === 'active' && listing.stock === 0 ? (listing.expiresAt?.toISOString() ?? null) : null,
+      /** `out_of_stock` when Anjio took it off after 90 days out of stock (an expired listing); else null. */
+      expired_reason: listing.expiredReason,
       url: listing.onShop && ['active', 'sold'].includes(listing.status) && listing.slug ? `${shopOrigin}/${listing.country.toLowerCase()}/l/${listing.ref}-${listing.slug}` : null,
       created_at: listing.createdAt.toISOString(),
       updated_at: listing.updatedAt.toISOString(),

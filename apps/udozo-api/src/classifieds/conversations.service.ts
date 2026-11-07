@@ -68,6 +68,7 @@ const listingSummary = {
     slug: true,
     status: true,
     onShop: true,
+    stock: true,
     country: true,
     currency: true,
     priceKind: true,
@@ -307,6 +308,7 @@ export class ConversationsService {
     const chat = await this.chatFor(customer, id);
     const side = this.requireWritable(chat, customer.id);
     if (!isOnShop(chat.listing)) throw conflict('listing_unavailable', 'This listing is no longer live, so offers cannot be made.');
+    if (chat.listing.stock === 0) throw conflict('out_of_stock', 'This is out of stock, so offers cannot be made until the seller restocks it.');
     if (!Number.isSafeInteger(price) || price <= 0 || price > Number(maxPriceMinor)) throw invalid('parameter_invalid', 'Offer a price above zero.', 'price');
     await this.requirePace(chat.id, customer.id);
     const now = new Date();

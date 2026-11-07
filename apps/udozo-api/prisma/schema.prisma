@@ -4763,9 +4763,14 @@ model ClassifiedListing {
   resaleMarkupMaxBps   Int?               @map("resale_markup_max_bps")
   /// The supplier paused reselling (stores stop selling it; it stays on BitoCard Shop if it is there too).
   resalePausedAt       DateTime?          @map("resale_paused_at")
-  /// Units left to sell, shared by BitoCard Shop and resellers' stores; Safe pay orders holding it take one each, and a
-  /// release takes one away (sold at none).
-  stock        Int                        @default(1)
+  /// Units in stock, shared by Udozo and resellers' stores, from 0 (out of stock, the default until the seller says how
+  /// many); Safe pay and buy orders holding it take one each, and a sale takes one away. A live listing at none stays
+  /// live, out of stock, for 90 days (`outOfStockDays`), then Anjio (the `classifieds` job) takes it off.
+  stock        Int                        @default(0)
+  /// When a posted listing's stock reached none (null while it has some, and for drafts).
+  outOfStockAt DateTime?                  @map("out_of_stock_at")
+  /// Why an expired listing left the market: `out_of_stock` when Anjio took it off after 90 days without stock.
+  expiredReason String?                   @map("expired_reason") @db.VarChar(20)
   /// Full-text search over the title, features, category and description, kept by the API (GIN index in SQL).
   search       Unsupported("tsvector")?
   createdAt    DateTime                   @default(now()) @map("created_at")

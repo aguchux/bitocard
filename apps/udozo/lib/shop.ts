@@ -33,13 +33,17 @@ export function resaleSums(priceMinor: number | null, discountBps: number, marku
   return { net: priceMinor - Math.floor((priceMinor * discountBps) / 10000), top: priceMinor + Math.floor((priceMinor * markupMaxBps) / 10000) };
 }
 
-/** My listings' tags for where a listing is sold and what is left: "Resellers", "Resellers only", paused, "3 left". */
+/** My listings' tags for where a listing is sold and what is left: "Resellers", "Resellers only", paused, "3 left", "Out of stock". */
 export function listingChannelTags(listing: Pick<ShopMyListing, "on_shop" | "resale" | "stock" | "status">) {
   const tags: string[] = [];
   if (listing.resale.enabled) tags.push(listing.resale.paused ? "Resellers paused" : listing.on_shop ? "Resellers" : "Resellers only");
-  if (listing.stock > 1 && !["sold", "removed"].includes(listing.status)) tags.push(`${listing.stock.toLocaleString("en-GB")} left`);
+  if (["active", "pending_review", "expired"].includes(listing.status) && listing.stock === 0) tags.push("Out of stock");
+  else if (listing.stock > 1 && !["sold", "removed"].includes(listing.status)) tags.push(`${listing.stock.toLocaleString("en-GB")} left`);
   return tags;
 }
+
+/** Out of stock and live or taken off by Anjio: the seller can add stock (and a taken-off ad comes back). */
+export const needsRestock = (listing: Pick<ShopMyListing, "status" | "stock">) => listing.stock === 0 && ["active", "expired"].includes(listing.status);
 
 /** A rate in basis points as people read it ("12.5%"). */
 export const bpsText = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
@@ -53,10 +57,13 @@ export const listingFilters: Array<{ status: ShopListingStatus | null; label: st
   { status: "expired", label: "Expired" },
 ];
 
-export type ListingAction = "edit" | "submit" | "sold" | "renew" | "delete" | "view";
+export type ListingAction = "edit" | "submit" | "sold" | "renew" | "restock" | "delete" | "view";
 
 /** What a seller can do with a listing in its state (the API checks again). */
-export function listingActions(listing: Pick<ShopMyListing, "status" | "url">): ListingAction[] {
+export function listingActions(listing: Pick<ShopMyListing, "status" | "url"> & { stock?: number }): ListingAction[] {
+  // Out of stock: add stock (live, it is still on Udozo; taken off by Anjio, restocking brings it back).
+  if (listing.stock === 0 && listing.status === "active") return ["edit", "restock", ...(listing.url ? (["view"] as const) : []), "delete"];
+  if (listing.stock === 0 && listing.status === "expired") return ["restock", "delete"];
   switch (listing.status) {
     case "draft":
       return ["edit", "delete"];
@@ -89,7 +96,12 @@ export const listingTones: Record<ShopListingStatus, string> = {
 const day = 86_400_000;
 
 /** The listing card's line under its price: what it has done, or where it stands. */
-export function listingMeta(listing: Pick<ShopMyListing, "status" | "views" | "leads" | "expires_at" | "updated_at" | "photos">, now = Date.now()) {
+/** A date as sellers read it ("12 February 2027"). */
+const dayText = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+
+export function listingMeta(listing: Pick<ShopMyListing, "status" | "views" | "leads" | "expires_at" | "updated_at" | "photos"> & Partial<Pick<ShopMyListing, "delist_at" | "expired_reason">>, now = Date.now()) {
+  if (listing.status === "active" && listing.delist_at) return `Out of stock: Anjio takes it off on ${dayText(listing.delist_at)} unless you restock it`;
+  if (listing.status === "expired" && listing.expired_reason === "out_of_stock") return "Anjio took it off: it was out of stock. Restock it to show it again";
   if (listing.status === "active") {
     const left = listing.expires_at ? Math.max(0, Math.ceil((Date.parse(listing.expires_at) - now) / day)) : null;
     return [`${listing.views} ${listing.views === 1 ? "view" : "views"}`, `${listing.leads} ${listing.leads === 1 ? "lead" : "leads"}`, left === null ? null : left === 0 ? "expires today" : `expires in ${left} ${left === 1 ? "day" : "days"}`].filter(Boolean).join(" · ");

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { priceText } from '../rules.js';
+import { outOfStockDays } from '../stock.js';
 
 /** BitoCard's sections of a shop assistant's knowledge for one country, in document order. */
 export const shopKnowledgeKeys = ['shop', 'categories', 'posting', 'safe_pay', 'safe_trade', 'prohibited', 'badges', 'contact'] as const;
@@ -128,6 +129,7 @@ export class ShopKnowledgeService {
         `- A listing needs a title (5 to 90 characters), a category, a price (or "on request"), its area, ${data.minPhotos} to ${data.maxPhotos} photos and, optionally, a video of up to 60 seconds.`,
         '- Titles and descriptions cannot contain links, web addresses, phone numbers to take buyers elsewhere, or HTML.',
         `- A listing stays up ${data.listingDays} days and can be renewed. Each seller can post ${data.monthlyLimit} listings a month.`,
+        `- Every listing says how many the seller has in stock (none until they say). Out of stock, nobody can buy it (Safe pay, buy orders and offers are closed) and it stays up ${outOfStockDays} days, then Anjio takes it off unless the seller restocks it from My listings. A sale that takes the last one leaves it out of stock.`,
         `- A new seller's first ${data.firstReviewed} listings are checked by a moderator before they go live; so are listings that look doubtful.`,
         '- Sellers mark a listing sold, renew it or delete it from My listings.',
       ].join('\n'),

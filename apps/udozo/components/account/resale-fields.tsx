@@ -7,7 +7,7 @@ import { bpsText, resaleSums } from "@/lib/shop";
 
 export type SellWhere = { onShop: boolean; resale: boolean; discountBps: number; markupMaxBps: number; stock: number };
 
-/** Where a new listing starts: on Udozo, not resold, one unit; the resale terms at the country's smallest discount. */
+/** Where a new listing starts: on Udozo, not resold, none in stock until the seller says; the resale terms at the country's smallest discount. */
 export function sellWhereFrom(listing: { on_shop: boolean; resale: { enabled: boolean; discount_bps: number | null; markup_max_bps: number | null }; stock: number } | null, availability: ShopResaleAvailability | null): SellWhere {
   const limits = availability ?? { discount_min_bps: 500, markup_max_bps: 3000 };
   return {
@@ -15,12 +15,21 @@ export function sellWhereFrom(listing: { on_shop: boolean; resale: { enabled: bo
     resale: listing?.resale.enabled ?? false,
     discountBps: listing?.resale.discount_bps ?? limits.discount_min_bps,
     markupMaxBps: listing?.resale.markup_max_bps ?? Math.min(2000, limits.markup_max_bps),
-    stock: listing?.stock ?? 1,
+    stock: listing?.stock ?? 0,
   };
 }
 
 /** The resale terms as the API takes them, sent together so a listing never holds half of them. */
 export const resaleChanges = (value: SellWhere) => ({ resale: value.resale, resale_discount_bps: value.discountBps, resale_markup_max_bps: value.markupMaxBps });
+
+/** Out of stock, an ad stays live this long, then Anjio takes it off (the API's `outOfStockDays`). */
+export const outOfStockDays = 90;
+
+/** What the stock box holds: a whole number from 0 (out of stock) to 100,000. */
+export const stockFrom = (typed: string) => Math.max(0, Math.min(100000, Math.floor(Number(typed) || 0)));
+
+/** The stock as the summary reads it. */
+export const stockText = (stock: number) => (stock > 0 ? `${stock.toLocaleString("en-GB")} in stock` : "Out of stock");
 
 const slider = "h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-700";
 
@@ -59,18 +68,22 @@ export function ResaleFields({
       <h2 id="sell-where" className="text-base font-bold">
         Where to sell
       </h2>
-      <label className="grid max-w-56 gap-1.5 text-sm font-semibold">
-        How many do you have?
+      <label className="grid max-w-sm gap-1.5 text-sm font-semibold">
+        How many do you have in stock?
         <input
           type="number"
           inputMode="numeric"
-          min={1}
+          min={0}
           max={100000}
           value={value.stock}
-          onChange={event => onChange({ ...value, stock: Math.max(1, Math.min(100000, Math.floor(Number(event.target.value) || 1))) }, ["stock"])}
-          className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${invalid("stock") ? "border-brand-600" : "border-slate-200"}`}
+          onChange={event => onChange({ ...value, stock: stockFrom(event.target.value) }, ["stock"])}
+          className={`h-12 max-w-56 rounded-xl border bg-white px-3 text-base font-normal ${invalid("stock") ? "border-brand-600" : "border-slate-200"}`}
         />
-        <span className="text-xs font-normal text-slate-600">Each sale takes one, wherever it is sold.</span>
+        <span className="text-xs font-normal text-slate-600">
+          {value.stock > 0
+            ? "Each sale takes one, wherever it is sold. When none are left, buyers can no longer buy it."
+            : `With none in stock, buyers can see it and chat but cannot buy it. It stays up ${outOfStockDays} days, then Anjio takes it off unless you restock.`}
+        </span>
       </label>
       <div className="grid gap-3">
         <label className="flex items-start gap-3 text-sm">

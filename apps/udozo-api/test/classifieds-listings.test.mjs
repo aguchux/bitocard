@@ -76,6 +76,7 @@ const phone = async (overrides = {}) => {
     description: 'Used and in **good** condition.\n\n- Small scratch on the back\n- Box and cable',
     price: 36500000,
     condition: 'used',
+    stock: 1,
     features: [
       { key: 'brand', value: 'Apple' },
       { key: 'storage', value: '128' },

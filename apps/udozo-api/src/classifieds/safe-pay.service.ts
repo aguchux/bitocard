@@ -27,6 +27,7 @@ import { publicName } from './search.service.js';
 import { ShopTermsService } from './terms.service.js';
 import { recordPurchase } from './reviews/purchases.js';
 import { ReviewsService } from './reviews/reviews.service.js';
+import { outOfStockNotice, takeStock } from './stock.js';
 
 const hourMs = 3_600_000;
 const dayMs = 24 * hourMs;
@@ -276,6 +277,7 @@ export class SafePayService {
     await this.guards.requireDifferentPeople(customer.id, listing.customerId);
     await this.guards.requireNotLimited(listing.customerId, country, false);
     const { address, fee: delivery, stateId } = await this.checkFulfilment(listing, input);
+    if (listing.stock === 0) throw this.outOfStock();
     if ((await this.held(listing.id)) >= listing.stock) throw this.reserved(listing.stock);
     if (settings.newSellerOrderLimitMinor !== null && price > settings.newSellerOrderLimitMinor) {
       const sales = await this.prisma.classifiedOrder.count({ where: { sellerId: listing.customerId, status: 'released' } });
@@ -373,6 +375,7 @@ export class SafePayService {
           data: { status: 'paid', paidAt: now, handoverBy: new Date(now.getTime() + settings.handoverDays * dayMs), releaseCode: code ? this.encryption().encrypt(code) : null },
         });
         if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
+        if (row?.stock === 0) throw this.outOfStock();
         if (!row || (await heldUnits(tx, order.listingId, order.id)) + order.quantity > row.stock) throw conflict('listing_reserved', 'Someone else has just paid for this with Safe pay.');
         await this.ledger.write(tx, entry);
       });
@@ -1175,6 +1178,7 @@ export class SafePayService {
     // The reseller's share is an earnings lot, released to withdrawable earnings after the country's payout hold.
     const hold = order.resellerId && split && split.resellerPayout > 0n ? ((await this.prisma.country.findUnique({ where: { code: order.country }, select: { payoutHoldDays: true } }))?.payoutHoldDays ?? 15) : null;
     const now = new Date();
+    let ranOut = false;
     await this.prisma.$transaction(async tx => {
       const claimed = await tx.classifiedOrder.updateMany({
         where: { id: order.id, status: { in: from } },
@@ -1196,16 +1200,8 @@ export class SafePayService {
       if (hold !== null) {
         await tx.earningsLot.create({ data: { resellerId: order.resellerId!, mode: order.mode, currency: order.currency, amountMinor: split!.resellerPayout, reference: `classified_order:${order.id}`, releaseAt: new Date(now.getTime() + hold * dayMs) } });
       }
-      // Released (wholly or in part): its units are sold; with none left, the listing is.
-      if (status !== 'refunded') {
-        await tx.$executeRaw`
-          UPDATE "classified_listings" SET
-            "stock" = GREATEST("stock" - ${order.quantity}, 0),
-            "status" = CASE WHEN "stock" <= ${order.quantity} AND "status" = 'active' THEN 'sold' ELSE "status" END,
-            "sold_at" = CASE WHEN "stock" <= ${order.quantity} AND "status" = 'active' THEN ${now} ELSE "sold_at" END,
-            "updated_at" = ${now}
-          WHERE "id" = ${order.listingId}::uuid`;
-      }
+      // Released (wholly or in part): its units are sold; with none left, the listing is out of stock (live 90 days).
+      if (status !== 'refunded') ranOut = (await takeStock(tx, order.listingId, order.quantity, now)).ranOut;
       if (order.kind === 'resale') await this.resaleEvents?.changed(tx, order.id);
       // A live direct sale released (wholly or in part) is a purchase: its buyer may review the seller.
       if (status !== 'refunded' && order.kind === 'direct' && order.mode === 'live') {
@@ -1214,6 +1210,7 @@ export class SafePayService {
     });
     if (order.kind === 'resale') this.resaleEvents?.committed();
     const done = await this.reload(order.id);
+    if (ranOut) await this.inbox.customer({ customerId: done.seller.id, storeId: done.seller.storeId }, 'customer.classifieds.out_of_stock', outOfStockNotice({ id: order.listingId, title: done.listing.title }, now));
     if (done.kind === 'resale') {
       const words = status === 'released' ? 'was completed' : status === 'refunded' ? 'was refunded' : 'was partly refunded';
       await this.tellReseller(done, `SP-${done.number} ${words}`, split && split.resellerPayout > 0n ? `${priceText(split.resellerPayout, done.currency)} was added to your earnings, withdrawable after the payout hold.` : 'Nothing was added to your earnings.');
@@ -1258,6 +1255,11 @@ export class SafePayService {
     else if (!(order.kind === 'resale' && actual === 'buyer' && (this.stores.sharesAccounts() || order.storeId === customer.storeId))) throw notFound();
     if (side && actual !== side) throw notYours(side === 'seller' ? 'Only the seller can do this.' : 'Only the buyer can do this.');
     return order;
+  }
+
+  /** Out of stock: nothing to buy until the seller restocks. */
+  private outOfStock() {
+    return conflict('out_of_stock', 'This is out of stock: the seller has none to sell right now.');
   }
 
   private reserved(stock: number) {

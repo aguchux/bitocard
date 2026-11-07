@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BadgeCheck, ImageIcon, Play, Star, Truck } from "lucide-react";
 import { conditionLabels, listingPath, postedAgo, shopPriceText, type ShopListingCard, type ShopResult, type ShopShowcaseCard } from "@bitocard/api-client/classifieds";
 import { Flag } from "./flag";
+import { OutOfStockBadge } from "./stock";
 
 type Card = ShopListingCard | ShopShowcaseCard;
 
@@ -19,6 +20,11 @@ function Cover({ card, className }: { card: Card; className: string }) {
         </span>
       )}
       {card.condition ? <span className="absolute top-2 left-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-navy-600">{conditionLabels[card.condition]}</span> : null}
+      {"in_stock" in card && card.in_stock === false ? (
+        <span className="absolute bottom-2 left-2">
+          <OutOfStockBadge />
+        </span>
+      ) : null}
       {card.has_video ? (
         <span className="absolute right-2 bottom-2 grid size-6 place-items-center rounded-full bg-navy-900/70 text-white" title="Has a video">
           <Play className="size-3" aria-hidden="true" />

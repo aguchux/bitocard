@@ -57,7 +57,7 @@ async function customer(name, { confirmPhone = true } = {}) {
 
 async function live(seller, title, { stock = 1, contact = 'both' } = {}) {
   const [cat, area] = await Promise.all([prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } }), prisma.classifiedArea.findFirstOrThrow({ where: { slug: 'gwarinpa' } })]);
-  const draft = (await seller.post('/v1/classifieds/listings', { title, price: 25000000, condition: 'used', category_id: cat.id, area_id: area.id, contact })).json;
+  const draft = (await seller.post('/v1/classifieds/listings', { title, price: 25000000, condition: 'used', category_id: cat.id, area_id: area.id, contact, stock: 1 })).json;
   await prisma.classifiedMedia.createMany({ data: [0, 1, 2, 3].map(position => ({ listingId: draft.id, kind: 'photo', position, url: `https://media.test/${draft.id}-${position}.jpg` })) });
   const submitted = (await seller.post(`/v1/classifieds/listings/${draft.id}/submit`)).json;
   assert.equal(submitted.status, 'active', JSON.stringify(submitted));
@@ -126,17 +126,20 @@ describe('Buy orders', () => {
     assert.deepEqual([sold.status, sold.json.status, sold.json.completed_by], [200, 'completed', 'seller']);
     assert.equal((await step(seller, asked.json, 'complete')).json.error.code, 'buy_order_closed', 'completed once');
     const listing = await prisma.classifiedListing.findUniqueOrThrow({ where: { id: tv.id } });
-    assert.deepEqual([listing.stock, listing.status], [0, 'sold']);
+    // The last one sold leaves it live but out of stock (90 days, then Anjio takes it off), and its seller is told.
+    assert.deepEqual([listing.stock, listing.status, Boolean(listing.outOfStockAt)], [0, 'active', true]);
+    assert.ok(listing.expiresAt.getTime() - Date.now() > 89 * 86_400_000, 'live 90 days out of stock');
+    assert.equal(await notices(seller.id, 'customer.classifieds.out_of_stock'), 1);
     assert.equal(await notices(buyer.id, 'customer.classifieds.buy_completed'), 1);
     const mine = (await buyer.get(`/v1/classifieds/buy-orders/${asked.json.id}`)).json;
     assert.deepEqual(mine.actions, ['confirm', 'void'], 'Yes, I bought it, or not');
     assert.ok(mine.void_until);
 
-    // The job closes the other buyer's request on the sold listing.
+    // The job closes the other buyer's request on the listing out of stock.
     const ran = await service.job();
     assert.equal(ran.closed, 1);
     const closed = (await other.get(`/v1/classifieds/buy-orders/${second.id}`)).json;
-    assert.deepEqual([closed.status, closed.ended_by, closed.end_reason], ['cancelled', 'udozo', 'listing_closed']);
+    assert.deepEqual([closed.status, closed.ended_by, closed.end_reason], ['cancelled', 'udozo', 'out_of_stock']);
 
     // Every step is a card in the chat, carrying the order as it stands.
     const chat = (await buyer.get(`/v1/classifieds/conversations/${asked.json.conversation_id}`)).json;

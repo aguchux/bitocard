@@ -91,7 +91,7 @@ async function fund(buyer, amount) {
 /** A draft with everything a listing needs, and its four photos. */
 async function draft(seller, title, extra = {}) {
   const [cat, area] = await Promise.all([prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } }), prisma.classifiedArea.findFirstOrThrow({ where: { slug: 'gwarinpa' } })]);
-  const made = await seller.post('/v1/classifieds/listings', { title, price: 25000000, condition: 'new', category_id: cat.id, area_id: area.id, ...extra });
+  const made = await seller.post('/v1/classifieds/listings', { title, price: 25000000, condition: 'new', category_id: cat.id, area_id: area.id, stock: 1, ...extra });
   assert.equal(made.status, 201, JSON.stringify(made.json));
   await prisma.classifiedMedia.createMany({ data: [0, 1, 2, 3].map(position => ({ listingId: made.json.id, kind: 'photo', position, url: `https://media.test/${made.json.id}-${position}.jpg` })) });
   return made.json;
@@ -202,7 +202,7 @@ describe('resale-only listings are never on BitoCard Shop', () => {
 });
 
 describe('stock', () => {
-  test('units sell to as many buyers as there are; each release takes one, the last sells the listing', async () => {
+  test('units sell to as many buyers as there are; each release takes one, the last leaves it out of stock', async () => {
     assert.equal((await admin.put('/v1/admin/switches/classifieds_safe_pay', { country_code: 'NG', enabled: true })).status, 200);
     assert.equal((await admin.put('/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 150, buyer_fee_cap: 100000, seller_fee_bps: 200, seller_fee_cap: 500000, new_seller_order_limit: 1_000_000_000 })).status, 200);
     const seller = await customer('Tunde Bakare');
@@ -210,7 +210,7 @@ describe('stock', () => {
     const listing = await draft(seller, 'Infinix 32 inch TV', { stock: 2 });
     assert.equal(listing.stock, 2);
     assert.equal((await seller.post(`/v1/classifieds/listings/${listing.id}/submit`)).json.status, 'active');
-    assert.equal((await seller.patch(`/v1/classifieds/listings/${listing.id}`, { stock: 0 })).status, 400, 'at least one');
+    assert.equal((await seller.patch(`/v1/classifieds/listings/${listing.id}`, { stock: -1 })).status, 400, 'never below none');
 
     const buyers = [await customer('Kemi Adeyemi'), await customer('Musa Bello'), await customer('Ada Eze')];
     const orders = [];
@@ -241,7 +241,7 @@ describe('stock', () => {
     assert.deepEqual([row.stock, row.status], [1, 'active'], 'one sold, one still held');
     await release(buyers[1], orders[1]);
     row = await prisma.classifiedListing.findUniqueOrThrow({ where: { id: listing.id } });
-    assert.deepEqual([row.stock, row.status], [0, 'sold'], 'the last unit sells the listing');
+    assert.deepEqual([row.stock, row.status, Boolean(row.outOfStockAt)], [0, 'active', true], 'the last unit leaves it out of stock (live 90 days), not sold');
   });
 
   test('two buyers paying for the last unit at once: one pays, the other is refused and keeps their money', async () => {

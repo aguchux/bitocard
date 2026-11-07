@@ -57,7 +57,7 @@ function OfferCard({ message, onAnswer, busy, buyPath }: { message: ShopMessage;
  * then it polls for new messages while open. Offers are sent and answered here; photos, blocking and reports are in the
  * account's Messages, where the chat continues.
  */
-export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath, draft }: { listingId: string; currency: string; initial: ShopChat | null; messagesHref: string | null; buyPath: string; draft?: { text: string; at: number } | null }) {
+export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath, draft, offers = true }: { listingId: string; currency: string; initial: ShopChat | null; messagesHref: string | null; buyPath: string; draft?: { text: string; at: number } | null; /** False while the listing is out of stock: nothing to offer on. */ offers?: boolean }) {
   const [chat, setChat] = useState<ShopChat | null>(initial);
   const [messages, setMessages] = useState<ShopMessage[]>(initial?.messages ?? []);
   const [body, setBody] = useState(initial ? "" : quick[0]!);
@@ -200,7 +200,7 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath,
           </button>
         </form>
       )}
-      {chat && !blocked ? (
+      {chat && !blocked && offers ? (
         <form
           className="flex items-center gap-2"
           onSubmit={event => {
