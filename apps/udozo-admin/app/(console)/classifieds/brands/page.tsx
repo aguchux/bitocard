@@ -219,6 +219,21 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
     setSaved(result.listings_renamed ? `Saved. ${formatNumber(result.listings_renamed)} ${result.listings_renamed === 1 ? "ad now reads" : "ads now read"} “${result.name}”.` : "Saved.");
   };
 
+  // An uploaded (or removed) logo or banner is saved at once, on its own: nothing else on the form changes with it.
+  const savePicture = async (field: "logo_url" | "banner_url", url: string) => {
+    (field === "logo_url" ? setLogoUrl : setBannerUrl)(url);
+    if (!current) return;
+    setSaved(null);
+    try {
+      const result = await update({ slug: current.slug, [field]: url.trim() || null }).unwrap();
+      onDone({ mode: "edit", brand: result });
+      const what = field === "logo_url" ? "logo" : "banner";
+      setSaved(url ? `The ${what} is saved. It shows on udozo.com within a few minutes.` : `The ${what} is taken off.`);
+    } catch {
+      // The API's message shows below (the mutation's error).
+    }
+  };
+
   const toggleEnabled = async () => {
     if (!current) return;
     onDone({ mode: "edit", brand: await update({ slug: current.slug, enabled: !current.enabled }).unwrap() });
@@ -254,7 +269,7 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
             </span>
           </Field>
           {current ? (
-            <ImageField label="Logo" realm="admin" purpose="classified_brand_logo" targetId={current.slug} value={logoUrl} onChange={setLogoUrl} hint="Square SVG or PNG, the full-colour logo on a clear background. Remove it to go back to the bundled one." />
+            <ImageField label="Logo" realm="admin" purpose="classified_brand_logo" targetId={current.slug} value={logoUrl} onChange={url => void savePicture("logo_url", url)} hint="Square SVG or PNG, the full-colour logo on a clear background. Saved as soon as it is uploaded; remove it to go back to the bundled one." />
           ) : (
             <p className="text-sm text-muted">Save the brand first, then upload its logo and banner.</p>
           )}
@@ -265,8 +280,8 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
               purpose="classified_brand_banner"
               targetId={current.slug}
               value={bannerUrl}
-              onChange={setBannerUrl}
-              hint="Across the top of its brand pages on udozo.com. Best 1600 × 400 pixels (4:1), at least 600 × 150; JPEG, PNG or WebP up to 3 MB. Keep words and faces in the middle: phones show less of the sides. Remove it to go back to Udozo's drawn banner."
+              onChange={url => void savePicture("banner_url", url)}
+              hint="Across the top of its brand pages on udozo.com, saved as soon as it is uploaded. Best 1600 × 400 pixels (4:1), at least 600 × 150; JPEG, PNG or WebP up to 3 MB. Keep words and faces in the middle: phones show less of the sides. Remove it to go back to Udozo's drawn banner."
             />
           ) : null}
           {current ? (

@@ -60,7 +60,9 @@ beforeEach(() => {
   roles = ["operations"];
   sent = [];
   process.env.NEXT_PUBLIC_API_URL = "http://api.test";
-  vi.stubGlobal("fetch", async (input: Request) => {
+  vi.stubGlobal("fetch", async (given: Request | string, init?: RequestInit) => {
+    // RTK Query sends a Request; a file's bytes go through apiFetch as fetch(url, init).
+    const input = typeof given === "string" ? { url: given, method: init?.method ?? "GET", json: async () => null } : given;
     const url = new URL(input.url);
     const body = input.method === "GET" ? null : await input.json().catch(() => null);
     sent.push({ method: input.method, path: `${url.pathname}${url.search}`, body });
@@ -68,7 +70,10 @@ beforeEach(() => {
     const ok = (value: unknown, status = 200) => Response.json(value, { status });
     if (path === "/v1/admin/auth/session") return ok({ object: "admin_session", admin: { id: "a1", name: "Ada", email: "ada@udozo.com", roles }, step_up_until: "2099-01-01T00:00:00.000Z" });
     if (path === "/v1/admin/notifications/unread-count") return ok({ object: "unread_count", count: 0 });
-    if (path === "/v1/admin/media/settings") return ok({ object: "media_settings", configured: false, purposes: [] });
+    if (path === "/v1/admin/media/settings") return ok({ object: "media_settings", configured: true, purposes: [{ purpose: "classified_brand_banner", label: "Marketplace brand banner", max_bytes: 3145728, content_types: ["image/png", "image/jpeg", "image/webp"] }, { purpose: "classified_brand_logo", label: "Marketplace brand logo", max_bytes: 1048576, content_types: ["image/png", "image/svg+xml"] }] });
+    if (path === "/v1/admin/media/uploads") return ok({ object: "media_upload", id: "m1", upload: { method: "PUT", url: "https://storage.test/k", headers: {} } }, 201);
+    if (path === "/v1/admin/media/m1/content") return ok({ object: "media_asset", id: "m1", url: "https://media.test/samsung-banner.jpg", status: "ready" });
+    if (path === "/v1/admin/media") return ok({ object: "list", data: [], has_more: false });
     if (path === "/v1/admin/classifieds/categories") return ok(categories);
     if (path === "/v1/admin/classifieds/brands" && input.method === "GET") return ok({ object: "list", data: url.searchParams.get("logo") === "missing" ? [tecno] : [samsung, tecno], total: 120, offset: Number(url.searchParams.get("offset") ?? 0), limit: 50 });
     if (path === "/v1/admin/classifieds/brands") return ok({ ...brand("zenphone", (body as { name: string }).name), listings_renamed: 2, suggestions_answered: 2 }, 201);
@@ -124,6 +129,16 @@ describe("Brand registry", () => {
     expect(await screen.findByText("Saved.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
     await waitFor(() => expect(lastBody("PATCH", "/v1/admin/classifieds/brands/samsung")).toEqual({ enabled: false }));
+  });
+
+  test("a banner is saved as soon as it is uploaded, on its own", slow, async () => {
+    show();
+    fireEvent.click(await within(await screen.findByRole("table")).findByRole("button", { name: /Samsung/ }));
+    const file = new File([new Uint8Array(32)], "banner.jpg", { type: "image/jpeg" });
+    fireEvent.change(await screen.findByLabelText("Banner file"), { target: { files: [file] } });
+    await waitFor(() => expect(lastBody("PATCH", "/v1/admin/classifieds/brands/samsung")).toEqual({ banner_url: "https://media.test/samsung-banner.jpg" }));
+    expect(await screen.findByText("The banner is saved. It shows on udozo.com within a few minutes.")).toBeTruthy();
+    expect(sent.some(item => item.path === "/v1/admin/media/m1/content")).toBe(true);
   });
 
   test("sellers' new brand added with their categories ticked, or dismissed", slow, async () => {
