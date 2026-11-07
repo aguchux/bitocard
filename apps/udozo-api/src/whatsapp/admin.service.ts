@@ -4,9 +4,9 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { ProviderError } from '../payments/provider-error.js';
-import { accountIdProblem, WhatsappCloud, type WhatsappSettings, whatsappConfigured, whatsappDigits } from './cloud-api.js';
+import { accountIdProblem, WhatsappCloud, WhatsappError, type WhatsappSettings, whatsappConfigured, whatsappDigits } from './cloud-api.js';
 import { e164 } from './contacts.service.js';
-import { templateLanguage, templateNames, templateSubmission, whatsappTemplates, type TemplateName } from './templates.js';
+import { templateLanguage, templateNames, templateSubmission, whatsappTemplates, type TemplateDefinition, type TemplateName } from './templates.js';
 
 const dayMs = 86_400_000;
 
@@ -97,7 +97,10 @@ export class WhatsappAdminService {
         await this.cloud().createTemplate(templateSubmission(item.name as TemplateName));
         submitted.push(item.name);
       } catch (error) {
-        failed.push({ name: item.name, error: error instanceof Error ? error.message.replace(/^whatsapp: /, '') : 'unknown error' });
+        const words = error instanceof Error ? error.message.replace(/^whatsapp: /, '') : 'unknown error';
+        // A verification (authentication) template refused for permission: Meta's rule, not ours.
+        const authentication = (whatsappTemplates[item.name as TemplateName] as TemplateDefinition).category === 'AUTHENTICATION';
+        failed.push({ name: item.name, error: authentication && error instanceof WhatsappError && error.metaCode === 10 ? `${words}. Meta lets an account create verification-code templates only once the business has finished Business Verification (Meta Business Suite > Settings > Security centre) and the app has the whatsapp_business_management permission; until then codes go by text.` : words });
       }
     }
     await this.audit.record({ actorId, action: 'whatsapp.templates_submitted', targetType: 'integration', targetId: 'whatsapp', before: null, after: { submitted, failed: failed.map(item => item.name) } });

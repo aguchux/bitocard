@@ -143,7 +143,7 @@ export function accountIdProblem(error: unknown, config: WhatsappSettings): stri
   return `Meta says ${id || 'the WhatsApp Business Account ID'} is not a WhatsApp Business Account this access token can use: it may be the phone number ID, the app ID or the Business portfolio ID. ${where} The system user's token also needs this account assigned to it.`;
 }
 
-type MetaError = { error?: { message?: string; code?: number; error_subcode?: number; error_data?: { details?: string } } };
+type MetaError = { error?: { message?: string; code?: number; error_subcode?: number; error_user_title?: string; error_user_msg?: string; error_data?: { details?: string } } };
 
 /** Meta's WhatsApp Cloud API, with plain `fetch`: messages, media, templates and the number's own details. */
 export class WhatsappCloud {
@@ -182,8 +182,9 @@ export class WhatsappCloud {
       const code = meta?.code;
       // Rate limits (4, 80007, 130429, 131048, 131056) and Meta's own trouble (1, 2, 131000) may pass: unclear.
       const passing = res.status === 429 || res.status === 408 || res.status >= 500 || [1, 2, 4, 80007, 130429, 131000, 131048, 131056].includes(code ?? -1);
-      const words = [meta?.message, meta?.error_data?.details].filter(Boolean).join(': ') || `HTTP ${res.status}`;
-      throw new WhatsappError(`${words.slice(0, 300)}${code ? ` (${code})` : ''}`, !passing, res.status, code);
+      // Meta's own words for people (error_user_title and _msg) say what is wrong where its message only says "Invalid parameter".
+      const words = [...new Set([meta?.message, meta?.error_user_title, meta?.error_user_msg, meta?.error_data?.details].filter(Boolean))].join(': ') || `HTTP ${res.status}`;
+      throw new WhatsappError(`${words.slice(0, 500)}${code ? ` (${code})` : ''}`, !passing, res.status, code);
     }
     return json as T;
   }

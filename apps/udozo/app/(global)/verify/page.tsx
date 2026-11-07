@@ -32,7 +32,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
       </div>
     );
   }
-  const whatsapp = !email && (await channelsFor(customer.country)).whatsapp.available;
+  const whatsapp = !email && Boolean((await channelsFor(customer.country)).whatsapp.codes);
   return (
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
       <h1 className="text-2xl font-extrabold">{email ? "Confirm your email" : "Confirm your mobile number"}</h1>

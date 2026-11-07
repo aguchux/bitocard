@@ -23,7 +23,8 @@ export const codeExpiryMinutes = 30;
 export const whatsappTemplates = {
   udozo_new_message: {
     purpose: 'A chat message waiting while the 24-hour window is closed.',
-    body: '{{1}} sent you a message about {{2}} on Udozo. Tap Read it to see it and reply here.',
+    // Meta refuses a body that starts or ends with a variable.
+    body: 'New message on Udozo: {{1}} wrote to you about {{2}}. Tap Read it to see it and reply here.',
     examples: ['Chinedu O.', 'iPhone 13 Pro 256GB'],
     button: 'Read it',
   },

@@ -58,6 +58,9 @@ before(async () => {
     // An ID that is not a WhatsApp Business Account (here, the phone number's): Meta has no such list on it.
     if (path === '/PNID/message_templates' || path === '/PNID/phone_numbers') return { status: 400, body: { error: { message: '(#100) Tried accessing nonexisting field (message_templates)', type: 'OAuthException', code: 100 } } };
     if (call.method === 'POST' && path === '/WABA/message_templates') {
+      // As Meta: a body may not start or end with a variable (its reason in error_user_msg).
+      const text = call.body.components?.find(item => item.type === 'BODY')?.text ?? '';
+      if (/^\{\{|\}\}[.!]?$/.test(text.trim())) return { status: 400, body: { error: { message: 'Invalid parameter', code: 100, error_subcode: 2388299, error_user_title: 'Variables can\'t be at the start or end of the template', error_user_msg: 'Variables can\'t be at the start or end of the template.' } } };
       templates.push({ name: call.body.name, status: 'PENDING', language: call.body.language, category: call.body.category });
       return { body: { id: `tpl-${templates.length}`, status: 'PENDING' } };
     }
@@ -207,7 +210,8 @@ describe('numbers, the menu, STOP and START', () => {
     assert.equal(contact.customerId, kemi.id);
 
     const channels = await (await fetch(`${server.base}/v1/classifieds/channels?country=ng`)).json();
-    assert.deepEqual([channels.whatsapp, channels.wanted], [{ available: true, number: '+2348000000000' }, true]);
+    // Codes confirming a mobile are not offered on WhatsApp until Meta approves the verification template.
+    assert.deepEqual([channels.whatsapp, channels.wanted], [{ available: true, number: '+2348000000000', codes: false }, true]);
     const status = await kemi.get('/v1/store/account/whatsapp');
     assert.deepEqual([status.json.available, status.json.connected, status.json.number], [true, true, '+2348000000000']);
 
@@ -393,6 +397,7 @@ describe('admins', () => {
     const before = await admin.get('/v1/admin/whatsapp/templates');
     assert.ok(before.json.data.every(item => item.status === 'not_submitted'));
     const submitted = await admin.post('/v1/admin/whatsapp/templates/submit', {});
+    assert.deepEqual(submitted.json.failed, [], 'none starts or ends with a variable');
     assert.equal(submitted.json.submitted.length, 6);
     assert.ok(submitted.json.templates.every(item => item.status === 'pending'));
     const contact = await admin.get('/v1/admin/whatsapp/contacts?phone=%2B2348022223333');
@@ -401,6 +406,14 @@ describe('admins', () => {
     assert.ok(out.json.opted_out_at);
     const tested = await admin.post('/v1/admin/integrations/whatsapp/test', {});
     assert.deepEqual([tested.json.ok, tested.json.message], [true, 'Connected to Udozo (+234 800 000 0000), quality green.']);
+  });
+
+  test("Meta's own words for a refusal are shown, and a verification template refused for permission says why", async () => {
+    const { WhatsappCloud, WhatsappError } = await import('../dist/whatsapp/cloud-api.js');
+    const config = { WHATSAPP_PHONE_NUMBER_ID: 'PNID', WHATSAPP_BUSINESS_ACCOUNT_ID: 'WABA', WHATSAPP_ACCESS_TOKEN: 'meta-token', WHATSAPP_API_URL: graph.url };
+    const error = await new WhatsappCloud(config).createTemplate({ name: 'x', language: 'en_GB', category: 'UTILITY', components: [{ type: 'BODY', text: '{{1}} wrote' }] }).catch(problem => problem);
+    assert.ok(error instanceof WhatsappError);
+    assert.equal(error.message, "whatsapp: Invalid parameter: Variables can't be at the start or end of the template: Variables can't be at the start or end of the template. (100)");
   });
 
   test('a WhatsApp Business Account ID that is not one is explained in plain words, not as Meta’s error', async () => {
@@ -514,6 +527,17 @@ describe('Anjio on WhatsApp', () => {
 });
 
 describe('verification codes on WhatsApp', () => {
+  test('nobody is offered WhatsApp codes until Meta approves the template; Meta not answering keeps the last answer', async () => {
+    const codes = server.app.get((await import('../dist/whatsapp/codes.service.js')).WhatsappCodes);
+    assert.equal(await codes.templateApproved(true), false, 'submitted, still pending');
+    const kemi = await customer('Ngozi Ade');
+    const refused = await kemi.post('/v1/store/account/phone', { phone: testMobile('NG'), channel: 'whatsapp' });
+    assert.deepEqual([refused.status, refused.json.error.code], [409, 'whatsapp_unavailable']);
+    for (const item of templates) if (item.name === 'udozo_verification_code') item.status = 'APPROVED';
+    assert.equal(await codes.templateApproved(true), true);
+    assert.equal((await (await fetch(`${server.base}/v1/classifieds/channels?country=NG`)).json()).whatsapp.codes, true);
+  });
+
   /** The code in the last verification template sent to a number (its body's value, the same as its copy button's). */
   const lastCode = (waId, since) => {
     const call = sentTo(waId, since).filter(body => body.type === 'template' && body.template.name === 'udozo_verification_code').at(-1);

@@ -7,6 +7,9 @@ import { WhatsappCloud } from './cloud-api.js';
 import { WhatsappContactsService, countryOfNumber } from './contacts.service.js';
 import { templateLanguage } from './templates.js';
 
+/** How long Meta's answer on the verification template's approval is kept before asking again. */
+const approvalTtlMs = 10 * 60_000;
+
 /** Meta's verification template for codes (authentication category, its words Meta's, with a Copy code button). */
 export const codeTemplate = 'udozo_verification_code';
 
@@ -19,6 +22,8 @@ export const codeTemplate = 'udozo_verification_code';
  */
 @Injectable()
 export class WhatsappCodes implements OnModuleInit {
+  private approval: { approved: boolean; at: number } | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
@@ -29,7 +34,25 @@ export class WhatsappCodes implements OnModuleInit {
 
   onModuleInit() {
     if (this.config.APP_PRODUCT !== 'udozo') return;
-    this.sms.useWhatsapp({ open: country => this.contacts.openIn(country), send: (to, code) => this.send(to, code) });
+    this.sms.useWhatsapp({ open: async country => (await this.contacts.openIn(country)) && (await this.templateApproved()), send: (to, code) => this.send(to, code) });
+  }
+
+  /**
+   * Whether Meta approved the verification template (read from its list, kept 10 minutes; `fresh` asks again). Until it
+   * is, codes go by text and nobody is offered WhatsApp. Meta not answering keeps the last answer (none: not approved).
+   */
+  async templateApproved(fresh = false) {
+    if (!fresh && this.approval && Date.now() - this.approval.at < approvalTtlMs) return this.approval.approved;
+    const cloud = new WhatsappCloud(this.integrations.config);
+    if (!cloud.configured() || !this.integrations.config.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim()) return false;
+    try {
+      const templates = await cloud.templates();
+      const approved = templates.some(item => item.name === codeTemplate && item.language === templateLanguage && item.status.toUpperCase() === 'APPROVED');
+      this.approval = { approved, at: Date.now() };
+      return approved;
+    } catch {
+      return this.approval?.approved ?? false;
+    }
   }
 
   async send(to: string, code: string) {

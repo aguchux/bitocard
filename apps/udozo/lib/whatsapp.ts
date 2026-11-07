@@ -2,7 +2,7 @@ import { cache } from "react";
 import { shopApi } from "@/lib/api";
 
 /** Whether WhatsApp and wanted requests are open in a market, and Udozo's number there (`GET /v1/classifieds/channels`). */
-export type Channels = { object: "classified_channels"; country: string; whatsapp: { available: boolean; number: string | null }; wanted: boolean };
+export type Channels = { object: "classified_channels"; country: string; whatsapp: { available: boolean; number: string | null; /** Codes confirming a mobile can go on WhatsApp (Meta approved the template). */ codes?: boolean }; wanted: boolean };
 
 /** The customer's WhatsApp (`GET /v1/store/account/whatsapp`). */
 export type WhatsappConnection = {
@@ -26,7 +26,7 @@ export const whatsappScreen = "/account/profile/whatsapp";
 /** A market's channels, kept a minute; nothing open while the API cannot answer. */
 export const channelsFor = cache(async (country: string | null | undefined): Promise<Channels> => {
   const code = (country ?? "").toUpperCase();
-  const closed: Channels = { object: "classified_channels", country: code, whatsapp: { available: false, number: null }, wanted: false };
+  const closed: Channels = { object: "classified_channels", country: code, whatsapp: { available: false, number: null, codes: false }, wanted: false };
   if (!/^[A-Z]{2}$/.test(code)) return closed;
   const result = await shopApi<Channels>(`/v1/classifieds/channels?country=${code}`, { revalidate: 60 });
   return result.ok ? result.data : closed;

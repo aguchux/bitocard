@@ -65,7 +65,7 @@ export type Notice = { object: 'notice'; message: string };
 /** How a mobile's code goes: by text, or on Udozo's WhatsApp number (Udozo only, where it is on WhatsApp there). */
 export type CodeChannel = 'sms' | 'whatsapp';
 /** Udozo: whether its WhatsApp number is open in a country (`GET /v1/classifieds/channels`, public). */
-export type CodeChannels = { object: 'classified_channels'; country: string; whatsapp: { available: boolean; number: string | null }; wanted: boolean };
+export type CodeChannels = { object: 'classified_channels'; country: string; whatsapp: { available: boolean; number: string | null; codes?: boolean }; wanted: boolean };
 
 /** One of a person's email addresses. Exactly one is primary: it signs in and gets notices, and cannot be removed. */
 export type UserEmail = { object: 'user_email'; email: string; primary: boolean; verified: boolean; added_at: string };

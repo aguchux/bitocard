@@ -7,6 +7,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { WhatsappContact } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
+import { SmsService } from '../notifications/sms.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { waLink, whatsappConfigured, whatsappDigits } from './cloud-api.js';
 import { windowOpen } from './outbox.service.js';
@@ -42,6 +43,7 @@ export class WhatsappContactsService {
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
     private readonly settings: SettingsService,
+    private readonly sms: SmsService,
   ) {}
 
   /** The contact for a number that wrote to Udozo (made on its first message), linked when its number is an account's confirmed mobile. */
@@ -87,8 +89,9 @@ export class WhatsappContactsService {
   async channels(country: string) {
     const code = country.toUpperCase();
     const digits = whatsappDigits(this.integrations.config);
-    const [whatsapp, wanted] = await Promise.all([this.openIn(code), this.settings.isOnForCountry('classifieds_wanted', code)]);
-    return { object: 'classified_channels' as const, country: code, whatsapp: { available: whatsapp, number: whatsapp && digits ? `+${digits}` : null }, wanted };
+    const [whatsapp, wanted, codes] = await Promise.all([this.openIn(code), this.settings.isOnForCountry('classifieds_wanted', code), this.sms.codeChannelsFor(code)]);
+    // `codes`: a code confirming a mobile can go on WhatsApp (open there, and Meta approved the verification template).
+    return { object: 'classified_channels' as const, country: code, whatsapp: { available: whatsapp, number: whatsapp && digits ? `+${digits}` : null, codes: codes.whatsapp }, wanted };
   }
 
   /** STOP: Udozo writes nothing more until START. */

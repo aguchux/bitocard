@@ -94,7 +94,7 @@ export default async function ProfilePage() {
         </section>
       ) : null}
       <section id="phone" aria-label="Phone number" className={card}>
-        <PhoneForm phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} whatsapp={channels.whatsapp.available} />
+        <PhoneForm phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} whatsapp={Boolean(channels.whatsapp.codes)} />
       </section>
       {channels.whatsapp.available ? (
         <section id="whatsapp" aria-labelledby="whatsapp-title" className={card}>

@@ -35,7 +35,7 @@ function MobileNumber() {
   const [code, setCode] = useState("");
   const phones = usePhonesQuery();
   // Codes can also go on Udozo's WhatsApp number where it is open in the business country.
-  const whatsapp = useCodeChannelsQuery(country ?? "", { skip: !country }).data?.whatsapp.available ?? false;
+  const whatsapp = useCodeChannelsQuery(country ?? "", { skip: !country }).data?.whatsapp.codes ?? false;
   const [addPhone, addState] = useAddAdditionalPhoneMutation();
   const [verifyPhone, verifyState] = useConfirmAdditionalPhoneMutation();
   const [makePrimary, primaryState] = useMakePrimaryPhoneMutation();
