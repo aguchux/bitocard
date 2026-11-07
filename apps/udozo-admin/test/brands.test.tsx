@@ -23,6 +23,7 @@ const brand = (slug: string, name: string, extra: Record<string, unknown> = {}) 
   logo_source: null,
   bundled_logo_url: null,
   uploaded_logo_url: null,
+  banner_url: null,
   color: null,
   enabled: true,
   categories: [{ id: "c-phones", slug: "mobile-phones", name: "Mobile phones" }],
@@ -114,10 +115,12 @@ describe("Brand registry", () => {
     show();
     fireEvent.click(await within(await screen.findByRole("table")).findByRole("button", { name: /Samsung/ }));
     fireEvent.change(await screen.findByLabelText("Search words"), { target: { value: "galaxy, galaxy note" } });
+    // Its banner is uploaded here, beside the logo, with the size it should be.
+    expect(screen.getByText(/Best 1600 × 400 pixels \(4:1\), at least 600 × 150/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Colour"), { target: { value: "#0a0a0a" } });
     fireEvent.click(screen.getByLabelText("Tablets"));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(lastBody("PATCH", "/v1/admin/classifieds/brands/samsung")).toEqual({ name: "Samsung", aliases: ["galaxy", "galaxy note"], color: "#0A0A0A", category_ids: ["c-phones", "c-tablets"], logo_url: null }));
+    await waitFor(() => expect(lastBody("PATCH", "/v1/admin/classifieds/brands/samsung")).toEqual({ name: "Samsung", aliases: ["galaxy", "galaxy note"], color: "#0A0A0A", category_ids: ["c-phones", "c-tablets"], logo_url: null, banner_url: null }));
     expect(await screen.findByText("Saved.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
     await waitFor(() => expect(lastBody("PATCH", "/v1/admin/classifieds/brands/samsung")).toEqual({ enabled: false }));
@@ -129,7 +132,7 @@ describe("Brand registry", () => {
     fireEvent.click(within(waiting as HTMLElement).getByRole("button", { name: "Add" }));
     expect((await screen.findByLabelText("Name") as HTMLInputElement).value).toBe("Zenphone");
     expect((screen.getByLabelText("Mobile phones") as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText("Save the brand first, then upload its logo.")).toBeTruthy();
+    expect(screen.getByText("Save the brand first, then upload its logo and banner.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add brand" }));
     await waitFor(() => expect(lastBody("POST", "/v1/admin/classifieds/brands")).toEqual({ name: "Zenphone", aliases: [], color: null, category_ids: ["c-phones"] }));
     fireEvent.click(within((await screen.findByText("Zenphone", { selector: "span" })).closest("li") as HTMLElement).getByRole("button", { name: "Dismiss" }));

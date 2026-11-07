@@ -234,7 +234,7 @@ export class MediaService {
       this.prisma.storefrontPage.findMany({ select: { key: true, draft: true, published: true } }),
       this.prisma.brandAsset.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { cardUrl: { in: urls } }] } }),
       this.prisma.supportBot.findMany({ where: { avatarUrl: { in: urls } }, select: { name: true, avatarUrl: true } }),
-      this.prisma.classifiedBrand.findMany({ where: { logoUrl: { in: urls } }, select: { slug: true, logoUrl: true } }),
+      this.prisma.classifiedBrand.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { bannerUrl: { in: urls } }] }, select: { slug: true, logoUrl: true, bannerUrl: true } }),
       this.prisma.classifiedBanner.findMany({ where: { imageUrl: { in: urls } }, select: { id: true, position: true, imageUrl: true } }),
       this.prisma.customer.findMany({ where: { OR: [{ avatarUrl: { in: urls } }, { bannerUrl: { in: urls } }] }, select: { id: true, avatarUrl: true, bannerUrl: true } }),
       this.prisma.user.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
@@ -245,7 +245,10 @@ export class MediaService {
     }
     for (const person of people) add(person.avatarUrl, `user:${person.id}:avatar`);
     for (const banner of banners) add(banner.imageUrl, `banner:${banner.position}:${banner.id}`);
-    for (const brand of shopBrands) add(brand.logoUrl, `marketplace_brand:${brand.slug}`);
+    for (const brand of shopBrands) {
+      add(brand.logoUrl, `marketplace_brand:${brand.slug}`);
+      add(brand.bannerUrl, `marketplace_brand:${brand.slug}:banner`);
+    }
     for (const entry of registry) {
       add(entry.logoUrl, `registry:${entry.slug}:logo`);
       add(entry.cardUrl, `registry:${entry.slug}:card`);

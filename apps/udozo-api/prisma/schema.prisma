@@ -4410,6 +4410,8 @@ model ClassifiedBrand {
   logoFile    String?                   @map("logo_file")
   /// An admin's upload, shown in place of the bundled one.
   logoUrl     String?                   @map("logo_url")
+  /// An admin's banner across the top of its brand pages (4:1); null for Udozo's drawn one.
+  bannerUrl   String?                   @map("banner_url")
   /// The brand's colour (`#RRGGBB`), behind its initials when it has no logo.
   color       String?
   enabled     Boolean                   @default(true)

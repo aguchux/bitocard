@@ -109,10 +109,18 @@ export default async function BrandPage({ params, searchParams }: Props) {
       </div>
 
       <section aria-labelledby="brand-name" className="overflow-hidden border-navy-200 bg-white sm:mt-4 sm:rounded-3xl sm:border">
-        <div className="relative h-28 overflow-hidden bg-gradient-to-br from-navy-900 via-navy-700 to-brand-600 sm:h-36" aria-hidden="true">
-          <span className="absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
-          <span className="absolute -bottom-20 left-1/3 size-48 rounded-full bg-brand-400/20" />
-          <span className="absolute top-6 left-8 size-16 rounded-full border border-white/15" />
+        {/* The banner Udozo's admins gave the brand (4:1, as wide as the page), else Udozo's drawn one. */}
+        <div className={`relative overflow-hidden bg-gradient-to-br from-navy-900 via-navy-700 to-brand-600 ${brand.banner_url ? "aspect-[4/1] max-h-72 min-h-28 w-full" : "h-28 sm:h-36"}`} aria-hidden="true">
+          {brand.banner_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- an admin's checked upload on the media CDN.
+            <img src={brand.banner_url} alt="" className="size-full object-cover" />
+          ) : (
+            <>
+              <span className="absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
+              <span className="absolute -bottom-20 left-1/3 size-48 rounded-full bg-brand-400/20" />
+              <span className="absolute top-6 left-8 size-16 rounded-full border border-white/15" />
+            </>
+          )}
         </div>
         <div className="grid gap-4 px-4 pb-5 sm:px-6">
           {/* Drawn above the banner (it is positioned, so it would otherwise paint over the logo's top half). */}

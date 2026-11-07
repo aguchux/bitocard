@@ -121,6 +121,8 @@ export type AdminClassifiedBrand = {
   logo_source: 'uploaded' | 'bundled' | null;
   bundled_logo_url: string | null;
   uploaded_logo_url: string | null;
+  /** The banner across the top of its brand pages on udozo.com (4:1); null for Udozo's drawn one. */
+  banner_url: string | null;
   color: string | null;
   enabled: boolean;
   categories: Array<{ id: string; slug: string; name: string }>;
@@ -130,7 +132,7 @@ export type AdminClassifiedBrand = {
   models: number;
   updated_at: string;
 };
-export type ClassifiedBrandInput = { name?: string; aliases?: string[]; color?: string | null; logo_url?: string | null; category_ids?: string[]; enabled?: boolean };
+export type ClassifiedBrandInput = { name?: string; aliases?: string[]; color?: string | null; logo_url?: string | null; banner_url?: string | null; category_ids?: string[]; enabled?: boolean };
 export type ClassifiedBrandSaved = AdminClassifiedBrand & { listings_renamed: number; suggestions_answered: number };
 export type ClassifiedBrandsFilter = { q?: string; category?: string; logo?: 'missing' | 'bundled' | 'uploaded'; status?: 'enabled' | 'disabled'; offset?: number; limit?: number };
 /** A brand's model in one category, as admins see it. */

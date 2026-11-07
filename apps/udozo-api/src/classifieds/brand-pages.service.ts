@@ -79,6 +79,8 @@ export class BrandPagesService {
       object: 'classified_brand_page' as const,
       country: code,
       url: `${shopOrigin}/${code.toLowerCase()}/brand/${brand.row.slug}`,
+      /** The banner Udozo's admins gave it (4:1), else null for the page's drawn one. */
+      banner_url: brand.row.bannerUrl,
       /** Its live listings in the market, and how many sellers they come from. */
       listings,
       sellers: totals[0]?.sellers ?? 0,

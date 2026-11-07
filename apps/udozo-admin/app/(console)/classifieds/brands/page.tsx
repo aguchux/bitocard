@@ -191,6 +191,7 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
   const [aliases, setAliases] = useState((current?.aliases ?? []).join(", "));
   const [color, setColor] = useState(current?.color ?? "");
   const [logoUrl, setLogoUrl] = useState(current?.uploaded_logo_url ?? "");
+  const [bannerUrl, setBannerUrl] = useState(current?.banner_url ?? "");
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(current ? current.categories.map(link => link.id) : editing.mode === "new" ? (editing.categoryIds ?? []) : []));
   const [find, setFind] = useState("");
   const [create, creating] = useCreateClassifiedBrandMutation();
@@ -213,7 +214,7 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
     if (problems.length) return;
     setSaved(null);
     const fields = { name: name.trim(), aliases: list(aliases), color: color.trim() ? color.trim().toUpperCase() : null, category_ids: [...chosen] };
-    const result = current ? await update({ slug: current.slug, ...fields, logo_url: logoUrl.trim() || null }).unwrap() : await create(fields).unwrap();
+    const result = current ? await update({ slug: current.slug, ...fields, logo_url: logoUrl.trim() || null, banner_url: bannerUrl.trim() || null }).unwrap() : await create(fields).unwrap();
     onDone({ mode: "edit", brand: result });
     setSaved(result.listings_renamed ? `Saved. ${formatNumber(result.listings_renamed)} ${result.listings_renamed === 1 ? "ad now reads" : "ads now read"} “${result.name}”.` : "Saved.");
   };
@@ -255,8 +256,19 @@ function BrandEditor({ editing, tree, changes, onDone }: { editing: Editing; tre
           {current ? (
             <ImageField label="Logo" realm="admin" purpose="classified_brand_logo" targetId={current.slug} value={logoUrl} onChange={setLogoUrl} hint="Square SVG or PNG, the full-colour logo on a clear background. Remove it to go back to the bundled one." />
           ) : (
-            <p className="text-sm text-muted">Save the brand first, then upload its logo.</p>
+            <p className="text-sm text-muted">Save the brand first, then upload its logo and banner.</p>
           )}
+          {current ? (
+            <ImageField
+              label="Banner"
+              realm="admin"
+              purpose="classified_brand_banner"
+              targetId={current.slug}
+              value={bannerUrl}
+              onChange={setBannerUrl}
+              hint="Across the top of its brand pages on udozo.com. Best 1600 × 400 pixels (4:1), at least 600 × 150; JPEG, PNG or WebP up to 3 MB. Keep words and faces in the middle: phones show less of the sides. Remove it to go back to Udozo's drawn banner."
+            />
+          ) : null}
           {current ? (
             <AppLink href={`/classifieds/brands/${current.slug}`} className="block text-sm font-semibold text-ink hover:underline">
               {formatNumber(current.models)} {current.models === 1 ? "model" : "models"}: see and change them

@@ -89,6 +89,10 @@ class BrandFieldsDto {
   @IsOptional() @IsString() @Matches(/^https:\/\/\S+$/) @Length(10, 2000)
   logo_url?: string | null;
 
+  /** A banner across the top of its brand pages (`classified_brand_banner`, 4:1); null for Udozo's drawn one. */
+  @IsOptional() @IsString() @Matches(/^https:\/\/\S+$/) @Length(10, 2000)
+  banner_url?: string | null;
+
   /** The subcategories it sells in; a new one goes last among each category's brands. */
   @IsOptional() @IsArray() @ArrayMaxSize(100) @IsUUID('all', { each: true })
   category_ids?: string[];
@@ -292,6 +296,7 @@ export class ClassifiedBrandsService {
       logo_source: row.logoUrl ? ('uploaded' as const) : row.logoFile ? ('bundled' as const) : null,
       bundled_logo_url: bundled,
       uploaded_logo_url: row.logoUrl,
+      banner_url: row.bannerUrl,
       enabled: row.enabled,
       categories: [...row.categories].sort((a, b) => a.category.name.localeCompare(b.category.name)).map(link => presentCategory(link.category)),
       listings,
@@ -402,7 +407,7 @@ export class ClassifiedBrandsService {
     let slug = slugify(words.name);
     for (let n = 2; await this.prisma.classifiedBrand.count({ where: { slug } }); n += 1) slug = `${slugify(words.name).slice(0, 56)}-${n}`;
     const result = await this.prisma.$transaction(async tx => {
-      const row = await tx.classifiedBrand.create({ data: { slug, ...words, color: input.color?.toUpperCase() ?? null, logoUrl: input.logo_url ?? null, enabled: input.enabled ?? true } });
+      const row = await tx.classifiedBrand.create({ data: { slug, ...words, color: input.color?.toUpperCase() ?? null, logoUrl: input.logo_url ?? null, bannerUrl: input.banner_url ?? null, enabled: input.enabled ?? true } });
       await this.setCategories(tx, row.id, categories);
       return { row, adopted: await this.adopt(tx, row, words.matchKeys, actorId) };
     });
@@ -428,6 +433,7 @@ export class ClassifiedBrandsService {
           ...words,
           ...(input.color !== undefined ? { color: input.color?.toUpperCase() ?? null } : {}),
           ...(input.logo_url !== undefined ? { logoUrl: input.logo_url } : {}),
+          ...(input.banner_url !== undefined ? { bannerUrl: input.banner_url } : {}),
           ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
         },
       });

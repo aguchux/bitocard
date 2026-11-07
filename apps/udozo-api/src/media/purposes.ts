@@ -52,6 +52,7 @@ const purposeTable = {
   storefront_image: { label: 'Storefront image', realm: 'admin', folder: () => 'platform/storefront/images', maxBytes: 5 * MB, types: rasterTypes },
   // udozo.com's home pages: banners, carousel slides and category tile photos.
   // Udozo's brand registry: a brand's logo, shown in place of the one bundled with udozo.com.
+  classified_brand_banner: { label: 'Marketplace brand banner', realm: 'admin', target: 'classified_brand', folder: slug => `platform/classifieds/brands/${segment(slug!)}/banners`, maxBytes: 3 * MB, types: rasterTypes },
   classified_brand_logo: { label: 'Marketplace brand logo', realm: 'admin', target: 'classified_brand', folder: slug => `platform/classifieds/brands/${segment(slug!)}/logos`, maxBytes: 1 * MB, types: withSvg },
   home_image: { label: 'Home page image', realm: 'admin', folder: () => 'platform/home/images', maxBytes: 5 * MB, types: rasterTypes },
   // udozo.com's banner ads (`BannersService`).

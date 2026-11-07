@@ -140,4 +140,22 @@ describe('Brand pages', () => {
     assert.ok(samsung && samsung.listings >= 4 && samsung.updated_at);
     assert.ok(sitemap.json.brands.every(item => item.listings > 0));
   });
+
+  test('admins give a brand a banner; its page carries it, and taking it off brings back the drawn one', async () => {
+    const plain = await visitor.get('/v1/classifieds/brands/samsung?country=NG');
+    assert.equal(plain.json.banner_url, null);
+    const settings = await admin.get('/v1/admin/media/settings');
+    assert.ok(settings.json.purposes.some(item => item.purpose === 'classified_brand_banner' && !item.content_types.includes('image/svg+xml')), 'a raster banner, uploaded by admins');
+    const set = await admin.patch('/v1/admin/classifieds/brands/samsung', { banner_url: 'https://media.test/samsung-banner.jpg' });
+    assert.equal(set.status, 200, JSON.stringify(set.json));
+    assert.equal(set.json.banner_url, 'https://media.test/samsung-banner.jpg');
+    assert.equal((await admin.patch('/v1/admin/classifieds/brands/samsung', { banner_url: 'http://media.test/plain.jpg' })).status, 400, 'https only');
+    const { ClassifiedBrandsService } = await import('../dist/classifieds/brands.service.js');
+    server.app.get(ClassifiedBrandsService)['forget']();
+    assert.equal((await visitor.get('/v1/classifieds/brands/samsung?country=NG')).json.banner_url, 'https://media.test/samsung-banner.jpg');
+    const cleared = await admin.patch('/v1/admin/classifieds/brands/samsung', { banner_url: null });
+    assert.equal(cleared.json.banner_url, null);
+    server.app.get(ClassifiedBrandsService)['forget']();
+    assert.equal((await visitor.get('/v1/classifieds/brands/samsung?country=NG')).json.banner_url, null);
+  });
 });

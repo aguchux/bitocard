@@ -118,6 +118,16 @@ describe("a brand's page", () => {
     expect(scripts.some(data => data["@type"] === "ItemList" && data.itemListElement?.length === 2)).toBe(true);
   });
 
+  it("wears the banner Udozo's admins gave the brand, else the drawn one", async () => {
+    const drawn = await page();
+    expect(drawn.querySelector("section[aria-labelledby=brand-name] > div:first-child img")).toBeNull();
+    api.brand = { ...api.brand!, banner_url: "https://media.test/hp-banner.jpg" };
+    const html = await page();
+    const banner = html.querySelector("section[aria-labelledby=brand-name] > div:first-child");
+    expect(banner?.querySelector("img")?.getAttribute("src")).toBe("https://media.test/hp-banner.jpg");
+    expect(banner?.className).toContain("aspect-[4/1]");
+  });
+
   it("narrows by its own categories and models only, keeping the sort and resetting the page", async () => {
     const html = await page("hp", { category: "laptops", model: "elitebook 840 g5", sort: "price_asc", page: "2" });
     expect(api.paths).toContain("/v1/classifieds/listings?country=NG&brand=hp&sort=price_asc&limit=24&category=laptops&f=model%3Aelitebook+840+g5&offset=24");

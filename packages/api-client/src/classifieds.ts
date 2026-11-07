@@ -61,6 +61,8 @@ export type ShopBrandPage = Omit<ShopBrand, 'object' | 'listings'> & {
   object: 'classified_brand_page';
   country: string;
   url: string;
+  /** The banner Udozo's admins gave it (4:1, up to 1600 × 400), else null for the page's drawn one. */
+  banner_url?: string | null;
   listings: number;
   sellers: number;
   updated_at: string | null;

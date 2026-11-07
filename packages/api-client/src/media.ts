@@ -24,6 +24,8 @@ export type MediaPurpose =
   /** Udozo's admins: udozo.com's banner ads. */
   | 'banner_image'
   | 'classified_brand_logo'
+  /** Udozo's admins: a brand page's banner (4:1). */
+  | 'classified_brand_banner'
   | 'store_logo'
   | 'store_image'
   | 'bot_avatar'
