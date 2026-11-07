@@ -27,7 +27,7 @@ import { linksFor } from './links.js';
 import { aiProvider, type AiProviderName, aiProviderLabels } from '../support/ai/providers.js';
 import { GithubIssues } from '../support/github.js';
 import { CloudflareTurn } from '../classifieds/turn.js';
-import { WhatsappCloud } from '../whatsapp/cloud-api.js';
+import { accountIdProblem, WhatsappCloud } from '../whatsapp/cloud-api.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -164,9 +164,20 @@ export class IntegrationsAdminService {
         const number = await cloud.phoneNumber();
         message = `Connected to ${number.verified_name ?? 'the number'} (${number.display_phone_number ?? 'number hidden'}), quality ${String(number.quality_rating ?? 'unknown').toLowerCase()}.`;
         ok = true;
+        // The WhatsApp Business Account (templates are listed and submitted there) must be one, holding this number.
+        const config = this.integrations.config;
+        if (!config.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim()) message += ' Set the WhatsApp Business Account ID too, to submit message templates.';
+        else {
+          const numbers = await cloud.accountNumbers();
+          if (!numbers.some(item => item.id === config.WHATSAPP_PHONE_NUMBER_ID?.trim())) {
+            ok = false;
+            message = `The phone number ID is not one of the WhatsApp Business Account's numbers (${numbers.map(item => item.display_phone_number ?? item.id).join(', ') || 'it has none'}). Check both IDs on WhatsApp > API Setup in Meta for Developers.`;
+          }
+        }
       } catch (error) {
         const detail = error instanceof Error ? error.message.replace(/^whatsapp: /, '') : 'unknown error';
-        message = error instanceof ProviderError && error.definite ? `Meta refused these settings (${detail}).` : `Could not reach Meta (${detail}). Try again in a moment.`;
+        ok = false;
+        message = accountIdProblem(error, this.integrations.config) ?? (error instanceof ProviderError && error.definite ? `Meta refused these settings (${detail}).` : `Could not reach Meta (${detail}). Try again in a moment.`);
       }
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'whatsapp', before: null, after: { environment: 'live', ok } });

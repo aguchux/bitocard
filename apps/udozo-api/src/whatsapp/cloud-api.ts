@@ -128,6 +128,21 @@ export class WhatsappError extends ProviderError {
   }
 }
 
+/**
+ * What to tell an admin when Meta refuses the WhatsApp Business Account ID: `message_templates` and `phone_numbers` exist
+ * only on a WhatsApp Business Account, so "nonexisting field" (or an object Meta cannot find) means the ID saved is
+ * something else (often the phone number ID, the app ID or the Business portfolio ID), or the token cannot see it.
+ * Null for any other error.
+ */
+export function accountIdProblem(error: unknown, config: WhatsappSettings): string | null {
+  if (!(error instanceof WhatsappError) || error.metaCode !== 100) return null;
+  if (!/nonexisting field|does not exist|unsupported get request|unsupported post request/i.test(error.message)) return null;
+  const id = config.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim() ?? '';
+  const where = 'In Meta for Developers, open your app, then WhatsApp > API Setup: copy the "WhatsApp Business Account ID" shown with the phone number (not the "Phone number ID"), into Settings > Integrations > WhatsApp.';
+  if (id && id === config.WHATSAPP_PHONE_NUMBER_ID?.trim()) return `The WhatsApp Business Account ID is the same as the phone number ID. ${where}`;
+  return `Meta says ${id || 'the WhatsApp Business Account ID'} is not a WhatsApp Business Account this access token can use: it may be the phone number ID, the app ID or the Business portfolio ID. ${where} The system user's token also needs this account assigned to it.`;
+}
+
 type MetaError = { error?: { message?: string; code?: number; error_subcode?: number; error_data?: { details?: string } } };
 
 /** Meta's WhatsApp Cloud API, with plain `fetch`: messages, media, templates and the number's own details. */
@@ -237,6 +252,12 @@ export class WhatsappCloud {
       'GET',
       `${encodeURIComponent(this.config.WHATSAPP_PHONE_NUMBER_ID?.trim() ?? '')}?fields=verified_name,display_phone_number,quality_rating`,
     );
+  }
+
+  /** The WhatsApp Business Account's phone numbers (also proves the account ID is one). */
+  async accountNumbers() {
+    const reply = await this.call<{ data?: Array<{ id: string; display_phone_number?: string }> }>('GET', `${encodeURIComponent(this.config.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim() ?? '')}/phone_numbers?fields=id,display_phone_number`);
+    return reply?.data ?? [];
   }
 
   /** The account's message templates and their approval status. */

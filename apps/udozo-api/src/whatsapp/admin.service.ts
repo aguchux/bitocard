@@ -4,15 +4,18 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { ProviderError } from '../payments/provider-error.js';
-import { WhatsappCloud, whatsappConfigured, whatsappDigits } from './cloud-api.js';
+import { accountIdProblem, WhatsappCloud, type WhatsappSettings, whatsappConfigured, whatsappDigits } from './cloud-api.js';
 import { e164 } from './contacts.service.js';
 import { templateLanguage, templateNames, templateSubmission, whatsappTemplates, type TemplateName } from './templates.js';
 
 const dayMs = 86_400_000;
 
 const unavailable = () => new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'whatsapp_not_configured', 'Set up WhatsApp in Settings > Integrations first.');
-const metaProblem = (error: unknown) =>
-  new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'whatsapp_unreachable', `Meta did not answer: ${error instanceof Error ? error.message.replace(/^whatsapp: /, '') : 'unknown error'}.`);
+const metaProblem = (error: unknown, config: WhatsappSettings = {}) => {
+  const account = accountIdProblem(error, config);
+  if (account) return new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'whatsapp_account_id_invalid', account, 'WHATSAPP_BUSINESS_ACCOUNT_ID');
+  return new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'whatsapp_unreachable', `Meta did not answer: ${error instanceof Error ? error.message.replace(/^whatsapp: /, '') : 'unknown error'}.`);
+};
 
 /** Udozo's admin Site > WhatsApp. */
 @Injectable()
@@ -71,7 +74,7 @@ export class WhatsappAdminService {
     try {
       remote = await this.cloud().templates();
     } catch (error) {
-      throw metaProblem(error);
+      throw metaProblem(error, this.integrations.config);
     }
     return {
       object: 'list' as const,

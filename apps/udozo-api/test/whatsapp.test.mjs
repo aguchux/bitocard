@@ -54,6 +54,9 @@ before(async () => {
     if (call.method === 'POST' && path === '/PNID/media') return { body: { id: `media-up-${(outCounter += 1)}` } };
     if (call.method === 'GET' && path === '/PNID') return { body: { verified_name: 'Udozo', display_phone_number: '+234 800 000 0000', quality_rating: 'GREEN' } };
     if (call.method === 'GET' && path === '/WABA/message_templates') return { body: { data: templates } };
+    if (call.method === 'GET' && path === '/WABA/phone_numbers') return { body: { data: [{ id: 'PNID', display_phone_number: '+234 800 000 0000' }] } };
+    // An ID that is not a WhatsApp Business Account (here, the phone number's): Meta has no such list on it.
+    if (path === '/PNID/message_templates' || path === '/PNID/phone_numbers') return { status: 400, body: { error: { message: '(#100) Tried accessing nonexisting field (message_templates)', type: 'OAuthException', code: 100 } } };
     if (call.method === 'POST' && path === '/WABA/message_templates') {
       templates.push({ name: call.body.name, status: 'PENDING', language: call.body.language, category: call.body.category });
       return { body: { id: `tpl-${templates.length}`, status: 'PENDING' } };
@@ -398,6 +401,15 @@ describe('admins', () => {
     assert.ok(out.json.opted_out_at);
     const tested = await admin.post('/v1/admin/integrations/whatsapp/test', {});
     assert.deepEqual([tested.json.ok, tested.json.message], [true, 'Connected to Udozo (+234 800 000 0000), quality green.']);
+  });
+
+  test('a WhatsApp Business Account ID that is not one is explained in plain words, not as Meta’s error', async () => {
+    const { WhatsappCloud, accountIdProblem } = await import('../dist/whatsapp/cloud-api.js');
+    const config = { WHATSAPP_PHONE_NUMBER_ID: 'PNID', WHATSAPP_BUSINESS_ACCOUNT_ID: 'PNID', WHATSAPP_ACCESS_TOKEN: 'meta-token', WHATSAPP_API_URL: graph.url };
+    const error = await new WhatsappCloud(config).templates().catch(problem => problem);
+    assert.match(accountIdProblem(error, config), /^The WhatsApp Business Account ID is the same as the phone number ID\. In Meta for Developers, open your app, then WhatsApp > API Setup/);
+    assert.match(accountIdProblem(error, { ...config, WHATSAPP_BUSINESS_ACCOUNT_ID: '123' }), /^Meta says 123 is not a WhatsApp Business Account/);
+    assert.equal(accountIdProblem(new Error('other'), config), null);
   });
 
   test('the job runs and is Udozo’s', async () => {
