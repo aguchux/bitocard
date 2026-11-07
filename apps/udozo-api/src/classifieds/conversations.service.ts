@@ -47,6 +47,25 @@ export const safetyNote = 'Stay safe: keep the chat on Udozo, meet in a busy pub
 
 type Side = 'buyer' | 'seller';
 
+/** Where a message was written: udozo.com, or Udozo's WhatsApp number (shown "via WhatsApp"). */
+export type MessageChannel = 'web' | 'whatsapp';
+export type WriteOptions = { channel?: MessageChannel };
+
+/** A text or photo written in a chat, after it is saved: what WhatsApp forwards to the other side. */
+export type ChatMessageEvent = {
+  conversationId: string;
+  messageId: string;
+  kind: 'text' | 'photo';
+  body: string;
+  objectKey: string | null;
+  contentType: string | null;
+  channel: MessageChannel;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  listingTitle: string;
+};
+
 const notFound = (what = 'chat') => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
 const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
 const tooFast = (code: string, message: string) => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', code, message);
@@ -106,6 +125,7 @@ type OfferRow = Prisma.ClassifiedOfferGetPayload<object>;
 @Injectable()
 export class ConversationsService {
   private readonly logger = new Logger(ConversationsService.name);
+  private readonly listeners: Array<(event: ChatMessageEvent) => unknown> = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -118,6 +138,36 @@ export class ConversationsService {
     private readonly discovery: DiscoveryRecorder,
     private readonly watermarks: WatermarkService,
   ) {}
+
+  /** Told of every text and photo once saved (Udozo on WhatsApp queues them; sending is after the reply); a listener never fails the message. */
+  onMessage(listener: (event: ChatMessageEvent) => unknown) {
+    this.listeners.push(listener);
+  }
+
+  private async told(chat: ChatRow, side: Side, message: { id: string; kind: string; body: string; objectKey: string | null; contentType: string | null; channel: string }) {
+    if (message.kind !== 'text' && message.kind !== 'photo') return;
+    const writer = side === 'buyer' ? chat.buyer : chat.seller;
+    const event: ChatMessageEvent = {
+      conversationId: chat.id,
+      messageId: message.id,
+      kind: message.kind,
+      body: message.body,
+      objectKey: message.objectKey,
+      contentType: message.contentType,
+      channel: message.channel === 'whatsapp' ? 'whatsapp' : 'web',
+      senderId: writer.id,
+      senderName: publicName(writer.name),
+      recipientId: side === 'buyer' ? chat.sellerId : chat.buyerId,
+      listingTitle: chat.listing.title ?? 'your listing',
+    };
+    for (const listener of this.listeners) {
+      try {
+        await listener(event);
+      } catch (error) {
+        this.logger.warn({ err: error }, 'A chat message listener failed');
+      }
+    }
+  }
 
   // ---- Reading ----
 
@@ -194,14 +244,14 @@ export class ConversationsService {
    * The buyer's first message about a listing opens the chat (or continues the one they have): live listings only, in
    * their own country, never their own, and only where the seller takes chats.
    */
-  async start(customer: CustomerWithStore, input: { listing_id: string; body: string }) {
+  async start(customer: CustomerWithStore, input: { listing_id: string; body: string }, options: WriteOptions = {}) {
     const country = await this.listings.sellerCountry(customer);
     const listing = await this.prisma.classifiedListing.findUnique({ where: { id: input.listing_id } });
     if (!listing || !isOnShop(listing) || listing.country !== country) throw notFound('listing');
     if (listing.customerId === customer.id) throw invalid('parameter_invalid', 'This is your own listing.', 'listing_id');
     const existing = await this.prisma.classifiedConversation.findUnique({ where: { listingId_buyerId: { listingId: listing.id, buyerId: customer.id } } });
     if (existing) {
-      await this.send(customer, existing.id, input.body);
+      await this.send(customer, existing.id, input.body, options);
       return this.get(customer, existing.id);
     }
     if (listing.contact === 'phone') throw conflict('chat_not_offered', 'This seller takes calls only: call them, ask for a call back, or ask for their contact.');
@@ -216,7 +266,7 @@ export class ConversationsService {
       id = await this.prisma.$transaction(async tx => {
         const chat = await tx.classifiedConversation.create({ data: { listingId: listing.id, buyerId: customer.id, sellerId: listing.customerId, country, lastMessageAt: now, buyerReadAt: now } });
         await tx.classifiedMessage.create({ data: { conversationId: chat.id, kind: 'system', body: safetyNote, createdAt: now } });
-        await tx.classifiedMessage.create({ data: { conversationId: chat.id, senderId: customer.id, kind: 'text', body: text, createdAt: new Date(now.getTime() + 1) } });
+        await tx.classifiedMessage.create({ data: { conversationId: chat.id, senderId: customer.id, kind: 'text', body: text, channel: options.channel ?? 'web', createdAt: new Date(now.getTime() + 1) } });
         await addLead(tx, listing.id, customer.id, 'chat');
         return chat.id;
       });
@@ -224,30 +274,32 @@ export class ConversationsService {
       if ((error as { code?: string }).code !== 'P2002') throw error;
       // Two first messages at once: the other created the chat, so this one joins it.
       const chat = await this.prisma.classifiedConversation.findUniqueOrThrow({ where: { listingId_buyerId: { listingId: listing.id, buyerId: customer.id } } });
-      await this.send(customer, chat.id, input.body);
+      await this.send(customer, chat.id, input.body, options);
       return this.get(customer, chat.id);
     }
     const chat = await this.prisma.classifiedConversation.findUniqueOrThrow({ where: { id }, include: chatInclude });
+    const first = chat.messages[0];
+    if (first) await this.told(chat, 'buyer', first);
     await this.discovery.record(customer.id, country, 'chat', listing.id);
     await this.alert(chat, 'seller', `${publicName(customer.name)} asked about "${chat.listing.title}"`, text);
     return this.get(customer, id);
   }
 
   /** A text message from either side. */
-  async send(customer: CustomerWithStore, id: string, body: string) {
+  async send(customer: CustomerWithStore, id: string, body: string, options: WriteOptions = {}) {
     await this.listings.sellerCountry(customer);
     const chat = await this.chatFor(customer, id);
     const side = this.requireWritable(chat, customer.id);
     const text = cleanMessage(body);
     if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
     await this.requirePace(chat.id, customer.id);
-    const message = await this.write(chat, side, { kind: 'text', body: text });
+    const message = await this.write(chat, side, { kind: 'text', body: text, channel: options.channel ?? 'web' });
     await this.alert(chat, other(side), `${publicName(customer.name)} wrote about "${chat.listing.title}"`, text);
     return this.presentMessage(message, customer.id);
   }
 
   /** A photo from either side (JPEG or PNG, at most 4 MB), its metadata removed, with an optional caption. */
-  async sendPhoto(customer: CustomerWithStore, id: string, file: MediaUpload | undefined, caption?: string) {
+  async sendPhoto(customer: CustomerWithStore, id: string, file: MediaUpload | undefined, caption?: string, options: WriteOptions = {}) {
     await this.listings.sellerCountry(customer);
     const chat = await this.chatFor(customer, id);
     const side = this.requireWritable(chat, customer.id);
@@ -262,7 +314,7 @@ export class ConversationsService {
     await this.requirePace(chat.id, customer.id);
     const objectKey = this.storage.shopChatKey(chat.id, randomUUID());
     await this.storage.put(objectKey, checked.bytes);
-    const message = await this.write(chat, side, { kind: 'photo', body: caption ? cleanMessage(caption) : '', objectKey, contentType: checked.contentType, size: checked.bytes.length, width: checked.width, height: checked.height });
+    const message = await this.write(chat, side, { kind: 'photo', body: caption ? cleanMessage(caption) : '', objectKey, contentType: checked.contentType, size: checked.bytes.length, width: checked.width, height: checked.height, channel: options.channel ?? 'web' });
     await this.alert(chat, other(side), `${publicName(customer.name)} sent a photo about "${chat.listing.title}"`, message.body || 'A photo');
     return this.presentMessage(message, customer.id);
   }
@@ -537,6 +589,7 @@ export class ConversationsService {
       this.prisma.classifiedMessage.create({ data: { ...data, conversationId: chat.id, senderId: writer, createdAt: now }, include: messageInclude }),
       this.prisma.classifiedConversation.update({ where: { id: chat.id }, data: { lastMessageAt: now, ...readNow(side, now), ...(side === 'seller' && !chat.sellerRepliedAt ? { sellerRepliedAt: now } : {}) } }),
     ]);
+    await this.told(chat, side, message);
     return message;
   }
 
@@ -633,6 +686,7 @@ export class ConversationsService {
       kind: message.kind,
       from: message.senderId === null ? 'bitocard' : message.senderId === viewerId ? 'me' : 'them',
       body: message.body,
+      channel: message.channel,
       photo: message.objectKey ? this.photoOf(message.conversationId, message) : null,
       offer: message.offer && message.kind === 'offer' ? this.presentOffer(message.offer, viewerId) : null,
       buy_order: message.buyOrder && message.kind === 'buy_order' ? buyOrderSummary(message.buyOrder, viewerId) : null,

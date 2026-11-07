@@ -2,6 +2,8 @@ import { P2pMerchantsService } from '../afrippa/merchants.service.js';
 import { P2pOrdersService } from '../afrippa/orders.service.js';
 import { ListingsService } from '../classifieds/listings.service.js';
 import { PostingRemindersService } from '../classifieds/posting-reminders.service.js';
+import { WantedService } from '../classifieds/wanted/wanted.service.js';
+import { WhatsappJobs } from '../whatsapp/jobs.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
@@ -124,6 +126,8 @@ export class CronController {
     sellerScores: SellerScoresService,
     postingJourneys: PostingJourneysService,
     postingReminders: PostingRemindersService,
+    wanted: WantedService,
+    whatsapp: WhatsappJobs,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -244,7 +248,10 @@ export class CronController {
         listing_signals: await discovery.refreshSignals(),
         private_photos: await watermarks.privatise(),
         posting_results: await postingJourneys.syncResults(),
+        wanted_expired: await wanted.expireDue(),
       }),
+      /** Udozo, every 5 minutes: WhatsApp notices and messages due a retry, menus left idle a day reset, and old rows deleted. */
+      whatsapp: () => whatsapp.run(),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),
     };

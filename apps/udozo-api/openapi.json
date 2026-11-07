@@ -43487,6 +43487,11 @@
               "store.watermark_cleared",
               "account.suspended",
               "account.reinstated",
+              "account.activated",
+              "account.identity_required",
+              "store.status_changed",
+              "plan.store_assigned",
+              "billing.credit_limit_changed",
               "connection.approved",
               "connection.rejected",
               "connection.suspended",
@@ -43515,6 +43520,8 @@
               "resale.note_decided",
               "resale.listing_unavailable",
               "resale.supplier_stopped",
+              "resale.supplier_restored",
+              "resale.checkout_restored",
               "resale.order_new",
               "resale.order_updated",
               "resale.order_message",
@@ -43537,7 +43544,10 @@
               "security.email_changed",
               "security.email_added",
               "security.phone_added",
-              "security.two_step_changed"
+              "security.two_step_changed",
+              "security.google_linked",
+              "team.role_changed",
+              "team.removed"
             ]
           },
           "severity": {
@@ -43696,6 +43706,11 @@
               "store.watermark_cleared",
               "account.suspended",
               "account.reinstated",
+              "account.activated",
+              "account.identity_required",
+              "store.status_changed",
+              "plan.store_assigned",
+              "billing.credit_limit_changed",
               "connection.approved",
               "connection.rejected",
               "connection.suspended",
@@ -43724,6 +43739,8 @@
               "resale.note_decided",
               "resale.listing_unavailable",
               "resale.supplier_stopped",
+              "resale.supplier_restored",
+              "resale.checkout_restored",
               "resale.order_new",
               "resale.order_updated",
               "resale.order_message",
@@ -43746,7 +43763,10 @@
               "security.email_changed",
               "security.email_added",
               "security.phone_added",
-              "security.two_step_changed"
+              "security.two_step_changed",
+              "security.google_linked",
+              "team.role_changed",
+              "team.removed"
             ]
           },
           "label": {

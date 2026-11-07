@@ -2390,6 +2390,8 @@ model NotificationPreference {
   customerId String?   @map("customer_id") @db.Uuid
   type       String
   push       Boolean
+  /// Udozo: also sent on WhatsApp to a linked number (null: the type's default).
+  whatsapp   Boolean?
   updatedAt  DateTime  @updatedAt @map("updated_at")
   user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -2758,6 +2760,11 @@ model Customer {
   classifiedSelling         ClassifiedConversation[]  @relation("ClassifiedSelling")
   classifiedBuyOrdersBuying  ClassifiedBuyOrder[]      @relation("ClassifiedBuyOrdersBuying")
   classifiedBuyOrdersSelling ClassifiedBuyOrder[]      @relation("ClassifiedBuyOrdersSelling")
+  whatsappContact            WhatsappContact?
+  whatsappLinkCodes          WhatsappLinkCode[]
+  wantedRequests             ClassifiedWantedRequest[]
+  wantedMatches              ClassifiedWantedMatch[]
+  wantedResponses            ClassifiedWantedResponse[]
   classifiedPurchasesSold    ClassifiedPurchase[]      @relation("ClassifiedPurchasesSold")
   classifiedPurchasesBought  ClassifiedPurchase[]      @relation("ClassifiedPurchasesBought")
   classifiedReviewsWritten   ClassifiedReview[]        @relation("ClassifiedReviewsWritten")
@@ -4368,6 +4375,7 @@ model ClassifiedCategory {
   children        ClassifiedCategory[]        @relation("ClassifiedCategoryTree")
   features        ClassifiedCategoryFeature[]
   countries       ClassifiedCategoryCountry[]
+  wantedRequests  ClassifiedWantedRequest[]
   listings        ClassifiedListing[]
   featureSuggestions ClassifiedFeatureSuggestion[]
   brands          ClassifiedBrandCategory[]
@@ -4594,6 +4602,8 @@ model ClassifiedArea {
   listings  ClassifiedListing[] @relation("ClassifiedListingArea")
   inState   ClassifiedListing[] @relation("ClassifiedListingState")
   customers Customer[]       @relation("CustomerArea")
+  wantedInState ClassifiedWantedRequest[] @relation("WantedState")
+  wantedInArea  ClassifiedWantedRequest[] @relation("WantedArea")
 
   @@index([country, kind])
   @@index([parentId])
@@ -4682,6 +4692,11 @@ model ClassifiedMarketSettings {
   readyReminder1Hours   Int      @default(24) @map("ready_reminder_1_hours")
   readyReminder2Hours   Int      @default(72) @map("ready_reminder_2_hours")
   readyReminder3Hours   Int      @default(168) @map("ready_reminder_3_hours")
+  /// Wanted requests: open requests a buyer may have, requests a day, sellers told per request, notices a seller gets a day.
+  wantedOpenPerBuyer    Int      @default(3) @map("wanted_open_per_buyer")
+  wantedPerDay          Int      @default(5) @map("wanted_per_day")
+  wantedSellersPerRequest Int    @default(30) @map("wanted_sellers_per_request")
+  wantedNoticesPerSellerDay Int  @default(20) @map("wanted_notices_per_seller_day")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("classified_market_settings")
@@ -4791,6 +4806,7 @@ model ClassifiedListing {
   favourites   ClassifiedFavourite[]
   contactRequests ClassifiedContactRequest[]
   buyOrders       ClassifiedBuyOrder[]
+  wantedResponses ClassifiedWantedResponse[]
   purchases       ClassifiedPurchase[]
   reviews         ClassifiedReview[]
   interactionRatings ClassifiedInteractionRating[]
@@ -5050,6 +5066,9 @@ model ClassifiedConversation {
   offers          ClassifiedOffer[]
   reports         ClassifiedReport[]
   buyOrders       ClassifiedBuyOrder[]
+  wantedResponses ClassifiedWantedResponse[]
+  whatsappMessages WhatsappMessage[]
+  whatsappActive  WhatsappContact[]
 
   @@unique([listingId, buyerId])
   @@index([buyerId, lastMessageAt])
@@ -5081,6 +5100,9 @@ model ClassifiedMessage {
   /// A buy order's step (kind `buy_order`).
   buyOrderId     String?                @map("buy_order_id") @db.Uuid
   buyOrder       ClassifiedBuyOrder?    @relation(fields: [buyOrderId], references: [id], onDelete: SetNull)
+  /// web, or whatsapp when written from Udozo's WhatsApp number (shown "via WhatsApp").
+  channel        String                 @default("web")
+  whatsappMessages WhatsappMessage[]
 
   @@index([conversationId, seq])
   @@map("classified_messages")
@@ -6793,4 +6815,174 @@ model PostingReviewDay {
 
   @@id([day, country, kind, value])
   @@map("posting_review_days")
+}
+
+// ---------------------------------------------------------------------------
+// Udozo on WhatsApp (docs/UDOZO_WHATSAPP_PLAN.md)
+
+/// A WhatsApp number that wrote to (or was connected with) Udozo's number, tied to at most one Udozo customer.
+model WhatsappContact {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  /// E.164 without the plus, as Meta sends it.
+  waId                 String                  @unique @map("wa_id") @db.VarChar(20)
+  customerId           String?                 @unique @map("customer_id") @db.Uuid
+  country              String?                 @db.Char(2)
+  /// The WhatsApp profile name Meta sends (never shown to anyone else).
+  profileName          String?                 @map("profile_name")
+  linkedAt             DateTime?               @map("linked_at")
+  /// Udozo may write first (templates) only while opted in: by connecting on udozo.com or by writing to Udozo.
+  optedInAt            DateTime?               @map("opted_in_at")
+  optedOutAt           DateTime?               @map("opted_out_at")
+  /// Their last message to Udozo: free-form messages may be sent for 24 hours after it.
+  lastInboundAt        DateTime?               @map("last_inbound_at")
+  /// Chats relayed to WhatsApp, and request alerts there.
+  chatsOn              Boolean                 @default(true) @map("chats_on")
+  alertsOn             Boolean                 @default(true) @map("alerts_on")
+  /// Meta said the number cannot receive messages: nothing more is sent until they write again.
+  unreachableAt        DateTime?               @map("unreachable_at")
+  /// The step-by-step menu they are in (find, chat, sell, wanted) and where they are in it.
+  flow                 String?
+  flowState            Json?                   @map("flow_state")
+  flowUpdatedAt        DateTime?               @map("flow_updated_at")
+  /// The chat a plain reply goes to when it quotes nothing.
+  activeConversationId String?                 @map("active_conversation_id") @db.Uuid
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+  customer             Customer?               @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  activeConversation   ClassifiedConversation? @relation(fields: [activeConversationId], references: [id], onDelete: SetNull)
+  messages             WhatsappMessage[]
+
+  @@index([flowUpdatedAt])
+  @@map("whatsapp_contacts")
+}
+
+/// A one-time code (SHA-256 kept) the customer sends from their number to connect it to their account (10 minutes).
+model WhatsappLinkCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  codeHash   String    @unique @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("whatsapp_link_codes")
+}
+
+/// A webhook body from Meta, stored (encrypted) before answering, then processed; failures are retried by the job.
+model WhatsappNotice {
+  id            String    @id @default(uuid()) @db.Uuid
+  bodyHash      String    @unique @map("body_hash")
+  bodyEncrypted String    @map("body_encrypted")
+  /// received, processed or failed.
+  status        String    @default("received")
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
+  receivedAt    DateTime  @default(now()) @map("received_at")
+  processedAt   DateTime? @map("processed_at")
+
+  @@index([status, nextAttemptAt])
+  @@map("whatsapp_notices")
+}
+
+/// A WhatsApp message in or out (kept 90 days). Outgoing ones wait here (`queued`, payload encrypted) until sent.
+model WhatsappMessage {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  /// Meta's message id: an inbound one is handled once; a reply quoting an outgoing one finds its chat.
+  wamid               String?                 @unique
+  contactId           String                  @map("contact_id") @db.Uuid
+  /// in or out.
+  direction           String
+  /// text, image, interactive, template, or what came in (button, list, image, location, other).
+  kind                String
+  template            String?
+  conversationId      String?                 @map("conversation_id") @db.Uuid
+  classifiedMessageId String?                 @map("classified_message_id") @db.Uuid
+  /// received (in); queued, sent, delivered, read or failed (out).
+  status              String
+  error               String?
+  attempts            Int                     @default(0)
+  nextAttemptAt       DateTime?               @map("next_attempt_at")
+  payloadEncrypted    String?                 @map("payload_encrypted")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+  contact             WhatsappContact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  conversation        ClassifiedConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  classifiedMessage   ClassifiedMessage?      @relation(fields: [classifiedMessageId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
+  @@map("whatsapp_messages")
+}
+
+/// A buyer's wanted request (WR-000123): what they need, where and for how much; matching sellers are told once.
+model ClassifiedWantedRequest {
+  id             String                     @id @default(uuid()) @db.Uuid
+  number         BigInt                     @unique @default(autoincrement())
+  customerId     String                     @map("customer_id") @db.Uuid
+  country        String                     @db.Char(2)
+  currency       String                     @db.Char(3)
+  categoryId     String                     @map("category_id") @db.Uuid
+  stateId        String?                    @map("state_id") @db.Uuid
+  areaId         String?                    @map("area_id") @db.Uuid
+  words          String                     @db.VarChar(80)
+  details        String?                    @db.VarChar(300)
+  budgetMinMinor BigInt?                    @map("budget_min_minor")
+  budgetMaxMinor BigInt?                    @map("budget_max_minor")
+  conditions     String[]                   @default([])
+  /// open, fulfilled, closed, expired or removed.
+  status         String                     @default("open")
+  /// web or whatsapp.
+  source         String                     @default("web")
+  sellersTold    Int                        @default(0) @map("sellers_told")
+  expiresAt      DateTime                   @map("expires_at")
+  closedAt       DateTime?                  @map("closed_at")
+  removedReason  String?                    @map("removed_reason")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+  customer       Customer                   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  category       ClassifiedCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  state          ClassifiedArea?            @relation("WantedState", fields: [stateId], references: [id], onDelete: SetNull)
+  area           ClassifiedArea?            @relation("WantedArea", fields: [areaId], references: [id], onDelete: SetNull)
+  matches        ClassifiedWantedMatch[]
+  responses      ClassifiedWantedResponse[]
+
+  @@index([customerId, createdAt])
+  @@index([status, expiresAt])
+  @@index([country, status])
+  @@map("classified_wanted_requests")
+}
+
+model ClassifiedWantedMatch {
+  id         String                  @id @default(uuid()) @db.Uuid
+  requestId  String                  @map("request_id") @db.Uuid
+  sellerId   String                  @map("seller_id") @db.Uuid
+  notifiedAt DateTime                @default(now()) @map("notified_at")
+  request    ClassifiedWantedRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  seller     Customer                @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, sellerId])
+  @@index([sellerId, notifiedAt])
+  @@map("classified_wanted_matches")
+}
+
+model ClassifiedWantedResponse {
+  id             String                  @id @default(uuid()) @db.Uuid
+  requestId      String                  @map("request_id") @db.Uuid
+  sellerId       String                  @map("seller_id") @db.Uuid
+  listingId      String                  @map("listing_id") @db.Uuid
+  conversationId String?                 @map("conversation_id") @db.Uuid
+  note           String?                 @db.VarChar(300)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  request        ClassifiedWantedRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  seller         Customer                @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  listing        ClassifiedListing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  conversation   ClassifiedConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@unique([requestId, sellerId])
+  @@index([sellerId])
+  @@map("classified_wanted_responses")
 }

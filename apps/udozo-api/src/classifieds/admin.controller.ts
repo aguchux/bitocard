@@ -177,6 +177,19 @@ class MarketSettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(720)
   ready_reminder_3_hours?: number;
+
+  /** Wanted requests: open requests a buyer may have, requests a day, sellers told per request, requests a seller hears of a day. */
+  @IsOptional() @IsInt() @Min(1) @Max(20)
+  wanted_open_per_buyer?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(50)
+  wanted_per_day?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(200)
+  wanted_sellers_per_request?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(200)
+  wanted_notices_per_seller_day?: number;
 }
 
 class SellersDto {
@@ -521,7 +534,8 @@ export class ClassifiedsAdminService {
     return { object: 'classified_market_settings' as const, country, listing_days: row.listingDays, monthly_listing_limit: row.monthlyListingLimit, first_listings_reviewed: row.firstListingsReviewed, min_photos: row.minPhotos, max_photos: row.maxPhotos, username_min_listings: row.usernameMinListings,
       buy_request_hours: row.buyRequestHours, buy_meet_days: row.buyMeetDays, buy_open_per_buyer: row.buyOpenPerBuyer, buy_requests_per_day: row.buyRequestsPerDay,
       reviews_neutral: row.reviewsNeutral, review_window_days: row.reviewWindowDays, review_min_shown: row.reviewMinShown,
-      unfinished_reminder_hours: row.unfinishedReminderHours, ready_reminder_1_hours: row.readyReminder1Hours, ready_reminder_2_hours: row.readyReminder2Hours, ready_reminder_3_hours: row.readyReminder3Hours };
+      unfinished_reminder_hours: row.unfinishedReminderHours, ready_reminder_1_hours: row.readyReminder1Hours, ready_reminder_2_hours: row.readyReminder2Hours, ready_reminder_3_hours: row.readyReminder3Hours,
+      wanted_open_per_buyer: row.wantedOpenPerBuyer, wanted_per_day: row.wantedPerDay, wanted_sellers_per_request: row.wantedSellersPerRequest, wanted_notices_per_seller_day: row.wantedNoticesPerSellerDay };
   }
 
   async setMarketSettings(actorId: string | null, country: string, input: MarketSettingsDto) {
@@ -548,6 +562,10 @@ export class ClassifiedsAdminService {
       ...(input.ready_reminder_1_hours !== undefined ? { readyReminder1Hours: input.ready_reminder_1_hours } : {}),
       ...(input.ready_reminder_2_hours !== undefined ? { readyReminder2Hours: input.ready_reminder_2_hours } : {}),
       ...(input.ready_reminder_3_hours !== undefined ? { readyReminder3Hours: input.ready_reminder_3_hours } : {}),
+      ...(input.wanted_open_per_buyer !== undefined ? { wantedOpenPerBuyer: input.wanted_open_per_buyer } : {}),
+      ...(input.wanted_per_day !== undefined ? { wantedPerDay: input.wanted_per_day } : {}),
+      ...(input.wanted_sellers_per_request !== undefined ? { wantedSellersPerRequest: input.wanted_sellers_per_request } : {}),
+      ...(input.wanted_notices_per_seller_day !== undefined ? { wantedNoticesPerSellerDay: input.wanted_notices_per_seller_day } : {}),
     };
     await this.prisma.classifiedMarketSettings.upsert({ where: { country }, create: { country, ...data }, update: data });
     const after = await this.marketSettings(country);

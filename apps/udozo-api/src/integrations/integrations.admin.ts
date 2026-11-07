@@ -27,13 +27,14 @@ import { linksFor } from './links.js';
 import { aiProvider, type AiProviderName, aiProviderLabels } from '../support/ai/providers.js';
 import { GithubIssues } from '../support/github.js';
 import { CloudflareTurn } from '../classifieds/turn.js';
+import { WhatsappCloud } from '../whatsapp/cloud-api.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
 
 const maxValueLength = 4000;
 /** Platform integrations with their own Test connection check (not a connectable adapter or a blockchain provider). */
-const ownTests = new Set(['domains', 'store_hosts', 'calls']);
+const ownTests = new Set(['domains', 'store_hosts', 'calls', 'whatsapp']);
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such integration.');
 const invalidValue = (key: string, message: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'invalid_value', message, `values.${key}`);
 
@@ -79,6 +80,7 @@ export class IntegrationsAdminService {
     if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id, platform);
     if (group.id === 'github') return this.testGithub(adminId, platform);
     if (group.id === 'calls') return this.testCalls(adminId);
+    if (group.id === 'whatsapp') return this.testWhatsapp(adminId);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -148,6 +150,27 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'calls', before: null, after: { environment: 'live', ok } });
     return { object: 'integration_test' as const, integration: 'calls', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Udozo on WhatsApp: the number as Meta has it (its verified name, display number and quality rating). */
+  private async testWhatsapp(adminId: string) {
+    await this.integrations.refresh(true);
+    const cloud = new WhatsappCloud(this.integrations.config);
+    let ok = false;
+    let message: string | null = null;
+    if (!cloud.configured()) message = 'Set the phone number ID and the access token first.';
+    else {
+      try {
+        const number = await cloud.phoneNumber();
+        message = `Connected to ${number.verified_name ?? 'the number'} (${number.display_phone_number ?? 'number hidden'}), quality ${String(number.quality_rating ?? 'unknown').toLowerCase()}.`;
+        ok = true;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.replace(/^whatsapp: /, '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `Meta refused these settings (${detail}).` : `Could not reach Meta (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'whatsapp', before: null, after: { environment: 'live', ok } });
+    return { object: 'integration_test' as const, integration: 'whatsapp', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** An AI provider: its model list read with the product's own key. */

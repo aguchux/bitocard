@@ -300,6 +300,14 @@ export const configSchema = z.object({
   CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
   CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
   CLOUDFLARE_TURN_API_URL: z.string().url().default('https://rtc.live.cloudflare.com'),
+  /** Udozo on WhatsApp (Meta's Cloud API): its number, the system user's token, the app secret and the webhook's verify token. */
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional(),
+  WHATSAPP_NUMBER: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  WHATSAPP_API_URL: z.string().url().default('https://graph.facebook.com/v23.0'),
 
   // File storage (DigitalOcean Spaces, S3-compatible): logos, icons and images uploaded by admins and resellers.
   // Browsers upload straight to the bucket with signed links; uploads are refused until the key, secret and bucket are set.

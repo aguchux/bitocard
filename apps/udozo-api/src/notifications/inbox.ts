@@ -226,6 +226,8 @@ export const notificationTypes = {
   'customer.classifieds.payout_held': { realm: 'customer', severity: 'warning', label: 'Safe pay money held for review', push: true },
   'customer.classifieds.message': { realm: 'customer', severity: 'info', label: 'New BitoCard Shop message', push: true },
   'customer.classifieds.offer': { realm: 'customer', severity: 'info', label: 'New offer on BitoCard Shop', push: true },
+  'customer.classifieds.wanted_match': { realm: 'customer', severity: 'info', label: 'A buyer is looking for something you sell', push: true },
+  'customer.classifieds.wanted_response': { realm: 'customer', severity: 'info', label: 'A seller answered your request', push: true },
   'customer.classifieds.contact_request': { realm: 'customer', severity: 'info', label: 'A buyer asked for your contact details', push: true },
   'customer.classifieds.contact_answered': { realm: 'customer', severity: 'info', label: 'A seller answered your contact request', push: true },
   'customer.classifieds.callback_request': { realm: 'customer', severity: 'info', label: 'A buyer asked you to call them back', push: true },

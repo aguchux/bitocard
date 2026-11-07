@@ -49,12 +49,19 @@ type Target = { audience: NotificationAudience; userId?: string; customerId?: st
 @Injectable()
 export class InboxService {
   private readonly logger = new Logger('Inbox');
+  /** Other channels told of each new notification (Udozo on WhatsApp), after push; never failing it. */
+  private readonly channels: Array<(created: Notification[]) => unknown> = [];
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly push: PushService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
+
+  /** Registers another channel for new notifications (Udozo on WhatsApp sends some to linked numbers). */
+  useChannel(channel: (created: Notification[]) => unknown) {
+    this.channels.push(channel);
+  }
 
   /** To the reseller account's owner and the members whose role the type lists. */
   async reseller(resellerId: string, type: ResellerNotificationType, content: NotificationContent) {
@@ -155,6 +162,13 @@ export class InboxService {
     });
     // Only new ones are pushed (a repeat of the same subject is skipped above).
     await this.push.enqueue(created);
+    for (const channel of this.channels) {
+      try {
+        await channel(created);
+      } catch (error) {
+        this.logger.warn({ err: error, type }, 'A notification channel failed');
+      }
+    }
     return created.length;
   }
 

@@ -1,3 +1,4 @@
+import { WhatsappModule } from '../whatsapp/whatsapp.module.js';
 import { AfrippaModule } from '../afrippa/afrippa.module.js';
 import { Module } from '@nestjs/common';
 import { BillingModule } from '../billing/billing.module.js';
@@ -21,5 +22,5 @@ import { SellerScoresModule } from '../classifieds/scores/scores.module.js';
 import { ResaleModule } from '../resale/resale.module.js';
 import { MarketingModule } from '../marketing/marketing.controller.js';
 
-@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, SellerScoresModule, ResaleModule, MarketingModule], controllers: [CronController] })
+@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, SellerScoresModule, ResaleModule, MarketingModule, WhatsappModule], controllers: [CronController] })
 export class CronModule {}

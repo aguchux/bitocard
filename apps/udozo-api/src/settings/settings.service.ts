@@ -161,6 +161,16 @@ export const switchDefinitions = {
     description:
       "Reminders to finish posting on Udozo: a seller whose ad has its title, category and a photo but is not finished is emailed and notified once; one whose ad is complete but not posted, up to three times. The hours are each market's, on Limits and words. Off: no reminders.",
   },
+  whatsapp_channel: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo on WhatsApp: buyers and sellers find listings, chat (relayed through Udozo's number, so neither sees the other's), post ads and make requests from WhatsApp, and get notices there. Needs the WhatsApp integration set up. Off: Udozo's number answers that it is not open there yet.",
+  },
+  classifieds_wanted: {
+    scopes: ['global', 'country'],
+    description:
+      'Wanted requests on Udozo: a buyer says what they need (category, place, budget), sees matching listings and Udozo tells sellers of that category nearby, who answer with one of their listings. On udozo.com and WhatsApp. Off: no new requests.',
+  },
   classifieds_reviews: {
     scopes: ['global', 'country'],
     description:
@@ -252,6 +262,8 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_assistant',
   'classifieds_buy_orders',
   'classifieds_post_reminders',
+  'whatsapp_channel',
+  'classifieds_wanted',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',

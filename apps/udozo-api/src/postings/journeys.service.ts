@@ -20,7 +20,7 @@ import { errorParts, utcDay } from '../signups/journeys.service.js';
  */
 
 /** Where Sell was pressed on udozo.com (`/sell?from=`). */
-export const sellSources = ['header', 'header_phone', 'my_listings', 'empty_state', 'start_here', 'invite', 'pwa', 'reseller', 'username', 'direct'] as const;
+export const sellSources = ['header', 'header_phone', 'my_listings', 'empty_state', 'start_here', 'invite', 'pwa', 'reseller', 'username', 'whatsapp', 'direct'] as const;
 export type SellSource = (typeof sellSources)[number];
 /** Plus `api` (a draft made without Sell), `resumed` (a draft or sent-back ad reopened) and `unknown`. */
 export const postingSources = [...sellSources, 'api', 'resumed', 'unknown'] as const;

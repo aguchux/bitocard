@@ -46,6 +46,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   reloadly: [signUp('https://www.reloadly.com/registration'), docs('https://developers.reloadly.com/')],
   vtpass: [signUp('https://www.vtpass.com/register'), { label: 'Sandbox sign up', url: 'https://sandbox.vtpass.com/register' }, docs('https://www.vtpass.com/documentation/')],
   didww: [signUp('https://www.didww.com/'), keys('https://my.didww.com/'), docs('https://doc.didww.com/api3/')],
+  whatsapp: [signUp('https://business.facebook.com/'), keys('https://developers.facebook.com/apps/', 'Meta apps'), docs('https://developers.facebook.com/docs/whatsapp/cloud-api/')],
   calls: [signUp('https://dash.cloudflare.com/sign-up'), keys('https://dash.cloudflare.com/?to=/:account/calls/turn-keys', 'TURN keys'), docs('https://developers.cloudflare.com/realtime/turn/generate-credentials/')],
   store_hosts: [signUp('https://dash.cloudflare.com/sign-up'), keys('https://dash.cloudflare.com/profile/api-tokens', 'API tokens'), docs('https://developers.cloudflare.com/api/resources/dns/subresources/records/')],
   domains: [signUp('https://vercel.com/signup'), keys('https://vercel.com/account/settings/tokens', 'Access tokens'), docs('https://vercel.com/docs/domains/registrar-api')],

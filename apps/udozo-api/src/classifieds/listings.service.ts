@@ -82,7 +82,7 @@ export function missingParts(listing: ListingParts): [string, string][] {
   return missing;
 }
 
-const defaults = { listingDays: 30, monthlyListingLimit: 10, firstListingsReviewed: 3, minPhotos: 4, maxPhotos: 12, usernameMinListings: 5, buyRequestHours: 48, buyMeetDays: 7, buyOpenPerBuyer: 10, buyRequestsPerDay: 20, reviewsNeutral: false, reviewWindowDays: 30, reviewMinShown: 3, unfinishedReminderHours: 24, readyReminder1Hours: 24, readyReminder2Hours: 72, readyReminder3Hours: 168 };
+const defaults = { listingDays: 30, monthlyListingLimit: 10, firstListingsReviewed: 3, minPhotos: 4, maxPhotos: 12, usernameMinListings: 5, buyRequestHours: 48, buyMeetDays: 7, buyOpenPerBuyer: 10, buyRequestsPerDay: 20, reviewsNeutral: false, reviewWindowDays: 30, reviewMinShown: 3, unfinishedReminderHours: 24, readyReminder1Hours: 24, readyReminder2Hours: 72, readyReminder3Hours: 168, wantedOpenPerBuyer: 3, wantedPerDay: 5, wantedSellersPerRequest: 30, wantedNoticesPerSellerDay: 20 };
 
 const listingInclude = {
   category: { include: { parent: true } },

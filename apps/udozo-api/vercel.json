@@ -49,6 +49,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/v1/cron/whatsapp",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/v1/cron/webhooks",
       "schedule": "*/5 * * * *"
     },
