@@ -59,8 +59,8 @@ export function initialsOf(name: string) {
   return (words.length > 1 ? `${words[0]![0]}${words.at(-1)![0]}` : words[0]![0]!).toUpperCase();
 }
 
-/** A listing the GIF can show: its photo, title and price as the card writes them. */
-export type CardListing = { photo: string; title: string; price: string };
+/** A listing the GIF can show: its photo, title and price as the card writes them, and who sells it (a brand's card names each seller). */
+export type CardListing = { photo: string; title: string; price: string; by?: string };
 
 export type SellerCardData = { profile: ShopSellerProfile; listings: CardListing[] };
 
@@ -131,7 +131,7 @@ export function collageTiles(count: number, width: number, height: number, gap =
 }
 
 /** The collage as a JPEG data address, or null without photos. */
-async function collage(photos: Buffer[], width: number, height: number): Promise<string | null> {
+export async function collage(photos: Buffer[], width: number, height: number): Promise<string | null> {
   if (!photos.length) return null;
   const tiles = collageTiles(photos.length, width, height);
   const parts = await Promise.all(photos.map(async (photo, index) => ({ input: await cover(photo, tiles[index]!.width, tiles[index]!.height).png().toBuffer(), left: tiles[index]!.left, top: tiles[index]!.top })));
@@ -232,7 +232,7 @@ async function band(listing: CardListing, seller: string, width: number, height:
           <div style={{ display: "flex", fontSize: px(32), fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>{ogClip(listing.title, 46)}</div>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: px(16) }}>
             <div style={{ display: "flex", fontSize: px(30), fontWeight: 800, color: "#9fd4f5" }}>{listing.price}</div>
-            <div style={{ display: "flex", fontSize: px(20), fontWeight: 600, color: "#dbe7ee" }}>{ogClip(`Sold by ${seller}`, 30)}</div>
+            <div style={{ display: "flex", fontSize: px(20), fontWeight: 600, color: "#dbe7ee" }}>{ogClip(`Sold by ${listing.by ?? seller}`, 30)}</div>
           </div>
         </div>
       </div>
@@ -313,7 +313,7 @@ async function render(data: SellerCardData, kind: SellerCardKind, random: () => 
   return sellerGif(card, frames.length >= 2 ? frames : [], data.profile.name);
 }
 
-const failure = (status: number) => new Response(null, { status, headers: { "Cache-Control": failureCacheControl } });
+export const failure = (status: number) => new Response(null, { status, headers: { "Cache-Control": failureCacheControl } });
 
 /** The route's answer for `file` (`<username or handle>.jpg` or `.gif`): 404 for anything else or an unknown seller, 502 when the API cannot answer. */
 export async function serveSellerCard(file: string, random: () => number = Math.random): Promise<Response> {

@@ -11,6 +11,8 @@ import { SellerShare } from "@/components/seller-share";
 import { marketFor, shopApi } from "@/lib/api";
 import { brandHref, brandIn, brandListingsQuery, brandPageSize, brandSlugPattern, brandSortLabels, brandSorts, brandStats, categoriesText, isBrandFiltered, readBrandFilters } from "@/lib/brand-page";
 import { siteOrigin } from "@/lib/customer";
+import { brandCardUrl } from "@/lib/brand-card";
+import { gifSizes } from "@/lib/seller-card";
 import { indexFrom } from "@/lib/search";
 import { brandJsonLd, breadcrumbJsonLd, itemListJsonLd, noindexFollow } from "@/lib/seo";
 import { sellHref } from "@/lib/sell-sources";
@@ -36,11 +38,17 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     : `Nothing from ${brand.name} is for sale in ${market.name} on Udozo yet. Sell yours, or see what else is for sale.`;
   // Indexed once it has enough for sale, and only the page itself (not filtered or later pages).
   const filtered = isBrandFiltered(await searchParams);
+  // The animated card first (WhatsApp and others show its first frame, the same card), then the still one, which X uses:
+  // the brand's listings' photos, picked at random, beside its logo.
+  const origin = siteOrigin();
+  const alt = `${brand.name} on Udozo: ${brand.listings ? `${brand.listings.toLocaleString("en-GB")} listing${brand.listings === 1 ? "" : "s"} for sale in ${market.name}` : `sell yours in ${market.name}`}`;
+  const still = { url: brandCardUrl(origin, cc, brand.slug, "jpg"), width: 1200, height: 630, type: "image/jpeg", alt };
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type: "website", url: path, title, description, siteName: "Udozo", ...(brand.logo_url?.startsWith("https://") ? { images: [{ url: brand.logo_url, alt: `${brand.name} logo` }] } : {}) },
+    openGraph: { type: "website", url: path, title, description, siteName: "Udozo", images: [{ url: brandCardUrl(origin, cc, brand.slug, "gif"), ...gifSizes[0], type: "image/gif", alt }, still] },
+    twitter: { card: "summary_large_image", title, description, images: [still] },
     ...(brand.listings < indexFrom || filtered ? { robots: noindexFollow } : {}),
   };
 }
@@ -350,7 +358,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
         </aside>
       </div>
 
-      <JsonLd data={brandJsonLd(brand, market.name, new URL(path, origin).href)} />
+      <JsonLd data={brandJsonLd(brand, market.name, new URL(path, origin).href, brandCardUrl(origin, cc, brand.slug, "jpg"))} />
       <JsonLd data={breadcrumbJsonLd(trail, origin)} />
       {cards.length ? <JsonLd data={itemListJsonLd(`${brand.name} for sale in ${market.name}`, cards, origin, cc)} /> : null}
     </div>

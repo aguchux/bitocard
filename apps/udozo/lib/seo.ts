@@ -157,12 +157,14 @@ export function sellerJsonLd(profile: ShopSellerProfile, url: string, card: stri
  * A brand page's JSON-LD: a CollectionPage about the brand (its name, and its logo when it is on https), with how many
  * of its listings are for sale. Never an Organization: the page is Udozo's, not the brand's.
  */
-export function brandJsonLd(brand: ShopBrandPage, marketName: string, url: string) {
+export function brandJsonLd(brand: ShopBrandPage, marketName: string, url: string, image?: string) {
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     url,
     name: `${brand.name} for sale in ${marketName}`,
+    // The page's share card (its listings' photos beside the brand), never the brand's own artwork.
+    ...(image ? { primaryImageOfPage: { "@type": "ImageObject", url: image, width: 1200, height: 630 } } : {}),
     about: { "@type": "Brand", "@id": `${url}#brand`, name: brand.name, ...(brand.logo_url?.startsWith("https://") ? { logo: brand.logo_url } : {}) },
     ...(brand.listings > 0 ? { mainEntity: { "@type": "ItemList", numberOfItems: brand.listings } } : {}),
   };
