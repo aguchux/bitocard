@@ -156,6 +156,19 @@ describe('reading a title', () => {
     assert.equal(brandOnly.brand.name, 'Toyota');
     assert.equal(brandOnly.model, null);
   });
+
+  test('IEE (Initial Entropy Energy, sold as IEETek): its bundled logo and every model on its site, found by its trade name', async () => {
+    const iee = await prisma.classifiedBrand.findUniqueOrThrow({ where: { slug: 'iee' }, include: { categories: { include: { category: true } } } });
+    assert.deepEqual([iee.name, iee.logoFile, iee.color, iee.categories.map(link => link.category.slug)], ['IEE', 'iee', '#384254', ['generators-solar']]);
+    const models = await visitor.get('/v1/classifieds/models?brand=IEE&category=generators-solar&limit=50');
+    assert.equal(models.status, 200, JSON.stringify(models.json));
+    assert.equal(models.json.data.length, 19);
+    assert.ok(models.json.data.some(model => model.name === 'SH4000 all-in-one ESS'));
+    const station = await detect('IEETek P2400 portable power station, 2048Wh', 'generators-solar');
+    assert.deepEqual([station.brand?.name, station.model], ['IEE', 'P2400 power station']);
+    const panel = await detect('Initial Entropy Energy SP200 foldable solar panel', 'generators-solar');
+    assert.deepEqual([panel.brand?.name, panel.model], ['IEE', 'SP200 solar panel']);
+  });
 });
 
 describe("listings' models", () => {

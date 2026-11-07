@@ -563,5 +563,10 @@
     "own": true,
     "hex": "376AB3",
     "source": "https://www.cantrackgps.com/favicon.ico"
+  },
+  "iee": {
+    "own": true,
+    "hex": "384254",
+    "source": "https://ieetek.com/wp-content/uploads/2021/07/ieetek-logo-300x77.png"
   }
 }
