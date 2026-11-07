@@ -54,6 +54,8 @@ export type OutgoingMessage =
   | { type: 'image'; link?: string; id?: string; caption?: string }
   | { type: 'buttons'; body: string; buttons: Button[]; header?: string; footer?: string }
   | { type: 'list'; body: string; button: string; rows: Row[]; header?: string; footer?: string }
+  /** A message with one button opening an address (Meta's call-to-action URL button). */
+  | { type: 'link'; body: string; button: string; url: string; header?: string; footer?: string }
   | { type: 'template'; name: string; language: string; params: string[]; buttonParam?: string; /** A verification template's code (its copy button). */ otp?: string };
 
 const cut = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`);
@@ -91,6 +93,18 @@ export function messageBody(to: string, message: OutgoingMessage, replyTo?: stri
             button: cut(message.button, 20),
             sections: [{ rows: message.rows.slice(0, 10).map(row => ({ id: row.id.slice(0, 200), title: cut(row.title, 24), ...(row.description ? { description: cut(row.description, 72) } : {}) })) }],
           },
+        },
+      };
+    case 'link':
+      return {
+        ...base,
+        type: 'interactive',
+        interactive: {
+          type: 'cta_url',
+          ...(message.header ? { header: { type: 'text', text: cut(message.header, 60) } } : {}),
+          body: { text: cut(message.body, 1024) },
+          ...(message.footer ? { footer: { text: cut(message.footer, 60) } } : {}),
+          action: { name: 'cta_url', parameters: { display_text: cut(message.button, 20), url: message.url } },
         },
       };
     case 'template':

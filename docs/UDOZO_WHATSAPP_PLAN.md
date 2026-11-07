@@ -13,6 +13,7 @@
 - Legal: terms section 10a and privacy section 4a, version `2026-11-07`.
 - **Codes on WhatsApp** (added the same day at the owner's request): codes that confirm a mobile number can go on WhatsApp with Meta's verification template (`udozo_verification_code`, authentication category), by choice, where the country cannot text, or when the text fails (`SmsService.sendCode`, `whatsapp/codes.service.ts`).
 - **Anjio answers on WhatsApp** (added the same day at the owner's request, beyond the plan's "no AI"): questions and the menu's Ask Anjio go to the market's shop assistant (`whatsapp/anjio.service.ts`, switch `whatsapp_assistant`, off by default), never inside a chat between people; when it cannot answer, the question is searched.
+- **Contact seller** (added the same day at the owner's request, an exception to "neither side sees the other's number" that the seller chooses): a listing's buttons are Chat with seller (the relay), **Contact seller** and More (Call me back, Save it, New search). A seller who chose **Let buyers WhatsApp me directly** (Profile > WhatsApp on udozo.com, off by default, asked first; `whatsapp_contacts.direct_at`, cleared when the number is let go or tied to another account) is shown to a signed-in buyer with their first name and initial and their connected WhatsApp number, in one message whose **Chat on WhatsApp** button (Meta's `cta_url`) opens `wa.me/<seller>` with "Hi, I saw your listing … on Udozo: <link>" filled in. A seller who shared their details with that buyer before (an accepted contact request) is shown the same way with their confirmed phone and email; anyone else is sent the usual contact request. Never a buyer the seller blocked, a suspended seller or a number opted out; each buyer and listing is recorded once (`whatsapp_direct_contacts`, migration `20270304000000_whatsapp_direct`, kept 12 months): a phone lead, at most 20 a day per buyer (`direct_contact_limit`), and the seller told once per buyer (`customer.classifieds.whatsapp_shared`). `whatsapp/direct.service.ts`; terms 10a and privacy 4a say so.
 
 ## Context
 
@@ -92,7 +93,7 @@ What the owner chose:
      1. The person types words.
      2. The state defaults to the customer's own; they can choose another.
      3. `ListingSearchService.search` returns up to 10 results as a list, with a "More results" row.
-     4. A chosen listing comes as its photo with a caption (title, price, area, condition, address), and the buttons Chat with seller, Call back and More. More offers Request contact, Save and "Buy on udozo.com".
+     4. A chosen listing comes as its photo with a caption (title, price, area, condition, address), and the buttons Chat with seller, Call back and More. More offers Request contact, Save and "Buy on udozo.com". (Built as Chat with seller, Contact seller and More: see Contact seller above.)
      5. Unknown numbers get results and a link to sign up.
    - **Chat (the relay):**
      - Chat with seller asks for the first message, then calls `ConversationsService.start` and makes that chat active.

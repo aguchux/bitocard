@@ -231,6 +231,7 @@ export const notificationTypes = {
   'customer.classifieds.contact_request': { realm: 'customer', severity: 'info', label: 'A buyer asked for your contact details', push: true },
   'customer.classifieds.contact_answered': { realm: 'customer', severity: 'info', label: 'A seller answered your contact request', push: true },
   'customer.classifieds.callback_request': { realm: 'customer', severity: 'info', label: 'A buyer asked you to call them back', push: true },
+  'customer.classifieds.whatsapp_shared': { realm: 'customer', severity: 'info', label: 'A buyer got your WhatsApp number', push: true },
   'customer.classifieds.call_incoming': { realm: 'customer', severity: 'warning', label: 'Someone is calling you on Udozo', push: true },
   'customer.classifieds.call_missed': { realm: 'customer', severity: 'info', label: 'You missed a call on Udozo', push: true },
   'customer.classifieds.offer_accepted': { realm: 'customer', severity: 'success', label: 'Your BitoCard Shop offer was accepted', push: true },

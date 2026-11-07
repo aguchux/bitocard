@@ -120,6 +120,8 @@ export class WhatsappContactsService {
       opted_out: Boolean(contact?.optedOutAt),
       chats: contact?.chatsOn ?? true,
       alerts: contact?.alertsOn ?? true,
+      // "Let buyers WhatsApp me directly": Contact seller gives buyers this number (off until they choose it).
+      direct: Boolean(contact?.directAt),
       window_open: contact ? windowOpen(contact) : false,
     };
   }
@@ -155,8 +157,10 @@ export class WhatsappContactsService {
     const customer = row.customer;
     if (customer.status !== 'active') return null;
     const linked = await this.prisma.$transaction(async tx => {
-      await tx.whatsappContact.updateMany({ where: { customerId: customer.id, id: { not: contact.id } }, data: { customerId: null, linkedAt: null, flow: null, flowUpdatedAt: null } });
-      return tx.whatsappContact.update({ where: { id: contact.id }, data: { customerId: customer.id, linkedAt: now, optedInAt: now, optedOutAt: null, country: customer.country ?? contact.country, flow: null, flowUpdatedAt: null } });
+      await tx.whatsappContact.updateMany({ where: { customerId: customer.id, id: { not: contact.id } }, data: { customerId: null, linkedAt: null, flow: null, flowUpdatedAt: null, directAt: null } });
+      // Sharing the number with buyers was another account's choice: a newly tied account chooses again.
+      const keepDirect = contact.customerId === customer.id;
+      return tx.whatsappContact.update({ where: { id: contact.id }, data: { customerId: customer.id, linkedAt: now, optedInAt: now, optedOutAt: null, country: customer.country ?? contact.country, flow: null, flowUpdatedAt: null, ...(keepDirect ? {} : { directAt: null }) } });
     });
     // Sending the code proved they hold the number: it becomes their confirmed mobile if they have none (never another's).
     if (!customer.phoneVerifiedAt) {
@@ -166,17 +170,24 @@ export class WhatsappContactsService {
     return { contact: linked, customer };
   }
 
-  /** "Chats on WhatsApp" and "Request alerts on WhatsApp". */
-  async setPreferences(customer: CustomerWithStore, input: { chats?: boolean; alerts?: boolean }) {
+  /** "Chats on WhatsApp", "Request alerts on WhatsApp" and "Let buyers WhatsApp me directly". */
+  async setPreferences(customer: CustomerWithStore, input: { chats?: boolean; alerts?: boolean; direct?: boolean }, now = new Date()) {
     const contact = await this.prisma.whatsappContact.findUnique({ where: { customerId: customer.id } });
     if (!contact) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'whatsapp_not_connected', 'Connect your WhatsApp first.');
-    await this.prisma.whatsappContact.update({ where: { id: contact.id }, data: { ...(input.chats !== undefined ? { chatsOn: input.chats } : {}), ...(input.alerts !== undefined ? { alertsOn: input.alerts } : {}) } });
+    await this.prisma.whatsappContact.update({
+      where: { id: contact.id },
+      data: {
+        ...(input.chats !== undefined ? { chatsOn: input.chats } : {}),
+        ...(input.alerts !== undefined ? { alertsOn: input.alerts } : {}),
+        ...(input.direct !== undefined ? { directAt: input.direct ? (contact.directAt ?? now) : null } : {}),
+      },
+    });
     return this.status(customer);
   }
 
   /** Lets the number go: nothing more reaches it about the account. */
   async disconnect(customer: CustomerWithStore) {
-    await this.prisma.whatsappContact.updateMany({ where: { customerId: customer.id }, data: { customerId: null, linkedAt: null, flow: null, flowUpdatedAt: null, activeConversationId: null } });
+    await this.prisma.whatsappContact.updateMany({ where: { customerId: customer.id }, data: { customerId: null, linkedAt: null, flow: null, flowUpdatedAt: null, activeConversationId: null, directAt: null } });
     return this.status(customer);
   }
 

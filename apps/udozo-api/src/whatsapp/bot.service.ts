@@ -8,9 +8,10 @@ import { ContactRequestsService } from '../classifieds/contact.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { FavouritesService } from '../classifieds/favourites.service.js';
 import { conditionName, isOnShop, priceText } from '../classifieds/rules.js';
-import { ListingSearchService } from '../classifieds/search.service.js';
+import { ListingSearchService, publicName } from '../classifieds/search.service.js';
 import { WhatsappAnjio, looksLikeQuestion, searchWordsOf } from './anjio.service.js';
 import { WhatsappContactsService, linkCodeIn } from './contacts.service.js';
+import { WhatsappDirect, directGreeting, directLink, phoneText } from './direct.service.js';
 import { type Inbound } from './inbound.js';
 import { words } from './messages.js';
 import { WhatsappOutbox } from './outbox.service.js';
@@ -48,6 +49,7 @@ export class WhatsappBot {
     private readonly sell: SellFlow,
     private readonly wanted: WantedFlow,
     private readonly anjio: WhatsappAnjio,
+    private readonly direct: WhatsappDirect,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -193,6 +195,8 @@ export class WhatsappBot {
         return ctx.say({ type: 'buttons', body: `${words.listingActions} Or open it on udozo.com.`, buttons: words.moreButtons(id!) });
       case 'chat':
         return this.askFirstMessage(ctx, id!);
+      case 'ct':
+        return this.contactSeller(ctx, id!);
       case 'cb':
       case 'contact':
       case 'save':
@@ -323,6 +327,43 @@ export class WhatsappBot {
     } catch (error) {
       return ctx.say({ type: 'text', body: problemText(error) });
     }
+  }
+
+  /**
+   * Contact seller: a seller who chose "Let buyers WhatsApp me directly" is shown with their own WhatsApp number and a
+   * button opening a chat with them there, about this listing. A seller who shared their details with this buyer before
+   * (an accepted contact request) is shown with those. Anyone else is asked for their details, as Ask for contact did.
+   */
+  private async contactSeller(ctx: BotContext, listingId: string) {
+    if (!ctx.customer) return ctx.needAccount();
+    try {
+      const direct = await this.direct.reveal(ctx.customer, listingId);
+      const card = (await this.search.cards([listingId])).get(listingId);
+      const title = card?.title ?? 'this listing';
+      if (direct) return this.sellerCard(ctx, { name: direct.name, phone: direct.phone, email: null, shared: false }, title, card?.url ?? '');
+      const listing = await this.prisma.classifiedListing.findUniqueOrThrow({ where: { id: listingId }, select: { customerId: true } });
+      const share = await this.prisma.classifiedContactShare.findUnique({
+        where: { sellerId_buyerId: { sellerId: listing.customerId, buyerId: ctx.customer.id } },
+        select: { seller: { select: { name: true, email: true, phone: true, phoneVerifiedAt: true } } },
+      });
+      if (share?.seller.phone && share.seller.phoneVerifiedAt) {
+        return this.sellerCard(ctx, { name: publicName(share.seller.name), phone: share.seller.phone, email: share.seller.email, shared: true }, title, card?.url ?? '');
+      }
+      await this.contactRequests.requestContact(ctx.customer, listingId);
+      return ctx.say({ type: 'text', body: words.contactNotShared });
+    } catch (error) {
+      return ctx.say({ type: 'text', body: problemText(error) });
+    }
+  }
+
+  private sellerCard(ctx: BotContext, seller: { name: string; phone: string; email: string | null; shared: boolean }, title: string, url: string) {
+    return ctx.say({
+      type: 'link',
+      body: words.sellerContact(seller.name, title, phoneText(seller.phone), seller.email, seller.shared),
+      button: words.sellerContactButton,
+      url: directLink(seller.phone, directGreeting(title, url)),
+      footer: words.sellerContactFooter(seller.shared),
+    });
   }
 
   // ---- Chats ----

@@ -16,6 +16,8 @@ export type WhatsappConnection = {
   opted_out: boolean;
   chats: boolean;
   alerts: boolean;
+  /** "Let buyers WhatsApp me directly": Contact seller on Udozo's WhatsApp gives buyers this number. */
+  direct: boolean;
   window_open: boolean;
 };
 

@@ -23,8 +23,10 @@ export async function whatsappStatus(): Promise<ConnectionResult> {
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: whatsappErrorText(result) };
 }
 
-export async function setWhatsappChoices(input: { chats?: boolean; alerts?: boolean }): Promise<ConnectionResult> {
-  const body = { ...(typeof input.chats === "boolean" ? { chats: input.chats } : {}), ...(typeof input.alerts === "boolean" ? { alerts: input.alerts } : {}) };
+export type WhatsappChoices = { chats?: boolean; alerts?: boolean; direct?: boolean };
+
+export async function setWhatsappChoices(input: WhatsappChoices): Promise<ConnectionResult> {
+  const body = Object.fromEntries((["chats", "alerts", "direct"] as const).filter(key => typeof input[key] === "boolean").map(key => [key, input[key]]));
   const result = await customerApi<WhatsappConnection>("PATCH", "/v1/store/account/whatsapp", body);
   if (!result.ok) return { ok: false, message: whatsappErrorText(result) };
   revalidatePath(whatsappScreen);

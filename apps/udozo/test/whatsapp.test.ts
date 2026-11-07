@@ -31,7 +31,7 @@ const { answerWanted, closeWanted, postWanted } = await import("@/lib/wanted-act
 const { WhatsappConnect } = await import("@/components/account/whatsapp-connect");
 const { SiteFooter } = await import("@/components/footer");
 
-const connection = (extra = {}) => ({ object: "whatsapp_connection" as const, available: true, number: "+2348000000000", chat_link: "https://wa.me/2348000000000?text=Hi", connected: false, phone: null, connected_at: null, opted_out: false, chats: true, alerts: true, window_open: false, ...extra });
+const connection = (extra = {}) => ({ object: "whatsapp_connection" as const, available: true, number: "+2348000000000", chat_link: "https://wa.me/2348000000000?text=Hi", connected: false, phone: null, connected_at: null, opted_out: false, chats: true, alerts: true, direct: false, window_open: false, ...extra });
 
 let container: HTMLDivElement;
 beforeEach(() => {
@@ -82,7 +82,7 @@ describe("Profile > WhatsApp", () => {
     const sent = [...container.querySelectorAll("button")].find(button => button.textContent?.includes("I sent it"))!;
     await act(async () => sent.click());
     expect(container.textContent).toContain("Connected to +2348031234567");
-    expect(container.querySelectorAll('[role="switch"]').length).toBe(2);
+    expect(container.querySelectorAll('[role="switch"]').length).toBe(3);
     act(() => root.unmount());
   });
 
@@ -94,6 +94,34 @@ describe("Profile > WhatsApp", () => {
     await act(async () => chats.click());
     expect(chats.getAttribute("aria-checked")).toBe("true");
     expect(container.textContent).toContain("Connect your WhatsApp first.");
+    act(() => root.unmount());
+  });
+
+  it("Let buyers WhatsApp me directly is off by default and asks first; Cancel changes nothing", async () => {
+    if (!HTMLDialogElement.prototype.showModal) HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) { this.open = true; };
+    if (!HTMLDialogElement.prototype.close) HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) { this.open = false; };
+    calls.replies.set("PATCH /v1/store/account/whatsapp", { ok: true, data: connection({ connected: true, phone: "+2348031234567", direct: true }) });
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(WhatsappConnect, { initial: connection({ connected: true, phone: "+2348031234567" }) })));
+    const direct = container.querySelector<HTMLButtonElement>('[aria-labelledby="wa-direct"]')!;
+    expect(direct.getAttribute("aria-checked")).toBe("false");
+    const press = (words: string) => [...container.querySelectorAll("dialog button")].find(button => button.textContent?.includes(words)) as HTMLButtonElement;
+
+    await act(async () => direct.click());
+    expect(container.querySelector("dialog")?.textContent).toContain("+2348031234567");
+    await act(async () => press("Cancel").click());
+    expect(calls.list).toEqual([]);
+    expect(direct.getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => direct.click());
+    await act(async () => press("Share my number").click());
+    expect(calls.list.at(-1)).toEqual({ method: "PATCH", path: "/v1/store/account/whatsapp", body: { direct: true } });
+    expect(direct.getAttribute("aria-checked")).toBe("true");
+
+    // Turning it off asks nothing.
+    calls.replies.set("PATCH /v1/store/account/whatsapp", { ok: true, data: connection({ connected: true, phone: "+2348031234567", direct: false }) });
+    await act(async () => direct.click());
+    expect(calls.list.at(-1)?.body).toEqual({ direct: false });
     act(() => root.unmount());
   });
 

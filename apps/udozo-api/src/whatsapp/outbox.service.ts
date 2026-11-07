@@ -28,7 +28,7 @@ export type QueueOptions = { fallback?: TemplateCall; conversationId?: string | 
 export const windowOpen = (contact: { lastInboundAt: Date | null }, now = new Date()) => Boolean(contact.lastInboundAt && now.getTime() - contact.lastInboundAt.getTime() < windowMs);
 
 /** What a queued message says, for the admin's log (never a chat photo's bytes). */
-const kindOf = (payload: QueuedPayload) => (payload.message.type === 'chat_photo' ? 'image' : payload.message.type === 'buttons' || payload.message.type === 'list' ? 'interactive' : payload.message.type);
+const kindOf = (payload: QueuedPayload) => (payload.message.type === 'chat_photo' ? 'image' : payload.message.type === 'buttons' || payload.message.type === 'list' || payload.message.type === 'link' ? 'interactive' : payload.message.type);
 
 /**
  * Every message Udozo sends on WhatsApp: written to `whatsapp_messages` first (its payload encrypted), then sent after

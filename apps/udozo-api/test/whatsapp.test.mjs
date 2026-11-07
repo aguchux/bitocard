@@ -241,7 +241,8 @@ describe('finding and chatting', () => {
     const card = await say(buyer.waId, tap(`l:${tv.ref}`));
     assert.equal(card[0].type, 'image');
     assert.match(card[0].image.caption, /Hisense 50 inch smart TV[\s\S]*₦250,000[\s\S]*Chinedu O\./);
-    assert.deepEqual(rowIds(card[1]), [`chat:${tv.id}`, `cb:${tv.id}`, `more:${tv.id}`]);
+    assert.deepEqual(rowIds(card[1]), [`chat:${tv.id}`, `ct:${tv.id}`, `more:${tv.id}`]);
+    assert.deepEqual(rowIds((await say(buyer.waId, tap(`more:${tv.id}`)))[0]), [`cb:${tv.id}`, `save:${tv.id}`, 'menu:find']);
 
     assert.match(bodies(await say(buyer.waId, tap(`chat:${tv.id}`)))[0], /Write your message to the seller/);
     const since = graph.calls.length;
@@ -298,6 +299,73 @@ describe('finding and chatting', () => {
     const photo = sentTo(seller.waId, photoAt).at(-1);
     assert.equal(photo.type, 'image');
     assert.match(photo.image.id, /^media-up-/, 'never a public link');
+  });
+});
+
+describe('Contact seller', () => {
+  test("gives the seller's own WhatsApp only when they chose it, or details they shared; anyone else is asked", async () => {
+    const seller = await customer('Bisi Adeyemi');
+    const buyer = await customer('Tunde Bello');
+    const tv = await live(seller, 'Sony Bravia 43 inch TV');
+    await say(seller.waId, text('hi'));
+    await say(buyer.waId, text('hi'));
+    const notices = type => prisma.notification.count({ where: { customerId: seller.id, type } });
+
+    // A visitor (no account) is asked to connect first.
+    const stranger = `2348${String(Date.now()).slice(-9)}`;
+    assert.match(bodies(await say(stranger, tap(`ct:${tv.id}`)))[0], /connect your Udozo account first/);
+
+    // Not chosen: the seller is asked for their details, as Ask for contact did; nothing about them is shown.
+    const asked = await say(buyer.waId, tap(`ct:${tv.id}`));
+    assert.match(bodies(asked)[0], /has not chosen to share their WhatsApp number/);
+    assert.doesNotMatch(JSON.stringify(asked), new RegExp(seller.waId));
+    assert.equal(await prisma.classifiedContactRequest.count({ where: { buyerId: buyer.id, sellerId: seller.id, kind: 'contact', status: 'pending' } }), 1);
+
+    // The seller chooses "Let buyers WhatsApp me directly" on udozo.com (only with a connected number).
+    const loner = await customer('Ngozi Obi');
+    assert.equal((await loner.patch('/v1/store/account/whatsapp', { direct: true })).json.error.code, 'whatsapp_not_connected');
+    const turned = await seller.patch('/v1/store/account/whatsapp', { direct: true });
+    assert.equal(turned.status, 200, JSON.stringify(turned.json));
+    assert.equal(turned.json.direct, true);
+
+    const shown = await say(buyer.waId, tap(`ct:${tv.id}`));
+    assert.equal(shown.length, 1);
+    const cta = shown[0].interactive;
+    assert.equal(cta.type, 'cta_url');
+    assert.match(cta.body.text, /\*Bisi A\.\* sells "Sony Bravia 43 inch TV" on Udozo\.\nWhatsApp: \+234/);
+    assert.match(cta.body.text, /Safe pay/);
+    assert.equal(cta.action.parameters.display_text, 'Chat on WhatsApp');
+    const link = new URL(cta.action.parameters.url);
+    assert.equal(`${link.origin}${link.pathname}`, `https://wa.me/${seller.waId}`);
+    assert.match(link.searchParams.get('text'), /^Hi, I saw your listing "Sony Bravia 43 inch TV" on Udozo: https:\/\/udozo\.com\/ng\/l\//);
+    // Recorded once: a lead, and the seller told once who has their number.
+    await say(buyer.waId, tap(`ct:${tv.id}`));
+    assert.equal(await prisma.whatsappDirectContact.count({ where: { buyerId: buyer.id, sellerId: seller.id } }), 1);
+    assert.equal(await prisma.classifiedLead.count({ where: { listingId: tv.id, buyerId: buyer.id, kind: 'phone' } }), 1);
+    assert.equal(await notices('customer.classifieds.whatsapp_shared'), 1);
+
+    // A seller who blocked the buyer is never shown to them.
+    const chat = await buyer.post('/v1/classifieds/conversations', { listing_id: tv.id, body: 'Hello' });
+    assert.equal(chat.status, 201, JSON.stringify(chat.json));
+    assert.equal((await seller.post(`/v1/classifieds/conversations/${chat.json.id}/block`)).status, 200);
+    assert.match(bodies(await say(buyer.waId, tap(`ct:${tv.id}`)))[0], /cannot contact this seller/);
+    assert.equal((await seller.post(`/v1/classifieds/conversations/${chat.json.id}/unblock`)).status, 200);
+
+    // Turned off (or the number let go), buyers are asked again; details the seller shared still show.
+    assert.equal((await seller.patch('/v1/store/account/whatsapp', { direct: false })).json.direct, false);
+    const request = await prisma.classifiedContactRequest.findFirstOrThrow({ where: { buyerId: buyer.id, sellerId: seller.id, kind: 'contact' } });
+    assert.equal((await seller.post(`/v1/classifieds/contact-requests/${request.id}/accept`)).status, 200);
+    const sharedReply = await say(buyer.waId, tap(`ct:${tv.id}`));
+    // (The accepted request's own notice comes first.)
+    const shared = sharedReply.at(-1)?.interactive;
+    assert.ok(shared, JSON.stringify(sharedReply));
+    assert.equal(shared.type, 'cta_url');
+    assert.match(shared.body.text, /They shared their details with you/);
+    assert.match(shared.body.text, /Email: wa\d+-\d+@example\.com/);
+
+    await seller.patch('/v1/store/account/whatsapp', { direct: true });
+    await seller.delete('/v1/store/account/whatsapp');
+    assert.equal((await prisma.whatsappContact.findUniqueOrThrow({ where: { waId: seller.waId } })).directAt, null, 'disconnecting forgets the choice');
   });
 });
 

@@ -60,6 +60,10 @@ class PreferencesDto {
 
   @IsOptional() @IsBoolean()
   alerts?: boolean;
+
+  /** "Let buyers WhatsApp me directly": Contact seller on Udozo's WhatsApp gives buyers this number. */
+  @IsOptional() @IsBoolean()
+  direct?: boolean;
 }
 
 /** udozo.com's Profile > WhatsApp: connect the customer's number with a one-time code, their choices, disconnect. */

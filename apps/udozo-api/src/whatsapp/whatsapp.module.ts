@@ -7,6 +7,7 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { WhatsappAdminService } from './admin.service.js';
 import { WhatsappAnjio } from './anjio.service.js';
 import { WhatsappCodes } from './codes.service.js';
+import { WhatsappDirect } from './direct.service.js';
 import { WhatsappBot } from './bot.service.js';
 import { WhatsappContactsService } from './contacts.service.js';
 import { SellFlow } from './flows/sell.flow.js';
@@ -21,7 +22,7 @@ import { ClassifiedChannelsController, WhatsappAccountController, WhatsappAdminC
 @Module({
   imports: [CheckoutModule, ClassifiedsModule, SettingsModule, ShopAssistantModule],
   controllers: [ClassifiedChannelsController, WhatsappWebhookController, WhatsappAccountController, WhatsappAdminController],
-  providers: [KycStorage, WhatsappAnjio, WhatsappCodes, WhatsappOutbox, WhatsappContactsService, WhatsappBot, WhatsappNotices, WhatsappRelay, WhatsappAdminService, WhatsappJobs, SellFlow, WantedFlow],
+  providers: [KycStorage, WhatsappAnjio, WhatsappCodes, WhatsappDirect, WhatsappOutbox, WhatsappContactsService, WhatsappBot, WhatsappNotices, WhatsappRelay, WhatsappAdminService, WhatsappJobs, SellFlow, WantedFlow],
   exports: [WhatsappJobs, WhatsappContactsService],
 })
 export class WhatsappModule {}

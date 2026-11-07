@@ -43,11 +43,11 @@ export const words = {
   listingActions: 'What would you like to do?',
   listingButtons: (id: string): Button[] => [
     { id: `chat:${id}`, title: 'Chat with seller' },
-    { id: `cb:${id}`, title: 'Call me back' },
+    { id: `ct:${id}`, title: 'Contact seller' },
     { id: `more:${id}`, title: 'More' },
   ],
   moreButtons: (id: string): Button[] => [
-    { id: `contact:${id}`, title: 'Ask for contact' },
+    { id: `cb:${id}`, title: 'Call me back' },
     { id: `save:${id}`, title: 'Save it' },
     { id: 'menu:find', title: 'New search' },
   ],
@@ -55,6 +55,19 @@ export const words = {
   saved: 'Saved to your favourites on Udozo.',
   callbackSent: 'Done: the seller has your request to call you back. You will hear here when they answer.',
   contactSent: 'Done: the seller has your request for their contact details. You will hear here when they answer.',
+  /** Contact seller: the seller's own WhatsApp (they chose to share it), or details they shared with this buyer before. */
+  sellerContact: (name: string, title: string, phone: string, email: string | null, shared: boolean) =>
+    [
+      `*${name}* sells "${title}" on Udozo.`,
+      `WhatsApp: ${phone}`,
+      ...(email ? [`Email: ${email}`] : []),
+      '',
+      shared ? 'They shared their details with you. Tap below to message them on WhatsApp.' : 'Tap below to message them on their own WhatsApp.',
+      'See the item before you pay, and never pay ahead to someone you have not met: Safe pay on udozo.com holds your money until you have it.',
+    ].join('\n'),
+  sellerContactButton: 'Chat on WhatsApp',
+  sellerContactFooter: (shared: boolean) => (shared ? 'Shared with you by the seller' : 'The seller chose to share it'),
+  contactNotShared: 'This seller has not chosen to share their WhatsApp number, so we asked them for their contact details. You will hear here when they answer. Meanwhile, Chat with seller sends them a message through Udozo.',
 
   // Chat
   askFirstMessage: (title: string) => `Write your message to the seller about "${title}". It goes through Udozo, so they never see your number.`,

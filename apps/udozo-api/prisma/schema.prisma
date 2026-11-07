@@ -2789,6 +2789,8 @@ model Customer {
   classifiedContactAskedOf  ClassifiedContactRequest[] @relation("ClassifiedContactAskedOf")
   classifiedContactsShared  ClassifiedContactShare[]   @relation("ClassifiedContactsShared")
   classifiedContactsGiven   ClassifiedContactShare[]   @relation("ClassifiedContactsGiven")
+  whatsappDirectShared      WhatsappDirectContact[]    @relation("WhatsappDirectShared")
+  whatsappDirectGiven       WhatsappDirectContact[]    @relation("WhatsappDirectGiven")
   classifiedCallsMade       ClassifiedCall[]           @relation("ClassifiedCallsMade")
   classifiedCallsTaken      ClassifiedCall[]           @relation("ClassifiedCallsTaken")
   presence                  CustomerPresence?
@@ -4808,6 +4810,7 @@ model ClassifiedListing {
   reports      ClassifiedReport[]
   favourites   ClassifiedFavourite[]
   contactRequests ClassifiedContactRequest[]
+  whatsappDirectContacts WhatsappDirectContact[]
   buyOrders       ClassifiedBuyOrder[]
   wantedResponses ClassifiedWantedResponse[]
   purchases       ClassifiedPurchase[]
@@ -6843,6 +6846,9 @@ model WhatsappContact {
   alertsOn             Boolean                 @default(true) @map("alerts_on")
   /// Meta said the number cannot receive messages: nothing more is sent until they write again.
   unreachableAt        DateTime?               @map("unreachable_at")
+  /// The seller's choice "Let buyers WhatsApp me directly": Contact seller on WhatsApp then gives buyers this number.
+  /// Cleared whenever the number is let go or tied to another account.
+  directAt             DateTime?               @map("direct_at")
   /// The step-by-step menu they are in (find, chat, sell, wanted) and where they are in it.
   flow                 String?
   flowState            Json?                   @map("flow_state")
@@ -6991,4 +6997,23 @@ model ClassifiedWantedResponse {
   @@unique([requestId, sellerId])
   @@index([sellerId])
   @@map("classified_wanted_responses")
+}
+
+/// A buyer who got a seller's WhatsApp number from Contact seller (the seller chose "Let buyers WhatsApp me
+/// directly"), once per buyer and listing: counts towards the buyer's daily limit and tells the seller who has it.
+/// Kept 12 months.
+model WhatsappDirectContact {
+  id        String            @id @default(uuid()) @db.Uuid
+  sellerId  String            @map("seller_id") @db.Uuid
+  buyerId   String            @map("buyer_id") @db.Uuid
+  listingId String            @map("listing_id") @db.Uuid
+  createdAt DateTime          @default(now()) @map("created_at")
+  seller    Customer          @relation("WhatsappDirectShared", fields: [sellerId], references: [id], onDelete: Cascade)
+  buyer     Customer          @relation("WhatsappDirectGiven", fields: [buyerId], references: [id], onDelete: Cascade)
+  listing   ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([buyerId, listingId])
+  @@index([buyerId, createdAt])
+  @@index([sellerId])
+  @@map("whatsapp_direct_contacts")
 }

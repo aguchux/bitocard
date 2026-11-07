@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { MessageCircle, RefreshCw } from "lucide-react";
-import { disconnectWhatsapp, setWhatsappChoices, startWhatsappLink, whatsappStatus } from "@/lib/whatsapp-actions";
+import { type WhatsappChoices, disconnectWhatsapp, setWhatsappChoices, startWhatsappLink, whatsappStatus } from "@/lib/whatsapp-actions";
 import type { WhatsappConnection, WhatsappLink } from "@/lib/whatsapp";
 import { useConfirm } from "../confirm-dialog";
 
@@ -27,7 +27,8 @@ function Choice({ id, label, note, on, busy, onChange }: { id: string; label: st
 /**
  * Profile > WhatsApp: **Connect WhatsApp** makes a one-time code and opens WhatsApp with `LINK <code>` ready to send to
  * Udozo's number (sending it from their phone proves the number is theirs); **I sent it** reads the connection again.
- * Once connected: chats and request alerts on WhatsApp, each on or off, and Disconnect (asked first).
+ * Once connected: chats and request alerts on WhatsApp, each on or off; **Let buyers WhatsApp me directly** (off by
+ * default, asked first when turned on: Contact seller on WhatsApp then gives buyers this number); and Disconnect (asked first).
  */
 export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
   const [connection, setConnection] = useState(initial);
@@ -54,7 +55,7 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
       else setError("Not connected yet. Send the message in WhatsApp, then try again.");
     });
 
-  const choose = (input: { chats?: boolean; alerts?: boolean }) => {
+  const choose = (input: WhatsappChoices) => {
     const before = connection;
     setConnection({ ...connection, ...input });
     start(async () => {
@@ -65,6 +66,18 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
         setError(result.message);
       } else setConnection(result.data);
     });
+  };
+
+  const chooseDirect = async (direct: boolean) => {
+    if (direct) {
+      const answer = await confirm({
+        title: "Let buyers WhatsApp you directly?",
+        body: `When a signed-in buyer taps Contact seller on Udozo's WhatsApp, they get your name and ${connection.phone ?? "this number"}, and can message or call you on it outside Udozo. You are told who has it. You can turn this off at any time, but buyers who already have your number keep it.`,
+        action: "Share my number",
+      });
+      if (!answer) return;
+    }
+    choose({ direct });
   };
 
   const disconnect = async () => {
@@ -93,6 +106,14 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
           </p>
           <Choice id="wa-chats" label="Chats on WhatsApp" note="Messages from buyers and sellers come to WhatsApp, and you answer there. Nobody sees your number." on={connection.chats} busy={busy} onChange={chats => choose({ chats })} />
           <Choice id="wa-alerts" label="Notices on WhatsApp" note="Requests that fit what you sell, answers to yours, buy orders and contact requests." on={connection.alerts} busy={busy} onChange={alerts => choose({ alerts })} />
+          <Choice
+            id="wa-direct"
+            label="Let buyers WhatsApp me directly"
+            note="Contact seller on Udozo's WhatsApp gives signed-in buyers your name and this number, so they chat with you on your own WhatsApp. Off: they ask for your details first."
+            on={connection.direct}
+            busy={busy}
+            onChange={direct => void chooseDirect(direct)}
+          />
           <div className="flex flex-wrap gap-2">
             {connection.chat_link ? (
               <a href={connection.chat_link} target="_blank" rel="noopener" className={`${button} bg-mint-700 text-white hover:bg-mint-500`}>
