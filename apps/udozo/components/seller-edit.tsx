@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, X } from "lucide-react";
-import { sendToStorage } from "@bitocard/ui/avatar";
 import { coverImage } from "@bitocard/ui/image";
 import { AvatarForm } from "@/components/account/avatar-form";
-import { removeBanner, setBanner, startBannerUpload } from "@/lib/avatar-actions";
+import { removeBanner } from "@/lib/avatar-actions";
+import { sendPicture } from "@/lib/picture-client";
 
 const accepted = "image/png,image/jpeg,image/webp";
 
@@ -62,8 +62,8 @@ export const coverAxis = (width: number, height: number) => (height > 0 && width
 
 /**
  * On the seller's own page: **Edit cover** on the banner. Choose a picture, slide it to the part that shows (it is cut to
- * 4:1, as wide as the page), save it (made 1600 × 400 at most in the browser, sent straight to storage, then checked by
- * Udozo), or take it off so Udozo's own banner shows again.
+ * 4:1, as wide as the page), save it (made 1600 × 400 at most in the browser, stored through this site with Udozo's signed
+ * link, then checked by Udozo), or take it off so Udozo's own banner shows again.
  */
 export function CoverButton({ url }: { url: string | null }) {
   const router = useRouter();
@@ -109,11 +109,7 @@ export function CoverButton({ url }: { url: string | null }) {
     setError(null);
     try {
       const cover = await coverImage(file, focus / 100);
-      const link = await startBannerUpload({ filename: `${file.name.replace(/\.[^.]+$/, "") || "cover"}.jpg`, content_type: cover.type, size: cover.size });
-      if (!link.ok) throw new Error(link.message);
-      await sendToStorage(link.data.upload, cover);
-      const set = await setBanner(link.data.id);
-      if (!set.ok) throw new Error(set.message);
+      await sendPicture("banner", cover, `${file.name.replace(/\.[^.]+$/, "") || "cover"}.jpg`);
       reset();
       dialog.current?.close();
       router.refresh();
