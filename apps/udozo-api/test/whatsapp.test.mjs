@@ -180,6 +180,7 @@ describe('numbers, the menu, STOP and START', () => {
     assert.equal(menu.length, 1);
     assert.deepEqual(rowIds(menu[0]), ['menu:find', 'menu:want', 'menu:sell', 'menu:chats', 'menu:help']);
     assert.match(bodies(await say(waId, text('STOP')))[0], /no more messages/);
+    assert.deepEqual(await say(waId, text('STOP')), [], 'STOP is answered once');
     assert.deepEqual(await say(waId, text('hello?')), [], 'nothing while opted out');
     const back = await say(waId, text('start'));
     assert.match(bodies(back)[0], /Welcome back/);
@@ -244,6 +245,19 @@ describe('finding and chatting', () => {
     const last = await prisma.classifiedMessage.findFirstOrThrow({ where: { conversationId: chat.id }, orderBy: { seq: 'desc' } });
     assert.deepEqual([last.senderId, last.body, last.channel], [seller.id, 'Yes, come and see it', 'whatsapp']);
     assert.equal(sentTo(buyer.waId, before).at(-1).text.body, '*Hisense 50 inch smart TV*\nChinedu O.: Yes, come and see it');
+
+    // While chatting, everyday words are messages to the other side, not the menu; MENU still leaves.
+    const hello = graph.calls.length;
+    assert.deepEqual(await say(buyer.waId, text('Hello')), [], 'no menu while chatting');
+    await services.outbox.idle();
+    assert.equal((await prisma.classifiedMessage.findFirstOrThrow({ where: { conversationId: chat.id }, orderBy: { seq: 'desc' } })).body, 'Hello');
+    assert.equal(sentTo(seller.waId, hello).at(-1).text.body, '*Hisense 50 inch smart TV*\nAmaka E.: Hello');
+    // The seller answered by quoting: their plain messages now go to that chat too.
+    const plain = graph.calls.length;
+    await say(seller.waId, text('Hi'));
+    await services.outbox.idle();
+    assert.equal(sentTo(buyer.waId, plain).at(-1).text.body, '*Hisense 50 inch smart TV*\nChinedu O.: Hi');
+    assert.deepEqual(rowIds((await say(buyer.waId, text('menu')))[0]).slice(0, 1), ['menu:find']);
 
     // Written on udozo.com, outside the buyer's 24 hours: the template goes instead, once an hour per chat.
     await prisma.whatsappContact.update({ where: { waId: buyer.waId }, data: { lastInboundAt: new Date(Date.now() - 25 * 3600_000) } });

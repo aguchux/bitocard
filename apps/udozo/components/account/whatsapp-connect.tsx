@@ -107,12 +107,12 @@ export function WhatsappConnect({ initial }: { initial: WhatsappConnection }) {
       ) : link ? (
         <div className="grid gap-3">
           <p className="text-[15px]">
-            WhatsApp should have opened with <strong className="font-mono text-navy-900">LINK {link.code}</strong> ready. Send it to Udozo ({connection.number}) from the phone you use for WhatsApp. The code works once, for 10 minutes.
+            Send <strong className="font-mono text-navy-900">LINK {link.code}</strong> to Udozo ({connection.number}) from the phone you use for WhatsApp. Open WhatsApp has it ready to send. The code works once, for 10 minutes.
           </p>
           <div className="flex flex-wrap gap-2">
             {link.link ? (
               <a href={link.link} target="_blank" rel="noopener" className={`${button} bg-mint-700 text-white hover:bg-mint-600`}>
-                <MessageCircle className="size-4" aria-hidden="true" /> Open WhatsApp again
+                <MessageCircle className="size-4" aria-hidden="true" /> Open WhatsApp
               </a>
             ) : null}
             <button type="button" onClick={check} disabled={busy} className={`${button} border border-navy-200 hover:border-navy-300`}>

@@ -104,6 +104,8 @@ export class WhatsappBot {
     const text = typed(ctx);
     const choice = ctx.input.choice;
     if (ctx.input.kind === 'text' && isWord(text, 'STOP', 'UNSUBSCRIBE', 'STOP ALL')) {
+      // Answered once: a STOP sent again while opted out gets nothing.
+      if (ctx.contact.optedOutAt) return;
       await this.contacts.optOut(ctx.contact.id);
       return ctx.say({ type: 'text', body: words.stopped }, { always: true });
     }
@@ -117,28 +119,31 @@ export class WhatsappBot {
     }
     if (!(await this.contacts.openIn(ctx.country))) return ctx.say({ type: 'text', body: words.notOpen });
 
+    // A reply to a forwarded chat message answers that chat, whatever menu they are in.
+    const quotedChat = !choice && ctx.input.replyTo && (ctx.input.kind === 'text' || ctx.input.kind === 'image') ? await this.quotedChat(ctx) : null;
+    // While chatting, everyday words ("Hi", "Hello", "Buy") are messages to the other side: only the words that leave
+    // or move around (MENU, CANCEL, HELP, CHATS) are commands.
+    const chatting = Boolean(quotedChat) || ctx.contact.flow === 'chat';
+
     if (ctx.input.kind === 'text') {
-      if (isWord(text, 'MENU', 'HI', 'HELLO', 'HEY', 'HOME', 'START', '0')) return this.menu(ctx);
+      if (isWord(text, 'MENU', 'HOME', '0') || (!chatting && isWord(text, 'HI', 'HELLO', 'HEY', 'START'))) return this.menu(ctx);
       if (isWord(text, 'CANCEL', 'STOP IT', 'EXIT', 'QUIT')) {
         await ctx.setFlow(null);
         await ctx.say({ type: 'text', body: words.cancelled });
         return this.menu(ctx);
       }
       if (isWord(text, 'HELP')) return ctx.say({ type: 'text', body: words.help });
-      if (isWord(text, 'SELL')) return this.sell.start(ctx);
-      if (isWord(text, 'WANT', 'REQUEST', 'WANTED')) return this.wanted.start(ctx);
-      if (isWord(text, 'FIND', 'SEARCH', 'BUY')) return this.askWords(ctx);
       if (isWord(text, 'CHATS', 'MY CHATS')) return this.myChats(ctx);
-      const ref = /^l\s*-?\s*(\d{1,12})$/i.exec(text)?.[1];
-      if (ref) return this.card(ctx, Number(ref));
+      if (!chatting) {
+        if (isWord(text, 'SELL')) return this.sell.start(ctx);
+        if (isWord(text, 'WANT', 'REQUEST', 'WANTED')) return this.wanted.start(ctx);
+        if (isWord(text, 'FIND', 'SEARCH', 'BUY')) return this.askWords(ctx);
+        const ref = /^l\s*-?\s*(\d{1,12})$/i.exec(text)?.[1];
+        if (ref) return this.card(ctx, Number(ref));
+      }
     }
     if (choice) return this.choose(ctx, choice);
-
-    // A reply to a forwarded chat message answers that chat, whatever menu they are in.
-    if (ctx.input.replyTo && (ctx.input.kind === 'text' || ctx.input.kind === 'image')) {
-      const quoted = await this.prisma.whatsappMessage.findUnique({ where: { wamid: ctx.input.replyTo }, select: { conversationId: true, contactId: true } });
-      if (quoted?.conversationId && quoted.contactId === ctx.contact.id) return this.relayIn(ctx, quoted.conversationId);
-    }
+    if (quotedChat) return this.relayIn(ctx, quotedChat);
     switch (ctx.contact.flow) {
       case 'find':
         return this.find(ctx, text, 0);
@@ -156,6 +161,12 @@ export class WhatsappBot {
     // Words with nothing going on: a search.
     if (text.length >= 3) return this.find(ctx, text, 0);
     return this.menu(ctx);
+  }
+
+  /** The chat of the Udozo message they quoted (WhatsApp's reply), when it was one of theirs about a chat. */
+  private async quotedChat(ctx: BotContext) {
+    const quoted = await this.prisma.whatsappMessage.findUnique({ where: { wamid: ctx.input.replyTo! }, select: { conversationId: true, contactId: true } });
+    return quoted?.conversationId && quoted.contactId === ctx.contact.id ? quoted.conversationId : null;
   }
 
   private async choose(ctx: BotContext, choice: string) {
@@ -323,7 +334,9 @@ export class WhatsappBot {
       } else return ctx.say({ type: 'text', body: words.photoUnsupported });
       await this.prisma.whatsappMessage.updateMany({ where: { wamid: ctx.input.wamid }, data: { conversationId } });
       await this.prisma.whatsappContact.update({ where: { id: ctx.contact.id }, data: { activeConversationId: conversationId } });
-      if (ctx.contact.flow !== 'chat' && !ctx.contact.flow) await ctx.setFlow('chat', { conversationId });
+      // Their next plain message goes to the chat they last answered (a quoted reply to another chat moves it there),
+      // unless they are in the middle of selling or a request.
+      if (!ctx.contact.flow || ctx.contact.flow === 'chat') await ctx.setFlow('chat', { conversationId });
     } catch (error) {
       const status = (error as { getStatus?: () => number }).getStatus?.();
       if (status === 404) return ctx.say({ type: 'text', body: words.noChat });
