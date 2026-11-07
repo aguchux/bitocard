@@ -1,12 +1,12 @@
 """Generates every logo file from each brand's master artwork: BitoCard's assets/logo.png (the lowercase "b" mark) for
-BitoCard's apps, Udozo's logo (assets/udozo/logo.png: the blue script "u" on a grey disc) for its apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
+BitoCard's apps, Udozo's logo (assets/udozo/logo.png: the "u" cut out of a blue disc, one colour on transparency) for its apps, and Afrippa's approved mark (the small "a", assets/afrippa/drafts/mark-c-single.png until its vector
 master arrives) for apps/afrippa.
 
 Run from the repository root after the logo changes: python scripts/brand-assets.py (needs Pillow and NumPy).
 
 Writes to each Next.js app's public/ folder (`<brand>` is bitocard or afrippa):
-  <brand>-mark.png          the mark, tightly cropped, navy and pink: beside the name on light backgrounds
-  <brand>-mark-light.png    the same with the navy in white (the pink kept), for navy and dark backgrounds
+  <brand>-mark.png          the mark, tightly cropped, navy and pink (Udozo: its blue): beside the name on light backgrounds
+  <brand>-mark-light.png    the same with the navy in white (the pink kept; Udozo: all white), for navy and dark backgrounds
   <brand>-logo.png          the mark centred in a square with room around it: favicons, app icons, push notifications
   <brand>-logo-light.png    the square logo in white and pink, for navy and dark backgrounds
   icon-192.png, icon-512.png    web app manifest icons (transparent, room around the mark)
@@ -69,19 +69,23 @@ def load_clean(source):
     return colour[box], alpha[box], pink[box], pink_colour
 
 
-# Brands whose artwork is used in its own colours, never recoloured: Udozo's "u" sits on its own grey disc, which reads
-# on white and on navy alike, so its light files are the artwork itself (white on the grey disc would barely show).
-AS_DRAWN = {"udozo"}
+# Brands whose artwork is one colour on transparency (7 November 2026: Udozo's "u" cut out of a blue disc, #185174):
+# every pixel is set to that colour, and the light files are the same shape in white, so on navy and dark backgrounds
+# the disc is white and the "u" shows the background through it.
+MONO = {"udozo"}
 
 
-def load_as_drawn(source):
-    """The artwork as it is, cropped to its drawing (near-transparent strays removed)."""
+def load_mono(source):
+    """The artwork's one colour (read from its solid pixels) on its own alpha, cropped to the drawing."""
     rgba = np.asarray(Image.open(source).convert("RGBA")).astype(np.float64)
     rgb, alpha = rgba[..., :3], rgba[..., 3]
     alpha[alpha < 4] = 0
+    ink = np.median(rgb[alpha >= 250], axis=0).round()
     ys, xs = np.nonzero(alpha > 0)
     box = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1))
-    return rgb[box], alpha[box]
+    shape = alpha[box]
+    print(f"Ink {tuple(int(v) for v in ink)}")
+    return np.broadcast_to(ink, (*shape.shape, 3)), np.broadcast_to(WHITE, (*shape.shape, 3)), shape
 
 
 def image(colour, alpha):
@@ -174,8 +178,9 @@ def main():
 
 
 def write_brand(brand, source, apps):
-    if brand in AS_DRAWN:
-        dark = white = image(*load_as_drawn(source))
+    if brand in MONO:
+        ink, paper, alpha = load_mono(source)
+        dark, white = image(ink, alpha), image(paper, alpha)
     else:
         colour, alpha, pink, pink_colour = load_clean(source)
         dark = image(colour, alpha)
