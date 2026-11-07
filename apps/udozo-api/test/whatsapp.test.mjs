@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, confirmMobile, fakeService, lastEmailCode, startApp, testMobile } from './helpers.mjs';
+import { fakeAi } from './fakes.mjs';
 
 let server;
 let prisma;
@@ -13,6 +14,8 @@ let bucket;
 let graph;
 let notices;
 let services;
+let ai;
+const anjio = '00000000-0000-4000-8000-0000000000c1';
 const objects = new Map();
 const appSecret = 'meta-app-secret';
 let outCounter = 0;
@@ -27,6 +30,7 @@ function jpeg({ width = 1600, height = 1200 } = {}) {
 }
 
 before(async () => {
+  ai = await fakeAi();
   bucket = await fakeService(call => {
     const key = decodeURIComponent(new URL(call.url, 'http://x').pathname);
     if (call.method === 'PUT') {
@@ -62,6 +66,10 @@ before(async () => {
     env: {
       APP_PRODUCT: 'udozo',
       CRON_SECRET: 'cron-secret',
+      ...ai.env,
+      ANTHROPIC_API_KEY: 'good-anthropic-bitocard',
+      ANTHROPIC_PRICES: 'claude-sonnet-5-5 3 15 0.3; claude-haiku-5-5 1 5 0.1',
+      AI_BITOCARD_MODELS: 'anthropic:claude-sonnet-5-5, anthropic:claude-haiku-5-5',
       SPACES_KEY: 'spaces-key', SPACES_SECRET: 'spaces-secret', SPACES_BUCKET: 'udozo-media', SPACES_ENDPOINT: bucket.url, SPACES_PUBLIC_URL: 'https://media.udozo.test', SPACES_ROOT: 'test',
       KYC_SPACES_KEY: 'kyc-key', KYC_SPACES_SECRET: 'kyc-secret', KYC_SPACES_BUCKET: 'kyc-private', KYC_SPACES_ENDPOINT: bucket.url,
       WHATSAPP_PHONE_NUMBER_ID: 'PNID', WHATSAPP_BUSINESS_ACCOUNT_ID: 'WABA', WHATSAPP_NUMBER: '+2348000000000', WHATSAPP_ACCESS_TOKEN: 'meta-token',
@@ -80,6 +88,7 @@ after(async () => {
   await server?.close();
   await bucket?.close();
   await graph?.close();
+  await ai?.close();
 });
 
 function storeServer() {
@@ -396,5 +405,98 @@ describe('admins', () => {
     assert.equal(run.status, 200);
     const body = await run.json();
     assert.ok('flows_reset' in body.result || 'flows_reset' in body, JSON.stringify(body));
+  });
+});
+
+
+describe('Anjio on WhatsApp', () => {
+  test('questions go to Anjio (visitors and accounts), listings come to tap, a drafted message is sent to the seller, and a person takes over', async () => {
+    // Off: a question is a search, and the menu has no Ask row.
+    const visitor = '2348066667777';
+    const off = await say(visitor, text('How does Safe pay work?'));
+    assert.equal(ai.state.calls.length, 0);
+    assert.match(bodies(off)[0], /Nothing found|Results for/);
+
+    for (const key of ['classifieds_assistant', 'whatsapp_assistant']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { country_code: 'NG', enabled: true })).status, 200, key);
+    assert.equal((await admin.post(`/v1/admin/support/bots/${anjio}/shop-knowledge/refresh`, {})).status, 200);
+    const active = await admin.post(`/v1/admin/support/bots/${anjio}/activate`);
+    assert.equal(active.json.status, 'active', JSON.stringify(active.json));
+
+    // A number with no account asks as a visitor; the answer's HTML becomes WhatsApp text.
+    await say(visitor, text('menu'));
+    ai.state.script = [{ text: '<p>With <strong>Safe pay</strong> Udozo holds your money until you have the item.</p><ul><li>Pay in the app</li><li>Never pay outside it</li></ul>' }];
+    const answer = await say(visitor, text('How does Safe pay work?'));
+    assert.equal(answer.length, 1, JSON.stringify(answer));
+    assert.equal(answer[0].text.body, 'With *Safe pay* Udozo holds your money until you have the item.\n\n• Pay in the app\n• Never pay outside it');
+    assert.ok(graph.calls.some(call => call.body?.status === 'read' && call.body?.typing_indicator?.type === 'text'), 'typing… while it answers');
+    const contact = await prisma.whatsappContact.findUniqueOrThrow({ where: { waId: visitor } });
+    const thread = await prisma.assistantThread.findUniqueOrThrow({ where: { id: contact.assistantThreadId } });
+    assert.deepEqual([thread.channel, thread.customerId, Boolean(thread.visitorHash)], ['whatsapp', null, true]);
+    // A follow-up carries on the same conversation (the earlier turn goes with it).
+    ai.state.script = [{ text: 'Yes, for every item with Safe pay.' }];
+    assert.equal(bodies(await say(visitor, text('and for phones too')))[0], 'Yes, for every item with Safe pay.');
+    assert.equal((await prisma.whatsappContact.findUniqueOrThrow({ where: { waId: visitor } })).assistantThreadId, thread.id);
+    assert.equal(await prisma.assistantMessage.count({ where: { threadId: thread.id } }), 4);
+    assert.match(JSON.stringify(ai.state.calls.at(-1).body.messages), /How does Safe pay work/);
+    // Talk to a person needs an account.
+    ai.state.script = [{ tool: { name: 'offer_person', arguments: { reason: 'A refund' } } }, { text: 'A person can help with that.' }];
+    assert.match(bodies(await say(visitor, text('I want my money back please')))[1], /once your Udozo account is connected/);
+
+    // A connected account: the menu offers Ask Anjio; listings come as a list to tap.
+    const seller = await customer('Bola Akin');
+    const buyer = await customer('Tunde Bello');
+    const tv = await live(seller, 'LG 55 inch OLED TV');
+    await say(seller.waId, text('hi'));
+    const menu = await say(buyer.waId, text('menu'));
+    assert.deepEqual(rowIds(menu[0]).slice(0, 2), ['menu:find', 'menu:ask']);
+    assert.match(bodies(await say(buyer.waId, tap('menu:ask')))[0], /^Ask Anjio, Udozo's AI assistant/);
+    ai.state.script = [{ tool: { name: 'search_listings', arguments: { words: 'LG OLED' } } }, { text: '<p>One LG OLED near you.</p>' }];
+    const found = await say(buyer.waId, text('lg oled'));
+    assert.equal(found.length, 1, JSON.stringify(found));
+    assert.equal(found[0].interactive.body.text, 'One LG OLED near you.');
+    assert.ok(rowIds(found[0]).includes(`l:${tv.ref}`), JSON.stringify(rowIds(found[0])));
+    const asked = await prisma.assistantThread.findFirstOrThrow({ where: { customerId: buyer.id, channel: 'whatsapp' } });
+    assert.equal(asked.surface, 'browse');
+
+    // A drafted first message, sent to the seller with one tap (relayed to their WhatsApp).
+    ai.state.script = [{ tool: { name: 'draft_message', arguments: { listing_id: tv.id, text: 'Hello, is the LG TV still available?' } } }, { text: 'Here is a message you can send.' }];
+    const drafted = await say(buyer.waId, text('write to the seller for me'));
+    const button = drafted.at(-1);
+    assert.match(button.interactive.body.text, /A first message to the seller of \*LG 55 inch OLED TV\*:\n\nHello, is the LG TV still available\?/);
+    const since = graph.calls.length;
+    assert.match(bodies(await say(buyer.waId, tap(rowIds(button)[0])))[0], /Sent to the seller of "LG 55 inch OLED TV"/);
+    await services.outbox.idle();
+    const chat = await prisma.classifiedConversation.findUniqueOrThrow({ where: { listingId_buyerId: { listingId: tv.id, buyerId: buyer.id } }, include: { messages: true } });
+    assert.ok(chat.messages.some(message => message.body === 'Hello, is the LG TV still available?' && message.channel === 'whatsapp'));
+    assert.equal(sentTo(seller.waId, since).at(-1).text.body, '*LG 55 inch OLED TV*\nTunde B.: Hello, is the LG TV still available?');
+
+    // Now chatting: a question is a message to the seller, never Anjio's.
+    const calls = ai.state.calls.length;
+    assert.deepEqual(await say(buyer.waId, text('Can you deliver to Wuse?')), []);
+    assert.equal(ai.state.calls.length, calls, 'Anjio stays out of chats between people');
+
+    // MENU, then a question with nothing going on goes to Anjio; a person takes over when it offers one.
+    await say(buyer.waId, text('menu'));
+    ai.state.script = [{ tool: { name: 'offer_person', arguments: { reason: 'A refund' } } }, { text: 'A person can help with that.' }];
+    const person = await say(buyer.waId, text('How do I get a refund for an order?'));
+    const threadId = (await prisma.whatsappContact.findUniqueOrThrow({ where: { waId: buyer.waId } })).assistantThreadId;
+    assert.deepEqual(rowIds(person.at(-1)), [`aperson:${threadId}`]);
+    assert.match(bodies(await say(buyer.waId, tap(rowIds(person.at(-1))[0])))[0], /a person from Udozo’s team has this conversation/);
+    assert.ok((await prisma.assistantThread.findUniqueOrThrow({ where: { id: threadId } })).chatId);
+
+    // Short words stay a search; when Anjio cannot answer, the question is searched instead.
+    const before = ai.state.calls.length;
+    await say(buyer.waId, text('menu'));
+    assert.ok(rowIds((await say(buyer.waId, text('oled')))[0]).includes(`l:${tv.ref}`));
+    assert.equal(ai.state.calls.length, before);
+    await say(buyer.waId, text('menu'));
+    ai.state.script = [{ status: 529 }, { status: 529 }, { status: 529 }];
+    assert.ok(rowIds((await say(buyer.waId, text('Where can I find an oled?')))[0]).includes(`l:${tv.ref}`));
+    ai.state.script = null;
+
+    // The admin sees it was on WhatsApp.
+    const threads = await admin.get(`/v1/admin/support/bots/${anjio}/threads`);
+    assert.ok(threads.json.data.some(row => row.channel === 'whatsapp'));
+    assert.equal((await admin.put('/v1/admin/switches/whatsapp_assistant', { country_code: 'NG', enabled: false })).status, 200);
   });
 });

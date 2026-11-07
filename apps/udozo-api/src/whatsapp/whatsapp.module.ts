@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { CheckoutModule } from '../checkout/checkout.module.js';
+import { ShopAssistantModule } from '../classifieds/assistant/assistant.module.js';
 import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 import { KycStorage } from '../kyc/storage.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { WhatsappAdminService } from './admin.service.js';
+import { WhatsappAnjio } from './anjio.service.js';
 import { WhatsappBot } from './bot.service.js';
 import { WhatsappContactsService } from './contacts.service.js';
 import { SellFlow } from './flows/sell.flow.js';
@@ -16,9 +18,9 @@ import { ClassifiedChannelsController, WhatsappAccountController, WhatsappAdminC
 
 /** Udozo on WhatsApp (docs/UDOZO_WHATSAPP_PLAN.md): Udozo's own number through Meta's Cloud API. */
 @Module({
-  imports: [CheckoutModule, ClassifiedsModule, SettingsModule],
+  imports: [CheckoutModule, ClassifiedsModule, SettingsModule, ShopAssistantModule],
   controllers: [ClassifiedChannelsController, WhatsappWebhookController, WhatsappAccountController, WhatsappAdminController],
-  providers: [KycStorage, WhatsappOutbox, WhatsappContactsService, WhatsappBot, WhatsappNotices, WhatsappRelay, WhatsappAdminService, WhatsappJobs, SellFlow, WantedFlow],
+  providers: [KycStorage, WhatsappAnjio, WhatsappOutbox, WhatsappContactsService, WhatsappBot, WhatsappNotices, WhatsappRelay, WhatsappAdminService, WhatsappJobs, SellFlow, WantedFlow],
   exports: [WhatsappJobs, WhatsappContactsService],
 })
 export class WhatsappModule {}

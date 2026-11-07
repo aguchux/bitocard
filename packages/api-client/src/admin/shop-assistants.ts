@@ -17,13 +17,14 @@ export type ShopCountryKnowledge = {
   sections: Array<{ key: ShopKnowledgeSectionKey; title: string; state: 'unchanged' | 'changed' | 'added'; added: number; removed: number }>;
 };
 
-export type AssistantThreadRow = { id: string; country: string; language: string; surface: ShopAssistantSurface; signed_in: boolean; first_question: string | null; messages: number; up: number; down: number; reported: number; last_message_at: string };
+export type AssistantThreadRow = { id: string; country: string; language: string; surface: ShopAssistantSurface; /** Held on udozo.com (web) or Udozo's WhatsApp number. Older answers may leave it out. */ channel?: 'web' | 'whatsapp'; signed_in: boolean; first_question: string | null; messages: number; up: number; down: number; reported: number; last_message_at: string };
 export type AssistantThreadDetail = {
   object: 'assistant_thread';
   id: string;
   country: string;
   language: string;
   surface: ShopAssistantSurface;
+  channel?: 'web' | 'whatsapp';
   signed_in: boolean;
   listing_id: string | null;
   created_at: string;

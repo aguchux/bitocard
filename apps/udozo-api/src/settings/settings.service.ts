@@ -166,6 +166,11 @@ export const switchDefinitions = {
     description:
       "Udozo on WhatsApp: buyers and sellers find listings, chat (relayed through Udozo's number, so neither sees the other's), post ads and make requests from WhatsApp, and get notices there. Needs the WhatsApp integration set up. Off: Udozo's number answers that it is not open there yet.",
   },
+  whatsapp_assistant: {
+    scopes: ['global', 'country'],
+    description:
+      "Anjio on WhatsApp: questions sent to Udozo's number (and Ask Anjio in its menu) are answered by the market's shop assistant, with listings to tap, within its daily limits and monthly budget. Never inside a chat between a buyer and a seller. Needs whatsapp_channel and classifieds_assistant on. Off: other words sent there are a search, as before.",
+  },
   classifieds_wanted: {
     scopes: ['global', 'country'],
     description:
@@ -263,6 +268,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_buy_orders',
   'classifieds_post_reminders',
   'whatsapp_channel',
+  'whatsapp_assistant',
   'classifieds_wanted',
   'classifieds_reviews',
   'classifieds_interaction_ratings',

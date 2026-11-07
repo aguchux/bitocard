@@ -34,6 +34,8 @@ export const whatsappTypes: ReadonlySet<string> = new Set([
   'customer.classifieds.buy_meet_reminder',
   'customer.classifieds.listing_live',
   'customer.classifieds.listing_rejected',
+  // Udozo's team answering after Anjio handed a WhatsApp conversation over.
+  'customer.support.chat_replied',
 ]);
 
 /**
@@ -83,8 +85,8 @@ export class WhatsappRelay implements OnModuleInit {
     } else {
       await this.outbox.queue(contact.id, { type: 'text', body: words.forwarded(event.listingTitle, event.senderName, event.body) }, options);
     }
-    // Their plain replies go to this chat while they are not in another menu.
-    await this.prisma.whatsappContact.updateMany({ where: { id: contact.id, OR: [{ flow: null }, { flow: 'chat' }] }, data: { activeConversationId: event.conversationId, flow: 'chat', flowState: { conversationId: event.conversationId }, flowUpdatedAt: new Date() } });
+    // Their plain replies go to this chat while they are not selling or making a request (searching and asking Anjio give way).
+    await this.prisma.whatsappContact.updateMany({ where: { id: contact.id, OR: [{ flow: null }, { flow: { in: ['chat', 'find', 'ask'] } }] }, data: { activeConversationId: event.conversationId, flow: 'chat', flowState: { conversationId: event.conversationId }, flowUpdatedAt: new Date() } });
   }
 
   /** New notifications of the WhatsApp types, to customers who connected WhatsApp and did not turn the type off. */

@@ -20,6 +20,7 @@ export const words = {
     '• Chat: messages go through Udozo, so nobody sees your number. Reply to a message to answer that chat.',
     '• Sell: SELL posts an ad step by step (photos too).',
     '• Request: WANT tells sellers what you need.',
+    '• Ask: questions about buying, selling and safety are answered by Udozo’s AI assistant, where it answers here. It can make mistakes.',
     'Send MENU for the menu, CANCEL to stop what you are doing, STOP for no more messages. Never send codes or pay before you see the item.',
   ].join('\n'),
   notOpen: 'Udozo is not on WhatsApp in your country yet. You can still use udozo.com.',
@@ -150,4 +151,19 @@ export const words = {
   wantedNoListings: 'You have no live listing in that category to answer with. Post one with SELL, then answer.',
   wantedAnswered: 'Done: the buyer has your listing, and your chat with them is open.',
   wantedResponse: (words: string, title: string, name: string) => `${name} answered your request for "${words}" with: *${title}*`,
+
+  // Anjio, Udozo's AI assistant
+  askRow: (name: string): Row => ({ id: 'menu:ask', title: `Ask ${name}`, description: 'Questions about buying, selling and staying safe' }),
+  askIntro: (name: string) => `Ask ${name}, Udozo's AI assistant, anything about buying and selling on Udozo: what to look for, prices, Safe pay, staying safe. ${name} can make mistakes, and never asks for codes or payments. Send MENU to leave.`,
+  anjioListings: 'Here is what I found:',
+  anjioSafePay: (price: string, fee: string, total: string) => `*Safe pay*\nPrice: ${price}\nSafe pay fee: ${fee}\nTotal: ${total}`,
+  anjioPriceRange: (category: string, low: string, high: string, median: string, count: number) => `*Prices for ${category}*: most between ${low} and ${high} (middle ${median}), from ${count} listings. Not a valuation.`,
+  anjioChecklist: '*Before you pay, check:*',
+  anjioDraft: (title: string, text: string) => `A first message to the seller of *${title}*:\n\n${text}`,
+  anjioDraftSent: (title: string) => `Sent to the seller of "${title}". Their replies come here.`,
+  anjioDraftGone: 'That is from an earlier conversation. Ask again, or send MENU.',
+  anjioPerson: 'Want a person from Udozo’s team to help?',
+  anjioPersonSignIn: 'A person from Udozo’s team can help once your Udozo account is connected: open udozo.com, Profile > WhatsApp.',
+  anjioHandedOver: 'Done: a person from Udozo’s team has this conversation and will answer you. You will hear here.',
+  anjioNothing: (name: string) => `${name} has no answer to that. Try asking another way, or send MENU.`,
 };

@@ -329,7 +329,7 @@ function Thread({ bot, thread, onClose }: { bot: SupportBot; thread: string; onC
       <QueryView query={query} loading={<Skeleton className="h-40 w-full" />}>
         {data => (
           <ol className="space-y-3">
-            <li className="text-xs text-muted">{`${data.country} · ${languageLabel(data.language)} · ${data.surface} · ${data.signed_in ? "signed in" : "visitor"} · ${new Date(data.created_at).toLocaleString("en-GB")}`}</li>
+            <li className="text-xs text-muted">{`${data.country} · ${languageLabel(data.language)} · ${data.surface}${data.channel === "whatsapp" ? " · via WhatsApp" : ""} · ${data.signed_in ? "signed in" : "visitor"} · ${new Date(data.created_at).toLocaleString("en-GB")}`}</li>
             {data.messages.map(message => (
               <li key={message.id} className="space-y-2">
                 {message.role === "assistant" && message.body ? (
@@ -384,7 +384,7 @@ function Conversations({ bot }: { bot: SupportBot }) {
           empty="No conversations yet."
           columns={[
             { key: "question", header: "First question", cell: row => <span className="line-clamp-2">{row.first_question ?? "—"}</span> },
-            { key: "where", header: "Where", cell: row => `${row.country} · ${row.surface}${row.signed_in ? "" : " · visitor"}`, hideOnMobile: true },
+            { key: "where", header: "Where", cell: row => `${row.country} · ${row.surface}${row.channel === "whatsapp" ? " · via WhatsApp" : ""}${row.signed_in ? "" : " · visitor"}`, hideOnMobile: true },
             { key: "flags", header: "", cell: row => [row.reported ? `${row.reported} reported` : null, row.down ? `${row.down} 👎` : null, row.up ? `${row.up} 👍` : null].filter(Boolean).join(" · ") },
             { key: "when", header: "Last message", cell: row => new Date(row.last_message_at).toLocaleString("en-GB"), hideOnMobile: true },
           ]}

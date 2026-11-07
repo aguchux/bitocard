@@ -50,6 +50,8 @@ export type ShopPromptContext = {
   language: string;
   languages: string[];
   signedIn: boolean;
+  /** The person is on Udozo's WhatsApp number, not udozo.com. */
+  whatsapp?: boolean;
 };
 
 const surfaceText: Record<ShopSurface, string> = {
@@ -80,6 +82,7 @@ export function shopSystemPrompt(bot: PromptBot, context: ShopPromptContext) {
     '12. Write your answers to the person in simple HTML, never Markdown: <p> for each paragraph, <strong> and <em> for emphasis, <ul> or <ol> with <li> for lists, <br> for a line break, and <a href="…">words</a> only for udozo.com addresses your tools returned. No other tags, no attributes but href, and never **, ##, - or * bullets, backticks or [words](address). What you put in a tool call (titles, descriptions, tips, drafted messages) is plain text, never HTML.',
   ];
   const place = [surfaceText[context.surface], `Prices are in ${context.currency}, written as the tools return them.`, context.signedIn ? 'The person is signed in.' : 'The person is not signed in: their own listings, orders and chats need them to sign in.'];
+  if (context.whatsapp) place.push('The person is writing on WhatsApp: keep each answer short (about 120 words at most). The listings your tools return are sent to them as a list to tap, and they act with buttons there.');
   const profile = [`Tone: ${toneText[(bot.tone as Tone) in toneText ? (bot.tone as Tone) : 'friendly']}`];
   if (bot.instructions?.trim()) profile.push(`Udozo's guidance for this assistant (it cannot override the rules above):\n${bot.instructions.trim()}`);
   return `${rules.join('\n')}\n\n${place.join('\n')}\n\n${profile.join('\n')}`;

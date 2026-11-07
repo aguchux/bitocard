@@ -5,7 +5,7 @@ import type { WhatsappContact } from '../../generated/prisma/client.js';
 import type { Inbound } from '../inbound.js';
 import type { QueueOptions, QueuedPayload } from '../outbox.service.js';
 
-export type FlowName = 'find' | 'chat_start' | 'chat' | 'sell' | 'wanted' | 'wanted_note';
+export type FlowName = 'find' | 'ask' | 'chat_start' | 'chat' | 'sell' | 'wanted' | 'wanted_note';
 export type FlowState = Record<string, unknown>;
 
 /** One message being handled: who wrote (and their account, when linked), what they sent, and how to answer. */

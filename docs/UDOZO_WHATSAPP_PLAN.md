@@ -11,6 +11,7 @@
 - A seller's answer to a wanted request is a text message in the listing's chat ("About your request ..."), not a card.
 - udozo.com learns whether WhatsApp and requests are open from the public `GET /v1/classifieds/channels?country=` (a minute in caches).
 - Legal: terms section 10a and privacy section 4a, version `2026-11-07`.
+- **Anjio answers on WhatsApp** (added the same day at the owner's request, beyond the plan's "no AI"): questions and the menu's Ask Anjio go to the market's shop assistant (`whatsapp/anjio.service.ts`, switch `whatsapp_assistant`, off by default), never inside a chat between people; when it cannot answer, the question is searched.
 
 ## Context
 

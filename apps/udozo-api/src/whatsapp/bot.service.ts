@@ -9,6 +9,7 @@ import { ConversationsService } from '../classifieds/conversations.service.js';
 import { FavouritesService } from '../classifieds/favourites.service.js';
 import { conditionName, isOnShop, priceText } from '../classifieds/rules.js';
 import { ListingSearchService } from '../classifieds/search.service.js';
+import { WhatsappAnjio, looksLikeQuestion, searchWordsOf } from './anjio.service.js';
 import { WhatsappContactsService, linkCodeIn } from './contacts.service.js';
 import { type Inbound } from './inbound.js';
 import { words } from './messages.js';
@@ -46,6 +47,7 @@ export class WhatsappBot {
     private readonly favourites: FavouritesService,
     private readonly sell: SellFlow,
     private readonly wanted: WantedFlow,
+    private readonly anjio: WhatsappAnjio,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -147,6 +149,9 @@ export class WhatsappBot {
     switch (ctx.contact.flow) {
       case 'find':
         return this.find(ctx, text, 0);
+      case 'ask':
+        if (ctx.input.kind !== 'text') return ctx.say({ type: 'text', body: words.photoUnsupported });
+        return this.ask(ctx, text);
       case 'chat_start':
         return this.startChat(ctx);
       case 'chat':
@@ -158,8 +163,8 @@ export class WhatsappBot {
     }
     if (ctx.input.kind === 'image') return ctx.say({ type: 'text', body: words.photoUnsupported });
     if (ctx.input.kind === 'other') return ctx.say({ type: 'text', body: words.photoUnsupported });
-    // Words with nothing going on: a search.
-    if (text.length >= 3) return this.find(ctx, text, 0);
+    // Words with nothing going on: a question for Anjio where it answers here, else a search.
+    if (text.length >= 3) return looksLikeQuestion(text) ? this.ask(ctx, text) : this.find(ctx, text, 0);
     return this.menu(ctx);
   }
 
@@ -178,6 +183,7 @@ export class WhatsappBot {
         if (id === 'sell') return this.sell.start(ctx);
         if (id === 'chats') return this.myChats(ctx);
         if (id === 'help') return ctx.say({ type: 'text', body: words.help });
+        if (id === 'ask') return this.startAsking(ctx);
         return this.menu(ctx);
       case 'find':
         return this.find(ctx, String(ctx.state.words ?? ''), Number(ctx.state.offset ?? 0) + resultsPerPage);
@@ -208,6 +214,10 @@ export class WhatsappBot {
         return this.wanted.show(ctx, id!);
       case 'wresp':
         return this.wanted.respond(ctx, id!, action!);
+      case 'adraft':
+        return this.anjio.sendDraft(ctx, id!, Number(action));
+      case 'aperson':
+        return this.anjio.person(ctx, id!);
       default:
         return this.menu(ctx);
     }
@@ -218,7 +228,27 @@ export class WhatsappBot {
   private async menu(ctx: BotContext) {
     await ctx.setFlow(null);
     const name = ctx.customer?.firstName ?? ctx.contact.profileName?.split(' ')[0] ?? null;
-    return ctx.say({ type: 'list', body: words.greeting(name), button: words.menuButton, rows: words.menuRows });
+    const anjio = await this.anjio.menuName(ctx.country);
+    const rows = anjio ? [words.menuRows[0]!, words.askRow(anjio), ...words.menuRows.slice(1)] : words.menuRows;
+    return ctx.say({ type: 'list', body: words.greeting(name), button: words.menuButton, rows });
+  }
+
+  // ---- Anjio ----
+
+  /** Ask Anjio from the menu: what they write next goes to Anjio until MENU (a search where Anjio is not answering). */
+  private async startAsking(ctx: BotContext) {
+    const name = await this.anjio.menuName(ctx.country);
+    if (!name) return this.askWords(ctx);
+    await ctx.setFlow('ask', {});
+    return ctx.say({ type: 'text', body: words.askIntro(name) });
+  }
+
+  /** A question for Anjio; where it is not answering here, the words are searched instead. */
+  private async ask(ctx: BotContext, question: string) {
+    const outcome = await this.anjio.ask(ctx, question, () => this.outbox.cloud().typing(ctx.input.wamid));
+    if (outcome === 'search') return this.find(ctx, searchWordsOf(question) || question, 0);
+    // Follow-up questions carry on the conversation.
+    if (ctx.contact.flow !== 'ask') await ctx.setFlow('ask', {});
   }
 
   private async link(ctx: BotContext, code: string) {

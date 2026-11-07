@@ -145,7 +145,7 @@ export class ShopAssistantService {
   }
 
   /** Starts a conversation. A visitor without a token gets one, once (their store's server keeps it in a cookie). */
-  async start(asker: Asker, input: { country: string; language?: string; surface: ShopSurface; listing_id?: string; conversation_id?: string }) {
+  async start(asker: Asker, input: { country: string; language?: string; surface: ShopSurface; listing_id?: string; conversation_id?: string; channel?: 'web' | 'whatsapp' }) {
     this.checkAsker(asker);
     const country = input.country.toUpperCase();
     if (!(await this.open(country))) throw unavailable();
@@ -174,6 +174,7 @@ export class ShopAssistantService {
         surface: input.surface,
         listingId: input.listing_id ?? null,
         conversationId: input.conversation_id ?? null,
+        channel: input.channel ?? 'web',
       },
     });
     return { ...(await this.present(thread, bot)), ...(visitorToken && visitorToken !== asker.visitorToken ? { visitor_token: visitorToken } : {}) };
@@ -231,9 +232,9 @@ export class ShopAssistantService {
 
   // -- Answering ------------------------------------------------------------------------------------------------
 
-  private async scopeFor(thread: Pick<AssistantThread, 'country' | 'surface' | 'listingId' | 'conversationId'>, bot: SupportBot, customer: CustomerWithStore | null): Promise<ToolScope> {
+  private async scopeFor(thread: Pick<AssistantThread, 'country' | 'surface' | 'listingId' | 'conversationId'> & { channel?: string }, bot: SupportBot, customer: CustomerWithStore | null): Promise<ToolScope> {
     const market = await this.prisma.country.findUnique({ where: { code: thread.country }, select: { currency: true } });
-    return { country: thread.country, currency: market?.currency ?? 'NGN', surface: thread.surface as ShopRole, roles: bot.roles, customer, listingId: thread.listingId, conversationId: thread.conversationId };
+    return { country: thread.country, currency: market?.currency ?? 'NGN', surface: thread.surface as ShopRole, roles: bot.roles, customer, listingId: thread.listingId, conversationId: thread.conversationId, channel: thread.channel === 'whatsapp' ? 'whatsapp' : 'web' };
   }
 
   private async system(bot: SupportBot, scope: ToolScope, language: string) {
@@ -246,6 +247,7 @@ export class ShopAssistantService {
       language: languageName(language),
       languages: bot.languages.map(languageName),
       signedIn: Boolean(scope.customer),
+      whatsapp: scope.channel === 'whatsapp',
     });
   }
 

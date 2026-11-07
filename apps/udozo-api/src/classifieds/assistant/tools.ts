@@ -25,6 +25,8 @@ export type ToolScope = {
   listingId: string | null;
   /** The chat it was opened from (reply suggestions): only for a participant. */
   conversationId: string | null;
+  /** Where the conversation is held: udozo.com, or Udozo's WhatsApp number (shorter answers). */
+  channel?: 'web' | 'whatsapp';
 };
 
 /** What the person sees beside the answer, drawn from tool results only. */

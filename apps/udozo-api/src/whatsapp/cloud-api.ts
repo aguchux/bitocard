@@ -208,6 +208,11 @@ export class WhatsappCloud {
     await this.call('POST', `${this.config.WHATSAPP_PHONE_NUMBER_ID?.trim()}/messages`, { messaging_product: 'whatsapp', status: 'read', message_id: wamid });
   }
 
+  /** Marks a message read and shows "typing…" to them while an answer is written (Meta clears it on the reply, or after 25 seconds). */
+  async typing(wamid: string) {
+    await this.call('POST', `${this.config.WHATSAPP_PHONE_NUMBER_ID?.trim()}/messages`, { messaging_product: 'whatsapp', status: 'read', message_id: wamid, typing_indicator: { type: 'text' } });
+  }
+
   /** A photo they sent: its address (valid a few minutes) is read first, then its bytes, at most `maxBytes`. */
   async media(mediaId: string, maxBytes = 5 * 1024 * 1024) {
     const info = await this.call<{ url?: string; mime_type?: string; file_size?: number }>('GET', encodeURIComponent(mediaId));
