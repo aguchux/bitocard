@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, X } from "lucide-react";
-import { coverImage } from "@bitocard/ui/image";
+import { coverCrop, coverImage, coverSize } from "@bitocard/ui/image";
 import { AvatarForm } from "@/components/account/avatar-form";
 import { removeBanner } from "@/lib/avatar-actions";
 import { sendPicture } from "@/lib/picture-client";
@@ -60,6 +60,16 @@ export function PhotoButton({ name, url }: { name: string; url: string | null })
 /** Which way a picture of this shape moves inside the 4:1 cover: up and down for most, sideways for a very wide one. */
 export const coverAxis = (width: number, height: number) => (height > 0 && width / height > 4 ? "x" : "y");
 
+/** The smallest cover Udozo takes (its `banner_too_small`), after the picture is cut to 4:1. */
+export const coverMinimum = { width: 600, height: 150 } as const;
+
+/** Why a picture of `width` × `height` cannot be a cover once cut to 4:1, or null when it can. */
+export function coverProblem(width: number, height: number) {
+  const crop = coverCrop(width, height);
+  if (crop.width >= coverMinimum.width && crop.height >= coverMinimum.height) return null;
+  return `That picture is too small: cut to 4:1 it is ${crop.width} × ${crop.height} pixels. Choose one at least ${coverMinimum.width} × ${coverMinimum.height}, best ${coverSize.width} × ${coverSize.height}.`;
+}
+
 /**
  * On the seller's own page: **Edit cover** on the banner. Choose a picture, slide it to the part that shows (it is cut to
  * 4:1, as wide as the page), save it (made 1600 × 400 at most in the browser, stored through this site with Udozo's signed
@@ -75,6 +85,7 @@ export function CoverButton({ url }: { url: string | null }) {
   const [focus, setFocus] = useState(50);
   const [busy, setBusy] = useState<"save" | "remove" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tooSmall, setTooSmall] = useState<string | null>(null);
 
   // The chosen picture's address on this device, let go when another is chosen or the editor closes.
   const previewRef = useRef<string | null>(null);
@@ -90,6 +101,7 @@ export function CoverButton({ url }: { url: string | null }) {
     showPreview(null);
     setFocus(50);
     setError(null);
+    setTooSmall(null);
     if (input.current) input.current.value = "";
   };
 
@@ -99,12 +111,13 @@ export function CoverButton({ url }: { url: string | null }) {
     if (!accepted.split(",").includes(chosen.type)) return setError("Choose a JPEG, PNG or WebP picture.");
     if (chosen.size > 20 * 1024 * 1024) return setError("That picture is too large. Choose one under 20 MB.");
     setFocus(50);
+    setTooSmall(null);
     setFile(chosen);
     showPreview(chosen);
   };
 
   const save = async () => {
-    if (!file) return;
+    if (!file || tooSmall) return;
     setBusy("save");
     setError(null);
     try {
@@ -146,7 +159,10 @@ export function CoverButton({ url }: { url: string | null }) {
         <ImagePlus className="size-4" aria-hidden="true" /> {url ? "Edit cover" : "Add a cover"}
       </button>
       <Sheet dialog={dialog} title="Your page's cover" onClose={reset}>
-        <p className="text-sm text-navy-600">A wide picture across the top of your page: your shop, your goods or your logo. It is cut to fit, about four times as wide as it is tall.</p>
+        <p className="text-sm text-navy-600">A wide picture across the top of your page: your shop, your goods or your logo. It is cut to fit, four times as wide as it is tall.</p>
+        <p className="rounded-xl bg-navy-50 px-3 py-2 text-sm text-navy-700">
+          <strong className="font-semibold text-navy-900">Best size: {coverSize.width} × {coverSize.height} pixels</strong> (4:1). At least {coverMinimum.width} × {coverMinimum.height} pixels. JPEG, PNG or WebP, up to 20 MB.
+        </p>
         <div className="relative aspect-[4/1] overflow-hidden rounded-2xl bg-gradient-to-br from-navy-900 via-navy-700 to-brand-600 ring-1 ring-navy-200">
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element -- the saved cover, or a picture chosen on this device before upload.
@@ -155,7 +171,12 @@ export function CoverButton({ url }: { url: string | null }) {
               alt={preview ? "Your new cover" : "Your cover"}
               className="size-full object-cover"
               style={preview ? { objectPosition: axis === "x" ? `${focus}% 50%` : `50% ${focus}%` } : undefined}
-              onLoad={event => preview && setAxis(coverAxis(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight))}
+              onLoad={event => {
+                if (!preview) return;
+                const { naturalWidth, naturalHeight } = event.currentTarget;
+                setAxis(coverAxis(naturalWidth, naturalHeight));
+                setTooSmall(coverProblem(naturalWidth, naturalHeight));
+              }}
             />
           ) : (
             <span className="grid size-full place-items-center text-sm font-semibold text-white/80">Udozo&apos;s banner</span>
@@ -173,7 +194,7 @@ export function CoverButton({ url }: { url: string | null }) {
             <input ref={input} type="file" accept={accepted} className="sr-only" disabled={busy !== null} onChange={event => choose(event.target.files?.[0])} />
           </label>
           {file ? (
-            <button type="button" onClick={() => void save()} disabled={busy !== null} className="inline-flex min-h-11 items-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white disabled:opacity-60">
+            <button type="button" onClick={() => void save()} disabled={busy !== null || Boolean(tooSmall)} className="inline-flex min-h-11 items-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white disabled:opacity-60">
               {busy === "save" ? "Saving…" : "Save cover"}
             </button>
           ) : null}
@@ -187,9 +208,9 @@ export function CoverButton({ url }: { url: string | null }) {
             </button>
           ) : null}
         </div>
-        {error ? (
+        {error || tooSmall ? (
           <p role="alert" className="text-sm text-brand-700">
-            {error}
+            {error ?? tooSmall}
           </p>
         ) : null}
       </Sheet>

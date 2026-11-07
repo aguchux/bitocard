@@ -5,7 +5,9 @@ import { coverCrop, coverSize } from "@bitocard/ui/image";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/ng/seller/chinedu", useSearchParams: () => new URLSearchParams() }));
 
-const { coverAxis } = await import("@/components/seller-edit");
+const { coverAxis, coverMinimum, coverProblem, CoverButton } = await import("@/components/seller-edit");
+const { createElement } = await import("react");
+const { renderToStaticMarkup } = await import("react-dom/server");
 const { usernameLine } = await import("@/lib/username");
 
 describe("the cover", () => {
@@ -20,6 +22,23 @@ describe("the cover", () => {
     expect(coverCrop(3000, 500, 2)).toEqual({ x: 1000, y: 0, width: 2000, height: 500 });
     expect(coverCrop(0, 500)).toEqual({ x: 0, y: 0, width: 0, height: 0 });
     expect([coverAxis(2000, 1500), coverAxis(3000, 500), coverAxis(800, 200)]).toEqual(["y", "x", "y"]);
+  });
+});
+
+describe("the cover's size", () => {
+  test("is said in the editor, and a picture too small once cut to 4:1 is refused before it is sent", () => {
+    const html = renderToStaticMarkup(createElement(CoverButton, { url: null }));
+    expect(html).toContain("Best size: 1600 × 400 pixels");
+    expect(html).toContain("At least 600 × 150 pixels");
+    expect(coverMinimum).toEqual({ width: 600, height: 150 });
+    expect(coverProblem(1600, 400)).toBeNull();
+    expect(coverProblem(600, 150)).toBeNull();
+    // 800 × 600 is cut to 800 × 200: wide enough and tall enough.
+    expect(coverProblem(800, 600)).toBeNull();
+    // 500 × 500 is cut to 500 × 125.
+    expect(coverProblem(500, 500)).toContain("500 × 125");
+    // A thin panorama, 3000 × 120, keeps only 480 × 120.
+    expect(coverProblem(3000, 120)).toContain("480 × 120");
   });
 });
 
