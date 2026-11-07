@@ -216,6 +216,7 @@ export const notificationTypes = {
   'customer.classifieds.out_of_stock': { realm: 'customer', severity: 'warning', label: 'Your ad is out of stock', push: true },
   'customer.classifieds.post_reminder': { realm: 'customer', severity: 'info', label: 'Reminders to finish and post your ad', push: true },
   'customer.classifieds.avatar_removed': { realm: 'customer', severity: 'warning', label: 'Udozo removed your profile photo', push: true },
+  'customer.classifieds.banner_removed': { realm: 'customer', severity: 'warning', label: 'Udozo removed your profile cover', push: true },
   'customer.classifieds.reviews_blocked': { realm: 'customer', severity: 'warning', label: 'Reviewing paused or restored', push: true },
   'customer.classifieds.review_moderated': { realm: 'customer', severity: 'info', label: 'A review about you was removed or restored', push: true },
   'customer.classifieds.report_decided': { realm: 'customer', severity: 'info', label: 'Your report was reviewed', push: false },

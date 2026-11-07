@@ -14,6 +14,7 @@ import {
   useClearClassifiedStrikesMutation,
   usePauseSellerBuyOrdersMutation,
   useRemoveClassifiedSellerAvatarMutation,
+  useRemoveClassifiedSellerBannerMutation,
   useRemoveClassifiedSellerUsernameMutation,
   useSetClassifiedSellerSuspendedMutation,
   useUnpauseSellerBuyOrdersMutation,
@@ -26,7 +27,7 @@ import { ListingCell, ListingStatus, listingPrice, reportReasonLabels } from "@/
 import { InteractionRatingItem, tagLabel } from "@/components/interaction-ratings";
 import { SellerScoresCard } from "@/components/seller-scores";
 
-type Action = "suspend" | "unsuspend" | "clear" | "photo" | "username" | "pause" | "unpause" | "block" | "unblock";
+type Action = "suspend" | "unsuspend" | "clear" | "photo" | "cover" | "username" | "pause" | "unpause" | "block" | "unblock";
 
 /**
  * One Udozo seller: their ads, reports about them or their ads, and their Safe pay standing (strikes over 90
@@ -41,6 +42,7 @@ export default function ClassifiedSellerPage() {
   const [suspend] = useSetClassifiedSellerSuspendedMutation();
   const [clear] = useClearClassifiedStrikesMutation();
   const [removePhoto] = useRemoveClassifiedSellerAvatarMutation();
+  const [removeCover] = useRemoveClassifiedSellerBannerMutation();
   const [removeUsername] = useRemoveClassifiedSellerUsernameMutation();
   const [pause] = usePauseSellerBuyOrdersMutation();
   const [unpause] = useUnpauseSellerBuyOrdersMutation();
@@ -65,6 +67,7 @@ export default function ClassifiedSellerPage() {
     if (chosen === "unblock") return blockReviewer({ customer: id, blocked: false, reason }).unwrap();
     if (chosen === "clear") return clear({ id, reason }).unwrap();
     if (chosen === "photo") return removePhoto({ id, reason }).unwrap();
+    if (chosen === "cover") return removeCover({ id, reason }).unwrap();
     if (chosen === "username") return removeUsername({ id, reason }).unwrap();
     return suspend({ id, suspended: chosen === "suspend", reason }).unwrap();
   };
@@ -162,6 +165,22 @@ export default function ClassifiedSellerPage() {
                       </span>
                     </div>
                     <div className="mb-3 grid gap-1">
+                      {data.banner_url ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element -- the seller's checked upload on the media CDN. */}
+                          <img src={data.banner_url} alt={`${data.name}'s profile cover`} className="aspect-[4/1] w-full rounded-xl object-cover ring-1 ring-line" />
+                          <span className="text-muted">Their profile cover, across the top of their seller page.</span>
+                          {operations ? (
+                            <button type="button" onClick={() => setAction("cover")} className="w-fit text-sm font-semibold text-red-600 hover:underline">
+                              Remove cover
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="text-muted">No profile cover: Udozo&apos;s banner shows.</span>
+                      )}
+                    </div>
+                    <div className="mb-3 grid gap-1">
                       {data.username ? (
                         <span>
                           Username <span className="font-mono font-semibold text-ink">{data.username}</span>
@@ -192,13 +211,14 @@ export default function ClassifiedSellerPage() {
               <ActionDialog
                 open
                 onClose={() => setAction(null)}
-                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?`, block: `Stop ${data.name} writing reviews?`, unblock: `Let ${data.name} write reviews again?` }[action]}
+                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, cover: `Remove ${data.name}'s cover?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?`, block: `Stop ${data.name} writing reviews?`, unblock: `Let ${data.name} write reviews again?` }[action]}
                 description={
                   {
                     suspend: "They cannot post, and their live and waiting ads are removed from Udozo. Ads removed now stay removed when they come back.",
                     unsuspend: "They can post again. Ads removed while suspended stay removed.",
                     clear: "They can take Safe pay orders again. Strikes before now stop counting; new ones count from today.",
                     photo: "Their photo is deleted and their initials show instead, everywhere. They can choose another; remove it again if it is not acceptable.",
+                    cover: "Their cover is deleted and Udozo's banner shows on their seller page. They are told why and can choose another.",
                     username: `Their seller page goes back to its handle and they are told. Nobody can take "${data.username ?? ""}" for 90 days. They can choose another username; remove it again if it is not acceptable.`,
                     pause: "Buyers cannot send them new buy orders until the pause ends. Buy orders already open carry on.",
                     unpause: "Buyers can send them buy orders again at once.",
@@ -206,8 +226,8 @@ export default function ClassifiedSellerPage() {
                     unblock: "They can write reviews and reply again at once.",
                   }[action]
                 }
-                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", username: "Remove username", pause: "Pause buy orders", unpause: "Unpause buy orders", block: "Block reviewing", unblock: "Unblock" }[action]}
-                tone={action === "suspend" || action === "photo" || action === "username" || action === "pause" || action === "block" ? "danger" : "primary"}
+                confirmLabel={{ suspend: "Suspend", unsuspend: "Unsuspend", clear: "Lift the limit", photo: "Remove photo", cover: "Remove cover", username: "Remove username", pause: "Pause buy orders", unpause: "Unpause buy orders", block: "Block reviewing", unblock: "Unblock" }[action]}
+                tone={action === "suspend" || action === "photo" || action === "cover" || action === "username" || action === "pause" || action === "block" ? "danger" : "primary"}
                 onConfirm={reason => confirm(action, reason)}
               >
                 {action === "pause" ? (

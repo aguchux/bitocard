@@ -147,6 +147,15 @@ describe("a seller's page", () => {
     expect(html.querySelector('[aria-labelledby="seller-name"] img')?.getAttribute("alt")).toBe("Chinedu O.'s photo");
   });
 
+  it("shows their own cover across the top when they have one, else Udozo's banner", async () => {
+    api.profile = profile({ banner_url: "https://media.test/cover.jpg", avatar_url: "https://media.test/me.jpg" });
+    const html = await page();
+    const images = [...html.querySelectorAll('[aria-labelledby="seller-name"] img')].map(img => img.getAttribute("src"));
+    expect(images).toEqual(["https://media.test/cover.jpg", "https://media.test/me.jpg"]);
+    api.profile = profile();
+    expect((await page()).querySelector('img[src="https://media.test/cover.jpg"]')).toBeNull();
+  });
+
   it("filters by one of their categories with a sort and a page, and ignores anything else in the address", async () => {
     const html = await page("a1b2c3d4e5", { category: "tvs", sort: "price_asc", page: "2" });
     expect(api.paths).toContain("/v1/classifieds/listings?country=NG&seller=a1b2c3d4e5&sort=price_asc&limit=24&category=tvs&offset=24");

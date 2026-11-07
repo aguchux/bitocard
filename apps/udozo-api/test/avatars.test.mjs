@@ -127,7 +127,7 @@ describe('profile photos', () => {
     const seller = await customer('Chinedu Okafor');
     assert.equal((await seller.get('/v1/store/account')).json.avatar_url, null, 'initials until they add one');
     const settings = await seller.get('/v1/store/account/avatar/settings');
-    assert.deepEqual([settings.json.configured, settings.json.purposes.map(item => item.purpose)], [true, ['avatar']]);
+    assert.deepEqual([settings.json.configured, settings.json.purposes.map(item => item.purpose)], [true, ['avatar', 'profile_banner']]);
 
     const refused = await seller.post('/v1/store/account/avatar/uploads', { filename: 'me.svg', content_type: 'image/svg+xml', size: 100 });
     assert.equal(refused.json.error.code, 'unsupported_file_type', 'never an SVG');
@@ -194,6 +194,53 @@ describe('profile photos', () => {
     assert.equal((await admin.get('/v1/admin/auth/session')).json.admin.avatar_url, null);
     // An admin's photo upload is not a reseller's to use.
     assert.equal((await owner.browser.post('/v1/auth/avatar', { media_id: mine.created.json.id })).status, 404);
+  });
+
+  test('a customer puts a cover across their seller page: 4:1, at least 600 by 150, replaced and removed like their photo', async () => {
+    const seller = await customer('Kemi Adeyemi');
+    const { sellerHandle } = await prisma.customer.findUniqueOrThrow({ where: { id: seller.id } });
+    assert.equal((await storeServer().get(`/v1/classifieds/sellers/${sellerHandle}`)).json.banner_url, null, "Udozo's own banner until they add one");
+
+    const first = await upload(seller, '/v1/store/account/banner', png(1600, 400));
+    assert.equal(first.created.status, 201, JSON.stringify(first.created.json));
+    assert.equal(first.created.json.folder, `test/people/customers/${seller.id}/banners`);
+    assert.deepEqual([first.set.status, first.set.json.banner_url], [200, first.created.json.url]);
+    assert.equal((await seller.get('/v1/store/account')).json.banner_url, first.created.json.url);
+    assert.equal((await storeServer().get(`/v1/classifieds/sellers/${sellerHandle}`)).json.banner_url, first.created.json.url);
+    assert.equal((await seller.get('/v1/store/account')).json.avatar_url, null, 'the photo is untouched');
+
+    // Too small, or a profile photo's upload, is never a cover; a cover's upload is never a photo.
+    assert.equal((await upload(seller, '/v1/store/account/banner', png(500, 120))).set.json.error.code, 'banner_too_small');
+    assert.equal((await seller.post('/v1/store/account/banner/uploads', { filename: 'c.png', content_type: 'image/png', size: 4 * 1024 * 1024 })).json.error.code, 'file_too_large');
+    const photo = await seller.post('/v1/store/account/avatar/uploads', { filename: 'me.png', content_type: 'image/png', size: 64 });
+    await fetch(photo.json.upload.url, { method: 'PUT', headers: photo.json.upload.headers, body: png(1600, 400) });
+    assert.equal((await seller.post('/v1/store/account/banner', { media_id: photo.json.id })).status, 404);
+    assert.equal((await seller.post('/v1/store/account/avatar', { media_id: first.created.json.id })).status, 404);
+
+    // A new one replaces it (the old file deleted); removing it brings Udozo's banner back.
+    const firstKey = `test/people/customers/${seller.id}/banners/${first.created.json.id}.png`;
+    assert.ok(spaces.objects.has(firstKey));
+    const second = await upload(seller, '/v1/store/account/banner', png(2000, 500));
+    assert.equal(second.set.json.banner_url, second.created.json.url);
+    assert.ok(!spaces.objects.has(firstKey), 'the old cover is gone from storage');
+    const removed = await seller.del('/v1/store/account/banner');
+    assert.deepEqual([removed.status, removed.json.banner_url], [200, null]);
+    assert.equal(await prisma.mediaAsset.count({ where: { purpose: 'profile_banner', uploadedById: seller.id } }), 0);
+
+    // Seller HQ's people have no cover.
+    const owner = await resellerClient(server);
+    assert.equal((await owner.browser.post('/v1/auth/banner/uploads', { filename: 'c.png', content_type: 'image/png', size: 64 })).status, 404);
+  });
+
+  test('operations take a seller’s cover off, audited, and the seller is told', async () => {
+    const seller = await customer('Tunde Bakare');
+    const { set } = await upload(seller, '/v1/store/account/banner', png(1600, 400));
+    assert.equal((await admin.get(`/v1/admin/classifieds/sellers/${seller.id}`)).json.banner_url, set.json.banner_url);
+    const removed = await admin.post(`/v1/admin/classifieds/sellers/${seller.id}/banner/remove`, { reason: 'Shows a phone number' });
+    assert.deepEqual([removed.status, removed.json.banner_url], [200, null]);
+    assert.equal((await seller.get('/v1/store/account')).json.banner_url, null);
+    assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.seller_banner_removed', targetId: seller.id } }), 1);
+    assert.equal(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.classifieds.banner_removed' } }), 1);
   });
 
   test('operations take a seller’s photo off, audited', async () => {

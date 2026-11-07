@@ -362,6 +362,32 @@ export class CustomerAccountController {
     return { object, avatar_url };
   }
 
+  /** Udozo: a signed link to send a profile cover (the wide picture across their seller page, 4:1) to storage; then `POST banner`. */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Post('banner/uploads')
+  bannerUpload(@CurrentCustomer() caller: CustomerCaller, @Body() body: AvatarUploadDto) {
+    return this.avatars.startUpload({ kind: 'customer', id: caller.customer.id }, body, 'banner');
+  }
+
+  /** Udozo: checks the uploaded cover (at least 600 by 150 pixels) and puts it across the top of their seller page. */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Post('banner')
+  @HttpCode(HttpStatus.OK)
+  setBanner(@CurrentCustomer() caller: CustomerCaller, @Body() body: AvatarSetDto) {
+    return this.avatars.set({ kind: 'customer', id: caller.customer.id }, body.media_id, 'banner');
+  }
+
+  /** Udozo: takes the cover off; Udozo's own banner shows again. */
+  @ProductOnly('udozo')
+  @UseGuards(CustomerGuard)
+  @Delete('banner')
+  async removeBanner(@CurrentCustomer() caller: CustomerCaller) {
+    const { object, banner_url } = await this.avatars.removeBanner({ kind: 'customer', id: caller.customer.id });
+    return { object, banner_url };
+  }
+
   /**
    * Udozo: "Continue with Google", step 1 (udozo.com's server): Google's consent address and the one-time state to keep
    * until Google returns. `signup` makes an account at the end; `signin` only signs one in.

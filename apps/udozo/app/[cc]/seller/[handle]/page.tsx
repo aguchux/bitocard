@@ -10,11 +10,12 @@ import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
 import { SellerContactPanel } from "@/components/seller-contact";
 import { SellerShare } from "@/components/seller-share";
+import { CoverButton, PhotoButton } from "@/components/seller-edit";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, siteOrigin } from "@/lib/customer";
 import { gifSizes, sellerCardUrl } from "@/lib/seller-card";
 import { isSellerKey, placesText, queryString, readSellerFilters, sellerHref, sellerListingsQuery, sellerPageSize, sellerSortLabels, sellerSorts, sellerStats, sinceText } from "@/lib/seller";
-import { usernameNudge } from "@/lib/username";
+import { usernameLine } from "@/lib/username";
 import { ReviewCard, ReviewSummaryBar } from "@/components/reviews/review-view";
 import { AnjioView } from "@/components/scores/anjio-view";
 import { readReviewFilters, reviewPath, reviewsHref, reviewPageSize, sellerReviewsQuery, summaryText } from "@/lib/reviews";
@@ -104,7 +105,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
     firstViewer?.conversation_id ? customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${firstViewer.conversation_id}`) : null,
     own && !profile.username ? customerApi<UsernameStatus>("GET", "/v1/store/account/username") : null,
   ]);
-  const nudge = usernameStatus?.ok ? usernameNudge(usernameStatus.data) : null;
+  const named = usernameLine(profile.username, own, usernameStatus?.ok ? usernameStatus.data : null);
 
   const path = sellerPath(cc, slug);
   const origin = siteOrigin();
@@ -125,21 +126,53 @@ export default async function SellerPage({ params, searchParams }: Props) {
       </div>
 
       <section aria-labelledby="seller-name" className="overflow-hidden border-navy-200 bg-white sm:mt-4 sm:rounded-3xl sm:border">
-        <div className="relative h-28 overflow-hidden bg-gradient-to-br from-navy-900 via-navy-700 to-brand-600 sm:h-36" aria-hidden="true">
-          <span className="absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
-          <span className="absolute -bottom-20 left-1/3 size-48 rounded-full bg-brand-400/20" />
-          <span className="absolute top-6 left-8 size-16 rounded-full border border-white/15" />
+        {/* Their own cover (4:1, as wide as the page), else Udozo's drawn banner. */}
+        <div className={`relative overflow-hidden bg-gradient-to-br from-navy-900 via-navy-700 to-brand-600 ${profile.banner_url ? "aspect-[4/1] max-h-72 min-h-28 w-full" : "h-28 sm:h-36"}`}>
+          {profile.banner_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a checked upload on the media CDN, 1600 × 400 at most.
+            <img src={profile.banner_url} alt="" className="size-full object-cover" />
+          ) : (
+            <span aria-hidden="true">
+              <span className="absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
+              <span className="absolute -bottom-20 left-1/3 size-48 rounded-full bg-brand-400/20" />
+              <span className="absolute top-6 left-8 size-16 rounded-full border border-white/15" />
+            </span>
+          )}
+          {own ? <CoverButton url={profile.banner_url ?? null} /> : null}
         </div>
         <div className="grid gap-4 px-4 pb-5 sm:px-6">
           {/* Drawn above the banner (it is positioned, so it would otherwise paint over the photo's top half). */}
           <div className="relative z-10 -mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">
-            <Avatar name={profile.name} url={profile.avatar_url} label={profile.avatar_url ? `${profile.name}'s photo` : undefined} className="size-24 text-3xl font-extrabold tracking-tight shadow-md ring-4 ring-white sm:size-28 sm:text-4xl" />
+            <span className="relative shrink-0">
+              <Avatar name={profile.name} url={profile.avatar_url} label={profile.avatar_url ? `${profile.name}'s photo` : undefined} className="size-24 text-3xl font-extrabold tracking-tight shadow-md ring-4 ring-white sm:size-28 sm:text-4xl" />
+              {own ? <PhotoButton name={profile.name} url={profile.avatar_url ?? null} /> : null}
+            </span>
             <SellerShare url={new URL(path, origin).href} name={profile.name} />
           </div>
           <div className="grid gap-2">
-            <h1 id="seller-name" className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {profile.name}
-            </h1>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 id="seller-name" className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+                {profile.name}
+              </h1>
+              {named ? (
+                <span id="seller-username" className="inline-flex flex-wrap items-center gap-x-2 text-sm">
+                  {named.username ? <span className="font-semibold text-navy-600">{named.username}</span> : null}
+                  {named.action ? (
+                    <Link
+                      href={named.action.href}
+                      className={
+                        named.username
+                          ? "font-semibold text-brand-700 hover:underline"
+                          : "inline-flex h-8 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 text-xs font-bold text-brand-700 hover:border-brand-400"
+                      }
+                    >
+                      {named.username ? null : <AtSign className="size-3.5" aria-hidden="true" />}
+                      {named.action.text}
+                    </Link>
+                  ) : null}
+                </span>
+              ) : null}
+            </div>
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-navy-600">
               <span className="inline-flex items-center gap-1.5">
                 <CalendarDays className="size-4" aria-hidden="true" /> On Udozo since {sinceText(profile.member_since)}
@@ -227,22 +260,6 @@ export default async function SellerPage({ params, searchParams }: Props) {
             </section>
           ) : null}
 
-          {nudge ? (
-            <aside aria-labelledby="username-nudge" className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-brand-700">
-                <AtSign className="size-5" aria-hidden="true" />
-              </span>
-              <span className="grid min-w-0 flex-1 basis-48 gap-0.5">
-                <strong id="username-nudge" className="text-sm">
-                  {nudge.title}
-                </strong>
-                <span className="text-sm text-navy-700">{nudge.body}</span>
-              </span>
-              <Link href={nudge.href} className="inline-flex h-10 shrink-0 items-center rounded-xl bg-navy-900 px-4 text-sm font-bold text-white">
-                {nudge.action}
-              </Link>
-            </aside>
-          ) : null}
 
           <section aria-labelledby="listings-heading" id="listings" className="scroll-mt-24">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">

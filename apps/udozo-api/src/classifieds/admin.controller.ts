@@ -240,7 +240,7 @@ const adminInclude = {
   reports: { where: { status: 'open' }, select: { id: true, reason: true, details: true, createdAt: true } },
 } satisfies Prisma.ClassifiedListingInclude;
 
-const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, avatarUrl: true, sellerHandle: true, username: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
+const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, avatarUrl: true, bannerUrl: true, sellerHandle: true, username: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
 
 /** The moderators' reads: listings with their seller (email included, admins only), flags and open reports. */
 @Injectable()
@@ -412,6 +412,8 @@ export class ClassifiedsAdminService {
       phone_confirmed: Boolean(row.phoneVerifiedAt),
       /** Their profile photo and the handle of their public seller page (`/<cc>/seller/<handle>`). */
       avatar_url: row.avatarUrl,
+      /** Their profile cover on their seller page, or null. */
+      banner_url: row.bannerUrl,
       handle: row.sellerHandle,
       /** Their chosen username (their page's address once set), or null. */
       username: row.username,
@@ -595,6 +597,19 @@ export class AdminClassifiedsController {
     await this.audit.record({ actorId: adminId(caller), action: 'classifieds.seller_avatar_removed', targetType: 'customer', targetId: customer, before: { avatar_url: row.avatar_url }, after: { avatar_url: null, reason: body.reason } });
     const seller = await this.prisma.customer.findUnique({ where: { id: customer }, select: { storeId: true } });
     if (seller) await this.inbox.customer({ customerId: customer, storeId: seller.storeId }, 'customer.classifieds.avatar_removed', { subject: `avatar_removed:${Date.now()}`, title: 'Udozo removed your profile photo', body: `Why: ${body.reason} You can choose another that follows Udozo’s rules.`, link: '/account/profile' });
+    return this.admin.seller(customer);
+  }
+
+  /** Takes a seller's profile cover off (an abusive or misleading picture): Udozo's own banner shows again; audited. */
+  @Post('sellers/:customer/banner/remove')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('operations')
+  async removeBanner(@CurrentCaller() caller: Caller, @Param('customer', ParseUUIDPipe) customer: string, @Body() body: ReasonDto) {
+    const row = await this.admin.seller(customer);
+    await this.avatars.removeBanner({ kind: 'customer', id: customer });
+    await this.audit.record({ actorId: adminId(caller), action: 'classifieds.seller_banner_removed', targetType: 'customer', targetId: customer, before: { banner_url: row.banner_url }, after: { banner_url: null, reason: body.reason } });
+    const seller = await this.prisma.customer.findUnique({ where: { id: customer }, select: { storeId: true, sellerHandle: true, username: true, country: true } });
+    if (seller) await this.inbox.customer({ customerId: customer, storeId: seller.storeId }, 'customer.classifieds.banner_removed', { subject: `banner_removed:${Date.now()}`, title: 'Udozo removed your profile cover', body: `Why: ${body.reason} You can choose another that follows Udozo’s rules.`, link: `/${seller.country?.toLowerCase() ?? 'ng'}/seller/${seller.username ?? seller.sellerHandle}` });
     return this.admin.seller(customer);
   }
 

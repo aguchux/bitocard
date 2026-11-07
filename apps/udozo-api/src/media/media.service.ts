@@ -144,7 +144,7 @@ export class MediaService {
     // admins only that product's files.
     if (!asset || asset.platform !== platformOf(actor) || (actor.realm === 'reseller' && asset.resellerId !== actor.resellerId)) throw notFound();
     // A person's own photos only: never someone else's, nor any other file.
-    if (actor.realm === 'person' && (asset.purpose !== 'avatar' || asset.uploadedById !== actor.userId)) throw notFound();
+    if (actor.realm === 'person' && (!['avatar', 'profile_banner'].includes(asset.purpose) || asset.uploadedById !== actor.userId)) throw notFound();
     return asset;
   }
 
@@ -236,10 +236,13 @@ export class MediaService {
       this.prisma.supportBot.findMany({ where: { avatarUrl: { in: urls } }, select: { name: true, avatarUrl: true } }),
       this.prisma.classifiedBrand.findMany({ where: { logoUrl: { in: urls } }, select: { slug: true, logoUrl: true } }),
       this.prisma.classifiedBanner.findMany({ where: { imageUrl: { in: urls } }, select: { id: true, position: true, imageUrl: true } }),
-      this.prisma.customer.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
+      this.prisma.customer.findMany({ where: { OR: [{ avatarUrl: { in: urls } }, { bannerUrl: { in: urls } }] }, select: { id: true, avatarUrl: true, bannerUrl: true } }),
       this.prisma.user.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
     ]);
-    for (const customer of customers) add(customer.avatarUrl, `customer:${customer.id}:avatar`);
+    for (const customer of customers) {
+      add(customer.avatarUrl, `customer:${customer.id}:avatar`);
+      add(customer.bannerUrl, `customer:${customer.id}:banner`);
+    }
     for (const person of people) add(person.avatarUrl, `user:${person.id}:avatar`);
     for (const banner of banners) add(banner.imageUrl, `banner:${banner.position}:${banner.id}`);
     for (const brand of shopBrands) add(brand.logoUrl, `marketplace_brand:${brand.slug}`);

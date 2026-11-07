@@ -41,7 +41,7 @@ export class SellerProfilesService {
   async seller(key: string) {
     const found = await this.usernames.resolve(key);
     if (!found) throw notFound();
-    const customer = await this.prisma.customer.findUnique({ where: { id: found.customerId }, select: { id: true, name: true, country: true, status: true, createdAt: true, phoneVerifiedAt: true, phone: true, avatarUrl: true, sellerHandle: true, username: true } });
+    const customer = await this.prisma.customer.findUnique({ where: { id: found.customerId }, select: { id: true, name: true, country: true, status: true, createdAt: true, phoneVerifiedAt: true, phone: true, avatarUrl: true, bannerUrl: true, sellerHandle: true, username: true } });
     if (!customer || customer.status !== 'active') throw notFound();
     return { ...customer, redirect: found.redirect };
   }
@@ -90,6 +90,8 @@ export class SellerProfilesService {
       name: publicName(customer.name),
       /** Their profile photo (a face, logo or icon), or null for their initials. */
       avatar_url: customer.avatarUrl,
+      /** Their profile cover across the top of the page, or null (Udozo's own banner). */
+      banner_url: customer.bannerUrl,
       country,
       url: `${shopOrigin}/${country.toLowerCase()}/seller/${customer.username ?? handle}`,
       member_since: customer.createdAt.toISOString(),

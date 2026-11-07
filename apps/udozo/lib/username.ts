@@ -121,3 +121,13 @@ export function usernameChecker<T>(ask: (value: string) => Promise<T>, answer: (
     },
   };
 }
+
+/**
+ * What goes beside a seller's name on their page: their `@username` for everyone; on their own page also **Change**,
+ * or, with none yet, **Choose a username** (or how many ads first). Null when there is nothing to show.
+ */
+export function usernameLine(username: string | null | undefined, own: boolean, status: Pick<UsernameStatus, "eligible" | "posted" | "required"> | null) {
+  if (username) return { username: `@${username}`, action: own ? { text: "Change", href: usernameScreen } : null };
+  if (!own) return null;
+  return { username: null, action: { text: !status || status.eligible ? "Choose a username" : moreAdsText(status), href: usernameScreen } };
+}

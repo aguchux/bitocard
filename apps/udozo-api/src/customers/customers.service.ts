@@ -57,6 +57,7 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     personalisation: !customer.personalisationOffAt,
     /** Udozo: their profile photo, or null for their initials. */
     avatar_url: customer.avatarUrl ?? null,
+    banner_url: customer.bannerUrl ?? null,
     /** Udozo: their chosen username (their seller page's address), or null until they choose one. */
     username: customer.username ?? null,
     /** Udozo: the random handle of their seller page (its address until they choose a username), so their own page knows them. */

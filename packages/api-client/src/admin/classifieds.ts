@@ -199,6 +199,8 @@ export type ClassifiedSeller = {
   phone_confirmed: boolean;
   /** Udozo: their profile photo and the handle of their public seller page (`/<cc>/seller/<handle>`). */
   avatar_url?: string | null;
+  /** Their profile cover on their seller page, or null (Udozo's own banner). */
+  banner_url?: string | null;
   handle?: string;
   /** Udozo: the username they chose for their seller page (`/<cc>/seller/<username>`), or null. */
   username?: string | null;
@@ -551,6 +553,11 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/avatar/remove`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, { type: 'ClassifiedSeller', id: 'LIST' }, 'Activity'],
     }),
+    /** Takes a seller's profile cover off (Udozo's own banner shows again), with why; audited and the seller told. */
+    removeClassifiedSellerBanner: build.mutation<unknown, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/banner/remove`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedSeller', id }, { type: 'ClassifiedSeller', id: 'LIST' }, 'Activity'],
+    }),
     /** Takes a seller's username away (their page goes back to its handle), with why; audited. */
     removeClassifiedSellerUsername: build.mutation<unknown, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/v1/admin/classifieds/sellers/${encodeURIComponent(id)}/username/remove`, method: 'POST', body: { reason } }),
@@ -782,6 +789,7 @@ export const {
   useSetClassifiedSellerSuspendedMutation,
   useClearClassifiedStrikesMutation,
   useRemoveClassifiedSellerAvatarMutation,
+  useRemoveClassifiedSellerBannerMutation,
   useRemoveClassifiedSellerUsernameMutation,
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,

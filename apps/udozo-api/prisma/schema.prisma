@@ -2669,6 +2669,9 @@ model Customer {
   /// Udozo: their profile photo (a face, logo or icon), the public address of a checked upload (`AvatarsService`); null
   /// shows their initials.
   avatarUrl                 String?                   @map("avatar_url")
+  /// Udozo: their profile cover, the wide picture across the top of their seller page (a checked upload, 4:1); null shows
+  /// Udozo's own drawn banner.
+  bannerUrl                 String?                   @map("banner_url")
   sellerHandle              String                    @unique @default(dbgenerated("substr(md5((random())::text || (clock_timestamp())::text), 1, 10)")) @map("seller_handle") @db.VarChar(12)
   /// Udozo: their chosen username (docs/UDOZO_USERNAMES_PLAN.md), stored lower-case and unique: their seller page's
   /// address once set (`/<cc>/seller/<username>`), else the handle. Changed at most once every 30 days.

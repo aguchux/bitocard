@@ -33,3 +33,27 @@ export async function removeAvatar(): Promise<AvatarResult<{ avatar_url: null }>
   revalidatePath("/", "layout");
   return { ok: true, data: { avatar_url: null } };
 }
+
+/** A signed link for the browser to send the prepared profile cover (4:1) straight to storage (10 minutes). */
+export async function startBannerUpload(file: { filename: string; content_type: string; size: number }): Promise<AvatarResult<AvatarUploadLink>> {
+  if (!types.includes(file.content_type) || !(file.size > 0)) return { ok: false, message: "Choose a JPEG, PNG or WebP picture." };
+  const result = await customerApi<AvatarUploadLink>("POST", "/v1/store/account/banner/uploads", { filename: String(file.filename).slice(0, 200) || "cover.jpg", content_type: file.content_type, size: file.size });
+  return result.ok ? { ok: true, data: { id: result.data.id, upload: result.data.upload } } : { ok: false, message: result.status === 401 ? "Sign in again to carry on." : result.message };
+}
+
+/** Once it is in storage: the API checks it and puts it across the top of their seller page. */
+export async function setBanner(mediaId: string): Promise<AvatarResult<{ banner_url: string | null }>> {
+  if (!uuid.test(mediaId)) return { ok: false, message: "That upload could not be found. Try again." };
+  const result = await customerApi<{ banner_url: string | null }>("POST", "/v1/store/account/banner", { media_id: mediaId });
+  if (!result.ok) return { ok: false, message: result.message };
+  revalidatePath("/", "layout");
+  return { ok: true, data: { banner_url: result.data.banner_url } };
+}
+
+/** Takes the cover off: Udozo's own banner shows again. */
+export async function removeBanner(): Promise<AvatarResult<{ banner_url: null }>> {
+  const result = await customerApi<{ banner_url: null }>("DELETE", "/v1/store/account/banner");
+  if (!result.ok) return { ok: false, message: result.message };
+  revalidatePath("/", "layout");
+  return { ok: true, data: { banner_url: null } };
+}

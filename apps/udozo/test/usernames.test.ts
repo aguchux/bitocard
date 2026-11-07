@@ -196,29 +196,45 @@ describe("share cards", () => {
 });
 
 describe("the seller's own page", () => {
-  it("offers a username to the seller with none, or says how many ads to go; never to buyers", async () => {
+  it("offers a username beside their name, or says how many ads to go; shows everyone's @username, and Change only to its owner", async () => {
     api.profile = profile({ username: null });
     api.signedIn = true;
     api.own = true;
     const before = await page("a1b2c3d4e5");
-    const card = before.querySelector('[aria-labelledby="username-nudge"]');
-    expect(card?.textContent).toContain("Post 3 more ads to choose a username");
-    expect(card?.querySelector("a")?.getAttribute("href")).toBe("/account/profile/username");
+    const line = before.querySelector("#seller-username");
+    expect(line?.textContent).toContain("Post 3 more ads to choose a username");
+    expect(line?.querySelector("a")?.getAttribute("href")).toBe("/account/profile/username");
 
     api.status = status({ eligible: true, posted: 6 });
     const ready = await page("a1b2c3d4e5");
-    expect(ready.querySelector('[aria-labelledby="username-nudge"]')?.textContent).toContain("Choose a username for a better address");
+    expect(ready.querySelector("#seller-username a")?.textContent).toBe("Choose a username");
 
     api.own = false;
     api.customerPaths = [];
-    expect((await page("a1b2c3d4e5")).querySelector('[aria-labelledby="username-nudge"]')).toBeNull();
+    expect((await page("a1b2c3d4e5")).querySelector("#seller-username")).toBeNull();
     expect(api.customerPaths).not.toContain("/v1/store/account/username");
-    // With a username already, nothing to offer (and nothing asked).
-    api.own = true;
+    // With a username already: shown to everyone, Change to its owner only (and nothing asked).
     api.profile = profile();
+    expect((await page("chinedu")).querySelector("#seller-username")?.textContent).toBe("@chinedu");
+    api.own = true;
     api.customerPaths = [];
-    expect((await page("chinedu")).querySelector('[aria-labelledby="username-nudge"]')).toBeNull();
+    const mine = (await page("chinedu")).querySelector("#seller-username");
+    expect(mine?.textContent).toContain("@chinedu");
+    expect(mine?.querySelector("a")?.textContent).toBe("Change");
     expect(api.customerPaths).not.toContain("/v1/store/account/username");
+  });
+
+  it("lets its owner change their photo and cover in place; never buyers", async () => {
+    api.signedIn = true;
+    api.own = true;
+    const mine = await page("chinedu");
+    expect(mine.querySelector('button[aria-label="Add a photo or logo"]')).not.toBeNull();
+    expect([...mine.querySelectorAll("button")].some(button => button.textContent?.includes("Add a cover"))).toBe(true);
+    expect(mine.querySelector(`dialog[aria-label="Your page's cover"]`)).not.toBeNull();
+    api.own = false;
+    const theirs = await page("chinedu");
+    expect(theirs.querySelector('button[aria-label="Add a photo or logo"]')).toBeNull();
+    expect(theirs.querySelector(`dialog[aria-label="Your page's cover"]`)).toBeNull();
   });
 });
 

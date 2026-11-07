@@ -104,3 +104,45 @@ export async function squareImage(file: Blob, fit: SquareFit = "cover", side = a
     bitmap.close();
   }
 }
+
+/** Profile covers (the wide picture across a seller page) are stored at most this size, 4:1. */
+export const coverSize = { width: 1600, height: 400 } as const;
+
+/**
+ * Which part of an image of `width` × `height` a 4:1 cover keeps: the whole width (or height, for a very wide picture),
+ * cut to 4:1 and moved by `focus` (0 the top or left edge, 0.5 the middle, 1 the bottom or right edge).
+ */
+export function coverCrop(width: number, height: number, focus = 0.5) {
+  if (!(width > 0) || !(height > 0)) return { x: 0, y: 0, width: 0, height: 0 };
+  const ratio = coverSize.width / coverSize.height;
+  const at = Math.min(1, Math.max(0, Number.isFinite(focus) ? focus : 0.5));
+  if (width / height > ratio) {
+    const w = Math.round(height * ratio);
+    return { x: Math.round((width - w) * at), y: 0, width: w, height };
+  }
+  const h = Math.round(width / ratio);
+  return { x: 0, y: Math.round((height - h) * at), width, height: h };
+}
+
+/**
+ * A profile cover: upright, cut to 4:1 around `focus`, at most 1600 × 400 (never enlarged), re-encoded as JPEG without
+ * its metadata.
+ */
+export async function coverImage(file: Blob, focus = 0.5): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  try {
+    const crop = coverCrop(bitmap.width, bitmap.height, focus);
+    const scale = Math.min(1, coverSize.width / crop.width);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(crop.width * scale));
+    canvas.height = Math.max(1, Math.round(crop.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("The picture could not be prepared.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
+    return await canvasToJpeg(canvas);
+  } finally {
+    bitmap.close();
+  }
+}

@@ -64,6 +64,8 @@ const purposeTable = {
   // A person's own profile photo: `target` is `customers/<id>` or `users/<id>` (`AvatarsService`). Public, as it is shown
   // on their seller page; never an SVG.
   avatar: { label: 'Profile photo', realm: 'person', folder: owner => `people/${owner}/avatars`, maxBytes: 2 * MB, types: rasterTypes },
+  // A udozo.com customer's profile cover, across the top of their seller page (`AvatarsService`): `customers/<id>`.
+  profile_banner: { label: 'Profile cover', realm: 'person', folder: owner => `people/${owner}/banners`, maxBytes: 3 * MB, types: rasterTypes },
   // Afrippa's admins, on Afrippa's own storage (`MediaStorage.forPlatform`).
   afrippa_bot_avatar: { label: 'Afrippa assistant avatar', realm: 'afrippa_admin', folder: () => 'afrippa/assistants/avatars', maxBytes: 1 * MB, types: rasterTypes },
 } satisfies Record<string, MediaPurpose>;

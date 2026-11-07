@@ -252,6 +252,8 @@ export type ShopSellerProfile = {
   name: string;
   /** Their profile photo (a face, logo or icon), or null for their initials. */
   avatar_url?: string | null;
+  /** Their profile cover across the top of the page (4:1), or null for Udozo's own banner. */
+  banner_url?: string | null;
   country: string;
   url: string;
   member_since: string;
