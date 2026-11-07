@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsString, IsUUID, Length, Max, Min } from 'class-validator';
@@ -40,6 +42,14 @@ export class AvatarController {
     return this.avatars.startUpload(personOf(caller), body);
   }
 
+  /** The photo itself (its bytes as the body), stored through the API; then set it as before. */
+  @Post('uploads/:id/content')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  content(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.avatars.receive(personOf(caller), id, req.body, req.headers['content-type']);
+  }
+
   @Post()
   @HttpCode(HttpStatus.OK)
   set(@CurrentCaller() caller: Caller, @Body() body: AvatarSetDto) {
@@ -69,6 +79,14 @@ export class AdminAvatarController {
   @Post('uploads')
   upload(@CurrentCaller() caller: Caller, @Body() body: AvatarUploadDto) {
     return this.avatars.startUpload(personOf(caller), body);
+  }
+
+  /** The photo itself (its bytes as the body), stored through the API; then set it as before. */
+  @Post('uploads/:id/content')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  content(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.avatars.receive(personOf(caller), id, req.body, req.headers['content-type']);
   }
 
   @Post()

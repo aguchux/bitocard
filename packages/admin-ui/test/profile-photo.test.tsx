@@ -1,5 +1,5 @@
-// Udozo's profile photos in Seller HQ and the admin: the card asks the API for a signed link, sends the prepared photo
-// straight to storage (no cookies), then sets it; taking it off works the same way; and the account menu shows the
+// Udozo's profile photos in Seller HQ and the admin: the card asks the API for an upload, sends the prepared photo's
+// bytes through the API (never straight to storage, so its CORS rule never matters), then sets it; taking it off works the same way; and the account menu shows the
 // photo in place of the initial (BitoCard's menu, with no photo, is unchanged).
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -22,7 +22,7 @@ beforeEach(() => {
     const body = typeof input === 'string' ? init?.body : await input.clone().text();
     sent.push({ method: request.method, url: request.url, credentials: (request as { credentials?: string }).credentials, body });
     if (request.url.endsWith('/v1/auth/avatar/uploads')) return Response.json({ object: 'media_upload', id: '11111111-1111-4111-8111-111111111111', url: 'https://media.test/me.jpg', upload: { method: 'PUT', url: 'https://storage.test/put', headers: { 'content-type': 'image/jpeg' } }, expires_at: '' }, { status: 201 });
-    if (request.url === 'https://storage.test/put') return new Response(null, { status: 200 });
+    if (request.url.endsWith('/content')) return Response.json({ object: 'media_upload', id: '11111111-1111-4111-8111-111111111111', received: true });
     if (request.url.endsWith('/v1/auth/avatar') && request.method === 'POST') return Response.json({ object: 'avatar', avatar_url: 'https://media.test/me.jpg' });
     if (request.url.endsWith('/v1/auth/avatar') && request.method === 'DELETE') return Response.json({ object: 'avatar', avatar_url: null });
     return Response.json({});
@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe('profile photo card', () => {
-  test('a chosen photo is sent to storage with the signed link, then set', async () => {
+  test('a chosen photo is sent through the API, then set', async () => {
     render(
       <Provider store={makeStore()}>
         <ProfilePhotoCard realm="reseller" name="Ada Obi" url={null} />
@@ -47,8 +47,10 @@ describe('profile photo card', () => {
     expect(screen.getByAltText('Your new photo')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Save photo' }));
     await waitFor(() => expect(screen.getByText('Your photo is saved.')).toBeTruthy());
-    expect(sent.map(call => `${call.method} ${new URL(call.url).pathname}`)).toEqual(['POST /v1/auth/avatar/uploads', 'PUT /put', 'POST /v1/auth/avatar']);
-    expect(sent[1].credentials).toBe('omit');
+    expect(sent.map(call => `${call.method} ${new URL(call.url).pathname}`)).toEqual(['POST /v1/auth/avatar/uploads', 'POST /v1/auth/avatar/uploads/11111111-1111-4111-8111-111111111111/content', 'POST /v1/auth/avatar']);
+    expect(sent[1].credentials).toBe('include');
+    expect(sent[1].body).toBeInstanceOf(Blob);
+    expect(sent.some(call => call.url.startsWith('https://storage.test'))).toBe(false);
     expect(JSON.parse(String(sent[2].body))).toEqual({ media_id: '11111111-1111-4111-8111-111111111111' });
   });
 

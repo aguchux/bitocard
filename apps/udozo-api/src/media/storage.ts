@@ -191,6 +191,15 @@ export class MediaStorage {
     }
   }
 
+  /**
+   * Stores bytes the browser sent through the API (`POST …/media/:id/content`) at a pending upload's private staging key,
+   * exactly where its signed link would have put them, so `complete` checks them the same way. Never public.
+   */
+  async putStaging(key: string, bytes: Buffer, contentType: string) {
+    const res = await this.send('PUT', key, { 'x-amz-acl': 'private', 'content-type': contentType }, bytes);
+    if (!res.ok) throw unavailable();
+  }
+
   /** The stored object's size and type, or null when it is not there. */
   async head(key: string) {
     const res = await this.send('HEAD', key);

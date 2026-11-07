@@ -1,6 +1,6 @@
-// Uploads go from the browser straight to storage with a signed link. When storage gives no answer at all (its CORS
-// rule does not allow the site, as for admin.udozo.com before it was added), the message says so instead of only
-// blaming the connection.
+// Uploads go through the API (`POST …/media/:id/content`), which stores the file with the signed link's own key, so
+// storage's CORS rule never matters (admin.udozo.com could not upload before it was added). A network failure, and the
+// API's refusal, are said in words.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { uploadMedia } from "../src/media";
 
@@ -11,28 +11,23 @@ const upload = () => uploadMedia(dispatch, "admin", { purpose: "banner_image" },
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("uploading to storage", () => {
-  it("names the CORS rule when storage gives no answer", async () => {
+describe("uploading a file", () => {
+  it("sends its bytes to the API, never to storage", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      urls.push(`${init.method} ${url}`);
+      return Response.json({ object: "media_asset", id: "m1", url: "https://media.test/m1.png", status: "ready" });
+    });
+    await expect(upload()).resolves.toMatchObject({ url: "https://media.test/m1.png" });
+    expect(urls).toEqual([expect.stringMatching(/^POST .*\/v1\/admin\/media\/m1\/content$/)]);
+  });
+
+  it("says when the API cannot be reached, and its refusal in its own words", async () => {
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("Failed to fetch");
     });
-    await expect(upload()).rejects.toMatchObject({ status: 0, code: "upload_failed", message: expect.stringMatching(/CORS rule must allow this address/) });
-  });
-
-  it("says an expired link, and a storage error, in words", async () => {
-    vi.stubGlobal("fetch", async () => new Response("", { status: 403 }));
-    await expect(upload()).rejects.toMatchObject({ status: 403, message: "The upload link was refused or has expired. Try again." });
-    vi.stubGlobal("fetch", async () => new Response("", { status: 500 }));
-    await expect(upload()).rejects.toMatchObject({ status: 500, message: "The file could not be uploaded. Check your connection and try again." });
-  });
-
-  it("sends the file with only the signed headers and no cookies", async () => {
-    const sent: RequestInit[] = [];
-    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
-      sent.push(init);
-      return new Response("", { status: 200 });
-    });
-    await upload();
-    expect(sent[0]).toMatchObject({ method: "PUT", credentials: "omit", headers: created.upload.headers });
+    await expect(upload()).rejects.toMatchObject({ status: 0, code: "network_error" });
+    vi.stubGlobal("fetch", async () => Response.json({ error: { type: "conflict_error", code: "upload_expired", message: "This upload has expired. Choose the file again." } }, { status: 409 }));
+    await expect(upload()).rejects.toMatchObject({ status: 409, message: "This upload has expired. Choose the file again." });
   });
 });

@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
@@ -63,6 +65,16 @@ export class AdminMediaController {
     return this.media.complete(this.actor(caller), id);
   }
 
+  /** The file itself (its bytes as the body, its type as Content-Type), stored through the API, then checked. */
+  @AdminRoles('operations')
+  @Post(':id/content')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  async content(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    await this.media.receive(this.actor(caller), id, req.body, req.headers['content-type']);
+    return this.media.complete(this.actor(caller), id);
+  }
+
   @AdminRoles('operations')
   @Delete(':id')
   remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
@@ -108,6 +120,16 @@ export class AfrippaAdminMediaController {
     return this.media.complete(this.actor(caller), id);
   }
 
+  /** The file itself (its bytes as the body, its type as Content-Type), stored through the API, then checked. */
+  @AdminRoles('operations', 'support')
+  @Post(':id/content')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  async content(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    await this.media.receive(this.actor(caller), id, req.body, req.headers['content-type']);
+    return this.media.complete(this.actor(caller), id);
+  }
+
   @AdminRoles('operations')
   @Delete(':id')
   remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
@@ -146,6 +168,16 @@ export class ResellerMediaController {
   @Post(':id/complete')
   @HttpCode(HttpStatus.OK)
   complete(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.media.complete(this.actor(caller), id);
+  }
+
+  /** The file itself (its bytes as the body, its type as Content-Type), stored through the API, then checked. */
+  @Roles('admin')
+  @Post(':id/content')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  async content(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    await this.media.receive(this.actor(caller), id, req.body, req.headers['content-type']);
     return this.media.complete(this.actor(caller), id);
   }
 

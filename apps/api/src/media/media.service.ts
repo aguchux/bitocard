@@ -152,6 +152,22 @@ export class MediaService {
     throw invalid('upload_invalid', message);
   }
 
+  /**
+   * The file itself, sent by the browser through the API instead of straight to storage with the signed link (so the
+   * bucket needs no CORS rule for the apps): only for the caller's own pending upload, before its link expires, exactly
+   * the size and type declared, stored privately where the link would have put it. `complete` then checks it as ever.
+   */
+  async receive(actor: MediaActor, id: string, bytes: unknown, contentType: string | undefined) {
+    const asset = await this.owned(actor, id);
+    if (asset.status === 'ready') return asset;
+    if (actor.realm !== 'reseller' && asset.resellerId) throw notFound();
+    if (asset.expiresAt.getTime() < Date.now()) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'upload_expired', 'This upload has expired. Choose the file again.');
+    const type = (contentType ?? '').split(';')[0].trim().toLowerCase();
+    if (!Buffer.isBuffer(bytes) || bytes.length !== asset.sizeBytes || type !== asset.contentType) throw invalid('upload_invalid', 'The file sent does not match the size or type that was declared.');
+    await this.storageOf(asset.platform).putStaging(this.staging(asset), bytes, asset.contentType);
+    return asset;
+  }
+
   /** Reads the uploaded file back and accepts it only if it is what was declared. Safe to call again. */
   async complete(actor: MediaActor, id: string) {
     const asset = await this.owned(actor, id);

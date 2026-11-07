@@ -409,7 +409,7 @@ describe('image field', () => {
       if (url.pathname.endsWith('/uploads')) {
         return Response.json({ object: 'media_upload', id: 'm1', upload: { method: 'PUT', url: 'https://storage.test/b/k', headers: { 'Content-Type': 'image/png' } } }, { status: 201 });
       }
-      if (url.pathname.endsWith('/complete')) return Response.json({ object: 'media_asset', id: 'm1', url: 'https://media.test/k.png', status: 'ready' });
+      if (url.pathname.endsWith('/content')) return Response.json({ object: 'media_asset', id: 'm1', url: 'https://media.test/k.png', status: 'ready' });
       return Response.json({ object: 'list', data: [{ object: 'media_asset', id: 'm0', url: 'https://media.test/old.png', filename: 'old.png' }], has_more: false });
     });
   });
@@ -425,7 +425,7 @@ describe('image field', () => {
     );
   }
 
-  test('uploads a chosen file straight to storage and uses the checked address', async () => {
+  test('uploads a chosen file through the API (never straight to storage) and uses the checked address', async () => {
     render(<Harness />);
     await screen.findByRole('button', { name: 'Upload' });
     expect(screen.getByText('PNG, SVG, up to 1 KB.')).toBeTruthy();
@@ -434,10 +434,10 @@ describe('image field', () => {
     await waitFor(() => expect(screen.getByTestId('value').textContent).toBe('https://media.test/k.png'));
     expect(calls.filter(call => call.method !== 'GET').map(call => [call.method, call.url])).toEqual([
       ['POST', '/v1/admin/media/uploads'],
-      ['PUT', 'https://storage.test/b/k'],
-      ['POST', '/v1/admin/media/m1/complete'],
+      ['POST', '/v1/admin/media/m1/content'],
     ]);
-    expect(calls.find(call => call.method === 'PUT')!.credentials).toBe('omit');
+    expect(calls.find(call => call.url.endsWith('/content'))!.credentials).toBe('include');
+    expect(calls.some(call => call.url.startsWith('https://storage.test'))).toBe(false);
     expect(screen.getByAltText('Logo preview').getAttribute('src')).toBe('https://media.test/k.png');
   });
 

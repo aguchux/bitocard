@@ -66,6 +66,12 @@ export class AvatarsService {
   }
 
   /** A signed link to send the picture to storage (10 minutes): PUT it there, then `set` it. */
+  /** The photo's bytes, sent through the API to the person's own pending upload (`MediaService.receive`). */
+  async receive(owner: AvatarOwner, mediaId: string, bytes: unknown, contentType: string | undefined) {
+    const asset = await this.media.receive(this.actor(owner), mediaId, bytes, contentType);
+    return { object: 'media_upload' as const, id: asset.id, received: true };
+  }
+
   startUpload(owner: AvatarOwner, input: AvatarUploadInput, which: ProfilePicture = 'avatar') {
     return this.media.createUpload(this.actor(owner), { ...input, purpose: this.allowed(owner, which).purpose });
   }

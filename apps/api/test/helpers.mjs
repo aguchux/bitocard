@@ -129,7 +129,8 @@ export function client(base, { origin = appOrigin, autoIdempotency = false } = {
         ...(autoIdempotency && method === 'POST' ? { 'idempotency-key': `auto-${Date.now()}-${Math.random()}` } : {}),
         ...headers,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      // A Buffer is sent as it is (a file's bytes), anything else as JSON.
+      body: body === undefined ? undefined : Buffer.isBuffer(body) ? body : JSON.stringify(body),
     });
     for (const line of res.headers.getSetCookie()) {
       const [pair, ...attributes] = line.split(';');
@@ -145,6 +146,8 @@ export function client(base, { origin = appOrigin, autoIdempotency = false } = {
     jar,
     get: (path, headers) => request('GET', path, undefined, headers),
     post: (path, body = {}, headers) => request('POST', path, body, headers),
+    /** A file's bytes as the body, with its type (`POST …/media/:id/content`). */
+    send: (path, bytes, type) => request('POST', path, bytes, { 'content-type': type }),
     patch: (path, body = {}, headers) => request('PATCH', path, body, headers),
     put: (path, body = {}, headers) => request('PUT', path, body, headers),
     delete: (path, headers) => request('DELETE', path, undefined, headers),

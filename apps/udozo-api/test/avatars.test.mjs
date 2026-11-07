@@ -194,6 +194,15 @@ describe('profile photos', () => {
     assert.equal((await admin.get('/v1/admin/auth/session')).json.admin.avatar_url, null);
     // An admin's photo upload is not a reseller's to use.
     assert.equal((await owner.browser.post('/v1/auth/avatar', { media_id: mine.created.json.id })).status, 404);
+    // As the apps send it: the photo's bytes through the API (no CORS rule on storage), then set.
+    const bytes = png(256, 256);
+    const created = await admin.post('/v1/admin/auth/avatar/uploads', { filename: 'me.png', content_type: 'image/png', size: bytes.length });
+    const sent = await admin.send(`/v1/admin/auth/avatar/uploads/${created.json.id}/content`, bytes, 'image/png');
+    assert.deepEqual([sent.status, sent.json.received], [200, true], JSON.stringify(sent.json));
+    assert.equal((await owner.browser.send(`/v1/auth/avatar/uploads/${created.json.id}/content`, bytes, 'image/png')).status, 404, "never someone else's");
+    const set = await admin.post('/v1/admin/auth/avatar', { media_id: created.json.id });
+    assert.equal(set.status, 200, JSON.stringify(set.json));
+    assert.equal((await admin.get('/v1/admin/auth/session')).json.admin.avatar_url, set.json.avatar_url);
   });
 
   test('a customer puts a cover across their seller page: 4:1, at least 600 by 150, replaced and removed like their photo', async () => {

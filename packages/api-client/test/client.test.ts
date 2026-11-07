@@ -487,45 +487,47 @@ describe('media uploads', () => {
     upload: { method: 'PUT', url: 'https://nyc3.storage.test/bucket/key?X-Amz-Signature=abc', headers: { 'Content-Type': 'image/png', 'x-amz-acl': 'public-read' } },
     expires_at: '2026-10-04T12:00:00Z',
   };
-  type Sent = { url: string; method: string; credentials?: RequestCredentials; headers: Headers; idempotent: boolean };
+  type Sent = { url: string; method: string; credentials?: RequestCredentials; headers: Headers; body?: unknown };
   let sent: Sent[];
-  let storageStatus: number;
+  let contentStatus: number;
 
   beforeEach(() => {
     sent = [];
-    storageStatus = 200;
-    // The API goes through the base query (a Request); storage gets a plain fetch(url, init).
+    contentStatus = 200;
+    // RTK Query sends a Request; the file's bytes go through apiFetch, a plain fetch(url, init) to the API.
     vi.stubGlobal('fetch', async (input: Request | string, init?: RequestInit) => {
       if (typeof input === 'string') {
-        sent.push({ url: input, method: init?.method ?? 'GET', credentials: init?.credentials, headers: new Headers(init?.headers), idempotent: false });
-        return new Response(null, { status: storageStatus });
+        sent.push({ url: input, method: init?.method ?? 'GET', credentials: init?.credentials, headers: new Headers(init?.headers), body: init?.body });
+        return contentStatus === 200
+          ? Response.json({ object: 'media_asset', id: 'm1', url: created.url, status: 'ready' })
+          : Response.json({ error: { type: 'invalid_request_error', code: 'upload_invalid', message: 'The file sent does not match the size or type that was declared.' } }, { status: contentStatus });
       }
-      sent.push({ url: input.url, method: input.method, credentials: input.credentials, headers: input.headers, idempotent: input.headers.has('idempotency-key') });
-      return input.url.endsWith('/uploads') ? Response.json(created, { status: 201 }) : Response.json({ object: 'media_asset', id: 'm1', url: created.url, status: 'ready' });
+      sent.push({ url: input.url, method: input.method, credentials: input.credentials, headers: input.headers });
+      return Response.json(created, { status: 201 });
     });
   });
 
-  test('asks for a link, sends the file straight to storage without cookies, then asks for the check', async () => {
+  test('asks for an upload, then sends the file through the API (never straight to storage), which stores and checks it', async () => {
     const store = makeStore();
     const file = new File([new Uint8Array(16)], 'logo.png', { type: 'image/png' });
     const asset = await uploadMedia(store.dispatch, 'admin', { purpose: 'brand_logo', target_id: 'amazon' }, file);
     expect(asset.url).toBe(created.url);
     expect(sent.map(call => [call.method, call.url])).toEqual([
       ['POST', 'http://api.test/v1/admin/media/uploads'],
-      ['PUT', created.upload.url],
-      ['POST', 'http://api.test/v1/admin/media/m1/complete'],
+      ['POST', 'http://api.test/v1/admin/media/m1/content'],
     ]);
-    expect(sent[1].credentials).toBe('omit');
-    expect(sent[1].headers.get('x-amz-acl')).toBe('public-read');
-    expect([sent[0].idempotent, sent[2].idempotent]).toEqual([true, true]);
+    expect(sent.some(call => call.url.startsWith('https://nyc3.storage.test'))).toBe(false);
+    expect(sent[1].credentials).toBe('include');
+    expect(sent[1].headers.get('content-type')).toBe('image/png');
+    expect(sent[1].body).toBe(file);
   });
 
-  test('SHQ uses its own address, and a refused upload is reported without checking', async () => {
-    storageStatus = 403;
+  test("SHQ uses its own address, and the API's refusal is reported in its words", async () => {
+    contentStatus = 400;
     const store = makeStore();
     const file = new File([new Uint8Array(4)], 'store.png', { type: 'image/png' });
-    await expect(uploadMedia(store.dispatch, 'reseller', { purpose: 'store_logo' }, file)).rejects.toMatchObject({ code: 'upload_failed' });
-    expect(sent.map(call => call.url)).toEqual(['http://api.test/v1/media/uploads', created.upload.url]);
+    await expect(uploadMedia(store.dispatch, 'reseller', { purpose: 'store_logo' }, file)).rejects.toMatchObject({ code: 'upload_invalid', status: 400 });
+    expect(sent.map(call => call.url)).toEqual(['http://api.test/v1/media/uploads', 'http://api.test/v1/media/m1/content']);
   });
 });
 

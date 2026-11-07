@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
-import { type ApiError, bitocardApi } from './base';
+import { apiFetch, bitocardApi, toApiError } from './base';
 
 /**
  * Whose files: the admin app (`/v1/admin/media`, platform files; admin.afrippa.com's switch sends it to Afrippa's own
@@ -106,37 +106,33 @@ type Dispatch = (action: unknown) => unknown;
 type Unwrappable<T> = { unwrap: () => Promise<T> };
 
 /**
- * Raised when storage refuses the file itself (for example an expired link), in the API's error shape. No answer at all
- * (`0`) is usually the bucket's CORS rule not allowing this site's address (`npm run media:cors`), not the connection.
+ * Sends a file's bytes through the API to its pending upload (`POST <base>/<id>/content`, with the account's cookies and
+ * headers), which stores it with the signed link's own key: the browser never talks to storage, so the bucket needs no
+ * CORS rule for the apps. Resolves with the API's JSON; throws the API's error.
  */
-const storageError = (status: number): ApiError => ({
-  status,
-  type: 'api_error',
-  code: 'upload_failed',
-  message:
-    status === 403
-      ? 'The upload link was refused or has expired. Try again.'
-      : status === 0
-        ? 'The file could not be sent to storage. If your connection is fine, storage does not accept uploads from this site yet: its CORS rule must allow this address.'
-        : 'The file could not be uploaded. Check your connection and try again.',
-});
+export async function sendThroughApi<T>(path: string, file: Blob): Promise<T> {
+  let res: Response;
+  try {
+    res = await apiFetch(path, { method: 'POST', body: file, headers: { 'content-type': file.type || 'application/octet-stream' } });
+  } catch {
+    throw toApiError('FETCH_ERROR', null);
+  }
+  const json = (await res.json().catch(() => null)) as unknown;
+  if (!res.ok) throw toApiError(res.status, json);
+  return json as T;
+}
 
 /**
- * Uploads a file the way the API expects: ask for a signed link, PUT the file straight to storage (no cookies, only
- * the signed headers), then ask the API to check it. Resolves with the checked file; its `url` is what to save.
+ * Uploads a file the way the API expects: ask for an upload, send the file's bytes through the API (which stores it
+ * where the signed link points), and the API checks it. Resolves with the checked file; its `url` is what to save.
  */
 export async function uploadMedia(dispatch: Dispatch, realm: MediaRealm, request: MediaRequest, file: Blob & { name?: string }): Promise<MediaAsset> {
   const created = await (
     dispatch(mediaApi.endpoints.createMediaUpload.initiate({ realm, ...request, filename: file.name || 'upload', content_type: file.type, size: file.size })) as Unwrappable<MediaUpload>
   ).unwrap();
-  let res: Response;
-  try {
-    res = await fetch(created.upload.url, { method: created.upload.method, headers: created.upload.headers, body: file, credentials: 'omit' });
-  } catch {
-    throw storageError(0);
-  }
-  if (!res.ok) throw storageError(res.status);
-  return (dispatch(mediaApi.endpoints.completeMediaUpload.initiate({ realm, id: created.id })) as Unwrappable<MediaAsset>).unwrap();
+  const asset = await sendThroughApi<MediaAsset>(`${base(realm)}/${created.id}/content`, file);
+  dispatch(mediaApi.util.invalidateTags(['Media', 'Activity']));
+  return asset;
 }
 
 /** `upload(file, { purpose, target_id })` for components. */

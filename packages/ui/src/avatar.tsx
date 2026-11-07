@@ -173,17 +173,3 @@ export function AvatarEditor({ name, url, actions, disabled, note }: { name: str
     </div>
   );
 }
-
-/**
- * Sends a prepared photo to storage with the signed link the API gave (no cookies, only its headers), the way every
- * upload goes. Throws a message to show when storage refuses it.
- */
-export async function sendToStorage(upload: { method: "PUT"; url: string; headers: Record<string, string> }, photo: Blob) {
-  let res: Response;
-  try {
-    res = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: photo, credentials: "omit" });
-  } catch {
-    throw new Error("The photo could not be sent to storage. If your connection is fine, storage does not accept uploads from this site yet: its CORS rule must allow this address.");
-  }
-  if (!res.ok) throw new Error(res.status === 403 ? "The upload link was refused or has expired. Try again." : "The photo could not be uploaded. Check your connection and try again.");
-}

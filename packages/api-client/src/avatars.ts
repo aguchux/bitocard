@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { bitocardApi } from './base';
+import { sendThroughApi } from './media';
 
 /**
  * Udozo's profile photos for the people of Seller HQ (`reseller`: `/v1/auth/avatar`) and the admin (`admin`:
- * `/v1/admin/auth/avatar`): a signed link to send the photo to storage, then set it (the API checks the stored file
+ * `/v1/admin/auth/avatar`): an upload, the photo's bytes sent through the API (stored with the signed link's key), then set it (the API checks the stored file
  * first), or take it off. Setting or removing it refreshes the session, so the account menu shows it at once.
  */
 export type AvatarRealm = 'admin' | 'reseller';
@@ -37,22 +38,22 @@ type Unwrappable<T> = { unwrap: () => Promise<T> };
 const messageOf = (error: unknown) => (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'The photo could not be saved. Try again.');
 
 /**
- * `{ upload, remove }` for the shared photo editor (`AvatarEditor` in `@bitocard/ui/avatar`): ask for a signed link,
- * send the prepared photo to storage, set it; or take it off. Each throws an `Error` with the message to show.
+ * `{ upload, remove }` for the shared photo editor (`AvatarEditor` in `@bitocard/ui/avatar`): ask for an upload, send
+ * the prepared photo through the API, set it; or take it off. Each throws an `Error` with the message to show.
  */
-export function useAvatarActions(realm: AvatarRealm, send: (upload: AvatarUpload['upload'], photo: Blob) => Promise<void>) {
+export function useAvatarActions(realm: AvatarRealm) {
   const dispatch = useDispatch() as (action: unknown) => unknown;
   const upload = useCallback(
     async (photo: Blob, filename: string) => {
       try {
         const created = await (dispatch(avatarsApi.endpoints.createAvatarUpload.initiate({ realm, filename, content_type: photo.type, size: photo.size })) as Unwrappable<AvatarUpload>).unwrap();
-        await send(created.upload, photo);
+        await sendThroughApi(`${base(realm)}/uploads/${created.id}/content`, photo);
         await (dispatch(avatarsApi.endpoints.setAvatar.initiate({ realm, media_id: created.id })) as Unwrappable<AvatarSet>).unwrap();
       } catch (error) {
         throw error instanceof Error ? error : new Error(messageOf(error));
       }
     },
-    [dispatch, realm, send],
+    [dispatch, realm],
   );
   const remove = useCallback(async () => {
     try {

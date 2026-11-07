@@ -3,7 +3,7 @@ import cookieParser from 'cookie-parser';
 import { ModulesContainer, NestFactory } from '@nestjs/core';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants.js';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { json, type NextFunction, type Request, type Response } from 'express';
+import { json, raw, type NextFunction, type Request, type Response } from 'express';
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule, type AppOptions } from './app.module.js';
@@ -31,6 +31,14 @@ const orderRoomJson = json({
   },
 });
 
+/**
+ * A file sent through the API to its pending upload (`POST /v1/admin/media/:id/content`, Afrippa's admins' and resellers'
+ * the same, and Udozo's people's profile photos), read as raw bytes up to 6 MB whatever its type, before Nest's parsers.
+ */
+export const isMediaContent = (url: string | undefined) =>
+  /^\/v1\/(?:(?:afrippa\/)?admin\/)?(?:media\/[^/?#]+|auth\/avatar\/uploads\/[^/?#]+)\/content(?:[?#]|$)/.test(url ?? '');
+const mediaContent = raw({ type: () => true, limit: '6mb' });
+
 /** BitoCard Shop's listing video uploads, sent by the seller's browser with a signed link (no cookies). */
 export const isVideoUpload = (url: string | undefined) => /^\/v1\/classifieds\/video-uploads\/[^/?#]+(?:[?#]|$)/.test(url ?? '');
 
@@ -47,6 +55,7 @@ export async function createApp(options: AppOptions = {}) {
   app.use(securityHeaders);
   app.use(cookieParser());
   app.use((req: Request, res: Response, next: NextFunction) => (isOrderRoomUpload(req.originalUrl) ? orderRoomJson(req, res, next) : next()));
+  app.use((req: Request, res: Response, next: NextFunction) => (req.method === 'POST' && isMediaContent(req.originalUrl) ? mediaContent(req, res, next) : next()));
   const config = app.get<AppConfig>(APP_CONFIG);
   // Browsers on BitoCard apps, and Afrippa's admin app, may call the API with cookies; anything else uses API keys and
   // needs no CORS.

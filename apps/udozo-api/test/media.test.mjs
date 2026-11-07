@@ -130,6 +130,16 @@ async function fakeSpaces(spacesCredentials) {
       res.writeHead(200).end('<CopyObjectResult></CopyObjectResult>');
       return;
     }
+    // Bytes the API itself stores (a file sent through it to its staging key): signed with the API's own credentials.
+    if (req.method === 'PUT' && !url.searchParams.has('X-Amz-Signature')) {
+      if (!String(req.headers.authorization ?? '').startsWith(`AWS4-HMAC-SHA256 Credential=${spacesCredentials.accessKey}/`)) {
+        res.writeHead(403).end();
+        return;
+      }
+      objects.set(key, { body, type: req.headers['content-type'], acl: req.headers['x-amz-acl'], cache: req.headers['cache-control'] });
+      res.writeHead(200).end();
+      return;
+    }
     if (req.method === 'PUT') {
       const given = url.searchParams.get('X-Amz-Signature');
       const signed = (url.searchParams.get('X-Amz-SignedHeaders') ?? '').split(';').filter(name => name !== 'host');
@@ -448,6 +458,35 @@ describe('signed uploads', () => {
     await fetch(created.json.upload.url, { method: 'PUT', headers: created.json.upload.headers, body: swapped });
     const served = spaces.objects.get(`test/platform/storefront/images/${created.json.id}.png`);
     assert.ok(served.body.equals(bytes), 'still the checked bytes');
+  });
+
+  test('the apps send the file through the API: stored where the signed link points, then checked, with no CORS rule', async () => {
+    const bytes = png(320, 80);
+    const created = await admin.post('/v1/admin/media/uploads', { purpose: 'brand_logo', target_id: 'amazon', filename: 'logo.png', content_type: 'image/png', size: bytes.length });
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    const sent = await admin.send(`/v1/admin/media/${created.json.id}/content`, bytes, 'image/png');
+    assert.equal(sent.status, 200, JSON.stringify(sent.json));
+    assert.deepEqual([sent.json.status, sent.json.width, sent.json.height], ['ready', 320, 80], 'stored, then checked as a signed upload is');
+    const stored = spaces.objects.get(`test/platform/brands/amazon/logos/${created.json.id}.png`);
+    assert.equal(stored.acl, 'public-read');
+    assert.ok(!spaces.objects.has(`test/uploads/${created.json.id}.png`), 'the staging object is removed');
+    const again = await admin.send(`/v1/admin/media/${created.json.id}/content`, bytes, 'image/png');
+    assert.deepEqual([again.status, again.json.status], [200, 'ready'], 'sending again is harmless');
+
+    // Only exactly what was declared, and only to one's own pending upload.
+    const other = await admin.post('/v1/admin/media/uploads', { purpose: 'brand_logo', target_id: 'amazon', filename: 'logo.png', content_type: 'image/png', size: bytes.length });
+    const wrongSize = await admin.send(`/v1/admin/media/${other.json.id}/content`, Buffer.concat([bytes, Buffer.alloc(4)]), 'image/png');
+    assert.deepEqual([wrongSize.status, wrongSize.json.error.code], [400, 'upload_invalid']);
+    const wrongType = await admin.send(`/v1/admin/media/${other.json.id}/content`, bytes, 'image/jpeg');
+    assert.deepEqual([wrongType.status, wrongType.json.error.code], [400, 'upload_invalid']);
+    const reseller = await resellerClient(server);
+    assert.equal((await reseller.browser.send(`/v1/media/${other.json.id}/content`, bytes, 'image/png')).status, 404, "never someone else's upload");
+    const disguised = await admin.send(`/v1/admin/media/${other.json.id}/content`, Buffer.concat([Buffer.from('not a png!'), Buffer.alloc(bytes.length - 10)]), 'image/png');
+    assert.deepEqual([disguised.status, disguised.json.error.code], [400, 'upload_invalid'], 'a file that is not the declared image is thrown away');
+    await prisma.mediaAsset.update({ where: { id: (await admin.post('/v1/admin/media/uploads', { purpose: 'brand_logo', target_id: 'amazon', filename: 'l.png', content_type: 'image/png', size: bytes.length })).json.id }, data: { expiresAt: new Date(Date.now() - 1000) } }).then(async asset => {
+      const late = await admin.send(`/v1/admin/media/${asset.id}/content`, bytes, 'image/png');
+      assert.deepEqual([late.status, late.json.error.code], [409, 'upload_expired']);
+    });
   });
 });
 
