@@ -7,6 +7,7 @@ import { findPlace } from "@/lib/places";
 import { areasOf } from "@/lib/reference";
 import { readFilters, searchQuery } from "@/lib/search";
 import { noindexFollow } from "@/lib/seo";
+import { channelsFor } from "@/lib/whatsapp";
 
 type Props = { params: Promise<{ cc: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -32,7 +33,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
       <div className="mx-auto grid max-w-[1400px] gap-4 px-4 sm:px-6 lg:px-8 pt-4">
         <h1 className="text-2xl font-extrabold tracking-tight">{filters.q ? `Results for “${filters.q}”` : `Everything in ${market.name}`}</h1>
         {result.ok ? (
-          <Results result={result.data} filters={filters} path={`/${cc}/search`} category={null} place={{ area: place?.area?.name, state: place?.state.name, country: market.name }} currency={market.currency} />
+          <Results result={result.data} filters={filters} path={`/${cc}/search`} category={null} place={{ area: place?.area?.name, state: place?.state.name, country: market.name }} currency={market.currency} wanted={(await channelsFor(market.country)).wanted ? `/${cc}/wanted/new` : null} />
         ) : (
           <p className="rounded-2xl border border-dashed border-navy-200 p-6 text-center text-sm text-navy-600">Listings could not be loaded just now. Try again shortly.</p>
         )}

@@ -58,6 +58,7 @@ const sourceLabels: Record<string, string> = {
   my_listings: "My listings",
   empty_state: "My listings (no ads yet)",
   start_here: "Start here",
+  whatsapp: "WhatsApp",
   invite: "Invite link",
   pwa: "App shortcut",
   reseller: "Resell page",

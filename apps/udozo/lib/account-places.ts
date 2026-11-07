@@ -1,7 +1,7 @@
 /** What the account's places show beside their names: unread messages, requests and resellers waiting on the seller. */
 export type PlaceCounts = { unread: number; resellers: { count: number; waiting: number }; requests?: number; buyOrders?: number; reviews?: number; notifications?: number };
 
-export type PlaceKey = "listings" | "notifications" | "messages" | "requests" | "buy-orders" | "orders" | "reviews" | "favourites" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
+export type PlaceKey = "listings" | "notifications" | "messages" | "requests" | "buy-orders" | "orders" | "reviews" | "favourites" | "wanted" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
 
 export type Place = { key: PlaceKey; href: string; label: string; badge?: number; also?: string[] };
 
@@ -21,6 +21,7 @@ export function accountPlaces(counts: PlaceCounts): Place[] {
     { key: "orders", href: "/account/orders", label: "Safe pay orders" },
     { key: "reviews", href: "/account/reviews", label: "Reviews", also: ["/account/ratings"], ...(counts.reviews ? { badge: counts.reviews } : {}) },
     { key: "favourites", href: "/account/favourites", label: "Favourites" },
+    { key: "wanted", href: "/account/wanted", label: "Wanted requests" },
     ...(counts.resellers.count ? [{ key: "resellers" as const, href: "/account/resellers", label: "My Resellers", ...(counts.resellers.waiting ? { badge: counts.resellers.waiting } : {}) }] : []),
     { key: "wallet", href: "/account/wallet", label: "Wallet" },
     { key: "safe-pay", href: "/account/safe-pay", label: "Safe pay" },

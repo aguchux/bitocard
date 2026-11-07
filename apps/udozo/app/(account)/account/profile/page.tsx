@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AtSign, Eye, ShieldCheck } from "lucide-react";
+import { AtSign, Eye, MessageCircle, ShieldCheck } from "lucide-react";
 import { regionWord } from "@bitocard/api-client/classifieds";
 import { CountryForm, NameForm, PasswordForm } from "@/components/account-forms";
 import { AboutForm } from "@/components/account/about-form";
@@ -10,6 +10,7 @@ import { PhoneForm } from "@/components/account/phone-form";
 import { Flag } from "@/components/flag";
 import { requireCustomer, sellReference } from "@/lib/account";
 import { usernameScreen } from "@/lib/username";
+import { channelsFor, whatsappScreen } from "@/lib/whatsapp";
 import { signOut } from "@/lib/account-actions";
 import { countries } from "@/lib/countries";
 
@@ -26,7 +27,7 @@ const card = "grid gap-3 rounded-2xl border border-navy-200 bg-white p-4 sm:p-5"
  */
 export default async function ProfilePage() {
   const customer = await requireCustomer("/account/profile");
-  const [list, reference] = await Promise.all([countries(), customer.country ? sellReference(customer.country) : null]);
+  const [list, reference, channels] = await Promise.all([countries(), customer.country ? sellReference(customer.country) : null, channelsFor(customer.country)]);
   const country = list.find(item => item.code === customer.country);
   return (
     <div className="grid max-w-2xl gap-5">
@@ -95,6 +96,17 @@ export default async function ProfilePage() {
       <section id="phone" aria-label="Phone number" className={card}>
         <PhoneForm phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} />
       </section>
+      {channels.whatsapp.available ? (
+        <section id="whatsapp" aria-labelledby="whatsapp-title" className={card}>
+          <h2 id="whatsapp-title" className="font-bold">
+            WhatsApp
+          </h2>
+          <p className="text-sm text-navy-600">Find, sell, chat and ask for what you need from WhatsApp, through Udozo&apos;s number.</p>
+          <Link href={whatsappScreen} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-navy-200 px-4 font-semibold hover:border-navy-300">
+            <MessageCircle className="size-4" aria-hidden="true" /> WhatsApp
+          </Link>
+        </section>
+      ) : null}
       <section aria-labelledby="check" className={card}>
         <h2 id="check" className="font-bold">
           Identity check

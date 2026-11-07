@@ -1,6 +1,16 @@
 # Udozo on WhatsApp: post, find, chat and ask, through Udozo's own number
 
-**Status:** planned on 7 November 2026 at the owner's request. Nothing is built yet; build it phase by phase only when the owner asks.
+**Status:** planned and built on 7 November 2026 at the owner's request (phases 1 to 5 below). It goes live once the owner's steps are done: Meta's business verification, the number, the token, the webhook, the templates submitted and approved from the admin, then `whatsapp_channel` switched on market by market (`classifieds_wanted` too, for wanted requests).
+
+**How it was built (where it differs from the plan below):**
+
+- The code is `apps/udozo-api/src/whatsapp/` (`cloud-api.ts`, `notices.service.ts`, `contacts.service.ts`, `outbox.service.ts`, `templates.ts`, `messages.ts`, `bot.service.ts`, `relay.service.ts`, `flows/sell.flow.ts`, `flows/wanted.flow.ts`, `admin.service.ts`, `jobs.service.ts`) and `apps/udozo-api/src/classifieds/wanted/`; migration `20270301000000_whatsapp_and_wanted`.
+- Templates are five: `udozo_new_message`, `udozo_wanted_match`, `udozo_wanted_response`, `udozo_account_update` (every other notice: buy orders, contact requests answered, call backs, missed calls) and `udozo_link_confirmed`.
+- The relay hooks are registered, not imported: `ConversationsService.onMessage` and `InboxService.useChannel`, so the classifieds code does not depend on WhatsApp. A template is claimed under an advisory lock per contact, chat and template, so two messages at once send one.
+- Plain text with no menu going on is read as a search.
+- A seller's answer to a wanted request is a text message in the listing's chat ("About your request ..."), not a card.
+- udozo.com learns whether WhatsApp and requests are open from the public `GET /v1/classifieds/channels?country=` (a minute in caches).
+- Legal: terms section 10a and privacy section 4a, version `2026-11-07`.
 
 ## Context
 
@@ -71,7 +81,7 @@ What the owner chose:
    - retries come from the `whatsapp` job (1, 5 and 30 minutes);
    - a definite refusal is marked `failed`, and a number that is not on WhatsApp stops further sends.
 6. **`templates.ts`**: the registry of template names, categories (utility), languages, bodies and buttons.
-   - The templates: `udozo_new_message`, `udozo_wanted_match`, `udozo_wanted_response`, `udozo_buy_order_update`, `udozo_contact_answered` and `udozo_link_confirmed`.
+   - The templates: `udozo_new_message`, `udozo_wanted_match`, `udozo_wanted_response`, `udozo_account_update` and `udozo_link_confirmed` (built: one generic update template in place of `udozo_buy_order_update` and `udozo_contact_answered`).
    - The admin page submits missing ones to Meta and shows each one's approval status.
 7. **Flows** (`flows/`): one state machine per flow. Each flow keeps its step in `flow_state`, an idle flow resets after 24 hours, and all wording is in `messages.ts`, in plain UK English.
    - **Main menu** (on hi, MENU, or an unknown message), as a list: Find something, Post a request, Sell something, My chats, Help. HELP, CANCEL, STOP and START work at any step.

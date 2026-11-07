@@ -284,6 +284,11 @@ export type ClassifiedMarketSettings = {
   ready_reminder_1_hours?: number;
   ready_reminder_2_hours?: number;
   ready_reminder_3_hours?: number;
+  /** Wanted requests: open requests a buyer may have, requests a day, sellers told per request, requests a seller hears of a day. */
+  wanted_open_per_buyer?: number;
+  wanted_per_day?: number;
+  wanted_sellers_per_request?: number;
+  wanted_notices_per_seller_day?: number;
 };
 
 /** A reported chat, read in full (every read is audited). */

@@ -4,7 +4,7 @@
  * or use Safe pay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
-export const legalVersion = "2026-11-05";
+export const legalVersion = "2026-11-07";
 /** Privacy and legal requests. */
 export const legalContact = "legal@udozo.com";
 /** Help with an account, a listing or an order. */
@@ -237,6 +237,21 @@ const terms: LegalDocument = {
             "It never acts for you. It cannot buy, sell, pay, message anyone or change a listing. Its suggestions change nothing until you accept them, and you are responsible for what you post or send.",
             "Signed in, you can ask for a person at any time, and your conversation is passed to our support team.",
             "Do not tell it personal details it does not need. It hides numbers that look like phone numbers, card numbers or codes before they are sent. There is a daily limit on questions. The privacy notice says what is sent to the AI provider and how long we keep conversations.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "whatsapp",
+      heading: "10a. Udozo on WhatsApp, and wanted requests",
+      body: [
+        {
+          list: [
+            "Where Udozo is on WhatsApp in your country, you can use it from Udozo's own WhatsApp number: find listings, chat with buyers and sellers, ask for a call back or contact details, post an ad step by step and post wanted requests. These terms apply there as on udozo.com, with the same rules for listings, chats and what may not be sold.",
+            "To do more than search, connect WhatsApp to your Udozo account: it connects by itself when WhatsApp uses the mobile number confirmed on your account, or with the one-time code from Profile, WhatsApp. A WhatsApp number never makes an account, and is connected to one account at a time.",
+            "Chats are relayed through Udozo's number: the other person sees your first name and initial and your messages, never your number. What you write on WhatsApp goes into the listing's chat on Udozo, marked as sent from WhatsApp, and replies come back to WhatsApp. Never send codes or passwords, and never pay before you see the item.",
+            "Udozo writes to you on WhatsApp only once you connected your number or wrote to Udozo there. Send STOP at any time for no more messages, and START to come back. When you have not written for a day, WhatsApp lets us send only short approved messages, so some updates reach you as a prompt to open them.",
+            "Wanted requests: say what you need, in a category, and Udozo tells sellers with live listings in it, nearest first. A request lasts 14 days, shows your first name and initial and what you wrote, and never your number. Sellers answer with one of their listings, which opens a chat with you. There are limits on how many you can make, and requests for anything that may not be sold are refused or removed.",
           ],
         },
       ],
@@ -710,6 +725,14 @@ const privacy: LegalDocument = {
       ],
     },
     {
+      id: "whatsapp",
+      heading: "4a. WhatsApp and wanted requests",
+      body: [
+        "If you use Udozo on WhatsApp, Meta (WhatsApp) carries the messages between you and Udozo's number, and we keep your WhatsApp number, your WhatsApp profile name, which Udozo account it is connected to, when you opted in or sent STOP, and a record of each message in and out (its kind and whether it was delivered and read; never what it said beyond what goes into a listing chat). What you write in a chat is kept as a chat message on Udozo, as section 2 says. Photos you send are fetched from Meta and kept as chat or listing photos. Udozo's own number relays chats, so the other person never sees your number.",
+        "When you post a wanted request, we keep what you wrote, its category, place, budget and condition, which sellers we told and who answered. Sellers we tell see what you wrote and your first name and initial.",
+      ],
+    },
+    {
       id: "why",
       heading: "5. Why we use it",
       body: [
@@ -723,6 +746,8 @@ const privacy: LegalDocument = {
               ["Keeping Udozo safe: checking listings, reports, strikes, same-person checks and limits", "Our legitimate interest in a safe marketplace and in preventing fraud, and the law where we must report"],
               ["Shop assistants, and reviewing their answers to improve them", "Our legitimate interest in helping people use Udozo, and our contract with you"],
               ["Running Seller HQ, stores, domains, invoices and payouts", "Our contract with sellers"],
+              ["Udozo on WhatsApp: relaying chats, posting ads and requests, and sending updates you chose", "Our contract with you, once you connect WhatsApp or write to Udozo there; send STOP at any time"],
+              ["Telling sellers about wanted requests that fit what they sell", "Our contract with you (the buyer who asked, and the seller who sells it)"],
               ["Seeing where people get stuck signing up, and helping them finish", "Our legitimate interest in a sign-up that works for everyone"],
               ["Seeing where sellers get stuck posting ads, and helping them", "Our legitimate interest in posting that works for everyone"],
               ["Personalising what you see (For you, Recently viewed, your searches, People also viewed) and improving search", "Signed in: our contract with you (the terms) and our legitimate interest in showing you what you are looking for; you can object by turning personalisation off. Not signed in: your consent, given by choosing Accept all"],
@@ -744,7 +769,7 @@ const privacy: LegalDocument = {
             "The public: live listings and each seller's page (first name and initial, username if they chose one, profile photo and cover, badges, when they joined, their live listings and figures), including in search engines and in previews when a link is shared.",
             "The other person in a chat: your first name and initial, your messages and offers. The other person in a buy order: your first name and initial, the price, notes and meeting place written, and each step. A seller sees a Safe pay buyer's delivery address once they have paid. A seller sees a buyer's name, confirmed mobile number and email when the buyer asks for a call back, and a buyer sees a seller's confirmed phone number and email once the seller shares them. Neither sees the other's number in a call. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
             "Udozo's team, as their work needs.",
-            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS, the network in front of our API, and relaying calls between buyers and sellers: the call passes through it, encrypted, and is not recorded), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), and browser push services (Google, Mozilla, Apple, Microsoft) for notifications on udozo.com and Seller HQ: they carry each notification to your device encrypted, so they cannot read it.",
+            "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS, the network in front of our API, and relaying calls between buyers and sellers: the call passes through it, encrypted, and is not recorded), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Meta (WhatsApp: carrying messages between you and Udozo's number, when you use Udozo on WhatsApp), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), and browser push services (Google, Mozilla, Apple, Microsoft) for notifications on udozo.com and Seller HQ: they carry each notification to your device encrypted, so they cannot read it.",
             "Authorities, where the law requires it.",
           ],
         },
@@ -782,6 +807,8 @@ const privacy: LegalDocument = {
               ["What you looked at and searched for (to personalise)", "90 days. Your interest profile: deleted after 180 days without a visit, and at once when you turn personalisation off, clear your history, choose Necessary only (not signed in) or close your account. When you sign in, what was kept under your udz_vid cookie becomes your account's."],
               ["Searches counted per day", "Each search's words (cleaned as section 2 says) and how often they were searched each day, with nothing about who searched: 13 months, to suggest popular searches and improve search."],
               ["Your sign-up steps", "Deleted 7 days after your account is ready to use, or 30 days after your last step if you never finish. Only daily counts with nothing about you are kept, for a year."],
+              ["WhatsApp", "Each message's record: 90 days. Webhook bodies from Meta: 30 days. Your WhatsApp number and choices: while it is connected, or until you ask us to delete them; after STOP, only the number, marked not to message."],
+              ["Wanted requests", "While your account is open, with the chats they started; a request ends after 14 days and is no longer shown to sellers."],
               ["Notifications", "90 days. A browser you turned notifications on in: until you turn them off, remove it, or sign out of it."],
               ["Your posting steps", "Deleted 30 days after your last step if your ad never goes live; otherwise 90 days after it went live, or 30 days after it sold if sooner. Only daily counts with nothing about you are kept, for a year."],
               ["Sellers we invite who do not sign up", "Deleted 12 months after our last contact (or after we added you, if we never reached you). If you ask us to stop, only your number or email, marked not to contact."],

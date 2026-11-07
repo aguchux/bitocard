@@ -220,6 +220,7 @@ export function Results({
   models = [],
   place,
   currency,
+  wanted = null,
 }: {
   result: ShopSearch;
   filters: ShopFilters;
@@ -231,6 +232,8 @@ export function Results({
   models?: ShopModel[];
   place: { area?: string | null; state?: string | null; country: string };
   currency: string;
+  /** Post a request's address, where requests are open (shown when nothing matches). */
+  wanted?: string | null;
 }) {
   const pages = Math.min(Math.ceil(result.total / perPage), Math.floor(maxOffset / perPage) + 1);
   const first = (filters.page - 1) * perPage;
@@ -249,6 +252,15 @@ export function Results({
           <Link href={path} className="font-semibold text-brand-700 hover:underline">
             See everything here
           </Link>
+          {wanted ? (
+            <>
+              {" "}or{" "}
+              <Link href={wanted} className="font-semibold text-brand-700 hover:underline">
+                post a request
+              </Link>{" "}
+              and sellers who have it answer.
+            </>
+          ) : null}
         </p>
       ) : null}
       {groupByTier(result.data).map((group, index) => (

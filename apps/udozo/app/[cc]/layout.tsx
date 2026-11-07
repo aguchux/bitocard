@@ -7,6 +7,7 @@ import { InstallPrompt } from "@bitocard/ui/install-ui";
 import { assistantFor } from "@/lib/assistant";
 import { marketFor, markets } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
+import { channelsFor, whatsappHref } from "@/lib/whatsapp";
 
 /**
  * A country's market (`/ng`…): only where Udozo is open; everything under it is in that country's currency.
@@ -17,14 +18,14 @@ export default async function CountryLayout({ children, params }: { children: Re
   const { cc } = await params;
   const market = await marketFor(cc);
   if (!market) notFound();
-  const [customer, all, assistant] = await Promise.all([currentCustomer(), markets(), assistantFor(market.country)]);
+  const [customer, all, assistant, channels] = await Promise.all([currentCustomer(), markets(), assistantFor(market.country), channelsFor(market.country)]);
   return (
     <AssistantProvider country={market.country} profile={assistant} signedIn={Boolean(customer)}>
       <SearchScopeProvider>
         <SiteHeader market={market} customer={customer} showcase={all.showcase} />
         <main>{children}</main>
       </SearchScopeProvider>
-      <SiteFooter country={{ code: market.country, name: market.name }} />
+      <SiteFooter country={{ code: market.country, name: market.name }} whatsapp={channels.whatsapp.available ? whatsappHref(channels.whatsapp.number, "Hi") : null} wanted={channels.wanted ? `/${cc.toLowerCase()}/wanted/new` : null} />
       <SellButton customer={customer} />
       <InstallPrompt enabled={market.install_prompt} appName="Udozo" />
     </AssistantProvider>

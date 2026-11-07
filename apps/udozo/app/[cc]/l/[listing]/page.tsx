@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { BadgeCheck, ChevronRight, MapPin, ShieldCheck, Star } from "lucide-react";
+import { BadgeCheck, ChevronRight, MapPin, MessageCircle, ShieldCheck, Star } from "lucide-react";
 import {
   brandFeatureKey,
   brandPath,
@@ -43,6 +43,7 @@ import { ListingView } from "@/components/listing-view";
 import { StockLine } from "@/components/stock";
 import { ReviewCard } from "@/components/reviews/review-view";
 import { reviewPath, reviewsHref, summaryText } from "@/lib/reviews";
+import { askOnWhatsappHref, channelsFor } from "@/lib/whatsapp";
 
 type Props = { params: Promise<{ cc: string; listing: string }> };
 
@@ -132,6 +133,7 @@ export default async function ListingPage({ params }: Props) {
   const viewerResult = customer ? await customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${listing.id}/viewer`) : null;
   const viewer = viewerResult?.ok ? viewerResult.data : null;
   const chatResult = viewer?.conversation_id ? await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${viewer.conversation_id}`) : null;
+  const whatsapp = askOnWhatsappHref((await channelsFor(cc)).whatsapp.number, listing.ref);
   const [similar, alsoViewed] = await Promise.all([
     shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&category=${listing.category.slug}&state=${listing.area.state.slug}&limit=9`),
     // What people who looked at this also looked at (kept five minutes, as the API says).
@@ -240,6 +242,11 @@ export default async function ListingPage({ params }: Props) {
             />
           )}
           {sold ? null : <AskAboutListing listingId={listing.id} title={listing.title} />}
+          {sold || !whatsapp ? null : (
+            <a href={whatsapp} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-navy-200 bg-white px-4 text-sm font-semibold hover:border-navy-300">
+              <MessageCircle className="size-4 text-mint-700" aria-hidden="true" /> Ask on WhatsApp
+            </a>
+          )}
           <section aria-label="The seller" className="grid gap-3 rounded-2xl border border-navy-200 bg-white p-4">
             <div className="flex items-center gap-3">
               <Avatar name={listing.seller.name} url={listing.seller.avatar_url} className="size-11 font-bold" />

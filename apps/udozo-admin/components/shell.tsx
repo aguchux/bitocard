@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, FlaskConical, Gauge, GalleryHorizontal, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, FlaskConical, Gauge, GalleryHorizontal, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -50,6 +50,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Areas", href: "/classifieds/areas", icon: MapPin },
       { label: "Safe pay orders", href: "/classifieds/orders", icon: HandCoins },
       { label: "Buy orders", href: "/classifieds/buy-orders", icon: Handshake },
+      { label: "Wanted requests", href: "/classifieds/wanted", icon: Megaphone },
       { label: "Reviews", href: "/classifieds/reviews", icon: Star },
       { label: "Private ratings", href: "/classifieds/ratings", icon: Gauge },
       { label: "Disputes", href: "/classifieds/disputes", icon: MessageSquareWarning },
@@ -97,6 +98,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Sponsored", href: "/sponsored", icon: Megaphone },
       { label: "Banners", href: "/banners", icon: GalleryHorizontal },
       { label: "Watermarks", href: "/watermarks", icon: Stamp },
+      { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
       { label: "Colour theme", href: "/theme", icon: Paintbrush },
     ],
   },

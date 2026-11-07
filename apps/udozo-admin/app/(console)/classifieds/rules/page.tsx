@@ -47,6 +47,10 @@ const limitFields: Array<{ key: keyof Limits; label: string; hint: string; min: 
   { key: "ready_reminder_1_hours", label: "Hours before the first reminder to post", hint: "An ad with everything filled in but not posted: this long after the seller last changed it. 1 to 720.", min: 1, max: 720, fallback: 24 },
   { key: "ready_reminder_2_hours", label: "Hours from the first to the second", hint: "The second reminder to post, this long after the first. 1 to 720.", min: 1, max: 720, fallback: 72 },
   { key: "ready_reminder_3_hours", label: "Hours from the second to the last", hint: "The third and last reminder, this long after the second. 1 to 720.", min: 1, max: 720, fallback: 168 },
+  { key: "wanted_open_per_buyer", label: "Open wanted requests per buyer", hint: "Requests a buyer may have open at once (each lasts 14 days). 1 to 20.", min: 1, max: 20, fallback: 3 },
+  { key: "wanted_per_day", label: "Wanted requests a buyer may post a day", hint: "1 to 50.", min: 1, max: 50, fallback: 5 },
+  { key: "wanted_sellers_per_request", label: "Sellers told about each request", hint: "Those with live listings in its category, nearest first. 1 to 200.", min: 1, max: 200, fallback: 30 },
+  { key: "wanted_notices_per_seller_day", label: "Requests a seller hears of a day", hint: "Beyond this, a seller is not told of more that day. 1 to 200.", min: 1, max: 200, fallback: 20 },
 ];
 
 /** What the market has saved for a field; a setting the API does not send yet reads as its default. */
