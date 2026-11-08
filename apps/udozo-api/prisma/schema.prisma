@@ -128,6 +128,19 @@ model OAuthAccount {
   @@map("oauth_accounts")
 }
 
+/// A data deletion request from Meta (Facebook Login's callback), by the confirmation code Meta shows the person, with
+/// how many udozo.com accounts and Seller HQ people were unlinked. The Facebook account's id is never kept.
+model FacebookDataDeletion {
+  id               String    @id @default(uuid()) @db.Uuid
+  confirmationCode String    @unique @map("confirmation_code") @db.VarChar(32)
+  customers        Int       @default(0)
+  people           Int       @default(0)
+  requestedAt      DateTime  @default(now()) @map("requested_at")
+  completedAt      DateTime? @map("completed_at")
+
+  @@map("facebook_data_deletions")
+}
+
 /// A Google sign-in in progress (10 minutes). The browser holds the state token in a cookie; this holds the PKCE verifier.
 model OAuthState {
   /// SHA-256 of the state token.

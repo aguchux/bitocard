@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { AppConfig } from '../config/config.js';
 
 /** A failure during the Facebook round trip: the site, or Seller HQ, shows the person why by its code. */
@@ -54,4 +54,28 @@ export async function facebookProfile(config: Config, input: { code: string; app
   const email = text(profile.email)?.toLowerCase() ?? null;
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new FacebookSignInError('facebook_email_missing');
   return { id, email, firstName: text(profile.first_name), lastName: text(profile.last_name), name: text(profile.name) };
+}
+
+/**
+ * Meta's `signed_request` (deauthorize and data deletion callbacks): `<signature>.<payload>`, both base64url, the
+ * signature an HMAC-SHA256 of the encoded payload keyed with the app secret. Returns the app-scoped user id it is about,
+ * or null when it is malformed, of another algorithm, or not signed with this app's secret.
+ */
+export function parseSignedRequest(signed: unknown, secret: string): { userId: string; issuedAt: number | null } | null {
+  if (typeof signed !== 'string' || signed.length > 4096 || !secret) return null;
+  const [signature, payload, extra] = signed.split('.');
+  if (!signature || !payload || extra !== undefined) return null;
+  const expected = createHmac('sha256', secret).update(payload).digest();
+  const given = Buffer.from(signature, 'base64url');
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'object' || data === null || String(data.algorithm ?? '').toUpperCase() !== 'HMAC-SHA256') return null;
+  const userId = typeof data.user_id === 'string' || typeof data.user_id === 'number' ? String(data.user_id) : '';
+  if (!/^[\w-]{1,64}$/.test(userId)) return null;
+  return { userId, issuedAt: typeof data.issued_at === 'number' ? data.issued_at : null };
 }

@@ -106,3 +106,21 @@ describe("Facebook returning to udozo.com", () => {
     expect(request.set.some(item => item.name === "udz_customer")).toBe(false);
   });
 });
+
+describe("Meta's data deletion page", () => {
+  test("shows where a request stands by its confirmation code, and how to have Facebook data deleted", async () => {
+    const { default: Page } = await import("@/app/(global)/legal/facebook-deletion/page");
+    reply = url => (url.endsWith("/v1/facebook/data-deletion/ABC123DEF456") ? Response.json({ confirmation_code: "ABC123DEF456", status: "completed", requested_at: "2026-11-08T10:00:00Z", completed_at: "2026-11-08T10:00:00Z" }) : Response.json({ error: { code: "resource_missing" } }, { status: 404 }));
+    const done = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ code: "abc123def456" }) }));
+    expect(done).toContain("Your request ABC123DEF456");
+    expect(done).toContain("Done. We removed your Facebook account from Udozo on 8 November 2026");
+    expect(done).toContain("Apps and websites");
+    const unknown = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ code: "NOSUCHCODE00" }) }));
+    expect(unknown).toContain("We have no request with that confirmation code");
+    // A code that is not letters and digits is never sent to the API.
+    calls = [];
+    const odd = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ code: "../../x" }) }));
+    expect(calls).toHaveLength(0);
+    expect(odd).not.toContain("Your request");
+  });
+});

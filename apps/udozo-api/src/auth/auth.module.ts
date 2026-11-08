@@ -11,6 +11,8 @@ import { AuthService } from './auth.service.js';
 import { CodesService } from './codes.service.js';
 import { DocsTokensService } from './docs-tokens.service.js';
 import { FacebookController } from './facebook.controller.js';
+import { FacebookDataStatusController, FacebookDataWebhookController } from './facebook-data.controller.js';
+import { FacebookDataService } from './facebook-data.service.js';
 import { FacebookService } from './facebook.service.js';
 import { GoogleController } from './google.controller.js';
 import { GoogleService } from './google.service.js';
@@ -22,8 +24,8 @@ import { TwoStepService } from './two-step.service.js';
 
 @Module({
   imports: [TeamModule, CountriesModule],
-  controllers: [AuthController, GoogleController, FacebookController, AdminAuthController, AfrippaAdminAuthController, AdminTeamController, TwoStepController, AdminTwoStepController],
-  providers: [AuthService, AdminAuthService, AdminTeamService, GoogleService, FacebookService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
+  controllers: [AuthController, GoogleController, FacebookController, FacebookDataWebhookController, FacebookDataStatusController, AdminAuthController, AfrippaAdminAuthController, AdminTeamController, TwoStepController, AdminTwoStepController],
+  providers: [AuthService, AdminAuthService, AdminTeamService, GoogleService, FacebookService, FacebookDataService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
   exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService, SignupVerificationService],
 })
 export class AuthModule {}

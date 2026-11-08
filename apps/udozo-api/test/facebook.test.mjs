@@ -193,3 +193,47 @@ describe("Seller HQ's people with Facebook", () => {
     assert.match(res.headers.get('location') ?? '', /auth_error=facebook_state_invalid/);
   });
 });
+
+describe("Meta's deauthorize and data deletion callbacks", () => {
+  const sign = (payload, secret = appSecret) => {
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    return `${createHmac('sha256', secret).update(body).digest('base64url')}.${body}`;
+  };
+  const post = (path, signed) =>
+    fetch(`${server.base}/v1/webhooks/facebook/${path}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ signed_request: signed }).toString() });
+
+  test('a request not signed with the app secret changes nothing', async () => {
+    const customer = await prisma.customer.findFirstOrThrow({ where: { facebookSubject: { not: null } } });
+    for (const signed of [sign({ algorithm: 'HMAC-SHA256', user_id: customer.facebookSubject }, 'someone-else'), 'not.signed', sign({ algorithm: 'RS256', user_id: customer.facebookSubject })]) {
+      assert.equal((await post('data-deletion', signed)).status, 401);
+    }
+    assert.equal((await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } })).facebookSubject, customer.facebookSubject);
+  });
+
+  test('deauthorizing unlinks the Facebook account from udozo.com and Seller HQ, keeping the Udozo accounts', async () => {
+    const customer = await prisma.customer.findFirstOrThrow({ where: { facebookSubject: { not: null } } });
+    const subject = customer.facebookSubject;
+    const account = await prisma.oAuthAccount.findFirstOrThrow({ where: { provider: 'facebook' } });
+    await prisma.oAuthAccount.update({ where: { id: account.id }, data: { providerUserId: subject } });
+    const res = await post('deauthorize', sign({ algorithm: 'HMAC-SHA256', user_id: subject, issued_at: Math.floor(Date.now() / 1000) }));
+    assert.equal(res.status, 200);
+    assert.equal((await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } })).facebookSubject, null);
+    assert.equal(await prisma.oAuthAccount.count({ where: { id: account.id } }), 0);
+    assert.ok(await prisma.user.findUnique({ where: { id: account.userId } }), 'the person is kept');
+  });
+
+  test('a deletion request answers a status page and a confirmation code, readable afterwards', async () => {
+    const someone = await prisma.customer.findFirstOrThrow({ where: { facebookSubject: null } });
+    const customer = await prisma.customer.update({ where: { id: someone.id }, data: { facebookSubject: `fb-delete-${Date.now()}` } });
+    const res = await post('data-deletion', sign({ algorithm: 'HMAC-SHA256', user_id: customer.facebookSubject }));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.confirmation_code, /^[A-Z0-9]{12}$/);
+    assert.equal(body.url, `https://udozo.com/legal/facebook-deletion?code=${body.confirmation_code}`);
+    assert.equal((await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } })).facebookSubject, null);
+    const status = await (await fetch(`${server.base}/v1/facebook/data-deletion/${body.confirmation_code}`)).json();
+    assert.equal(status.status, 'completed');
+    assert.equal(status.confirmation_code, body.confirmation_code);
+    assert.equal((await fetch(`${server.base}/v1/facebook/data-deletion/NOSUCHCODE00`)).status, 404);
+  });
+});
