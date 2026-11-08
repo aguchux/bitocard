@@ -30,11 +30,8 @@ export function shownSlides(slides: HeroSlide[]): ShownSlide[] {
     .map(slide => ({ id: slide.id, layout: slide.layout, tiles: slide.tiles.map(({ href, ...tile }) => ({ ...tile, link: href ? safeBannerHref(href) : null })) }));
 }
 
-/**
- * Enough columns to fill the widest screens and keep the loop going (columns are one row wide, 106 to 156 px, so 24
- * cover 2,560 px): the list repeated, each repeat marked.
- */
-export function filledSlides<T>(slides: T[], least = 24): Array<{ slide: T; repeat: number }> {
+/** Enough columns to fill the widest screens and keep the loop going: the list repeated, each repeat marked. */
+export function filledSlides<T>(slides: T[], least = 6): Array<{ slide: T; repeat: number }> {
   if (!slides.length) return [];
   const out: Array<{ slide: T; repeat: number }> = [];
   for (let repeat = 0; out.length < least; repeat += 1) for (const slide of slides) out.push({ slide, repeat });

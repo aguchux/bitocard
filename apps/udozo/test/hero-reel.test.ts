@@ -45,10 +45,9 @@ describe("the hero reel's columns", () => {
   });
 
   it("few columns are repeated to fill the widest screens", () => {
-    expect(filledSlides(["a", "b"], 6).map(item => `${item.slide}${item.repeat}`)).toEqual(["a0", "b0", "a1", "b1", "a2", "b2"]);
-    expect(filledSlides(["a", "b"]).length).toBe(24);
+    expect(filledSlides(["a", "b"]).map(item => `${item.slide}${item.repeat}`)).toEqual(["a0", "b0", "a1", "b1", "a2", "b2"]);
     expect(filledSlides([])).toEqual([]);
-    expect(filledSlides(Array.from({ length: 30 }, (_, index) => index)).length).toBe(30);
+    expect(filledSlides([1, 2, 3, 4, 5, 6, 7]).length).toBe(7);
   });
 
   it("draws three rows a column, 6 px apart on white, square-cornered, links where they go, Ad in the link's words", () => {
@@ -60,10 +59,8 @@ describe("the hero reel's columns", () => {
     expect(html).toMatch(/class="flex shrink-0 gap-1\.5 pr-1\.5/);
     expect(html).toMatch(/<li data-hero-slide="s1" class="grid [^"]*gap-1\.5/);
     const columns = html.match(/<li[^]*?<\/li>/g) ?? [];
-    // 24 columns, and the marquee's copy of them.
-    expect(columns.length).toBe(48);
-    // As wide as a row is high: thirds are squares, two thirds 1:2, a whole column 1:3.
-    expect(html).toMatch(/<li data-hero-slide="s1" class="grid h-\[330px\] w-\[106px\] gap-1\.5 sm:h-\[420px\] sm:w-\[136px\] lg:h-\[480px\] lg:w-\[156px\]"/);
+    // 6 columns, and the marquee's copy of them.
+    expect(columns.length).toBe(12);
     for (const column of columns) expect(column).not.toMatch(/rounded/);
     // The full banner spans the three rows and opens its listing here; the big one two rows, outside in a new tab.
     expect(html).toMatch(/<a class="relative block min-h-0 overflow-hidden bg-navy-100 group row-span-3" href="\/ng\/l\/100123-iphone-13">/);

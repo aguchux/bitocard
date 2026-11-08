@@ -29,8 +29,7 @@ const heroLayouts: Record<HeroLayout, { name: string; rows: number[] }> = {
   two_thirds_third: { name: "Two thirds over a third", rows: [2, 1] },
   thirds: { name: "Three thirds", rows: [1, 1, 1] },
 };
-/** Columns are as wide as a row is high: a third is a square, two thirds an upright 1:2 rectangle, a whole column 1:3. */
-const sizeFor: Record<number, string> = { 3: "600 × 1800 px (an upright 1:3 strip)", 2: "600 × 1200 px (upright, 1:2)", 1: "600 × 600 px (square)" };
+const sizeFor: Record<number, string> = { 3: "900 × 1000 px", 2: "900 × 660 px", 1: "900 × 330 px" };
 
 const linkKinds: Record<HeroLinkKind, { name: string; label: string; placeholder: string; hint: string }> = {
   listing: { name: "A listing", label: "Listing", placeholder: "Type its title, number or SKU", hint: "Choose from the suggestions, or type its number (in its address, /ng/l/100123-…) or SKU." },
@@ -138,7 +137,7 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
           {(Object.keys(heroLayouts) as HeroLayout[]).map(key => (
             <label key={key} className={`grid cursor-pointer justify-items-center gap-2 border p-2 text-center text-xs font-medium ${layout === key ? "border-pink-500 bg-pink-50 text-navy-900" : "border-line text-ink"}`}>
               <input type="radio" name={`${id}-layout`} value={key} checked={layout === key} onChange={() => chooseLayout(key)} className="sr-only" />
-              <span className="block h-24 w-8" aria-hidden="true">
+              <span className="block h-20 w-16" aria-hidden="true">
                 <LayoutDrawing layout={key} />
               </span>
               {heroLayouts[key].name}
@@ -276,7 +275,7 @@ function Reel({ markets, editable }: { markets: Market[]; editable: boolean }) {
             <ol aria-label="Columns in order" className="flex gap-3 overflow-x-auto px-5 pb-5 sm:px-6">
               {data.data.map((slide, index) => (
                 <li key={slide.id} className="grid w-56 shrink-0 content-start gap-2">
-                  <span className="block h-60 w-20">
+                  <span className="block h-60 w-56">
                     <LayoutDrawing layout={slide.layout} images={slide.tiles.map(tile => ({ src: tile.image_url, alt: tile.alt }))} />
                   </span>
                   <span className="flex flex-wrap items-center gap-2 text-sm">
