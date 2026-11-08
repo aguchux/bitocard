@@ -40,7 +40,9 @@ function isFocusVisible(target: EventTarget): boolean {
  * something in it has keyboard focus, and with its own Pause button (moving content needs one, WCAG 2.2.2). For visitors who ask
  * for reduced motion it never moves by itself: the copy goes and the row only scrolls by hand. Never wider than the screen.
  */
-export function Marquee({ label, count, speed = "normal", direction = "left", children }: { label: string; count: number; speed?: MarqueeSpeed; direction?: "left" | "right"; children: React.ReactNode }) {
+/** `tight`: items 2 px apart (the hero reel), else 12 px. */
+export function Marquee({ label, count, speed = "normal", direction = "left", tight = false, children }: { label: string; count: number; speed?: MarqueeSpeed; direction?: "left" | "right"; tight?: boolean; children: React.ReactNode }) {
+  const spacing = tight ? "gap-0.5 pr-0.5" : "gap-3 pr-3";
   const [paused, setPaused] = useState(false);
   const duration = Math.max(12, count * marqueeSeconds[speed]);
   const viewport = useRef<HTMLDivElement>(null);
@@ -186,10 +188,10 @@ export function Marquee({ label, count, speed = "normal", direction = "left", ch
         onDragStart={event => event.preventDefault()}
       >
         <div className="marquee-track relative flex w-max">
-          <ul aria-label={label} className="flex shrink-0 gap-3 pr-3 [&>li]:shrink-0">
+          <ul aria-label={label} className={`flex shrink-0 ${spacing} [&>li]:shrink-0`}>
             {children}
           </ul>
-          <ul ref={copy} aria-hidden="true" className="marquee-copy flex shrink-0 gap-3 pr-3 [&>li]:shrink-0">
+          <ul ref={copy} aria-hidden="true" className={`marquee-copy flex shrink-0 ${spacing} [&>li]:shrink-0`}>
             {children}
           </ul>
         </div>

@@ -241,7 +241,7 @@ export class MediaService {
     const add = (url: string | null, label: string) => {
       if (url && urls.includes(url)) uses.set(url, [...(uses.get(url) ?? []), label]);
     };
-    const [brands, products, suppliers, categories, stores, pages, registry, bots, shopBrands, banners, customers, people] = await Promise.all([
+    const [brands, products, suppliers, categories, stores, pages, registry, bots, shopBrands, banners, customers, people, heroTiles] = await Promise.all([
       this.prisma.brand.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { imageUrl: { in: urls } }] }, select: { slug: true, logoUrl: true, imageUrl: true } }),
       this.prisma.product.findMany({ where: { imageUrl: { in: urls } }, select: { key: true, imageUrl: true } }),
       this.prisma.supplier.findMany({ where: { logoUrl: { in: urls } }, select: { code: true, logoUrl: true } }),
@@ -254,6 +254,7 @@ export class MediaService {
       this.prisma.classifiedBanner.findMany({ where: { imageUrl: { in: urls } }, select: { id: true, position: true, imageUrl: true } }),
       this.prisma.customer.findMany({ where: { OR: [{ avatarUrl: { in: urls } }, { bannerUrl: { in: urls } }] }, select: { id: true, avatarUrl: true, bannerUrl: true } }),
       this.prisma.user.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
+      this.prisma.classifiedHeroTile.findMany({ where: { imageUrl: { in: urls } }, select: { slideId: true, imageUrl: true } }),
     ]);
     for (const customer of customers) {
       add(customer.avatarUrl, `customer:${customer.id}:avatar`);
@@ -261,6 +262,7 @@ export class MediaService {
     }
     for (const person of people) add(person.avatarUrl, `user:${person.id}:avatar`);
     for (const banner of banners) add(banner.imageUrl, `banner:${banner.position}:${banner.id}`);
+    for (const tile of heroTiles) add(tile.imageUrl, `hero_slide:${tile.slideId}`);
     for (const brand of shopBrands) {
       add(brand.logoUrl, `marketplace_brand:${brand.slug}`);
       add(brand.bannerUrl, `marketplace_brand:${brand.slug}:banner`);

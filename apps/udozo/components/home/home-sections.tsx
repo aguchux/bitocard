@@ -343,12 +343,13 @@ function Row({ row, look, preview, country }: { row: ResolvedHomeRow; look: Home
  * rows left empty with them; the layout's look sets the hero's colour, the cards, corners and spacing. `preview` marks
  * rows and blocks for the editor's click-to-edit (only on /home-preview).
  */
-export function HomeRows({ home, rows, preview = false }: { home: ClassifiedHome; rows: ResolvedHomeRow[]; preview?: boolean }) {
+export function HomeRows({ home, rows, preview = false, hero }: { home: ClassifiedHome; rows: ResolvedHomeRow[]; preview?: boolean; hero?: React.ReactNode }) {
   const [first, ...rest] = rows.filter(row => !row.hidden);
   const leadHero = first && first.blocks.length === 1 && first.blocks[0]!.type === "home_hero" ? (first.blocks[0] as Of<"home_hero">) : null;
   return (
     <div data-home-layout={home.layout} className="grid pb-4">
-      {leadHero ? (
+      {/* The hero reel, when the team set one up, takes the leading hero's place. */}
+      {hero ? hero : leadHero ? (
         <div data-home-row={preview ? first!.id : undefined} data-home-block={preview ? leadHero.id : undefined}>
           <Hero section={leadHero} look={home.look} bleed />
         </div>
@@ -365,15 +366,15 @@ export function HomeRows({ home, rows, preview = false }: { home: ClassifiedHome
  * column on phones, 6 on tablets and 12 on desktops (each section's own width from tablets up). Sections with nothing to
  * show are left out; the layout's look sets the hero's colour, the cards, corners and spacing.
  */
-export function HomeSections({ home, preview = false }: { home: ClassifiedHome; preview?: boolean }) {
-  if (home.rows) return <HomeRows home={home} rows={home.rows} preview={preview} />;
+export function HomeSections({ home, preview = false, hero }: { home: ClassifiedHome; preview?: boolean; /** The hero reel, in place of the page's leading hero. */ hero?: React.ReactNode }) {
+  if (home.rows) return <HomeRows home={home} rows={home.rows} preview={preview} hero={hero} />;
   const shown = home.sections.filter(section => !section.hidden && showsSomething(section));
   const [first, ...rest] = shown;
   const leadHero = first?.type === "home_hero" ? first : null;
   const body = leadHero ? rest : shown;
   return (
     <div data-home-layout={home.layout}>
-      {leadHero ? <Hero section={leadHero} look={home.look} bleed /> : null}
+      {hero ? hero : leadHero ? <Hero section={leadHero} look={home.look} bleed /> : null}
       <div className={`mx-auto grid max-w-[1400px] grid-cols-1 px-4 pt-5 pb-4 sm:px-6 md:grid-cols-6 lg:grid-cols-12 lg:px-8 ${gaps[home.look.density]}`}>
         {body.map(section => (
           <div key={section.id} data-discovery-source={homeSource(section.id)} className={`min-w-0 ${mdSpans[section.span.md] ?? "md:col-span-6"} ${lgSpans[section.span.lg] ?? "lg:col-span-12"}`}>

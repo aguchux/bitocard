@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
 import type { ClassifiedHome } from "@bitocard/api-client/home";
+import { HeroReel } from "@/components/home/hero-reel";
 import { HomeSections } from "@/components/home/home-sections";
 import { ListingGrid } from "@/components/listing-card";
 import { type ApiResult, markets, shopApi } from "@/lib/api";
 import { JsonLd } from "@/components/json-ld";
 import { siteOrigin } from "@/lib/customer";
+import { heroSlidesFor } from "@/lib/hero";
 import { chosenOpenMarket } from "@/lib/market-choice";
 import { currentMarketChoice } from "@/lib/market-choice-server";
 import { organizationJsonLd, regionalAlternates, websiteJsonLd } from "@/lib/seo";
@@ -40,12 +42,12 @@ export default async function GlobalHome() {
       </div>
     );
   }
-  const home = await shopApi<ClassifiedHome>("/v1/classifieds/home?page=global");
+  const [home, slides] = await Promise.all([shopApi<ClassifiedHome>("/v1/classifieds/home?page=global"), heroSlidesFor("global")]);
   return (
     <>
       <JsonLd data={organizationJsonLd(siteOrigin())} />
       <JsonLd data={websiteJsonLd(siteOrigin())} />
-      {home.ok ? <HomeSections home={home.data} /> : <DefaultGlobalHome showcase={await shopApi<ShopShowcase>("/v1/classifieds/showcase")} />}
+      {home.ok ? <HomeSections home={home.data} hero={slides.length ? <HeroReel slides={slides} title="Udozo: buy and sell near you" /> : undefined} /> : <DefaultGlobalHome showcase={await shopApi<ShopShowcase>("/v1/classifieds/showcase")} />}
     </>
   );
 }

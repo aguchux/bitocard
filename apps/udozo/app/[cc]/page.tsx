@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { ShopMarket, ShopSearch } from "@bitocard/api-client/classifieds";
 import type { ClassifiedHome } from "@bitocard/api-client/home";
+import { HeroReel } from "@/components/home/hero-reel";
 import { firstListingSection, HomeSections } from "@/components/home/home-sections";
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
 import { type ApiResult, marketFor, markets, shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
+import { heroSlidesFor } from "@/lib/hero";
 import { itemListJsonLd, organizationJsonLd, regionalAlternates } from "@/lib/seo";
 
 type Props = { params: Promise<{ cc: string }> };
@@ -36,12 +38,12 @@ export default async function CountryHome({ params }: Props) {
   const market = await marketFor(cc);
   // Pages render alongside the layout, so each checks the market itself.
   if (!market) notFound();
-  const home = await shopApi<ClassifiedHome>(`/v1/classifieds/home?page=${market.country}`);
+  const [home, slides] = await Promise.all([shopApi<ClassifiedHome>(`/v1/classifieds/home?page=${market.country}`), heroSlidesFor(market.country)]);
   const list = home.ok ? firstListingSection(home.data) : null;
   const recent = home.ok ? null : await shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&sort=newest&limit=12`);
   return (
     <>
-      {home.ok ? <HomeSections home={home.data} /> : <DefaultMarketHome market={market} cc={cc} recent={recent!} />}
+      {home.ok ? <HomeSections home={home.data} hero={slides.length ? <HeroReel slides={slides} title={`Udozo ${market.name}: buy and sell near you`} /> : undefined} /> : <DefaultMarketHome market={market} cc={cc} recent={recent!} />}
       {list ? <JsonLd data={itemListJsonLd(list.title, list.cards, siteOrigin(), market.country)} /> : null}
       <JsonLd data={organizationJsonLd(siteOrigin())} />
       <JsonLd data={{ "@context": "https://schema.org", "@type": "WebSite", name: `Udozo ${market.name}`, url: `${siteOrigin()}/${cc}`, inLanguage: `en-${market.country}`, publisher: { "@id": `${siteOrigin()}/#organization` }, potentialAction: { "@type": "SearchAction", target: `${siteOrigin()}/${cc}/search?q={search_term_string}`, "query-input": "required name=search_term_string" } }} />

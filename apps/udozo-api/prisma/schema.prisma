@@ -6431,6 +6431,50 @@ model ClassifiedBanner {
   @@map("classified_banners")
 }
 
+/// A column of udozo.com's hero reel (the home page's top, below the header): three rows high, holding one banner over
+/// all three (`full`), two (`third_two_thirds`: a third on top, two thirds below; `two_thirds_third` the other way up)
+/// or three (`thirds`). Placed by Udozo's team for one market or every market, in their order (`position`), switched
+/// on and off (the gate), optionally between two dates.
+model ClassifiedHeroSlide {
+  id          String               @id @default(uuid()) @db.Uuid
+  /// A market's code; null: every market (shown after the market's own).
+  country     String?              @db.Char(2)
+  layout      String               @db.VarChar(20)
+  position    Int                  @default(0)
+  enabled     Boolean              @default(true)
+  startsAt    DateTime?            @map("starts_at")
+  endsAt      DateTime?            @map("ends_at")
+  note        String?
+  createdById String?              @map("created_by_id") @db.Uuid
+  updatedById String?              @map("updated_by_id") @db.Uuid
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+  tiles       ClassifiedHeroTile[]
+
+  @@index([country, position])
+  @@map("classified_hero_slides")
+}
+
+/// One banner of a hero column, top first (`slot` 0 to 2). Links to a listing (its id), a brand (its slug), a seller
+/// (their customer id) or any address (`/…` or https), worked out when udozo.com reads it.
+model ClassifiedHeroTile {
+  id         String              @id @default(uuid()) @db.Uuid
+  slideId    String              @map("slide_id") @db.Uuid
+  slot       Int
+  imageUrl   String              @map("image_url")
+  /// What the image says, for people who cannot see it.
+  alt        String              @db.VarChar(120)
+  /// listing, brand, seller or url.
+  linkKind   String              @map("link_kind") @db.VarChar(20)
+  linkTarget String              @map("link_target")
+  /// Labelled Ad on udozo.com (off for Udozo's own promotions).
+  ad         Boolean             @default(true)
+  slide      ClassifiedHeroSlide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([slideId, slot])
+  @@map("classified_hero_tiles")
+}
+
 /// Udozo's personalised discovery (docs/UDOZO_PERSONALISATION_PLAN.md): what one person (a signed-in customer `c:<id>`,
 /// or a visitor who accepted all cookies, `v:<HMAC of their visitor ID>`) looked at, searched for and did, append-only,
 /// with what it was about copied at the time. Kept 90 days. No foreign keys: a listing gone keeps its events until then.

@@ -57,6 +57,7 @@ const purposeTable = {
   home_image: { label: 'Home page image', realm: 'admin', folder: () => 'platform/home/images', maxBytes: 5 * MB, types: rasterTypes },
   // udozo.com's banner ads (`BannersService`).
   banner_image: { label: 'Banner ad image', realm: 'admin', folder: () => 'platform/banners/images', maxBytes: 2 * MB, types: rasterTypes },
+  hero_image: { label: 'Hero reel banner', realm: 'admin', folder: () => 'platform/hero/images', maxBytes: 3 * MB, types: rasterTypes },
   store_logo: { label: 'Store logo', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/logos`, maxBytes: 1 * MB, types: rasterTypes },
   store_image: { label: 'Store image', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/images`, maxBytes: 5 * MB, types: rasterTypes },
   bot_avatar: { label: 'Assistant avatar', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/bots/avatars`, maxBytes: 1 * MB, types: rasterTypes },

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, FlaskConical, Gauge, GalleryHorizontal, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -96,6 +96,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
     items: [
       { label: "Home pages", href: "/home-pages", icon: LayoutTemplate },
       { label: "Sponsored", href: "/sponsored", icon: Megaphone },
+      { label: "Hero slider", href: "/hero-slider", icon: GalleryHorizontalEnd },
       { label: "Banners", href: "/banners", icon: GalleryHorizontal },
       { label: "Watermarks", href: "/watermarks", icon: Stamp },
       { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
