@@ -70,8 +70,8 @@ describe('the hero reel', () => {
     assert.equal(nigeria.cache, 'public, max-age=60');
     assert.deepEqual(nigeria.json.data.map(item => item.id), [two.json.id, full.json.id, three.json.id], 'the market’s own first');
     assert.deepEqual(nigeria.json.data[0].tiles, [
-      { id: two.json.tiles[0].id, image_url: image('big'), alt: 'Banner big', href: '/ng/brand/herotest', ad: true },
-      { id: two.json.tiles[1].id, image_url: image('small'), alt: 'Banner small', href: '/ng/seller/adaeze_gadgets', ad: false },
+      { id: two.json.tiles[0].id, image_url: image('big'), photos: [], alt: 'Banner big', href: '/ng/brand/herotest', ad: true },
+      { id: two.json.tiles[1].id, image_url: image('small'), photos: [], alt: 'Banner small', href: '/ng/seller/adaeze_gadgets', ad: false },
     ]);
     assert.ok(!JSON.stringify(nigeria.json).includes('Launch week'), 'never the note');
     // Ghana and the page across countries see only those for every market.
@@ -96,6 +96,8 @@ describe('the hero reel', () => {
     await refused({ layout: 'full', tiles: [tile('a', { kind: 'seller', target: 'nobody_here' })] }, 'seller_unknown', 'tiles[0].link.target');
     await refused({ layout: 'full', tiles: [{ ...tile('a', { kind: 'url', target: '/ng' }), alt: ' ' }] }, 'parameter_missing', 'tiles[0].alt');
     await refused({ layout: 'full', tiles: [{ ...tile('a', { kind: 'url', target: '/ng' }), image_url: 'http://x.test/a.jpg' }] }, 'parameter_invalid', 'tiles[0].image_url');
+    // Only a banner linking to something with listings may go without an image.
+    await refused({ layout: 'full', tiles: [{ ...tile('a', { kind: 'url', target: '/ng' }), image_url: '' }] }, 'parameter_missing', 'tiles[0].image_url');
     await refused({ country: 'ZZ', layout: 'full', tiles: [tile('a', { kind: 'url', target: '/ng' })] }, 'market_unavailable', 'country');
     // Changing the split needs its banners.
     const made = await post({ layout: 'full', tiles: [tile('a', { kind: 'url', target: '/ng' })] });
@@ -166,6 +168,40 @@ describe('the hero reel', () => {
     assert.ok(categories.data.some(item => item.value === 'mobile-phones' && /^In /.test(item.detail)), JSON.stringify(categories.data));
     assert.ok((await suggest({ kind: 'category' })).data.every(item => item.detail.startsWith('Top category')), 'nothing typed: the top categories');
     assert.equal((await support.get('/v1/admin/classifieds/hero-slides/targets?kind=url&q=x')).status, 400);
+  });
+
+  test('a banner without an image shows photos of what it links to: its category, brand, seller or listing', async () => {
+    await prisma.classifiedMedia.createMany({ data: [0, 1, 2].map(position => ({ listingId: listing.id, kind: 'photo', position, url: `https://media.test/${listing.id}/${position}.jpg` })) });
+    const brandFeature = await prisma.classifiedFeature.findUniqueOrThrow({ where: { key: 'brand' } });
+    await prisma.classifiedListingFeature.upsert({ where: { listingId_featureId: { listingId: listing.id, featureId: brandFeature.id } }, create: { listingId: listing.id, featureId: brandFeature.id, valueText: 'Herotest' }, update: { valueText: 'Herotest' } });
+    const bare = (link, alt) => ({ alt, link });
+    const made = await operations.post('/v1/admin/classifieds/hero-slides', {
+      layout: 'thirds',
+      tiles: [bare({ kind: 'category', target: 'phones-tablets' }, 'Phones'), bare({ kind: 'brand', target: 'herotest' }, 'Herotest'), bare({ kind: 'seller', target: 'adaeze_gadgets' }, 'Adaeze')],
+    });
+    assert.equal(made.status, 201, JSON.stringify(made.json));
+    assert.deepEqual(made.json.tiles.map(item => item.image_url), [null, null, null]);
+    const own = await operations.post('/v1/admin/classifieds/hero-slides', { layout: 'full', tiles: [bare({ kind: 'listing', target: String(listing.ref) }, 'iPhone 13')] });
+    assert.equal(own.status, 201, JSON.stringify(own.json));
+
+    const cover = `https://media.test/${listing.id}/0.jpg`;
+    const ours = async page => {
+      const data = (await showing(page)).json.data;
+      return [made.json.id, own.json.id].map(id => data.find(item => item.id === id));
+    };
+    for (const page of ['NG', 'global']) {
+      const [column, single] = await ours(page);
+      // A category counts its subcategories' listings; each shows the cover photo of a live listing.
+      assert.deepEqual(column.tiles.map(item => [item.image_url, item.photos]), [[null, [cover]], [null, [cover]], [null, [cover]]], page);
+      assert.deepEqual(single.tiles[0].photos, [0, 1, 2].map(position => `https://media.test/${listing.id}/${position}.jpg`), 'a listing shows its own photos in order');
+    }
+    // Ghana has none of them.
+    assert.deepEqual((await ours('GH')).flatMap(item => item.tiles.map(entry => entry.photos)), [[], [], [], []]);
+    // A listing no longer for sale shows none.
+    await prisma.classifiedListing.update({ where: { id: listing.id }, data: { status: 'sold' } });
+    assert.deepEqual((await ours('NG'))[1].tiles[0].photos, []);
+    await prisma.classifiedListing.update({ where: { id: listing.id }, data: { status: 'active' } });
+    for (const id of [made.json.id, own.json.id]) await operations.delete(`/v1/admin/classifieds/hero-slides/${id}`);
   });
 
   test('support reads but never changes; the uploads are counted as in use', async () => {

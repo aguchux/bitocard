@@ -6461,7 +6461,8 @@ model ClassifiedHeroTile {
   id         String              @id @default(uuid()) @db.Uuid
   slideId    String              @map("slide_id") @db.Uuid
   slot       Int
-  imageUrl   String              @map("image_url")
+  /// Null: a banner linking to a listing, brand, seller or category shows photos of its live listings instead.
+  imageUrl   String?             @map("image_url")
   /// What the image says, for people who cannot see it.
   alt        String              @db.VarChar(120)
   /// listing, brand, seller, category or url.

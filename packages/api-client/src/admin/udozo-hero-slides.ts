@@ -9,13 +9,16 @@ export const heroTileCount: Record<HeroLayout, number> = { full: 1, third_two_th
 /** Where a banner links: a listing, a brand's page, a seller's page, a category or any address. */
 export type HeroLinkKind = 'listing' | 'brand' | 'seller' | 'category' | 'url';
 /** A suggestion for a link as the admin types: `value` goes in the link's target. */
+/** Link kinds whose banner may go without an image (udozo.com then shows photos of its listings). */
+export const heroPhotoKinds: readonly HeroLinkKind[] = ['listing', 'brand', 'seller', 'category'];
 export type HeroTarget = { value: string; label: string; detail: string | null; image_url: string | null };
 export type HeroState = 'showing' | 'off' | 'scheduled' | 'ended';
 
 export type HeroTile = {
   id: string;
   slot: number;
-  image_url: string;
+  /** Null: it shows photos of what it links to (its listings) on udozo.com instead. */
+  image_url: string | null;
   alt: string;
   /** Labelled Ad on udozo.com. */
   ad: boolean;
@@ -40,7 +43,8 @@ export type HeroSlide = {
   updated_at: string;
 };
 
-export type HeroTileInput = { image_url: string; alt: string; link: { kind: HeroLinkKind; target: string }; ad?: boolean };
+/** Leave `image_url` out for a banner linking to a listing, brand, seller or category to show photos of its listings. */
+export type HeroTileInput = { image_url?: string; alt: string; link: { kind: HeroLinkKind; target: string }; ad?: boolean };
 export type HeroSlideInput = { country?: string | null; layout?: HeroLayout; tiles?: HeroTileInput[]; enabled?: boolean; starts_at?: string | null; ends_at?: string | null; note?: string | null };
 
 const tag = { type: 'Settings' as const, id: 'HERO_SLIDES' };

@@ -2,8 +2,10 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { ClassifiedHeroSlide, ClassifiedHeroTile, Prisma } from '../generated/prisma/client.js';
+import { type ClassifiedHeroSlide, type ClassifiedHeroTile, Prisma } from '../generated/prisma/client.js';
+import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { bannerHrefOk } from './banners.service.js';
+import { brandListingSql, ClassifiedBrandsService } from './brands.service.js';
 import { ShopDirectoryService } from './directory.service.js';
 import { shopOrigin } from './listings.service.js';
 import { priceText, readSku } from './rules.js';
@@ -23,6 +25,16 @@ export type HeroLinkKind = (typeof heroLinkKinds)[number];
 
 /** Columns per market (and for every market): the reel never grows past this. */
 export const maxHeroSlides = 30;
+
+/**
+ * A banner left without an image shows photos of what it links to instead (`photos`): its listing's own, or the cover
+ * photos of live listings in its category (and its subcategories), of its brand or of its seller, picked at random in
+ * the market being viewed (every open market across countries). At most this many; udozo.com uses as many as the
+ * banner's size holds.
+ */
+export const heroCollageSize = 6;
+/** Link kinds whose banner may go without an image (an address has no listings to show). */
+export const heroPhotoKinds: readonly HeroLinkKind[] = ['listing', 'brand', 'seller', 'category'];
 
 export type HeroTileInput = { image_url?: string; alt?: string; link?: { kind?: HeroLinkKind; target?: string }; ad?: boolean };
 export type HeroSlideInput = {
@@ -63,6 +75,8 @@ export class HeroSlidesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly directory: ShopDirectoryService,
+    private readonly brands: ClassifiedBrandsService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   stateOf(row: Pick<ClassifiedHeroSlide, 'enabled' | 'startsAt' | 'endsAt'>, now = new Date()): HeroState {
@@ -112,6 +126,52 @@ export class HeroSlidesService {
         out.set(tile.id, live ? { href: `/${seller.country!.toLowerCase()}/seller/${slug}`, label: publicName(seller.name), target: slug } : { href: null, label: seller ? publicName(seller.name) : null, target: slug });
       }
     }
+    return out;
+  }
+
+  /**
+   * Photos for every banner without an image, by tile: up to `heroCollageSize` of what it links to (see
+   * `heroCollageSize`), in `countries`, chosen afresh on each read (udozo.com keeps the answer a minute).
+   */
+  private async collages(tiles: Pick<ClassifiedHeroTile, 'id' | 'imageUrl' | 'linkKind' | 'linkTarget'>[], countries: string[]) {
+    const out = new Map<string, string[]>();
+    const wanted = tiles.filter(tile => !tile.imageUrl && heroPhotoKinds.includes(tile.linkKind as HeroLinkKind));
+    if (!wanted.length || !countries.length) return out;
+    const cover = Prisma.sql`JOIN LATERAL (SELECT m."id", m."url" FROM "classified_media" m WHERE m."listing_id" = l."id" AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL ORDER BY m."position" LIMIT 1) m ON true`;
+    const live = Prisma.sql`l."country" = ANY(${countries}::text[]) AND l."status" = 'active' AND l."on_shop"`;
+    const photosOf = async (kind: HeroLinkKind, target: string): Promise<{ id: string; url: string }[]> => {
+      if (kind === 'listing') {
+        return this.prisma.$queryRaw`
+          SELECT m."id", m."url" FROM "classified_media" m JOIN "classified_listings" l ON l."id" = m."listing_id"
+          WHERE l."id" = ${target}::uuid AND ${live} AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL
+          ORDER BY m."position" LIMIT ${heroCollageSize}`;
+      }
+      let where: Prisma.Sql;
+      if (kind === 'category') {
+        const category = await this.prisma.classifiedCategory.findUnique({ where: { slug: target }, select: { id: true, enabled: true, children: { where: { enabled: true }, select: { id: true } } } });
+        if (!category?.enabled) return [];
+        where = Prisma.sql`l."category_id" = ANY(${[category.id, ...category.children.map(child => child.id)]}::uuid[])`;
+      } else if (kind === 'brand') {
+        const brand = await this.brands.bySlug(target);
+        if (!brand) return [];
+        where = brandListingSql(brand.keys);
+      } else {
+        where = Prisma.sql`l."customer_id" = ${target}::uuid`;
+      }
+      return this.prisma.$queryRaw`SELECT m."id", m."url" FROM "classified_listings" l ${cover} WHERE ${live} AND ${where} ORDER BY random() LIMIT ${heroCollageSize}`;
+    };
+    // One question per thing linked to, however many banners link to it.
+    const keys = [...new Set(wanted.map(tile => `${tile.linkKind}:${tile.linkTarget}`))];
+    const found = new Map(
+      await Promise.all(
+        keys.map(async key => {
+          const [kind, ...rest] = key.split(':');
+          const rows = await photosOf(kind as HeroLinkKind, rest.join(':')).catch(() => []);
+          return [key, rows.map(row => this.watermarks.url(row, 480)).filter((url): url is string => Boolean(url))] as const;
+        }),
+      ),
+    );
+    for (const tile of wanted) out.set(tile.id, found.get(`${tile.linkKind}:${tile.linkTarget}`) ?? []);
     return out;
   }
 
@@ -284,7 +344,9 @@ export class HeroSlidesService {
     });
     // The market's own first.
     const ordered = [...rows.filter(row => row.country !== null), ...rows.filter(row => row.country === null)].filter(row => row.tiles.length === heroTiles[row.layout as HeroLayout]);
-    const links = await this.resolve(ordered.flatMap(row => row.tiles), country);
+    const tiles = ordered.flatMap(row => row.tiles);
+    const countries = country ? [country] : tiles.some(tile => !tile.imageUrl) ? (await this.directory.markets()).data.map(market => market.country) : [];
+    const [links, photos] = await Promise.all([this.resolve(tiles, country), this.collages(tiles, countries)]);
     return {
       object: 'list' as const,
       page: country ?? 'global',
@@ -292,7 +354,7 @@ export class HeroSlidesService {
         object: 'hero_slide' as const,
         id: row.id,
         layout: row.layout as HeroLayout,
-        tiles: [...row.tiles].sort((a, b) => a.slot - b.slot).map(tile => ({ id: tile.id, image_url: tile.imageUrl, alt: tile.alt, href: links.get(tile.id)?.href ?? null, ad: tile.ad })),
+        tiles: [...row.tiles].sort((a, b) => a.slot - b.slot).map(tile => ({ id: tile.id, image_url: tile.imageUrl, photos: tile.imageUrl ? [] : (photos.get(tile.id) ?? []), alt: tile.alt, href: links.get(tile.id)?.href ?? null, ad: tile.ad })),
       })),
     };
   }
@@ -324,9 +386,10 @@ export class HeroSlidesService {
       tiles = [];
       for (const [slot, tile] of input.tiles.entries()) {
         const param = `tiles[${slot}]`;
-        const imageUrl = (tile.image_url ?? '').trim();
-        if (!imageUrl) throw invalid('parameter_missing', 'Add the banner’s image.', `${param}.image_url`);
-        if (!imageOk(imageUrl)) throw invalid('parameter_invalid', 'Upload the image, or use an https address.', `${param}.image_url`);
+        // Without an image, a banner linking to a listing, brand, seller or category shows photos of its listings.
+        const imageUrl = (tile.image_url ?? '').trim() || null;
+        if (!imageUrl && (!tile.link?.kind || !heroPhotoKinds.includes(tile.link.kind))) throw invalid('parameter_missing', 'Add the banner’s image (only a banner linking to a listing, brand, seller or category can show its photos instead).', `${param}.image_url`);
+        if (imageUrl && !imageOk(imageUrl)) throw invalid('parameter_invalid', 'Upload the image, or use an https address.', `${param}.image_url`);
         const alt = (tile.alt ?? '').trim();
         if (!alt) throw invalid('parameter_missing', 'Describe the banner for people who cannot see it.', `${param}.alt`);
         if (alt.length > 120) throw invalid('parameter_invalid', 'Keep the description to 120 characters.', `${param}.alt`);

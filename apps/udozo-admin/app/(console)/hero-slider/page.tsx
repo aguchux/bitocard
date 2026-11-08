@@ -11,6 +11,7 @@ import {
   type HeroSlideInput,
   type HeroState,
   type HeroTileInput,
+  heroPhotoKinds,
   heroTileCount,
   useCreateHeroSlideMutation,
   useDeleteHeroSlideMutation,
@@ -54,15 +55,19 @@ type TileDraft = { image_url: string; alt: string; kind: HeroLinkKind; target: s
 const emptyTile = (): TileDraft => ({ image_url: "", alt: "", kind: "listing", target: "", label: null, ad: true });
 
 /** A drawing of a split: its rows in thirds, closely gapped, with small rounded corners (as udozo.com draws it). */
-function LayoutDrawing({ layout, images }: { layout: HeroLayout; images?: Array<{ src: string; alt: string } | null> }) {
+function LayoutDrawing({ layout, images }: { layout: HeroLayout; images?: Array<{ src: string | null; alt: string; photos?: boolean } | null> }) {
   return (
     <span className="grid h-full w-full gap-1" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
       {heroLayouts[layout].rows.map((span, index) => {
         const image = images?.[index];
         return (
           <span key={index} className="block min-h-0 overflow-hidden rounded-sm bg-navy-100" style={{ gridRow: `span ${span} / span ${span}` }}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- uploaded banners on Udozo's storage */}
-            {image?.src ? <img src={image.src} alt={image.alt} className="size-full object-cover" /> : null}
+            {image?.src ? (
+              // eslint-disable-next-line @next/next/no-img-element -- uploaded banners on Udozo's storage
+              <img src={image.src} alt={image.alt} className="size-full object-cover" />
+            ) : image?.photos ? (
+              <span className="grid size-full place-items-center p-1 text-center text-[11px] leading-tight font-semibold text-navy-700">Photos of its listings</span>
+            ) : null}
           </span>
         );
       })}
@@ -77,7 +82,7 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
   const [market, setMarket] = useState(slide ? (slide.country ?? "") : scope === "global" ? "" : scope);
   const [layout, setLayout] = useState<HeroLayout>(slide?.layout ?? "full");
   const [tiles, setTiles] = useState<TileDraft[]>(
-    slide ? slide.tiles.map(tile => ({ image_url: tile.image_url, alt: tile.alt, kind: tile.link.kind, target: tile.link.target, label: tile.link.label, ad: tile.ad })) : [emptyTile()],
+    slide ? slide.tiles.map(tile => ({ image_url: tile.image_url ?? "", alt: tile.alt, kind: tile.link.kind, target: tile.link.target, label: tile.link.label, ad: tile.ad })) : [emptyTile()],
   );
   const [enabled, setEnabled] = useState(slide?.enabled ?? true);
   const [startsAt, setStartsAt] = useState(local(slide?.starts_at ?? null));
@@ -103,7 +108,7 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
     const body: HeroSlideInput = {
       country: market || null,
       layout,
-      tiles: tiles.map((tile): HeroTileInput => ({ image_url: tile.image_url.trim(), alt: tile.alt.trim(), link: { kind: tile.kind, target: tile.target.trim() }, ad: tile.ad })),
+      tiles: tiles.map((tile): HeroTileInput => ({ ...(tile.image_url.trim() ? { image_url: tile.image_url.trim() } : {}), alt: tile.alt.trim(), link: { kind: tile.kind, target: tile.target.trim() }, ad: tile.ad })),
       enabled,
       starts_at: startsAt ? new Date(startsAt).toISOString() : null,
       ends_at: endsAt ? new Date(endsAt).toISOString() : null,
@@ -171,10 +176,10 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
               purpose="hero_image"
               value={tile.image_url}
               onChange={value => change(index, { image_url: value })}
-              hint={`JPEG, PNG or WebP. Best ${sizeFor[rows]}: it fills its space and is cropped to fit, so keep what matters in the middle.`}
+              hint={`JPEG, PNG or WebP. Best ${sizeFor[rows]}: it fills its space and is cropped to fit, so keep what matters in the middle.${heroPhotoKinds.includes(tile.kind) ? " Optional: without one, the banner shows photos of its listings, picked at random, under what it says." : ""}`}
               error={errorFor(`${at}.image_url`)}
             />
-            <Field label="What the banner says" htmlFor={`${id}-alt-${index}`} hint="Read out to people who cannot see the image. Up to 120 characters." error={errorFor(`${at}.alt`)}>
+            <Field label="What the banner says" htmlFor={`${id}-alt-${index}`} hint={tile.image_url ? "Read out to people who cannot see the image. Up to 120 characters." : "Shown over the photos, and read out to people who cannot see them. Up to 120 characters."} error={errorFor(`${at}.alt`)}>
               <Input id={`${id}-alt-${index}`} value={tile.alt} maxLength={120} onChange={event => change(index, { alt: event.target.value })} required />
             </Field>
             <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
@@ -276,7 +281,7 @@ function Reel({ markets, editable }: { markets: Market[]; editable: boolean }) {
               {data.data.map((slide, index) => (
                 <li key={slide.id} className="grid w-56 shrink-0 content-start gap-2">
                   <span className="block h-60 w-56">
-                    <LayoutDrawing layout={slide.layout} images={slide.tiles.map(tile => ({ src: tile.image_url, alt: tile.alt }))} />
+                    <LayoutDrawing layout={slide.layout} images={slide.tiles.map(tile => ({ src: tile.image_url, alt: tile.alt, photos: !tile.image_url }))} />
                   </span>
                   <span className="flex flex-wrap items-center gap-2 text-sm">
                     <strong className="text-navy-900">{index + 1}.</strong> {heroLayouts[slide.layout].name}

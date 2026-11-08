@@ -141,6 +141,24 @@ describe("hero slider", () => {
       ],
       enabled: true,
     });
+    // No image uploaded: each shows photos of its listings on udozo.com, and the form says so.
+    expect((sent.find(item => item.method === "POST")?.body as { tiles: object[] }).tiles.every(item => !("image_url" in item))).toBe(true);
+  });
+
+  test("a banner left without an image is drawn as photos of its listings; an address still needs one", long, async () => {
+    existing.push(slide("s4", { position: 2, tiles: [tile("bare", 0, { image_url: null, alt: "Phones", link: { kind: "category", target: "mobile-phones", label: "Mobile phones", href: "/c/mobile-phones" } })] }));
+    try {
+      show();
+      expect(await screen.findByText("Photos of its listings", {}, slow)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Add column" }));
+      const dialog = await screen.findByRole("dialog", {}, slow);
+      expect(within(dialog).getByText(/Optional: without one, the banner shows photos of its listings/)).toBeTruthy();
+      expect(within(dialog).getByText(/Shown over the photos/)).toBeTruthy();
+      fireEvent.change(within(dialog).getByLabelText("Links to"), { target: { value: "url" } });
+      expect(within(dialog).queryByText(/Optional: without one/)).toBeNull();
+    } finally {
+      existing.pop();
+    }
   });
 
   test("a listing and a category are chosen from suggestions as the admin types", long, async () => {

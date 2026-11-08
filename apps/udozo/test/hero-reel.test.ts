@@ -12,7 +12,7 @@ vi.mock("@/lib/api", () => ({
   shopApi: async (path: string) => (path === "/v1/classifieds/hero-slides?page=NG" && answer.value ? { ok: true, data: answer.value } : { ok: false, status: 0, code: null }),
 }));
 
-const { filledSlides, heroSlidesFor, shownSlides } = await import("@/lib/hero");
+const { collageOf, filledSlides, heroSlidesFor, shownSlides } = await import("@/lib/hero");
 const { HeroReel } = await import("@/components/home/hero-reel");
 
 const image = (name: string) => `https://cdn.udozo.test/platform/hero/images/${name}.jpg`;
@@ -77,6 +77,42 @@ describe("the hero reel's columns", () => {
     // The first column's image loads at once; the reel can be paused.
     expect(html).toMatch(/fetchPriority="high"|fetchpriority="high"/);
     expect(html).toMatch(/Pause Featured on Udozo/);
+  });
+
+  it("a banner without an image shows photos of its listings under its words, as many as fit its size evenly", () => {
+    const photo = (n: number) => `https://media.udozo.test/l/${n}.jpg`;
+    const bare = [
+      {
+        object: "hero_slide" as const,
+        id: "c1",
+        layout: "third_two_thirds" as const,
+        tiles: [
+          { id: "p1", image_url: null, photos: [1, 2, 3, 4, 5].map(photo), alt: "Mobile phones", href: "/ng/c/mobile-phones", ad: false },
+          { id: "p2", image_url: null, photos: [6, 7, 8, 9, 10].map(photo), alt: "Samsung", href: "/ng/brand/samsung", ad: true },
+        ],
+      },
+      // No photos (nothing for sale there) and no image: left out.
+      { object: "hero_slide" as const, id: "empty", layout: "full" as const, tiles: [{ id: "p3", image_url: null, photos: [], alt: "Nothing", href: "/ng/c/x", ad: false }] },
+      // Photos that are not https are dropped, never drawn.
+      { object: "hero_slide" as const, id: "mixed", layout: "full" as const, tiles: [{ id: "p4", image_url: null, photos: ["http://plain.test/a.jpg", photo(11)], alt: "Adaeze", href: "/ng/seller/adaeze", ad: false }] },
+    ];
+    const shown = shownSlides(bare);
+    expect(shown.map(slide => slide.id)).toEqual(["c1", "mixed"]);
+    expect(shown[1]!.tiles[0]!.photos).toEqual([photo(11)]);
+    // A third of the column: up to three across; two thirds: four, two by two; the whole column: six, two by three.
+    expect(collageOf([1, 2, 3, 4, 5].map(photo), 1)).toEqual({ photos: [1, 2, 3].map(photo), grid: "grid-cols-3" });
+    expect(collageOf([1, 2, 3].map(photo), 2)).toEqual({ photos: [1, 2].map(photo), grid: "grid-cols-2" });
+    expect(collageOf([1, 2, 3, 4, 5].map(photo), 3).photos.length).toBe(4);
+    expect(collageOf([1, 2, 3, 4, 5, 6, 7].map(photo), 3)).toEqual({ photos: [1, 2, 3, 4, 5, 6].map(photo), grid: "grid-cols-2 grid-rows-3" });
+    expect(collageOf([photo(1)], 3)).toEqual({ photos: [photo(1)], grid: "grid-cols-1" });
+
+    const html = renderToStaticMarkup(createElement(HeroReel, { slides: shown.slice(0, 1), title: "Udozo" }));
+    expect(html).toMatch(/<span data-hero-collage="3" class="grid size-full gap-px bg-white grid-cols-3">/);
+    expect(html).toMatch(/<span data-hero-collage="4" class="grid size-full gap-px bg-white grid-cols-2 grid-rows-2">/);
+    // The photos are the background: the banner's words name the link, with Ad at the top when it is one.
+    expect(html).toMatch(/<a class="[^"]*row-span-1" href="\/ng\/c\/mobile-phones"><span data-hero-collage[^]*?<img src="https:\/\/media\.udozo\.test\/l\/1\.jpg" alt=""/);
+    expect(html).toMatch(/>Mobile phones<\/span><\/a>/);
+    expect(html).toMatch(/>Samsung<\/span><span class="absolute top-1\.5 left-1\.5[^"]*">Ad<\/span>/);
   });
 
   it("takes the place of the home page's own hero on the market and global home pages", () => {
