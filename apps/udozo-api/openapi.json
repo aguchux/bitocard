@@ -11858,6 +11858,117 @@
         "x-bitocard-auth": "public"
       }
     },
+    "/v1/auth/facebook/start": {
+      "get": {
+        "description": "Afterwards the browser returns to `return_to` (a Udozo app; defaults to Seller HQ), with `?auth_error=<code>` if it failed. A Facebook account no account uses yet signs up: only the person is made, and their email is confirmed with an emailed code before onboarding.",
+        "operationId": "FacebookController_start",
+        "parameters": [
+          {
+            "name": "return_to",
+            "required": false,
+            "in": "query",
+            "description": "A Udozo app URL to return to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "signin",
+                "signup"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects the browser to Facebook."
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Redirects to Facebook",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/auth/facebook/callback": {
+      "get": {
+        "description": "Not called directly.",
+        "operationId": "FacebookController_callback",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Redirects the browser back to the Udozo app it came from, signed in, or with `?auth_error=<code>`."
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Facebook returns here",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
     "/v1/auth/two-step": {
       "get": {
         "description": "Your method, whether your account requires two-step sign-in, whether this session still has to finish it, and the methods you can choose.",

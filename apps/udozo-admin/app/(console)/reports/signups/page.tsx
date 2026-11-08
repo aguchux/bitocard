@@ -16,7 +16,7 @@ import {
   useSignupSummaryQuery,
 } from "@bitocard/api-client/admin";
 import { UdozoShell } from "@/components/shell";
-import { codeLabel, duration, milestoneLabels, percent, statusLabels, statusTones, stepLabel, stuckLabels, surfaceLabels } from "@/components/signups";
+import { codeLabel, duration, methodLabel, milestoneLabels, percent, statusLabels, statusTones, stepLabel, stuckLabels, surfaceLabels } from "@/components/signups";
 
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const showFilters = [
@@ -191,7 +191,7 @@ function Overview({ data, onPick }: { data: SignupSummary; onPick: (filter: { st
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Split title="How they signed up" rows={data.methods.map(row => ({ key: row.method, label: row.method === "google" ? "Google" : "Email", ...row }))} />
+        <Split title="How they signed up" rows={data.methods.map(row => ({ key: row.method, label: methodLabel(row.method), ...row }))} />
         <Split title="Devices" description="Journeys still kept (30 days at most)." rows={data.devices.map(row => ({ key: row.device, label: row.device, ...row }))} />
         <Split title="Countries" rows={data.countries.map(row => ({ key: row.country ?? "none", label: row.country ?? "Not chosen yet", ...row }))} />
       </div>

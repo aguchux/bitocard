@@ -83,7 +83,7 @@ export class CustomerGoogleService {
   async finish(store: Store, input: { state: string; code: string; ref?: string }) {
     const record = await this.prisma.oAuthState.findUnique({ where: { id: sha256(input.state) } });
     // Only this store's accounts' own round trips, unexpired.
-    if (!record || record.platform !== 'bitocard' || record.returnTo !== customerGoogleState(store.id) || record.expiresAt <= new Date()) throw refused('google_state_invalid');
+    if (!record || record.provider !== 'google' || record.platform !== 'bitocard' || record.returnTo !== customerGoogleState(store.id) || record.expiresAt <= new Date()) throw refused('google_state_invalid');
     const { config, clientId, clientSecret, redirectUri } = this.client();
     // Used once: whoever deletes it goes on.
     if ((await this.prisma.oAuthState.deleteMany({ where: { id: record.id } })).count === 0) throw refused('google_state_invalid');

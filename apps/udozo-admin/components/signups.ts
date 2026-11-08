@@ -34,6 +34,7 @@ const stepLabels: Record<string, string> = {
   phone_verify: "Entered the texted code",
   signup: "Set a password and created the account",
   google: "Continued with Google",
+  facebook: "Continued with Facebook",
   profile: "Saved name and country",
   account_email_verify: "Confirmed email from the account",
   account_phone: "Added a mobile from the account",
@@ -67,15 +68,22 @@ const codeLabels: Record<string, string> = {
   parameter_missing: "A field was left empty",
   parameter_invalid: "A field was not accepted",
   google_account_not_found: "Signed in with Google, but had no account",
-  account_exists_sign_in_with_password: "Google email already has a password account",
-  account_exists_sign_in_to_link: "Google email already has an account",
+  account_exists_sign_in_with_password: "Google or Facebook email already has an account",
+  account_exists_sign_in_to_link: "Google or Facebook email already has an account",
   google_cancelled: "Cancelled at Google",
   google_failed: "Google sign-in failed",
   google_state_invalid: "Google sign-in timed out",
+  facebook_cancelled: "Cancelled at Facebook",
+  facebook_failed: "Facebook sign-in failed",
+  facebook_state_invalid: "Facebook sign-in timed out",
+  facebook_email_missing: "Facebook shared no email",
   already_owner: "Already owns a business",
   rate_limited: "Too many attempts",
   api_error: "Something went wrong at Udozo",
 };
+/** How a journey signed up, in words. */
+export const methodLabel = (method: string) => (method === "google" ? "Google" : method === "facebook" ? "Facebook" : "Email");
+
 export const codeLabel = (code: string | null | undefined) => (code ? (codeLabels[code] ?? humanise(code)) : "—");
 
 export const percent = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 1000) / 10}%` : "—");

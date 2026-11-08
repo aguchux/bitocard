@@ -74,6 +74,9 @@ const integrationKeyList = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'GOOGLE_REDIRECT_URI',
+  'FACEBOOK_APP_ID',
+  'FACEBOOK_APP_SECRET',
+  'FACEBOOK_REDIRECT_URI',
   'FLUTTERWAVE_SECRET_KEY',
   'FLUTTERWAVE_WEBHOOK_HASH',
   'FLUTTERWAVE_SANDBOX',
@@ -305,6 +308,17 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('GOOGLE_CLIENT_ID', 'Client ID', { required: true }),
       secret('GOOGLE_CLIENT_SECRET', 'Client secret'),
       field('GOOGLE_REDIRECT_URI', 'Redirect URI', { kind: 'url', help: 'Must match the Google Cloud console: https://api.bitocard.com/v1/auth/google/callback' }),
+    ],
+  },
+  {
+    id: 'facebook',
+    name: 'Facebook sign-in',
+    description:
+      'Continue with Facebook for udozo.com’s customers and Seller HQ (never admins). Switched off until the app ID and secret are set. In the Meta app, add Facebook Login with the valid OAuth redirect addresses https://api.udozo.com/v1/auth/facebook/callback (Seller HQ) and https://udozo.com/auth/facebook/callback (udozo.com), asking only for email and public_profile.',
+    fields: [
+      field('FACEBOOK_APP_ID', 'App ID', { required: true, help: 'Meta for Developers > your app > App settings > Basic.' }),
+      secret('FACEBOOK_APP_SECRET', 'App secret', { help: 'On the same page: App secret, Show.' }),
+      field('FACEBOOK_REDIRECT_URI', 'Seller HQ redirect URI', { kind: 'url', help: 'Must be one of Facebook Login’s valid OAuth redirect URIs: https://api.udozo.com/v1/auth/facebook/callback' }),
     ],
   },
   {

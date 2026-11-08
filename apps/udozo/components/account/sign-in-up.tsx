@@ -26,6 +26,7 @@ import {
   type StepResult,
 } from "@/lib/account-actions";
 import type { Market } from "@/lib/countries";
+import { FacebookButton } from "./facebook-button";
 import { GoogleButton } from "./google-button";
 
 const phoneInput =
@@ -173,15 +174,16 @@ export function SignInForm({
     );
   }
 
-  // An account made with Google has no password until Forgot password sets one.
+  // An account made with Google or Facebook has no password until Forgot password sets one.
   if (step === "google") {
     return (
       <div className="space-y-4">
         <EmailChip email={email.trim()} onChange={() => setStep("email")} />
         <p role="status" className="text-sm text-navy-700">
-          This account signs in with Google.
+          This account signs in with Google or Facebook.
         </p>
         <GoogleButton intent="signin" next={next} />
+        <FacebookButton intent="signin" next={next} />
         <Link
           href={`/forgot-password?email=${encodeURIComponent(email.trim())}`}
           className="block text-sm font-semibold text-brand-700 hover:underline"

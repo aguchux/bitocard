@@ -735,6 +735,8 @@ export const dashboardDocs: DocsArea = {
     },
     'GET /v1/auth/google/start': { status: 302, description: 'Redirects the browser to Google.' },
     'GET /v1/auth/google/callback': { status: 302, description: 'Redirects the browser back to the BitoCard app it came from, signed in, or with `?auth_error=<code>`.' },
+    'GET /v1/auth/facebook/start': { status: 302, description: 'Redirects the browser to Facebook.' },
+    'GET /v1/auth/facebook/callback': { status: 302, description: 'Redirects the browser back to the Udozo app it came from, signed in, or with `?auth_error=<code>`.' },
 
     // -- Notifications and push -------------------------------------------------------------------------------------
     'GET /v1/notifications': {

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthLinks } from "@/components/account-forms";
+import { FacebookButton } from "@/components/account/facebook-button";
 import { GoogleButton, OrDivider } from "@/components/account/google-button";
 import { SignUpForm } from "@/components/account/sign-in-up";
 import { SignupVisit } from "@/components/account/signup-visit";
-import { googleErrorText } from "@/lib/google";
+import { authErrorText } from "@/lib/facebook";
 import { markets } from "@/lib/api";
 import { countries } from "@/lib/countries";
 import { currentCustomer, safeNext } from "@/lib/customer";
@@ -31,14 +32,17 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
       <h1 className="text-2xl leading-tight font-extrabold">Create your Udozo account</h1>
       <p className="text-sm text-navy-600">Buy and sell near you, and pay safely with Safe pay. One account works on udozo.com and every Udozo store.</p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">
-        {googleErrorText(params.auth_error) ? (
+        {authErrorText(params.auth_error) ? (
           <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-            {googleErrorText(params.auth_error)}
+            {authErrorText(params.auth_error)}
           </p>
         ) : null}
         {list.length ? (
           <>
-            <GoogleButton intent="signup" next={next} refCode={cleanRef(params.ref)} />
+            <div className="grid gap-3">
+              <GoogleButton intent="signup" next={next} refCode={cleanRef(params.ref)} />
+              <FacebookButton intent="signup" next={next} refCode={cleanRef(params.ref)} />
+            </div>
             <OrDivider />
           </>
         ) : null}

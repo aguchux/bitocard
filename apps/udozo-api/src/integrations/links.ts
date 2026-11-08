@@ -35,6 +35,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   kyc_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/how-to/manage-access/')],
   file_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/')],
   google: [keys('https://console.cloud.google.com/apis/credentials', 'Google Cloud credentials'), docs('https://developers.google.com/identity/protocols/oauth2/web-server')],
+  facebook: [signUp('https://developers.facebook.com/apps/'), keys('https://developers.facebook.com/apps/', 'Meta apps: App settings > Basic'), docs('https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow')],
   flutterwave: [signUp('https://app.flutterwave.com/register'), keys('https://app.flutterwave.com/dashboard/settings/apis'), docs('https://developer.flutterwave.com/')],
   stripe: [signUp('https://dashboard.stripe.com/register'), keys('https://dashboard.stripe.com/apikeys'), { label: 'Webhooks', url: 'https://dashboard.stripe.com/webhooks' }, docs('https://docs.stripe.com/api/checkout/sessions')],
   paystack: [signUp('https://dashboard.paystack.com/#/signup'), keys('https://dashboard.paystack.com/#/settings/developers', 'API keys and webhooks'), docs('https://paystack.com/docs/api/transaction/')],

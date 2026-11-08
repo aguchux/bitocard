@@ -6,7 +6,7 @@ import { Badge, Card, CardHeader, cn, formatDateTime, KeyValue, PageHeader, Quer
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { type SignupJourneyDetail, type SignupMilestone, signupMilestones, useSignupJourneyQuery } from "@bitocard/api-client/admin";
 import { UdozoShell } from "@/components/shell";
-import { codeLabel, duration, milestoneLabels, statusLabels, statusTones, stepLabel, stuckLabels, surfaceLabels } from "@/components/signups";
+import { codeLabel, duration, methodLabel, milestoneLabels, statusLabels, statusTones, stepLabel, stuckLabels, surfaceLabels } from "@/components/signups";
 
 /**
  * One person's sign-up journey: the milestones across the top (each with when it was reached and how long it took
@@ -32,7 +32,7 @@ function Journey({ data }: { data: SignupJourneyDetail }) {
     <>
       <PageHeader
         title={data.email}
-        description={`${surfaceLabels[data.surface]} · ${data.method === "google" ? "Google" : "Email"} sign-up · started ${formatDateTime(data.started_at)}`}
+        description={`${surfaceLabels[data.surface]} · ${methodLabel(data.method)} sign-up · started ${formatDateTime(data.started_at)}`}
         actions={<Badge tone={statusTones[data.status]}>{statusLabels[data.status]}</Badge>}
       />
 

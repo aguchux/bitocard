@@ -52,7 +52,27 @@ describe("Seller HQ sign-in, the email first", () => {
 
   test("a Google-only account is told to use Google (or set a password)", async () => {
     signIn({ exists: true, password: false });
-    expect(await screen.findByText(/This account signs in with Google/, {}, slow)).toBeTruthy();
+    expect(await screen.findByText(/This account signs in with Google or Facebook/, {}, slow)).toBeTruthy();
     expect(screen.queryByLabelText("Password")).toBeNull();
+  }, 20000);
+
+  test("Sign in with Facebook beside Google goes to the API's Facebook start, returning to Seller HQ", async () => {
+    const assign = vi.fn();
+    const real = window.location;
+    Object.defineProperty(window, "location", { configurable: true, value: { ...real, origin: "https://shq.udozo.com", assign } });
+    try {
+      fakeApi({ "/v1/auth/session": refusal(401, "not_signed_in", "Sign in first.") });
+      render(
+        <AdminProviders>
+          <SignIn />
+        </AdminProviders>,
+      );
+      expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Sign in with Facebook" }));
+      expect(assign).toHaveBeenCalledTimes(1);
+      expect(String(assign.mock.calls[0]![0])).toMatch(/\/v1\/auth\/facebook\/start\?intent=signin&return_to=https%3A%2F%2Fshq\.udozo\.com%2F$/);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: real });
+    }
   }, 20000);
 });

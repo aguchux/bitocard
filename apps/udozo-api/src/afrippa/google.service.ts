@@ -70,7 +70,7 @@ export class TraderGoogleService {
   async finish(input: { state: string; code: string; country?: string }) {
     const record = await this.prisma.oAuthState.findUnique({ where: { id: sha256(input.state) } });
     // Only Afrippa's own round trips, unexpired.
-    if (!record || record.platform !== 'afrippa' || record.expiresAt <= new Date()) throw refused('google_state_invalid');
+    if (!record || record.provider !== 'google' || record.platform !== 'afrippa' || record.expiresAt <= new Date()) throw refused('google_state_invalid');
     const { config, clientId, clientSecret, redirectUri } = this.client();
     // The country is checked first, so a sign-up sent without one can be sent again with it.
     const country = record.intent === 'signup' ? await this.signupCountry(input.country) : null;

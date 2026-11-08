@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthLinks } from "@/components/account-forms";
+import { FacebookButton } from "@/components/account/facebook-button";
 import { GoogleButton, OrDivider } from "@/components/account/google-button";
 import { SignInForm } from "@/components/account/sign-in-up";
 import { currentCustomer, safeNext } from "@/lib/customer";
-import { googleErrorText } from "@/lib/google";
+import { authErrorText } from "@/lib/facebook";
 import { SellVisit } from "@/components/account/sell-visit";
 import { sellSourceOf } from "@/lib/sell-sources";
 
@@ -33,12 +34,15 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       <h1 className="text-2xl leading-tight font-extrabold">{reasons[params.for ?? ""] ?? "Sign in to Udozo"}</h1>
       <p className="text-sm text-navy-600">One Udozo account for buying and selling here and on every Udozo store.</p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">
-        {googleErrorText(params.auth_error) ? (
+        {authErrorText(params.auth_error) ? (
           <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-            {googleErrorText(params.auth_error)}
+            {authErrorText(params.auth_error)}
           </p>
         ) : null}
-        <GoogleButton intent="signin" next={next} />
+        <div className="grid gap-3">
+          <GoogleButton intent="signin" next={next} />
+          <FacebookButton intent="signin" next={next} />
+        </div>
         {params.auth_error === "google_account_not_found" ? (
           <div className="mt-3">
             <GoogleButton intent="signup" next={next} />

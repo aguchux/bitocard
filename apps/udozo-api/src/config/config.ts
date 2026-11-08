@@ -110,6 +110,13 @@ export const configSchema = z.object({
   GOOGLE_TOKEN_URL: z.string().url().default('https://oauth2.googleapis.com/token'),
   GOOGLE_JWKS_URL: z.string().url().default('https://www.googleapis.com/oauth2/v3/certs'),
 
+  // Continue with Facebook (Udozo's customers and Seller HQ). Unset app ID means Facebook sign-in is switched off.
+  FACEBOOK_APP_ID: z.string().optional(),
+  FACEBOOK_APP_SECRET: z.string().optional(),
+  FACEBOOK_REDIRECT_URI: z.string().url().default('https://api.bitocard.com/v1/auth/facebook/callback'),
+  FACEBOOK_DIALOG_URL: z.string().url().default('https://www.facebook.com/v23.0/dialog/oauth'),
+  FACEBOOK_GRAPH_URL: z.string().url().default('https://graph.facebook.com/v23.0'),
+
   // Admins: allowed email domains, and the 32-byte base64 key that encrypts authenticator secrets.
   ADMIN_EMAIL_DOMAINS: list.prefault('bitocard.com,golojan.co.uk'),
   ENCRYPTION_KEY: z.string().optional(),
@@ -400,6 +407,7 @@ export const productDefaults: Record<'udozo', Record<string, string>> = {
     TERMII_SENDER_ID: 'Udozo',
     WEB_PUSH_SUBJECT: 'mailto:support@udozo.com',
     GOOGLE_REDIRECT_URI: 'https://api.udozo.com/v1/auth/google/callback',
+    FACEBOOK_REDIRECT_URI: 'https://api.udozo.com/v1/auth/facebook/callback',
     PAYMENT_RETURN_URL: 'https://shq.udozo.com/wallet',
     ALERT_EMAIL: 'alerts@udozo.com',
     SPACES_ROOT: 'udozo',

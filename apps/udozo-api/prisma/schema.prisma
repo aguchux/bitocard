@@ -142,6 +142,8 @@ model OAuthState {
   /// Whose round trip it is: BitoCard's resellers', or Afrippa's traders' (with Afrippa's own Google client). Neither
   /// side finishes the other's.
   platform     Platform    @default(bitocard)
+  /// Whose sign-in it is: `google` or `facebook`. Neither finishes the other's.
+  provider     String      @default("google") @db.VarChar(20)
   expiresAt    DateTime    @map("expires_at")
   createdAt    DateTime    @default(now()) @map("created_at")
 
@@ -2650,6 +2652,9 @@ model Customer {
   /// Afrippa's traders who signed up with Google: the Google account's subject (one account per store). Never set by
   /// matching an email: a Google account never links itself to a password account.
   googleSubject             String?                   @map("google_subject")
+  /// Udozo customers who continued with Facebook: the Facebook account's app-scoped id (one account per store). Never
+  /// set by matching an email, as for Google.
+  facebookSubject           String?                   @map("facebook_subject")
   emailVerifiedAt           DateTime?                 @map("email_verified_at")
   phone                     String?
   phoneVerifiedAt           DateTime?                 @map("phone_verified_at")
@@ -2799,6 +2804,7 @@ model Customer {
 
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
+  @@unique([storeId, facebookSubject])
   @@unique([storeId, phone])
   @@index([signupRef])
   @@index([areaId])

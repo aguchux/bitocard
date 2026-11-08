@@ -64,7 +64,34 @@ export function continueWithGoogle(next: string, intent: "signin" | "signup" = "
   window.location.assign(`${apiBaseUrl()}/v1/auth/google/start?intent=${intent}&return_to=${encodeURIComponent(returnTo)}`);
 }
 
+/** Facebook's "f", white on its blue circle, as Facebook's sign-in branding asks. */
+export function FacebookMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
+      <circle cx="12" cy="12" r="12" fill="#1877F2" />
+      <path fill="#fff" d="M16.67 15.47 17.2 12h-3.33V9.75c0-.95.47-1.87 1.96-1.87h1.51V4.92s-1.37-.23-2.68-.23c-2.74 0-4.53 1.66-4.53 4.66V12H7.08v3.47h3.05V24a12.1 12.1 0 0 0 3.74 0v-8.53h2.8z" />
+    </svg>
+  );
+}
+
+/**
+ * Facebook, as Google: the API's `/v1/auth/facebook/start`, returning to `next` in Seller HQ (with `?auth_error=` if it
+ * failed). A Facebook account no account uses yet signs up; its email is then confirmed with the emailed code.
+ */
+export function continueWithFacebook(next: string, intent: "signin" | "signup" = "signin") {
+  const returnTo = /^https?:\/\//.test(next) ? next : `${window.location.origin}${next}`;
+  // The API's Facebook start page, on another origin.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign(`${apiBaseUrl()}/v1/auth/facebook/start?intent=${intent}&return_to=${encodeURIComponent(returnTo)}`);
+}
+
+/** What a refused Google or Facebook sign-in says, by its code. */
 export const googleErrors: Record<string, string> = {
+  facebook_not_configured: "Facebook sign-in is not available yet. Use your email and password, or Google.",
+  facebook_cancelled: "Facebook sign-in was cancelled.",
+  facebook_state_invalid: "That took too long. Try Facebook again.",
+  facebook_email_missing: "Facebook did not share your email address. Try again and allow Udozo to see your email, or use your email and password.",
+  facebook_failed: "Facebook sign-in did not work. Try again or use your email and password.",
   google_not_configured: "Google sign-in is not available yet. Use your email and password.",
   access_denied: "Google sign-in was cancelled.",
   google_cancelled: "Google sign-in was cancelled.",
@@ -143,7 +170,7 @@ export function SignIn() {
         {search.get("reset") ? <Notice tone="green">Your password was changed. Sign in with the new one.</Notice> : null}
         {authError ? (
           <Notice tone="red">
-            {googleErrors[authError] ?? "Google sign-in did not complete. Try again or use your email and password."}
+            {googleErrors[authError] ?? (authError.startsWith("facebook_") ? googleErrors.facebook_failed : "Google sign-in did not complete. Try again or use your email and password.")}
             {authError === "google_account_not_found" ? (
               <>
                 {" "}
@@ -159,7 +186,7 @@ export function SignIn() {
             {errorMessage(signInState.error)}
             {"code" in signInState.error && signInState.error.code === "invalid_credentials" ? (
               // Never says whether the account exists: the hint is for everyone.
-              <span className="mt-1 block text-xs">Signed up with Google? Use Sign in with Google, or reset your password to add one.</span>
+              <span className="mt-1 block text-xs">Signed up with Google or Facebook? Use it to sign in, or reset your password to add one.</span>
             ) : null}
           </Notice>
         ) : null}
@@ -214,7 +241,7 @@ export function SignIn() {
           <div className="space-y-4">
             {chip}
             <Notice tone="amber">
-              This account signs in with Google. Or{" "}
+              This account signs in with Google or Facebook. Or{" "}
               <AppLink href={isEmail ? `/forgot-password?email=${encodeURIComponent(cleanIdentifier)}` : "/forgot-password"} className="font-semibold underline">
                 set a password
               </AppLink>{" "}
@@ -245,6 +272,9 @@ export function SignIn() {
         </div>
         <Button type="button" variant="secondary" className="min-h-12 w-full text-base" icon={<GoogleMark />} onClick={() => continueWithGoogle(next)}>
           Sign in with Google
+        </Button>
+        <Button type="button" variant="secondary" className="min-h-12 w-full text-base" icon={<FacebookMark />} onClick={() => continueWithFacebook(next)}>
+          Sign in with Facebook
         </Button>
 
         <p className="pt-2 text-center text-sm text-muted">

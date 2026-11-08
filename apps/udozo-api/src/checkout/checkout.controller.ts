@@ -8,6 +8,7 @@ import { NamePart, namedApart, renaming } from '../auth/names.js';
 import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { AllowPhonePending, CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { CustomerFacebookService } from '../customers/customer-facebook.service.js';
 import { CustomerGoogleService } from '../customers/customer-google.service.js';
 import { CustomersService, customerSexes, type CustomerSex } from '../customers/customers.service.js';
 import { HandoffService } from '../customers/handoff.service.js';
@@ -332,6 +333,7 @@ export class CustomerAccountController {
     private readonly identity: IdentityService,
     private readonly handoffs: HandoffService,
     private readonly google: CustomerGoogleService,
+    private readonly facebook: CustomerFacebookService,
     private readonly avatars: AvatarsService,
   ) {}
 
@@ -415,6 +417,25 @@ export class CustomerAccountController {
   @HttpCode(HttpStatus.OK)
   async googleFinish(@StoreKey() store: string | null, @Body() body: GoogleFinishDto) {
     return this.google.finish(await this.stores.accountStore(store), body);
+  }
+
+  /** Udozo: "Continue with Facebook", step 1 (udozo.com's server), as Google's: Facebook's consent address and the one-time state. */
+  @ProductOnly('udozo')
+  @SkipIdempotency()
+  @Post('facebook/start')
+  @HttpCode(HttpStatus.OK)
+  async facebookStart(@StoreKey() store: string | null, @Body() body: GoogleStartDto) {
+    return this.facebook.start(await this.stores.accountStore(store), body.intent);
+  }
+
+  /** Step 2: the code Facebook returned with that state; the customer is signed in (`signed_up` when the account is new, its email still to confirm). */
+  @ProductOnly('udozo')
+  @SkipIdempotency()
+  @TrackSignup('udozo', 'facebook')
+  @Post('facebook/finish')
+  @HttpCode(HttpStatus.OK)
+  async facebookFinish(@StoreKey() store: string | null, @Body() body: GoogleFinishDto) {
+    return this.facebook.finish(await this.stores.accountStore(store), body);
   }
 
   /**

@@ -49,7 +49,7 @@ export class SignupJourneyInterceptor implements NestInterceptor {
     // Sign-in's first step counts only when the email has no account: someone who may sign up next.
     if (step === 'signin_lookup' && (error || answer?.exists !== false)) return;
     // Google: a new account is a sign-up; signing in to an existing one is a sign-in.
-    if (step === 'google' && answer && !answer.signed_up) step = 'signin';
+    if ((step === 'google' || step === 'facebook') && answer && !answer.signed_up) step = 'signin';
     const body = (req.body ?? {}) as Record<string, unknown>;
     const text = (value: unknown) => (typeof value === 'string' ? value : null);
     const identifier = text(body.identifier);

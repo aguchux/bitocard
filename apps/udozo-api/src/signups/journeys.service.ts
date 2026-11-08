@@ -27,6 +27,7 @@ export const journeySteps = [
   'phone_verify',
   'signup',
   'google',
+  'facebook',
   'profile',
   'account_email_verify',
   'account_phone',
@@ -43,9 +44,9 @@ export const milestones = ['email_entered', 'email_verified', 'phone_entered', '
 export type Milestone = (typeof milestones)[number];
 
 /** Steps that may start a journey; the rest only add to an open one. */
-const opening = new Set<JourneyStep>(['signin_lookup', 'email', 'signup', 'google']);
+const opening = new Set<JourneyStep>(['signin_lookup', 'email', 'signup', 'google', 'facebook']);
 /** Steps after which the account may have become usable. */
-const checking = new Set<JourneyStep>(['signup', 'google', 'profile', 'account_email_verify', 'account_phone_verify', 'phone_later', 'onboarding', 'signin', 'phone_verify']);
+const checking = new Set<JourneyStep>(['signup', 'google', 'facebook', 'profile', 'account_email_verify', 'account_phone_verify', 'phone_later', 'onboarding', 'signin', 'phone_verify']);
 
 export const completedRetentionMs = 7 * 24 * 60 * 60 * 1000;
 export const openRetentionMs = 30 * 24 * 60 * 60 * 1000;
@@ -143,7 +144,7 @@ export class SignupJourneysService {
   private async open(input: JourneyInput, email: string, now: Date): Promise<Journey> {
     try {
       return await this.prisma.signupJourney.create({
-        data: { surface: input.surface, email, method: input.step === 'google' ? 'google' : 'email', device: input.device ?? null, startedAt: now, lastEventAt: now },
+        data: { surface: input.surface, email, method: input.step === 'google' || input.step === 'facebook' ? input.step : 'email', device: input.device ?? null, startedAt: now, lastEventAt: now },
       });
     } catch (error) {
       // Another step of the same person opened it first.
@@ -175,6 +176,9 @@ export class SignupJourneysService {
       case 'google':
         // Google confirmed the email, and the account exists.
         return { method: 'google', ...first('emailEnteredAt'), ...first('emailVerifiedAt'), ...first('accountCreatedAt'), ...first('signedInAt') };
+      case 'facebook':
+        // The account exists; Facebook does not confirm the email, so that waits for Udozo's code.
+        return { method: 'facebook', ...first('emailEnteredAt'), ...first('accountCreatedAt'), ...first('signedInAt') };
       case 'signin':
         return first('signedInAt');
       case 'phone_later':

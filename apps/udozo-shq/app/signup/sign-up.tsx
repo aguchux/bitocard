@@ -16,7 +16,7 @@ import { AppLink } from "@bitocard/admin-ui/shell";
 import { PhoneInput } from "@bitocard/ui/phone-input";
 import { Button, CodeInput, cn, errorMessage, Notice, PasswordToggleButton, Select, Skeleton } from "@bitocard/admin-ui";
 import { UdozoWordmark } from "@/components/wordmark";
-import { continueWithGoogle, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
+import { continueWithFacebook, continueWithGoogle, FacebookMark, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
 type Step = "details" | "verify" | "business" | "phone" | "password";
 
@@ -188,13 +188,15 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
     if (done) goNext(invitation ? "/" : next, router);
   }
 
-  const google = () => {
-    // Back to this page (without an old error), which sends the signed-in person on to `next`.
+  // Back to this page (without an old error), which sends the signed-in person on to `next`.
+  const signupHere = () => {
     const params = new URLSearchParams(search.toString());
     params.delete("auth_error");
     const query = params.toString();
-    continueWithGoogle(`/signup${query ? `?${query}` : ""}`, "signup");
+    return `/signup${query ? `?${query}` : ""}`;
   };
+  const google = () => continueWithGoogle(signupHere(), "signup");
+  const facebook = () => continueWithFacebook(signupHere(), "signup");
 
   const error = startState.error ?? verifyState.error ?? signUpState.error;
   const errorCode = failure(error)?.code;
@@ -232,7 +234,7 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
       <div className="mt-6 space-y-5">
         <Progress steps={steps} current={step} titles={titles} />
 
-        {authError && step === "details" ? <Notice tone="red">{googleErrors[authError] ?? "Google sign-up did not complete. Try again or use your email."}</Notice> : null}
+        {authError && step === "details" ? <Notice tone="red">{googleErrors[authError] ?? (authError.startsWith("facebook_") ? googleErrors.facebook_failed : "Google sign-up did not complete. Try again or use your email.")}</Notice> : null}
         {notice ? <Notice tone={notice.startsWith("A new code") ? "green" : "amber"}>{notice}</Notice> : null}
         {error ? (
           <Notice tone="red">
@@ -286,8 +288,11 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
             <Button type="button" variant="secondary" className="min-h-12 w-full text-base" icon={<GoogleMark />} onClick={google}>
               Sign up with Google
             </Button>
+            <Button type="button" variant="secondary" className="min-h-12 w-full text-base" icon={<FacebookMark />} onClick={facebook}>
+              Sign up with Facebook
+            </Button>
             <p className="text-center text-xs text-muted">
-              {invitation ? "Use the Google account for the email the invitation was sent to." : "With Google, you name your business, choose its country and confirm your mobile next."}
+              {invitation ? "Use the Google account for the email the invitation was sent to." : "With Google or Facebook, you name your business, choose its country and confirm your mobile next."}
             </p>
           </>
         ) : null}

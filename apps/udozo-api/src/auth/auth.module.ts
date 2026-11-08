@@ -10,6 +10,8 @@ import { AuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
 import { CodesService } from './codes.service.js';
 import { DocsTokensService } from './docs-tokens.service.js';
+import { FacebookController } from './facebook.controller.js';
+import { FacebookService } from './facebook.service.js';
 import { GoogleController } from './google.controller.js';
 import { GoogleService } from './google.service.js';
 import { PasswordsService } from './passwords.service.js';
@@ -20,8 +22,8 @@ import { TwoStepService } from './two-step.service.js';
 
 @Module({
   imports: [TeamModule, CountriesModule],
-  controllers: [AuthController, GoogleController, AdminAuthController, AfrippaAdminAuthController, AdminTeamController, TwoStepController, AdminTwoStepController],
-  providers: [AuthService, AdminAuthService, AdminTeamService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
+  controllers: [AuthController, GoogleController, FacebookController, AdminAuthController, AfrippaAdminAuthController, AdminTeamController, TwoStepController, AdminTwoStepController],
+  providers: [AuthService, AdminAuthService, AdminTeamService, GoogleService, FacebookService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
   exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService, SignupVerificationService],
 })
 export class AuthModule {}

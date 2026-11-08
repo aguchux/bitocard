@@ -30,7 +30,7 @@ export function GoogleButton({ intent, next, refCode = null }: { intent: "signin
   );
 }
 
-/** The line between Google and the email form. */
+/** The line between Google and Facebook, and the email form. */
 export function OrDivider() {
   return (
     <p className="my-4 flex items-center gap-3 text-xs font-semibold tracking-wide text-navy-400 uppercase">
