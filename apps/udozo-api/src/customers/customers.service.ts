@@ -320,6 +320,37 @@ export class CustomersService {
     return { customer: await this.present(customer), session: await this.startSession(customer.id) };
   }
 
+  /**
+   * Sign-up on Udozo's WhatsApp number (`SignupFlow`): the email was confirmed there with Udozo's emailed code (its
+   * sign-up token), the names were typed by the person, and the WhatsApp number it all came from is the confirmed mobile
+   * (sending from it proves they hold it). The country is the number's own, open for sign-up. No password: they sign in
+   * with WhatsApp, or set one with Forgot password. `whatsapp_number_in_use` when an account already has the number.
+   */
+  async signupWithWhatsapp(store: Store, input: { email: string; first_name: string; last_name: string; phone: string; country: string; signup_token: string; ref?: string | null }) {
+    const email = input.email.trim().toLowerCase();
+    const country = await this.marketCode(input.country);
+    const phone = normalisePhone(input.phone, country);
+    if (await this.prisma.customer.findFirst({ where: { storeId: store.id, phone }, select: { id: true } })) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'whatsapp_number_in_use', 'An account already uses this number. Sign in on udozo.com with its email, then connect WhatsApp from Profile > WhatsApp.', 'phone');
+    }
+    try {
+      const customer = await this.prisma.$transaction(async tx => {
+        await this.signups.consume(tx, email, input.signup_token, null, store.id);
+        const now = new Date();
+        return tx.customer.create({
+          data: { storeId: store.id, email, ...nameData({ first_name: input.first_name, last_name: input.last_name }, now), country, phone, phoneVerifiedAt: now, passwordHash: null, emailVerifiedAt: now, lastSignInAt: now, signupRef: input.ref ?? null },
+        });
+      });
+      return customer;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        if (violatedFields(error).some(field => field.includes('phone'))) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'whatsapp_number_in_use', 'An account already uses this number.', 'phone');
+        throw emailTaken();
+      }
+      throw error;
+    }
+  }
+
   async signin(store: Store, input: { email: string; password: string }) {
     const customer = await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email: input.email.trim().toLowerCase() } } });
     const ok = await this.passwords.verify(customer?.passwordHash ?? null, input.password);

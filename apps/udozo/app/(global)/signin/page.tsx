@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AuthLinks } from "@/components/account-forms";
 import { FacebookButton } from "@/components/account/facebook-button";
 import { GoogleButton, OrDivider } from "@/components/account/google-button";
+import { WhatsappButton } from "@/components/account/whatsapp-button";
+import { whatsappMarket } from "@/lib/whatsapp-sign-in";
 import { SignInForm } from "@/components/account/sign-in-up";
 import { currentCustomer, safeNext } from "@/lib/customer";
 import { authErrorText } from "@/lib/facebook";
@@ -28,6 +30,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   if (await currentCustomer()) redirect(next);
   // Sell pressed while signed out: counted on the way to Post an ad (nothing about the visitor kept).
   const selling = params.for === "sell" ? sellSourceOf(next) : null;
+  // Continue with WhatsApp, where Udozo is on WhatsApp in the visitor's market (or any open one).
+  const whatsapp = await whatsappMarket();
   return (
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
       {selling ? <SellVisit source={selling} signedIn={false} /> : null}
@@ -42,6 +46,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         <div className="grid gap-3">
           <GoogleButton intent="signin" next={next} />
           <FacebookButton intent="signin" next={next} />
+          {whatsapp ? <WhatsappButton intent="signin" next={next} /> : null}
         </div>
         {params.auth_error === "google_account_not_found" ? (
           <div className="mt-3">

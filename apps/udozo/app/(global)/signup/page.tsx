@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AuthLinks } from "@/components/account-forms";
 import { FacebookButton } from "@/components/account/facebook-button";
 import { GoogleButton, OrDivider } from "@/components/account/google-button";
+import { WhatsappButton } from "@/components/account/whatsapp-button";
+import { whatsappMarket } from "@/lib/whatsapp-sign-in";
 import { SignUpForm } from "@/components/account/sign-in-up";
 import { SignupVisit } from "@/components/account/signup-visit";
 import { authErrorText } from "@/lib/facebook";
@@ -23,7 +25,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const next = safeNext(params.next);
   if (await currentCustomer()) redirect(next);
-  const [list, open] = await Promise.all([countries(), markets()]);
+  const [list, open, whatsapp] = await Promise.all([countries(), markets(), whatsappMarket()]);
   const fromPath = /^\/([a-z]{2})(?:\/|$)/.exec(next)?.[1]?.toUpperCase();
   const suggested = [params.country?.toUpperCase(), fromPath, open.data.length === 1 ? open.data[0]!.country : undefined].find(code => code && list.some(item => item.code === code)) ?? null;
   return (
@@ -42,6 +44,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
             <div className="grid gap-3">
               <GoogleButton intent="signup" next={next} refCode={cleanRef(params.ref)} />
               <FacebookButton intent="signup" next={next} refCode={cleanRef(params.ref)} />
+              {whatsapp ? <WhatsappButton intent="signup" next={next} refCode={cleanRef(params.ref)} /> : null}
             </div>
             <OrDivider />
           </>

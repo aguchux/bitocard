@@ -18,6 +18,9 @@ import { HelpMenu } from "./help-menu";
 import { NotificationBell } from "./notifications/bell";
 import { SignInHere } from "./sign-in-here";
 import { sellHref } from "@/lib/sell-sources";
+import { channelsFor } from "@/lib/whatsapp";
+import { whatsappMarket } from "@/lib/whatsapp-sign-in";
+import { WhatsappTab } from "./whatsapp-tab";
 
 /** Udozo's lockup on white: the "u" mark, then the name. */
 export function UdozoWordmark({ href = "/" }: { href?: string }) {
@@ -49,19 +52,26 @@ async function menuCategories(market: ShopMarket | null): Promise<MenuCategory[]
 
 /** Udozo's top bar, with the market's categories for its menu, the open markets for the country menu, and (with no market) the customer's own to go to. */
 export async function SiteHeader({ market, customer, showcase }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean }) {
-  const [categories, all] = await Promise.all([menuCategories(market), markets()]);
+  const [categories, all, whatsapp] = await Promise.all([menuCategories(market), markets(), whatsappNumber(market)]);
   const own = market ? undefined : all.data.find(item => item.country === customer?.country);
   const countries = all.data.map(item => ({ country: item.country, name: item.name, listings: item.listings }));
-  return <HeaderBar market={market} customer={customer} showcase={showcase} categories={categories} countries={countries} continueTo={own ? { country: own.country, name: own.name } : null} />;
+  return <HeaderBar market={market} customer={customer} showcase={showcase} categories={categories} countries={countries} continueTo={own ? { country: own.country, name: own.name } : null} whatsapp={whatsapp} />;
+}
+
+/** Udozo's WhatsApp number for the header's tab: the market's where it is open there; across countries, the visitor's chosen or first open one. */
+async function whatsappNumber(market: ShopMarket | null) {
+  if (!market) return (await whatsappMarket())?.number ?? null;
+  const channels = await channelsFor(market.country);
+  return channels.whatsapp.available ? channels.whatsapp.number : null;
 }
 
 /**
  * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
  * and the search (with no market, "Continue to <their country>"), on its own full-width row on phones and tablets and
- * beside the lockup from desktops; on the right **Get help** (a menu: Safe pay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
+ * beside the lockup from desktops (and, where Udozo is on WhatsApp, its green tab hanging below); on the right **Get help** (a menu: Safe pay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
  * markets from the second one), just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones).
  */
-export function HeaderBar({ market, customer, showcase, categories, countries = [], continueTo = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; countries?: MenuCountry[]; continueTo?: ContinueTo }) {
+export function HeaderBar({ market, customer, showcase, categories, countries = [], continueTo = null, whatsapp = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; countries?: MenuCountry[]; continueTo?: ContinueTo; /** Udozo's WhatsApp number where it is open: the tab hanging under the header. */ whatsapp?: string | null }) {
   const home = market ? `/${market.country.toLowerCase()}` : "/";
   const search = { country: market?.country ?? null, categories, prefix: market ? `${home}/c/` : "/c/", allHref: market ? `${home}/search` : "/", place: market?.name ?? null, continueTo };
   const sellClass = "hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex";
@@ -106,6 +116,7 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
           )}
         </div>
       </div>
+      {whatsapp ? <WhatsappTab number={whatsapp} signedIn={Boolean(customer)} /> : null}
     </header>
   );
 }

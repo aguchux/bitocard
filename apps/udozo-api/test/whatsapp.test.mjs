@@ -193,7 +193,8 @@ describe('numbers, the menu, STOP and START', () => {
     const waId = '2348022223333';
     const menu = await say(waId, text('Hi'));
     assert.equal(menu.length, 1);
-    assert.deepEqual(rowIds(menu[0]), ['menu:find', 'menu:want', 'menu:sell', 'menu:chats', 'menu:help']);
+    // A number with no account is offered one, made right there.
+    assert.deepEqual(rowIds(menu[0]), ['menu:find', 'menu:want', 'menu:sell', 'menu:chats', 'menu:join', 'menu:help']);
     assert.match(bodies(await say(waId, text('STOP')))[0], /no more messages/);
     assert.deepEqual(await say(waId, text('STOP')), [], 'STOP is answered once');
     assert.deepEqual(await say(waId, text('hello?')), [], 'nothing while opted out');
@@ -684,5 +685,82 @@ describe('verification codes on WhatsApp', () => {
     assert.equal(auth.category, 'AUTHENTICATION');
     assert.deepEqual(auth.components.map(item => item.type), ['BODY', 'FOOTER', 'BUTTONS']);
     assert.deepEqual([auth.components[1].code_expiration_minutes, auth.components[2].buttons[0].otp_type], [30, 'COPY_CODE']);
+  });
+});
+
+describe('signing up and in with WhatsApp', () => {
+  const start = body => fetch(`${server.base}/v1/store/account/whatsapp-sign-in/start`, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36' }, body: JSON.stringify(body) });
+  const finish = async token => {
+    const res = await fetch(`${server.base}/v1/store/account/whatsapp-sign-in/finish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) });
+    return { status: res.status, json: await res.json() };
+  };
+
+  test('a number with no account makes one on WhatsApp (names, the email and its code), and the browser that asked is signed in once', async () => {
+    const taken = await customer('Taken Email');
+    const takenEmail = (await prisma.customer.findUniqueOrThrow({ where: { id: taken.id } })).email;
+    const begun = await start({ intent: 'signup', country: 'NG', ref: 'abc123def0' });
+    assert.equal(begun.status, 200);
+    const signIn = await begun.json();
+    assert.match(signIn.link, /^https:\/\/wa\.me\/2348000000000\?text=JOIN%20[A-Z0-9]{8}$/);
+    assert.match(signIn.token, /^bws_/);
+    assert.equal((await finish(signIn.token)).json.status, 'waiting');
+
+    const waId = testMobile('NG').replace(/\D/g, '');
+    const intro = await say(waId, text(signIn.text));
+    assert.match(bodies(intro)[0], /make your Udozo account/);
+    assert.deepEqual(rowIds(intro[0]), ['join:accept', 'join:cancel']);
+    assert.match(bodies(await say(waId, tap('join:accept')))[0], /first name/);
+    assert.match(bodies(await say(waId, text('Ada1')))[0], /does not look like a first name/);
+    assert.match(bodies(await say(waId, text('Ada')))[0], /last name/);
+    assert.match(bodies(await say(waId, text("Obi-Nwosu")))[0], /email address/);
+    assert.match(bodies(await say(waId, text(takenEmail)))[0], /already uses that email/);
+    const email = `ada-${Date.now()}@example.com`;
+    assert.match(bodies(await say(waId, text(email)))[0], /emailed a 6-digit code/);
+    assert.match(bodies(await say(waId, text('000000')))[0], /not valid/);
+    const done = await say(waId, text(await lastEmailCode(server.app, email)));
+    assert.match(bodies(done)[0], /Welcome to Udozo, Ada! .*you are signed in there/);
+
+    const row = await prisma.customer.findFirstOrThrow({ where: { email } });
+    assert.deepEqual([row.firstName, row.lastName, row.phone, row.country, row.passwordHash, row.signupRef], ['Ada', 'Obi-Nwosu', `+${waId}`, 'NG', null, 'abc123def0']);
+    assert.ok(row.emailVerifiedAt && row.phoneVerifiedAt && row.nameConfirmedAt, 'email, mobile and names confirmed');
+    assert.equal((await prisma.whatsappContact.findUniqueOrThrow({ where: { waId } })).customerId, row.id);
+
+    const approved = await finish(signIn.token);
+    assert.equal(approved.json.status, 'approved');
+    assert.deepEqual([approved.json.signed_up, approved.json.customer.email], [true, email]);
+    const me = await fetch(`${server.base}/v1/store/account`, { headers: { 'bitocard-customer-session': approved.json.session.token } });
+    assert.equal(me.status, 200, 'the session works');
+    assert.equal((await finish(signIn.token)).json.error.code, 'whatsapp_sign_in_unknown', 'once only');
+    const journey = await prisma.signupJourney.findFirstOrThrow({ where: { email } });
+    assert.equal(journey.method, 'whatsapp');
+    assert.ok(journey.accountCreatedAt);
+
+    // The account is theirs on WhatsApp too: JOIN again says so.
+    assert.match(bodies(await say(waId, text('JOIN')))[0], /already have a Udozo account/);
+  });
+
+  test('a number with an account says yes or no; the code is bound to the number that sent it; refusals', async () => {
+    const kemi = await customer('Kemi Bello');
+    await say(kemi.waId, text('hello'));
+
+    const first = await (await start({ intent: 'signin', country: 'NG' })).json();
+    const ask = await say(kemi.waId, text(first.text));
+    assert.match(bodies(ask)[0], /Sign in to Udozo as Kemi on Chrome on Windows\?/);
+    const [yes] = rowIds(ask[0]);
+    assert.match(bodies(await say(testMobile('NG').replace(/\D/g, ''), text(first.text)))[0], /did not work/, 'another number cannot take it');
+    assert.equal((await finish(first.token)).json.status, 'waiting');
+    assert.match(bodies(await say(kemi.waId, tap(yes)))[0], /you are signed in/);
+    const approved = await finish(first.token);
+    assert.deepEqual([approved.json.status, approved.json.signed_up, approved.json.customer.id], ['approved', false, kemi.id]);
+
+    const second = await (await start({ intent: 'signin', country: 'NG' })).json();
+    const no = rowIds((await say(kemi.waId, text(second.text)))[0])[1];
+    assert.match(bodies(await say(kemi.waId, tap(no)))[0], /Nobody was signed in/);
+    assert.equal((await finish(second.token)).json.status, 'declined');
+
+    assert.equal((await finish('bws_not-a-real-token-at-all')).status, 400);
+    const closed = await start({ intent: 'signin', country: 'GH' });
+    assert.deepEqual([closed.status, (await closed.json()).error.code], [409, 'whatsapp_unavailable']);
+    assert.match(bodies(await say(kemi.waId, text('LOGIN ABCD2345')))[0], /did not work/);
   });
 });

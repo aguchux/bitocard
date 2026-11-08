@@ -6946,6 +6946,31 @@ model WhatsappLinkCode {
   @@map("whatsapp_link_codes")
 }
 
+/// A sign-in (or sign-up) with WhatsApp: udozo.com asked for it, the person sends its code from their WhatsApp to
+/// Udozo's number, and once their account approves it (or the account made there is ready) the browser that asked is
+/// signed in, once. `waiting`, `approved`, `declined` or `used`; 20 minutes. Only hashes of the code and token.
+model WhatsappSignIn {
+  id         String    @id @default(uuid()) @db.Uuid
+  codeHash   String    @unique @map("code_hash")
+  tokenHash  String    @unique @map("token_hash")
+  intent     String    @default("signin") @db.VarChar(10)
+  status     String    @default("waiting") @db.VarChar(12)
+  /// "Chrome on Windows", to tell the person on WhatsApp what is signing in.
+  device     String?   @db.VarChar(60)
+  /// A campaign's or invite's code, kept on an account made through it.
+  ref        String?   @db.VarChar(40)
+  contactId  String?   @map("contact_id") @db.Uuid
+  customerId String?   @map("customer_id") @db.Uuid
+  signedUp   Boolean   @default(false) @map("signed_up")
+  expiresAt  DateTime  @map("expires_at")
+  approvedAt DateTime? @map("approved_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("whatsapp_sign_ins")
+}
+
 /// A webhook body from Meta, stored (encrypted) before answering, then processed; failures are retried by the job.
 model WhatsappNotice {
   id            String    @id @default(uuid()) @db.Uuid

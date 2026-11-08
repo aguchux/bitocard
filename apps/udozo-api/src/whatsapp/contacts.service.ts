@@ -34,8 +34,8 @@ export const linkCodeIn = (text: string) => /^\s*link\s+([a-z0-9]{8})\s*$/i.exec
 
 /**
  * Who a WhatsApp number is: at most one Udozo account, linked by itself when the number is the account's confirmed
- * mobile, or by a one-time code the customer sends from the number (Profile > WhatsApp on udozo.com). A number never
- * makes an account. Udozo writes first only to numbers that opted in (connected, or wrote to Udozo); STOP opts out.
+ * mobile, or by a one-time code the customer sends from the number (Profile > WhatsApp on udozo.com). A number makes
+ * an account only through WhatsApp's own sign-up (`SignupFlow`). Udozo writes first only to numbers that opted in (connected, or wrote to Udozo); STOP opts out.
  */
 @Injectable()
 export class WhatsappContactsService {

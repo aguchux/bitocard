@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { googleErrorText } from "@/lib/google";
+import { whatsappSignInErrors } from "@/lib/whatsapp-sign-in";
 
 /**
  * "Continue with Facebook" on udozo.com, kept as Google's is (`lib/google.ts`): starting it keeps the API's one-time
@@ -42,5 +43,6 @@ export const facebookErrors: Record<string, string> = {
 };
 export const facebookFailed = "Facebook sign-in did not work. Try again.";
 
-/** The words for an `auth_error` code from Google or Facebook (only known codes; anything else reads as that sign-in's failure). */
-export const authErrorText = (code: string | undefined) => (code?.startsWith("facebook_") ? (facebookErrors[code] ?? facebookFailed) : googleErrorText(code));
+/** The words for an `auth_error` code from Google, Facebook or WhatsApp (only known codes; anything else reads as that sign-in's failure). */
+export const authErrorText = (code: string | undefined) =>
+  code?.startsWith("facebook_") ? (facebookErrors[code] ?? facebookFailed) : code?.startsWith("whatsapp_") ? (whatsappSignInErrors[code] ?? whatsappSignInErrors.whatsapp_failed!) : googleErrorText(code);

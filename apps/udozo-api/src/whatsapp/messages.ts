@@ -31,7 +31,7 @@ export const words = {
   notUnderstood: 'Sorry, I did not get that.',
   linked: (name: string) => `Done: this WhatsApp is now connected to your Udozo account, ${name}.`,
   linkInvalid: 'That code did not work: it may be used or out of date. Get a new one from Profile > WhatsApp on udozo.com.',
-  needAccount: (link: string) => `For that, connect your Udozo account first: open ${link} and tap Connect WhatsApp. New to Udozo? Sign up there too, it is free.`,
+  needAccount: (link: string) => `For that, connect your Udozo account first: open ${link} and tap Connect WhatsApp. New to Udozo? Send JOIN to make your account right here, it is free.`,
   photoUnsupported: 'Send photos one at a time as images (not documents), and text as messages. Voice notes and stickers are not read.',
 
   // Find
@@ -179,4 +179,42 @@ export const words = {
   anjioPersonSignIn: 'A person from Udozo’s team can help once your Udozo account is connected: open udozo.com, Profile > WhatsApp.',
   anjioHandedOver: 'Done: a person from Udozo’s team has this conversation and will answer you. You will hear here.',
   anjioNothing: (name: string) => `${name} has no answer to that. Try asking another way, or send MENU.`,
+
+  // Signing up and in with WhatsApp
+  joinRow: { id: 'menu:join', title: 'Create an account', description: 'Free, in a minute, right here' } satisfies Row,
+  signupIntro: (terms: string, privacy: string) =>
+    [
+      'Let us make your Udozo account. It takes a minute: your name and your email, which we confirm with a code.',
+      'This WhatsApp number becomes your account’s mobile, and you sign in to udozo.com with WhatsApp.',
+      `By carrying on you accept Udozo’s terms (${terms}) and privacy notice (${privacy}).`,
+    ].join('\n\n'),
+  signupStartButtons: [
+    { id: 'join:accept', title: 'I accept, carry on' },
+    { id: 'join:cancel', title: 'Cancel' },
+  ] satisfies Button[],
+  askFirstName: 'What is your first name? Write it as it is on your ID.',
+  askLastName: (first: string) => `Thanks, ${first}. And your last name (surname)?`,
+  nameInvalid: (part: 'first' | 'last') => `That does not look like a ${part} name. Use letters only (spaces, hyphens and apostrophes are fine), up to 60.`,
+  askEmail: 'What is your email address? We send it a code to confirm it is yours.',
+  emailInvalid: 'That does not look like an email address. Try again, for example ada@example.com.',
+  emailTaken: (signin: string) => `An account already uses that email. Sign in on udozo.com (${signin}) with it, then connect WhatsApp from Profile > WhatsApp. Or send another email.`,
+  askEmailCode: (email: string) => `We emailed a 6-digit code to ${email}. Type it here. RESEND sends another, CHANGE uses another email.`,
+  emailCodeInvalid: 'Type the 6-digit code from the email. RESEND sends another, CHANGE uses another email.',
+  signupTypeIt: 'Type your answer as a message, please.',
+  signupCancelled: 'Stopped: no account was made. Send JOIN any time to start again.',
+  signupNotOpen: (site: string) => `You cannot sign up from this number’s country on WhatsApp yet. See ${site} for the countries Udozo is open in.`,
+  numberOnAccount: (signin: string) => `A Udozo account already uses this number. Sign in on udozo.com (${signin}) with its email, then connect WhatsApp from Profile > WhatsApp.`,
+  alreadyHaveAccount: (name: string) => `You already have a Udozo account, ${name}, connected to this WhatsApp. Send MENU to carry on.`,
+  signupDone: (name: string, signedIn: boolean) =>
+    `Welcome to Udozo, ${name}! Your account is ready.${signedIn ? ' Go back to udozo.com: you are signed in there.' : ' Sign in to udozo.com any time with Continue with WhatsApp.'} Send MENU to find, sell and chat here.`,
+  signInAsk: (name: string, device: string | null) =>
+    `Sign in to Udozo as ${name}${device ? ` on ${device}` : ''}? Say yes only if you asked to sign in on udozo.com just now. Never do it because someone asked you to.`,
+  signInButtons: (id: string): Button[] => [
+    { id: `wsi:${id}:yes`, title: 'Yes, sign me in' },
+    { id: `wsi:${id}:no`, title: 'No, it was not me' },
+  ],
+  signedIn: 'Done: go back to udozo.com, you are signed in.',
+  signInDeclined: 'Nobody was signed in. If you did not ask, you can ignore it: your account is safe.',
+  signInInvalid: 'That sign-in code did not work: it may be used or out of date. Start again from Continue with WhatsApp on udozo.com.',
+  signInOver: 'That sign-in is over. Start again from Continue with WhatsApp on udozo.com.',
 };

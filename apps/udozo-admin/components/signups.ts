@@ -35,6 +35,7 @@ const stepLabels: Record<string, string> = {
   signup: "Set a password and created the account",
   google: "Continued with Google",
   facebook: "Continued with Facebook",
+  whatsapp: "Signed up on WhatsApp",
   profile: "Saved name and country",
   account_email_verify: "Confirmed email from the account",
   account_phone: "Added a mobile from the account",
@@ -77,12 +78,13 @@ const codeLabels: Record<string, string> = {
   facebook_failed: "Facebook sign-in failed",
   facebook_state_invalid: "Facebook sign-in timed out",
   facebook_email_missing: "Facebook shared no email",
+  whatsapp_number_in_use: "WhatsApp number already on an account",
   already_owner: "Already owns a business",
   rate_limited: "Too many attempts",
   api_error: "Something went wrong at Udozo",
 };
 /** How a journey signed up, in words. */
-export const methodLabel = (method: string) => (method === "google" ? "Google" : method === "facebook" ? "Facebook" : "Email");
+export const methodLabel = (method: string) => (method === "google" ? "Google" : method === "facebook" ? "Facebook" : method === "whatsapp" ? "WhatsApp" : "Email");
 
 export const codeLabel = (code: string | null | undefined) => (code ? (codeLabels[code] ?? humanise(code)) : "—");
 

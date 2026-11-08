@@ -10,6 +10,8 @@ import { ProductOnly } from '../products/product.js';
 import { WhatsappAdminService } from './admin.service.js';
 import { WhatsappContactsService } from './contacts.service.js';
 import { WhatsappNotices } from './notices.service.js';
+import { WhatsappSignIns } from './sign-in.service.js';
+import { deviceOf } from '../signups/journeys.service.js';
 import { templateNames } from './templates.js';
 
 /** Meta's webhook for Udozo's number: the address check, then signed notifications. */
@@ -96,6 +98,50 @@ export class WhatsappAccountController {
   @Delete()
   disconnect(@CurrentCustomer() caller: CustomerCaller) {
     return this.contacts.disconnect(caller.customer);
+  }
+}
+
+class SignInStartDto {
+  @IsIn(['signin', 'signup'])
+  intent: 'signin' | 'signup';
+
+  /** The market udozo.com shows: WhatsApp must be open there. */
+  @IsString() @Matches(/^[A-Za-z]{2}$/)
+  country: string;
+
+  /** A campaign's or invite's code, kept on an account made through it. */
+  @IsOptional() @IsString() @Matches(/^[A-Za-z0-9_-]{1,40}$/)
+  ref?: string;
+}
+
+class SignInFinishDto {
+  @IsString() @Length(20, 200)
+  token: string;
+}
+
+/**
+ * udozo.com's "Continue with WhatsApp" (its server only): `start` gives the code to send from WhatsApp (and the wa.me
+ * link filling it in) with a token the site keeps for that browser; `finish` brings the token back until the sign-in
+ * is approved on WhatsApp, then answers the customer and a session, once. Neither is ever stored for replay.
+ */
+@ApiExcludeController()
+@Public()
+@SkipIdempotency()
+@Controller('store/account/whatsapp-sign-in')
+@ProductOnly('udozo')
+export class WhatsappSignInController {
+  constructor(private readonly signIns: WhatsappSignIns) {}
+
+  @Post('start')
+  @HttpCode(HttpStatus.OK)
+  start(@Req() req: Request, @Body() body: SignInStartDto) {
+    return this.signIns.start({ intent: body.intent, country: body.country, ref: body.ref ?? null, device: deviceOf(req.headers) });
+  }
+
+  @Post('finish')
+  @HttpCode(HttpStatus.OK)
+  finish(@Body() body: SignInFinishDto) {
+    return this.signIns.finish(body.token);
   }
 }
 

@@ -17,6 +17,8 @@ import { words } from './messages.js';
 import { WhatsappOutbox } from './outbox.service.js';
 import { type BotContext, type FlowName, type FlowState, problemText, typed } from './flows/context.js';
 import { SellFlow } from './flows/sell.flow.js';
+import { SignupFlow } from './flows/signup.flow.js';
+import { WhatsappSignIns, signInCodeIn } from './sign-in.service.js';
 import { WantedFlow } from './flows/wanted.flow.js';
 
 const minuteMs = 60_000;
@@ -50,6 +52,8 @@ export class WhatsappBot {
     private readonly wanted: WantedFlow,
     private readonly anjio: WhatsappAnjio,
     private readonly direct: WhatsappDirect,
+    private readonly signup: SignupFlow,
+    private readonly signIns: WhatsappSignIns,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -115,6 +119,13 @@ export class WhatsappBot {
     }
     const code = ctx.input.kind === 'text' ? linkCodeIn(text) : null;
     if (code) return this.link(ctx, code);
+    // Signing in (or up) on udozo.com: the code its link filled in. Sending it is asking to hear back, so it opts in.
+    const signInCode = ctx.input.kind === 'text' ? signInCodeIn(text) : null;
+    if (signInCode) {
+      if (ctx.contact.optedOutAt) ctx.contact = await this.contacts.optIn(ctx.contact.id);
+      if (!(await this.contacts.openIn(ctx.country))) return ctx.say({ type: 'text', body: words.notOpen });
+      return this.signInWith(ctx, signInCode);
+    }
     if (ctx.contact.optedOutAt) {
       if (!isWord(text, 'START')) return;
       await this.contacts.optIn(ctx.contact.id);
@@ -139,6 +150,7 @@ export class WhatsappBot {
       if (isWord(text, 'HELP')) return ctx.say({ type: 'text', body: words.help });
       if (isWord(text, 'CHATS', 'MY CHATS')) return this.myChats(ctx);
       if (!chatting) {
+        if (isWord(text, 'JOIN', 'SIGNUP', 'SIGN UP', 'REGISTER', 'CREATE ACCOUNT')) return this.signup.start(ctx);
         if (isWord(text, 'SELL')) return this.sell.start(ctx);
         if (isWord(text, 'WANT', 'REQUEST', 'WANTED')) return this.wanted.start(ctx);
         if (isWord(text, 'FIND', 'SEARCH', 'BUY')) return this.askWords(ctx);
@@ -162,6 +174,8 @@ export class WhatsappBot {
         return this.sell.step(ctx);
       case 'wanted':
         return this.wanted.step(ctx);
+      case 'signup':
+        return this.signup.step(ctx);
     }
     if (ctx.input.kind === 'image') return ctx.say({ type: 'text', body: words.photoUnsupported });
     if (ctx.input.kind === 'other') return ctx.say({ type: 'text', body: words.photoUnsupported });
@@ -186,6 +200,7 @@ export class WhatsappBot {
         if (id === 'chats') return this.myChats(ctx);
         if (id === 'help') return ctx.say({ type: 'text', body: words.help });
         if (id === 'ask') return this.startAsking(ctx);
+        if (id === 'join') return this.signup.start(ctx);
         return this.menu(ctx);
       case 'find':
         return this.find(ctx, String(ctx.state.words ?? ''), Number(ctx.state.offset ?? 0) + resultsPerPage);
@@ -218,6 +233,11 @@ export class WhatsappBot {
         return this.wanted.show(ctx, id!);
       case 'wresp':
         return this.wanted.respond(ctx, id!, action!);
+      case 'join':
+        if (ctx.contact.flow !== 'signup') return this.signup.start(ctx);
+        return this.signup.step(ctx);
+      case 'wsi':
+        return this.answerSignIn(ctx, id!, action);
       case 'adraft':
         return this.anjio.sendDraft(ctx, id!, Number(action));
       case 'aperson':
@@ -233,7 +253,9 @@ export class WhatsappBot {
     await ctx.setFlow(null);
     const name = ctx.customer?.firstName ?? ctx.contact.profileName?.split(' ')[0] ?? null;
     const anjio = await this.anjio.menuName(ctx.country);
-    const rows = anjio ? [words.menuRows[0]!, words.askRow(anjio), ...words.menuRows.slice(1)] : words.menuRows;
+    const base = anjio ? [words.menuRows[0]!, words.askRow(anjio), ...words.menuRows.slice(1)] : words.menuRows;
+    // A number with no account is offered one, made right here (lists hold at most 10 rows).
+    const rows = ctx.customer ? base : [...base.slice(0, -1), words.joinRow, base[base.length - 1]!];
     return ctx.say({ type: 'list', body: words.greeting(name), button: words.menuButton, rows });
   }
 
@@ -253,6 +275,27 @@ export class WhatsappBot {
     if (outcome === 'search') return this.find(ctx, searchWordsOf(question) || question, 0);
     // Follow-up questions carry on the conversation.
     if (ctx.contact.flow !== 'ask') await ctx.setFlow('ask', {});
+  }
+
+  // ---- Signing up and in ----
+
+  /** A sign-in's code from udozo.com: an account asks yes or no; a number without one makes its account here. */
+  private async signInWith(ctx: BotContext, code: string) {
+    const signIn = await this.signIns.claim(ctx.contact, code);
+    if (!signIn) return ctx.say({ type: 'text', body: words.signInInvalid });
+    if (!ctx.customer) return this.signup.start(ctx, signIn.id);
+    return ctx.say({ type: 'buttons', body: words.signInAsk(ctx.customer.firstName ?? ctx.customer.name.split(' ')[0] ?? 'you', signIn.device), buttons: words.signInButtons(signIn.id) });
+  }
+
+  private async answerSignIn(ctx: BotContext, id: string, answer: string | undefined) {
+    const signIn = await this.signIns.waiting(ctx.contact, id);
+    if (!signIn) return ctx.say({ type: 'text', body: words.signInOver });
+    if (answer !== 'yes') {
+      await this.signIns.decline(signIn, ctx.contact);
+      return ctx.say({ type: 'text', body: words.signInDeclined });
+    }
+    if (!ctx.customer) return this.signup.start(ctx, signIn.id);
+    return ctx.say({ type: 'text', body: (await this.signIns.approve(signIn, ctx.contact, ctx.customer.id)) ? words.signedIn : words.signInOver });
   }
 
   private async link(ctx: BotContext, code: string) {

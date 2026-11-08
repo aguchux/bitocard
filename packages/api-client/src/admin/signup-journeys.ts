@@ -15,7 +15,7 @@ export type SignupJourney = {
   id: string;
   surface: SignupSurface;
   email: string;
-  method: 'email' | 'google' | 'facebook' | string;
+  method: 'email' | 'google' | 'facebook' | 'whatsapp' | string;
   country: string | null;
   device: string | null;
   status: SignupJourneyStatus;
