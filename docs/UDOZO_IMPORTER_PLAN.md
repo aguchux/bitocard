@@ -11,7 +11,7 @@ None of the three offers an official way in:
 - **Konga:** no public seller API. Its sellers work with spreadsheet uploads in Seller HQ.
 - **Facebook:** Marketplace listings posted by individuals cannot be read through any API. Meta's Graph API reaches only business catalogues (Commerce Manager), and only for an app whose permissions Meta has approved.
 
-So the importer works from **what the seller gives it**. That is their own store on Jiji or Konga, which they first prove is theirs, a spreadsheet, or later their Facebook business catalogue. It is never a crawl of another site.
+So the importer works from **what the seller gives it**. That is their own store on Jiji, Konga, Facebook Marketplace or another platform, which they first link and prove is theirs, a spreadsheet, or later their Facebook Page's catalogue. It is never a crawl of another site.
 
 **Owner's rule, 8 November 2026: only a store's owner can import its ads.** Before importing anything, a seller links their store on Jiji, Konga or Facebook to their Udozo account and proves it is theirs (see Linked stores below). Udozo keeps the store's name, address and the platform's own id for it. Every ad imported afterwards must name that same store on its own page, or it is refused. This is the main protection against the legal risk.
 
@@ -19,7 +19,7 @@ So the importer works from **what the seller gives it**. That is their own store
 
 That rule also keeps out of Udozo the other sites' watermarks, photos the seller may not own the rights to, and the cost of fetching them.
 
-**Legal point to settle first:** Jiji's and Konga's terms very likely forbid automated copying of their pages. With this design, Udozo only ever reads pages of a store whose owner proved it is theirs and asked for the import. That is a much smaller step than scraping. Even so, lawyers should confirm it per market before link import is switched on. The spreadsheet and the Facebook catalogue need no such check.
+**Legal point to settle first:** Jiji's and Konga's terms very likely forbid automated copying of their pages. With this design, Udozo only ever reads pages of a store whose owner proved it is theirs and asked for the import. That is a much smaller step than scraping. Even so, lawyers should confirm it per market before a platform's switch is turned on. The spreadsheet and the Facebook catalogue need no such check.
 
 ## Rules the design follows
 
@@ -147,7 +147,7 @@ A seller links a store once per platform, from Profile > **Linked stores** on ud
   - failures by source and code, which is how a source changing its pages is noticed;
   - drafts posted against drafts left;
   - linked stores by platform, codes not yet found, and stores released by operations.
-  - The two switches and the two limits sit on Limits and words.
+  - The switches (one for the importer, one per platform) and the two limits sit on Limits and words.
 - **Legal:** the terms say a seller may import only their own ads and is responsible for them. The privacy notice says what an import keeps and for how long. Bump `legalVersion`.
 
 ## Phases (one commit each, each tested)
