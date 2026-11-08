@@ -247,6 +247,10 @@ export type AdminClassifiedCategory = {
   sku_prefix: string;
   /** What people call the things sold here, matched as typed on Post an ad, in search suggestions and by the assistants. */
   keywords: string[];
+  /** Top categories only: the banner across the top of its pages on udozo.com (4:1). */
+  banner_url?: string | null;
+  /** Top categories only: a cut-out of what is sold there, drawn on a circle beside its name on udozo.com. */
+  spotlight_url?: string | null;
   /** Open in the country asked for. */
   open: boolean;
   active_listings: number;
@@ -600,6 +604,14 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ id, keywords }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}`, method: 'PATCH', body: { keywords } }),
       invalidatesTags: ['ClassifiedCategory', 'Activity'],
     }),
+    /** A top category's banner or spotlight image (null removes it); the saved category is returned. */
+    setClassifiedCategoryPictures: build.mutation<
+      { object: 'classified_admin_category'; id: string; slug: string; banner_url: string | null; spotlight_url: string | null },
+      { id: string; banner_url?: string | null; spotlight_url?: string | null }
+    >({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}`, method: 'PATCH', body }),
+      invalidatesTags: ['ClassifiedCategory', 'Activity'],
+    }),
     /** Shown at once; a refusal undoes it and reloads the market's list. */
     setClassifiedCategoryCountry: build.mutation<unknown, { id: string; country: string; open: boolean }>({
       query: ({ id, country, open }) => ({ url: `/v1/admin/classifieds/categories/${encodeURIComponent(id)}/countries/${country}`, method: 'PUT', body: { open } }),
@@ -800,6 +812,7 @@ export const {
   useRemoveClassifiedSellerUsernameMutation,
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,
+  useSetClassifiedCategoryPicturesMutation,
   useSetClassifiedCategorySkuPrefixMutation,
   useSetClassifiedCategoryKeywordsMutation,
   useSetClassifiedCategoryCountryMutation,

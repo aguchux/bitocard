@@ -100,9 +100,11 @@ export class MediaService {
               ? registryBrand(value.toLowerCase())?.slug === value.toLowerCase()
               : kind === 'classified_brand'
                 ? (await this.prisma.classifiedBrand.count({ where: { slug: value.toLowerCase() } })) > 0
-                : productCategories.includes(value as ProductCategory);
+                : kind === 'classified_category'
+                  ? (await this.prisma.classifiedCategory.count({ where: { slug: value.toLowerCase(), parentId: null } })) > 0
+                  : productCategories.includes(value as ProductCategory);
     if (!exists) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${kind}.`, 'target_id');
-    return kind === 'brand' || kind === 'registry' || kind === 'classified_brand' ? value.toLowerCase() : value;
+    return kind === 'brand' || kind === 'registry' || kind === 'classified_brand' || kind === 'classified_category' ? value.toLowerCase() : value;
   }
 
   async createUpload(actor: MediaActor, input: UploadInput) {
@@ -241,7 +243,7 @@ export class MediaService {
     const add = (url: string | null, label: string) => {
       if (url && urls.includes(url)) uses.set(url, [...(uses.get(url) ?? []), label]);
     };
-    const [brands, products, suppliers, categories, stores, pages, registry, bots, shopBrands, banners, customers, people, heroTiles] = await Promise.all([
+    const [brands, products, suppliers, categories, stores, pages, registry, bots, shopBrands, banners, customers, people, heroTiles, shopCategories] = await Promise.all([
       this.prisma.brand.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { imageUrl: { in: urls } }] }, select: { slug: true, logoUrl: true, imageUrl: true } }),
       this.prisma.product.findMany({ where: { imageUrl: { in: urls } }, select: { key: true, imageUrl: true } }),
       this.prisma.supplier.findMany({ where: { logoUrl: { in: urls } }, select: { code: true, logoUrl: true } }),
@@ -255,7 +257,12 @@ export class MediaService {
       this.prisma.customer.findMany({ where: { OR: [{ avatarUrl: { in: urls } }, { bannerUrl: { in: urls } }] }, select: { id: true, avatarUrl: true, bannerUrl: true } }),
       this.prisma.user.findMany({ where: { avatarUrl: { in: urls } }, select: { id: true, avatarUrl: true } }),
       this.prisma.classifiedHeroTile.findMany({ where: { imageUrl: { in: urls } }, select: { slideId: true, imageUrl: true } }),
+      this.prisma.classifiedCategory.findMany({ where: { OR: [{ bannerUrl: { in: urls } }, { spotlightUrl: { in: urls } }] }, select: { slug: true, bannerUrl: true, spotlightUrl: true } }),
     ]);
+    for (const category of shopCategories) {
+      add(category.bannerUrl, `marketplace_category:${category.slug}:banner`);
+      add(category.spotlightUrl, `marketplace_category:${category.slug}:spotlight`);
+    }
     for (const customer of customers) {
       add(customer.avatarUrl, `customer:${customer.id}:avatar`);
       add(customer.bannerUrl, `customer:${customer.id}:banner`);

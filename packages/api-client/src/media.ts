@@ -27,6 +27,9 @@ export type MediaPurpose =
   | 'classified_brand_logo'
   /** Udozo's admins: a brand page's banner (4:1). */
   | 'classified_brand_banner'
+  /** Udozo's admins: a top marketplace category's banner (4:1) and spotlight image (a cut-out on a circle). */
+  | 'classified_category_banner'
+  | 'classified_category_spotlight'
   | 'store_logo'
   | 'store_image'
   | 'bot_avatar'

@@ -4402,6 +4402,10 @@ model ClassifiedCategory {
   skuNext         Int                         @default(1) @map("sku_next")
   /// What people call the things sold here ("plastic chair", "carpet"), matched as typed on Post an ad, in search suggestions and by the assistants.
   keywords        String[]                    @default([])
+  /// Top categories only: a banner across the top of its pages on udozo.com (`classified_category_banner`, 4:1).
+  bannerUrl       String?                     @map("banner_url")
+  /// Top categories only: a cut-out of what is sold there, drawn on a circle beside its name (`classified_category_spotlight`).
+  spotlightUrl    String?                     @map("spotlight_url")
   createdAt       DateTime                    @default(now()) @map("created_at")
   updatedAt       DateTime                    @updatedAt @map("updated_at")
   parent          ClassifiedCategory?         @relation("ClassifiedCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { categoryPath, type ShopSearch } from "@bitocard/api-client/classifieds";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { CategoryHero, SubcategoryPills } from "@/components/category-hero";
 import { JsonLd } from "@/components/json-ld";
 import { Results } from "@/components/results";
 import { marketFor, markets, shopApi } from "@/lib/api";
@@ -51,22 +51,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     <>
       <div className="mx-auto grid max-w-[1400px] gap-4 px-4 sm:px-6 lg:px-8 pt-4">
         <Breadcrumbs trail={trail} />
-        <h1 className="text-2xl font-extrabold tracking-tight">
-          {found.category.name} <span className="text-navy-500">in {market.name}</span>
-        </h1>
-        {found.children.length ? (
-          <nav aria-label="Subcategories" className="-mx-4 overflow-x-auto px-4">
-            <ul className="flex gap-2 whitespace-nowrap">
-              {found.children.map(child => (
-                <li key={child.slug}>
-                  <Link href={categoryPath(cc, child.slug)} className="flex h-9 items-center rounded-full border border-navy-200 bg-white px-3.5 text-sm font-semibold hover:border-navy-400">
-                    {child.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ) : null}
+        <CategoryHero category={found.category} top={found.top} place={market.name} listings={result.ok ? result.data.total : null} eyebrow={found.top.slug !== slug ? found.top.name : null} />
+        <SubcategoryPills country={cc} items={found.top.children} current={slug} />
         {result.ok ? (
           <Results result={result.data} filters={filters} path={path} category={found.category} brands={brands} models={models} place={{ country: market.name }} currency={market.currency} />
         ) : (

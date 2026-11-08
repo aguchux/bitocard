@@ -109,6 +109,10 @@ export type ShopCategory = {
   b2b: boolean;
   /** What people call the things sold here ("plastic chair", "carpet"), matched as typed. */
   keywords?: string[];
+  /** A top category's banner across the top of its pages (4:1); null for subcategories and when none is uploaded. */
+  banner_url?: string | null;
+  /** A top category's spotlight image: a cut-out of what is sold there, drawn on a circle beside its name. */
+  spotlight_url?: string | null;
   safety_checklist: string[];
   /** The keys the category suggests, in order; `filter` marks those buyers filter by. */
   features: Array<ShopFeature & { filter: boolean }>;
@@ -281,7 +285,7 @@ export type ShopShowcaseCard = Omit<ShopListingCard, 'price'>;
 export type ShopShowcase = {
   object: 'classified_showcase';
   markets: ShopMarket[];
-  category: { slug: string; name: string; icon: string } | null;
+  category: { slug: string; name: string; icon: string; banner_url?: string | null; spotlight_url?: string | null } | null;
   categories: Array<{ slug: string; name: string; icon: string; countries: string[]; listings: Record<string, number> }>;
   recent: ShopShowcaseCard[];
   trending: ShopShowcaseCard[];

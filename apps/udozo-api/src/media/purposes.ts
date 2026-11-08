@@ -3,7 +3,7 @@
  * (`SPACES_ROOT`): platform files under `platform/`, each reseller's under `resellers/<reseller id>/`, so a bucket is
  * easy to browse and a reseller's files are never mixed with BitoCard's or another reseller's.
  */
-export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'registry' | 'classified_brand';
+export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'registry' | 'classified_brand' | 'classified_category';
 
 export type MediaPurpose = {
   label: string;
@@ -54,6 +54,9 @@ const purposeTable = {
   // Udozo's brand registry: a brand's logo, shown in place of the one bundled with udozo.com.
   classified_brand_banner: { label: 'Marketplace brand banner', realm: 'admin', target: 'classified_brand', folder: slug => `platform/classifieds/brands/${segment(slug!)}/banners`, maxBytes: 3 * MB, types: rasterTypes },
   classified_brand_logo: { label: 'Marketplace brand logo', realm: 'admin', target: 'classified_brand', folder: slug => `platform/classifieds/brands/${segment(slug!)}/logos`, maxBytes: 1 * MB, types: withSvg },
+  // A top marketplace category's banner and spotlight image on udozo.com (`target_id` its slug).
+  classified_category_banner: { label: 'Marketplace category banner', realm: 'admin', target: 'classified_category', folder: slug => `platform/classifieds/categories/${segment(slug!)}/banners`, maxBytes: 3 * MB, types: rasterTypes },
+  classified_category_spotlight: { label: 'Marketplace category spotlight image', realm: 'admin', target: 'classified_category', folder: slug => `platform/classifieds/categories/${segment(slug!)}/spotlights`, maxBytes: 2 * MB, types: rasterTypes },
   home_image: { label: 'Home page image', realm: 'admin', folder: () => 'platform/home/images', maxBytes: 5 * MB, types: rasterTypes },
   // udozo.com's banner ads (`BannersService`).
   banner_image: { label: 'Banner ad image', realm: 'admin', folder: () => 'platform/banners/images', maxBytes: 2 * MB, types: rasterTypes },

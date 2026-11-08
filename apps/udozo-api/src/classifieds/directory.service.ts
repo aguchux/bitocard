@@ -191,7 +191,7 @@ export class ShopDirectoryService {
     return {
       object: 'classified_showcase' as const,
       markets: markets.data,
-      category: chosen ? { slug: chosen.slug, name: chosen.name, icon: chosen.icon } : null,
+      category: chosen ? { slug: chosen.slug, name: chosen.name, icon: chosen.icon, banner_url: chosen.bannerUrl, spotlight_url: chosen.spotlightUrl } : null,
       categories: categories.map(row => ({
         slug: row.slug,
         name: row.name,

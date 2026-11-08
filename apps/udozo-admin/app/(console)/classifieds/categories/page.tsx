@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Badge, Button, Card, errorMessage, formatNumber, Input, Notice, PageHeader, QueryView, Skeleton, Toggle } from "@bitocard/admin-ui";
+import { Badge, Button, Card, errorMessage, formatNumber, ImageField, Input, Notice, PageHeader, QueryView, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { UdozoShell } from "@/components/shell";
 import {
@@ -10,6 +10,7 @@ import {
   useSetClassifiedCategoryCountryMutation,
   useSetClassifiedCategoryKeywordsMutation,
   useSetClassifiedCategoryMutation,
+  useSetClassifiedCategoryPicturesMutation,
   useSetClassifiedCategorySkuPrefixMutation,
 } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
@@ -20,7 +21,9 @@ import { textWords, wordsText } from "@/components/category-words";
  * subcategories there), and switching one off everywhere. Closing stops new ads; live ones stay until they end.
  * Each category's SKU prefix starts its ads' SKUs (PHN-000123), and its search words (what people call the things
  * sold there) send "carpet" or "plastic chairs" to the right subcategory on Post an ad, in search suggestions and in
- * the assistants. Operations change them (switches shown at once, undone if refused); each change is audited.
+ * the assistants. A top category also has its own pictures on udozo.com: a banner across the top of its pages and a
+ * spotlight image drawn on a circle beside its name. Operations change them (switches shown at once, undone if
+ * refused); each change is audited.
  */
 export default function ClassifiedCategoriesPage() {
   const admin = useAdmin();
@@ -88,8 +91,10 @@ function CategoryRow({
   onOpen: (open: boolean) => void;
   onEnable: (enabled: boolean) => void;
 }) {
+  const [pictures, setPictures] = useState(false);
   return (
-    <div className={top ? "flex flex-wrap items-center gap-3 px-5 py-4 sm:px-6" : "flex flex-wrap items-center gap-3 py-2.5 pl-10 pr-5 sm:pr-6"}>
+    <>
+      <div className={top ? "flex flex-wrap items-center gap-3 px-5 py-4 sm:px-6" : "flex flex-wrap items-center gap-3 py-2.5 pl-10 pr-5 sm:pr-6"}>
       <span className="min-w-0 flex-1">
         <span className={top ? "block font-semibold text-ink" : "block text-sm text-ink"}>{category.name}</span>
         <span className="block text-xs text-muted">
@@ -97,6 +102,7 @@ function CategoryRow({
         </span>
       </span>
       {!category.enabled ? <Badge tone="grey">Off everywhere</Badge> : null}
+      {top ? <PicturesButton category={category} open={pictures} onToggle={() => setPictures(shown => !shown)} /> : null}
       <SkuPrefix category={category} changes={changes} />
       {top ? null : <SearchWords category={category} changes={changes} />}
       <span className="flex items-center gap-2 text-xs font-semibold text-muted">
@@ -107,6 +113,90 @@ function CategoryRow({
         On everywhere
         <Toggle label={`${category.name}: on everywhere`} checked={category.enabled} disabled={!changes} onChange={onEnable} />
       </span>
+      </div>
+      {top && pictures ? <CategoryPictures category={category} changes={changes} /> : null}
+    </>
+  );
+}
+
+/** What a top category's pictures are, opening their editor. */
+function PicturesButton({ category, open, onToggle }: { category: AdminClassifiedCategory; open: boolean; onToggle: () => void }) {
+  const count = [category.banner_url, category.spotlight_url].filter(Boolean).length;
+  const label = count === 2 ? "Banner and spotlight" : category.banner_url ? "Banner, no spotlight" : category.spotlight_url ? "Spotlight, no banner" : "No pictures";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label={`${category.name}: ${label}, ${open ? "close" : "open"} the pictures`}
+      className={`rounded-lg border px-2 py-1 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 ${count ? "border-line bg-white text-ink" : "border-amber-300 bg-amber-50 text-amber-900"}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/**
+ * A top category's pictures on udozo.com, each saved as soon as it is uploaded or removed: the banner across the top of
+ * its pages (and its subcategories'), and the spotlight image beside its name, with a preview of the two together.
+ */
+function CategoryPictures({ category, changes }: { category: AdminClassifiedCategory; changes: boolean }) {
+  const [save, saving] = useSetClassifiedCategoryPicturesMutation();
+  const [saved, setSaved] = useState<string | null>(null);
+  const banner = category.banner_url ?? "";
+  const spotlight = category.spotlight_url ?? "";
+  const change = async (field: "banner_url" | "spotlight_url", url: string) => {
+    setSaved(null);
+    try {
+      await save({ id: category.id, [field]: url.trim() || null }).unwrap();
+      const what = field === "banner_url" ? "banner" : "spotlight image";
+      setSaved(url ? `The ${what} is saved. It shows on udozo.com within a few minutes.` : `The ${what} is taken off.`);
+    } catch {
+      // The API's message shows below (the mutation's error).
+    }
+  };
+  return (
+    <div className="grid gap-4 border-t border-line bg-canvas/60 px-5 py-4 sm:px-6 lg:grid-cols-2">
+      <fieldset disabled={!changes} className="grid min-w-0 content-start gap-4">
+        <ImageField
+          label="Banner"
+          realm="admin"
+          purpose="classified_category_banner"
+          targetId={category.slug}
+          shape="wide"
+          value={banner}
+          onChange={url => void change("banner_url", url)}
+          hint="Across the top of its category pages on udozo.com, its subcategories' too. Best 1600 × 400 pixels (4:1), at least 600 × 150; JPEG, PNG or WebP up to 3 MB. Keep the left side calm: the name is written there. Remove it for Udozo's drawn banner."
+        />
+        <ImageField
+          label="Spotlight image"
+          realm="admin"
+          purpose="classified_category_spotlight"
+          targetId={category.slug}
+          value={spotlight}
+          onChange={url => void change("spotlight_url", url)}
+          hint="A cut-out of what is sold here (phones and a tablet, a fridge and a cooker) on a clear background, drawn on a circle beside the name. Square, best 800 × 800 pixels; PNG or WebP with transparency, up to 2 MB. Remove it to show the category's icon instead."
+        />
+        {saving.error ? <Notice tone="red">{errorMessage(saving.error)}</Notice> : saved ? <p className="text-sm text-muted">{saved}</p> : null}
+      </fieldset>
+      <div className="grid min-w-0 content-start gap-2">
+        <span className="text-xs font-semibold text-muted">How it looks on udozo.com</span>
+        <div role="img" aria-label={`${category.name}: preview of its banner and spotlight image`} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#10212e] via-[#185174] to-[#0e7cc0]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- an admin's checked upload on the media CDN. */}
+          {banner ? <img src={banner} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+          <span className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
+          <div className="relative flex min-h-36 items-center justify-between gap-3 p-4">
+            <span className="grid gap-1">
+              <span className="text-lg font-extrabold text-white">{category.name}</span>
+              <span className="text-xs text-white/80">{formatNumber(category.active_listings)} live ads</span>
+            </span>
+            <span className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-full bg-white/90 ring-4 ring-white/30">
+              {/* eslint-disable-next-line @next/next/no-img-element -- an admin's checked upload on the media CDN. */}
+              {spotlight ? <img src={spotlight} alt="" className="size-[88%] object-contain" /> : <span className="text-xs text-muted">Its icon</span>}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

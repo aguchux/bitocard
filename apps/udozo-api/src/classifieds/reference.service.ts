@@ -67,6 +67,9 @@ export class ClassifiedReferenceService {
       b2b: category.b2b,
       /** What people call the things sold here, for matching what they type. */
       keywords: category.keywords,
+      /** Top categories' own pictures on udozo.com (null for subcategories, which show their top category's banner). */
+      banner_url: category.bannerUrl,
+      spotlight_url: category.spotlightUrl,
       safety_checklist: category.safetyChecklist.length ? category.safetyChecklist : checklist,
       features: category.features
         .filter(link => link.feature.enabled)

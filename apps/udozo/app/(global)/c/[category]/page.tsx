@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { categoryPath, type ShopShowcase } from "@bitocard/api-client/classifieds";
+import { CategoryHero } from "@/components/category-hero";
 import { Flag } from "@/components/flag";
 import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
@@ -33,9 +34,12 @@ export default async function GlobalCategory({ params }: Props) {
   }
   const showcase = await shopApi<ShopShowcase>(`/v1/classifieds/showcase?category=${encodeURIComponent(category)}`);
   if (!showcase.ok || !showcase.data.category || !showcase.data.sections) notFound();
+  const names = showcase.data.sections.map(section => section.name);
+  const place = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "Africa");
+  const listings = showcase.data.sections.reduce((sum, section) => sum + section.listings, 0);
   return (
     <div className="mx-auto grid max-w-[1400px] gap-8 px-4 sm:px-6 lg:px-8 pt-5">
-      <h1 className="text-2xl font-extrabold tracking-tight">{showcase.data.category.name} across Africa</h1>
+      <CategoryHero category={showcase.data.category} top={showcase.data.category} place={place} listings={listings} />
       {showcase.data.sections.map(section => (
         <section key={section.country} aria-labelledby={`in-${section.country}`}>
           <div className="mb-3 flex items-baseline justify-between gap-3">

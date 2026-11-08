@@ -237,6 +237,14 @@ class CategoryDto {
   /** What people call the things sold here, matched as typed (at most 60, each 2 to 40 characters). */
   @IsOptional() @IsArray() @ArrayMaxSize(60) @IsString({ each: true }) @Length(2, 40, { each: true })
   keywords?: string[];
+
+  /** Top categories only: the banner across the top of its pages (an uploaded `classified_category_banner`); null removes it. */
+  @IsOptional() @IsString() @Matches(/^https:\/\/\S+$/) @Length(10, 2000)
+  banner_url?: string | null;
+
+  /** Top categories only: a cut-out of what is sold there, drawn on a circle (`classified_category_spotlight`); null removes it. */
+  @IsOptional() @IsString() @Matches(/^https:\/\/\S+$/) @Length(10, 2000)
+  spotlight_url?: string | null;
 }
 
 class CategoryCountryDto {
@@ -470,6 +478,8 @@ export class ClassifiedsAdminService {
       enabled: row.enabled,
       sku_prefix: row.skuPrefix,
       keywords: row.keywords,
+      banner_url: row.bannerUrl,
+      spotlight_url: row.spotlightUrl,
       open: row.countries[0]?.enabled ?? false,
       active_listings: live.get(row.id) ?? 0,
     });
@@ -485,12 +495,22 @@ export class ClassifiedsAdminService {
   /**
    * Switches a category off everywhere (or back on): no new listings in it; live ones stay until they end. Or gives it
    * another SKU prefix: its new listings' SKUs start with it, those given keep theirs, and a prefix any category has had
-   * stays that category's, so no other can take it and no SKU is ever given twice.
+   * stays that category's, so no other can take it and no SKU is ever given twice. Or, for a top category, sets or
+   * removes its banner and spotlight image on udozo.com.
    */
-  async setCategory(actorId: string | null, id: string, input: { enabled?: boolean; sku_prefix?: string; keywords?: string[] }) {
+  async setCategory(actorId: string | null, id: string, input: { enabled?: boolean; sku_prefix?: string; keywords?: string[]; banner_url?: string | null; spotlight_url?: string | null }) {
     const row = await this.prisma.classifiedCategory.findUnique({ where: { id } });
     if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such category.');
-    if (input.enabled === undefined && input.sku_prefix === undefined && input.keywords === undefined) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Say what to change.', 'enabled');
+    if (input.enabled === undefined && input.sku_prefix === undefined && input.keywords === undefined && input.banner_url === undefined && input.spotlight_url === undefined) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Say what to change.', 'enabled');
+    }
+    for (const field of ['banner_url', 'spotlight_url'] as const) {
+      if (input[field] !== undefined && row.parentId) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Only top categories have a banner and a spotlight image; subcategories show the banner of their top category.', field);
+    }
+    const pictures = {
+      ...(input.banner_url !== undefined && input.banner_url !== row.bannerUrl ? { bannerUrl: input.banner_url } : {}),
+      ...(input.spotlight_url !== undefined && input.spotlight_url !== row.spotlightUrl ? { spotlightUrl: input.spotlight_url } : {}),
+    };
     const keywords = input.keywords === undefined ? undefined : categoryKeywords(input.keywords);
     const keywordsChanged = keywords !== undefined && keywords.join('\n') !== row.keywords.join('\n');
     const prefix = input.sku_prefix !== undefined && input.sku_prefix !== row.skuPrefix ? input.sku_prefix : undefined;
@@ -501,7 +521,7 @@ export class ClassifiedsAdminService {
     }
     const enabled = input.enabled ?? row.enabled;
     await this.prisma.$transaction(async tx => {
-      await tx.classifiedCategory.update({ where: { id }, data: { enabled, ...(prefix ? { skuPrefix: prefix } : {}), ...(keywordsChanged ? { keywords } : {}) } });
+      await tx.classifiedCategory.update({ where: { id }, data: { enabled, ...(prefix ? { skuPrefix: prefix } : {}), ...(keywordsChanged ? { keywords } : {}), ...pictures } });
       if (prefix) await tx.classifiedCategorySkuPrefix.upsert({ where: { prefix }, create: { prefix, categoryId: id }, update: {} });
     });
     await this.audit.record({
@@ -509,10 +529,31 @@ export class ClassifiedsAdminService {
       action: 'classifieds.category_changed',
       targetType: 'classified_category',
       targetId: id,
-      before: { enabled: row.enabled, ...(prefix ? { sku_prefix: row.skuPrefix } : {}), ...(keywordsChanged ? { keywords: row.keywords } : {}) },
-      after: { enabled, ...(prefix ? { sku_prefix: prefix } : {}), ...(keywordsChanged ? { keywords } : {}) },
+      before: {
+        enabled: row.enabled,
+        ...(prefix ? { sku_prefix: row.skuPrefix } : {}),
+        ...(keywordsChanged ? { keywords: row.keywords } : {}),
+        ...('bannerUrl' in pictures ? { banner_url: row.bannerUrl } : {}),
+        ...('spotlightUrl' in pictures ? { spotlight_url: row.spotlightUrl } : {}),
+      },
+      after: {
+        enabled,
+        ...(prefix ? { sku_prefix: prefix } : {}),
+        ...(keywordsChanged ? { keywords } : {}),
+        ...('bannerUrl' in pictures ? { banner_url: pictures.bannerUrl } : {}),
+        ...('spotlightUrl' in pictures ? { spotlight_url: pictures.spotlightUrl } : {}),
+      },
     });
-    return { object: 'classified_admin_category' as const, id, slug: row.slug, enabled, sku_prefix: prefix ?? row.skuPrefix, keywords: keywordsChanged ? keywords : row.keywords };
+    return {
+      object: 'classified_admin_category' as const,
+      id,
+      slug: row.slug,
+      enabled,
+      sku_prefix: prefix ?? row.skuPrefix,
+      keywords: keywordsChanged ? keywords : row.keywords,
+      banner_url: pictures.bannerUrl !== undefined ? pictures.bannerUrl : row.bannerUrl,
+      spotlight_url: pictures.spotlightUrl !== undefined ? pictures.spotlightUrl : row.spotlightUrl,
+    };
   }
 
   /** Opens or closes a category in one country (a top category closes all of its subcategories there). */
