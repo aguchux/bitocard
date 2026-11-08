@@ -118,8 +118,8 @@ describe("hero slider", () => {
     const dialog = await screen.findByRole("dialog", {}, slow);
     fireEvent.change(within(dialog).getByLabelText("Market"), { target: { value: "NG" } });
     fireEvent.click(within(dialog).getByLabelText("Two thirds over a third"));
-    expect(within(dialog).getByText(/Best 900 × 660 px/)).toBeTruthy();
-    expect(within(dialog).getByText(/Best 900 × 330 px/)).toBeTruthy();
+    expect(within(dialog).getByText(/Best 600 × 1200 px \(upright, 1:2\)/)).toBeTruthy();
+    expect(within(dialog).getByText(/Best 600 × 600 px \(square\)/)).toBeTruthy();
     const words = within(dialog).getAllByLabelText("What the banner says");
     fireEvent.change(words[0]!, { target: { value: "Phones from ₦50,000" } });
     fireEvent.change(words[1]!, { target: { value: "Meet Adaeze" } });

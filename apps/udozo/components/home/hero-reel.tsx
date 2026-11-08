@@ -46,13 +46,15 @@ export function HeroReel({ slides, title }: { slides: ShownSlide[]; title: strin
   return (
     <section aria-label="Featured" className="bg-white py-1.5">
       <h1 className="sr-only">{title}</h1>
-      <Marquee label="Featured on Udozo" count={columns.length} speed="slow" tight>
+      <Marquee label="Featured on Udozo" count={columns.length} speed="normal" tight>
         {columns.map(({ slide, repeat }, index) => (
           <li
             key={`${slide.id}-${repeat}`}
             aria-hidden={repeat > 0 || undefined}
             data-hero-slide={slide.id}
-            className="grid h-[330px] w-[78vw] max-w-[440px] gap-1.5 sm:h-[420px] sm:w-[380px] lg:h-[480px] lg:w-[440px]"
+            // As wide as one row is high (three rows less the two 6 px gaps), so a third is a square, two thirds an
+            // upright 1:2 rectangle and a whole column an upright 1:3 strip: narrow columns, many on screen.
+            className="grid h-[330px] w-[106px] gap-1.5 sm:h-[420px] sm:w-[136px] lg:h-[480px] lg:w-[156px]"
             style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}
           >
             {slide.tiles.map((tile, at) => (
