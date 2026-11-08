@@ -2,8 +2,11 @@ import { bitocardApi } from '../base';
 
 // udozo.com's banner ads (Udozo's API only: /v1/admin/classifieds/banners).
 
-/** Where a banner shows: `account_rail`, the account pages, above the menu on the left. */
-export type BannerPosition = 'account_rail';
+/**
+ * Where a banner shows: `account_rail`, the account pages, above the menu on the left; on the account dashboard,
+ * `dashboard_top` (a strip beside the title), `dashboard_side` (under the message board), `dashboard_main` (under the chart).
+ */
+export type BannerPosition = 'account_rail' | 'dashboard_top' | 'dashboard_side' | 'dashboard_main';
 export type BannerState = 'showing' | 'off' | 'scheduled' | 'ended';
 export type Banner = {
   object: 'banner';

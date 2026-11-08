@@ -2,7 +2,7 @@ import "server-only";
 import { query, shopApi } from "./api";
 
 /** The places on udozo.com Udozo's team can put a banner ad (the API's `bannerPositions`). */
-export type BannerPosition = "account_rail";
+export type BannerPosition = "account_rail" | "dashboard_top" | "dashboard_side" | "dashboard_main";
 export type SiteBanner = { object: "banner"; id: string; image_url: string; href: string; alt: string };
 
 /**
@@ -11,7 +11,7 @@ export type SiteBanner = { object: "banner"; id: string; image_url: string; href
  */
 export async function bannersFor(position: BannerPosition, country: string | null): Promise<SiteBanner[]> {
   const result = await shopApi<{ data: SiteBanner[] }>(`/v1/classifieds/banners${query({ position, country })}`);
-  return result.ok ? result.data.data.filter(banner => safeBannerHref(banner.href) !== null && /^https:\/\//.test(banner.image_url)) : [];
+  return result.ok && Array.isArray(result.data?.data) ? result.data.data.filter(banner => safeBannerHref(banner.href) !== null && /^https:\/\//.test(banner.image_url)) : [];
 }
 
 /** One of them, a different one from visit to visit, so banners sharing a place take turns. */

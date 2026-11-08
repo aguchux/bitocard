@@ -98,6 +98,22 @@ describe('banner ads above the account menu', () => {
     assert.equal((await operations.delete(`/v1/admin/classifieds/banners/${made.json.id}`)).status, 404);
   });
 
+  test("the account dashboard's three places: each read on its own, never another place's", async () => {
+    await prisma.classifiedBanner.deleteMany();
+    const made = {};
+    for (const position of ['dashboard_top', 'dashboard_side', 'dashboard_main']) {
+      const res = await operations.post('/v1/admin/classifieds/banners', banner({ position, alt: `Banner ${position}` }));
+      assert.equal(res.status, 201, JSON.stringify(res.json));
+      made[position] = res.json.id;
+    }
+    for (const position of ['dashboard_top', 'dashboard_side', 'dashboard_main']) {
+      const read = await (await fetch(`${server.base}/v1/classifieds/banners?position=${position}&country=NG`)).json();
+      assert.deepEqual(read.data.map(item => item.id), [made[position]]);
+    }
+    assert.deepEqual((await showing('NG')).json.data, [], 'the account rail keeps its own');
+    assert.deepEqual((await support.get('/v1/admin/classifieds/banners?position=dashboard_side')).json.data.map(item => item.id), [made.dashboard_side]);
+  });
+
   test('the public read needs a known place, and resellers and signed-out callers cannot reach the admin routes', async () => {
     assert.equal((await fetch(`${server.base}/v1/classifieds/banners?position=nowhere`)).status, 400);
     assert.equal((await client(server.base).get('/v1/admin/classifieds/banners')).status, 401);

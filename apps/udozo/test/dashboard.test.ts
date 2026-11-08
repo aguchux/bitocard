@@ -36,18 +36,24 @@ const dashboard: AccountDashboard = {
 };
 
 let calls: string[];
+let shownBanners: string[];
 let answer: () => Response;
 beforeEach(() => {
   vi.stubEnv("API_URL", "http://api.test");
   vi.stubEnv("UDOZO_URL", "https://udozo.com");
   setRequest({ host: "udozo.com" }, { udz_customer: "bcc_session" });
   calls = [];
+  shownBanners = [];
   answer = () => Response.json(dashboard);
   vi.stubGlobal("fetch", async (url: string) => {
     calls.push(url);
     if (url.includes("/v1/store/account")) return Response.json(customer);
     if (url.includes("/v1/classifieds/markets")) return Response.json({ object: "list", data: [{ object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 3 }], showcase: false });
     if (url.includes("/v1/classifieds/me/dashboard")) return answer();
+    if (url.includes("/v1/classifieds/banners")) {
+      const position = new URL(url).searchParams.get("position")!;
+      return Response.json({ object: "list", position, data: shownBanners.includes(position) ? [{ object: "banner", id: `b-${position}`, image_url: `https://cdn.udozo.test/${position}.png`, href: "/ng/c/tvs", alt: `Banner ${position}` }] : [] });
+    }
     return Response.json({});
   });
 });
@@ -93,6 +99,23 @@ describe("the dashboard page", () => {
     expect(html).toContain("1 listing needs changes");
     expect(html).toContain("₦240,000");
     expect(html).toContain("50%");
+  });
+
+  test("banners Udozo's team placed show in the three dashboard places, for the customer's market; none, nothing", async () => {
+    shownBanners = ["dashboard_top", "dashboard_side", "dashboard_main"];
+    const html = renderToStaticMarkup(await Dashboard({ searchParams: Promise.resolve({}) }));
+    for (const position of shownBanners) {
+      expect(calls.some(url => url.includes(`/v1/classifieds/banners?position=${position}&country=NG`))).toBe(true);
+      expect(html).toContain(`data-banner="b-${position}"`);
+    }
+    // The top strip sits between the title and Post an ad; the side one after the board; the main one after the chart.
+    expect(html.indexOf('data-banner="b-dashboard_top"')).toBeLessThan(html.indexOf("Your figures"));
+    expect(html.indexOf("Message board")).toBeLessThan(html.indexOf('data-banner="b-dashboard_side"'));
+    expect(html.indexOf("See every day as a table")).toBeLessThan(html.indexOf('data-banner="b-dashboard_main"'));
+    expect(html.indexOf('data-banner="b-dashboard_main"')).toBeLessThan(html.indexOf("Your most viewed listings"));
+    expect(html).toContain(">Ad<");
+    shownBanners = [];
+    expect(renderToStaticMarkup(await Dashboard({ searchParams: Promise.resolve({}) }))).not.toContain("data-banner=");
   });
 
   test("says so when the dashboard cannot be read, and sends people signed out to sign in", async () => {

@@ -7,9 +7,11 @@ import { ShopDirectoryService } from './directory.service.js';
 
 /**
  * Where on udozo.com a banner shows. `account_rail`: the account pages, above the menu on the left (desktops; the
- * rail's width, 15rem). A new place is a new key here and on udozo.com.
+ * rail's width, 15rem). On the account dashboard (`/account`, 8 November 2026): `dashboard_top`, a wide strip beside
+ * the title (under it on phones); `dashboard_side`, under the message board; `dashboard_main`, under the chart. A new
+ * place is a new key here, on udozo.com and in the admin's `bannerPlaces`.
  */
-export const bannerPositions = ['account_rail'] as const;
+export const bannerPositions = ['account_rail', 'dashboard_top', 'dashboard_side', 'dashboard_main'] as const;
 export type BannerPosition = (typeof bannerPositions)[number];
 
 export type BannerState = 'showing' | 'off' | 'scheduled' | 'ended';

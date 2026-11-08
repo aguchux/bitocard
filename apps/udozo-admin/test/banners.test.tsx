@@ -91,12 +91,17 @@ describe("banners", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Add banner" }, slow));
     const dialog = await screen.findByRole("dialog", {}, slow);
     expect(within(dialog).getByText(/Upload 480 px wide/)).toBeTruthy();
+    // The account dashboard's places, each with the size that fits.
+    const places = [...(within(dialog).getByLabelText("Where it shows") as HTMLSelectElement).options].map(option => option.value);
+    expect(places).toEqual(["account_rail", "dashboard_top", "dashboard_side", "dashboard_main"]);
+    fireEvent.change(within(dialog).getByLabelText("Where it shows"), { target: { value: "dashboard_top" } });
+    expect(within(dialog).getByText(/Upload a wide strip, 1200 × 160 px/)).toBeTruthy();
     fireEvent.change(within(dialog).getByLabelText("Market"), { target: { value: "GH" } });
     fireEvent.change(within(dialog).getByLabelText("Link"), { target: { value: "https://partner.example.com/offer" } });
     fireEvent.change(within(dialog).getByLabelText("What the banner says"), { target: { value: "Solar panels, 20% off" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Add banner" }));
     await waitFor(() => expect(sent.some(item => item.method === "POST" && item.path === "/v1/admin/classifieds/banners")).toBe(true), slow);
-    expect(sent.find(item => item.method === "POST")?.body).toMatchObject({ position: "account_rail", country: "GH", href: "https://partner.example.com/offer", alt: "Solar panels, 20% off", enabled: true, starts_at: null, ends_at: null, note: null });
+    expect(sent.find(item => item.method === "POST")?.body).toMatchObject({ position: "dashboard_top", country: "GH", href: "https://partner.example.com/offer", alt: "Solar panels, 20% off", enabled: true, starts_at: null, ends_at: null, note: null });
   });
 
   test("support sees the banners and cannot change them", long, async () => {

@@ -10,6 +10,9 @@ import { UdozoShell } from "@/components/shell";
 /** The places on udozo.com a banner can show, with the size that fits. */
 const bannerPlaces: Record<BannerPosition, { name: string; hint: string }> = {
   account_rail: { name: "Account pages, above the menu", hint: "On computers, above the menu on the left of every account page: 240 px wide. Upload 480 px wide (twice for sharp screens), at least 80 px tall; it is never cropped." },
+  dashboard_top: { name: "Dashboard, top strip", hint: "On the account dashboard, between the title and Post an ad on computers (about 600 px wide, 80 to 100 px tall); under the title, full width, on phones. Upload a wide strip, 1200 × 160 px; it is never cropped." },
+  dashboard_side: { name: "Dashboard, under the message board", hint: "On the account dashboard, in the right column under the message board: 350 px wide on computers, full width on phones. Upload 700 px wide, 300 to 500 px tall; it is never cropped." },
+  dashboard_main: { name: "Dashboard, under the chart", hint: "On the account dashboard, across the main column under the chart (about 700 to 900 px wide on computers, full width on phones). Upload 1600 × 250 px; it is never cropped." },
 };
 
 const stateTones: Record<BannerState, "green" | "grey" | "blue" | "amber"> = { showing: "green", off: "grey", scheduled: "blue", ended: "amber" };

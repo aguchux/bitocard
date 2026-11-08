@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, ExternalLink, Eye, Heart, Lightbulb, Minus, Newspaper, Pin, ShoppingBag, Sparkles, UsersRound, MessagesSquare } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, ExternalLink, Eye, Heart, Lightbulb, Minus, Newspaper, Pin, Plus, ShoppingBag, Sparkles, UsersRound, MessagesSquare } from "lucide-react";
 import { dashboardPeriods, listingStatusLabels, shopMoney, type AccountDashboard, type BoardPost, type BoardTone, type DashboardMetric } from "@bitocard/api-client/classifieds";
 import { ActivityChart } from "@/components/account/activity-chart";
 import { PageTitle } from "@/components/account/nav";
+import { RailBanner } from "@/components/account/rail-banner";
+import { bannersFor, pickBanner } from "@/lib/banners";
 import { customerApi } from "@/lib/customer";
 import { requireSeller } from "@/lib/account";
 import { boardLink, boardTones, changeText, dayLabel, metricLabels, metricOrder, periodOf } from "@/lib/dashboard";
@@ -89,12 +91,19 @@ function Board({ posts }: { posts: BoardPost[] }) {
 /**
  * The account's own page (8 November 2026, the owner's request; My listings moved to `/account/listings`): the
  * customer's figures for 7, 30 or 90 days against the period before, a chart of each figure day by day, their listings
- * at a glance, their best listings, sales, how often they answer chats, their reviews, and Udozo's message board.
+ * at a glance, their best listings, sales, how often they answer chats, their reviews, and Udozo's message board. Banner
+ * ads Udozo's team places (Site > Banners) show in three places: a strip beside the title (`dashboard_top`), under the
+ * message board (`dashboard_side`) and under the chart (`dashboard_main`); a place with none shows nothing.
  */
 export default async function Dashboard({ searchParams }: Props) {
   const days = periodOf((await searchParams).days);
-  await requireSeller("/account");
-  const result = await customerApi<AccountDashboard>("GET", `/v1/classifieds/me/dashboard?days=${days}`);
+  const { market } = await requireSeller("/account");
+  const [result, top, side, main] = await Promise.all([
+    customerApi<AccountDashboard>("GET", `/v1/classifieds/me/dashboard?days=${days}`),
+    bannersFor("dashboard_top", market.country).then(pickBanner),
+    bannersFor("dashboard_side", market.country).then(pickBanner),
+    bannersFor("dashboard_main", market.country).then(pickBanner),
+  ]);
 
   const periods = (
     <nav aria-label="Period" className="flex gap-1 rounded-full bg-slate-100 p-1">
@@ -131,13 +140,26 @@ export default async function Dashboard({ searchParams }: Props) {
 
   return (
     <div className="grid gap-5">
-      <PageTitle title="Dashboard" note={`${dayLabel(data.since)} to ${dayLabel(data.until)}`} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {periods}
-        <Link href="/account/listings" className="text-sm font-semibold text-brand-700 hover:underline">
-          Go to my listings
-        </Link>
-      </div>
+      {/* On computers: the title and periods, the top banner between them and the actions, then Post an ad. */}
+      <header className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
+        <div className="grid min-w-0 content-start gap-3">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Dashboard</h1>
+            <p className="mt-1 text-sm text-slate-600">{`${dayLabel(data.since)} to ${dayLabel(data.until)}`}</p>
+          </div>
+          {periods}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 lg:order-3 lg:grid lg:justify-items-end lg:self-stretch lg:content-between">
+          <Link href={sellHref("my_listings")} className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-brand-700 px-4 text-sm font-bold text-white hover:bg-brand-600">
+            <Plus className="size-4" strokeWidth={2.6} aria-hidden="true" />
+            Post an ad
+          </Link>
+          <Link href="/account/listings" className="text-sm font-semibold text-brand-700 hover:underline">
+            Go to my listings
+          </Link>
+        </div>
+        {top ? <RailBanner banner={top} className="min-w-0 lg:order-2 lg:mx-auto lg:w-full lg:max-w-[40rem]" /> : <span aria-hidden="true" className="hidden lg:order-2 lg:block" />}
+      </header>
 
       <section aria-label="Your figures" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         {metricOrder.map(metric => (
@@ -148,6 +170,7 @@ export default async function Dashboard({ searchParams }: Props) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="grid min-w-0 content-start gap-5">
           <ActivityChart series={data.series} />
+          {main ? <RailBanner banner={main} /> : null}
 
           <section aria-labelledby="top-listings" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
             <h2 id="top-listings" className="text-base font-extrabold">
@@ -183,6 +206,7 @@ export default async function Dashboard({ searchParams }: Props) {
 
         <div className="grid min-w-0 content-start gap-5">
           <Board posts={data.board} />
+          {side ? <RailBanner banner={side} /> : null}
 
           <section aria-labelledby="glance" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
             <h2 id="glance" className="text-base font-extrabold">
