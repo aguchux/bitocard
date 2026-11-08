@@ -63,7 +63,10 @@ describe("the hero reel's columns", () => {
     expect(columns.length).toBe(12);
     for (const column of columns) expect(column).not.toMatch(/rounded/);
     // The full banner spans the three rows and opens its listing here; the big one two rows, outside in a new tab.
-    expect(html).toMatch(/<a class="relative block min-h-0 overflow-hidden bg-navy-100 row-span-3" href="\/ng\/l\/100123-iphone-13">/);
+    expect(html).toMatch(/<a class="relative block min-h-0 overflow-hidden bg-navy-100 group row-span-3" href="\/ng\/l\/100123-iphone-13">/);
+    // Each linked banner fades and its colours shift under the pointer or keyboard focus; one without a link stays still.
+    expect(html).toMatch(/alt="iPhone 13 deals"[^>]*class="[^"]*group-hover:opacity-85 group-hover:saturate-150 group-hover:hue-rotate-15[^"]*motion-reduce|motion-reduce[^"]*group-hover:opacity-85/);
+    expect(html).toMatch(/class="size-full object-cover select-none "[^>]*alt="Sell on Udozo"|alt="Sell on Udozo"[^>]*class="size-full object-cover select-none "/);
     expect(html).toMatch(/<a href="https:\/\/partner\.example\.com\/offer" target="_blank" rel="sponsored noopener" class="[^"]*row-span-2"/);
     expect(html).toMatch(/<div class="[^"]*row-span-1"><img[^>]*alt="Sell on Udozo"/);
     expect(html).toMatch(/alt="Solar panels 20% off"[^>]*\/><span[^>]*>Ad<\/span>/);

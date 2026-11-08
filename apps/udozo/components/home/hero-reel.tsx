@@ -5,15 +5,22 @@ import { filledSlides, heroRows, type ShownSlide, type ShownTile } from "@/lib/h
 /** Each banner's row span (its share of the column's three rows). */
 const spans: Record<number, string> = { 1: "row-span-1", 2: "row-span-2", 3: "row-span-3" };
 
+/**
+ * A linked banner answers the pointer (and keyboard focus) on its own: it fades a little and its colours deepen and
+ * shift slightly, quickly and without moving (none at all for reduced motion). Banners without a link stay still.
+ */
+export const hover = "transition-[opacity,filter] duration-200 ease-out motion-reduce:transition-none group-hover:opacity-85 group-hover:saturate-150 group-hover:hue-rotate-15 group-focus-visible:opacity-85 group-focus-visible:saturate-150";
+
 function Tile({ tile, rows, first, hidden }: { tile: ShownTile; rows: number; first: boolean; hidden: boolean }) {
+  const linked = Boolean(tile.link);
   const picture = (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element -- banners on Udozo's storage, any size the team uploaded */}
-      <img src={tile.image_url} alt={tile.alt} draggable={false} loading={first ? "eager" : "lazy"} fetchPriority={first ? "high" : undefined} decoding="async" className="size-full object-cover select-none" />
+      <img src={tile.image_url} alt={tile.alt} draggable={false} loading={first ? "eager" : "lazy"} fetchPriority={first ? "high" : undefined} decoding="async" className={`size-full object-cover select-none ${linked ? hover : ""}`} />
       {tile.ad ? <span className="absolute bottom-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white">Ad</span> : null}
     </>
   );
-  const box = `relative block min-h-0 overflow-hidden bg-navy-100 ${spans[rows] ?? "row-span-1"}`;
+  const box = `relative block min-h-0 overflow-hidden bg-navy-100 ${linked ? "group" : ""} ${spans[rows] ?? "row-span-1"}`;
   if (!tile.link) return <div className={box}>{picture}</div>;
   const focus = hidden ? { tabIndex: -1 } : {};
   return tile.link.external ? (
