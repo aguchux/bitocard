@@ -68,7 +68,7 @@ async function whatsappNumber(market: ShopMarket | null) {
 /**
  * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
  * and the search (with no market, "Continue to <their country>"), on its own full-width row on phones and tablets and
- * beside the lockup from desktops (and, where Udozo is on WhatsApp, its green tab hanging below); on the right **Get help** (a menu: Safe pay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
+ * beside the lockup from desktops (and, where Udozo is on WhatsApp, its green tab on the screen's right edge); on the right **Get help** (a menu: Safe pay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
  * markets from the second one), just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones).
  */
 export function HeaderBar({ market, customer, showcase, categories, countries = [], continueTo = null, whatsapp = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; countries?: MenuCountry[]; continueTo?: ContinueTo; /** Udozo's WhatsApp number where it is open: the tab hanging under the header. */ whatsapp?: string | null }) {
@@ -86,6 +86,7 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
   ) : null;
 
   return (
+    <>
     <header className="sticky top-0 z-30 border-b border-navy-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-1.5 gap-y-2 px-4 pt-2.5 pb-3 sm:gap-x-2 sm:px-6 lg:h-[72px] lg:flex-nowrap lg:gap-x-4 lg:px-8 lg:py-0">
         <UdozoWordmark href={home} />
@@ -116,8 +117,10 @@ export function HeaderBar({ market, customer, showcase, categories, countries = 
           )}
         </div>
       </div>
-      {whatsapp ? <WhatsappTab number={whatsapp} signedIn={Boolean(customer)} /> : null}
     </header>
+    {/* Outside the header: its blur would hold a fixed child inside it, and the tab stands on the screen's right edge. */}
+    {whatsapp ? <WhatsappTab number={whatsapp} signedIn={Boolean(customer)} /> : null}
+    </>
   );
 }
 

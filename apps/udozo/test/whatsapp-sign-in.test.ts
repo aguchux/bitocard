@@ -105,9 +105,14 @@ describe("waiting for WhatsApp", () => {
 describe("the WhatsApp tab and buttons", () => {
   const market = { object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN" } as never;
 
-  test("hangs under the header where Udozo is on WhatsApp: a chat with Udozo, and signing up or in with WhatsApp", () => {
+  test("stands on the right edge where Udozo is on WhatsApp; its flyout has the WhatsApp menu and what Udozo does there", () => {
     const html = renderToStaticMarkup(createElement(HeaderBar, { market, customer: null, showcase: false, categories: [], whatsapp: "+2348000000000" }));
     expect(html).toContain("data-whatsapp-tab");
+    // Outside the header (its blur would hold a fixed tab inside it), the flyout closed and out of reach until opened.
+    expect(html.indexOf("data-whatsapp-tab")).toBeGreaterThan(html.indexOf("</header>"));
+    expect(html).toMatch(/aria-expanded="false" aria-controls="whatsapp-flyout"/);
+    expect(html).toMatch(/id="whatsapp-flyout" role="dialog" aria-label="Udozo on WhatsApp" inert=""/);
+    for (const word of ["FIND", "SELL", "WANT", "CHATS", "HELP"]) expect(html).toContain(`href="https://wa.me/2348000000000?text=${word}"`);
     expect(html).toContain('href="https://wa.me/2348000000000?text=Hi"');
     expect(html).toContain("Sign up with WhatsApp");
     expect(html).toContain("Sign in with WhatsApp");
