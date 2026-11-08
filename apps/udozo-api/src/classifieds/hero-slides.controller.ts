@@ -20,7 +20,7 @@ class ScopeQueryDto {
 
 class LinkDto {
   @IsOptional() @IsIn(heroLinkKinds) kind?: HeroLinkKind;
-  /** A listing's number or SKU, a brand's slug, a seller's handle or username, or an address. */
+  /** A listing's number or SKU, a brand's slug, a seller's handle or username, a category's slug, or an address. */
   @IsOptional() @IsString() @MaxLength(500) target?: string;
 }
 
@@ -42,6 +42,12 @@ class SlideDto {
   @ValidateIf((_object, value) => value !== null) @IsOptional() @IsString() @MaxLength(40) starts_at?: string | null;
   @ValidateIf((_object, value) => value !== null) @IsOptional() @IsString() @MaxLength(40) ends_at?: string | null;
   @ValidateIf((_object, value) => value !== null) @IsOptional() @IsString() @MaxLength(300) note?: string | null;
+}
+
+class TargetsQueryDto {
+  @IsIn(['listing', 'brand', 'seller', 'category']) kind: Exclude<HeroLinkKind, 'url'>;
+  @IsOptional() @IsString() @MaxLength(80) q?: string;
+  @IsOptional() @IsString() @Matches(/^(global|[A-Za-z]{2})$/) scope?: string;
 }
 
 class OrderDto {
@@ -76,6 +82,13 @@ export class AdminHeroSlidesController {
   @Get()
   list(@Query() query: ScopeQueryDto) {
     return this.slides.list(query.scope ?? 'global');
+  }
+
+  /** What a banner's link may point at, as the admin types: listings, brands, sellers or categories (up to 8). */
+  @AdminRoles('operations', 'support')
+  @Get('targets')
+  targets(@Query() query: TargetsQueryDto) {
+    return this.slides.suggest(query.kind, query.q ?? '', query.scope ?? 'global');
   }
 
   @AdminRoles('operations')

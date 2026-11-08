@@ -6456,7 +6456,7 @@ model ClassifiedHeroSlide {
 }
 
 /// One banner of a hero column, top first (`slot` 0 to 2). Links to a listing (its id), a brand (its slug), a seller
-/// (their customer id) or any address (`/…` or https), worked out when udozo.com reads it.
+/// (their customer id), a category (its slug) or any address (`/…` or https), worked out when udozo.com reads it.
 model ClassifiedHeroTile {
   id         String              @id @default(uuid()) @db.Uuid
   slideId    String              @map("slide_id") @db.Uuid
@@ -6464,7 +6464,7 @@ model ClassifiedHeroTile {
   imageUrl   String              @map("image_url")
   /// What the image says, for people who cannot see it.
   alt        String              @db.VarChar(120)
-  /// listing, brand, seller or url.
+  /// listing, brand, seller, category or url.
   linkKind   String              @map("link_kind") @db.VarChar(20)
   linkTarget String              @map("link_target")
   /// Labelled Ad on udozo.com (off for Udozo's own promotions).

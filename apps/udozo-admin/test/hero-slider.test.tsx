@@ -67,6 +67,17 @@ beforeEach(() => {
     if (url.pathname === "/v1/admin/media/settings") return ok({ object: "media_settings", configured: true, purposes: [{ purpose: "hero_image", content_types: ["image/png", "image/jpeg"], max_bytes: 3_000_000 }] });
     if (url.pathname === "/v1/admin/classifieds/hero-slides" && input.method === "GET") return ok({ object: "list", scope: url.searchParams.get("scope"), data: existing });
     if (url.pathname === "/v1/admin/classifieds/hero-slides" && input.method === "POST") return ok(slide("s3", body as object), 201);
+    if (url.pathname === "/v1/admin/classifieds/hero-slides/targets") {
+      const kind = url.searchParams.get("kind");
+      const q = url.searchParams.get("q") ?? "";
+      const options =
+        kind === "listing"
+          ? [{ value: "100123", label: "iPhone 13 128GB", detail: "No. 100123 · PHN-000123 · ₦450,000 · NG", image_url: null }, { value: "100124", label: "iPhone 13 Pro", detail: "No. 100124 · NG", image_url: null }]
+          : kind === "category"
+            ? [{ value: "mobile-phones", label: "Mobile phones", detail: "In Phones and tablets · mobile-phones", image_url: null }]
+            : [];
+      return ok({ object: "list", kind, data: options.filter(option => option.label.toLowerCase().includes(q.toLowerCase())) });
+    }
     if (url.pathname === "/v1/admin/classifieds/hero-slides/order") return ok({ object: "list", scope: "global", data: existing });
     if (url.pathname.startsWith("/v1/admin/classifieds/hero-slides/") && input.method === "PATCH") return ok({ ...existing[0], ...(body as object) });
     return ok({ error: { type: "not_found_error", code: "resource_missing", message: "Not found." } }, 404);
@@ -130,6 +141,37 @@ describe("hero slider", () => {
       ],
       enabled: true,
     });
+  });
+
+  test("a listing and a category are chosen from suggestions as the admin types", long, async () => {
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Add column" }, slow));
+    const dialog = await screen.findByRole("dialog", {}, slow);
+    fireEvent.change(within(dialog).getByLabelText("What the banner says"), { target: { value: "iPhone deals" } });
+    const listing = within(dialog).getByRole("combobox", { name: "Listing" });
+    fireEvent.focus(listing);
+    fireEvent.change(listing, { target: { value: "iphone" } });
+    const suggestions = () => within(within(dialog).getByRole("listbox", { name: "Suggestions" })).getAllByRole("option");
+    await waitFor(() => expect(suggestions().length).toBe(2), slow);
+    expect(sent.some(item => item.path === "/v1/admin/classifieds/hero-slides/targets?kind=listing&q=iphone&scope=global")).toBe(true);
+    fireEvent.keyDown(listing, { key: "ArrowDown" });
+    fireEvent.keyDown(listing, { key: "ArrowDown" });
+    expect(suggestions()[1]!.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(listing, { key: "Enter" });
+    expect((listing as HTMLInputElement).value).toBe("100124");
+    expect(within(dialog).getByText("iPhone 13 Pro")).toBeTruthy();
+    expect(within(dialog).queryByRole("listbox")).toBeNull();
+
+    // Now a category, chosen with the mouse.
+    fireEvent.change(within(dialog).getByLabelText("Links to"), { target: { value: "category" } });
+    const category = within(dialog).getByRole("combobox", { name: "Category" });
+    expect((category as HTMLInputElement).value).toBe("");
+    fireEvent.focus(category);
+    fireEvent.change(category, { target: { value: "mob" } });
+    fireEvent.mouseDown(await within(dialog).findByRole("option", { name: /Mobile phones/ }, slow));
+    expect((category as HTMLInputElement).value).toBe("mobile-phones");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add column" }));
+    await waitFor(() => expect(sent.find(item => item.method === "POST")?.body).toMatchObject({ layout: "full", tiles: [{ alt: "iPhone deals", link: { kind: "category", target: "mobile-phones" } }] }), slow);
   });
 
   test("support sees the columns and cannot change them", long, async () => {

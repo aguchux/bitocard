@@ -5,7 +5,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { ClassifiedHeroSlide, ClassifiedHeroTile, Prisma } from '../generated/prisma/client.js';
 import { bannerHrefOk } from './banners.service.js';
 import { ShopDirectoryService } from './directory.service.js';
-import { readSku } from './rules.js';
+import { shopOrigin } from './listings.service.js';
+import { priceText, readSku } from './rules.js';
 import { publicName } from './search.service.js';
 
 /**
@@ -16,8 +17,8 @@ export const heroLayouts = ['full', 'third_two_thirds', 'two_thirds_third', 'thi
 export type HeroLayout = (typeof heroLayouts)[number];
 export const heroTiles: Record<HeroLayout, number> = { full: 1, third_two_thirds: 2, two_thirds_third: 2, thirds: 3 };
 
-/** Where a hero banner links: a listing, a brand's page, a seller's page or any address (`/…` or https). */
-export const heroLinkKinds = ['listing', 'brand', 'seller', 'url'] as const;
+/** Where a hero banner links: a listing, a brand's page, a seller's page, a category or any address (`/…` or https). */
+export const heroLinkKinds = ['listing', 'brand', 'seller', 'category', 'url'] as const;
 export type HeroLinkKind = (typeof heroLinkKinds)[number];
 
 /** Columns per market (and for every market): the reel never grows past this. */
@@ -78,18 +79,25 @@ export class HeroSlidesService {
     const listingIds = ids('listing');
     const brandSlugs = ids('brand');
     const sellerIds = ids('seller');
-    const [listings, brands, sellers, firstMarket] = await Promise.all([
+    const categorySlugs = ids('category');
+    const [listings, brands, sellers, firstMarket, categories] = await Promise.all([
       listingIds.length ? this.prisma.classifiedListing.findMany({ where: { id: { in: listingIds } }, select: { id: true, ref: true, slug: true, country: true, title: true, status: true } }) : [],
       brandSlugs.length ? this.prisma.classifiedBrand.findMany({ where: { slug: { in: brandSlugs } }, select: { slug: true, name: true, enabled: true } }) : [],
       sellerIds.length
         ? this.prisma.customer.findMany({ where: { id: { in: sellerIds } }, select: { id: true, name: true, country: true, status: true, sellerHandle: true, username: true, classifiedSeller: { select: { suspendedAt: true } } } })
         : [],
       !market && brandSlugs.length ? this.directory.markets().then(list => list.data[0]?.country ?? null) : Promise.resolve(market),
+      categorySlugs.length ? this.prisma.classifiedCategory.findMany({ where: { slug: { in: categorySlugs } }, select: { slug: true, name: true, enabled: true } }) : [],
     ]);
     const out = new Map<string, Resolved>();
     for (const tile of tiles) {
       const target = tile.linkTarget;
       if (tile.linkKind === 'url') out.set(tile.id, { href: target, label: target, target });
+      else if (tile.linkKind === 'category') {
+        // The market's category page, or the page across countries (`/c/<slug>`).
+        const category = categories.find(item => item.slug === target);
+        out.set(tile.id, category?.enabled ? { href: market ? `/${market.toLowerCase()}/c/${category.slug}` : `/c/${category.slug}`, label: category.name, target } : { href: null, label: category?.name ?? null, target });
+      }
       else if (tile.linkKind === 'listing') {
         const listing = listings.find(item => item.id === target);
         out.set(tile.id, listing && listing.status !== 'deleted' ? { href: `/${listing.country.toLowerCase()}/l/${listing.ref}${listing.slug ? `-${listing.slug}` : ''}`, label: listing.title, target: String(listing.ref) } : { href: null, label: null, target });
@@ -124,6 +132,12 @@ export class HeroSlidesService {
       if (!listing || listing.status === 'deleted') throw invalid('listing_unknown', 'No listing has that number or SKU.', `${param}.target`);
       return { kind, target: listing.id };
     }
+    if (kind === 'category') {
+      const slug = text.toLowerCase().replace(/^.*\/c\//, '').replace(/[/?#].*$/, '');
+      const category = await this.prisma.classifiedCategory.findUnique({ where: { slug }, select: { slug: true } });
+      if (!category) throw invalid('category_unknown', 'No category has that slug.', `${param}.target`);
+      return { kind, target: category.slug };
+    }
     if (kind === 'brand') {
       const slug = text.toLowerCase().replace(/^.*\/brand\//, '').replace(/[/?#].*$/, '');
       const brand = await this.prisma.classifiedBrand.findUnique({ where: { slug }, select: { slug: true } });
@@ -135,6 +149,84 @@ export class HeroSlidesService {
     const seller = await this.prisma.customer.findFirst({ where: { OR: [{ sellerHandle: key }, { username: key.toLowerCase() }] }, select: { id: true } });
     if (!seller) throw invalid('seller_unknown', 'No seller has that handle or username.', `${param}.target`);
     return { kind, target: seller.id };
+  }
+
+  /**
+   * Admins: what a link may point at, as they type (`q`, up to 8): listings by number, SKU or title (live first, the
+   * market's when `scope` is one), brands by name or slug, sellers by username, handle or name, categories by name,
+   * slug or search word. `value` is what goes in
+   * the link's target; `label`, `detail` and `image_url` are for the list.
+   */
+  async suggest(kind: Exclude<HeroLinkKind, 'url'>, raw: string, scope: string) {
+    const q = raw.trim().slice(0, 80);
+    const country = scope === 'global' ? null : scope.toUpperCase();
+    const take = 8;
+    let data: Array<{ value: string; label: string; detail: string | null; image_url: string | null }> = [];
+    if (kind === 'listing') {
+      const number = /^\d{1,15}$/.test(q) ? BigInt(q) : null;
+      const sku = readSku(q);
+      const rows = await this.prisma.classifiedListing.findMany({
+        where: {
+          status: { notIn: ['deleted', 'draft'] },
+          ...(country ? { country } : {}),
+          ...(q ? { OR: [...(number !== null ? [{ ref: number }] : []), ...(sku ? [{ sku }] : []), { title: { contains: q, mode: 'insensitive' as const } }, { sku: { startsWith: q.toUpperCase() } }] } : {}),
+        },
+        select: { ref: true, sku: true, title: true, status: true, country: true, currency: true, priceKind: true, priceMinor: true },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: take * 3,
+      });
+      // Live ones first, then the rest as they came.
+      const live = (row: { status: string }) => (row.status === 'active' ? 0 : 1);
+      data = rows
+        .sort((a, b) => live(a) - live(b))
+        .slice(0, take)
+        .map(row => ({
+          value: String(row.ref),
+          label: row.title ?? `Listing ${row.ref}`,
+          detail: [`No. ${row.ref}`, row.sku, row.priceKind !== 'on_request' && row.priceMinor !== null ? priceText(row.priceMinor, row.currency) : null, row.status === 'active' ? null : row.status, row.country].filter(Boolean).join(' · '),
+          image_url: null,
+        }));
+    } else if (kind === 'category') {
+      const rows = await this.prisma.classifiedCategory.findMany({
+        where: { enabled: true, ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { slug: { startsWith: q.toLowerCase() } }, { keywords: { has: q.toLowerCase() } }] } : { parentId: null }) },
+        select: { slug: true, name: true, parent: { select: { name: true } } },
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        take: take * 3,
+      });
+      const starts = (name: string) => (name.toLowerCase().startsWith(q.toLowerCase()) ? 0 : 1);
+      data = rows
+        .sort((a, b) => starts(a.name) - starts(b.name))
+        .slice(0, take)
+        .map(row => ({ value: row.slug, label: row.name, detail: row.parent ? `In ${row.parent.name} · ${row.slug}` : `Top category · ${row.slug}`, image_url: null }));
+    } else if (kind === 'brand') {
+      const rows = await this.prisma.classifiedBrand.findMany({
+        where: { enabled: true, ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { slug: { startsWith: q.toLowerCase() } }, { aliases: { has: q.toLowerCase() } }] } : {}) },
+        select: { slug: true, name: true, logoUrl: true, logoFile: true },
+        orderBy: [{ name: 'asc' }],
+        take: take * 3,
+      });
+      // Names starting with what was typed first.
+      const starts = (name: string) => (name.toLowerCase().startsWith(q.toLowerCase()) ? 0 : 1);
+      data = rows
+        .sort((a, b) => starts(a.name) - starts(b.name))
+        .slice(0, take)
+        .map(row => ({ value: row.slug, label: row.name, detail: row.slug, image_url: row.logoUrl ?? (row.logoFile ? `${shopOrigin}/brand-logos/${row.logoFile}.svg` : null) }));
+    } else {
+      const key = q.replace(/^@/, '');
+      const rows = await this.prisma.customer.findMany({
+        where: {
+          status: 'active',
+          classifiedListings: { some: { status: { notIn: ['deleted', 'draft'] } } },
+          ...(country ? { country } : {}),
+          ...(key ? { OR: [{ username: { startsWith: key.toLowerCase() } }, { sellerHandle: { startsWith: key } }, { name: { contains: key, mode: 'insensitive' } }] } : {}),
+        },
+        select: { name: true, username: true, sellerHandle: true, country: true, avatarUrl: true },
+        orderBy: [{ updatedAt: 'desc' }],
+        take,
+      });
+      data = rows.map(row => ({ value: row.username ?? row.sellerHandle, label: row.name, detail: [row.username ? `@${row.username}` : `Handle ${row.sellerHandle}`, row.country].filter(Boolean).join(' · '), image_url: row.avatarUrl }));
+    }
+    return { object: 'list' as const, kind, data };
   }
 
   // ---- Reading ----

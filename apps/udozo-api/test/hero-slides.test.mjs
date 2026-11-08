@@ -142,11 +142,37 @@ describe('the hero reel', () => {
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'hero_slide.reordered', targetId: 'global' } }));
   });
 
+  test('a category link opens its page in the market, or across countries; suggestions as the admin types', async () => {
+    await prisma.classifiedHeroSlide.deleteMany();
+    const made = await operations.post('/v1/admin/classifieds/hero-slides', { layout: 'full', tiles: [tile('cat', { kind: 'category', target: 'https://udozo.com/ng/c/mobile-phones' })] });
+    assert.equal(made.status, 201, JSON.stringify(made.json));
+    assert.deepEqual([made.json.tiles[0].link.target, made.json.tiles[0].link.href], ['mobile-phones', '/c/mobile-phones']);
+    assert.equal((await showing('NG')).json.data[0].tiles[0].href, '/ng/c/mobile-phones');
+    assert.equal((await showing('global')).json.data[0].tiles[0].href, '/c/mobile-phones');
+    const unknown = await operations.post('/v1/admin/classifieds/hero-slides', { layout: 'full', tiles: [tile('x', { kind: 'category', target: 'no-such-category' })] });
+    assert.deepEqual([unknown.status, unknown.json.error.code, unknown.json.error.param], [400, 'category_unknown', 'tiles[0].link.target']);
+
+    const suggest = async query => (await support.get(`/v1/admin/classifieds/hero-slides/targets?${new URLSearchParams(query)}`)).json;
+    const byTitle = await suggest({ kind: 'listing', q: 'iphone 13', scope: 'NG' });
+    assert.deepEqual(byTitle.data[0], { value: String(listing.ref), label: 'iPhone 13 128GB', detail: `No. ${listing.ref} · PHN-009991 · ₦450,000 · NG`, image_url: null });
+    assert.equal((await suggest({ kind: 'listing', q: 'PHN-9991' })).data[0].value, String(listing.ref), 'by SKU');
+    assert.equal((await suggest({ kind: 'listing', q: String(listing.ref) })).data[0].value, String(listing.ref), 'by number');
+    assert.deepEqual((await suggest({ kind: 'listing', q: 'iphone 13', scope: 'GH' })).data, [], 'another market’s are left out');
+    assert.deepEqual((await suggest({ kind: 'brand', q: 'herot' })).data.map(item => [item.value, item.label]), [['herotest', 'Herotest']]);
+    const sellers = await suggest({ kind: 'seller', q: '@adaeze' });
+    assert.deepEqual(sellers.data.map(item => [item.value, item.label, item.detail]), [['adaeze_gadgets', 'Adaeze Nwosu', '@adaeze_gadgets · NG']]);
+    assert.equal((await suggest({ kind: 'seller', q: 'Nwosu' })).data[0]?.value, 'adaeze_gadgets', 'by name');
+    const categories = await suggest({ kind: 'category', q: 'phone' });
+    assert.ok(categories.data.some(item => item.value === 'mobile-phones' && /^In /.test(item.detail)), JSON.stringify(categories.data));
+    assert.ok((await suggest({ kind: 'category' })).data.every(item => item.detail.startsWith('Top category')), 'nothing typed: the top categories');
+    assert.equal((await support.get('/v1/admin/classifieds/hero-slides/targets?kind=url&q=x')).status, 400);
+  });
+
   test('support reads but never changes; the uploads are counted as in use', async () => {
     assert.equal((await support.get('/v1/admin/classifieds/hero-slides?scope=NG')).status, 200);
     assert.equal((await support.post('/v1/admin/classifieds/hero-slides', { layout: 'full', tiles: [tile('x', { kind: 'url', target: '/ng' })] })).status, 403);
     const media = server.app.get((await import('../dist/media/media.service.js')).MediaService);
-    const uses = await media.usage([image('bottom')]);
-    assert.match(uses.get(image('bottom'))?.[0] ?? '', /^hero_slide:/);
+    const uses = await media.usage([image('cat')]);
+    assert.match(uses.get(image('cat'))?.[0] ?? '', /^hero_slide:/);
   });
 });

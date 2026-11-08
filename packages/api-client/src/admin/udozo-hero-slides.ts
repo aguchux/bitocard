@@ -6,8 +6,10 @@ import { bitocardApi } from '../base';
 export type HeroLayout = 'full' | 'third_two_thirds' | 'two_thirds_third' | 'thirds';
 /** Banners each split holds. */
 export const heroTileCount: Record<HeroLayout, number> = { full: 1, third_two_thirds: 2, two_thirds_third: 2, thirds: 3 };
-/** Where a banner links: a listing, a brand's page, a seller's page or any address. */
-export type HeroLinkKind = 'listing' | 'brand' | 'seller' | 'url';
+/** Where a banner links: a listing, a brand's page, a seller's page, a category or any address. */
+export type HeroLinkKind = 'listing' | 'brand' | 'seller' | 'category' | 'url';
+/** A suggestion for a link as the admin types: `value` goes in the link's target. */
+export type HeroTarget = { value: string; label: string; detail: string | null; image_url: string | null };
 export type HeroState = 'showing' | 'off' | 'scheduled' | 'ended';
 
 export type HeroTile = {
@@ -17,7 +19,7 @@ export type HeroTile = {
   alt: string;
   /** Labelled Ad on udozo.com. */
   ad: boolean;
-  /** `target`: the listing's number, brand's slug, seller's username or handle, or the address; `href`: where it goes now (null when gone). */
+  /** `target`: the listing's number, brand's slug, seller's username or handle, category's slug, or the address; `href`: where it goes now (null when gone). */
   link: { kind: HeroLinkKind; target: string; label: string | null; href: string | null };
 };
 
@@ -61,6 +63,10 @@ export const adminUdozoHeroSlidesApi = bitocardApi.injectEndpoints({
       query: id => ({ url: `/v1/admin/classifieds/hero-slides/${id}`, method: 'DELETE' }),
       invalidatesTags: [tag, 'Activity'],
     }),
+    heroTargets: build.query<{ object: 'list'; kind: string; data: HeroTarget[] }, { kind: Exclude<HeroLinkKind, 'url'>; q: string; scope: string }>({
+      query: params => ({ url: '/v1/admin/classifieds/hero-slides/targets', params }),
+      keepUnusedDataFor: 30,
+    }),
     reorderHeroSlides: build.mutation<{ object: 'list'; scope: string; data: HeroSlide[] }, { scope: string; ids: string[] }>({
       query: body => ({ url: '/v1/admin/classifieds/hero-slides/order', method: 'POST', body }),
       invalidatesTags: [tag, 'Activity'],
@@ -68,4 +74,4 @@ export const adminUdozoHeroSlidesApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useHeroSlidesQuery, useCreateHeroSlideMutation, useUpdateHeroSlideMutation, useDeleteHeroSlideMutation, useReorderHeroSlidesMutation } = adminUdozoHeroSlidesApi;
+export const { useHeroSlidesQuery, useLazyHeroTargetsQuery, useCreateHeroSlideMutation, useUpdateHeroSlideMutation, useDeleteHeroSlideMutation, useReorderHeroSlidesMutation } = adminUdozoHeroSlidesApi;

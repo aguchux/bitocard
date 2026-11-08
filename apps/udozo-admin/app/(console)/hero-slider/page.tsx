@@ -19,6 +19,7 @@ import {
   useReorderHeroSlidesMutation,
   useUpdateHeroSlideMutation,
 } from "@bitocard/api-client/admin";
+import { HeroTargetField } from "@/components/hero-target-field";
 import { UdozoShell } from "@/components/shell";
 
 /** Each split, its rows top to bottom (in thirds of the column's height), and the image size that fits each banner. */
@@ -31,9 +32,10 @@ const heroLayouts: Record<HeroLayout, { name: string; rows: number[] }> = {
 const sizeFor: Record<number, string> = { 3: "900 × 1000 px", 2: "900 × 660 px", 1: "900 × 330 px" };
 
 const linkKinds: Record<HeroLinkKind, { name: string; label: string; placeholder: string; hint: string }> = {
-  listing: { name: "A listing", label: "Listing number or SKU", placeholder: "100123 or PHN-000123", hint: "The number in its address (/ng/l/100123-…), or its SKU." },
-  brand: { name: "A brand", label: "Brand", placeholder: "samsung", hint: "Its slug in the brand registry (or its page’s address). Opens its page in the market being viewed." },
-  seller: { name: "A seller", label: "Seller", placeholder: "adaeze_gadgets", hint: "Their username or handle (or their page’s address)." },
+  listing: { name: "A listing", label: "Listing", placeholder: "Type its title, number or SKU", hint: "Choose from the suggestions, or type its number (in its address, /ng/l/100123-…) or SKU." },
+  brand: { name: "A brand", label: "Brand", placeholder: "Type the brand’s name", hint: "Choose from the suggestions. Opens its page in the market being viewed." },
+  seller: { name: "A seller", label: "Seller", placeholder: "Type their username or name", hint: "Choose from the suggestions, or type their username or handle." },
+  category: { name: "A category", label: "Category", placeholder: "Type the category’s name", hint: "Choose from the suggestions. Opens it in the market being viewed (across countries on the global page)." },
   url: { name: "Any address", label: "Address", placeholder: "/ng/c/mobile-phones", hint: "A page on udozo.com, such as /ng/c/mobile-phones, or an https address elsewhere (opens in a new tab)." },
 };
 
@@ -47,8 +49,9 @@ const local = (iso: string | null) => {
 };
 
 type Market = { code: string; name: string };
-type TileDraft = { image_url: string; alt: string; kind: HeroLinkKind; target: string; ad: boolean };
-const emptyTile = (): TileDraft => ({ image_url: "", alt: "", kind: "listing", target: "", ad: true });
+/** `label`: what the target names, once chosen from the suggestions (or as the API last read it). */
+type TileDraft = { image_url: string; alt: string; kind: HeroLinkKind; target: string; label: string | null; ad: boolean };
+const emptyTile = (): TileDraft => ({ image_url: "", alt: "", kind: "listing", target: "", label: null, ad: true });
 
 /** A drawing of a split: its rows in thirds, closely gapped, square-cornered (as udozo.com draws it). */
 function LayoutDrawing({ layout, images }: { layout: HeroLayout; images?: Array<{ src: string; alt: string } | null> }) {
@@ -74,7 +77,7 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
   const [market, setMarket] = useState(slide ? (slide.country ?? "") : scope === "global" ? "" : scope);
   const [layout, setLayout] = useState<HeroLayout>(slide?.layout ?? "full");
   const [tiles, setTiles] = useState<TileDraft[]>(
-    slide ? slide.tiles.map(tile => ({ image_url: tile.image_url, alt: tile.alt, kind: tile.link.kind, target: tile.link.target, ad: tile.ad })) : [emptyTile()],
+    slide ? slide.tiles.map(tile => ({ image_url: tile.image_url, alt: tile.alt, kind: tile.link.kind, target: tile.link.target, label: tile.link.label, ad: tile.ad })) : [emptyTile()],
   );
   const [enabled, setEnabled] = useState(slide?.enabled ?? true);
   const [startsAt, setStartsAt] = useState(local(slide?.starts_at ?? null));
@@ -176,7 +179,7 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
             </Field>
             <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
               <Field label="Links to" htmlFor={`${id}-kind-${index}`} error={errorFor(`${at}.link.kind`)}>
-                <Select id={`${id}-kind-${index}`} value={tile.kind} onChange={event => change(index, { kind: event.target.value as HeroLinkKind, target: "" })}>
+                <Select id={`${id}-kind-${index}`} value={tile.kind} onChange={event => change(index, { kind: event.target.value as HeroLinkKind, target: "", label: null })}>
                   {(Object.keys(linkKinds) as HeroLinkKind[]).map(key => (
                     <option key={key} value={key}>
                       {linkKinds[key].name}
@@ -185,7 +188,20 @@ function SlideForm({ markets, scope, slide, onDone }: { markets: Market[]; scope
                 </Select>
               </Field>
               <Field label={kind.label} htmlFor={`${id}-target-${index}`} hint={kind.hint} error={errorFor(`${at}.link.target`)}>
-                <Input id={`${id}-target-${index}`} value={tile.target} placeholder={kind.placeholder} onChange={event => change(index, { target: event.target.value })} required />
+                {tile.kind === "url" ? (
+                  <Input id={`${id}-target-${index}`} value={tile.target} placeholder={kind.placeholder} onChange={event => change(index, { target: event.target.value })} required />
+                ) : (
+                  <HeroTargetField
+                    id={`${id}-target-${index}`}
+                    kind={tile.kind}
+                    scope={market || "global"}
+                    value={tile.target}
+                    chosen={tile.label}
+                    placeholder={kind.placeholder}
+                    invalid={Boolean(errorFor(`${at}.link.target`))}
+                    onChange={(target, label) => change(index, { target, label })}
+                  />
+                )}
               </Field>
             </div>
             <div className="flex items-center gap-3">
@@ -329,7 +345,7 @@ export default function HeroSliderPage() {
     <UdozoShell section="theme" current="/hero-slider" crumbs={[{ label: "Site", href: "/home-pages" }, { label: "Hero slider" }]}>
       <PageHeader
         title="Hero slider"
-        description="The top of udozo.com’s home pages: columns three rows high, each holding one banner, two (a third and two thirds, either way up) or three, sliding past. Each banner links to a listing, a brand, a seller or any address."
+        description="The top of udozo.com’s home pages: columns three rows high, each holding one banner, two (a third and two thirds, either way up) or three, sliding past. Each banner links to a listing, a brand, a seller, a category or any address."
       />
       {!editable ? <Notice tone="grey">Only operations admins add and change the hero slider.</Notice> : null}
       <QueryView query={pages} loading={<Skeleton className="h-48 w-full" />}>
