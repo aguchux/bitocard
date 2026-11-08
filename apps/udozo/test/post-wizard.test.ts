@@ -168,7 +168,7 @@ describe("posting an ad", () => {
     expect(steps.map(item => item.disabled)).toEqual([false, false, false, false, false, false]);
     await click(steps[3]!);
     expect(stepLine(host)).toBe("Step 4 of 6: Where to sell");
-    expect(host.textContent).toContain("How many do you have?");
+    expect(host.textContent).toContain("How many do you have in stock?");
     await click(steps[2]!);
     expect(host.textContent).toContain("Description");
     expect(host.textContent).toContain("Condition");
@@ -193,7 +193,7 @@ describe("posting an ad", () => {
     await act(async () => void (await new Promise(resolve => setTimeout(resolve, 0))));
     expect(acceptShopTerms).toHaveBeenCalledWith("2026-11-01");
     expect(submitListing).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith("/account?posted=live");
+    expect(push).toHaveBeenCalledWith("/account/listings?posted=live");
   });
 
   it("says the terms are accepted already, and a refusal opens the step holding its field", async () => {

@@ -395,7 +395,7 @@ export function ListingForm({
     }
     if (live) {
       setSubmitting(false);
-      router.push("/account");
+      router.push("/account/listings");
       return router.refresh();
     }
     // The terms are accepted here, on the last step, before the ad is posted.
@@ -424,7 +424,7 @@ export function ListingForm({
       }
       return setProblem({ message: result.message, param: result.param });
     }
-    router.push(`/account?posted=${result.data.status === "active" ? "live" : "review"}`);
+    router.push(`/account/listings?posted=${result.data.status === "active" ? "live" : "review"}`);
     router.refresh();
   };
 
@@ -524,7 +524,7 @@ export function ListingForm({
   return (
     <div className="grid gap-6 pb-28 lg:pb-8">
       <header className="flex items-center gap-2">
-        <Link href="/account" aria-label="Back to my listings" className="-ml-2 grid size-10 place-items-center rounded-full hover:bg-slate-100">
+        <Link href="/account/listings" aria-label="Back to my listings" className="-ml-2 grid size-10 place-items-center rounded-full hover:bg-slate-100">
           <ChevronLeft className="size-6" aria-hidden="true" />
         </Link>
         <h1 className="flex-1 text-xl font-extrabold tracking-tight sm:text-2xl">{listing ? (status === "draft" ? "Finish your ad" : "Edit your ad") : "Post an ad"}</h1>

@@ -6603,6 +6603,31 @@ model ListingNeighbour {
   @@map("listing_neighbours")
 }
 
+/// Udozo: a post on the account dashboard's message board (/account on udozo.com), written by Udozo's team for one
+/// market or every market (`country` null), on and off by admins (the gate), optionally between two dates; pinned ones
+/// first, then the newest. Plain text, with an optional link (a page here or an https address).
+model ClassifiedBoardPost {
+  id          String    @id @default(uuid()) @db.Uuid
+  country     String?   @db.Char(2)
+  title       String    @db.VarChar(100)
+  body        String    @db.VarChar(1000)
+  /// news, tip or alert (a database check).
+  tone        String    @default("news") @db.VarChar(10)
+  href        String?   @db.VarChar(500)
+  linkLabel   String?   @map("link_label") @db.VarChar(40)
+  pinned      Boolean   @default(false)
+  enabled     Boolean   @default(true)
+  startsAt    DateTime? @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([country, enabled])
+  @@map("classified_board_posts")
+}
+
 /// A listing's page views on one UTC day (trending ranks by recent views); the listing's `views` keeps the total.
 model ClassifiedListingViewDay {
   listingId String            @map("listing_id") @db.Uuid

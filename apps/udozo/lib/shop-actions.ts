@@ -140,7 +140,7 @@ export async function loadListing(listingId: string): Promise<ShopResult<ShopMyL
 export async function submitListing(listingId: string): Promise<ShopResult<ShopMyListing>> {
   if (!id(listingId)) return refused("No such listing.");
   const result = answer(await customerApi<ShopMyListing>("POST", `/v1/classifieds/listings/${listingId}/submit`, {}));
-  if (result.ok) revalidatePath("/account");
+  if (result.ok) revalidatePath("/account", "layout");
   return result;
 }
 
@@ -148,7 +148,7 @@ export async function submitListing(listingId: string): Promise<ShopResult<ShopM
 export async function listingAction(listingId: string, action: "renew" | "sold" | "delete"): Promise<ShopResult<unknown>> {
   if (!id(listingId) || !["renew", "sold", "delete"].includes(action)) return refused("No such listing.");
   const result = answer(action === "delete" ? await customerApi("DELETE", `/v1/classifieds/listings/${listingId}`) : await customerApi("POST", `/v1/classifieds/listings/${listingId}/${action}`, {}));
-  if (result.ok) revalidatePath("/account");
+  if (result.ok) revalidatePath("/account", "layout");
   return result;
 }
 
@@ -161,7 +161,7 @@ export async function restockListing(listingId: string, stock: number): Promise<
   const changed = answer(await customerApi<ShopMyListing>("PATCH", `/v1/classifieds/listings/${listingId}`, { stock }));
   if (!changed.ok) return changed;
   const result = changed.data.status === "expired" ? answer(await customerApi<ShopMyListing>("POST", `/v1/classifieds/listings/${listingId}/renew`, {})) : changed;
-  revalidatePath("/account");
+  revalidatePath("/account", "layout");
   return result;
 }
 

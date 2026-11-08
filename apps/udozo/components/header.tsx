@@ -34,7 +34,8 @@ export function UdozoWordmark({ href = "/" }: { href?: string }) {
 
 /** The signed-in customer's own places, in the account menu. */
 const accountLinks = [
-  { href: "/account", label: "My listings" },
+  { href: "/account", label: "Dashboard" },
+  { href: "/account/listings", label: "My listings" },
   { href: "/account/messages", label: "Messages" },
   { href: "/account/orders", label: "Orders" },
   { href: "/account/wallet", label: "Wallet" },

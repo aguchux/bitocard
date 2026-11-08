@@ -1,7 +1,7 @@
 /** What the account's places show beside their names: unread messages, requests and resellers waiting on the seller. */
 export type PlaceCounts = { unread: number; resellers: { count: number; waiting: number }; requests?: number; buyOrders?: number; reviews?: number; notifications?: number };
 
-export type PlaceKey = "listings" | "notifications" | "messages" | "requests" | "buy-orders" | "orders" | "reviews" | "favourites" | "wanted" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
+export type PlaceKey = "dashboard" | "listings" | "notifications" | "messages" | "requests" | "buy-orders" | "orders" | "reviews" | "favourites" | "wanted" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
 
 export type Place = { key: PlaceKey; href: string; label: string; badge?: number; also?: string[] };
 
@@ -13,7 +13,8 @@ export type Place = { key: PlaceKey; href: string; label: string; badge?: number
  */
 export function accountPlaces(counts: PlaceCounts): Place[] {
   return [
-    { key: "listings", href: "/account", label: "My listings", also: ["/account/listings"] },
+    { key: "dashboard", href: "/account", label: "Dashboard" },
+    { key: "listings", href: "/account/listings", label: "My listings" },
     { key: "messages", href: "/account/messages", label: "Messages", ...(counts.unread ? { badge: counts.unread } : {}) },
     { key: "notifications", href: "/account/notifications", label: "Notifications", ...(counts.notifications ? { badge: counts.notifications } : {}) },
     { key: "requests", href: "/account/requests", label: "Requests", ...(counts.requests ? { badge: counts.requests } : {}) },
@@ -32,7 +33,7 @@ export function accountPlaces(counts: PlaceCounts): Place[] {
 
 const under = (path: string, base: string) => path === base || path.startsWith(`${base}/`);
 
-/** The current place's address on a path: the most specific place it is under (`/account` only for itself and its listings). */
+/** The current place's address on a path: the most specific place it is under (`/account`, the dashboard, only for itself). */
 export function currentPlace(places: Place[], pathname: string): string | null {
   const path = pathname.split(/[?#]/)[0]!.replace(/\/+$/, "") || "/";
   let best: { href: string; length: number } | null = null;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Bell, HandCoins, Heart, Landmark, LayoutList, Megaphone, MessagesSquare, PhoneCall, Plus, ReceiptText, ShieldCheck, Star, Store, UserRound, WalletMinimal } from "lucide-react";
+import { Bell, HandCoins, Heart, Landmark, LayoutDashboard, LayoutList, Megaphone, MessagesSquare, PhoneCall, Plus, ReceiptText, ShieldCheck, Star, Store, UserRound, WalletMinimal } from "lucide-react";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import {
   accountPlaces,
@@ -13,6 +13,7 @@ import {
 import { sellHref } from "@/lib/sell-sources";
 
 const icons = {
+  dashboard: LayoutDashboard,
   listings: LayoutList,
   messages: MessagesSquare,
   notifications: Bell,

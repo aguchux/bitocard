@@ -157,9 +157,9 @@ describe("listings and orders", () => {
 describe("the account's places", () => {
   const none = { unread: 0, resellers: { count: 0, waiting: 0 } };
 
-  test("listings, messages, notifications, requests, buy orders, Safe pay orders, favourites, the wallet, Safe pay, payouts and the profile; Messages and Notifications badged with what is unread", () => {
+  test("the dashboard, listings, messages, notifications, requests, buy orders, Safe pay orders, favourites, the wallet, Safe pay, payouts and the profile; Messages and Notifications badged with what is unread", () => {
     const places = accountPlaces({ ...none, unread: 3, requests: 2 });
-    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Notifications", "Requests", "Buy orders", "Safe pay orders", "Reviews", "Favourites", "Wanted requests", "Wallet", "Safe pay", "Payouts", "Profile"]);
+    expect(places.map(place => place.label)).toEqual(["Dashboard", "My listings", "Messages", "Notifications", "Requests", "Buy orders", "Safe pay orders", "Reviews", "Favourites", "Wanted requests", "Wallet", "Safe pay", "Payouts", "Profile"]);
     expect(places.find(place => place.label === "Messages")?.badge).toBe(3);
     expect(places.find(place => place.label === "Requests")?.badge).toBe(2);
     expect(accountPlaces(none).find(place => place.label === "Requests")?.badge).toBeUndefined();
@@ -167,13 +167,14 @@ describe("the account's places", () => {
     expect(accountPlaces({ ...none, notifications: 7 }).find(place => place.label === "Notifications")?.badge).toBe(7);
     expect(accountPlaces(none).find(place => place.label === "Notifications")?.badge).toBeUndefined();
     expect(currentPlace(places, `/account/buy-orders/${order}`)).toBe("/account/buy-orders");
-    expect(places.map(place => place.href)).toEqual(["/account", "/account/messages", "/account/notifications", "/account/requests", "/account/buy-orders", "/account/orders", "/account/reviews", "/account/favourites", "/account/wanted", "/account/wallet", "/account/safe-pay", "/account/payouts", "/account/profile"]);
+    expect(places.map(place => place.href)).toEqual(["/account", "/account/listings", "/account/messages", "/account/notifications", "/account/requests", "/account/buy-orders", "/account/orders", "/account/reviews", "/account/favourites", "/account/wanted", "/account/wallet", "/account/safe-pay", "/account/payouts", "/account/profile"]);
   });
 
-  test("the current place follows the address: a listing, a chat or an order keeps its place; /account only for itself", () => {
+  test("the current place follows the address: a listing, a chat or an order keeps its place; /account (the dashboard) only for itself", () => {
     const places = accountPlaces(none);
     expect(currentPlace(places, "/account")).toBe("/account");
-    expect(currentPlace(places, `/account/listings/${listing}`)).toBe("/account");
+    expect(currentPlace(places, `/account/listings/${listing}`)).toBe("/account/listings");
+    expect(currentPlace(places, "/account/listings?status=draft")).toBe("/account/listings");
     expect(currentPlace(places, `/account/messages/${listing}`)).toBe("/account/messages");
     expect(currentPlace(places, `/account/orders/${order}?x=1`)).toBe("/account/orders");
     expect(currentPlace(places, "/account/requests")).toBe("/account/requests");
@@ -186,7 +187,7 @@ describe("the account's places", () => {
   test("My Resellers shows once resellers carry the supplier's listings, badged with what waits there", () => {
     expect(accountPlaces(none).map(place => place.label)).not.toContain("My Resellers");
     const places = accountPlaces({ unread: 0, resellers: { count: 2, waiting: 3 } });
-    expect(places.map(place => place.label)).toEqual(["My listings", "Messages", "Notifications", "Requests", "Buy orders", "Safe pay orders", "Reviews", "Favourites", "Wanted requests", "My Resellers", "Wallet", "Safe pay", "Payouts", "Profile"]);
+    expect(places.map(place => place.label)).toEqual(["Dashboard", "My listings", "Messages", "Notifications", "Requests", "Buy orders", "Safe pay orders", "Reviews", "Favourites", "Wanted requests", "My Resellers", "Wallet", "Safe pay", "Payouts", "Profile"]);
     expect(places.find(place => place.label === "My Resellers")?.badge).toBe(3);
     expect(currentPlace(places, `/account/resellers/${listing}`)).toBe("/account/resellers");
   });

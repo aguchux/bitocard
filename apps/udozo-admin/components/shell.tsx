@@ -98,6 +98,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Sponsored", href: "/sponsored", icon: Megaphone },
       { label: "Hero slider", href: "/hero-slider", icon: GalleryHorizontalEnd },
       { label: "Banners", href: "/banners", icon: GalleryHorizontal },
+      { label: "Message board", href: "/message-board", icon: MessagesSquare },
       { label: "Watermarks", href: "/watermarks", icon: Stamp },
       { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
       { label: "Colour theme", href: "/theme", icon: Paintbrush },

@@ -713,6 +713,34 @@ export type ShopMyListing = {
   sold_at: string | null;
 };
 export type ShopMyListings = { object: 'list'; data: ShopMyListing[]; has_more: boolean };
+
+// ---- The account dashboard (udozo.com's /account) ----
+
+/** The periods the account dashboard reports on, in days ending today (UTC). */
+export const dashboardPeriods = [7, 30, 90] as const;
+export type DashboardPeriod = (typeof dashboardPeriods)[number];
+export type DashboardMetric = 'views' | 'leads' | 'chats' | 'saves' | 'sales';
+export type DashboardTotal = { value: number; previous: number; change_pct: number | null };
+export type BoardTone = 'news' | 'tip' | 'alert';
+/** A post on the dashboard's message board, written by Udozo's team. */
+export type BoardPost = { object: 'board_post'; id: string; title: string; body: string; tone: BoardTone; href: string | null; link_label: string | null; pinned: boolean; posted_at: string };
+/** `GET /v1/classifieds/me/dashboard?days=`: a customer's own figures, day by day, best listings and Udozo's message board. */
+export type AccountDashboard = {
+  object: 'account_dashboard';
+  country: string;
+  days: DashboardPeriod;
+  since: string;
+  until: string;
+  listings: { active: number; in_review: number; drafts: number; needs_changes: number; sold: number; expired: number; views: number; leads: number };
+  totals: Record<DashboardMetric, DashboardTotal>;
+  sales_value: Array<{ currency: string; amount: number }>;
+  response_rate: number | null;
+  purchases: number;
+  reviews: { counted: number; positive_pct: number | null } | null;
+  series: Array<{ day: string } & Record<DashboardMetric, number>>;
+  top_listings: Array<{ id: string; title: string | null; status: ShopListingStatus; views: number; leads: number }>;
+  board: BoardPost[];
+};
 export type ShopMedia = { object: 'classified_media'; id: string; kind: 'photo' | 'video'; position: number; url: string | null; width: number | null; height: number | null; status: 'processing' | 'ready' | 'failed'; failure_reason: string | null };
 export type ShopVideoUpload = { object: 'classified_video_upload'; listing_id: string; path: string; expires_at: string };
 export type ShopListingStats = { object: 'classified_listing_stats'; listing_id: string; views: number; leads: number; phone_reveals: number; chats: number; offers: number };

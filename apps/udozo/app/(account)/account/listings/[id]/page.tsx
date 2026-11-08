@@ -65,7 +65,7 @@ export default async function ListingPage({ params }: Props) {
           <p className="text-sm text-slate-600">
             {listing.data.status === "sold" ? "Sold: it no longer takes changes." : listing.data.status === "expired" ? "Expired: renew it from My listings to show it again." : "Removed by Udozo: it no longer shows on Udozo."}
           </p>
-          <Link href="/account" className="justify-self-start font-semibold text-brand-700 hover:underline">
+          <Link href="/account/listings" className="justify-self-start font-semibold text-brand-700 hover:underline">
             Back to my listings
           </Link>
         </div>
