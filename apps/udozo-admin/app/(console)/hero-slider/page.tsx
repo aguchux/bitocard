@@ -56,7 +56,7 @@ const emptyTile = (): TileDraft => ({ image_url: "", alt: "", kind: "listing", t
 /** A drawing of a split: its rows in thirds, closely gapped, square-cornered (as udozo.com draws it). */
 function LayoutDrawing({ layout, images }: { layout: HeroLayout; images?: Array<{ src: string; alt: string } | null> }) {
   return (
-    <span className="grid h-full w-full gap-0.5" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
+    <span className="grid h-full w-full gap-1" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
       {heroLayouts[layout].rows.map((span, index) => {
         const image = images?.[index];
         return (

@@ -1,5 +1,5 @@
 // udozo.com's hero reel (8 November 2026): the home page's top below the header, columns three rows high (one banner,
-// a third and two thirds either way up, or three thirds), 2 px apart and square-cornered, sliding past and moved by hand.
+// a third and two thirds either way up, or three thirds), 6 px apart on white and square-cornered, sliding past and moved by hand.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -50,11 +50,14 @@ describe("the hero reel's columns", () => {
     expect(filledSlides([1, 2, 3, 4, 5, 6, 7]).length).toBe(7);
   });
 
-  it("draws three rows a column, 2 px apart, square-cornered, links where they go, Ad in the link's words", () => {
+  it("draws three rows a column, 6 px apart on white, square-cornered, links where they go, Ad in the link's words", () => {
     const html = renderToStaticMarkup(createElement(HeroReel, { slides: shownSlides(slides).slice(0, 2), title: "Udozo Nigeria: buy and sell near you" }));
     expect(html).toContain('<h1 class="sr-only">Udozo Nigeria: buy and sell near you</h1>');
     expect(html).toContain("grid-template-rows:repeat(3, minmax(0, 1fr))");
-    expect(html).toMatch(/gap-0\.5/);
+    // White behind the columns, 6 px between them and between their banners, so the gaps show.
+    expect(html).toMatch(/<section aria-label="Featured" class="bg-white py-1\.5">/);
+    expect(html).toMatch(/class="flex shrink-0 gap-1\.5 pr-1\.5/);
+    expect(html).toMatch(/<li data-hero-slide="s1" class="grid [^"]*gap-1\.5/);
     const columns = html.match(/<li[^]*?<\/li>/g) ?? [];
     // 6 columns, and the marquee's copy of them.
     expect(columns.length).toBe(12);

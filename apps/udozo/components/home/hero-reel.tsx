@@ -29,7 +29,7 @@ function Tile({ tile, rows, first, hidden }: { tile: ShownTile; rows: number; fi
 
 /**
  * udozo.com's hero reel, the home page's top below the header in place of its own hero: columns three rows high, each
- * one banner, a third and two thirds (either way up) or three thirds, 2 px apart and square-cornered, sliding past on
+ * one banner, a third and two thirds (either way up) or three thirds, 6 px apart on white and square-cornered, sliding past on
  * their own and moved by hand (dragged with the mouse, swiped, scrolled), with a Pause button (`Marquee`). Few columns
  * are repeated so the reel always fills the screen; repeats are hidden from screen readers and the tab order. `title`
  * is the page's heading (the hero's, which this replaces), for screen readers and search engines.
@@ -37,7 +37,7 @@ function Tile({ tile, rows, first, hidden }: { tile: ShownTile; rows: number; fi
 export function HeroReel({ slides, title }: { slides: ShownSlide[]; title: string }) {
   const columns = filledSlides(slides);
   return (
-    <section aria-label="Featured" className="bg-navy-900">
+    <section aria-label="Featured" className="bg-white py-1.5">
       <h1 className="sr-only">{title}</h1>
       <Marquee label="Featured on Udozo" count={columns.length} speed="slow" tight>
         {columns.map(({ slide, repeat }, index) => (
@@ -45,7 +45,7 @@ export function HeroReel({ slides, title }: { slides: ShownSlide[]; title: strin
             key={`${slide.id}-${repeat}`}
             aria-hidden={repeat > 0 || undefined}
             data-hero-slide={slide.id}
-            className="grid h-[330px] w-[78vw] max-w-[440px] gap-0.5 sm:h-[420px] sm:w-[380px] lg:h-[480px] lg:w-[440px]"
+            className="grid h-[330px] w-[78vw] max-w-[440px] gap-1.5 sm:h-[420px] sm:w-[380px] lg:h-[480px] lg:w-[440px]"
             style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}
           >
             {slide.tiles.map((tile, at) => (
