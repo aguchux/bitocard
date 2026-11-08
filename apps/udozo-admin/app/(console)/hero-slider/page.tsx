@@ -53,14 +53,14 @@ type Market = { code: string; name: string };
 type TileDraft = { image_url: string; alt: string; kind: HeroLinkKind; target: string; label: string | null; ad: boolean };
 const emptyTile = (): TileDraft => ({ image_url: "", alt: "", kind: "listing", target: "", label: null, ad: true });
 
-/** A drawing of a split: its rows in thirds, closely gapped, square-cornered (as udozo.com draws it). */
+/** A drawing of a split: its rows in thirds, closely gapped, with small rounded corners (as udozo.com draws it). */
 function LayoutDrawing({ layout, images }: { layout: HeroLayout; images?: Array<{ src: string; alt: string } | null> }) {
   return (
     <span className="grid h-full w-full gap-1" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
       {heroLayouts[layout].rows.map((span, index) => {
         const image = images?.[index];
         return (
-          <span key={index} className="block min-h-0 overflow-hidden bg-navy-100" style={{ gridRow: `span ${span} / span ${span}` }}>
+          <span key={index} className="block min-h-0 overflow-hidden rounded-sm bg-navy-100" style={{ gridRow: `span ${span} / span ${span}` }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- uploaded banners on Udozo's storage */}
             {image?.src ? <img src={image.src} alt={image.alt} className="size-full object-cover" /> : null}
           </span>

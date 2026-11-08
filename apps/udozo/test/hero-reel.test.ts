@@ -1,5 +1,5 @@
 // udozo.com's hero reel (8 November 2026): the home page's top below the header, columns three rows high (one banner,
-// a third and two thirds either way up, or three thirds), 6 px apart on white and square-cornered, sliding past and moved by hand.
+// a third and two thirds either way up, or three thirds), 6 px apart on white with small rounded corners, sliding past and moved by hand.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -50,7 +50,7 @@ describe("the hero reel's columns", () => {
     expect(filledSlides([1, 2, 3, 4, 5, 6, 7]).length).toBe(7);
   });
 
-  it("draws three rows a column, 6 px apart on white, square-cornered, links where they go, Ad in the link's words", () => {
+  it("draws three rows a column, 6 px apart on white, small rounded corners, links where they go, Ad in the link's words", () => {
     const html = renderToStaticMarkup(createElement(HeroReel, { slides: shownSlides(slides).slice(0, 2), title: "Udozo Nigeria: buy and sell near you" }));
     expect(html).toContain('<h1 class="sr-only">Udozo Nigeria: buy and sell near you</h1>');
     expect(html).toContain("grid-template-rows:repeat(3, minmax(0, 1fr))");
@@ -61,9 +61,10 @@ describe("the hero reel's columns", () => {
     const columns = html.match(/<li[^]*?<\/li>/g) ?? [];
     // 6 columns, and the marquee's copy of them.
     expect(columns.length).toBe(12);
-    for (const column of columns) expect(column).not.toMatch(/rounded/);
+    // Each banner has small rounded corners (6 px, as wide as the gaps).
+    for (const column of columns) expect(column).toMatch(/class="relative block min-h-0 overflow-hidden rounded-md /);
     // The full banner spans the three rows and opens its listing here; the big one two rows, outside in a new tab.
-    expect(html).toMatch(/<a class="relative block min-h-0 overflow-hidden bg-navy-100 group row-span-3" href="\/ng\/l\/100123-iphone-13">/);
+    expect(html).toMatch(/<a class="relative block min-h-0 overflow-hidden rounded-md bg-navy-100 group row-span-3" href="\/ng\/l\/100123-iphone-13">/);
     // Each linked banner fades and its colours shift under the pointer or keyboard focus; one without a link stays still.
     expect(html).toMatch(/alt="iPhone 13 deals"[^>]*class="[^"]*group-hover:opacity-85 group-hover:saturate-150 group-hover:hue-rotate-15[^"]*motion-reduce|motion-reduce[^"]*group-hover:opacity-85/);
     expect(html).toMatch(/class="size-full object-cover select-none "[^>]*alt="Sell on Udozo"|alt="Sell on Udozo"[^>]*class="size-full object-cover select-none "/);

@@ -20,7 +20,7 @@ function Tile({ tile, rows, first, hidden }: { tile: ShownTile; rows: number; fi
       {tile.ad ? <span className="absolute bottom-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white">Ad</span> : null}
     </>
   );
-  const box = `relative block min-h-0 overflow-hidden bg-navy-100 ${linked ? "group" : ""} ${spans[rows] ?? "row-span-1"}`;
+  const box = `relative block min-h-0 overflow-hidden rounded-md bg-navy-100 ${linked ? "group" : ""} ${spans[rows] ?? "row-span-1"}`;
   if (!tile.link) return <div className={box}>{picture}</div>;
   const focus = hidden ? { tabIndex: -1 } : {};
   return tile.link.external ? (
@@ -36,7 +36,7 @@ function Tile({ tile, rows, first, hidden }: { tile: ShownTile; rows: number; fi
 
 /**
  * udozo.com's hero reel, the home page's top below the header in place of its own hero: columns three rows high, each
- * one banner, a third and two thirds (either way up) or three thirds, 6 px apart on white and square-cornered, sliding past on
+ * one banner, a third and two thirds (either way up) or three thirds, 6 px apart on white with small rounded corners, sliding past on
  * their own and moved by hand (dragged with the mouse, swiped, scrolled), with a Pause button (`Marquee`). Few columns
  * are repeated so the reel always fills the screen; repeats are hidden from screen readers and the tab order. `title`
  * is the page's heading (the hero's, which this replaces), for screen readers and search engines.
