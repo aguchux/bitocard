@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -129,6 +129,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Sign-up journeys", href: "/reports/signups", icon: Route },
       { label: "Posting journeys", href: "/reports/postings", icon: FilePlus2 },
       { label: "Discovery", href: "/reports/discovery", icon: Compass },
+      { label: "Traffic sources", href: "/reports/traffic", icon: Footprints },
       { label: "Safe pay and resale", href: "/reports/resale", icon: HandCoins },
       { label: "Seller ratings", href: "/reports/ratings", icon: Gauge },
       { label: "Statements", href: "/reports/statements", icon: ReceiptText },

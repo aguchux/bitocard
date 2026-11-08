@@ -240,7 +240,7 @@ describe("what an event may say", () => {
 
 describe("the visitor's ID, only with Accept all", () => {
   test("is set host-only, httpOnly, for 12 months once they chose Accept all, and only from this site's pages", async () => {
-    setRequest({ "x-real-ip": "203.0.113.7" }, { udz_cookie_consent: "v2.all.2026-11-04" });
+    setRequest({ "x-real-ip": "203.0.113.7" }, { udz_cookie_consent: "v3.all.2026-11-04" });
     expect((await visitorRoute.POST(from("https://udozo.com/api/discovery/visitor", { method: "POST" }))).status).toBe(204);
     const set = request.set.find(item => item.name === visitorCookie)!;
     expect(set.value).toMatch(visitorPattern);
@@ -253,12 +253,12 @@ describe("the visitor's ID, only with Accept all", () => {
   });
 
   test("is never set with Necessary only, an older choice, no choice or from another site", async () => {
-    for (const cookies of [{ udz_cookie_consent: "v2.necessary.2026-11-04" }, { udz_cookie_consent: "v1.all.2026-11-01" }, {}] as Array<Record<string, string>>) {
+    for (const cookies of [{ udz_cookie_consent: "v3.necessary.2026-11-04" }, { udz_cookie_consent: "v2.all.2026-11-04" }, {}] as Array<Record<string, string>>) {
       setRequest({}, cookies);
       await visitorRoute.POST(from("https://udozo.com/api/discovery/visitor", { method: "POST" }));
       expect(request.set).toHaveLength(0);
     }
-    setRequest({}, { udz_cookie_consent: "v2.all.2026-11-04" });
+    setRequest({}, { udz_cookie_consent: "v3.all.2026-11-04" });
     await visitorRoute.POST(from("https://udozo.com/api/discovery/visitor", { method: "POST", site: "cross-site" }));
     expect(request.set).toHaveLength(0);
   });
@@ -282,7 +282,7 @@ describe("the visitor's ID, only with Accept all", () => {
     expect(tracker).toContain('choice !== "all" && state.current.visitor');
     expect(tracker).toContain("consentChangedEvent");
     expect(read("../app/layout.tsx")).toContain("{onStore ? null : <DiscoveryTracker");
-    expect(read("../lib/cookie-consent.ts")).toContain("export const consentVersion = 2;");
+    expect(read("../lib/cookie-consent.ts")).toContain("export const consentVersion = 3;");
   });
 });
 

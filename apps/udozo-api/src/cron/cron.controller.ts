@@ -57,6 +57,7 @@ import { RepliesService } from '../support/replies.service.js';
 import { TicketsService } from '../support/tickets.service.js';
 import { ContactMessagesService } from '../support/contact-messages.service.js';
 import { SignupJourneysService } from '../signups/journeys.service.js';
+import { TrafficService } from '../traffic/traffic.service.js';
 import { PostingJourneysService } from '../postings/journeys.service.js';
 import { ShopAssistantsService } from '../classifieds/assistant/shop-assistants.service.js';
 import { jobRunsFor } from '../products/jobs.js';
@@ -118,6 +119,7 @@ export class CronController {
     marketing: MarketingService,
     calls: CallsService,
     signupJourneys: SignupJourneysService,
+    traffic: TrafficService,
     discovery: DiscoveryAdminService,
     watermarks: WatermarkService,
     buyOrders: BuyOrdersService,
@@ -205,7 +207,7 @@ export class CronController {
        */
       /** Hourly 01:17 to 04:17 UTC (Udozo): Anjio's seller scores, summaries and the month's snapshot, carrying on where it stopped. */
       'seller-scores': () => sellerScores.run(),
-      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), posting_journeys: { ...(await postingJourneys.reconcile()), ...(await postingJourneys.purge()) }, discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld(), reviews: await reviews.purge(), interaction_ratings: await interactionRatings.purge() }),
+      marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), traffic: await traffic.purge(), posting_journeys: { ...(await postingJourneys.reconcile()), ...(await postingJourneys.purge()) }, discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld(), reviews: await reviews.purge(), interaction_ratings: await interactionRatings.purge() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
        * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the

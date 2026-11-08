@@ -702,10 +702,11 @@ const privacy: LegalDocument = {
             "Posting an ad: each step you take from pressing Sell to your ad going live (where you pressed Sell, which step of Post an ad you reached, what a step still needed, whether posting went through or why not), how a moderator's review ended and why, and when your ad first got a view, a chat, a call or a lead, and sold, with the kind of device and browser, never anything you typed or uploaded. Our team uses it to see where sellers get stuck posting, and may contact you to help. If you leave an ad unfinished, or finished but not posted, we may remind you in your account and by email (once for an unfinished ad, up to three times for one ready to post); deleting the draft stops them. We also count how many times Post an ad is opened each day, by where Sell was pressed, without anything about who opened it.",
             "Technical data: your IP address, used for rate limits and security, and the requests your browser makes, in our server logs.",
             "Listing views: how many times each listing's page was opened, each day, shown to its seller and used to rank Trending. Nothing about who viewed it is kept: so one visitor counts once, a one-way code of their IP address, browser and the listing is held in memory for half an hour, then forgotten.",
+            "Where visits come from: each time someone arrives on udozo.com from another site, an ad, a campaign link or by typing the address, we count it for the day by where it came from (for example Facebook, a Google search, an ad's campaign name or another website's name), the kind of page they landed on and the market. We read the linking site's name and the campaign tags and ad click markers in the address (such as utm_campaign or fbclid) to do this, and keep only those daily counts: never the address, the click marker, the visitor's IP address or anything that could identify them. If you chose Accept all on our cookie banner, the optional udz_src cookie also remembers where your latest visit came from for 30 days, and if you then create an account, we keep that source (such as \"Facebook ad, campaign tv_week\") with your account so we can tell which of our ads bring people to Udozo. It is never shared with advertisers or used to show you ads.",
             "What you look at, to personalise what you see (section 5): signed in, or if you are not signed in and chose Accept all on our cookie banner, the listings you open, how long you read them, how many photos you open and how far down you read; what you search for (the words, with phone numbers, emails, long numbers and codes taken out) and the filters you use; which listings you click, share or mark Not interested, and where on the page they were; and, from your account, the listings you save, contact, call, make offers on or buy. Each visit has a random ID kept only in the page while it is open. If you are not signed in, a random ID in the optional udz_vid cookie links your visits; we keep only a one-way code of it. From this we keep a short profile of your interests (categories, brands, models, areas, price ranges and condition, which fade over time), your last searches and the listings you viewed.",
           ],
         },
-        'We do not collect your precise location: "Use my location" on udozo.com finds the nearest area in your browser, and your position is never sent to us. We use no analytics, advertising or tracking cookies. Our one optional cookie, udz_vid, is set only if you choose Accept all, and only to personalise what you see.',
+        'We do not collect your precise location: "Use my location" on udozo.com finds the nearest area in your browser, and your position is never sent to us. We use no advertising or third-party tracking cookies. Our two optional cookies are set only if you choose Accept all: udz_vid, to personalise what you see, and udz_src, to know which link or ad brought you to an account you create.',
         "Personalisation never uses your date of birth (except to leave out anyone under 18, who gets no profile), your sex, what you write in messages or chats, or your phone number. It is never used for advertising, never sold and never shown to sellers: they see only how many people viewed and contacted their listings. One person in ten, chosen at random, sees the usual popular order in For you instead, so we can measure whether personalising helps.",
       ],
     },
@@ -808,6 +809,7 @@ const privacy: LegalDocument = {
               ["Contact us messages", "Two years after the last reply or change; messages we mark as spam, after 30 days."],
               ["What you looked at and searched for (to personalise)", "90 days. Your interest profile: deleted after 180 days without a visit, and at once when you turn personalisation off, clear your history, choose Necessary only (not signed in) or close your account. When you sign in, what was kept under your udz_vid cookie becomes your account's."],
               ["Searches counted per day", "Each search's words (cleaned as section 2 says) and how often they were searched each day, with nothing about who searched: 13 months, to suggest popular searches and improve search."],
+              ["Where visits came from", "Daily counts, with nothing about any visitor: about 13 months. Where your account came from (only after Accept all): while your account is open."],
               ["Your sign-up steps", "Deleted 7 days after your account is ready to use, or 30 days after your last step if you never finish. Only daily counts with nothing about you are kept, for a year."],
               ["WhatsApp", "Each message's record: 90 days. Webhook bodies from Meta: 30 days. Who got a seller's WhatsApp number through Contact seller: 12 months. Your WhatsApp number and choices: while it is connected, or until you ask us to delete them; after STOP, only the number, marked not to message."],
               ["Wanted requests", "While your account is open, with the chats they started; a request ends after 14 days and is no longer shown to sellers."],
@@ -851,7 +853,7 @@ const cookies: LegalDocument = {
       id: "cookies",
       heading: "1. Cookies",
       body: [
-        "Udozo uses cookies that are strictly necessary for its sites to work, and one optional cookie, udz_vid, set only if you choose Accept all (section 3). It uses no analytics, advertising or tracking cookies.",
+        "Udozo uses cookies that are strictly necessary for its sites to work, and two optional cookies, udz_vid and udz_src, set only if you choose Accept all (section 3). It uses no advertising or third-party tracking cookies. Counting where visits come from uses no cookie at all.",
         {
           table: {
             head: ["Name", "Site", "What for", "Kept"],
@@ -867,6 +869,7 @@ const cookies: LegalDocument = {
               ["udz_kyc", "verify.udozo.com", "Keeps your identity check open while you do it", "Two hours"],
               ["udz_cookie_consent", "udozo.com, and each reseller's store on its own address", "Remembers your cookie choice (Necessary only or Accept all) and when you made it", "12 months"],
               ["udz_vid", "udozo.com", "Optional, only after Accept all: a random ID that links your visits when you are not signed in, so udozo.com can remember what you look at and show you listings you are likely to want (For you, Recently viewed, your searches). Never used for advertising. Removed, with what was kept under it, when you choose Necessary only", "12 months"],
+              ["udz_src", "udozo.com", "Optional, only after Accept all: where your latest visit came from (the linking site's name, the campaign tags in the address, and the page you landed on), so that if you create an account we know which link or ad brought you. Never shared with advertisers. Removed once you create or sign in to an account, or when you choose Necessary only", "30 days"],
             ],
           },
         },
@@ -899,7 +902,7 @@ const cookies: LegalDocument = {
       id: "choices",
       heading: "3. Your cookie choices",
       body: [
-        "On your first visit each of Udozo's sites asks about cookies. Necessary only keeps to the strictly necessary cookies above; Accept all also allows Udozo's one optional cookie, udz_vid, on udozo.com. If Udozo adds other optional cookies, this notice will name them first, and you will be asked again.",
+        "On your first visit each of Udozo's sites asks about cookies. Necessary only keeps to the strictly necessary cookies above; Accept all also allows Udozo's two optional cookies on udozo.com: udz_vid and udz_src. If Udozo adds other optional cookies, this notice will name them first, and you will be asked again.",
         "Your choice is kept for 12 months in udz_cookie_consent, then you are asked again. You can change it at any time with Cookie settings at the foot of every page. Each reseller's store on its own address asks separately.",
       ],
     },

@@ -1,8 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextFetchEvent, type NextRequest, NextResponse } from "next/server";
 import { apiUrl } from "@/lib/api";
 import { siteOrigin } from "@/lib/site";
 import { type SiteHost, type StoreRoute, classifyHost, storeHeader, storeOriginHeader, storePathHeader, storeRoute, subdomainOrigin } from "@/lib/store-host";
 import { previewHeader, previewToken } from "@/lib/theme-preview";
+import { landingOf, sourceCookie, sourceCookieChange, sourceCookieMaxAge, visitRequest } from "@/lib/traffic";
 
 /** Listings the API says are gone (410), and those it does not, for a minute per instance. */
 const seen = new Map<string, { gone: boolean; at: number }>();
@@ -114,13 +115,30 @@ async function storeRequest(request: NextRequest, host: Exclude<SiteHost, { kind
  * them faster than a 404); everything else goes on to the page. Only listing addresses (`/ng/l/<number>-<slug>`) are
  * checked, never their Safe pay pages.
  */
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest, event?: NextFetchEvent) {
   const host = classifyHost(request.headers.get("host") ?? request.nextUrl.host, siteOrigin());
   if (host.kind !== "marketplace") return storeRequest(request, host);
   if (request.nextUrl.pathname === "/store" || request.nextUrl.pathname.startsWith("/store/")) return page("Page not found", "There is nothing here.", 404);
   const match = /^\/([a-z]{2})\/l\/(\d{1,15})(?:-[a-z0-9-]*)?$/.exec(request.nextUrl.pathname);
-  if (!match || request.method !== "GET" || !(await listingGone(match[1]!, match[2]!))) return withPreview(request);
-  return new NextResponse(goneHtml(match[1]!), { status: 410, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300", "x-robots-tag": "noindex" } });
+  const response =
+    !match || request.method !== "GET" || !(await listingGone(match[1]!, match[2]!))
+      ? withPreview(request)
+      : new NextResponse(goneHtml(match[1]!), { status: 410, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300", "x-robots-tag": "noindex" } });
+  return trackLanding(request, response, event);
+}
+
+/**
+ * Traffic sources (`lib/traffic.ts`): a landing from outside is reported to the API after the response, never delaying
+ * or breaking the page; with Accept all, where it came from is also kept in `udz_src` for crediting a sign-up.
+ */
+function trackLanding(request: NextRequest, response: NextResponse, event?: NextFetchEvent) {
+  const landing = landingOf(request, new URL(siteOrigin()).hostname.toLowerCase());
+  const visit = landing ? visitRequest(landing, request) : null;
+  if (visit && event) event.waitUntil(fetch(visit.url, visit.init).then(() => undefined, () => undefined));
+  const change = sourceCookieChange(landing, request.headers.get("cookie"), request.cookies.get(sourceCookie)?.value);
+  if (change && "set" in change) response.cookies.set(sourceCookie, change.set, { maxAge: sourceCookieMaxAge, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  else if (change) response.cookies.delete(sourceCookie);
+  return response;
 }
 
 // Every page and route handler (never `_next`'s files or this site's static files), so the headers above can never be

@@ -46,6 +46,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module.js';
 import { WatermarksModule } from './watermarks/watermarks.module.js';
 import { MarketingModule } from './marketing/marketing.controller.js';
 import { SignupsModule } from './signups/signups.module.js';
+import { TrafficModule } from './traffic/traffic.module.js';
 import { PostingsModule } from './postings/postings.module.js';
 import { ResaleModule } from './resale/resale.module.js';
 import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
@@ -126,6 +127,7 @@ export class AppModule {
         WhatsappModule,
         MarketingModule,
         SignupsModule,
+        TrafficModule,
         PostingsModule,
         ResaleModule,
         ShopAssistantModule,

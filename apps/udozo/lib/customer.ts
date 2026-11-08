@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { apiUrl } from "./api";
 import { siteOrigin } from "./site";
 import { storeHeader } from "./store-host";
+import { readSource, sourceCookie } from "./traffic";
 
 export { siteOrigin };
 
@@ -147,7 +148,30 @@ export const currentCustomer = cache(async (): Promise<Customer | null> => {
 
 /** Keeps the session the API gave (Server Actions and route handlers only): host-only, so no other site ever reads it. */
 export async function keepSession(session: { token: string }) {
-  (await cookies()).set(customerCookie, session.token, { maxAge: thirtyDays, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  const jar = await cookies();
+  jar.set(customerCookie, session.token, { maxAge: thirtyDays, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  await creditSource(jar, session.token);
+}
+
+/**
+ * Traffic sources: where the visit that led here came from, kept in `udz_src` only with Accept all, credited to the
+ * account (the API credits only an account made in the last day, once), then forgotten. Never fails signing in.
+ */
+async function creditSource(jar: Awaited<ReturnType<typeof cookies>>, token: string) {
+  const kept = readSource(jar.get(sourceCookie)?.value);
+  if (!kept) return;
+  jar.delete(sourceCookie);
+  try {
+    await fetch(apiUrl("/v1/store/account/attribution"), {
+      method: "POST",
+      cache: "no-store",
+      headers: { "content-type": "application/json", accept: "application/json", [sessionHeader]: token },
+      body: JSON.stringify(kept),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch {
+    // Not credited: signing in goes on.
+  }
 }
 
 export async function dropSession() {

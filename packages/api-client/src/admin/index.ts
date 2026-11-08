@@ -530,6 +530,7 @@ export * from './udozo';
 export * from './udozo-home';
 export * from './udozo-banners';
 export * from './udozo-board';
+export * from './udozo-traffic';
 export * from './udozo-hero-slides';
 export * from './udozo-whatsapp';
 export * from './udozo-watermark';

@@ -2736,6 +2736,14 @@ model Customer {
   marketingProspects        MarketingProspect[]
   /// The referral or invite code the account signed up with (`ref` on the sign-up link), for Marketing and campaigns.
   signupRef                 String?                   @map("signup_ref")
+  /// Where the account came from (traffic sources): the first source of the visit that led to signing up, only for
+  /// visitors who chose Accept all on udozo.com's cookie banner (`udz_src`); null otherwise.
+  acquisitionChannel        String?                   @map("acquisition_channel") @db.VarChar(12)
+  acquisitionSource         String?                   @map("acquisition_source") @db.VarChar(60)
+  acquisitionMedium         String?                   @map("acquisition_medium") @db.VarChar(40)
+  acquisitionCampaign       String?                   @map("acquisition_campaign") @db.VarChar(80)
+  acquisitionLanding        String?                   @map("acquisition_landing") @db.VarChar(12)
+  acquiredAt                DateTime?                 @map("acquired_at")
   /// Afrippa's traders (customers of Afrippa's store): two-step sign-in, required from day one. How the second step is
   /// done, since when, the one-time recovery codes (SHA-256), and a method being set up (with an authenticator's new
   /// secret, encrypted) until its first code.
@@ -2820,6 +2828,7 @@ model Customer {
   @@unique([storeId, facebookSubject])
   @@unique([storeId, phone])
   @@index([signupRef])
+  @@index([acquisitionChannel, acquisitionSource])
   @@index([areaId])
   @@map("customers")
   resaleStoreReports        ResaleStoreReport[]
@@ -6601,6 +6610,23 @@ model ListingNeighbour {
 
   @@id([listingId, neighbourId])
   @@map("listing_neighbours")
+}
+
+/// Udozo: landings on udozo.com from another site, an ad, a campaign link or typed in, counted per day by where they
+/// came from and the kind of page (traffic sources). Nothing about the visitor; about 13 months.
+model TrafficSourceDay {
+  day      DateTime @db.Date
+  country  String   @db.Char(2)
+  channel  String   @db.VarChar(12)
+  source   String   @db.VarChar(60)
+  medium   String   @default("") @db.VarChar(40)
+  campaign String   @default("") @db.VarChar(80)
+  landing  String   @db.VarChar(12)
+  visits   Int      @default(0)
+
+  @@id([day, country, channel, source, medium, campaign, landing])
+  @@index([day])
+  @@map("traffic_source_days")
 }
 
 /// Udozo: a post on the account dashboard's message board (/account on udozo.com), written by Udozo's team for one

@@ -1,13 +1,14 @@
 /**
- * Cookie consent on Udozo's sites. Udozo's one optional cookie is `udz_vid` (udozo.com remembering what a signed-out
- * visitor looks at, to personalise what they see); every other cookie is strictly necessary (the cookie notice lists
+ * Cookie consent on Udozo's sites. Udozo's optional cookies are `udz_vid` (udozo.com remembering what a signed-out
+ * visitor looks at, to personalise what they see) and `udz_src` (where the latest visit came from, to credit a sign-up
+ * to the link or ad that brought it; `lib/traffic.ts`); every other cookie is strictly necessary (the cookie notice lists
  * them). The banner asks, and remembers the answer in `udz_cookie_consent` (first-party, readable by the page, 12
  * months). Nothing optional may be set unless `optionalAllowed` says so. Bump `consentVersion` when the optional cookies
- * change, so everyone is asked again (2: `udz_vid`, 4 November 2026).
+ * change, so everyone is asked again (2: `udz_vid`, 4 November 2026; 3: `udz_src`, 8 November 2026).
  */
 
 export const consentCookie = "udz_cookie_consent";
-export const consentVersion = 2;
+export const consentVersion = 3;
 export const consentMaxAgeSeconds = 365 * 24 * 60 * 60;
 /** Fired on `window` to open the banner again (the footers' Cookie settings). */
 export const consentSettingsEvent = "udz:cookie-settings";
