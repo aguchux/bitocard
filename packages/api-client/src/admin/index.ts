@@ -518,6 +518,7 @@ export * from './top-ups';
 export * from './team';
 export * from './marketing';
 export * from './contact-messages';
+export * from './connect';
 export * from './signup-journeys';
 export * from './posting-journeys';
 export * from './discovery';

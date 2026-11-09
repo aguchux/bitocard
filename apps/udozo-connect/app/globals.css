@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@import "@bitocard/ui/styles/tokens.css";
+@import "@bitocard/ui/styles/interactive.css";
+/* Shared components styled with Tailwind utilities. */
+@source "../../../packages/ui/src/handoff-ui.tsx";
+
+/* Udozo's logo colours (primary #185174, accent #0e7cc0, ink #10212e) in place of BitoCard's navy and pink, so every
+   shared class (`navy-900`, `brand-600`) is Udozo's here. Unlayered, so they win over the tokens' theme layer. */
+:root {
+  --color-navy-950: color-mix(in srgb, #185174 80%, black);
+  --color-navy-900: #185174;
+  --color-navy-800: color-mix(in srgb, #185174 88%, white);
+  --color-navy-700: color-mix(in srgb, #185174 76%, white);
+  --color-navy-600: color-mix(in srgb, #185174 70%, white);
+  --color-navy-500: color-mix(in srgb, #185174 58%, white);
+  --color-navy-400: color-mix(in srgb, #185174 46%, white);
+  --color-navy-200: color-mix(in srgb, #185174 12%, white);
+  --color-navy-100: color-mix(in srgb, #185174 9%, white);
+  --color-navy-50: color-mix(in srgb, #185174 4%, white);
+  --color-brand-50: color-mix(in srgb, #0e7cc0 7%, white);
+  --color-brand-100: color-mix(in srgb, #0e7cc0 14%, white);
+  --color-brand-200: color-mix(in srgb, #0e7cc0 28%, white);
+  --color-brand-500: #0e7cc0;
+  --color-brand-600: color-mix(in srgb, #0e7cc0 88%, black);
+  --color-brand-700: color-mix(in srgb, #0e7cc0 76%, black);
+  --color-ink: #10212e;
+  --color-page: #ffffff;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  /* Mobile first, never sideways. */
+  html { overflow-x: clip; }
+  body { margin: 0; background: var(--color-page); color: var(--color-ink); overflow-wrap: break-word; }
+  .grid > * { min-width: 0; }
+  :where(input, select, textarea) { min-width: 0; max-width: 100%; }
+  :focus-visible { outline: 3px solid var(--color-brand-700); outline-offset: 3px; }
+  :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
+}
+
+/* Confirmations: a sheet pulled up from the bottom on phones, centred above. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+dialog.sheet[open] {
+  animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.sheet::backdrop {
+  background: rgb(16 33 46 / 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.sheet[open] {
+    animation: none;
+  }
+}

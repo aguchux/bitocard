@@ -1,19 +1,20 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserRound, Users, UsersRound, Wallet } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserCheck, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
 
 export type { Crumb };
 
-export type UdozoSection = "home" | "marketplace" | "assistants" | "resellers" | "money" | "plans" | "theme" | "verifications" | "support" | "reports" | "settings";
+export type UdozoSection = "home" | "marketplace" | "connect" | "assistants" | "resellers" | "money" | "plans" | "theme" | "verifications" | "support" | "reports" | "settings";
 
 /** The left rail of admin.udozo.com, in order. BitoCard's own areas (catalogue, orders, suppliers, crypto) are not here. */
 export const sections: Array<NavItem<UdozoSection>> = [
   { key: "home", label: "Home", href: "/", icon: House },
   { key: "marketplace", label: "Marketplace", href: "/classifieds", icon: Store },
+  { key: "connect", label: "Connect", href: "/connect/applications", icon: Warehouse },
   { key: "assistants", label: "Shop assistants", href: "/support/assistants", icon: Bot },
   { key: "resellers", label: "Resellers", href: "/resellers", icon: Users },
   { key: "money", label: "Money", href: "/money/payouts", icon: Wallet },
@@ -58,6 +59,15 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "UdozoPay settings", href: "/classifieds/safe-pay", icon: Percent },
       { label: "Resale settings", href: "/classifieds/resale", icon: Repeat },
       { label: "Store reports", href: "/classifieds/resale-reports", icon: Flag },
+    ],
+  },
+  connect: {
+    title: "Udozo Connect",
+    items: [
+      { label: "Applications", href: "/connect/applications", icon: ClipboardList },
+      { label: "Visitors", href: "/connect/visitors", icon: UserCheck },
+      { label: "States and deposit", href: "/connect/settings", icon: MapPinned },
+      { label: "Centres", href: "/connect/centres", icon: Warehouse },
     ],
   },
   assistants: {

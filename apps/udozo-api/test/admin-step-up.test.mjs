@@ -89,6 +89,7 @@ const protectedRoutes = [
   ['post', `/v1/admin/team/${randomId}/authenticator/reset`, { reason: 'Lost phone' }],
   ['post', `/v1/admin/team/${randomId}/suspend`, { reason: 'Left' }],
   ['post', `/v1/admin/team/${randomId}/restore`, { reason: 'Back' }],
+  ['put', '/v1/admin/connect/settings/NG', { deposit: 5000000 }],
 ];
 
 describe('admin step-up window', () => {

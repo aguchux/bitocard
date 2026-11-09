@@ -35,6 +35,8 @@ export default createNextConfig({
       // Safe pay is UdozoPay (9 November 2026): its old addresses move for good.
       { source: "/account/safe-pay", destination: "/account/udozopay", permanent: true },
       { source: "/legal/safe-pay", destination: "/legal/udozopay", permanent: true },
+      // Udozo Connect's addresses in notices and emails (`/connect/application`) open connect.udozo.com.
+      { source: "/connect/:path*", destination: `${(process.env.NEXT_PUBLIC_CONNECT_URL ?? "https://connect.udozo.com").replace(/\/$/, "")}/:path*`, permanent: false },
       ...movedCategories.flatMap(({ from, to }) => [
         { source: `/c/${from}`, destination: `/c/${to}`, permanent: true },
         { source: `/:cc([a-z]{2})/c/${from}`, destination: `/:cc/c/${to}`, permanent: true },

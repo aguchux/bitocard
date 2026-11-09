@@ -146,7 +146,7 @@ export class MediaService {
     // admins only that product's files.
     if (!asset || asset.platform !== platformOf(actor) || (actor.realm === 'reseller' && asset.resellerId !== actor.resellerId)) throw notFound();
     // A person's own photos only: never someone else's, nor any other file.
-    if (actor.realm === 'person' && (!['avatar', 'profile_banner'].includes(asset.purpose) || asset.uploadedById !== actor.userId)) throw notFound();
+    if (actor.realm === 'person' && (mediaPurposes[asset.purpose as MediaPurposeKey]?.realm !== 'person' || asset.uploadedById !== actor.userId)) throw notFound();
     return asset;
   }
 

@@ -62,7 +62,10 @@ export class AvatarsService {
 
   /** Whether pictures can be uploaded (storage set up), and what is accepted. */
   settings() {
-    return this.media.settings('person');
+    // Only the pictures of a person: a person's other uploads (a Connect Centre's office photos) have their own place.
+    const settings = this.media.settings('person');
+    const own = new Set<string>(Object.values(pictures).map(picture => picture.purpose));
+    return { ...settings, purposes: settings.purposes.filter(item => own.has(item.purpose)) };
   }
 
   /** A signed link to send the picture to storage (10 minutes): PUT it there, then `set` it. */

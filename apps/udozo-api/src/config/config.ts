@@ -144,6 +144,8 @@ export const configSchema = z.object({
   /** BitoCard Verify, where people complete identity checks in Verify countries. */
   VERIFY_URL: z.string().url().default('https://verify.bitocard.com'),
   SHOP_URL: z.string().url().default('https://shop.bitocard.com'),
+  /** Udozo Connect's dashboard (connect.udozo.com): customers are handed to it signed in. Environment only. */
+  CONNECT_URL: z.string().url().default('https://connect.udozo.com'),
   /** Afrippa's site (docs/CRYPTO_SPINOFF_PLAN.md): where its emails and links point. */
   AFRIPPA_URL: z.string().url().default('https://afrippa.com'),
   /** Verify in Afrippa's name, where its traders complete identity checks. */

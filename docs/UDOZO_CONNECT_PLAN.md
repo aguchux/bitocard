@@ -1,7 +1,7 @@
 # Udozo Connect: UdozoPay, logistics and Connect Centres
 
 Status: **being built** (9 November 2026, the owner's request). The owner has answered every open question
-(recorded at the end). Phase 1 is built; nothing is pushed until every phase is (the owner's rule).
+(recorded at the end). Phases 1 and 2 are built; nothing is pushed until every phase is (the owner's rule).
 
 ## Udozo's two halves
 
@@ -68,8 +68,8 @@ Centre** on connect.udozo.com (linked from udozo.com's footer, help menu and Con
   finance), paid with UdozoPay into its own held ledger account (`connect_centre_deposits`, the centre's, never
   spent). It covers what the centre owes Udozo, buyers or sellers for items it loses or mishandles while liable. When a
   centre closes and holds nothing, the deposit is returned less anything still owed, audited.
-- **Stored:** `connect_centre_applications`, numbered `CA-000123`. Statuses are `submitted`, `in_review`,
-  `changes_requested`, `visit_scheduled`, `visited`, `approved` and `rejected`, with the reason.
+- **Stored:** `connect_centre_applications`, numbered `CA-000123`. Statuses are `draft`, `submitted`,
+  `changes_requested`, `visit_scheduled`, `visited`, `approved`, `rejected` (with the reason) and `withdrawn`.
 - **Udozo's review** (admin Connect > **Applications**, operations), in two parts, both needed before approval:
   1. **Online:** read the application, its photos and the identity check; ask for changes or reject.
   2. **A visit:** **Udozo's own staff or trained agents** visit the office (`visit_scheduled`, then `visited` with the
@@ -362,8 +362,28 @@ assistants' knowledge, help, terms and privacy.
 
 1. **UdozoPay rename** (**built**): words only, as above, with Udozo Connect named as the home of payments and logistics.
    The name is in `payName` and `connectName` for new copy, and a test fails on the old name anywhere in Udozo's code.
-2. **Connect Centre applications**: the apply page on connect.udozo.com, identity and mobile checks, the admin's review,
-   and the agreement.
+2. **Connect Centre applications** (**built**): the apply page on connect.udozo.com, identity and mobile checks, the
+   admin's review, and the agreement. As built:
+   - **API** (`apps/udozo-api/src/connect/`, migration `20270309100000_connect_applications`; switch `connect_applications`,
+     Udozo's, global or country, off by default): customers' `/v1/connect` (`apply` settings, `agreement/accept`,
+     `applications` create, read, `PATCH`, photo `uploads` and attach (`connect_photo` purpose), `submit`, `withdraw`,
+     `visit/confirm`, `visit/reschedule`); admins' `/v1/admin/connect` (applications with `request-changes`, `visit`,
+     `visit/result`, `approve`, `reject`; `visitors`; `states/:country` and `PUT states/:state`; `settings/:country` for
+     the deposit, finance with step-up; `centres`). Statuses: draft, submitted, changes_requested, visit_scheduled, visited,
+     approved, rejected, withdrawn (`in_review` dropped: a sent application is `submitted` until Udozo acts). The deposit is
+     taken from the UdozoPay wallet on first submission into the applicant's own `connect_centre_deposit` account, returned
+     on rejection or withdrawal, kept by the approved centre. Approval makes a `connect_centres` row (`CC-000123`). Notices
+     `customer.connect.application` and `admin.connect.application`, emails linking to udozo.com's `/connect/application`
+     (which redirects to connect.udozo.com). Tests: `apps/udozo-api/test/connect-applications.test.mjs`.
+   - **Admin** (admin.udozo.com, Connect: Applications, Visitors, States and deposit, Centres; hooks in
+     `@bitocard/api-client/admin` `connect.ts`). Tests: `apps/udozo-admin/test/connect.test.tsx`.
+   - **connect.udozo.com** (`apps/udozo-connect`, `@udozo/connect`, port 3013, private): signs in through udozo.com's
+     handoff (the API allows `CONNECT_URL`), keeps the session in its own `udz_connect` cookie, the landing page, the apply
+     wizard (photos uploaded through its own server), and the application page (timeline, visit confirm or another time,
+     withdraw). Tests: `apps/udozo-connect/test/`. Not deployed: its Vercel project and DNS are still to make.
+   - **udozo.com:** the Connect Centre agreement (`/legal/connect-centres`, version `2026-11-09` in the API), the privacy
+     notice's section 4b and the `udz_connect` cookie, footer links, and `/connect/*` redirected to connect.udozo.com.
+     Tests: `apps/udozo/test/connect.test.ts`.
 3. **Centres and the dashboard**: the centres table, connect.udozo.com (sign-in, centre roles and staff, Centre,
    shelves), the admin's Centres page, and udozo.com's Connect Centres page.
 4. **Listings**: shipping states and centres in Post an ad, and the listing page's shipping line.

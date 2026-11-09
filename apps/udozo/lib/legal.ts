@@ -666,7 +666,7 @@ const privacy: LegalDocument = {
       heading: "1. Who we are",
       body: [
         whoWeAre,
-        `This notice covers udozo.com, resellers' stores hosted by Udozo (on udozo.com addresses and their own domains), Seller HQ (shq.udozo.com) and Udozo Verify (verify.udozo.com). We decide how your personal data is used: we are its controller. Write to us at ${legalContact}.`,
+        `This notice covers udozo.com, resellers' stores hosted by Udozo (on udozo.com addresses and their own domains), Seller HQ (shq.udozo.com), Udozo Connect (connect.udozo.com) and Udozo Verify (verify.udozo.com). We decide how your personal data is used: we are its controller. Write to us at ${legalContact}.`,
       ],
     },
     {
@@ -734,6 +734,15 @@ const privacy: LegalDocument = {
       body: [
         "If you use Udozo on WhatsApp, Meta (WhatsApp) carries the messages between you and Udozo's number, and we keep your WhatsApp number, your WhatsApp profile name, which Udozo account it is connected to, when you opted in or sent STOP, and a record of each message in and out (its kind and whether it was delivered and read; never what it said beyond what goes into a listing chat). What you write in a chat is kept as a chat message on Udozo, as section 2 says. Photos you send are fetched from Meta and kept as chat or listing photos. Udozo's own number relays chats, so the other person never sees your number, unless you are a seller who chose Let buyers WhatsApp me directly: then a signed-in buyer who taps Contact seller gets your first name and initial and your connected WhatsApp number, and we keep who got it, about which listing and when (for 12 months) and tell you. You can also make your Udozo account there, or sign in to udozo.com with it: you give your first and last name and your email (confirmed with a code we email you), the WhatsApp number becomes your account's confirmed mobile and its country your account's, and a sign-in on udozo.com waits until you approve it from that WhatsApp (we keep the request, with the kind of browser that asked, for a day). A code to confirm your mobile number may be sent to it on WhatsApp, when you ask for that or a text cannot reach you: Meta carries it, and we keep only that it was sent, never the code. Questions you ask the shop assistant there are sent to it and kept as assistant conversations, as section 4 says; if your number is not connected to an account, it is recognised by a code made from your number, never the number itself.",
         "When you post a wanted request, we keep what you wrote, its category, place, budget and condition, which sellers we told and who answered. Sellers we tell see what you wrote and your first name and initial.",
+      ],
+    },
+    {
+      id: "connect-centres",
+      heading: "4b. Connect Centre applications",
+      body: [
+        "If you apply to run a Udozo Connect Centre we keep what you tell us about your business and office (its address, map position, opening hours, phone, capacity and the person in charge), the photos of your office, which version of the Connect Centre agreement you accepted, the deposit you paid, and our team's notes: what we asked you to change, the visit (who visited, when, and their report) and our decision. Your identity check is kept as section 3 says.",
+        "Our team and the person who visits your office see your application. Once your centre is approved, its name, address, opening hours, phone and photos are shown to buyers and sellers who choose it.",
+        "We keep an application while your centre runs and for two years after it closes; one that is rejected or withdrawn, for two years after it ends.",
       ],
     },
     {
@@ -866,6 +875,7 @@ const cookies: LegalDocument = {
               ["udz_facebook", "udozo.com", "Checks that a \"Continue with Facebook\" sign-in is the one this browser started", "10 minutes"],
               ["udz_whatsapp", "udozo.com", "Lets this browser finish a \"Continue with WhatsApp\" sign-in it started, once WhatsApp approves it", "20 minutes"],
               ["udz_session", "Seller HQ (shq.udozo.com), shared across udozo.com addresses", "Keeps sellers and their team signed in", "30 days"],
+              ["udz_connect", "Udozo Connect (connect.udozo.com)", "Keeps you signed in on Udozo Connect, where Connect Centres apply and run their office", "30 days"],
               ["udz_admin_session", "Udozo's admin", "Keeps Udozo's team signed in", "12 hours"],
               ["udz_kyc", "verify.udozo.com", "Keeps your identity check open while you do it", "Two hours"],
               ["udz_cookie_consent", "udozo.com, and each reseller's store on its own address", "Remembers your cookie choice (Necessary only or Accept all) and when you made it", "12 months"],
@@ -910,5 +920,122 @@ const cookies: LegalDocument = {
   ],
 };
 
-export const legalDocuments: LegalDocument[] = [terms, safePay, sellers, privacy, cookies];
+const connectCentres: LegalDocument = {
+  slug: "connect-centres",
+  title: "Connect Centre agreement",
+  summary: "Running a Udozo Connect Centre: applying, the deposit and the visit, receiving and handing over items, holding times, returns, Loss of care, fees and payouts, buyers' details, and closing.",
+  sections: [
+    {
+      id: "about",
+      heading: "1. About this agreement",
+      body: [
+        whoWeAre,
+        "Udozo Connect is the part of Udozo that makes sure goods and money change hands safely: UdozoPay, shipping with tracking, and Connect Centres. A Connect Centre is an office, run by you, where sellers send items and buyers collect them.",
+        `This agreement applies when you apply to run a Connect Centre on connect.udozo.com, and while you run one. It sits alongside the terms of use, the UdozoPay rules and the privacy notice. "You" means the person who applies and the business they apply for, and includes the staff you add.`,
+      ],
+    },
+    {
+      id: "applying",
+      heading: "2. Applying",
+      body: [
+        {
+          list: [
+            "Anyone with a Udozo account can apply in a market and state where Udozo Connect is open. What you tell us about your business and office must be true, and the photos must be of your own office.",
+            "Before you send an application you pass Udozo's identity check, confirm your mobile number and accept this agreement.",
+            "Our team reviews your application online and may ask you to change something. If it is in order, our staff or an agent we trained visits your office at a time agreed with you. We approve an application only after the visit.",
+            "We may reject an application, with our reason. We do not have to approve any office.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "deposit",
+      heading: "3. The deposit",
+      body: [
+        "When you send your application you pay the deposit for your market from your UdozoPay wallet. The amount is shown before you send it.",
+        {
+          list: [
+            "If we reject your application, or you withdraw it before it is approved, the deposit goes back to your UdozoPay wallet in full.",
+            "Once your centre is approved, we keep the deposit while it runs. It covers what your centre owes buyers, sellers or Udozo for items it loses or mishandles while it is responsible for them.",
+            "When your centre closes and holds no items, we return the deposit less anything your centre still owes.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "running",
+      heading: "4. Running your centre",
+      body: [
+        {
+          list: [
+            "Keep the opening hours and capacity you gave us, and tell us on your dashboard when they change or you close for a holiday.",
+            "Check each item in against its order and photos, take check-in photos, shelve it in a place you record, and hand it over only to the buyer who gives the order's release code, or to the seller with their return code, or to Udozo.",
+            "Let the buyer inspect the item at the counter before the code is entered. If they refuse it, record why with photos and keep it.",
+            "Never open, use, lend, sell or give away an item, or charge anyone anything outside Udozo.",
+            "Keep every item safe from theft, damage and the weather, and tell us at once if anything happens to one.",
+            "Your staff act for you, and you are responsible for what they do.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "holding",
+      heading: "5. Holding times, returns and Loss of care",
+      body: [
+        "Udozo sets these rules for each market and shows them on your dashboard. At launch in Nigeria:",
+        {
+          list: [
+            "A buyer has 72 hours to collect free. After that, demurrage of 2.1% of the order's shipping charge is charged for each day, with no limit.",
+            "If the buyer has not collected the item after 7 days, you request a return to the seller. The seller accepts it, or Udozo approves it; if nobody answers within 48 hours it is accepted automatically, and everyone is told.",
+            "The seller then has 7 days to collect the item. After that the item is in Loss of care: you are no longer liable for damage to it or its loss, but you are still responsible for keeping it safe and handing it over properly. Demurrage carries on, and the seller pays a daily penalty of 2.1% of the shipping charge, at most ₦500 a day.",
+            "After 30 days in Loss of care the item is abandoned, and Udozo collects it from you and takes it to its warehouse. Udozo may sell it at auction after 90 days.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "money",
+      heading: "6. What you earn",
+      body: [
+        {
+          list: [
+            "70% of the Connect fee buyers pay for the orders you hand over, and 70% of the demurrage and Loss of care penalties on items you hold. Udozo keeps the rest.",
+            "Your earnings are paid into your Udozo account and you can pay them out to your bank account.",
+            "We may change these shares or rates with 30 days' notice. Nothing is owed for items you refuse in error, lose or hand to the wrong person; what they cost may be taken from your earnings or your deposit.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "privacy",
+      heading: "7. Buyers' and sellers' details",
+      body: [
+        "You see a buyer's name, phone number and order so you can hand over the right item, and a seller's when they collect a return. Use them only for that, keep them private, and never contact anyone about anything else.",
+      ],
+    },
+    {
+      id: "record",
+      heading: "8. Your record, pausing and closing",
+      body: [
+        {
+          list: [
+            "We keep a record of how your centre does: items received and handed over on time, refused, uncollected, lost or disputed.",
+            "We may pause your centre (it takes no new items while it finishes what it holds) or close it, saying why, if it breaks this agreement, falls below the standard we expect, or puts buyers, sellers or Udozo at risk.",
+            "You may close your centre at any time once it holds no items. Tell us first on your dashboard.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "law",
+      heading: "9. Changes and the law",
+      body: [
+        "We may change this agreement. We tell you at least 30 days before a change that affects you takes effect, and ask you to accept the new version.",
+        `This agreement is governed by ${operator.law}. Ask for help from your dashboard, or email ${supportContact}.`,
+      ],
+    },
+  ],
+};
+
+export const legalDocuments: LegalDocument[] = [terms, safePay, sellers, connectCentres, privacy, cookies];
 export const legalDocument = (slug: string) => legalDocuments.find(doc => doc.slug === slug) ?? null;

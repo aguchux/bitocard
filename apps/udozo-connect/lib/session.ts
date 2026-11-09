@@ -1,0 +1,88 @@
+import "server-only";
+import { createHmac, randomUUID } from "node:crypto";
+import { cache } from "react";
+import { cookies, headers } from "next/headers";
+import { apiUrl } from "./site";
+
+/**
+ * The signed-in Udozo customer on connect.udozo.com. Their account is their ordinary Udozo account; this site keeps its
+ * own session (the API's token, from udozo.com's sign-in handoff) in its own host-only, httpOnly cookie and sends it to
+ * the API from the server only. Browsers never see the API or the token.
+ */
+export const sessionCookie = "udz_connect";
+const sessionHeader = "bitocard-customer-session";
+const clientHeader = "bitocard-client";
+const thirtyDays = 60 * 60 * 24 * 30;
+
+export type Customer = {
+  object: "customer";
+  id: string;
+  email: string;
+  name: string;
+  first_name?: string;
+  email_verified: boolean;
+  phone: string | null;
+  phone_verified: boolean;
+  country: string | null;
+  currency: string | null;
+};
+
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
+
+/** The visitor's address, signed with `STORE_SERVER_SECRET`, so the API rate limits people one by one. */
+export async function clientHeaders(now = Date.now()): Promise<Record<string, string>> {
+  const secret = process.env.STORE_SERVER_SECRET;
+  if (!secret) return {};
+  const list = await headers();
+  const ip = (list.get("x-real-ip") ?? list.get("x-forwarded-for")?.split(",")[0] ?? "").trim();
+  if (!/^[0-9a-fA-F:.]{2,45}$/.test(ip)) return {};
+  const t = Math.floor(now / 1000);
+  return { [clientHeader]: `t=${t},ip=${ip},v1=${createHmac("sha256", secret).update(`${t}.${ip}`).digest("hex")}` };
+}
+
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+/**
+ * Calls a customer endpoint with this site's session and reads its JSON. Server only; never cached, never throws
+ * (status 0 when the API cannot be reached). Every POST carries a fresh Idempotency-Key unless one is named.
+ */
+export async function customerApi<T>(method: Method, path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<ApiResult<T>> {
+  if (typeof window !== "undefined") throw new Error("customerApi runs on the server only.");
+  const token = (await cookies()).get(sessionCookie)?.value;
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), {
+      method,
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        ...(body !== undefined ? { "content-type": "application/json" } : {}),
+        ...(token ? { [sessionHeader]: token } : {}),
+        ...(await clientHeaders()),
+        ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && /^[A-Za-z0-9_-]{8,128}$/.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, status: 0, code: null, message: "We could not reach Udozo. Try again shortly.", param: null };
+  }
+  const json = (await res.json().catch(() => null)) as (T & { error?: { code?: string; message?: string; param?: string } }) | null;
+  if (res.ok) return { ok: true, data: json as T };
+  return { ok: false, status: res.status, code: json?.error?.code ?? null, message: json?.error?.message ?? "Something went wrong. Try again.", param: json?.error?.param ?? null };
+}
+
+/** The signed-in customer, or null. Asked once per request. */
+export const currentCustomer = cache(async (): Promise<Customer | null> => {
+  if (!(await cookies()).get(sessionCookie)?.value) return null;
+  const result = await customerApi<Customer>("GET", "/v1/store/account");
+  return result.ok ? result.data : null;
+});
+
+/** Keeps the session the API gave (server actions and route handlers only): host-only, so no other site reads it. */
+export async function keepSession(session: { token: string }) {
+  (await cookies()).set(sessionCookie, session.token, { maxAge: thirtyDays, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+}
+
+export async function dropSession() {
+  (await cookies()).delete(sessionCookie);
+}

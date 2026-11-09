@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BRANDS = [
     ("bitocard", ROOT / "assets" / "logo.png", ["storefront", "docs", "legals", "admin", "shq", "verify"]),
     ("afrippa", ROOT / "assets" / "afrippa" / "drafts" / "mark-c-single.png", ["afrippa", "afrippa-admin"]),
-    ("udozo", ROOT / "assets" / "udozo" / "logo.png", ["udozo", "udozo-shq", "udozo-admin"]),
+    ("udozo", ROOT / "assets" / "udozo" / "logo.png", ["udozo", "udozo-shq", "udozo-admin", "udozo-connect"]),
 ]
 
 # Apps deployed a second time in another brand: that brand's whole set (marks, favicons, app and manifest icons) goes in

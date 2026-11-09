@@ -1065,6 +1065,10 @@ enum AccountKind {
   /// Afrippa: a seller's coins held for an open P2P order (the amount and the seller's fee), released to the buyer or
   /// returned to the seller. Never below zero.
   crypto_escrow
+  /// Udozo Connect: a Connect Centre's deposit (docs/UDOZO_CONNECT_PLAN.md), paid from the applicant's UdozoPay wallet
+  /// when they submit, returned if the application is rejected or withdrawn, kept for the centre while it runs. The
+  /// applicant's own; never below zero.
+  connect_centre_deposit
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -2832,6 +2836,9 @@ model Customer {
   @@index([areaId])
   @@map("customers")
   resaleStoreReports        ResaleStoreReport[]
+  connectApplications       ConnectCentreApplication[]
+  connectAgreements         ConnectAgreementAcceptance[]
+  connectCentres            ConnectCentre[]           @relation("ConnectCentrePartner")
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
@@ -4641,6 +4648,10 @@ model ClassifiedArea {
   customers Customer[]       @relation("CustomerArea")
   wantedInState ClassifiedWantedRequest[] @relation("WantedState")
   wantedInArea  ClassifiedWantedRequest[] @relation("WantedArea")
+  connectApplicationsInState ConnectCentreApplication[] @relation("ConnectApplicationState")
+  connectApplicationsInArea  ConnectCentreApplication[] @relation("ConnectApplicationArea")
+  connectCentresInState      ConnectCentre[]            @relation("ConnectCentreState")
+  connectCentresInArea       ConnectCentre[]            @relation("ConnectCentreArea")
 
   @@index([country, kind])
   @@index([parentId])
@@ -7160,4 +7171,176 @@ model WhatsappDirectContact {
   @@index([buyerId, createdAt])
   @@index([sellerId])
   @@map("whatsapp_direct_contacts")
+}
+
+// ---- Udozo Connect (docs/UDOZO_CONNECT_PLAN.md): Connect Centre applications and centres ----
+
+/// Each market's Connect rules set by finance. The deposit is null until set: applications cannot be submitted until then.
+model ConnectSettings {
+  country      String   @id @db.Char(2)
+  depositMinor BigInt?  @map("deposit_minor")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  /// The admin who last changed them (no foreign key: admins are never deleted).
+  updatedById  String?  @map("updated_by_id") @db.Uuid
+
+  @@map("connect_settings")
+}
+
+/// A state admins switched off for Connect (or on again): with no row a state is open.
+model ConnectState {
+  stateId   String   @id @map("state_id") @db.Uuid
+  country   String   @db.Char(2)
+  enabled   Boolean
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([country])
+  @@map("connect_states")
+}
+
+/// The Connect Centre agreement a customer accepted, by version.
+model ConnectAgreementAcceptance {
+  customerId String   @map("customer_id") @db.Uuid
+  version    String
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, version])
+  @@map("connect_agreement_acceptances")
+}
+
+/// Who visits applicants' offices: Udozo's own staff or agents it trained.
+model ConnectVisitor {
+  id           String                     @id @default(uuid()) @db.Uuid
+  country      String                     @db.Char(2)
+  name         String
+  phone        String?
+  email        String?
+  /// staff or agent.
+  kind         String
+  /// When an agent finished Udozo's training (staff need none); an agent is never sent on a visit without it.
+  trainedAt    DateTime?                  @map("trained_at")
+  active       Boolean                    @default(true)
+  createdById  String?                    @map("created_by_id") @db.Uuid
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+  applications ConnectCentreApplication[]
+
+  @@index([country, active])
+  @@map("connect_visitors")
+}
+
+/// An application to run a Connect Centre (CA-000123): draft, submitted, changes_requested, visit_scheduled, visited,
+/// approved, rejected or withdrawn. One open at a time per customer (a partial unique index in the migration).
+model ConnectCentreApplication {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  number              Int                       @unique @default(autoincrement())
+  customerId          String                    @map("customer_id") @db.Uuid
+  country             String                    @db.Char(2)
+  status              String                    @default("draft")
+  businessName        String?                   @map("business_name")
+  registrationNumber  String?                   @map("registration_number")
+  stateId             String?                   @map("state_id") @db.Uuid
+  areaId              String?                   @map("area_id") @db.Uuid
+  address             String?
+  landmark            String?
+  latitude            Decimal?                  @db.Decimal(9, 6)
+  longitude           Decimal?                  @db.Decimal(9, 6)
+  /// Opening hours as the applicant writes them ("Mon to Sat, 8am to 6pm").
+  hours               String?
+  phone               String?
+  /// How many items the office can hold at once.
+  capacity            Int?
+  personName          String?                   @map("person_name")
+  personRole          String?                   @map("person_role")
+  /// The Connect Centre agreement version accepted when submitting.
+  agreementVersion    String?                   @map("agreement_version")
+  currency            String
+  /// The deposit taken from the applicant's wallet on first submission (in the ledger mode `depositMode`).
+  depositMinor        BigInt?                   @map("deposit_minor")
+  depositMode         String?                   @map("deposit_mode")
+  depositPaidAt       DateTime?                 @map("deposit_paid_at")
+  depositReturnedAt   DateTime?                 @map("deposit_returned_at")
+  submittedAt         DateTime?                 @map("submitted_at")
+  /// What Udozo asked the applicant to change (changes_requested).
+  changesNote         String?                   @map("changes_note")
+  changesAt           DateTime?                 @map("changes_at")
+  visitorId           String?                   @map("visitor_id") @db.Uuid
+  visitAt             DateTime?                 @map("visit_at")
+  /// What Udozo told the applicant about the visit.
+  visitNote           String?                   @map("visit_note")
+  visitConfirmedAt    DateTime?                 @map("visit_confirmed_at")
+  /// The applicant asked for another time, saying when suits them.
+  visitRescheduleNote String?                   @map("visit_reschedule_note")
+  visitedAt           DateTime?                 @map("visited_at")
+  visitPassed         Boolean?                  @map("visit_passed")
+  /// The visitor's report (Udozo's team only).
+  visitReport         String?                   @map("visit_report")
+  decidedAt           DateTime?                 @map("decided_at")
+  /// The admin who approved or rejected it (no foreign key: admins are never deleted).
+  decidedById         String?                   @map("decided_by_id") @db.Uuid
+  rejectReason        String?                   @map("reject_reason")
+  withdrawnAt         DateTime?                 @map("withdrawn_at")
+  centreId            String?                   @unique @map("centre_id") @db.Uuid
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  customer            Customer                  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  state               ClassifiedArea?           @relation("ConnectApplicationState", fields: [stateId], references: [id], onDelete: Restrict)
+  area                ClassifiedArea?           @relation("ConnectApplicationArea", fields: [areaId], references: [id], onDelete: Restrict)
+  visitor             ConnectVisitor?           @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  centre              ConnectCentre?            @relation(fields: [centreId], references: [id], onDelete: Restrict)
+  photos              ConnectApplicationPhoto[]
+
+  @@index([status, submittedAt])
+  @@index([customerId])
+  @@index([country, status])
+  @@map("connect_centre_applications")
+}
+
+/// A photo of an applicant's office: shopfront, counter, storage or other.
+model ConnectApplicationPhoto {
+  id            String                   @id @default(uuid()) @db.Uuid
+  applicationId String                   @map("application_id") @db.Uuid
+  /// The upload (media_assets), kept without a foreign key as other uploads are.
+  mediaId       String                   @map("media_id") @db.Uuid
+  url           String
+  kind          String
+  position      Int                      @default(0)
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  application   ConnectCentreApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, position])
+  @@map("connect_application_photos")
+}
+
+/// An approved Connect Centre (CC-000123): active, paused or closed. Run by its partner, the customer who applied.
+model ConnectCentre {
+  id           String                    @id @default(uuid()) @db.Uuid
+  number       Int                       @unique @default(autoincrement())
+  partnerId    String                    @map("partner_id") @db.Uuid
+  country      String                    @db.Char(2)
+  stateId      String                    @map("state_id") @db.Uuid
+  areaId       String                    @map("area_id") @db.Uuid
+  name         String
+  address      String
+  landmark     String?
+  latitude     Decimal?                  @db.Decimal(9, 6)
+  longitude    Decimal?                  @db.Decimal(9, 6)
+  hours        String
+  phone        String
+  capacity     Int
+  status       String                    @default("active")
+  /// The deposit it paid, held in its partner's `connect_centre_deposit` account.
+  depositMinor BigInt                    @map("deposit_minor")
+  currency     String
+  photos       String[]                  @default([])
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
+  partner      Customer                  @relation("ConnectCentrePartner", fields: [partnerId], references: [id], onDelete: Restrict)
+  state        ClassifiedArea            @relation("ConnectCentreState", fields: [stateId], references: [id], onDelete: Restrict)
+  area         ClassifiedArea            @relation("ConnectCentreArea", fields: [areaId], references: [id], onDelete: Restrict)
+  application  ConnectCentreApplication?
+
+  @@index([country, stateId, status])
+  @@index([partnerId])
+  @@map("connect_centres")
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CookieSettingsButton } from "@/components/cookie-consent";
+import { connectUrl } from "@/lib/connect";
 
 /**
  * Udozo's footer: Start selling (the sellers' landing page), Udozo on WhatsApp and Post a request where the market has
@@ -27,6 +28,9 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
               Udozo on WhatsApp
             </a>
           ) : null}
+          <a href={connectUrl} className="font-semibold text-navy-900 hover:underline">
+            Become a Connect Centre
+          </a>
           <Link href="/safe-trade" className="font-semibold text-navy-900 hover:underline">
             Safe Trade Guide
           </Link>
@@ -47,6 +51,9 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           </Link>
           <Link href="/legal/sellers" className="hover:underline">
             Seller terms
+          </Link>
+          <Link href="/legal/connect-centres" className="hover:underline">
+            Connect Centre agreement
           </Link>
           <Link href="/legal/privacy" className="hover:underline">
             Privacy

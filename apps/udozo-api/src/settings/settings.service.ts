@@ -171,6 +171,11 @@ export const switchDefinitions = {
     description:
       "Anjio on WhatsApp: questions sent to Udozo's number (and Ask Anjio in its menu) are answered by the market's shop assistant, with listings to tap, within its daily limits and monthly budget. Never inside a chat between a buyer and a seller. Needs whatsapp_channel and classifieds_assistant on. Off: other words sent there are a search, as before.",
   },
+  connect_applications: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo Connect: applications to run a Connect Centre on connect.udozo.com (docs/UDOZO_CONNECT_PLAN.md). On: customers in the market apply, pay the market's deposit from their UdozoPay wallet, and Udozo's team reviews, visits and approves them. Each state is open unless switched off on Connect > States. Off: no new applications (those under way finish).",
+  },
   classifieds_wanted: {
     scopes: ['global', 'country'],
     description:
@@ -280,6 +285,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'whatsapp_channel',
   'whatsapp_assistant',
   'classifieds_wanted',
+  'connect_applications',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',
