@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const all = await markets();
   return {
     title: { absolute: "Udozo across Africa: buy and sell near you" },
-    description: `Buy and sell near you in ${all.data.map(market => market.name).join(", ") || "Africa"}, protected by Safe pay.`,
+    description: `Buy and sell near you in ${all.data.map(market => market.name).join(", ") || "Africa"}, protected by UdozoPay.`,
     alternates: { canonical: "/", languages: regionalAlternates(all.data, all.showcase, code => `/${code}`, "/") },
   };
 }
@@ -38,7 +38,7 @@ export default async function GlobalHome() {
     return (
       <div className="mx-auto grid max-w-md gap-3 px-4 py-16 text-center">
         <h1 className="text-2xl font-extrabold">Udozo is opening soon</h1>
-        <p className="text-navy-600">Buy and sell near you, protected by Safe pay. Check back shortly.</p>
+        <p className="text-navy-600">Buy and sell near you, protected by UdozoPay. Check back shortly.</p>
       </div>
     );
   }
@@ -61,7 +61,7 @@ function DefaultGlobalHome({ showcase }: { showcase: ApiResult<ShopShowcase> }) 
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">
             Udozo across Africa
             <br />
-            <span className="text-brand-300">buy and sell near you, protected by Safe pay</span>
+            <span className="text-brand-300">buy and sell near you, protected by UdozoPay</span>
           </h1>
         </div>
       </section>

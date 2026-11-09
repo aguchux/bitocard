@@ -58,7 +58,7 @@ const slugOf = (value: unknown) => {
 };
 const json = (value: unknown) => JSON.stringify(value);
 
-/** A Safe pay order's next step, as the person reads it (never the release code). */
+/** A UdozoPay order's next step, as the person reads it (never the release code). */
 const nextStep: Record<string, { buyer: string; seller: string }> = {
   requested: { buyer: 'Waiting for the seller to accept.', seller: 'Accept or decline the request.' },
   accepted: { buyer: 'Pay from your wallet before the deadline.', seller: 'Waiting for the buyer to pay.' },
@@ -105,7 +105,7 @@ export class ShopAssistantTools {
             condition: { type: 'array', items: { type: 'string', enum: [...conditions] }, description: conditionHelp },
             features: { type: 'array', items: { type: 'object', properties: { key: text, value: text, min: number, max: number }, required: ['key'] }, description: 'Registry keys (search_features) with a value, or a min and max for numbers.' },
             id_checked_only: { type: 'boolean', description: 'Only sellers whose ID Udozo checked.' },
-            safe_pay_ready_only: { type: 'boolean', description: 'Only sellers set up to take Safe pay.' },
+            safe_pay_ready_only: { type: 'boolean', description: 'Only sellers set up to take UdozoPay.' },
             sort: { type: 'string', enum: [...searchSorts] },
           },
         ),
@@ -116,7 +116,7 @@ export class ShopAssistantTools {
     }
     if (buyer || can('help')) {
       list.push(
-        tool('safe_pay_quote', 'The buyer’s Safe pay fee and total for a listing or a price (whole currency units), from Safe pay’s own fee rules.', { listing_id: uuid, price: number }),
+        tool('safe_pay_quote', 'The buyer’s UdozoPay fee and total for a listing or a price (whole currency units), from UdozoPay’s own fee rules.', { listing_id: uuid, price: number }),
         tool('safety_checklist', 'The Safe Trade Guide’s checks, and a category’s own checks.', { category: text }),
       );
     }
@@ -125,7 +125,7 @@ export class ShopAssistantTools {
     if (scope.customer && can('help')) {
       list.push(
         tool('my_listings', 'The signed-in person’s own listings: title, status, views, leads.'),
-        tool('my_orders', 'The signed-in person’s Safe pay orders, buying and selling: status and what is next (never codes).'),
+        tool('my_orders', 'The signed-in person’s UdozoPay orders, buying and selling: status and what is next (never codes).'),
         tool('my_conversations', 'The signed-in person’s chats: the listing and who is waiting for a reply (never the messages).'),
       );
     }
@@ -242,7 +242,7 @@ export class ShopAssistantTools {
     return { result: json({ total: found.total, shown: result.length, listings: result }), cards: cards.length ? [{ type: 'listings', items: cards }] : [], urls: cards.map(card => card.url) };
   }
 
-  /** Sellers who could accept Safe pay now: identity checked and a payout account in the country (live). */
+  /** Sellers who could accept UdozoPay now: identity checked and a payout account in the country (live). */
   private async safePayReady(country: string, customerIds: string[]) {
     if (!customerIds.length) return new Set<string>();
     const [checked, accounts] = await Promise.all([
@@ -358,9 +358,9 @@ export class ShopAssistantTools {
   }
 
   private async safePayQuote(scope: ToolScope, args: Record<string, unknown>): Promise<ToolOutcome> {
-    if (!(await this.settings.isOnForCountry('classifieds_safe_pay', scope.country))) return { result: 'Safe pay is not open in this country yet: point to the Safe Trade Guide.' };
+    if (!(await this.settings.isOnForCountry('classifieds_safe_pay', scope.country))) return { result: 'UdozoPay is not open in this country yet: point to the Safe Trade Guide.' };
     const settings = await this.prisma.classifiedSafePaySettings.findUnique({ where: { country: scope.country } });
-    if (!settings || settings.buyerFeeBps === null || settings.buyerFeeCapMinor === null) return { result: 'Safe pay is not set up in this country yet.' };
+    if (!settings || settings.buyerFeeBps === null || settings.buyerFeeCapMinor === null) return { result: 'UdozoPay is not set up in this country yet.' };
     let price: bigint | null = null;
     let listingId: string | null = null;
     if (args.listing_id) {

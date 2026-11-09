@@ -232,7 +232,7 @@ export type ShopListingPage = {
   video: { url: string; poster_url: string | null; duration_ms: number | null; width: number | null; height: number | null } | null;
   delivery: ShopDelivery;
   reserved: boolean;
-  /** Units still to be had: its stock less those held for buyers (Safe pay, or buy orders the seller accepted). */
+  /** Units still to be had: its stock less those held for buyers (UdozoPay, or buy orders the seller accepted). */
   available?: number;
   /** The seller has some (Udozo); out of stock, nobody can buy it until they restock. */
   in_stock?: boolean;
@@ -483,7 +483,7 @@ export type ShopOrderMessage = {
 /** A resale buyer's details, for the supplier and the reseller once the order is accepted. */
 export type ShopBuyerDetails = { name: string; email: string; phone: string | null; address: string | null };
 
-/** A Safe pay order as one side sees it: the buyer their fee and total, the seller their fee and payout, never the other's. */
+/** A UdozoPay order as one side sees it: the buyer their fee and total, the seller their fee and payout, never the other's. */
 export type ShopOrder = {
   object: 'classified_order';
   id: string;
@@ -579,7 +579,7 @@ export type ShopStoreReport = {
   created_at: string;
 };
 export type ShopReleaseCode = { object: 'classified_release_code'; order_id: string; code: string; tries_left: number };
-/** What a seller still needs before accepting Safe pay orders. */
+/** What a seller still needs before accepting UdozoPay orders. */
 /** `identity_required`: whether the market requires the identity check (Udozo's `customer_identity_check` switch); optional otherwise. */
 export type ShopReadiness = { object: 'classified_safe_pay_readiness'; identity_required?: boolean; identity_checked: boolean; payout_account: boolean; ready: boolean; limited: boolean; strikes: number; strike_limit: number };
 
@@ -769,6 +769,11 @@ export type ShopWallet = { object: 'customer_wallet'; currency: string; balance:
 // ---- Labels ----
 
 /** What people read. The stored value `untested` is shown as Foreign used (imported second-hand). */
+/** What paying through Udozo is called (Safe pay until 9 November 2026), and the part of Udozo it belongs to: payments
+ * and logistics. Write new copy with these, never the name itself (docs/UDOZO_CONNECT_PLAN.md). */
+export const payName = 'UdozoPay';
+export const connectName = 'Udozo Connect';
+
 export const conditionLabels: Record<ShopCondition, string> = { new: 'New', used: 'Used', untested: 'Foreign used', parts: 'For parts' };
 export const deliveryLabels: Record<ShopDelivery, string> = { none: 'Collection only', state: 'Delivers in the state', nationwide: 'Delivers nationwide' };
 export const sortLabels: Record<ShopSort, string> = { relevant: 'Best match', newest: 'Newest', price_asc: 'Lowest price', price_desc: 'Highest price' };
@@ -1053,7 +1058,7 @@ export const assistantToolLabels: Record<string, string> = {
   get_listing: 'Reading the listing',
   compare_listings: 'Comparing listings',
   price_range: 'Checking prices',
-  safe_pay_quote: 'Working out the Safe pay total',
+  safe_pay_quote: 'Working out the UdozoPay total',
   safety_checklist: 'Finding the safety checks',
   categories: 'Looking at categories',
   search_features: 'Looking up features',
@@ -1206,7 +1211,7 @@ export type ShopReviewReportReason = 'fake' | 'not_a_buyer' | 'offensive' | 'per
 export const reviewRatingLabels: Record<ShopReviewRating, string> = { positive: 'Positive', neutral: 'Neutral', negative: 'Negative' };
 export const reviewAspectLabels: Record<ShopReviewAspect, string> = { described: 'As described', communication: 'Communication', handover: 'Hand-over' };
 export const reviewStanceLabels: Record<ShopReviewStance, string> = { agree: 'Agrees', disagree: 'Disagrees', context: 'Adds context' };
-export const reviewSourceLabels: Record<ShopReviewSource, string> = { safe_pay: 'Safe pay purchase', buy_order: 'Buy order' };
+export const reviewSourceLabels: Record<ShopReviewSource, string> = { safe_pay: 'UdozoPay purchase', buy_order: 'Buy order' };
 export const reviewReportReasonLabels: Record<ShopReviewReportReason, string> = {
   fake: 'It looks fake',
   not_a_buyer: 'They did not buy it',
@@ -1348,7 +1353,7 @@ export type ShopPurchase = {
   object: 'classified_purchase';
   id: string;
   source: ShopReviewSource;
-  /** The Safe pay order or buy order it came from. */
+  /** The UdozoPay order or buy order it came from. */
   order_id: string | null;
   buy_order_id: string | null;
   listing: { id: string; title: string | null; path: string; cover_url: string | null };

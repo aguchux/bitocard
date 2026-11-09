@@ -1,5 +1,5 @@
 // In stock and out of stock (6 November 2026, the owner's request): a listing's stock is tracked from posting and
-// starts at none; out of stock, nobody can buy it (buy orders, offers; Safe pay in classifieds-safe-pay.test.mjs) and
+// starts at none; out of stock, nobody can buy it (buy orders, offers; UdozoPay in classifieds-safe-pay.test.mjs) and
 // it stays live 90 days, then Anjio (the job) takes it off; restocking brings back a listing period. Results show
 // those in stock first, and cards and the listing page say whether it is in stock.
 import assert from 'node:assert/strict';

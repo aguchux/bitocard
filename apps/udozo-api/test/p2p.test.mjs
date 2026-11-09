@@ -382,7 +382,7 @@ describe('paying withdrawable money out to a bank', () => {
     return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
   }
 
-  /** A customer holding NGN 33,000 from a Safe pay sale (Nigeria's smallest payout is NGN 15,000). */
+  /** A customer holding NGN 33,000 from a UdozoPay sale (Nigeria's smallest payout is NGN 15,000). */
   async function sellerWithProceeds() {
     const shopper = storeServer();
     const email = `p2p-money${(counter += 1)}-${Date.now()}@example.com`;
@@ -394,7 +394,7 @@ describe('paying withdrawable money out to a bank', () => {
       mode: 'test',
       type: 'classified_release',
       reference: `classified_order:${randomUUID()}:released`,
-      description: 'A Safe pay sale',
+      description: 'A UdozoPay sale',
       lines: [
         { account: { kind: 'adjustments', currency: 'NGN' }, debit: 33_000_00n },
         { account: { kind: 'customer_withdrawable', currency: 'NGN', customerId: shopper.id }, credit: 33_000_00n },

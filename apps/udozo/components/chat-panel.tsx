@@ -24,10 +24,10 @@ function OfferCard({ message, onAnswer, busy, buyPath }: { message: ShopMessage;
     <div className="grid gap-2 rounded-2xl border border-navy-200 bg-white p-3 text-navy-900">
       <span className="text-xs font-semibold text-navy-500">{offer.made_by === "me" ? "Your offer" : "Their offer"}</span>
       <strong className="text-lg">{shopMoney(offer.price.amount, offer.price.currency)}</strong>
-      <span className="text-xs text-navy-600">{open ? "Open for 48 hours" : offer.status === "accepted" ? "Accepted: buy at this price with Safe pay" : offer.status[0]!.toUpperCase() + offer.status.slice(1)}</span>
+      <span className="text-xs text-navy-600">{open ? "Open for 48 hours" : offer.status === "accepted" ? "Accepted: buy at this price with UdozoPay" : offer.status[0]!.toUpperCase() + offer.status.slice(1)}</span>
       {offer.status === "accepted" ? (
         <a href={`${buyPath}?offer=${offer.id}`} className="flex h-10 items-center justify-center rounded-xl bg-mint-700 text-sm font-bold text-white">
-          Buy with Safe pay at this price
+          Buy with UdozoPay at this price
         </a>
       ) : null}
       {open ? (

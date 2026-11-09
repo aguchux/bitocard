@@ -46,11 +46,11 @@ export function ThemeSwatch({ colors, label }: { colors: ThemeColors; label: str
             </p>
           </div>
           <span className="rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ background: safe.accent }}>
-            Safe pay
+            UdozoPay
           </span>
         </div>
         <span className="inline-flex min-h-9 items-center rounded-lg px-4 text-sm font-semibold text-white" style={{ background: safe.primary }}>
-          Buy with Safe pay
+          Buy with UdozoPay
         </span>
       </div>
       {!valid ? <figcaption className="bg-amber-50 px-4 py-2 text-xs text-amber-900">Every colour must be #rrggbb to show it.</figcaption> : null}

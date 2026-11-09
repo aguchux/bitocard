@@ -230,7 +230,7 @@ export class ListingsService {
         // Units paid for and waiting to be handed over stay: stock cannot go below them (the row locked against a payment).
         await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ${id}::uuid FOR UPDATE`;
         const held = await heldUnits(tx, id);
-        if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are held for buyers (paid with Safe pay, or buy orders you accepted): stock cannot go below that.`);
+        if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are held for buyers (paid with UdozoPay, or buy orders you accepted): stock cannot go below that.`);
         // Running out starts the 90 days out of stock; restocking ends them (the stock as it is now, read under the lock).
         const current = await tx.classifiedListing.findUniqueOrThrow({ where: { id }, select: { status: true, stock: true, outOfStockAt: true, expiresAt: true } });
         Object.assign(data.fields, stockChange(current, data.fields.stock, listingDays, new Date()));

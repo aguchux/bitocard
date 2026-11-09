@@ -141,7 +141,7 @@ describe('The account dashboard', () => {
     const everyone = await post({ title: 'Welcome to Udozo', body: 'Post your first ad in a minute.\nIt is free.', href: '/sell', link_label: 'Post an ad' });
     assert.equal(everyone.status, 201, JSON.stringify(everyone.json));
     assert.deepEqual([everyone.json.object, everyone.json.country, everyone.json.tone, everyone.json.state, everyone.json.pinned], ['board_post', null, 'news', 'showing', false]);
-    const nigeria = await post({ country: 'ng', title: 'Safe pay in Lagos', body: 'Pay through Udozo and the seller is paid once you have it.', tone: 'tip', pinned: true });
+    const nigeria = await post({ country: 'ng', title: 'UdozoPay in Lagos', body: 'Pay through Udozo and the seller is paid once you have it.', tone: 'tip', pinned: true });
     const ghana = await post({ country: 'GH', title: 'Akwaaba', body: 'Udozo is open in Ghana.' });
     const later = await post({ title: 'Coming soon', body: 'Something new.', starts_at: new Date(Date.now() + day).toISOString() });
     assert.equal(later.json.state, 'scheduled');
@@ -153,7 +153,7 @@ describe('The account dashboard', () => {
     const read = (await seller.get('/v1/classifieds/me/dashboard')).json.board;
     assert.deepEqual(
       read.map(item => item.title),
-      ['Safe pay in Lagos', 'Welcome to Udozo'],
+      ['UdozoPay in Lagos', 'Welcome to Udozo'],
       'their market and every market, pinned first; never another market’s, a scheduled or a switched-off post',
     );
     assert.deepEqual(Object.keys(read[1]).sort(), ['body', 'href', 'id', 'link_label', 'object', 'pinned', 'posted_at', 'title', 'tone']);

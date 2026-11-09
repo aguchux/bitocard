@@ -157,7 +157,7 @@ export function ResaleBuy({ item, signedIn, signInHref, stateName, accountOrigin
             </div>
           ) : null}
           <div className="flex justify-between">
-            <dt>Safe pay fee</dt>
+            <dt>UdozoPay fee</dt>
             <dd className="font-semibold">{shopMoney(quote.buyer_fee, quote.currency)}</dd>
           </div>
           <div className="flex justify-between border-t border-slate-100 pt-2 text-base font-bold">

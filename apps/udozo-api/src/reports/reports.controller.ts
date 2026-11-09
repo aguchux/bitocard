@@ -62,7 +62,7 @@ export class AdminReportsController {
     private readonly resale: ResaleReportsService,
   ) {}
 
-  /** Safe pay's fees by market and kind (BitoCard Shop's own sales and resale), each side's fee apart. */
+  /** UdozoPay's fees by market and kind (BitoCard Shop's own sales and resale), each side's fee apart. */
   @Get('resale')
   @ProductOnly('udozo')
   resaleFees(@Query() query: ResaleFeesDto) {

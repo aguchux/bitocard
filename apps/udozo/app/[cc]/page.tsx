@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [market, all] = await Promise.all([marketFor(cc), markets()]);
   if (!market) return {};
   const title = `Udozo ${market.name}: buy and sell near you`;
-  const description = `Buy and sell phones, cars, property, electronics and more across ${market.name}. Chat with sellers and pay with Safe pay: Udozo holds the money until you have the item.`;
+  const description = `Buy and sell phones, cars, property, electronics and more across ${market.name}. Chat with sellers and pay with UdozoPay: Udozo holds the money until you have the item.`;
   return {
     title: { absolute: title },
     description,
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /**
  * A country's home page as Udozo's admins laid it out (Site › Home pages: its layout and sections, filled by the API);
- * the plain page (the Safe pay promise and the newest listings) while the API cannot give it. Search, categories and
+ * the plain page (the UdozoPay promise and the newest listings) while the API cannot give it. Search, categories and
  * Near me are in the header.
  */
 export default async function CountryHome({ params }: Props) {
@@ -51,7 +51,7 @@ export default async function CountryHome({ params }: Props) {
   );
 }
 
-/** The plain market page: the Safe pay promise and the newest listings. */
+/** The plain market page: the UdozoPay promise and the newest listings. */
 function DefaultMarketHome({ market, cc, recent }: { market: ShopMarket; cc: string; recent: ApiResult<ShopSearch> }) {
   return (
     <>
@@ -60,7 +60,7 @@ function DefaultMarketHome({ market, cc, recent }: { market: ShopMarket; cc: str
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">
             Buy and sell near you,
             <br />
-            <span className="text-brand-300">protected by Safe pay</span>
+            <span className="text-brand-300">protected by UdozoPay</span>
           </h1>
         </div>
       </section>

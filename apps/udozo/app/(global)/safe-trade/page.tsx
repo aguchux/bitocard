@@ -7,7 +7,7 @@ import { categoriesOf } from "@/lib/reference";
 
 export const metadata: Metadata = {
   title: "Safe Trade Guide",
-  description: "How to buy and sell safely on Udozo: checks before and at a meeting, checks for each category, red flags, and how Safe pay holds the money until you have the item.",
+  description: "How to buy and sell safely on Udozo: checks before and at a meeting, checks for each category, red flags, and how UdozoPay holds the money until you have the item.",
   alternates: { canonical: "/safe-trade" },
 };
 
@@ -29,7 +29,7 @@ function checklists(lists: ShopTopCategory[][]) {
 
 /**
  * The Safe Trade Guide: the checks for every trade a buyer pays for themselves, each category's own checks, the red
- * flags, and how Safe pay protects them instead.
+ * flags, and how UdozoPay protects them instead.
  */
 export default async function SafeTradePage() {
   const all = await markets();
@@ -38,11 +38,13 @@ export default async function SafeTradePage() {
     <div className="mx-auto grid max-w-3xl gap-6 px-4 pt-5">
       <header className="grid gap-2">
         <h1 className="text-2xl font-extrabold tracking-tight">Safe Trade Guide</h1>
-        <p className="text-navy-600">Tick these off for every trade you pay for yourself. With Safe pay, we hold the money for you.</p>
+        <p className="text-navy-600">Tick these off for every trade you pay for yourself. With UdozoPay, we hold the money for you.</p>
       </header>
-      <section id="safe-pay" aria-labelledby="safe-pay-heading" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4 text-navy-800">
-        <h2 id="safe-pay-heading" className="flex items-center gap-2 font-bold text-mint-700">
-          <ShieldCheck className="size-5" aria-hidden="true" /> Safe pay
+      {/* UdozoPay was Safe pay: old links to #safe-pay still land here. */}
+      <span id="safe-pay" aria-hidden="true" />
+      <section id="udozopay" aria-labelledby="udozopay-heading" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4 text-navy-800">
+        <h2 id="udozopay-heading" className="flex items-center gap-2 font-bold text-mint-700">
+          <ShieldCheck className="size-5" aria-hidden="true" /> UdozoPay <span className="text-sm font-semibold text-mint-700/80">by Udozo Connect</span>
         </h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm">
           <li>You ask to buy; the seller accepts.</li>
@@ -50,7 +52,7 @@ export default async function SafeTradePage() {
           <li>You check the item: at a meet-up you give the seller your release code, for a delivery you confirm it arrived.</li>
           <li>Not as described, or it never came? Open a dispute and Udozo decides. If the seller cancels or does not hand it over in time, you are refunded in full, fee included.</li>
         </ol>
-        <p className="text-xs text-navy-600">Udozo is not the seller and does not inspect goods. Safe pay is your choice on each purchase, for a small fee shown before you pay.</p>
+        <p className="text-xs text-navy-600">Udozo is not the seller and does not inspect goods. UdozoPay is your choice on each purchase, for a small fee shown before you pay.</p>
       </section>
       {groups.map(group => (
         <section key={group.title} aria-labelledby={group.title}>

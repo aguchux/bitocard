@@ -158,7 +158,7 @@ describe("admin.udozo.com", () => {
     expect(await screen.findByRole("heading", { name: /Ada/ }, slow)).toBeTruthy();
     expect(await screen.findByText("ads waiting for review", { exact: false }, slow)).toBeTruthy();
     expect(screen.getAllByText("Udozo").length).toBeGreaterThan(0);
-    expect(document.querySelector('img[src="/udozo-mark-light.png"]')).toBeTruthy();
+    expect(document.querySelector('img[src="/udozo-mark.png"]')).toBeTruthy();
     expect(screen.queryByText("Catalog")).toBeNull();
     expect(sent.every(call => !call.path.startsWith("/v1/afrippa/")), "never Afrippa's routes").toBe(true);
   });
@@ -242,9 +242,9 @@ describe("admin.udozo.com", () => {
     expect(screen.queryByText(/BitoCard/)).toBeNull();
   });
 
-  test("money: sellers' Safe pay payouts from Udozo's own list", async () => {
+  test("money: sellers' UdozoPay payouts from Udozo's own list", async () => {
     page(<PayoutsPage />);
-    expect((await screen.findAllByText("Safe pay payouts", {}, slow)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("UdozoPay payouts", {}, slow)).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("bola@example.com", {}, slow)).length).toBeGreaterThan(0);
     expect(sent.find(call => call.path.startsWith("/v1/admin/customer-payouts"))?.path).toBe("/v1/admin/customer-payouts?mode=live");
   });

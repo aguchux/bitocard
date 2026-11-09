@@ -309,7 +309,7 @@ export class HomeResolver {
       LIMIT ${take}`;
   }
 
-  /** Listings by released Safe pay sales over 30 days, most units first. */
+  /** Listings by released UdozoPay sales over 30 days, most units first. */
   private async sales(ctx: HomeContext, take: number) {
     const since = new Date(ctx.now.getTime() - salesDays * day);
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`

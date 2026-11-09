@@ -2,7 +2,7 @@ import { bitocardApi } from '../base';
 import { type Patch, settleOptimistic } from '../optimistic';
 import type { List } from './types';
 
-/** BitoCard Shop (classifieds) for admins: moderation, sellers, categories, market rules and Safe pay. */
+/** BitoCard Shop (classifieds) for admins: moderation, sellers, categories, market rules and UdozoPay. */
 
 export const classifiedListingStatuses = ['draft', 'pending_review', 'active', 'sold', 'expired', 'rejected', 'removed', 'deleted'] as const;
 export type ClassifiedListingStatus = (typeof classifiedListingStatuses)[number];
@@ -402,7 +402,7 @@ export type AdminClassifiedOrderDetail = Omit<AdminClassifiedOrder, 'dispute'> &
 export type AdminClassifiedDisputeRow = ClassifiedDispute & { order: AdminClassifiedOrder };
 export type AdminClassifiedOrderFilter = { status?: ClassifiedOrderStatus; country?: string; q?: string; payout_review?: ClassifiedPayoutReview; kind?: 'direct' | 'resale'; offset?: number };
 
-/** A courier offered when marking a Safe pay order shipped: its tracking link has `{tracking}` where the number goes. */
+/** A courier offered when marking a UdozoPay order shipped: its tracking link has `{tracking}` where the number goes. */
 export type ClassifiedCourier = { name: string; tracking_url: string | null };
 
 /** A reseller's resale strikes in 90 days (orders their stores cancelled, disputes lost because of a store, reports upheld) against the country's limit. */
@@ -426,7 +426,7 @@ export type AdminResaleStoreReport = {
   created_at: string;
 };
 
-/** Safe pay's fees in a period by market and kind (BitoCard Shop's own sales, resale). */
+/** UdozoPay's fees in a period by market and kind (BitoCard Shop's own sales, resale). */
 export type ResaleFeesReport = {
   object: 'resale_fees_report';
   mode: 'test' | 'live';
@@ -454,7 +454,7 @@ export type ClassifiedSafePaySettings = {
   transit_days: number;
   /** The couriers sellers choose from when marking an order shipped. */
   couriers: ClassifiedCourier[];
-  /** Both fees (rate and cap) set: Safe pay can open where its switch is on. */
+  /** Both fees (rate and cap) set: UdozoPay can open where its switch is on. */
   ready: boolean;
 };
 export type ClassifiedSafePaySettingsInput = Partial<Omit<ClassifiedSafePaySettings, 'object' | 'country' | 'ready'>>;
@@ -719,7 +719,7 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       invalidatesTags: (_result, _error, { country }) => [{ type: 'ClassifiedSettings', id: `MARKET:${country}` }, 'Activity'],
     }),
 
-    // ---- Safe pay ----
+    // ---- UdozoPay ----
     classifiedOrders: build.query<Paged<AdminClassifiedOrder>, AdminClassifiedOrderFilter>({
       query: filter => ({ url: '/v1/admin/classifieds/orders', params: params({ limit: 50, ...filter }) }),
       providesTags: [{ type: 'ClassifiedOrder', id: 'LIST' }],

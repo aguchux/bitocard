@@ -260,7 +260,7 @@ export class SellerScoresService {
     const metrics: Metrics = { response: response.metric, attention: attention.metric, pricing: pricing.metric, costing: costing.metric, reliability: reliability.metric, satisfaction: satisfaction.metric, salesmanship };
     const tips: string[] = [];
     if (response.waitedDay) tips.push(`${response.waitedDay} of your ${plural(response.chats, 'chat')} waited over a day for a first reply.`);
-    if (attention.missed) tips.push(`You missed ${attention.missed} of ${plural(attention.total, "buyers' request", "buyers' requests")} (chats, calls, call backs, offers and Safe pay requests).`);
+    if (attention.missed) tips.push(`You missed ${attention.missed} of ${plural(attention.total, "buyers' request", "buyers' requests")} (chats, calls, call backs, offers and UdozoPay requests).`);
     if (pricing.rose) tips.push(`${plural(pricing.rose, 'listing')} went up in price within a week of a buyer asking about it.`);
     if (pricing.onRequest) tips.push(`${plural(pricing.onRequest, 'listing')} ${pricing.onRequest === 1 ? 'says' : 'say'} price on request: buyers prefer a price.`);
     if (costing.aboveMost) tips.push(`${plural(costing.aboveMost, 'listing')} ${costing.aboveMost === 1 ? 'is' : 'are'} priced above most similar ones.`);

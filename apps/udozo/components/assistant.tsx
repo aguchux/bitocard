@@ -128,13 +128,13 @@ function CardView({ card, signedIn, listingOnPage, onPerson }: { card: ShopAssis
     case "safe_pay":
       return (
         <dl className={box}>
-          <p className="font-bold">Safe pay</p>
+          <p className="font-bold">UdozoPay</p>
           <div className="flex justify-between">
             <dt className="text-navy-600">Price</dt>
             <dd>{shopMoney(card.price, card.currency)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-navy-600">Safe pay fee</dt>
+            <dt className="text-navy-600">UdozoPay fee</dt>
             <dd>{shopMoney(card.fee, card.currency)}</dd>
           </div>
           <div className="flex justify-between border-t border-navy-100 pt-1.5 font-bold">
@@ -268,7 +268,7 @@ function Answer({ message, signedIn, listingOnPage, onPerson }: { message: ShopA
 /**
  * Ask Anjio (or the country's own assistant): a panel from the right on desktops and a sheet from the bottom on phones.
  * The greeting and suggested questions, the language menu where the country's assistants speak several, each answer
- * with the cards its tools returned (listings with their real prices, the Safe pay total, the checks), thumbs, Report,
+ * with the cards its tools returned (listings with their real prices, the UdozoPay total, the checks), thumbs, Report,
  * and Talk to a person. Answers stream from this site's route handler; a failure says so and search still works.
  */
 function Panel({ country, initial, signedIn, opening, onClose, dialog }: { country: string; initial: ShopAssistantProfile; signedIn: boolean; opening: Opening & { at: number }; onClose: () => void; dialog: React.RefObject<HTMLDialogElement | null> }) {
@@ -564,7 +564,7 @@ export function AskButton({ className }: { className?: string }) {
   );
 }
 
-/** Ask Anjio about this listing (its features, the checks, the Safe pay total). */
+/** Ask Anjio about this listing (its features, the checks, the UdozoPay total). */
 export function AskAboutListing({ listingId, title }: { listingId: string; title: string }) {
   const assistant = useAssistant();
   if (!assistant.available) return null;

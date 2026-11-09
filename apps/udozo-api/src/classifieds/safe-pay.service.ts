@@ -33,9 +33,9 @@ const hourMs = 3_600_000;
 const dayMs = 24 * hourMs;
 /** A seller enters the release code at most this many times. */
 export const releaseCodeTries = 5;
-/** A seller's first Safe pay sales, while the new-seller order limit applies. */
+/** A seller's first UdozoPay sales, while the new-seller order limit applies. */
 export const newSellerSales = 5;
-/** An accepted offer can be paid with Safe pay for this long. */
+/** An accepted offer can be paid with UdozoPay for this long. */
 export const acceptedOfferMs = 7 * dayMs;
 /** Photos one dispute can hold. */
 export const maxDisputePhotos = 20;
@@ -120,7 +120,7 @@ const covers = [
 ];
 
 /**
- * BitoCard Shop's Safe pay: the buyer asks at the listed price or an accepted offer, seeing their fee and the total; the
+ * BitoCard Shop's UdozoPay: the buyer asks at the listed price or an accepted offer, seeing their fee and the total; the
  * seller accepts (after their identity check and a payout bank account, live) seeing their fee and payout; the buyer
  * pays from their wallet into escrow (`classified_escrow`) in the same transaction that marks the order paid; hand-over
  * by the buyer's release code at a meet-up, or sent and confirmed for a delivery (released by itself once the
@@ -187,21 +187,21 @@ export class SafePayService {
 
   // ---- Gates ----
 
-  /** The country's Safe pay settings, once Safe pay is open there for this customer. */
+  /** The country's UdozoPay settings, once UdozoPay is open there for this customer. */
   private async open(customer: CustomerWithStore) {
     const country = await this.listings.sellerCountry(customer);
     const mode = this.stores.mode(customer.store);
-    if (!(await this.settings.isOnForCountry('classifieds_safe_pay', country))) throw unavailable('Safe pay is not open in this country yet.');
+    if (!(await this.settings.isOnForCountry('classifieds_safe_pay', country))) throw unavailable('UdozoPay is not open in this country yet.');
     const row = await this.prisma.classifiedSafePaySettings.findUnique({ where: { country } });
-    if (!row || row.buyerFeeBps === null || row.buyerFeeCapMinor === null || row.sellerFeeBps === null || row.sellerFeeCapMinor === null) throw unavailable('Safe pay is not set up in this country yet.');
+    if (!row || row.buyerFeeBps === null || row.buyerFeeCapMinor === null || row.sellerFeeBps === null || row.sellerFeeCapMinor === null) throw unavailable('UdozoPay is not set up in this country yet.');
     const seller = await this.stores.sellerFor(customer);
-    if (!(await this.wallets.enabled(seller, mode))) throw unavailable('Safe pay is paid from your Udozo wallet, which is not open in this country.');
+    if (!(await this.wallets.enabled(seller, mode))) throw unavailable('UdozoPay is paid from your Udozo wallet, which is not open in this country.');
     const settings: Settings = { ...row, buyerFeeBps: row.buyerFeeBps, buyerFeeCapMinor: row.buyerFeeCapMinor, sellerFeeBps: row.sellerFeeBps, sellerFeeCapMinor: row.sellerFeeCapMinor };
     return { country, mode, settings, house: seller };
   }
 
   /**
-   * What a seller still needs before accepting Safe pay orders (live): a payout bank account, and their identity check
+   * What a seller still needs before accepting UdozoPay orders (live): a payout bank account, and their identity check
    * where the market's `customer_identity_check` switch requires it (optional otherwise).
    */
   async readiness(customer: CustomerWithStore) {
@@ -241,7 +241,7 @@ export class SafePayService {
 
   // ---- The buyer ----
 
-  /** What Safe pay would cost the buyer: the price, their fee and the total, and what it covers. */
+  /** What UdozoPay would cost the buyer: the price, their fee and the total, and what it covers. */
   async quote(customer: CustomerWithStore, listingId: string, offerId?: string) {
     const { country, settings } = await this.open(customer);
     const { listing, price, offerId: offer } = await this.priceFor(customer, country, listingId, offerId);
@@ -281,7 +281,7 @@ export class SafePayService {
     if ((await this.held(listing.id)) >= listing.stock) throw this.reserved(listing.stock);
     if (settings.newSellerOrderLimitMinor !== null && price > settings.newSellerOrderLimitMinor) {
       const sales = await this.prisma.classifiedOrder.count({ where: { sellerId: listing.customerId, status: 'released' } });
-      if (sales < newSellerSales) throw conflict('new_seller_limit', `This seller is new to Safe pay: their orders can be at most ${priceText(settings.newSellerOrderLimitMinor, listing.currency)} for now.`);
+      if (sales < newSellerSales) throw conflict('new_seller_limit', `This seller is new to UdozoPay: their orders can be at most ${priceText(settings.newSellerOrderLimitMinor, listing.currency)} for now.`);
     }
     const now = new Date();
     let order;
@@ -310,12 +310,12 @@ export class SafePayService {
         include: orderInclude,
       });
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002') throw conflict('order_exists', 'You have already asked for this with Safe pay.');
+      if ((error as { code?: string }).code === 'P2002') throw conflict('order_exists', 'You have already asked for this with UdozoPay.');
       throw error;
     }
     await this.discovery.record(customer.id, country, 'order', listing.id);
-    await this.noteInChat(order, `${publicName(customer.name)} asked to buy with Safe pay for ${priceText(price, order.currency)}.`);
-    await this.tell(order, 'seller', 'customer.classifieds.order_requested', `Safe pay request for "${order.listing.title}"`, `${publicName(customer.name)} wants to buy it for ${priceText(price, order.currency)}. Accept or decline within ${settings.acceptHours} hours.`);
+    await this.noteInChat(order, `${publicName(customer.name)} asked to buy with UdozoPay for ${priceText(price, order.currency)}.`);
+    await this.tell(order, 'seller', 'customer.classifieds.order_requested', `UdozoPay request for "${order.listing.title}"`, `${publicName(customer.name)} wants to buy it for ${priceText(price, order.currency)}. Accept or decline within ${settings.acceptHours} hours.`);
     return this.present(order, 'buyer');
   }
 
@@ -357,7 +357,7 @@ export class SafePayService {
       mode: order.mode,
       type: 'classified_payment',
       reference: `classified_order:${order.id}:paid`,
-      description: `Safe pay SP-${order.number}`,
+      description: `UdozoPay SP-${order.number}`,
       metadata: { order: Number(order.number) },
       lines: [
         { account: { kind: 'customer_wallet', currency: order.currency, customerId: customer.id }, debit: total },
@@ -376,11 +376,11 @@ export class SafePayService {
         });
         if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
         if (row?.stock === 0) throw this.outOfStock();
-        if (!row || (await heldUnits(tx, order.listingId, order.id)) + order.quantity > row.stock) throw conflict('listing_reserved', 'Someone else has just paid for this with Safe pay.');
+        if (!row || (await heldUnits(tx, order.listingId, order.id)) + order.quantity > row.stock) throw conflict('listing_reserved', 'Someone else has just paid for this with UdozoPay.');
         await this.ledger.write(tx, entry);
       });
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002') throw conflict('listing_reserved', 'Someone else has just paid for this with Safe pay.');
+      if ((error as { code?: string }).code === 'P2002') throw conflict('listing_reserved', 'Someone else has just paid for this with UdozoPay.');
       if (error instanceof ApiError && error.code === 'insufficient_funds') throw this.walletLow(total, order.currency);
       throw error;
     }
@@ -389,15 +389,15 @@ export class SafePayService {
     const others = (await this.held(order.listingId)) < stock ? [] : await this.prisma.classifiedOrder.findMany({ where: { listingId: order.listingId, id: { not: order.id }, status: { in: ['requested', 'awaiting_payment'] } }, include: orderInclude });
     for (const other of others) {
       const ended = await this.prisma.classifiedOrder.updateMany({ where: { id: other.id, status: other.status }, data: { status: 'cancelled', closedAt: now, endedBy: 'bitocard', endReason: 'reserved_for_another_buyer' } });
-      if (ended.count) await this.tell(other, 'buyer', 'customer.classifieds.order_cancelled', `"${other.listing.title}" is no longer available`, 'Another buyer paid for it with Safe pay first.');
+      if (ended.count) await this.tell(other, 'buyer', 'customer.classifieds.order_cancelled', `"${other.listing.title}" is no longer available`, 'Another buyer paid for it with UdozoPay first.');
     }
     const paid = await this.reload(order.id);
-    await this.noteInChat(paid, 'Paid with Safe pay: Udozo holds the money until the hand-over.');
+    await this.noteInChat(paid, 'Paid with UdozoPay: Udozo holds the money until the hand-over.');
     await this.tell(
       paid,
       'seller',
       'customer.classifieds.order_paid',
-      `Safe pay order SP-${paid.number} is paid`,
+      `UdozoPay order SP-${paid.number} is paid`,
       paid.fulfilment === 'meet_up' ? `Meet the buyer and hand "${paid.listing.title}" over; enter their release code to be paid.` : `Send "${paid.listing.title}" to the buyer and mark it sent.`,
     );
     return this.present(paid, 'buyer');
@@ -437,7 +437,7 @@ export class SafePayService {
     const disputed = await this.reload(order.id);
     await this.tellReseller(disputed, `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides.`);
     await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides; add your side in the dispute.`);
-    await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `Safe pay dispute on SP-${disputed.number}`, body: `${input.reason.replace(/_/g, ' ')}: ${details.slice(0, 120)}`, link: `/classifieds/orders/${disputed.id}` });
+    await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `UdozoPay dispute on SP-${disputed.number}`, body: `${input.reason.replace(/_/g, ' ')}: ${details.slice(0, 120)}`, link: `/classifieds/orders/${disputed.id}` });
     return this.present(disputed, 'buyer');
   }
 
@@ -457,12 +457,12 @@ export class SafePayService {
     await this.guards.requireNotLimited(customer.id, order.country, true);
     await this.guards.requireDifferentPeople(order.buyerId, customer.id);
     const ready = await this.readinessOf(customer.id, mode, house.id, order.country);
-    if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
-    if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting Safe pay orders.`, 'payout_account');
+    if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting UdozoPay orders.', 'identity');
+    if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting UdozoPay orders.`, 'payout_account');
     const claimed = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: 'requested', acceptBy: { gt: now } }, data: { status: 'awaiting_payment', acceptedAt: now, payBy: new Date(now.getTime() + settings.payHours * hourMs) } });
     if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
     const accepted = await this.reload(order.id);
-    await this.noteInChat(accepted, 'The seller accepted the Safe pay request.');
+    await this.noteInChat(accepted, 'The seller accepted the UdozoPay request.');
     await this.tell(accepted, 'buyer', 'customer.classifieds.order_accepted', `Pay for "${accepted.listing.title}"`, `The seller accepted. Pay ${priceText(accepted.priceMinor + accepted.buyerFeeMinor, accepted.currency)} from your wallet within ${settings.payHours} hours.`);
     return this.present(accepted, 'seller');
   }
@@ -479,7 +479,7 @@ export class SafePayService {
     const claimed = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: 'requested' }, data: { status: 'declined', closedAt: new Date(), endedBy: 'seller', endReason: reason?.trim().slice(0, 300) || null } });
     if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
     const declined = await this.reload(order.id);
-    await this.tell(declined, 'buyer', 'customer.classifieds.order_declined', `Safe pay request for "${declined.listing.title}" declined`, reason ? `The seller said: ${cleanMessage(reason).slice(0, 200)}` : 'The seller declined. You can still chat with them.');
+    await this.tell(declined, 'buyer', 'customer.classifieds.order_declined', `UdozoPay request for "${declined.listing.title}" declined`, reason ? `The seller said: ${cleanMessage(reason).slice(0, 200)}` : 'The seller declined. You can still chat with them.');
     return this.present(declined, 'seller');
   }
 
@@ -631,7 +631,7 @@ export class SafePayService {
   /**
    * The supplier accepts a resale order (or it is accepted by itself, with auto-accept): the buyer's locked money goes
    * into escrow in the same transaction that marks it paid, the hand-over time starts and a meet-up's release code is
-   * made. Needs what accepting any Safe pay order needs (terms, strikes, identity check and payout account; the last two
+   * made. Needs what accepting any UdozoPay order needs (terms, strikes, identity check and payout account; the last two
    * not while admins test reselling in the market, `resale_skip_supplier_checks`).
    */
   async acceptResale(order: OrderRow, houseId: string, settings: Settings, auto = false) {
@@ -642,15 +642,15 @@ export class SafePayService {
     await this.guards.requireDifferentPeople(order.buyerId, order.sellerId);
     if (!(await this.settings.isOnForCountry('resale_skip_supplier_checks', order.country))) {
       const ready = await this.readinessOf(order.sellerId, order.mode, houseId, order.country);
-      if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
-      if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting Safe pay orders.`, 'payout_account');
+      if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting UdozoPay orders.', 'identity');
+      if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting UdozoPay orders.`, 'payout_account');
     }
     const total = totalOf(order);
     const entry = await this.ledger.prepare({
       mode: order.mode,
       type: 'classified_payment',
       reference: `classified_order:${order.id}:paid`,
-      description: `Safe pay SP-${order.number}`,
+      description: `UdozoPay SP-${order.number}`,
       metadata: { order: Number(order.number) },
       resellerId: order.resellerId,
       lines: [
@@ -681,7 +681,7 @@ export class SafePayService {
       mode: order.mode,
       type: 'classified_unlock',
       reference: `classified_order:${order.id}:unlocked`,
-      description: `Safe pay SP-${order.number} ${end.status}`,
+      description: `UdozoPay SP-${order.number} ${end.status}`,
       metadata: { order: Number(order.number) },
       resellerId: order.resellerId,
       lines: [
@@ -997,7 +997,7 @@ export class SafePayService {
     return this.adminGet(id);
   }
 
-  /** A seller's Safe pay strikes and whether they are limited. */
+  /** A seller's UdozoPay strikes and whether they are limited. */
   async sellerStanding(customerId: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, country: true } });
     if (!customer?.country) throw notFound('seller');
@@ -1012,7 +1012,7 @@ export class SafePayService {
     await this.audit.record({ actorId, action: 'classifieds.safe_pay_limit_cleared', targetType: 'customer', targetId: customerId, before: { strikes: before.strikes, limited: before.limited }, after: { reason } });
     if (before.limited) {
       const seller = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { storeId: true } });
-      if (seller) await this.inbox.customer({ customerId, storeId: seller.storeId }, 'customer.classifieds.safe_pay_restored', { subject: `safe_pay_restored:${now.toISOString()}`, title: 'You can take Safe pay orders again', body: 'Udozo lifted the limit on your Safe pay orders. Earlier strikes no longer count.', link: '/account/safe-pay' });
+      if (seller) await this.inbox.customer({ customerId, storeId: seller.storeId }, 'customer.classifieds.safe_pay_restored', { subject: `safe_pay_restored:${now.toISOString()}`, title: 'You can take UdozoPay orders again', body: 'Udozo lifted the limit on your UdozoPay orders. Earlier strikes no longer count.', link: '/account/udozopay' });
     }
     return this.sellerStanding(customerId);
   }
@@ -1070,7 +1070,7 @@ export class SafePayService {
       const claimed = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: order.status }, data: { status: 'lapsed', closedAt: now, endedBy: unaccepted ? 'seller' : 'buyer', endReason: unaccepted ? 'not_accepted_in_time' : 'not_paid_in_time' } });
       if (!claimed.count) continue;
       lapsed += 1;
-      if (unaccepted) await this.tell(order, 'buyer', 'customer.classifieds.order_lapsed', `Safe pay request for "${order.listing.title}" ended`, 'The seller did not answer in time. You can still chat with them.');
+      if (unaccepted) await this.tell(order, 'buyer', 'customer.classifieds.order_lapsed', `UdozoPay request for "${order.listing.title}" ended`, 'The seller did not answer in time. You can still chat with them.');
       else await this.tell(order, 'seller', 'customer.classifieds.order_lapsed', `SP-${order.number} ended`, 'The buyer did not pay in time.');
     }
     for (const order of await this.prisma.classifiedOrder.findMany({ where: { status: 'paid', handoverBy: { lte: now } }, include: orderInclude, take: 100 })) {
@@ -1121,9 +1121,9 @@ export class SafePayService {
         const by = deadlineText(deadline!, order.country);
         const title = order.listing.title ?? 'your item';
         if (step.field === 'acceptRemindedAt') {
-          await this.tell(order, 'seller', 'customer.classifieds.order_reminder', `Accept SP-${order.number} soon`, order.kind === 'resale' ? `Accept or decline the order for "${title}" by ${by}. If you do not, the buyer's money goes back to them and it counts as a strike.` : `Accept or decline the Safe pay request for "${title}" by ${by}, or it ends.`);
+          await this.tell(order, 'seller', 'customer.classifieds.order_reminder', `Accept SP-${order.number} soon`, order.kind === 'resale' ? `Accept or decline the order for "${title}" by ${by}. If you do not, the buyer's money goes back to them and it counts as a strike.` : `Accept or decline the UdozoPay request for "${title}" by ${by}, or it ends.`);
         } else if (step.field === 'payRemindedAt') {
-          await this.tell(order, 'buyer', 'customer.classifieds.order_reminder', `Pay for "${title}" soon`, `The seller accepted your Safe pay request. Pay from your wallet by ${by}, or the request ends.`);
+          await this.tell(order, 'buyer', 'customer.classifieds.order_reminder', `Pay for "${title}" soon`, `The seller accepted your UdozoPay request. Pay from your wallet by ${by}, or the request ends.`);
         } else if (step.field === 'handoverRemindedAt') {
           await this.tell(order, 'seller', 'customer.classifieds.order_reminder', `Hand over SP-${order.number} soon`, `${order.fulfilment === 'meet_up' ? 'Hand' : 'Ship'} "${title}" ${order.fulfilment === 'meet_up' ? 'over to the buyer' : 'to the buyer with tracking'} by ${by}. If you do not, the buyer is refunded and it counts as a strike.`);
           await this.tellReseller(order, `SP-${order.number}: hand-over due by ${by}`, `The supplier has until then to ${order.fulfilment === 'meet_up' ? 'hand it over' : 'ship it'}.`);
@@ -1173,7 +1173,7 @@ export class SafePayService {
       mode: order.mode,
       type,
       reference: `classified_order:${order.id}:${status}`,
-      description: `Safe pay SP-${order.number} ${status.replace('_', ' ')}`,
+      description: `UdozoPay SP-${order.number} ${status.replace('_', ' ')}`,
       metadata: { order: Number(order.number) },
       resellerId: order.resellerId,
       lines,
@@ -1230,7 +1230,7 @@ export class SafePayService {
           : `${priceText(sellerPayout!, order.currency)} is in your Shop money, ready to withdraw once the payout hold ends.`,
       );
       if (review) await this.inbox.admins('admin.classifieds.payout_review', { subject: done.id, title: `Check the payout of SP-${done.number}`, body: `The buyer topped up by card or mobile money in the last 60 days. Approve the seller's ${priceText(sellerPayout!, order.currency)} for withdrawal, or keep it held.`, link: `/classifieds/orders/${done.id}` });
-      await this.noteInChat(done, 'Safe pay released the money to the seller.');
+      await this.noteInChat(done, 'UdozoPay released the money to the seller.');
     }
     if (refund !== null) await this.tell(done, 'buyer', 'customer.classifieds.order_refunded', `SP-${done.number} was refunded`, `${priceText(refund, order.currency)} is back in your wallet.`);
     if (status !== 'refunded' && done.kind === 'direct') {
@@ -1266,7 +1266,7 @@ export class SafePayService {
   }
 
   private reserved(stock: number) {
-    return conflict('listing_reserved', stock === 1 ? 'Someone has already paid for this with Safe pay.' : 'Every one of these is already paid for with Safe pay.');
+    return conflict('listing_reserved', stock === 1 ? 'Someone has already paid for this with UdozoPay.' : 'Every one of these is already paid for with UdozoPay.');
   }
 
   private walletLow(short: bigint, currency: string) {

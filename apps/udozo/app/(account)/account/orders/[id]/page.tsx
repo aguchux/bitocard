@@ -7,12 +7,12 @@ import { customerApi } from "@/lib/customer";
 import { orderActions, uuidPattern } from "@/lib/shop";
 import { requireSeller } from "@/lib/account";
 
-export const metadata: Metadata = { title: "Safe pay order" };
+export const metadata: Metadata = { title: "UdozoPay order" };
 
 type Props = { params: Promise<{ id: string }> };
 
 /**
- * A Safe pay order in the seller's account, from the reader's side: Udozo's own orders, and resale orders from
+ * A UdozoPay order in the seller's account, from the reader's side: Udozo's own orders, and resale orders from
  * resellers' stores, which the supplier accepts, hands over or ships here.
  */
 export default async function ShopOrderPage({ params }: Props) {

@@ -225,7 +225,7 @@ describe("the page's helpers", () => {
     expect(sellerStats(profile({ response_rate: null, active_listings: 1 })).map(stat => [stat.value, stat.label])).toEqual([
       ["1", "Listing for sale"],
       ["4", "Sold on Udozo"],
-      ["2", "Safe pay sales"],
+      ["2", "UdozoPay sales"],
       ["New", "Too few chats to say"],
     ]);
     expect(sellerHref("NG", "a1b2c3d4e5", { category: "tvs", sort: "price_desc", page: 3 })).toBe("/ng/seller/a1b2c3d4e5?category=tvs&sort=price_desc&page=3");

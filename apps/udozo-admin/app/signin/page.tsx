@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Sign in" };
 
 const features = [
   { icon: ShieldCheck, label: "Secure platform access" },
-  { icon: Store, label: "Marketplace and Safe pay" },
+  { icon: Store, label: "Marketplace and UdozoPay" },
   { icon: Users, label: "Sellers and resellers" },
 ];
 
@@ -38,7 +38,7 @@ export default function SignInPage() {
             <br />
             <span className="text-brand-500">workspace</span>
           </h1>
-          <p className="mt-4 text-lg leading-snug text-white/75">Sign in to run Udozo: the marketplace, sellers and resellers, Safe pay and settings.</p>
+          <p className="mt-4 text-lg leading-snug text-white/75">Sign in to run Udozo: the marketplace, sellers and resellers, UdozoPay and settings.</p>
           <ul className="mt-8 space-y-3">
             {features.map(({ icon: Icon, label }) => (
               <li key={label} className="flex items-center gap-3 text-base font-medium">

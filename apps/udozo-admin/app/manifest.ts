@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Udozo Admin",
     short_name: "Udozo Admin",
-    description: "Udozo's operations: the marketplace, sellers and resellers, Safe pay, plans and fees, theme and settings.",
+    description: "Udozo's operations: the marketplace, sellers and resellers, UdozoPay, plans and fees, theme and settings.",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -189,7 +189,7 @@ export class ContactMessagesService {
 /** The form's words for each kind, in Udozo's admin notices too. */
 export const kindLabels: Record<ContactKind, string> = {
   order: 'An order',
-  safe_pay: 'Safe pay',
+  safe_pay: 'UdozoPay',
   account: 'My account',
   selling: 'Selling',
   reselling: 'Reselling on Seller HQ',

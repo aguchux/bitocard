@@ -88,7 +88,7 @@ function Badge({ children, tone = "mint" }: { children: React.ReactNode; tone?: 
   return <div style={{ display: "flex", padding: "8px 18px", borderRadius: 999, background: colours[0], color: colours[1], fontSize: 24, fontWeight: 600 }}>{children}</div>;
 }
 
-/** A listing's card: its photo on the left, then what it is, its price, where, and Safe pay. */
+/** A listing's card: its photo on the left, then what it is, its price, where, and UdozoPay. */
 export async function listingCard(listing: { title: string; price: string; place: string; category: string; condition: string | null; sold: boolean; photo: string | null }) {
   const [fonts, mark] = await Promise.all([ogFonts(), ogMark()]);
   const text = (
@@ -101,7 +101,7 @@ export async function listingCard(listing: { title: string; price: string; place
         <div style={{ display: "flex", fontSize: 28, fontWeight: 600, color: slate }}>{ogClip(listing.place, 46)}</div>
       </div>
       <div style={{ display: "flex", gap: 12 }}>
-        {listing.sold ? <Badge tone="navy">Sold</Badge> : <Badge>Safe pay protected</Badge>}
+        {listing.sold ? <Badge tone="navy">Sold</Badge> : <Badge>UdozoPay protected</Badge>}
         {listing.condition ? <Badge tone="pink">{listing.condition}</Badge> : null}
       </div>
     </div>

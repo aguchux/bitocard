@@ -375,7 +375,7 @@ export class ClassifiedsAdminService {
     return { object: 'list' as const, data: rows.map(row => this.presentSeller(row, stats)), total };
   }
 
-  /** One seller: their listings by status, reports about them or their listings, and their Safe pay standing. */
+  /** One seller: their listings by status, reports about them or their listings, and their UdozoPay standing. */
   async seller(id: string) {
     const row = await this.prisma.customer.findUnique({ where: { id }, select: sellerSelect });
     if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such seller.');
@@ -944,7 +944,7 @@ class PayoutReviewDto {
   note: string;
 }
 
-/** Admin Classifieds: Safe pay orders, disputes and their decisions, and Safe pay settings per country. */
+/** Admin Classifieds: UdozoPay orders, disputes and their decisions, and UdozoPay settings per country. */
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('support', 'operations', 'finance')
@@ -1006,13 +1006,13 @@ export class AdminSafePayController {
     return this.safePay.decidePayoutReview(adminId(caller), id, body);
   }
 
-  /** A seller's Safe pay strikes and whether they can take orders. */
+  /** A seller's UdozoPay strikes and whether they can take orders. */
   @Get('sellers/:customer/safe-pay')
   standing(@Param('customer', ParseUUIDPipe) customer: string) {
     return this.safePay.sellerStanding(customer);
   }
 
-  /** Lifts a seller's Safe pay limit (strikes so far no longer count). */
+  /** Lifts a seller's UdozoPay limit (strikes so far no longer count). */
   @Post('sellers/:customer/safe-pay/clear')
   @HttpCode(HttpStatus.OK)
   @AdminRoles('operations')

@@ -32,6 +32,9 @@ export default createNextConfig({
   async redirects() {
     return [
       oldLogo,
+      // Safe pay is UdozoPay (9 November 2026): its old addresses move for good.
+      { source: "/account/safe-pay", destination: "/account/udozopay", permanent: true },
+      { source: "/legal/safe-pay", destination: "/legal/udozopay", permanent: true },
       ...movedCategories.flatMap(({ from, to }) => [
         { source: `/c/${from}`, destination: `/c/${to}`, permanent: true },
         { source: `/:cc([a-z]{2})/c/${from}`, destination: `/:cc/c/${to}`, permanent: true },

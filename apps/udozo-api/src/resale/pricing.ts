@@ -10,7 +10,7 @@ export function moved(price: bigint, bps: number): bigint {
   return (price * BigInt(10_000 + bps) + 5_000n) / 10_000n;
 }
 
-/** A capped fee: the rate rounded down, never above its cap (Safe pay's own rule). */
+/** A capped fee: the rate rounded down, never above its cap (UdozoPay's own rule). */
 export function cappedFee(amount: bigint, bps: number | null, cap: bigint | null): bigint {
   if (amount <= 0n || !bps || bps <= 0 || cap === null) return 0n;
   const byRate = (amount * BigInt(bps)) / 10_000n;

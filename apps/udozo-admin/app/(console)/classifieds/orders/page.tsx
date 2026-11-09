@@ -11,11 +11,11 @@ import { ListingCell, MarketFilter, OrderStatus, orderStatusLabels, PersonCell, 
 const pageSize = 50;
 
 /**
- * Udozo > Safe pay orders: every order, newest first, searched by number or either side's email. Finance
+ * Udozo > UdozoPay orders: every order, newest first, searched by number or either side's email. Finance
  * filters the sellers' payouts held for review (the buyer paid from a recent card or mobile money top-up).
  */
 export default function ClassifiedOrdersPage() {
-  // The Safe pay settings page links here with ?payout_review=pending.
+  // The UdozoPay settings page links here with ?payout_review=pending.
   return (
     <Suspense>
       <Orders />
@@ -80,8 +80,8 @@ function Orders() {
   ];
 
   return (
-    <UdozoShell section="marketplace" current="/classifieds/orders" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Safe pay orders" }]}>
-      <PageHeader title="Safe pay orders" description="Buyers pay into escrow from their wallet; the money reaches the seller when the buyer confirms, gives the release code at a meet-up, or after the confirmation days. Search by SP number or either side's email." />
+    <UdozoShell section="marketplace" current="/classifieds/orders" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "UdozoPay orders" }]}>
+      <PageHeader title="UdozoPay orders" description="Buyers pay into escrow from their wallet; the money reaches the seller when the buyer confirms, gives the release code at a meet-up, or after the confirmation days. Search by SP number or either side's email." />
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <FilterSelect
           id="orders-status"
@@ -151,7 +151,7 @@ function Orders() {
           loading={orders.isLoading}
           error={orders.error ? errorMessage(orders.error) : null}
           onRetry={orders.refetch}
-          empty="No Safe pay orders match."
+          empty="No UdozoPay orders match."
         />
       </Card>
       {total > pageSize ? (

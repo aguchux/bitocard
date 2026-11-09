@@ -105,8 +105,8 @@ export default async function StoreLayout({ children, params }: Props) {
             <a href={`${site}/legal/terms`} className="hover:underline">
               Terms of use
             </a>
-            <a href={`${site}/legal/safe-pay`} className="hover:underline">
-              Safe pay rules
+            <a href={`${site}/legal/udozopay`} className="hover:underline">
+              UdozoPay rules
             </a>
             <a href={`${site}/legal/privacy`} className="hover:underline">
               Privacy

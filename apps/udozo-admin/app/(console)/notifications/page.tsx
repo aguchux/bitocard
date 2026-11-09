@@ -9,7 +9,7 @@ export default function NotificationsPage() {
   const admin = useAdmin();
   return (
     <UdozoShell section="home" current="/notifications" crumbs={[{ label: "Dashboard", href: "/" }, { label: "Notifications" }]}>
-      <PageHeader title="Notifications" description="What needs attention for your admin roles: listings and identity checks to review, Safe pay disputes, payouts and failed withdrawals." />
+      <PageHeader title="Notifications" description="What needs attention for your admin roles: listings and identity checks to review, UdozoPay disputes, payouts and failed withdrawals." />
       <NotificationsInbox realm="admin" />
       <PushSettings realm="admin" userId={admin.id} />
     </UdozoShell>

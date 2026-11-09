@@ -27,7 +27,7 @@ const showcaseCards = 12;
 const sectionCards = 8;
 const trendingDays = 14;
 
-/** Requests and orders still holding a listing for a buyer (the listing page's Buy with Safe pay continues them). */
+/** Requests and orders still holding a listing for a buyer (the listing page's Buy with UdozoPay continues them). */
 const openOrders = ['requested', 'awaiting_payment', 'paid', 'sent', 'disputed'] as const;
 
 /**
@@ -46,7 +46,7 @@ export class ShopDirectoryService {
   ) {}
 
   /**
-   * Countries where BitoCard Shop is open, by name, with their live listings, whether Safe pay is open there (its
+   * Countries where BitoCard Shop is open, by name, with their live listings, whether UdozoPay is open there (its
    * switch on and finance having set both fees; buyers' wallets are checked when they ask) and whether the site asks
    * visitors to install it as an app (`classifieds_install_prompt`).
    */
@@ -314,7 +314,7 @@ export class ShopDirectoryService {
 
   /**
    * What the signed-in buyer already has with a listing, for its page: their own listing, saved, a chat about it, an open
-   * Safe pay request or order, and whether they can contact the seller at all (live, and in their own country).
+   * UdozoPay request or order, and whether they can contact the seller at all (live, and in their own country).
    */
   async viewer(customer: CustomerWithStore, listingId: string) {
     const listing = await this.prisma.classifiedListing.findUnique({ where: { id: listingId }, select: { id: true, customerId: true, country: true, status: true, onShop: true } });

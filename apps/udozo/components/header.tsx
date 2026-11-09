@@ -69,7 +69,7 @@ async function whatsappNumber(market: ShopMarket | null) {
 /**
  * Udozo's top bar, mobile first: the lockup, then one bar of the **Categories** menu (its navy left end, opening a drawer)
  * and the search (with no market, "Continue to <their country>"), on its own full-width row on phones and tablets and
- * beside the lockup from desktops (and, where Udozo is on WhatsApp, its green tab on the screen's right edge); on the right **Get help** (a menu: Safe pay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
+ * beside the lockup from desktops (and, where Udozo is on WhatsApp, its green tab on the screen's right edge); on the right **Get help** (a menu: UdozoPay, FAQs, Resell on Udozo, Contact us…), the country (a dropdown of the open
  * markets from the second one), just left of the account's profile icon, and **Sell** (`/sell`; a floating button on phones).
  */
 export function HeaderBar({ market, customer, showcase, categories, countries = [], continueTo = null, whatsapp = null }: { market: ShopMarket | null; customer: Customer | null; showcase: boolean; categories: MenuCategory[]; countries?: MenuCountry[]; continueTo?: ContinueTo; /** Udozo's WhatsApp number where it is open: the tab hanging under the header. */ whatsapp?: string | null }) {

@@ -36,7 +36,7 @@ export default function PnlReportPage() {
     <UdozoShell section="reports" current="/reports" crumbs={[{ label: "Reports", href: "/reports" }, { label: "P&L" }]}>
       <PageHeader
         title="Profit and loss"
-        description="Revenue Udozo keeps for itself (Safe pay and resale fees, plans, setup fees and domains), less what it costs: domains bought and the cost of running the business."
+        description="Revenue Udozo keeps for itself (UdozoPay and resale fees, plans, setup fees and domains), less what it costs: domains bought and the cost of running the business."
         actions={
           data ? (
             <div className="flex flex-wrap gap-2">

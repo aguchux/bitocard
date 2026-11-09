@@ -29,7 +29,7 @@ export const languageLabel = (code: string) => commonLanguages.find(item => item
 export const shopRoleLabels: Record<ShopBotRole, { title: string; text: string }> = {
   browse: { title: "Buyers", text: "Finds and compares listings on udozo.com, explains prices and safety, drafts a first message." },
   sell: { title: "Sellers", text: "Fill from photos, a price range, improving a listing and reply suggestions in the Shop tab. Needs a model that reads photos." },
-  help: { title: "Shop help", text: "How the Shop, Safe pay, fees and disputes work, and the customer’s own listings and orders." },
+  help: { title: "Shop help", text: "How the Shop, UdozoPay, fees and disputes work, and the customer’s own listings and orders." },
 };
 
 const defaultLimits: ShopBotLimits = { customer_daily: 50, visitor_daily: 10, photos_per_draft: 8, monthly_budget_usd: null, summaries_daily: 50, summary_budget_share: 0.25, summary_model: null };

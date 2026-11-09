@@ -1,5 +1,5 @@
 // B2B reselling, stage 4 (docs/BITOCARD_B2B_RESELLING_PLAN.md): buying on a Resale shop. The buyer's store wallet is
-// locked, the supplier accepts (or it is accepted by itself), Safe pay holds it, and the release is split three ways
+// locked, the supplier accepts (or it is accepted by itself), UdozoPay holds it, and the release is split three ways
 // (supplier, reseller's earnings lot, BitoCard's fees); declines, lapses and cancels unlock it; a part refund is split in
 // proportion; shipping needs dispatch photos and a tracking number; the buyer's details are logged views; the order
 // chat shows the store's side as the store; the trade thread is never the buyer's; the reseller's strikes pause their
@@ -474,7 +474,7 @@ describe('stage 5: disputes with both parties, reports of stores, strikes and re
   });
 });
 
-describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with deadline reminders', () => {
+describe('stage 6: UdozoPay, resale and BitoCard Shop notices are emailed, with deadline reminders', () => {
   let emailService;
   const outbox = () => server.app.get(emailService).outbox;
   before(async () => {
@@ -561,7 +561,7 @@ describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with 
     await mail(supplierEmail, /Hand over SP-\d+ soon/);
   });
 
-  test('suppliers and resellers working together, listing outcomes and direct Safe pay orders are emailed too', async () => {
+  test('suppliers and resellers working together, listing outcomes and direct UdozoPay orders are emailed too', async () => {
     const seller = await supplier('Tunde Bello');
     const item = await listing(seller, 'Hisense 50 inch TV');
     const reseller = await shop(item, 'Tunde Hub');
@@ -584,7 +584,7 @@ describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with 
     const [removed] = await mail(supplierEmail, /Your ad was removed/);
     assert.ok(removed.text.includes('Udozo.'));
 
-    // A direct Safe pay order's seller and buyer (bitocard.com accounts) hear from BitoCard Shop.
+    // A direct UdozoPay order's seller and buyer (bitocard.com accounts) hear from BitoCard Shop.
     const emails = server.app.get((await import('../dist/classifieds/shop-emails.service.js')).ShopEmails);
     const id = randomUUID();
     emails.order({ id, kind: 'direct', mode: 'live', storeId: null, resellerId: null, buyerId: seller.id, sellerId: seller.id }, 'supplier', { title: 'Direct order step', body: 'Hand it over.' });

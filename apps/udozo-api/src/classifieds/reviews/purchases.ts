@@ -1,7 +1,7 @@
 import type { Prisma } from '../../generated/prisma/client.js';
 
 /**
- * Udozo's purchases (docs/UDOZO_RATINGS_PLAN.md phase 1): every completed sale, Safe pay or buy order, is a row giving
+ * Udozo's purchases (docs/UDOZO_RATINGS_PLAN.md phase 1): every completed sale, UdozoPay or buy order, is a row giving
  * its buyer one review of the seller, and the right to join the conversation on reviews of the same product from the
  * same seller. Pure helpers, used inside the transactions that complete a sale.
  */

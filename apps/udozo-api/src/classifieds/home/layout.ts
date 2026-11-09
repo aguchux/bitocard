@@ -64,7 +64,7 @@ const sponsoredRail = z.object({
   limit: z.number().int().min(1).max(12).default(8),
 });
 
-/** What sold most through Safe pay in 30 days; while too few have, the most contacted, titled `fallbackTitle`. */
+/** What sold most through UdozoPay in 30 days; while too few have, the most contacted, titled `fallbackTitle`. */
 const topSellingRail = z.object({
   ...base,
   type: z.literal('top_selling_rail'),

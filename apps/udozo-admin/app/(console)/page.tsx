@@ -29,7 +29,7 @@ export default function OverviewPage() {
   const attention = [
     { count: queue.data?.stats.waiting ?? 0, label: "ads waiting for review", href: "/classifieds", icon: ListChecks },
     { count: reports.data?.data.length ?? 0, label: "open reports", href: "/classifieds/reports", icon: Flag },
-    { count: disputes.data?.data.length ?? 0, label: "Safe pay disputes to decide", href: "/classifieds/disputes", icon: MessageSquareWarning },
+    { count: disputes.data?.data.length ?? 0, label: "UdozoPay disputes to decide", href: "/classifieds/disputes", icon: MessageSquareWarning },
     { count: storeReports.data?.data.length ?? 0, label: "store reports to decide", href: "/classifieds/resale-reports", icon: Store },
     { count: data?.attention.verifications_in_review ?? 0, label: "identity checks to decide", href: "/verifications", icon: ShieldCheck },
   ].filter(item => item.count > 0);

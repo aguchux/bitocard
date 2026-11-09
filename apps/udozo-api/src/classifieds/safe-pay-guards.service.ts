@@ -17,7 +17,7 @@ export const reversibleTopUpMs = 60 * dayMs;
 const nameKey = (name: string | null) => (name ? name.toLowerCase().replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).sort().join(' ') : null);
 
 /**
- * Safe pay's protections against abuse: a buyer and seller who are the same verified person (the same ID document, the
+ * UdozoPay's protections against abuse: a buyer and seller who are the same verified person (the same ID document, the
  * same verified name and date of birth, or the same payout bank account) cannot trade with each other; a seller with
  * too many strikes in 90 days (cancelling after accepting, not handing over, disputes lost) cannot take orders until an
  * admin lifts it; and a seller paid by a buyer who topped up by card or mobile money in the last 60 days waits for
@@ -34,18 +34,18 @@ export class SafePayGuardsService {
 
   // ---- The same person ----
 
-  /** Refuses Safe pay between two accounts of the same verified person, and tells admins once per pair. */
+  /** Refuses UdozoPay between two accounts of the same verified person, and tells admins once per pair. */
   async requireDifferentPeople(buyerId: string, sellerId: string) {
     const reason = await this.samePerson(buyerId, sellerId);
     if (!reason) return;
     const [first, second] = [buyerId, sellerId].sort();
     await this.inbox.admins('admin.classifieds.same_person', {
       subject: `${first}:${second}`,
-      title: 'Safe pay refused: one person on both sides',
+      title: 'UdozoPay refused: one person on both sides',
       body: `A buyer and seller on Udozo matched by ${reason.replace(/_/g, ' ')}. Their order was refused; check both accounts.`,
       link: `/customers/${buyerId}`,
     });
-    throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'same_person', 'Safe pay is for trades between two different people, so it cannot be used here.');
+    throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'same_person', 'UdozoPay is for trades between two different people, so it cannot be used here.');
   }
 
   /** Why two accounts are the same person (`id_document`, `name_and_birth_date`, `bank_account`), or null. */
@@ -116,12 +116,12 @@ export class SafePayGuardsService {
     const subject = `${seller.id}:${standing.cleared_at ?? 'never'}`;
     await this.inbox.customer({ customerId: seller.id, storeId: seller.storeId }, 'customer.classifieds.safe_pay_limited', {
       subject,
-      title: 'You cannot take Safe pay orders for now',
-      body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact Udozo to have it reviewed.`,
+      title: 'You cannot take UdozoPay orders for now',
+      body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} UdozoPay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact Udozo to have it reviewed.`,
       link: '/account/orders',
     });
-    this.emails.customer(seller.id, { title: 'You cannot take Safe pay orders for now', body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you. Contact Udozo to have it reviewed.`, path: '/account/orders' });
-    await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A Udozo seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/classifieds/sellers/${seller.id}` });
+    this.emails.customer(seller.id, { title: 'You cannot take UdozoPay orders for now', body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} UdozoPay orders in ${strikeWindowDays} days. Buyers can still chat with you. Contact Udozo to have it reviewed.`, path: '/account/orders' });
+    await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A Udozo seller reached the UdozoPay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/classifieds/sellers/${seller.id}` });
   }
 
   /** `safe_pay_limited` once a seller has reached the strike limit. */
@@ -131,7 +131,7 @@ export class SafePayGuardsService {
       HttpStatus.FORBIDDEN,
       'permission_error',
       'safe_pay_limited',
-      asSeller ? `You cannot take Safe pay orders for now: too many were cancelled, not handed over or lost in the last ${strikeWindowDays} days. Contact Udozo to have it reviewed.` : 'This seller cannot take Safe pay orders at the moment. You can still chat with them.',
+      asSeller ? `You cannot take UdozoPay orders for now: too many were cancelled, not handed over or lost in the last ${strikeWindowDays} days. Contact Udozo to have it reviewed.` : 'This seller cannot take UdozoPay orders at the moment. You can still chat with them.',
     );
   }
 

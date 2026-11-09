@@ -52,7 +52,7 @@ const pushCaller = (caller: CustomerCaller): PushCaller => ({ owner: { customerI
 
 /**
  * A Udozo customer's inbox and push on udozo.com: what Udozo tells them about their listings, chats, requests, buy
- * orders, Safe pay orders, reviews, payouts and account, newest first, each read or not; the browsers they turned
+ * orders, UdozoPay orders, reviews, payouts and account, newest first, each read or not; the browsers they turned
  * push on in (pushed while that session stays signed in) and which notices are pushed (security ones always are).
  * Read by udozo.com's server with the customer's session.
  */

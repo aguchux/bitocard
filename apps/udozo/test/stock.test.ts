@@ -49,9 +49,9 @@ describe("the listing page", () => {
   const page = { status: "active", reserved: false, in_stock: false, price: { kind: "fixed", amount: 2500000, currency: "NGN" } } as Pick<ShopListingPage, "status" | "reserved" | "price" | "in_stock">;
   const viewer = { object: "classified_listing_viewer", listing_id: id, own: false, favourite: false, conversation_id: null, order: null, can_contact: true, buy_orders: true, buy_order: null } as unknown as ShopViewer;
 
-  test("out of stock, there is no Buy with Safe pay, but an order already open carries on", () => {
+  test("out of stock, there is no Buy with UdozoPay, but an order already open carries on", () => {
     expect(buyButton(page, viewer, "/ng/l/1/buy", true)).toBeNull();
-    expect(buyButton({ ...page, in_stock: true }, viewer, "/ng/l/1/buy", true)?.label).toBe("Buy with Safe pay");
+    expect(buyButton({ ...page, in_stock: true }, viewer, "/ng/l/1/buy", true)?.label).toBe("Buy with UdozoPay");
     expect(buyButton(page, { ...viewer, order: { id: "o1", number: "SP-100001", status: "paid" } } as ShopViewer, "/b", true)?.label).toMatch(/Continue/);
   });
 

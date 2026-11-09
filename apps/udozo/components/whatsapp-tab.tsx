@@ -136,7 +136,7 @@ export function WhatsappTab({ number, signedIn }: { number: string; signedIn: bo
 
           <p className="flex gap-2 rounded-xl bg-navy-50 p-3 text-sm text-navy-700">
             <ShieldCheck className="mt-0.5 size-4.5 shrink-0 text-[#128C7E]" aria-hidden="true" />
-            <span>Udozo never asks for your codes or passwords on WhatsApp. See the item before you pay, or use Safe pay on udozo.com.</span>
+            <span>Udozo never asks for your codes or passwords on WhatsApp. See the item before you pay, or use UdozoPay on udozo.com.</span>
           </p>
         </div>
       </div>

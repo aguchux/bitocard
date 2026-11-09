@@ -1,5 +1,5 @@
 // Udozo's header, mobile first: one bar of the Categories menu and the search (its own row on phones, beside the lockup
-// on desktops), the Get help menu (Safe pay, FAQs, Resell on Udozo, Contact us), and the country just left of the profile icon.
+// on desktops), the Get help menu (UdozoPay, FAQs, Resell on Udozo, Contact us), and the country just left of the profile icon.
 import "./request";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -49,8 +49,8 @@ describe("the header", () => {
 
   it("has the Get help menu and the notifications bell before the country, its open places as links; the profile menu holds only the account", () => {
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]).filter(href => !href.startsWith("/ng/c/") && href !== "/ng/search" && href !== "/ng/areas");
-    expect(links).toEqual(["/ng", "/safe-trade#safe-pay", "/help/faqs", "/start-here", "/help/contact", "/account/notifications", "/account", "/account/listings", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell?from=header"]);
-    expect(html.indexOf('aria-label="Get help"')).toBeLessThan(html.indexOf('href="/safe-trade#safe-pay"'));
+    expect(links).toEqual(["/ng", "/safe-trade#udozopay", "/help/faqs", "/start-here", "/help/contact", "/account/notifications", "/account", "/account/listings", "/account/messages", "/account/orders", "/account/wallet", "/account/profile", "/sell?from=header"]);
+    expect(html.indexOf('aria-label="Get help"')).toBeLessThan(html.indexOf('href="/safe-trade#udozopay"'));
     expect(html.indexOf('href="/help/contact"')).toBeLessThan(html.indexOf('title="Nigeria"'));
     expect(html).toContain("Sign out");
   });
@@ -130,7 +130,7 @@ describe("the header's search", () => {
   it("the global header takes the signed-in customer to their own country", () => {
     const html = renderToStaticMarkup(createElement(HeaderBar, { market: null, customer, showcase: true, categories, continueTo: { country: "NG", name: "Nigeria" } }));
     expect(html).toContain("Continue to Nigeria");
-    expect(html).toContain('href="/safe-trade#safe-pay"');
+    expect(html).toContain('href="/safe-trade#udozopay"');
   });
 });
 
@@ -143,7 +143,7 @@ describe("the country menu", () => {
   it("from the second market, a dropdown of every market just left of the profile icon, the current one ticked", () => {
     const html = renderToStaticMarkup(createElement(HeaderBar, { market, customer, showcase: true, categories, countries }));
     const menu = html.indexOf('<details id="country-menu"');
-    expect(menu).toBeGreaterThan(html.indexOf('href="/safe-trade#safe-pay"'));
+    expect(menu).toBeGreaterThan(html.indexOf('href="/safe-trade#udozopay"'));
     expect(menu).toBeLessThan(html.indexOf('aria-label="Account: Ngozi Okafor"'));
     expect(html).toContain('aria-label="Country: Nigeria. Change"');
     const list = html.slice(html.indexOf('<nav aria-label="Countries"'));

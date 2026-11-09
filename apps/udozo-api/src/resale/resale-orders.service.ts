@@ -69,9 +69,9 @@ type BuyInput = { ref: number; quantity?: number; fulfilment: 'meet_up' | 'deliv
  * B2B reselling, stage 4 (`docs/BITOCARD_B2B_RESELLING_PLAN.md`): buying on a Resale shop. The buyer, a customer of the
  * reseller's store, buys from their store wallet; the total is locked in the same transaction that creates the order
  * (`customer_wallet` to `customer_wallet_locked`, the stock held), every figure fixed then; the supplier accepts in the
- * Shop tab (or it is accepted by itself) and Safe pay takes it from there: escrow, hand-over or tracked shipping,
+ * Shop tab (or it is accepted by itself) and UdozoPay takes it from there: escrow, hand-over or tracked shipping,
  * release split three ways. This service is the buyer's side, the reseller's (`/v1/resale/orders`), both order threads,
- * reseller strikes and the `resale_order.*` events, which Safe pay reports through `useResaleEvents`.
+ * reseller strikes and the `resale_order.*` events, which UdozoPay reports through `useResaleEvents`.
  */
 @Injectable()
 export class ResaleOrdersService implements OnModuleInit {

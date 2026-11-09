@@ -33463,7 +33463,7 @@
           },
           "buyer_fee": {
             "type": "integer",
-            "description": "BitoCard’s Safe pay fee the buyer pays on top, in minor units of `currency` (for example kobo)."
+            "description": "BitoCard’s UdozoPay fee the buyer pays on top, in minor units of `currency` (for example kobo)."
           },
           "total": {
             "type": "integer",
@@ -46382,7 +46382,7 @@
           },
           "buyer_fee": {
             "type": "integer",
-            "description": "The buyer’s Safe pay fee, paid on top, in minor units of `currency`."
+            "description": "The buyer’s UdozoPay fee, paid on top, in minor units of `currency`."
           },
           "buyer_pays": {
             "type": "integer",
@@ -47225,7 +47225,7 @@
           },
           "buyer_fee": {
             "type": "integer",
-            "description": "BitoCard’s Safe pay fee the buyer pays on top, in minor units of `currency` (for example kobo)."
+            "description": "BitoCard’s UdozoPay fee the buyer pays on top, in minor units of `currency` (for example kobo)."
           },
           "total": {
             "type": "integer",

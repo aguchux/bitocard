@@ -1,7 +1,7 @@
 # Udozo Connect: UdozoPay, logistics and Connect Centres
 
-Status: **planned** (9 November 2026, the owner's request). Nothing is built yet. The owner has answered every open
-question (recorded at the end); building starts with phase 1.
+Status: **being built** (9 November 2026, the owner's request). The owner has answered every open question
+(recorded at the end). Phase 1 is built; nothing is pushed until every phase is (the owner's rule).
 
 ## Udozo's two halves
 
@@ -360,7 +360,8 @@ assistants' knowledge, help, terms and privacy.
 
 ## Phases
 
-1. **UdozoPay rename**: words only, as above, with Udozo Connect named as the home of payments and logistics.
+1. **UdozoPay rename** (**built**): words only, as above, with Udozo Connect named as the home of payments and logistics.
+   The name is in `payName` and `connectName` for new copy, and a test fails on the old name anywhere in Udozo's code.
 2. **Connect Centre applications**: the apply page on connect.udozo.com, identity and mobile checks, the admin's review,
    and the agreement.
 3. **Centres and the dashboard**: the centres table, connect.udozo.com (sign-in, centre roles and staff, Centre,

@@ -113,7 +113,7 @@ async function storeRequest(request: NextRequest, host: Exclude<SiteHost, { kind
  * Every request starts here. A reseller's store (its sandbox subdomain or its own domain) is served from `/store/…`,
  * which udozo.com itself never serves. On udozo.com, listing pages that are gone answer 410 Gone (search engines drop
  * them faster than a 404); everything else goes on to the page. Only listing addresses (`/ng/l/<number>-<slug>`) are
- * checked, never their Safe pay pages.
+ * checked, never their UdozoPay pages.
  */
 export async function proxy(request: NextRequest, event?: NextFetchEvent) {
   const host = classifyHost(request.headers.get("host") ?? request.nextUrl.host, siteOrigin());

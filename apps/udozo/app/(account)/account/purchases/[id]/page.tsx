@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 /**
  * A resale order's notices link to `/account/purchases/<id>` (a store's own account page); on udozo.com, where the same
- * account reads its inbox, the order is the account's Safe pay order.
+ * account reads its inbox, the order is the account's UdozoPay order.
  */
 export default async function Purchase({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

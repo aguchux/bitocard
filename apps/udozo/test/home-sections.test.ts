@@ -10,6 +10,10 @@ import type { ClassifiedHome, HomeCard, ResolvedHomeSection } from "@bitocard/ap
 
 const api = { home: null as null | ClassifiedHome };
 vi.mock("@/lib/api", () => ({
+  query: (values: Record<string, string | undefined>) => {
+    const text = new URLSearchParams(Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+    return text ? `?${text}` : "";
+  },
   markets: async () => ({ showcase: true, data: [{ object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 21, safe_pay: false, install_prompt: false }] }),
   marketFor: async (cc: string) => (cc === "ng" ? { object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 21, safe_pay: false, install_prompt: false } : null),
   shopApi: async (path: string) => {
@@ -58,7 +62,7 @@ const home = (sections: ResolvedHomeSection[], scope: "global" | "country" = "co
   sections,
 });
 
-const hero: ResolvedHomeSection = { id: "h", type: "home_hero", span, hidden: false, style: "search", title: "Buy and sell near you", accent: "protected by Safe pay", subtitle: "", slides: [], data: { slides: [] } };
+const hero: ResolvedHomeSection = { id: "h", type: "home_hero", span, hidden: false, style: "search", title: "Buy and sell near you", accent: "protected by UdozoPay", subtitle: "", slides: [], data: { slides: [] } };
 
 describe("a managed home page", () => {
   it("runs its hero edge to edge, then a grid that is one column on phones; empty sections are left out", () => {

@@ -20,7 +20,7 @@ const message = (over: Record<string, unknown> = {}) => ({
   name: "Chiamaka Eze",
   email: "chiamaka@example.com",
   phone: "+234 803 112 0042",
-  body: "I paid with Safe pay but the seller has not answered.",
+  body: "I paid with UdozoPay but the seller has not answered.",
   country: "NG",
   customer_id: null,
   assignee_id: null,
@@ -70,7 +70,7 @@ describe("Support > Contact us", () => {
   test("lists what is to do, with what each is about, who sent it and its status", async () => {
     shown(<ListPage />);
     const row = (await screen.findAllByText(/C-000042/, {}, slow))[0]!.closest("tr")!;
-    expect(row.textContent).toContain("Safe pay");
+    expect(row.textContent).toContain("UdozoPay");
     expect(row.textContent).toContain("chiamaka@example.com");
     expect(within(row).getByText("New")).toBeTruthy();
     expect(sent.find(item => item.path === "/v1/admin/support/contact-messages")?.search).toBe("?status=active");
@@ -79,7 +79,7 @@ describe("Support > Contact us", () => {
 
   test("a message: the sender's words and the team's notes, a reply emailed to the sender, and resolving", async () => {
     shown(<MessagePage />);
-    expect(await screen.findByText("I paid with Safe pay but the seller has not answered.", {}, slow)).toBeTruthy();
+    expect(await screen.findByText("I paid with UdozoPay but the seller has not answered.", {}, slow)).toBeTruthy();
     expect(screen.getByText("Asked the seller.")).toBeTruthy();
     expect(screen.getByText(/never sees this/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "chiamaka@example.com" }).getAttribute("href")).toBe("mailto:chiamaka@example.com");

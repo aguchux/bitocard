@@ -32,7 +32,7 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
     const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, stateId: fulfilment === "delivery" && zone === "state" ? (charges?.state_id ?? undefined) : undefined, nonce: attempt });
     if (result.ok) return router.refresh();
     setBusy(false);
-    // Safe pay needs the Udozo terms accepted: ask, then send again (a refused request is final, so a new key).
+    // UdozoPay needs the Udozo terms accepted: ask, then send again (a refused request is final, so a new key).
     if (result.code === termsCode) return setNeedsTerms(true);
     setError(result.message);
   };
@@ -125,7 +125,7 @@ export function SafePayOrderActions({ orderId, canPay, canCancel, addFundsHref, 
   const [confirm, confirmDialog] = useConfirm();
 
   const pay = async () => {
-    const ok = await confirm({ title: `Pay ${shopMoney(total, currency)} from your wallet?`, body: "Udozo holds it with Safe pay until you have the item and release it to the seller.", action: `Pay ${shopMoney(total, currency)}`, tone: "money" });
+    const ok = await confirm({ title: `Pay ${shopMoney(total, currency)} from your wallet?`, body: "Udozo holds it with UdozoPay until you have the item and release it to the seller.", action: `Pay ${shopMoney(total, currency)}`, tone: "money" });
     if (!ok) return;
     setBusy(true);
     setError(null);
@@ -138,7 +138,7 @@ export function SafePayOrderActions({ orderId, canPay, canCancel, addFundsHref, 
     setBusy(false);
   };
   const cancel = async () => {
-    const ok = await confirm({ title: "Cancel this Safe pay request?", body: "The seller is told it is cancelled. You can ask again later.", action: "Cancel request", dismiss: "Keep it", tone: "danger" });
+    const ok = await confirm({ title: "Cancel this UdozoPay request?", body: "The seller is told it is cancelled. You can ask again later.", action: "Cancel request", dismiss: "Keep it", tone: "danger" });
     if (!ok) return;
     setBusy(true);
     const result = await cancelSafePay(orderId);

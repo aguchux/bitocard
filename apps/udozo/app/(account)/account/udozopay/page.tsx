@@ -8,7 +8,7 @@ import { PageTitle } from "@/components/account/nav";
 import { customerApi } from "@/lib/customer";
 import { requireSeller } from "@/lib/account";
 
-export const metadata: Metadata = { title: "Get paid with Safe pay" };
+export const metadata: Metadata = { title: "Get paid with UdozoPay" };
 
 function Step({ n, done, title, note, children }: { n: number; done: boolean; title: string; note: string; children?: React.ReactNode }) {
   return (
@@ -26,12 +26,12 @@ function Step({ n, done, title, note, children }: { n: number; done: boolean; ti
 }
 
 /**
- * Getting paid through Safe pay (the design canvas's SafePaySetup board): once, before the first Safe pay sale, a
+ * Getting paid through UdozoPay (the design canvas's SafePaySetup board): once, before the first UdozoPay sale, a
  * payout bank account, and the identity check where the market requires it (`identity_required`; optional otherwise,
  * the account then in the name on the customer's Udozo account). Selling and chatting need neither.
  */
 export default async function SafePaySetup() {
-  await requireSeller("/account/safe-pay");
+  await requireSeller("/account/udozopay");
   const [readiness, accounts, banks] = await Promise.all([
     customerApi<ShopReadiness>("GET", "/v1/classifieds/me/safe-pay"),
     customerApi<StoreList<StoreCustomerBankAccount>>("GET", "/v1/store/cash/bank-accounts"),
@@ -43,16 +43,16 @@ export default async function SafePaySetup() {
   const required = ready?.identity_required !== false;
   return (
     <div className="grid max-w-2xl gap-5">
-      <PageTitle title="Get paid with Safe pay" note="Once, before your first Safe pay sale. You can still sell and chat without it." post={false} />
+      <PageTitle title="Get paid with UdozoPay" note="Once, before your first UdozoPay sale. You can still sell and chat without it." post={false} />
       {!readiness.ok ? (
-        <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700">{readiness.code === "safe_pay_unavailable" ? readiness.message : "Your Safe pay set-up could not be read just now. Try again shortly."}</p>
+        <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700">{readiness.code === "safe_pay_unavailable" ? readiness.message : "Your UdozoPay set-up could not be read just now. Try again shortly."}</p>
       ) : null}
       {ready?.limited ? (
         <p className="rounded-2xl bg-brand-50 p-4 text-sm text-brand-700">
-          You cannot take Safe pay orders right now: {ready.strikes} of {ready.strike_limit} strikes in 90 days (cancelling after accepting, missing a hand-over, or losing a dispute). Buyers can still chat with you and pay you directly.
+          You cannot take UdozoPay orders right now: {ready.strikes} of {ready.strike_limit} strikes in 90 days (cancelling after accepting, missing a hand-over, or losing a dispute). Buyers can still chat with you and pay you directly.
         </p>
       ) : null}
-      {ready?.ready ? <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">You are ready: accept Safe pay requests from Orders.</p> : null}
+      {ready?.ready ? <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">You are ready: accept UdozoPay requests from Orders.</p> : null}
       {ready ? (
         <>
           <Step
@@ -92,7 +92,7 @@ export default async function SafePaySetup() {
             )}
           </Step>
           <p className="text-sm text-slate-600">
-            What Safe pay sales pay you is withdrawable after the payout hold, from{" "}
+            What UdozoPay sales pay you is withdrawable after the payout hold, from{" "}
             <Link href="/account/payouts" className="font-semibold text-brand-700 hover:underline">
               Cash out
             </Link>

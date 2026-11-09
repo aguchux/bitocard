@@ -227,7 +227,7 @@ export class CronController {
       'crypto-reconcile': async () => ({ live: await reconciliation.run('live'), test: await reconciliation.run('test') }),
       /**
        * Every 15 minutes: BitoCard Shop listings past their time expire, videos stuck processing fail, open offers past
-       * their time expire, unread messages are emailed, chats a year old are deleted, and Safe pay orders past a deadline
+       * their time expire, unread messages are emailed, chats a year old are deleted, and UdozoPay orders past a deadline
        * lapse, are refunded (not handed over) or released (delivery not confirmed or disputed); resale deals past their
        * end end, auto-listing rules add new listings, and resellers are told when a store listing stops selling; calls
        * that rang out are missed (the seller told) and calls past 90 days deleted; every live listing's discovery signals

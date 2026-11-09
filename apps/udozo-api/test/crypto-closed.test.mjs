@@ -1,6 +1,6 @@
 // Crypto has left BitoCard (docs/CRYPTO_SPINOFF_PLAN.md): Afrippa's own routes live under /v1/afrippa/, and with
 // CRYPTO_ROUTES closed (the default) its customer and public routes answer as an
-// unknown route does. The old addresses (and the retired exchange and resellers' coins) are gone, the cash-out Safe pay sellers use stays at
+// unknown route does. The old addresses (and the retired exchange and resellers' coins) are gone, the cash-out UdozoPay sellers use stays at
 // /v1/store/cash, and production refuses to open them.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
@@ -66,7 +66,7 @@ describe('crypto is closed to BitoCard', () => {
     assert.equal((document.tags ?? []).some(tag => ['Crypto', 'Exchange'].includes(tag.name)), false);
   });
 
-  test("the cash-out for Safe pay sellers stays, at /v1/store/cash", async () => {
+  test("the cash-out for UdozoPay sellers stays, at /v1/store/cash", async () => {
     const shopper = await customer();
     const accounts = await shopper.get('/v1/store/cash/bank-accounts');
     assert.equal(accounts.status, 200, JSON.stringify(accounts.json));

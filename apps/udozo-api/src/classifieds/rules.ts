@@ -21,7 +21,7 @@ export const contacts = ['chat', 'phone', 'both'] as const;
 
 /**
  * Live on BitoCard Shop itself: active and sold there (`onShop`). A listing open to resellers only is never shown on the
- * Shop, in search, on its pages, in its chats or Safe pay, its sitemaps, showcase or assistant (B2B reselling plan).
+ * Shop, in search, on its pages, in its chats or UdozoPay, its sitemaps, showcase or assistant (B2B reselling plan).
  */
 export const onShopWhere = { status: 'active', onShop: true } as const;
 export const isOnShop = (listing: { status: string; onShop: boolean }) => listing.status === 'active' && listing.onShop;
@@ -35,7 +35,7 @@ type Summer = { aggregate(args: { where: { listingId: string; status: { in: stri
 type OrderCounter = { classifiedOrder: Summer; classifiedBuyOrder: Summer };
 
 /**
- * Units of a listing held by Safe pay orders (`holdingStatuses`) and accepted buy orders, less one order's own when
+ * Units of a listing held by UdozoPay orders (`holdingStatuses`) and accepted buy orders, less one order's own when
  * given (an id of either kind).
  */
 export async function heldUnits(db: OrderCounter, listingId: string, exceptOrderId?: string) {

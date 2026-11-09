@@ -334,7 +334,7 @@ describe('Contact seller', () => {
     const cta = shown[0].interactive;
     assert.equal(cta.type, 'cta_url');
     assert.match(cta.body.text, /\*Bisi A\.\* sells "Sony Bravia 43 inch TV" on Udozo\.\nWhatsApp: \+234/);
-    assert.match(cta.body.text, /Safe pay/);
+    assert.match(cta.body.text, /UdozoPay/);
     assert.equal(cta.action.parameters.display_text, 'Chat on WhatsApp');
     const link = new URL(cta.action.parameters.url);
     assert.equal(`${link.origin}${link.pathname}`, `https://wa.me/${seller.waId}`);
@@ -507,7 +507,7 @@ describe('Anjio on WhatsApp', () => {
   test('questions go to Anjio (visitors and accounts), listings come to tap, a drafted message is sent to the seller, and a person takes over', async () => {
     // Off: a question is a search, and the menu has no Ask row.
     const visitor = '2348066667777';
-    const off = await say(visitor, text('How does Safe pay work?'));
+    const off = await say(visitor, text('How does UdozoPay work?'));
     assert.equal(ai.state.calls.length, 0);
     assert.match(bodies(off)[0], /Nothing found|Results for/);
 
@@ -518,20 +518,20 @@ describe('Anjio on WhatsApp', () => {
 
     // A number with no account asks as a visitor; the answer's HTML becomes WhatsApp text.
     await say(visitor, text('menu'));
-    ai.state.script = [{ text: '<p>With <strong>Safe pay</strong> Udozo holds your money until you have the item.</p><ul><li>Pay in the app</li><li>Never pay outside it</li></ul>' }];
-    const answer = await say(visitor, text('How does Safe pay work?'));
+    ai.state.script = [{ text: '<p>With <strong>UdozoPay</strong> Udozo holds your money until you have the item.</p><ul><li>Pay in the app</li><li>Never pay outside it</li></ul>' }];
+    const answer = await say(visitor, text('How does UdozoPay work?'));
     assert.equal(answer.length, 1, JSON.stringify(answer));
-    assert.equal(answer[0].text.body, 'With *Safe pay* Udozo holds your money until you have the item.\n\n• Pay in the app\n• Never pay outside it');
+    assert.equal(answer[0].text.body, 'With *UdozoPay* Udozo holds your money until you have the item.\n\n• Pay in the app\n• Never pay outside it');
     assert.ok(graph.calls.some(call => call.body?.status === 'read' && call.body?.typing_indicator?.type === 'text'), 'typing… while it answers');
     const contact = await prisma.whatsappContact.findUniqueOrThrow({ where: { waId: visitor } });
     const thread = await prisma.assistantThread.findUniqueOrThrow({ where: { id: contact.assistantThreadId } });
     assert.deepEqual([thread.channel, thread.customerId, Boolean(thread.visitorHash)], ['whatsapp', null, true]);
     // A follow-up carries on the same conversation (the earlier turn goes with it).
-    ai.state.script = [{ text: 'Yes, for every item with Safe pay.' }];
-    assert.equal(bodies(await say(visitor, text('and for phones too')))[0], 'Yes, for every item with Safe pay.');
+    ai.state.script = [{ text: 'Yes, for every item with UdozoPay.' }];
+    assert.equal(bodies(await say(visitor, text('and for phones too')))[0], 'Yes, for every item with UdozoPay.');
     assert.equal((await prisma.whatsappContact.findUniqueOrThrow({ where: { waId: visitor } })).assistantThreadId, thread.id);
     assert.equal(await prisma.assistantMessage.count({ where: { threadId: thread.id } }), 4);
-    assert.match(JSON.stringify(ai.state.calls.at(-1).body.messages), /How does Safe pay work/);
+    assert.match(JSON.stringify(ai.state.calls.at(-1).body.messages), /How does UdozoPay work/);
     // Talk to a person needs an account.
     ai.state.script = [{ tool: { name: 'offer_person', arguments: { reason: 'A refund' } } }, { text: 'A person can help with that.' }];
     assert.match(bodies(await say(visitor, text('I want my money back please')))[1], /once your Udozo account is connected/);

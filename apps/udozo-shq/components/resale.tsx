@@ -101,7 +101,7 @@ export function PriceSummary({ price }: { price: ResalePrice | ResaleListing }) 
     ["Udozo’s fee", formatMoney(price.reseller_fee, price.currency)],
     ["You keep per sale", formatMoney(price.earnings, price.currency)],
   ];
-  if ("buyer_pays" in price) rows.push(["The buyer pays (with their Safe pay fee)", formatMoney(price.buyer_pays, price.currency)]);
+  if ("buyer_pays" in price) rows.push(["The buyer pays (with their UdozoPay fee)", formatMoney(price.buyer_pays, price.currency)]);
   return (
     <dl className="grid gap-x-6 gap-y-2 rounded-xl bg-canvas p-4 text-sm sm:grid-cols-2">
       {rows.map(([label, value]) => (

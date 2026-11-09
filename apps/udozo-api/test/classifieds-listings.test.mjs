@@ -49,7 +49,7 @@ async function seller({ country = 'NG', verify = true, terms = true } = {}) {
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   if (verify) {
     assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-    // The BitoCard Shop terms, accepted before posting or Safe pay.
+    // The BitoCard Shop terms, accepted before posting or UdozoPay.
     if (terms) await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   }
   shopper.id = signup.json.customer.id;

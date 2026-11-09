@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { ogImageSize, pngRatio } from "@bitocard/ui/og-image";
 
-export const alt = "Udozo – buy and sell near you, protected by Safe pay";
+export const alt = "Udozo – buy and sell near you, protected by UdozoPay";
 export const size = ogImageSize;
 export const contentType = "image/png";
 
@@ -41,7 +41,7 @@ export default async function OpenGraphImage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05 }}>Buy and sell near you.</div>
-            <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05, color: pink }}>Protected by Safe pay.</div>
+            <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -3, lineHeight: 1.05, color: pink }}>Protected by UdozoPay.</div>
             <div style={{ display: "flex", marginTop: 26, fontSize: 28, fontWeight: 600, color: "#5f6b73" }}>Phones · Electronics · Vehicles · Property · Fashion · Home</div>
           </div>
         </div>

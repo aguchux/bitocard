@@ -1,10 +1,10 @@
 /**
  * Udozo's legal documents (docs/UDOZO_SPINOFF_PLAN.md, step 5 item 3), describing what Udozo actually does now that it
  * is live and takes real payments. `legalVersion` is the date of the terms people accept before they post a listing
- * or use Safe pay (the API's `shopTermsVersion`): change both together when people must accept again.
+ * or use UdozoPay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
-export const legalVersion = "2026-11-07";
+export const legalVersion = "2026-11-09";
 /** Privacy and legal requests. */
 export const legalContact = "legal@udozo.com";
 /** Help with an account, a listing or an order. */
@@ -34,7 +34,7 @@ const terms: LegalDocument = {
       body: [
         whoWeAre,
         "Udozo is a marketplace for buying and selling near you, at udozo.com. Sellers post listings and buyers contact them. Some sellers also let resellers sell their listings on the resellers' own stores, which Udozo hosts.",
-        "These terms, the Safe pay rules and the privacy notice form one agreement between you and us. Sellers who run stores in Seller HQ also accept the seller terms. Where a document says more about one subject, that document applies to it.",
+        "These terms, the UdozoPay rules and the privacy notice form one agreement between you and us. Sellers who run stores in Seller HQ also accept the seller terms. Where a document says more about one subject, that document applies to it.",
         "Udozo opens country by country. In a country where it is not open, nothing in these documents is an offer.",
       ],
     },
@@ -44,11 +44,11 @@ const terms: LegalDocument = {
       body: [
         {
           list: [
-            "We host listings and chats. We check listings, keep the marketplace safe and offer Safe pay.",
+            "We host listings and chats. We check listings, keep the marketplace safe and offer UdozoPay.",
             "We are not the seller or the buyer. A sale is between the buyer and the seller. We do not own, inspect, store, value or deliver the items. We do not promise that an item is as described, that a seller will sell or that a buyer will pay.",
-            "Safe pay is the one exception. When a buyer pays with Safe pay, we hold the money and pay it to the seller, or back to the buyer, as the Safe pay rules say. We still do not become the seller or inspect the item.",
-            "A reseller's store is not the seller of the item either. The item is sold by the seller named on its page, and Udozo holds the money as for Safe pay.",
-            "Paying directly is at your own risk. If you pay or are paid outside Safe pay, in cash, by transfer or any other way, we take no part in that payment and cannot get the money back.",
+            "UdozoPay is the one exception. When a buyer pays with UdozoPay, we hold the money and pay it to the seller, or back to the buyer, as the UdozoPay rules say. We still do not become the seller or inspect the item.",
+            "A reseller's store is not the seller of the item either. The item is sold by the seller named on its page, and Udozo holds the money as for UdozoPay.",
+            "Paying directly is at your own risk. If you pay or are paid outside UdozoPay, in cash, by transfer or any other way, we take no part in that payment and cannot get the money back.",
           ],
         },
         "How listings are shown. Search results come in the order you choose (best match, newest or price), nearest to you first. On the home pages:",
@@ -58,7 +58,7 @@ const terms: LegalDocument = {
             "Trending ranks recent listings by how many people contacted, saved and viewed them.",
             "Some rows show listings or stores Udozo's team picked by hand to show what is on Udozo. Nobody pays for these; a store or listing is only picked while it is live.",
             "Trending deals are listings whose price came down, shown beside the lowest price they had in the 30 days before.",
-            "Top selling ranks listings by Safe pay sales completed in the last 30 days. Until enough have sold, the most contacted listings show instead, titled Popular, never as sales.",
+            "Top selling ranks listings by UdozoPay sales completed in the last 30 days. Until enough have sold, the most contacted listings show instead, titled Popular, never as sales.",
             "For you, Recently viewed, Because you searched and Price dropped are chosen for you from your own activity on Udozo: the listings you looked at, saved and contacted, and what you searched for. Without that activity, or if you turn personalisation off, For you shows what is popular. People also viewed shows listings that others who looked at a listing looked at too.",
             "Personalisation only changes the order of listings that are already on Udozo for you to see. Sponsored listings stay labelled, and nothing moves up because anyone paid. You can turn personalisation off, and clear what Udozo remembers, under Account, Privacy.",
           ],
@@ -74,7 +74,7 @@ const terms: LegalDocument = {
             "You must be 18 or over. You need a confirmed email address, and a mobile number from your country. You confirm the number later, with a code we text it, from your profile (where we can text numbers in your country).",
             "One Udozo account works on udozo.com and on every reseller's store, with one wallet and one history of purchases. One person, one account: do not open accounts to get round a limit, a block or a suspension.",
             "Your country is fixed when you open your account. You buy and sell in your own country's market, in its currency. A reseller's store sells only to shoppers from its own country; others may look, but cannot buy there.",
-            "Sharing your phone number with a buyer who asks for it needs it confirmed with a code. Selling with Safe pay needs a passed identity check and a payout bank account in your verified name.",
+            "Sharing your phone number with a buyer who asks for it needs it confirmed with a code. Selling with UdozoPay needs a passed identity check and a payout bank account in your verified name.",
             "Keep your password and codes secret. Udozo never asks for them in a chat, a call or a message.",
           ],
         },
@@ -84,8 +84,8 @@ const terms: LegalDocument = {
       id: "wallet",
       heading: "4. Your wallet",
       body: [
-        "Your Udozo wallet pays for Safe pay orders and purchases on resellers' stores. You top it up through our payment partners; we credit a top-up only once the partner confirms it. Money you top up can be spent on Udozo and its stores, but cannot be withdrawn or transferred. Refunds of orders paid from the wallet go back to it.",
-        "Money from your own Safe pay sales is kept apart, and can be paid out to your bank account as the Safe pay rules say.",
+        "Your Udozo wallet pays for UdozoPay orders and purchases on resellers' stores. You top it up through our payment partners; we credit a top-up only once the partner confirms it. Money you top up can be spent on Udozo and its stores, but cannot be withdrawn or transferred. Refunds of orders paid from the wallet go back to it.",
+        "Money from your own UdozoPay sales is kept apart, and can be paid out to your bank account as the UdozoPay rules say.",
       ],
     },
     {
@@ -107,7 +107,7 @@ const terms: LegalDocument = {
             "No contact details or links. Titles and descriptions cannot contain web addresses, links or phone numbers. Buyers contact you through Udozo, and you choose whether they can see your confirmed phone number.",
             "Photos and video. Each listing needs at least the number of photos shown when you post it, and may have one short video. We remove the hidden details phones add, such as where a photo was taken.",
             "How long and how many. A listing is live for 30 days unless you renew it. There is a limit on how many listings you post in each category every 30 days, shown when you post.",
-            "What is public. Live listings are public, on Udozo and in search engines: the title, description, features, photos, video, price, condition, the area you chose, and your first name and initial with your badges (for example a confirmed phone or a passed identity check). If you add a profile photo (a picture of you, or a logo or icon), it is public too, beside your name on your listings and seller page, and so is a cover you put across the top of your seller page; each is stored with our file storage provider in the United States, deleted when you replace or remove it, and Udozo's team may remove one that breaks the rules. Your seller page gathers the same: your first name and initial, your photo and cover, your badges, when you joined, your live listings with their categories and states, how many you have sold, your Safe pay sales and how often you answer chats; never your full name, phone, email or where you live. Never put anyone's personal details in a listing.",
+            "What is public. Live listings are public, on Udozo and in search engines: the title, description, features, photos, video, price, condition, the area you chose, and your first name and initial with your badges (for example a confirmed phone or a passed identity check). If you add a profile photo (a picture of you, or a logo or icon), it is public too, beside your name on your listings and seller page, and so is a cover you put across the top of your seller page; each is stored with our file storage provider in the United States, deleted when you replace or remove it, and Udozo's team may remove one that breaks the rules. Your seller page gathers the same: your first name and initial, your photo and cover, your badges, when you joined, your live listings with their categories and states, how many you have sold, your UdozoPay sales and how often you answer chats; never your full name, phone, email or where you live. Never put anyone's personal details in a listing.",
             "Usernames. Once you have posted enough ads, you may choose a username, and your seller page's address becomes it. It is public, on your seller page's address and beside your listings. It may not pretend to be another person, business or Udozo, mislead buyers, or carry a phone number, email address, link, social media handle or words we do not allow. You can change it once every 30 days; your old one then leads to your new page for 90 days, and nobody else can take it meanwhile. We may remove a username that breaks these rules, and your page goes back to its first address.",
             "Sold listings stay visible, marked sold, for about 30 days, then leave the market.",
             "Your content. You keep the rights in your words, photos and video. You give us a free, worldwide licence to host, show, resize and share them, including in previews on other sites and apps, to run and promote Udozo while the listing is live and for a reasonable time after.",
@@ -147,7 +147,7 @@ const terms: LegalDocument = {
           list: [
             "We check listings when they are posted or changed. Some checks are automatic: a listing using a word for an item that may never be sold is refused, and listings that look doubtful (for example a price far below similar listings, a photo another seller uses, many listings posted at once, or a new seller's first listings) wait for a person to review them.",
             "We may ask you to change a listing, refuse it, or remove a live one, if we think it breaks these terms or the law, or is unsafe for buyers. We tell you why.",
-            "Anyone can report a listing, and buyers and sellers can report each other from a chat. We review reports. A moderator reads a chat only when it has been reported, or when it matters to a Safe pay dispute.",
+            "Anyone can report a listing, and buyers and sellers can report each other from a chat. We review reports. A moderator reads a chat only when it has been reported, or when it matters to a UdozoPay dispute.",
             "If you break these terms, try to defraud anyone or put people at risk, we may suspend you or close your account, and your listings leave the market. Where the law requires it, we report it to the authorities.",
             `If you disagree with a decision, ask us through your account or email ${supportContact}, and a person will review it.`,
           ],
@@ -161,7 +161,7 @@ const terms: LegalDocument = {
         {
           list: [
             "Keep the conversation on Udozo. Chats protect both of you: we can see them if you report a problem. Be polite, honest and lawful. Do not send spam, links, threats or other people's personal details.",
-            "Either side can offer a price in a chat. An offer lasts 48 hours unless it is accepted, declined, withdrawn or replaced first. An accepted offer is the price for Safe pay for 7 days. Accepting an offer says you will buy or sell at that price; it does not move any money.",
+            "Either side can offer a price in a chat. An offer lasts 48 hours unless it is accepted, declined, withdrawn or replaced first. An accepted offer is the price for UdozoPay for 7 days. Accepting an offer says you will buy or sell at that price; it does not move any money.",
             "Nobody's phone number or email is on a listing. Where a seller takes calls, a signed-in buyer can ask for the seller's contact details. If the seller shares them, that buyer sees the seller's confirmed phone number and email on every listing of the seller's, until the seller stops sharing. A seller who declines can be asked again after 7 days. We limit how many sellers a buyer can ask each hour.",
             "A buyer can ask a seller to call them back. The seller is then given the buyer's name, confirmed mobile number and email with the listing, until the seller marks it done. We limit how many call backs a buyer can ask for each hour.",
             "While a seller has Udozo open, a signed-in buyer can call them in the browser about a listing. The call is relayed by our provider, so neither of you sees the other's phone number or internet address, and we do not record it. We keep who called whom, about which listing, when and how it ended, and tell a seller about a call they missed.",
@@ -176,7 +176,7 @@ const terms: LegalDocument = {
       id: "safe-trade",
       heading: "9. Paying directly",
       body: [
-        "Many people meet, look at the item and pay directly. We take no part in those payments and cannot recover money paid outside Safe pay. The Safe Trade Guide on udozo.com gives each category's checks. In short:",
+        "Many people meet, look at the item and pay directly. We take no part in those payments and cannot recover money paid outside UdozoPay. The Safe Trade Guide on udozo.com gives each category's checks. In short:",
         {
           list: [
             "meet in a busy public place in daylight, and bring someone if you can;",
@@ -194,11 +194,11 @@ const terms: LegalDocument = {
       id: "buy-orders",
       heading: "9a. Buy orders",
       body: [
-        "Where buy orders are open, a buyer can ask to buy a listing at a price with Buy this. A buy order is an agreement between the buyer and the seller: Udozo is not the seller or the buyer, does not hold the money, and cannot recover money paid outside Safe pay. Section 9 applies to every buy order.",
+        "Where buy orders are open, a buyer can ask to buy a listing at a price with Buy this. A buy order is an agreement between the buyer and the seller: Udozo is not the seller or the buyer, does not hold the money, and cannot recover money paid outside UdozoPay. Section 9 applies to every buy order.",
         {
           list: [
             "The seller has the hours shown to accept, offer another price or decline. Without an answer the buy order ends. A price the seller offers is answered by the buyer in the same time.",
-            "Once accepted, the item is held for the buyer: it cannot be accepted for someone else, or bought with Safe pay, while the buy order is open. Meet within the days shown; the seller can give more time once. Either side can cancel, or say the sale did not happen, before it is marked sold.",
+            "Once accepted, the item is held for the buyer: it cannot be accepted for someone else, or bought with UdozoPay, while the buy order is open. Meet within the days shown; the seller can give more time once. Either side can cancel, or say the sale did not happen, before it is marked sold.",
             "The seller marks the buy order sold only once the buyer has paid and has the item. The buyer can say they bought it; if the seller does not answer within 3 days, it is recorded as sold.",
             "A buyer can say they did not buy it within 7 days of the seller marking it sold. Marking a sale that did not happen, or denying one that did, breaks these terms. When buyers say they did not buy from a seller three times in 90 days, we pause that seller's buy orders for 30 days, and we may suspend accounts that misuse buy orders.",
             "Completed buy orders are the record of who bought what on Udozo, which we use to let buyers review sellers when reviews open.",
@@ -211,7 +211,7 @@ const terms: LegalDocument = {
       id: "reviews",
       heading: "9b. Reviews and ratings",
       body: [
-        "Where reviews are open, a buyer who completed a purchase (a Safe pay order released to the seller, or a buy order the seller marked sold) can review the seller once for it, within the time shown (30 days unless the market says otherwise): positive or negative, and neutral where the market offers it. A negative review says what went wrong.",
+        "Where reviews are open, a buyer who completed a purchase (a UdozoPay order released to the seller, or a buy order the seller marked sold) can review the seller once for it, within the time shown (30 days unless the market says otherwise): positive or negative, and neutral where the market offers it. A negative review says what went wrong.",
         {
           list: [
             "Reviews are public on the seller's page and their listings, with the reviewer's first name and initial, their photo if they have one, the item and the month. A seller's positive share counts the last 12 months, each buyer once (their latest review), and leaves neutral reviews out.",
@@ -250,7 +250,7 @@ const terms: LegalDocument = {
             "Where Udozo is on WhatsApp in your country, you can use it from Udozo's own WhatsApp number: find listings, chat with buyers and sellers, ask for a call back or contact details, post an ad step by step and post wanted requests. These terms apply there as on udozo.com, with the same rules for listings, chats and what may not be sold.",
             "To do more than search, connect WhatsApp to your Udozo account: it connects by itself when WhatsApp uses the mobile number confirmed on your account, or with the one-time code from Profile, WhatsApp. A WhatsApp number never makes an account, and is connected to one account at a time.",
             "Chats are relayed through Udozo's number: the other person sees your first name and initial and your messages, never your number. What you write on WhatsApp goes into the listing's chat on Udozo, marked as sent from WhatsApp, and replies come back to WhatsApp. Never send codes or passwords, and never pay before you see the item.",
-            "A seller may choose Let buyers WhatsApp me directly in Profile, WhatsApp (it is off until they choose it). Then Contact seller on Udozo's WhatsApp gives a signed-in buyer the seller's first name and initial and the WhatsApp number they connected, so the buyer can message or call them on it outside Udozo. Sellers are told who got their number, a buyer can get at most 20 sellers' numbers a day, and it is never given to a buyer the seller blocked. Use it only to ask about and buy what is listed: never to spam, harass, sell the number on or pay ahead outside Udozo. What you agree outside Udozo is between you and the other person; Safe pay only covers payments made through Udozo. Turning the choice off stops new buyers getting the number, but buyers who already have it keep it.",
+            "A seller may choose Let buyers WhatsApp me directly in Profile, WhatsApp (it is off until they choose it). Then Contact seller on Udozo's WhatsApp gives a signed-in buyer the seller's first name and initial and the WhatsApp number they connected, so the buyer can message or call them on it outside Udozo. Sellers are told who got their number, a buyer can get at most 20 sellers' numbers a day, and it is never given to a buyer the seller blocked. Use it only to ask about and buy what is listed: never to spam, harass, sell the number on or pay ahead outside Udozo. What you agree outside Udozo is between you and the other person; UdozoPay only covers payments made through Udozo. Turning the choice off stops new buyers getting the number, but buyers who already have it keep it.",
             "Where Udozo's AI shop assistant answers on WhatsApp, questions you send Udozo's number (and everything after Ask in its menu) are answered by it, as on udozo.com: it is an AI, it can be wrong, it never acts for you and never asks for codes or payments, and a person from Udozo's team can take over. It never answers inside a chat between you and a buyer or seller.",
             "Udozo writes to you on WhatsApp only once you connected your number or wrote to Udozo there. Send STOP at any time for no more messages, and START to come back. When you have not written for a day, WhatsApp lets us send only short approved messages, so some updates reach you as a prompt to open them.",
             "Wanted requests: say what you need, in a category, and Udozo tells sellers with live listings in it, nearest first. A request lasts 14 days, shows your first name and initial and what you wrote, and never your number. Sellers answer with one of their listings, which opens a chat with you. There are limits on how many you can make, and requests for anything that may not be sold are refused or removed.",
@@ -263,7 +263,7 @@ const terms: LegalDocument = {
       heading: "11. Consumer rights and our responsibility",
       body: [
         "If you buy from someone selling as a business, you have the rights consumer law gives you against them. Sellers who sell as a business must say so in their listings and follow consumer law. These terms do not take away any right the law gives you.",
-        "We are responsible for running Safe pay as the Safe pay rules describe, and for holding and paying out its money correctly. We are not responsible for the items, for what buyers, sellers and resellers say or do, or for payments made outside Safe pay.",
+        "We are responsible for running UdozoPay as the UdozoPay rules describe, and for holding and paying out its money correctly. We are not responsible for the items, for what buyers, sellers and resellers say or do, or for payments made outside UdozoPay.",
         "Nothing in these terms limits a responsibility the law does not allow us to limit.",
       ],
     },
@@ -271,7 +271,7 @@ const terms: LegalDocument = {
       id: "changes",
       heading: "12. Changes",
       body: [
-        "We may change these documents, for example when we open Udozo in a new country or add a feature. We tell you before a change that affects you takes effect, and ask you to accept the new version before you next post a listing or use Safe pay. An order already requested follows the terms and fees shown when it was asked for.",
+        "We may change these documents, for example when we open Udozo in a new country or add a feature. We tell you before a change that affects you takes effect, and ask you to accept the new version before you next post a listing or use UdozoPay. An order already requested follows the terms and fees shown when it was asked for.",
       ],
     },
     {
@@ -286,16 +286,17 @@ const terms: LegalDocument = {
 };
 
 const safePay: LegalDocument = {
-  slug: "safe-pay",
-  title: "Safe pay rules",
-  summary: "How Safe pay holds the money: the steps and deadlines, fees, delivery, refunds, releases, payouts, disputes, and buying on a reseller's store.",
+  slug: "udozopay",
+  title: "UdozoPay rules",
+  summary: "How UdozoPay holds the money: the steps and deadlines, fees, delivery, refunds, releases, payouts, disputes, and buying on a reseller's store.",
   sections: [
     {
       id: "about",
-      heading: "1. What Safe pay is",
+      heading: "1. What UdozoPay is",
       body: [
-        "Safe pay lets a buyer pay through Udozo, which holds the money until the buyer has the item. It is the buyer's choice on each purchase, offered where we have opened it in your country. Purchases on resellers' stores always use it.",
-        "Safe pay takes real payments. Udozo collects, holds and refunds Safe pay money through licensed payment partners.",
+        "UdozoPay lets a buyer pay through Udozo, which holds the money until the buyer has the item. It is the buyer's choice on each purchase, offered where we have opened it in your country. Purchases on resellers' stores always use it.",
+        "UdozoPay is part of Udozo Connect, Udozo's payments and logistics. Until 9 November 2026 it was called Safe pay: only the name changed.",
+        "UdozoPay takes real payments. Udozo collects, holds and refunds UdozoPay money through licensed payment partners.",
         "The deadlines below are those set for Nigeria. Each country's own are shown before anyone commits.",
       ],
     },
@@ -305,7 +306,7 @@ const safePay: LegalDocument = {
       body: [
         {
           list: [
-            "The buyer asks to buy with Safe pay, at the listed price or a price the seller accepted in a chat in the last 7 days. They choose to meet in person, where the seller hands over in person, or delivery, where the seller delivers. They see the price, any delivery charge, their fee and the total first.",
+            "The buyer asks to buy with UdozoPay, at the listed price or a price the seller accepted in a chat in the last 7 days. They choose to meet in person, where the seller hands over in person, or delivery, where the seller delivers. They see the price, any delivery charge, their fee and the total first.",
             "The seller accepts or declines within 24 hours. To accept, a seller must have passed our identity check and added a payout bank account in their verified name.",
             "The buyer pays the total from their Udozo wallet within 24 hours. We hold it, and the listing shows as reserved.",
             "The hand-over, within 5 days. Meeting in person: the buyer gets a 6-digit release code. When they have the item and are happy with it, they give the code to the seller, who enters it to be paid. Buyers: never give the code before you have the item. Five wrong codes lock the release until we help.",
@@ -338,7 +339,7 @@ const safePay: LegalDocument = {
       body: [
         {
           list: [
-            "Safe pay has a fee for the buyer and a fee for the seller. Each is a percentage of the price, up to a maximum amount, set for each country and shown before anyone commits. The fees fixed when the buyer asks are the ones for that order.",
+            "UdozoPay has a fee for the buyer and a fee for the seller. Each is a percentage of the price, up to a maximum amount, set for each country and shown before anyone commits. The fees fixed when the buyer asks are the ones for that order.",
             "The buyer pays their fee with the price. It is refunded with the price if the item does not change hands: a cancellation, a seller who does not hand over in time, or a dispute decided with a full refund.",
             "The seller's fee is taken only from money released to them: from the price, or from the part released after a dispute.",
           ],
@@ -378,19 +379,19 @@ const safePay: LegalDocument = {
       heading: "7. Disputes",
       body: [
         "Before the money is released, the buyer can open a dispute: the item did not arrive, is not as described or is damaged. The money stays held. Both sides add their side, with photos, in the dispute.",
-        "Udozo decides, from what both sides give us, the listing and the chat: a full refund to the buyer, a part refund with the rest released to the seller, or release to the seller. We do not inspect items. Our decision settles where the Safe pay money goes. It does not stop either of you using your legal rights against the other.",
+        "Udozo decides, from what both sides give us, the listing and the chat: a full refund to the buyer, a part refund with the rest released to the seller, or release to the seller. We do not inspect items. Our decision settles where the UdozoPay money goes. It does not stop either of you using your legal rights against the other.",
       ],
     },
     {
       id: "protection",
-      heading: "8. Protecting Safe pay",
+      heading: "8. Protecting UdozoPay",
       body: [
         {
           list: [
             "The same person cannot be the buyer and the seller. We compare identity checks and payout accounts to stop it, and refuse those orders.",
-            "A seller new to Safe pay can sell up to a limit for their first five sales.",
-            "Cancelling after accepting, not handing over in time, and disputes decided against the seller each count as a strike. A seller with 3 strikes in 90 days cannot take Safe pay orders until we review it.",
-            "We may refuse, hold or reverse a Safe pay order, and report it, where we suspect fraud, money laundering or a breach of these rules.",
+            "A seller new to UdozoPay can sell up to a limit for their first five sales.",
+            "Cancelling after accepting, not handing over in time, and disputes decided against the seller each count as a strike. A seller with 3 strikes in 90 days cannot take UdozoPay orders until we review it.",
+            "We may refuse, hold or reverse a UdozoPay order, and report it, where we suspect fraud, money laundering or a breach of these rules.",
           ],
         },
       ],
@@ -403,8 +404,8 @@ const safePay: LegalDocument = {
         {
           list: [
             "The buyer pays from their Udozo wallet. The money is locked in the wallet until the supplier accepts the order, within 24 hours. If the supplier declines or does not answer in time, the money is unlocked; not answering counts as the supplier's strike. A supplier may choose to accept orders automatically.",
-            "Once accepted, the money is held by Udozo as for any Safe pay order, and the steps, deadlines, delivery rules and disputes above apply.",
-            "On release, the money is split three ways: the supplier receives their price less the reseller's discount, less their Safe pay fee, plus any delivery charge; the reseller receives the rest of the price, less our fee on it; and Udozo keeps its fees. After a part refund, what remains is shared between the supplier and the reseller in proportion to what each would have received.",
+            "Once accepted, the money is held by Udozo as for any UdozoPay order, and the steps, deadlines, delivery rules and disputes above apply.",
+            "On release, the money is split three ways: the supplier receives their price less the reseller's discount, less their UdozoPay fee, plus any delivery charge; the reseller receives the rest of the price, less our fee on it; and Udozo keeps its fees. After a part refund, what remains is shared between the supplier and the reseller in proportion to what each would have received.",
             "The supplier and the reseller both answer the buyer in the order's chat. The buyer sees every message as from the store. The supplier and the reseller also have a thread of their own about the order, which the buyer never sees.",
             "Once the supplier accepts, the supplier and the reseller see the buyer's name, confirmed phone number, email and delivery address, to hand over or deliver the item, until 30 days after the order ends. We record each time they are opened.",
             "The reseller can cancel an order before it is handed over or shipped; the buyer gets all their money back.",
@@ -432,7 +433,7 @@ const sellers: LegalDocument = {
       heading: "1. About these terms",
       body: [
         whoWeAre,
-        "These terms apply when you open a seller account on Seller HQ (shq.udozo.com) and sell suppliers' listings on your own stores. They sit alongside the terms of use, the Safe pay rules and the privacy notice.",
+        "These terms apply when you open a seller account on Seller HQ (shq.udozo.com) and sell suppliers' listings on your own stores. They sit alongside the terms of use, the UdozoPay rules and the privacy notice.",
         `"You" means the business that holds the account, and includes the people you add to your team. "Suppliers" are Udozo sellers who open their listings to resellers. Some features are open only in some countries or on some plans; a section describes one only once we switch it on for you.`,
       ],
     },
@@ -459,7 +460,7 @@ const sellers: LegalDocument = {
           list: [
             "The supplier owns and sells the item. The supplier is the seller of the item and gets it to your buyer. Your store is where it was bought. You never own or hold the item, and never hold your buyer's money: Udozo holds it until the buyer has the item.",
             "Your catalogue lists suppliers' listings from your own country. Your stores sell only to shoppers from your country.",
-            "You earn the difference between your price and what the supplier receives, less our fee on it, as the Safe pay rules describe. It is added to your earnings when the order is released.",
+            "You earn the difference between your price and what the supplier receives, less our fee on it, as the UdozoPay rules describe. It is added to your earnings when the order is released.",
           ],
         },
       ],
@@ -562,7 +563,7 @@ const sellers: LegalDocument = {
       body: [
         {
           list: [
-            "Your buyers pay only from their Udozo wallet, as the Safe pay rules describe. Nothing is yours before the order is released.",
+            "Your buyers pay only from their Udozo wallet, as the UdozoPay rules describe. Nothing is yours before the order is released.",
             "You and the supplier both write to the buyer in the order's chat, and the buyer sees every message as from your store. No links, bank details or requests to pay outside Udozo.",
             "Once the supplier accepts, you see the buyer's name, phone number, email and delivery address. Use them only for that order, never for anything else, and only until 30 days after it ends. We record every time they are opened.",
             "You can cancel an order before it is handed over or shipped; the buyer gets all their money back. Each cancellation counts as a strike.",
@@ -677,7 +678,7 @@ const privacy: LegalDocument = {
             "Your account: name, email address, country, password (only as a one-way hash), your mobile number (confirmed later with a code we text it, where we can text numbers in your country), when you signed in, failed sign-ins, and the codes we email or text you (only as hashes).",
             "About you, from your profile: the area you live in and, if you give them, your date of birth and your sex (or that you would rather not say). Only you and Udozo's team see them, never buyers, sellers or stores, and you can change them at any time.",
             "Your listings: title, description, features, price and its changes, condition, category, the area you chose, photos and video, how you deliver, and how many people contacted you. Live listings are public, with your first name and the first letter of your last name and your badges. If you choose a username, it is public too: it is your seller page's address and shows with your listings. We remove the hidden details phones add to photos and videos, and keep a one-way fingerprint of each photo to spot photos copied from another listing.",
-            "Chats: messages, photos (encrypted, in private storage, seen only by the two of you), offers, when each side read them, blocks, and how fast sellers reply. A moderator reads a chat only when one of you reports it, or when it matters to a Safe pay dispute, and each reading is recorded.",
+            "Chats: messages, photos (encrypted, in private storage, seen only by the two of you), offers, when each side read them, blocks, and how fast sellers reply. A moderator reads a chat only when one of you reports it, or when it matters to a UdozoPay dispute, and each reading is recorded.",
             "Interest in listings: the listings you save, and that you started a chat, asked for a seller's contact details or a call back, or called a seller.",
             "Contact requests and call backs: who asked whom, about which listing, the note written (numbers and links hidden) and the answer. When a seller shares their contact, the buyers they shared it with.",
             "Purchases and reviews: each completed purchase (what was bought, from whom and when) as the right to review it; your reviews, the parts you marked, their earlier versions, your replies in reviews' conversations (contact details and links hidden), the reports you make about reviews and what moderators decided. Reviews and replies are public with your first name and initial and your photo if you have one.",
@@ -687,8 +688,8 @@ const privacy: LegalDocument = {
             "Calls: who called whom, about which listing, when it rang, was answered and ended, and how. The connection details the two browsers swap are deleted when the call ends. Calls are not recorded. While you have udozo.com open signed in, when you last had it open, so buyers can see you are there.",
             "Reports and safety: reports you make or that are made about you, our checks and reviews of listings, strikes and any suspension, with its reason.",
             "Your wallet and payments: top-ups, purchases, refunds and payouts. You pay on our payment partner's page; we never receive your full card number, card security code or mobile money PIN.",
-            "Safe pay orders: the item, price, both fees, the hand-over, the delivery address (encrypted, shown only to the seller once the buyer has paid), the release code (encrypted, shown only to the buyer), the seller's dispatch photos (encrypted, in private storage), the courier and tracking, the deadlines, and who ended the order and why.",
-            "Orders on a reseller's store: what is kept for a Safe pay order, plus the store, the price figures each side is paid, your confirmed phone number when you bought (encrypted), the listing and the store's note as you saw them, the order's chat with the store, and the supplier and reseller's own thread about it. We record each time your details are opened.",
+            "UdozoPay orders: the item, price, both fees, the hand-over, the delivery address (encrypted, shown only to the seller once the buyer has paid), the release code (encrypted, shown only to the buyer), the seller's dispatch photos (encrypted, in private storage), the courier and tracking, the deadlines, and who ended the order and why.",
+            "Orders on a reseller's store: what is kept for a UdozoPay order, plus the store, the price figures each side is paid, your confirmed phone number when you bought (encrypted), the listing and the store's note as you saw them, the order's chat with the store, and the supplier and reseller's own thread about it. We record each time your details are opened.",
             "Disputes: the reason, everyone's messages and photos (encrypted, in private storage), our decision and, on a store's order, whose fault an upheld dispute was.",
             "Reports of a reseller's store: who reported it, the store, the reason, what was written, the order, and our decision. Only Udozo sees who made a report.",
             "Payout accounts: the bank (account name, and the number kept encrypted) or mobile money number, when it was added, and each payout's amount, status and reference.",
@@ -714,7 +715,7 @@ const privacy: LegalDocument = {
       id: "identity-checks",
       heading: "3. Identity checks",
       body: [
-        "Before you sell with Safe pay, are paid out, or run stores, Udozo Verify (verify.udozo.com) checks your identity: your name, date of birth, your ID document's type, number and photos, a selfie, and short photos taken by your camera while you follow on-screen steps. A registered business also gives its registration documents.",
+        "Before you sell with UdozoPay, are paid out, or run stores, Udozo Verify (verify.udozo.com) checks your identity: your name, date of birth, your ID document's type, number and photos, a selfie, and short photos taken by your camera while you follow on-screen steps. A registered business also gives its registration documents.",
         "Comparing your face with your ID uses biometric data, so we ask for your explicit consent first. Without it we cannot check you, and you cannot use what needs the check.",
         "Photos are stripped of hidden data, such as location, encrypted, and stored privately in the United States. A person on Udozo's team reviews them. ID numbers are encrypted, and a keyed fingerprint of them shows our reviewers when the same ID is used on another account. We keep the outcome, your verified name and your document's country.",
       ],
@@ -723,7 +724,7 @@ const privacy: LegalDocument = {
       id: "ai",
       heading: "4. AI providers",
       body: [
-        "A shop assistant's answers are written by Anthropic, OpenAI or DeepSeek, whichever runs that assistant. We send it your question and the conversation so far, Udozo's own information for your country, and the public details of the listings it looks up. Signed in, it can also look up your own listings, your Safe pay orders (never codes) and which of your chats are waiting for a reply (never their messages).",
+        "A shop assistant's answers are written by Anthropic, OpenAI or DeepSeek, whichever runs that assistant. We send it your question and the conversation so far, Udozo's own information for your country, and the public details of the listings it looks up. Signed in, it can also look up your own listings, your UdozoPay orders (never codes) and which of your chats are waiting for a reply (never their messages).",
         "We send more only when you ask: a seller's own listing and its photos when they ask it to fill in a listing from its photos (only to Anthropic or OpenAI: DeepSeek is never sent photos), and the latest messages of a chat when a seller asks it to suggest a reply. Before anything is sent, numbers that look like phone, card or account numbers, codes and passwords are hidden, and we never send your email address, phone number, delivery address or payment details.",
       ],
     },
@@ -744,7 +745,7 @@ const privacy: LegalDocument = {
             head: ["What for", "Our reason"],
             rows: [
               ["Running your account, listings, chats, offers, wallet and orders, and helping you", "Our contract with you"],
-              ["Safe pay: holding money, releasing or refunding it, deciding disputes", "Our contract with you"],
+              ["UdozoPay: holding money, releasing or refunding it, deciding disputes", "Our contract with you"],
               ["Identity checks with biometric data", "Your explicit consent, and the law on knowing who we pay"],
               ["Keeping Udozo safe: checking listings, reports, strikes, same-person checks and limits", "Our legitimate interest in a safe marketplace and in preventing fraud, and the law where we must report"],
               ["Shop assistants, and reviewing their answers to improve them", "Our legitimate interest in helping people use Udozo, and our contract with you"],
@@ -759,7 +760,7 @@ const privacy: LegalDocument = {
             ],
           },
         },
-        "Some decisions are made automatically: refusing a listing that uses a word for an item that may never be sold, refusing store pages that claim to own the items, refusing a Safe pay order whose buyer and seller our checks show are the same person, limits, and pausing a seller or store at the strike limit. A person on Udozo's team reviews them if you ask.",
+        "Some decisions are made automatically: refusing a listing that uses a word for an item that may never be sold, refusing store pages that claim to own the items, refusing a UdozoPay order whose buyer and seller our checks show are the same person, limits, and pausing a seller or store at the strike limit. A person on Udozo's team reviews them if you ask.",
         "Personalisation is automated too: it chooses the order of listings in For you and the other rows made for you. It decides nothing about you beyond that order: it never stops you seeing, buying or selling anything, and search with words still shows the best matches first. Turn it off, remove single items or clear your history at any time under Account, Privacy (signed in), or with Necessary only in Cookie settings (not signed in).",
       ],
     },
@@ -770,7 +771,7 @@ const privacy: LegalDocument = {
         {
           list: [
             "The public: live listings and each seller's page (first name and initial, username if they chose one, profile photo and cover, badges, when they joined, their live listings and figures), including in search engines and in previews when a link is shared.",
-            "The other person in a chat: your first name and initial, your messages and offers. The other person in a buy order: your first name and initial, the price, notes and meeting place written, and each step. A seller sees a Safe pay buyer's delivery address once they have paid. A seller sees a buyer's name, confirmed mobile number and email when the buyer asks for a call back, and a buyer sees a seller's confirmed phone number and email once the seller shares them. Neither sees the other's number in a call. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
+            "The other person in a chat: your first name and initial, your messages and offers. The other person in a buy order: your first name and initial, the price, notes and meeting place written, and each step. A seller sees a UdozoPay buyer's delivery address once they have paid. A seller sees a buyer's name, confirmed mobile number and email when the buyer asks for a call back, and a buyer sees a seller's confirmed phone number and email once the seller shares them. Neither sees the other's number in a call. On a reseller's store, the supplier and the reseller see the buyer's name, phone number, email and address once the supplier accepts, and the courier the seller chooses receives the delivery address.",
             "Udozo's team, as their work needs.",
             "Service providers working for us: Neon (database, United States), DigitalOcean (servers and file storage, United States), Upstash (cache and rate limits), Vercel (hosting our sites, and the registrar for domains sellers buy, which receives the registrant's details), Cloudflare (our domain's DNS, the network in front of our API, and relaying calls between buyers and sellers: the call passes through it, encrypted, and is not recorded), Resend and MailerSend (email), Termii and Africa's Talking (text messages), our payment partners Paystack, Flutterwave, pawaPay and Stripe (payments, refunds and payouts, depending on your country and method), Anthropic, OpenAI and DeepSeek (shop assistants, as section 4 says; DeepSeek processes what it is sent in China), Meta (WhatsApp: carrying messages between you and Udozo's number, when you use Udozo on WhatsApp), Google (signing up and in with Google on udozo.com and Seller HQ: Google tells us your name, email and that it confirmed it; we keep your Google account's ID to recognise it, never your Google password), Meta (signing up and in with Facebook on udozo.com and Seller HQ: Facebook tells us your name and email, which we then confirm with our own emailed code; we keep the ID Facebook gives Udozo for your account to recognise it, never your Facebook password, and we ask for nothing else from Facebook), and browser push services (Google, Mozilla, Apple, Microsoft) for notifications on udozo.com and Seller HQ: they carry each notification to your device encrypted, so they cannot read it.",
             "Authorities, where the law requires it.",
@@ -795,7 +796,7 @@ const privacy: LegalDocument = {
               ["Listings", "Public while live (sold ones for about 30 days after), then kept, not public, while your account is open and with the records of any order or report about them. A draft is deleted when you delete it."],
               ["Chats with buyers and sellers", "12 months after their last message, with their photos, unless a report on them is still open."],
               ["Shop assistant conversations", "30 days after their last message, with the daily codes kept with them."],
-              ["Safe pay and store orders, disputes, store reports and payouts", "As long as accounting and tax laws require, usually six years after the order."],
+              ["UdozoPay and store orders, disputes, store reports and payouts", "As long as accounting and tax laws require, usually six years after the order."],
               ["Order chats on a reseller's store", "12 months after the order ends."],
               ["Contact requests and call backs", "12 months after they are answered or cancelled. A shared contact stays shared until the seller stops sharing it or closes their account."],
               ["Buy orders", "Two years after they end, as the record of who bought what (reviews of sellers rely on it)."],

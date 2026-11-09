@@ -20,10 +20,10 @@ beforeEach(() => api.customerApi.mockReset());
 describe("the Get help menu", () => {
   const html = renderToStaticMarkup(createElement(HelpMenu));
 
-  it("lists every place in order; Safe pay, FAQs, Resell on Udozo and Contact us open, the rest marked Soon", () => {
-    expect(helpLinks.map(link => link.label)).toEqual(["Help Centre", "Safe pay", "Track orders", "FAQs", "Resell on Udozo", "Pickup centres", "Contact us"]);
+  it("lists every place in order; UdozoPay, FAQs, Resell on Udozo and Contact us open, the rest marked Soon", () => {
+    expect(helpLinks.map(link => link.label)).toEqual(["Help Centre", "UdozoPay", "Track orders", "FAQs", "Resell on Udozo", "Pickup centres", "Contact us"]);
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]);
-    expect(links).toEqual(["/safe-trade#safe-pay", "/help/faqs", "/start-here", "/help/contact"]);
+    expect(links).toEqual(["/safe-trade#udozopay", "/help/faqs", "/start-here", "/help/contact"]);
     for (const label of ["Help Centre", "Track orders", "Pickup centres"]) {
       const row = html.slice(html.lastIndexOf("<li", html.indexOf(label)), html.indexOf("</li>", html.indexOf(label)));
       expect(row).toContain('aria-disabled="true"');
@@ -68,7 +68,7 @@ describe("Contact us", () => {
 
   it("the form: every topic, the reply address, an optional phone, and a warning never to send codes", () => {
     const html = renderToStaticMarkup(createElement(ContactForm, { initial: { name: "Chiamaka Eze", email: "chiamaka@example.com", phone: "" }, country: "NG" }));
-    for (const topic of ["An order", "Safe pay", "My account", "Selling", "Reselling on Seller HQ", "Reporting a person or listing", "Partnerships and press", "Something else"]) expect(html).toContain(`>${topic}</option>`);
+    for (const topic of ["An order", "UdozoPay", "My account", "Selling", "Reselling on Seller HQ", "Reporting a person or listing", "Partnerships and press", "Something else"]) expect(html).toContain(`>${topic}</option>`);
     expect(html).toContain('value="chiamaka@example.com"');
     expect(html).toContain("(optional)");
     expect(html).toContain("Never send a password");
@@ -101,7 +101,7 @@ describe("the FAQs", () => {
     expect(html).toContain('href="/help/contact"');
   });
 
-  it("keeps to what is true: listing free, Safe pay's fee shown first, never a code asked for", () => {
+  it("keeps to what is true: listing free, UdozoPay's fee shown first, never a code asked for", () => {
     const text = faqGroups.flatMap(group => group.faqs.map(faq => `${faq.q} ${faq.a}`)).join(" ");
     expect(text).toContain("Signing up and listing are free");
     expect(text).toContain("A small fee, shown before");

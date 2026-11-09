@@ -46,7 +46,7 @@ describe("the Start here page", async () => {
     expect(hrefs).toContain("https://shq.udozo.com/signup?ref=ada-01");
   });
 
-  it("is honest: free to list with Safe pay's fee shown first, no setup fee, the phone an illustration", () => {
+  it("is honest: free to list with UdozoPay's fee shown first, no setup fee, the phone an illustration", () => {
     expect(html).toContain("Free to list");
     expect(html).toContain("No setup fee");
     expect(html).toMatch(/small fee, always shown before you accept/);

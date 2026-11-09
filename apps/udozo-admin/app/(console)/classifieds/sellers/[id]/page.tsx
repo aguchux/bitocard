@@ -30,8 +30,8 @@ import { SellerScoresCard } from "@/components/seller-scores";
 type Action = "suspend" | "unsuspend" | "clear" | "photo" | "cover" | "username" | "pause" | "unpause" | "block" | "unblock";
 
 /**
- * One Udozo seller: their ads, reports about them or their ads, and their Safe pay standing (strikes over 90
- * days). Operations suspend them (their live and waiting ads leave the market), bring them back, or lift a Safe pay
+ * One Udozo seller: their ads, reports about them or their ads, and their UdozoPay standing (strikes over 90
+ * days). Operations suspend them (their live and waiting ads leave the market), bring them back, or lift a UdozoPay
  * limit (strikes so far stop counting), and take off a photo or username that is not acceptable. Every change is audited.
  */
 export default function ClassifiedSellerPage() {
@@ -96,7 +96,7 @@ export default function ClassifiedSellerPage() {
                   <span className="flex flex-wrap gap-2">
                     {data.safe_pay.limited ? (
                       <Button variant="secondary" onClick={() => setAction("clear")}>
-                        Lift the Safe pay limit
+                        Lift the UdozoPay limit
                       </Button>
                     ) : null}
                     {data.suspended ? (
@@ -122,8 +122,8 @@ export default function ClassifiedSellerPage() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Live ads" value={formatNumber(data.listings.active)} icon={<Package className="size-5" />} footer={`${formatNumber(data.listings.total)} in all, ${formatNumber(data.listings.sold)} sold`} />
               <StatCard label="Open reports" value={formatNumber(data.open_reports)} icon={<Flag className="size-5" />} tone={data.open_reports ? "amber" : "blue"} />
-              <StatCard label="Safe pay sales" value={formatNumber(data.safe_pay_sales)} icon={<HandCoins className="size-5" />} footer={`${formatNumber(data.safe_pay.bought)} bought`} />
-              <StatCard label="Safe pay strikes" value={`${data.safe_pay.strikes} of ${data.safe_pay.strike_limit ?? "—"}`} icon={<Ban className="size-5" />} tone={data.safe_pay.limited ? "amber" : "violet"} footer={data.safe_pay.limited ? "Cannot take Safe pay orders" : "In the last 90 days"} />
+              <StatCard label="UdozoPay sales" value={formatNumber(data.safe_pay_sales)} icon={<HandCoins className="size-5" />} footer={`${formatNumber(data.safe_pay.bought)} bought`} />
+              <StatCard label="UdozoPay strikes" value={`${data.safe_pay.strikes} of ${data.safe_pay.strike_limit ?? "—"}`} icon={<Ban className="size-5" />} tone={data.safe_pay.limited ? "amber" : "violet"} footer={data.safe_pay.limited ? "Cannot take UdozoPay orders" : "In the last 90 days"} />
             </div>
             <div className="mt-6 grid gap-6 lg:grid-cols-3">
               <Card className="lg:col-span-2">
@@ -211,12 +211,12 @@ export default function ClassifiedSellerPage() {
               <ActionDialog
                 open
                 onClose={() => setAction(null)}
-                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the Safe pay limit?", photo: `Remove ${data.name}'s photo?`, cover: `Remove ${data.name}'s cover?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?`, block: `Stop ${data.name} writing reviews?`, unblock: `Let ${data.name} write reviews again?` }[action]}
+                title={{ suspend: `Suspend ${data.name}?`, unsuspend: `Unsuspend ${data.name}?`, clear: "Lift the UdozoPay limit?", photo: `Remove ${data.name}'s photo?`, cover: `Remove ${data.name}'s cover?`, username: `Remove ${data.name}'s username?`, pause: `Pause ${data.name}'s buy orders?`, unpause: `Unpause ${data.name}'s buy orders?`, block: `Stop ${data.name} writing reviews?`, unblock: `Let ${data.name} write reviews again?` }[action]}
                 description={
                   {
                     suspend: "They cannot post, and their live and waiting ads are removed from Udozo. Ads removed now stay removed when they come back.",
                     unsuspend: "They can post again. Ads removed while suspended stay removed.",
-                    clear: "They can take Safe pay orders again. Strikes before now stop counting; new ones count from today.",
+                    clear: "They can take UdozoPay orders again. Strikes before now stop counting; new ones count from today.",
                     photo: "Their photo is deleted and their initials show instead, everywhere. They can choose another; remove it again if it is not acceptable.",
                     cover: "Their cover is deleted and Udozo's banner shows on their seller page. They are told why and can choose another.",
                     username: `Their seller page goes back to its handle and they are told. Nobody can take "${data.username ?? ""}" for 90 days. They can choose another username; remove it again if it is not acceptable.`,
@@ -352,9 +352,9 @@ function Standing({ seller }: { seller: ClassifiedSellerDetail }) {
   const standing = seller.safe_pay;
   return (
     <Card>
-      <CardHeader title="Safe pay standing" description="Strikes over the last 90 days, since the limit was last lifted." />
+      <CardHeader title="UdozoPay standing" description="Strikes over the last 90 days, since the limit was last lifted." />
       <div className="space-y-3 px-5 pb-5 sm:px-6">
-        {standing.limited ? <Badge tone="red">Limited: cannot take Safe pay orders</Badge> : <Badge tone="green">Can take Safe pay orders</Badge>}
+        {standing.limited ? <Badge tone="red">Limited: cannot take UdozoPay orders</Badge> : <Badge tone="green">Can take UdozoPay orders</Badge>}
         <KeyValue
           items={[
             { label: "Cancelled after accepting", value: formatNumber(standing.cancelled_after_accepting) },

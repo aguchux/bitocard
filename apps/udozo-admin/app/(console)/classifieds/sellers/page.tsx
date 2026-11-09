@@ -45,7 +45,7 @@ export default function ClassifiedSellersPage() {
         </span>
       ),
     },
-    { key: "sales", header: "Safe pay sales", hideOnMobile: true, align: "right", cell: item => formatNumber(item.safe_pay_sales) },
+    { key: "sales", header: "UdozoPay sales", hideOnMobile: true, align: "right", cell: item => formatNumber(item.safe_pay_sales) },
     {
       key: "flags",
       header: "Standing",
@@ -61,7 +61,7 @@ export default function ClassifiedSellersPage() {
 
   return (
     <UdozoShell section="marketplace" current="/classifieds/sellers" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Users" }]}>
-      <PageHeader title="Users" description="Udozo accounts that have put up an ad on Udozo. Open one to see their ads, the reports about them and their Safe pay strikes, or to suspend them." />
+      <PageHeader title="Users" description="Udozo accounts that have put up an ad on Udozo. Open one to see their ads, the reports about them and their UdozoPay strikes, or to suspend them." />
       <div className="mt-6">
         <Tabs
           label="Sellers shown"

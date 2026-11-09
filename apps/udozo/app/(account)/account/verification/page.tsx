@@ -16,7 +16,7 @@ const reasonText = (reason: string) =>
   kycDeclineReasons[reason as keyof typeof kycDeclineReasons] ?? ({ not_verified: "We could not confirm your identity", name_mismatch: "The name did not match", expired: "The check was not finished in time" } as Record<string, string>)[reason] ?? reason;
 
 /**
- * The customer's identity check for their own country (Udozo Verify): needed once before a Safe pay seller is paid.
+ * The customer's identity check for their own country (Udozo Verify): needed once before a UdozoPay seller is paid.
  * Its address is where Verify sends them back to. A check in progress opens with a fresh link, since links work once.
  */
 export default async function VerificationPage() {
@@ -26,7 +26,7 @@ export default async function VerificationPage() {
   const name = list.find(item => item.code === country)?.name ?? country;
   return (
     <div className="grid max-w-2xl gap-5">
-      <PageTitle title="Identity check" note="Once, before you are paid for a Safe pay sale. It protects buyers and sellers from fraud." post={false} />
+      <PageTitle title="Identity check" note="Once, before you are paid for a UdozoPay sale. It protects buyers and sellers from fraud." post={false} />
       <section className="rounded-2xl border border-navy-200 bg-white p-4 sm:p-5">
         {!country ? (
           <p className="text-sm text-navy-600">Choose your country in your profile first.</p>

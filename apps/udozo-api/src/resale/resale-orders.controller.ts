@@ -184,7 +184,7 @@ class SupplierReportDto {
   details: string;
 }
 
-/** The supplier's side of resale orders in the Shop tab: the order's threads and auto-accept (Safe pay's own routes do the rest). */
+/** The supplier's side of resale orders in the Shop tab: the order's threads and auto-accept (UdozoPay's own routes do the rest). */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
@@ -291,7 +291,7 @@ class BuyerDisputeMessageDto {
 
 /**
  * Buying on a Resale shop, for the store's customers (through the store's server, `BitoCard-Store` naming it): the
- * quote, buying from the store wallet, their orders, the order chat with the store, and Safe pay's buyer steps.
+ * quote, buying from the store wallet, their orders, the order chat with the store, and UdozoPay's buyer steps.
  */
 @ApiExcludeController()
 @Public()

@@ -12,7 +12,7 @@ export default async function ListingImage({ params }: { params: Promise<{ cc: s
   const { cc, listing: segment } = await params;
   const ref = listingRef(segment);
   const result = ref ? await shopApi<ShopListingPage>(`/v1/classifieds/listings/${ref}?country=${cc.toUpperCase()}`) : null;
-  if (!result?.ok) return textCard({ eyebrow: "Udozo", title: "Buy and sell near you", line: "Chat with sellers and pay with Safe pay." });
+  if (!result?.ok) return textCard({ eyebrow: "Udozo", title: "Buy and sell near you", line: "Chat with sellers and pay with UdozoPay." });
   const listing = result.data;
   const price = listing.price.kind === "on_request" || listing.price.amount === null ? "Price on request" : ogMoney(listing.price.amount, listing.price.currency);
   return listingCard({

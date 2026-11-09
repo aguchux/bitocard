@@ -63,7 +63,7 @@ export const words = {
       ...(email ? [`Email: ${email}`] : []),
       '',
       shared ? 'They shared their details with you. Tap below to message them on WhatsApp.' : 'Tap below to message them on their own WhatsApp.',
-      'See the item before you pay, and never pay ahead to someone you have not met: Safe pay on udozo.com holds your money until you have it.',
+      'See the item before you pay, and never pay ahead to someone you have not met: UdozoPay on udozo.com holds your money until you have it.',
     ].join('\n'),
   sellerContactButton: 'Chat on WhatsApp',
   sellerContactFooter: (shared: boolean) => (shared ? 'Shared with you by the seller' : 'The seller chose to share it'),
@@ -167,9 +167,9 @@ export const words = {
 
   // Anjio, Udozo's AI assistant
   askRow: (name: string): Row => ({ id: 'menu:ask', title: `Ask ${name}`, description: 'Questions about buying, selling and staying safe' }),
-  askIntro: (name: string) => `Ask ${name}, Udozo's AI assistant, anything about buying and selling on Udozo: what to look for, prices, Safe pay, staying safe. ${name} can make mistakes, and never asks for codes or payments. Send MENU to leave.`,
+  askIntro: (name: string) => `Ask ${name}, Udozo's AI assistant, anything about buying and selling on Udozo: what to look for, prices, UdozoPay, staying safe. ${name} can make mistakes, and never asks for codes or payments. Send MENU to leave.`,
   anjioListings: 'Here is what I found:',
-  anjioSafePay: (price: string, fee: string, total: string) => `*Safe pay*\nPrice: ${price}\nSafe pay fee: ${fee}\nTotal: ${total}`,
+  anjioSafePay: (price: string, fee: string, total: string) => `*UdozoPay*\nPrice: ${price}\nUdozoPay fee: ${fee}\nTotal: ${total}`,
   anjioPriceRange: (category: string, low: string, high: string, median: string, count: number) => `*Prices for ${category}*: most between ${low} and ${high} (middle ${median}), from ${count} listings. Not a valuation.`,
   anjioChecklist: '*Before you pay, check:*',
   anjioDraft: (title: string, text: string) => `A first message to the seller of *${title}*:\n\n${text}`,

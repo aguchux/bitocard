@@ -21,7 +21,7 @@ const orderField = { buyer: 'buyerEmailedAt', supplier: 'supplierEmailedAt', res
 type Notice = { title: string; body: string; path: string; action?: string; sandbox?: boolean; throttle?: EmailThrottle; held?: boolean; storeId?: string };
 
 /**
- * Emails for BitoCard Shop and B2B reselling, beside the inbox and push: every Safe pay order's steps (direct and
+ * Emails for BitoCard Shop and B2B reselling, beside the inbox and push: every UdozoPay order's steps (direct and
  * resale), the supplier and reseller's work together, resellers' resale notices and Shop sellers' listing outcomes.
  * A customer of a reseller's store hears from that store (its name, its own sending domain once verified, links on
  * its main address); bitocard.com's customers from BitoCard Shop; a reseller's owner from BitoCard, linking to SHQ.
@@ -38,7 +38,7 @@ export class ShopEmails {
     private readonly integrations: IntegrationsService,
   ) {}
 
-  /** A Safe pay order's step to one side (`message: true` for a new message, without its text). */
+  /** A UdozoPay order's step to one side (`message: true` for a new message, without its text). */
   order(order: EmailOrder, to: OrderEmailAudience, input: { title: string; body: string; message?: boolean }) {
     if (to === 'reseller' && !order.resellerId) return;
     const resale = order.kind === 'resale';

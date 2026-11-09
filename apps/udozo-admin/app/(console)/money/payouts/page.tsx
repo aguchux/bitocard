@@ -55,7 +55,7 @@ const columns: Array<Column<CustomerPayout>> = [
   },
 ];
 
-/** Money > Safe pay payouts: sellers' Safe pay sales paid out to their own bank accounts. */
+/** Money > UdozoPay payouts: sellers' UdozoPay sales paid out to their own bank accounts. */
 export default function CustomerPayoutsPage() {
   // useSearchParams needs a Suspense boundary (a customer's page links here with ?customer=<id>).
   return (
@@ -71,10 +71,10 @@ function CustomerPayouts() {
   const [status, setStatus] = useState("");
   const payouts = useCustomerPayoutsQuery({ mode, ...(status ? { status } : {}), ...(customer ? { customer_id: customer } : {}) });
   return (
-    <UdozoShell section="money" current="/money/payouts" crumbs={[{ label: "Money", href: "/money/payouts" }, { label: "Safe pay payouts" }]}>
+    <UdozoShell section="money" current="/money/payouts" crumbs={[{ label: "Money", href: "/money/payouts" }, { label: "UdozoPay payouts" }]}>
       <PageHeader
-        title="Safe pay payouts"
-        description="Sellers' Safe pay sales paid out to bank accounts in their verified name. Set aside while the bank transfer runs; returned only if the bank refused it."
+        title="UdozoPay payouts"
+        description="Sellers' UdozoPay sales paid out to bank accounts in their verified name. Set aside while the bank transfer runs; returned only if the bank refused it."
       />
       <div className="mt-6 flex flex-wrap gap-3">
         <FilterSelect id="payouts-mode" label="Mode" value={mode} onChange={value => setMode(value as Mode)} options={[{ value: "live", label: "Live" }, { value: "test", label: "Test" }]} />

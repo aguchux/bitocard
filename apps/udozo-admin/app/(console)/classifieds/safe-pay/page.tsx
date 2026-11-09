@@ -14,8 +14,8 @@ const whole = (value: string) => (/^\d+$/.test(value.trim()) ? Number(value) : n
 const major = (minor: number | null) => (minor === null ? "" : String(minor / 100));
 
 /**
- * Udozo > Safe pay settings, per market: each side's fee (a rate with a cap), a new seller's order limit, the
- * time limits, and the strike limit. Safe pay opens only once both fees are set (and its switch is on). Changes apply
+ * Udozo > UdozoPay settings, per market: each side's fee (a rate with a cap), a new seller's order limit, the
+ * time limits, and the strike limit. UdozoPay opens only once both fees are set (and its switch is on). Changes apply
  * to new requests only. Finance changes them, inside the step-up window; each change is audited.
  */
 export default function ClassifiedSafePayPage() {
@@ -25,10 +25,10 @@ export default function ClassifiedSafePayPage() {
   const countries = useCountriesQuery();
   const currency = countries.data?.data.find(item => item.code === country)?.currency ?? "NGN";
   return (
-    <UdozoShell section="marketplace" current="/classifieds/safe-pay" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Safe pay settings" }]}>
+    <UdozoShell section="marketplace" current="/classifieds/safe-pay" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "UdozoPay settings" }]}>
       <PageHeader
-        title="Safe pay settings"
-        description="Safe pay holds the buyer's money in escrow until the item is handed over. It opens in a market once both fees are set here and the classifieds_safe_pay switch is on (Settings > Feature switches)."
+        title="UdozoPay settings"
+        description="UdozoPay holds the buyer's money in escrow until the item is handed over. It opens in a market once both fees are set here and the classifieds_safe_pay switch is on (Settings > Feature switches)."
         actions={
           <AppLink href="/classifieds/orders?payout_review=pending" className="rounded-lg px-3 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50">
             Payouts held for review
@@ -93,7 +93,7 @@ function FeeExamples({ currency, buyerBps, buyerCap, sellerBps, sellerCap }: { c
           <p className="text-sm text-muted">Enter both fees and their caps to see examples.</p>
         )}
         <p className="text-xs text-muted">&ldquo;cap&rdquo; marks a fee held at its cap.</p>
-        <Notice tone="amber">Keep Safe pay to the sandbox in a market until the legal advice on holding buyers&apos; money there is done.</Notice>
+        <Notice tone="amber">Keep UdozoPay to the sandbox in a market until the legal advice on holding buyers&apos; money there is done.</Notice>
       </div>
     </Card>
   );
@@ -122,7 +122,7 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
     setDone(false);
   };
 
-  // Blank fee fields stay unset (Safe pay stays closed); a blank new-seller limit means none.
+  // Blank fee fields stay unset (UdozoPay stays closed); a blank new-seller limit means none.
   const next: ClassifiedSafePaySettingsInput = {};
   const problems: string[] = [];
   const rate = (value: string, key: "buyer_fee_bps" | "seller_fee_bps", label: string) => {
@@ -190,12 +190,12 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
   return (
     <form onSubmit={submit} className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
-        {saved.ready ? <Badge tone="green">Fees set: Safe pay can open here</Badge> : <Badge tone="amber">Fees not set: Safe pay stays closed</Badge>}
+        {saved.ready ? <Badge tone="green">Fees set: UdozoPay can open here</Badge> : <Badge tone="amber">Fees not set: UdozoPay stays closed</Badge>}
       </div>
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
       <Card>
-        <CardHeader title="Fees" description="Each side's fee is its rate of the price, or its cap when that is lower. Leave a fee blank to keep Safe pay closed." />
+        <CardHeader title="Fees" description="Each side's fee is its rate of the price, or its cap when that is lower. Leave a fee blank to keep UdozoPay closed." />
         <div className="grid gap-4 px-5 pb-5 sm:grid-cols-2 sm:px-6">
           {input("buyer_fee", "Buyer's fee (%)", "Added to what the buyer pays.", "decimal")}
           {input("buyer_cap", `Buyer's fee cap (${currency})`, "The most a buyer pays in fees on one order.", "decimal")}
@@ -236,10 +236,10 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
         </Notice>
       ) : null}
       {updating.error ? <Notice tone="red">{errorMessage(updating.error)}</Notice> : null}
-      {done ? <Notice tone="green">Saved. New Safe pay requests use these settings; orders already asked keep theirs.</Notice> : null}
+      {done ? <Notice tone="green">Saved. New UdozoPay requests use these settings; orders already asked keep theirs.</Notice> : null}
       {changes ? (
         <Button type="submit" loading={updating.isLoading} disabled={Boolean(problems.length) || !changed}>
-          Save Safe pay settings
+          Save UdozoPay settings
         </Button>
       ) : (
         <p className="text-sm text-muted">Finance changes these settings.</p>

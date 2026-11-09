@@ -1006,7 +1006,7 @@ export function ListingForm({
                   <a href={termsHref(terms)} target="_blank" rel="noopener" className="font-semibold text-navy-900 underline">
                     Udozo&apos;s terms
                   </a>
-                  : what may be sold, Safe pay&apos;s fees, deadlines and disputes, and paying directly. My ad follows them.
+                  : what may be sold, UdozoPay&apos;s fees, deadlines and disputes, and paying directly. My ad follows them.
                 </span>
               </span>
             </label>

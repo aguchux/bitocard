@@ -16,8 +16,8 @@ import "./globals.css";
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
-const title = "Udozo – Buy and sell near you, protected by Safe pay";
-const description = "Buy and sell phones, cars, property, electronics and more near you. Chat with sellers, and pay with Safe pay: Udozo holds the money until you have the item.";
+const title = "Udozo – Buy and sell near you, protected by UdozoPay";
+const description = "Buy and sell phones, cars, property, electronics and more near you. Chat with sellers, and pay with UdozoPay: Udozo holds the money until you have the item.";
 
 export const metadata: Metadata = {
   // Canonical addresses, sitemaps and Open Graph images always name udozo.com (UDOZO_URL), previews included.

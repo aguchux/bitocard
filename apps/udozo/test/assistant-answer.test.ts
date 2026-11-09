@@ -25,8 +25,8 @@ afterEach(() => {
 
 describe("an answer", () => {
   it("is drawn as paragraphs, emphasis, lists and links", () => {
-    const answer = draw('<p>Two phones <strong>match</strong>:</p><ul><li><a href="https://udozo.com/ng/l/12-iphone-13">iPhone 13</a></li><li>A <em>Samsung</em> A54</li></ul><p>Use Safe pay &amp; chat first.<br>Thanks</p>');
-    expect(answer.innerHTML).toBe('<p>Two phones <strong>match</strong>:</p><ul><li><a href="https://udozo.com/ng/l/12-iphone-13">iPhone 13</a></li><li>A <em>Samsung</em> A54</li></ul><p>Use Safe pay &amp; chat first.<br>Thanks</p>');
+    const answer = draw('<p>Two phones <strong>match</strong>:</p><ul><li><a href="https://udozo.com/ng/l/12-iphone-13">iPhone 13</a></li><li>A <em>Samsung</em> A54</li></ul><p>Use UdozoPay &amp; chat first.<br>Thanks</p>');
+    expect(answer.innerHTML).toBe('<p>Two phones <strong>match</strong>:</p><ul><li><a href="https://udozo.com/ng/l/12-iphone-13">iPhone 13</a></li><li>A <em>Samsung</em> A54</li></ul><p>Use UdozoPay &amp; chat first.<br>Thanks</p>');
     expect(answer.textContent).not.toMatch(/\*\*|<|&amp;/);
   });
 

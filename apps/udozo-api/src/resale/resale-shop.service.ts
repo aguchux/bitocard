@@ -164,7 +164,7 @@ export class ResaleShopService implements OnModuleInit {
       photos: detail.media.filter(media => media.kind === 'photo').map(media => ({ url: photoUrl(media, photosAt, 1600), width: media.width, height: media.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs } : null,
       safety_checklist: checklist,
-      /** The buyer's Safe pay fee, paid on top of the price. */
+      /** The buyer's UdozoPay fee, paid on top of the price. */
       buyer_fee: Number(item.sums.buyerFee),
       supplier: { ...card.supplier, member_since: item.row.listing.customer.createdAt.toISOString() },
     };

@@ -9,7 +9,7 @@ import { uuidPattern } from "./shop";
 /**
  * Buying on a Resale shop (B2B reselling, stage 4): the quote, buying from the store wallet (the money locked until the
  * supplier accepts), and the order chat with the store. The store's server adds the customer's session and names the
- * store; the API checks everything again. Safe pay's other buyer steps (cancel, confirm, dispute, the release code)
+ * store; the API checks everything again. UdozoPay's other buyer steps (cancel, confirm, dispute, the release code)
  * use the account's actions, which the API allows a Resale shop's buyer on their own orders.
  */
 

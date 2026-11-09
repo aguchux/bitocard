@@ -102,7 +102,7 @@ export function ResaleFields({
             </span>
             <span className="block text-slate-600">
               {open
-                ? "Resellers sell it on their own stores and earn a discount; you hand it to their buyer, paid through Safe pay."
+                ? "Resellers sell it on their own stores and earn a discount; you hand it to their buyer, paid through UdozoPay."
                 : availability?.reason === "not_set_up"
                   ? "Udozo is still setting up selling through resellers in your country. You can turn it on here once it opens."
                   : "Selling through resellers is not open in your country yet."}
@@ -127,7 +127,7 @@ export function ResaleFields({
               ) : null}
               {identityMissing && !availability.payout_account ? " and " : null}
               {!availability.payout_account ? (
-                <Link href="/account/safe-pay" className="font-semibold underline">
+                <Link href="/account/udozopay" className="font-semibold underline">
                   add a payout bank account
                 </Link>
               ) : null}

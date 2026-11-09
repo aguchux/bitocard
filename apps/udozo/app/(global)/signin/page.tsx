@@ -18,7 +18,7 @@ const reasons: Record<string, string> = {
   phone: "Sign in to contact the seller",
   call: "Sign in to call the seller",
   save: "Sign in to save listings",
-  buy: "Sign in to buy with Safe pay",
+  buy: "Sign in to buy with UdozoPay",
   report: "Sign in to report a listing",
   sell: "Sign in to sell on Udozo",
 };

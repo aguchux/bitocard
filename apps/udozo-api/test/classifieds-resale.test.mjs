@@ -1,6 +1,6 @@
 // B2B reselling, stage 1 (docs/BITOCARD_B2B_RESELLING_PLAN.md): a listing's channels (BitoCard Shop, resellers or
 // both) and resale terms within BitoCard's limits per country, suppliers ready before opening listings to resellers,
-// resale-only listings kept off BitoCard Shop everywhere, and stock shared by every Safe pay order.
+// resale-only listings kept off BitoCard Shop everywhere, and stock shared by every UdozoPay order.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
@@ -190,7 +190,7 @@ describe('resale: BitoCard limits and the switch', () => {
 });
 
 describe('resale-only listings are never on BitoCard Shop', () => {
-  test('no page, search result, count, sitemap entry, chat, phone, saving or Safe pay', async () => {
+  test('no page, search result, count, sitemap entry, chat, phone, saving or UdozoPay', async () => {
     const seller = await customer('Bola Ade');
     await ready(seller);
     const buyer = await customer('Kemi Adeyemi');
@@ -213,7 +213,7 @@ describe('resale-only listings are never on BitoCard Shop', () => {
     assert.equal((await buyer.post(`/v1/classifieds/listings/${listing.id}/phone`)).status, 404, 'no phone');
     assert.equal((await buyer.post('/v1/classifieds/favourites', { listing_id: listing.id })).status, 404, 'not saved');
     assert.equal((await buyer.get(`/v1/classifieds/listings/${listing.id}/viewer`)).status, 404);
-    assert.notEqual((await buyer.get(`/v1/classifieds/listings/${listing.id}/safe-pay`)).status, 200, 'no Safe pay on the Shop');
+    assert.notEqual((await buyer.get(`/v1/classifieds/listings/${listing.id}/safe-pay`)).status, 200, 'no UdozoPay on the Shop');
 
     // On the Shop too, it shows like any listing.
     const both = await seller.patch(`/v1/classifieds/listings/${listing.id}`, { on_shop: true });

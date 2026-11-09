@@ -28,7 +28,7 @@ const topColumns: Array<Column<Top>> = [
 ];
 
 /**
- * Reports > Safe pay and resale: Udozo's fees on Safe pay orders released in a range, by market, Udozo's
+ * Reports > UdozoPay and resale: Udozo's fees on UdozoPay orders released in a range, by market, Udozo's
  * own sales beside resale orders, each side's fee apart, and the resellers who paid the most resale fees.
  */
 export default function ResaleFeesPage() {
@@ -37,8 +37,8 @@ export default function ResaleFeesPage() {
   const report = useResaleFeesReportQuery({ mode, from: range.from, to: range.to });
 
   return (
-    <UdozoShell section="reports" current="/reports/resale" crumbs={[{ label: "Reports", href: "/reports" }, { label: "Safe pay and resale" }]}>
-      <PageHeader title="Safe pay and resale" description="Udozo’s fees on Safe pay orders released in this range, from buyers, sellers and resellers, per market." />
+    <UdozoShell section="reports" current="/reports/resale" crumbs={[{ label: "Reports", href: "/reports" }, { label: "UdozoPay and resale" }]}>
+      <PageHeader title="UdozoPay and resale" description="Udozo’s fees on UdozoPay orders released in this range, from buyers, sellers and resellers, per market." />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <DateRangePicker value={range} onChange={setRange} />
         <Select value={mode} onChange={event => setMode(event.target.value as Mode)} className="w-auto">

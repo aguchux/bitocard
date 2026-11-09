@@ -66,7 +66,7 @@ describe('admin classifieds', () => {
     ]);
   });
 
-  test('Safe pay: dispute messages and decisions, payout reviews and settings', async () => {
+  test('UdozoPay: dispute messages and decisions, payout reviews and settings', async () => {
     const store = makeStore();
     await store.dispatch(adminClassifiedsApi.endpoints.classifiedOrders.initiate({ payout_review: 'pending' }));
     await store.dispatch(adminClassifiedsApi.endpoints.writeClassifiedDispute.initiate({ id: 'o1', body: 'Send photos.' }));

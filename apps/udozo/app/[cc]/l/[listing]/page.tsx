@@ -61,7 +61,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const path = listingPath(cc, listing.ref, listing.slug);
   const price = shopPriceText(listing.price);
   const title = `${listing.title}, ${price}`;
-  const description = `${listing.status === "sold" ? "Sold. " : ""}${listing.title} for ${price} in ${listing.area.name}, ${listing.area.state.name}. ${listing.condition ? `${conditionLabels[listing.condition]}. ` : ""}Chat with the seller on Udozo and pay with Safe pay.`;
+  const description = `${listing.status === "sold" ? "Sold. " : ""}${listing.title} for ${price} in ${listing.area.name}, ${listing.area.state.name}. ${listing.condition ? `${conditionLabels[listing.condition]}. ` : ""}Chat with the seller on Udozo and pay with UdozoPay.`;
   // The preview image is the listing's own card (`opengraph-image.tsx`: its photo, price and area), never the bare photo.
   return {
     title,
@@ -163,7 +163,7 @@ export default async function ListingPage({ params }: Props) {
           <Gallery title={listing.title} photos={listing.photos} video={listing.video} />
           <section className="grid gap-2 px-4 sm:px-0">
             {sold ? <span className="w-fit rounded-full bg-navy-900 px-3 py-1 text-xs font-bold text-white">Sold</span> : null}
-            {listing.reserved && !sold && listing.in_stock !== false ? <span className="w-fit rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700">Reserved with Safe pay</span> : null}
+            {listing.reserved && !sold && listing.in_stock !== false ? <span className="w-fit rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700">Reserved with UdozoPay</span> : null}
             {!sold && listing.status === "active" ? <StockLine inStock={listing.in_stock} available={listing.available} /> : null}
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-x-2.5">
@@ -309,7 +309,7 @@ export default async function ListingPage({ params }: Props) {
               <ShieldCheck className="size-5" aria-hidden="true" /> Safe trade
             </h2>
             <ul className="list-disc space-y-1 pl-5 text-sm text-navy-800">
-              <li>Use Safe pay, or meet in a busy public place.</li>
+              <li>Use UdozoPay, or meet in a busy public place.</li>
               {listing.category.safety_checklist.slice(0, 3).map(item => (
                 <li key={item}>{item}</li>
               ))}

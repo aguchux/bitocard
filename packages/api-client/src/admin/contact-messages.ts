@@ -5,7 +5,7 @@ export const contactKinds = ['order', 'safe_pay', 'account', 'selling', 'reselli
 export type ContactKind = (typeof contactKinds)[number];
 export const contactKindLabels: Record<ContactKind, string> = {
   order: 'An order',
-  safe_pay: 'Safe pay',
+  safe_pay: 'UdozoPay',
   account: 'My account',
   selling: 'Selling',
   reselling: 'Reselling on Seller HQ',

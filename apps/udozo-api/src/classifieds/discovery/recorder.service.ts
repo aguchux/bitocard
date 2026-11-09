@@ -121,7 +121,7 @@ export class DiscoveryRecorder {
   }
 
   /**
-   * An action the API itself saw (a save, chat, contact request or call back, call, offer or Safe pay order), after it
+   * An action the API itself saw (a save, chat, contact request or call back, call, offer or UdozoPay order), after it
    * committed. Never throws.
    */
   async record(customerId: string, country: string | null, kind: ServerEventKind, listingId: string) {

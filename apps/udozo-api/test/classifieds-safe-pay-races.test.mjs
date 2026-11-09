@@ -1,4 +1,4 @@
-// BitoCard Shop, step 11: Safe pay's money paths under parallel requests, as for P2P trades. Every race leaves each
+// BitoCard Shop, step 11: UdozoPay's money paths under parallel requests, as for P2P trades. Every race leaves each
 // order paid at most once and settled at most once (released, refunded or partly refunded, never two), the escrow
 // account holding exactly what open orders hold, and the ledger balanced. On PGlite the requests queue on one
 // connection; on Docker's Postgres (`npm run test:docker`) they truly race.
@@ -57,7 +57,7 @@ async function customer(name = 'Kemi Adeyemi') {
   const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
   await confirmMobile(server.app, shopper);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  // The BitoCard Shop terms, accepted before posting or UdozoPay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   shopper.name = name;
@@ -146,7 +146,7 @@ async function conserved() {
 
 const codes = results => results.map(res => (res.status < 300 ? res.status : res.json?.error?.code)).sort();
 
-describe('Safe pay under parallel requests', () => {
+describe('UdozoPay under parallel requests', () => {
   test('the same request sent twice at once makes one order', async () => {
     const seller = await readySeller();
     const buyer = await customer();

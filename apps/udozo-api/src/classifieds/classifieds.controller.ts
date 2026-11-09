@@ -421,7 +421,7 @@ export class ClassifiedListingsController {
     private readonly resale: ResaleService,
   ) {}
 
-  /** The BitoCard Shop terms' current version and whether the customer has accepted it (needed to post or use Safe pay). */
+  /** The BitoCard Shop terms' current version and whether the customer has accepted it (needed to post or use UdozoPay). */
   @Get('terms')
   termsStatus(@CurrentCustomer() caller: CustomerCaller) {
     return this.terms.status(caller.customer.id);
@@ -569,7 +569,7 @@ export class ClassifiedChatsController {
   ) {}
 
   /**
-   * What the signed-in buyer already has with a listing: saved, a chat, an open Safe pay request or order, the seller's
+   * What the signed-in buyer already has with a listing: saved, a chat, an open UdozoPay request or order, the seller's
    * contact details if shared with them (or their request), a call back asked for, and whether the seller can be called.
    */
   @Get('listings/:id/viewer')
@@ -761,7 +761,7 @@ class OrdersDto {
   offset?: number;
 }
 
-/** BitoCard Shop's Safe pay: the buyer's request and payment from the wallet, the seller's acceptance and hand-over, disputes. */
+/** BitoCard Shop's UdozoPay: the buyer's request and payment from the wallet, the seller's acceptance and hand-over, disputes. */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
@@ -770,13 +770,13 @@ class OrdersDto {
 export class ClassifiedSafePayController {
   constructor(private readonly safePay: SafePayService) {}
 
-  /** The buyer's price, Safe pay fee and total for a listing (or an accepted offer), and what it covers. */
+  /** The buyer's price, UdozoPay fee and total for a listing (or an accepted offer), and what it covers. */
   @Get('listings/:id/safe-pay')
   quote(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Query() query: SafePayQuoteDto) {
     return this.safePay.quote(caller.customer, id, query.offer_id);
   }
 
-  /** What a seller still needs before accepting Safe pay orders. */
+  /** What a seller still needs before accepting UdozoPay orders. */
   @Get('me/safe-pay')
   readiness(@CurrentCustomer() caller: CustomerCaller) {
     return this.safePay.readiness(caller.customer);

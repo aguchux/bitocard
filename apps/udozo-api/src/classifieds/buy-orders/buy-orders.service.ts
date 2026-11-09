@@ -277,7 +277,7 @@ export class BuyOrdersService {
     const now = new Date();
     const meetBy = new Date(now.getTime() + rules.buyMeetDays * dayMs);
     await this.prisma.$transaction(async tx => {
-      // Locked against a Safe pay payment or another acceptance taking the same units.
+      // Locked against a UdozoPay payment or another acceptance taking the same units.
       const [listing] = await tx.$queryRaw<{ stock: number; status: string; on_shop: boolean }[]>`SELECT "stock", "status", "on_shop" FROM "classified_listings" WHERE "id" = ${order.listingId}::uuid FOR UPDATE`;
       if (!listing || listing.status !== 'active' || !listing.on_shop) throw conflict('listing_unavailable', 'This listing is no longer live.');
       if (listing.stock === 0) throw conflict('out_of_stock', 'This is out of stock: add stock to the listing before accepting.');

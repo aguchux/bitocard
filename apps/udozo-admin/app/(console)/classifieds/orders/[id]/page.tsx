@@ -24,7 +24,7 @@ const faults = [
 ] as const;
 
 /**
- * One Safe pay order: the money each side sees, the people, the deadlines and what happened, and its dispute. Support,
+ * One UdozoPay order: the money each side sees, the people, the deadlines and what happened, and its dispute. Support,
  * operations and finance write on the dispute (both sides see it); operations or finance release, and finance refunds
  * (in full or in part), behind the step-up window. Finance approves a seller's payout held for review.
  */
@@ -32,7 +32,7 @@ export default function ClassifiedOrderPage() {
   const { id } = useParams<{ id: string }>();
   const order = useClassifiedOrderQuery(id);
   return (
-    <UdozoShell section="marketplace" current="/classifieds/orders" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Safe pay orders", href: "/classifieds/orders" }, { label: order.data?.number ?? "Order" }]}>
+    <UdozoShell section="marketplace" current="/classifieds/orders" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "UdozoPay orders", href: "/classifieds/orders" }, { label: order.data?.number ?? "Order" }]}>
       <QueryView query={order} loading={<Skeleton className="h-96 w-full" />}>
         {data => <Order order={data} />}
       </QueryView>

@@ -12,7 +12,7 @@ const sum = (value: bigint | null | undefined) => minor(value ?? 0n);
 /**
  * B2B reselling, stage 5: reports on resale orders. A reseller's own (`/v1/reports/resale`): their orders by state,
  * sales, margin, BitoCard's fee and their earnings from the orders released in the period, per store and per listing.
- * BitoCard's (`/v1/admin/reports/resale`): Safe pay's fees by market, BitoCard Shop's own sales beside resale, each
+ * BitoCard's (`/v1/admin/reports/resale`): UdozoPay's fees by market, BitoCard Shop's own sales beside resale, each
  * side's fee told apart. Built from the orders' own fixed figures, so a later price or rule change never moves them.
  */
 @Injectable()
@@ -70,7 +70,7 @@ export class ResaleReportsService {
     };
   }
 
-  /** BitoCard's Safe pay and resale fees in a period, by market and kind (BitoCard Shop's own sales, resale). */
+  /** BitoCard's UdozoPay and resale fees in a period, by market and kind (BitoCard Shop's own sales, resale). */
   async platform(input: { mode: LedgerMode; from: Date; to: Date; country?: string }) {
     const where: Prisma.ClassifiedOrderWhereInput = { mode: input.mode, status: { in: settled }, releasedAt: { gte: input.from, lt: input.to }, ...(input.country ? { country: input.country } : {}) };
     const [rows, refunded, resellers] = await Promise.all([

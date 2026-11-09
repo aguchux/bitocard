@@ -35,7 +35,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const kinds = categoriesText(brand.categories.filter(item => item.listings > 0), 3);
   const title = brand.listings ? `${brand.name} for sale in ${market.name}: ${brand.listings.toLocaleString("en-GB")} listing${brand.listings === 1 ? "" : "s"} on Udozo` : `${brand.name} in ${market.name} on Udozo`;
   const description = brand.listings
-    ? `Buy ${brand.name}${kinds ? ` ${kinds}` : ""} in ${market.name} from ${brand.sellers.toLocaleString("en-GB")} seller${brand.sellers === 1 ? "" : "s"} on Udozo. Compare prices, chat with sellers and pay with Safe pay.`
+    ? `Buy ${brand.name}${kinds ? ` ${kinds}` : ""} in ${market.name} from ${brand.sellers.toLocaleString("en-GB")} seller${brand.sellers === 1 ? "" : "s"} on Udozo. Compare prices, chat with sellers and pay with UdozoPay.`
     : `Nothing from ${brand.name} is for sale in ${market.name} on Udozo yet. Sell yours, or see what else is for sale.`;
   // Indexed once it has enough for sale, and only the page itself (not filtered or later pages).
   const filtered = isBrandFiltered(await searchParams);
@@ -354,7 +354,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
               <ShieldCheck className="size-5" aria-hidden="true" /> Buy safely
             </h2>
             <ul className="list-disc space-y-1 pl-5 text-sm text-navy-800">
-              <li>Pay with Safe pay: the seller is paid only once you have the item.</li>
+              <li>Pay with UdozoPay: the seller is paid only once you have the item.</li>
               <li>Check it is genuine: serial number, box and receipt where there are any.</li>
               <li>Never pay in advance. Udozo never asks for your codes.</li>
             </ul>

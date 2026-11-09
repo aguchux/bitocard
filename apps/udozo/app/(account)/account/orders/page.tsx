@@ -7,12 +7,12 @@ import { customerApi } from "@/lib/customer";
 import { orderNext, orderTone } from "@/lib/shop";
 import { requireSeller } from "@/lib/account";
 
-export const metadata: Metadata = { title: "Safe pay orders" };
+export const metadata: Metadata = { title: "UdozoPay orders" };
 
 type Props = { searchParams: Promise<{ role?: string }> };
 
 /**
- * Safe pay orders, buying and selling (the design canvas's Orders board), each with what to do next.
+ * UdozoPay orders, buying and selling (the design canvas's Orders board), each with what to do next.
  */
 export default async function ShopOrdersPage({ searchParams }: Props) {
   const { role: asked } = await searchParams;
@@ -27,7 +27,7 @@ export default async function ShopOrdersPage({ searchParams }: Props) {
   const sellerWaiting = (role === "selling" ? orders : selling?.ok ? selling.data.data : []).filter(order => order.status === "requested" || order.status === "locked" || order.status === "paid").length;
   return (
     <div className="grid gap-5">
-      <PageTitle title="Safe pay orders" />
+      <PageTitle title="UdozoPay orders" />
       <nav aria-label="Orders by role">
         <ul className="flex gap-2">
           {(["buying", "selling"] as const).map(item => (
@@ -72,7 +72,7 @@ export default async function ShopOrdersPage({ searchParams }: Props) {
         </ul>
       ) : (
         <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
-          {role === "buying" ? "When you buy with Safe pay, your orders show here. Udozo holds the money until you have the item." : "When a buyer asks to pay with Safe pay, or buys your listing on a reseller’s store, the order shows here for you to accept."}
+          {role === "buying" ? "When you buy with UdozoPay, your orders show here. Udozo holds the money until you have the item." : "When a buyer asks to pay with UdozoPay, or buys your listing on a reseller’s store, the order shows here for you to accept."}
         </p>
       )}
     </div>

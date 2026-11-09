@@ -3,29 +3,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Wallet } from "lucide-react";
-import { buyerOrderLabels, listingPath, listingRef, shopMoney, type ShopListingPage, type ShopOrder, type ShopSafePayQuote, type ShopViewer, type ShopWallet } from "@bitocard/api-client/classifieds";
+import { buyerOrderLabels, connectName, listingPath, listingRef, shopMoney, type ShopListingPage, type ShopOrder, type ShopSafePayQuote, type ShopViewer, type ShopWallet, payName } from "@bitocard/api-client/classifieds";
 import { SafePayOrderActions, SafePayRequest } from "@/components/safe-pay";
 import { marketFor, shopApi } from "@/lib/api";
 import { currentCustomer, customerApi, signInPath } from "@/lib/customer";
 
 type Props = { params: Promise<{ cc: string; listing: string }>; searchParams: Promise<{ offer?: string }> };
 
-export const metadata: Metadata = { title: "Buy with Safe pay", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Buy with UdozoPay", robots: { index: false, follow: false } };
 
 const steps = ["You ask; the seller accepts.", "You pay from your Udozo wallet. We hold the money.", "You check the item, then release the money.", "Not as described? Open a dispute and we decide."];
 
 const unavailable: Record<string, string> = {
-  safe_pay_unavailable: "Safe pay is not open here yet. You can still chat with the seller.",
+  safe_pay_unavailable: "UdozoPay is not open here yet. You can still chat with the seller.",
   price_required: "This listing has no price: agree one by offer in the chat first, then buy at that price.",
   offer_not_accepted: "Use an offer the seller accepted in the last 7 days.",
-  listing_reserved: "Someone has already paid for this with Safe pay.",
+  listing_reserved: "Someone has already paid for this with UdozoPay.",
   out_of_stock: "This is out of stock: the seller has none to sell right now. Chat with them to ask when more come in.",
-  safe_pay_limited: "This seller cannot take Safe pay orders right now. You can still chat with them.",
+  safe_pay_limited: "This seller cannot take UdozoPay orders right now. You can still chat with them.",
   classifieds_unavailable: "Udozo is not open in your country yet.",
 };
 
 /**
- * Buy with Safe pay (`/ng/l/<number>/buy`): how it protects the buyer, meet-up or delivery, the price, fee and total
+ * Buy with UdozoPay (`/ng/l/<number>/buy`): how it protects the buyer, meet-up or delivery, the price, fee and total
  * and the wallet, then the request to the seller. Once asked, the same page shows the order: waiting for the seller,
  * then **Pay** from the wallet once they accept; from there the order continues in the seller's account.
  */
@@ -61,7 +61,10 @@ export default async function BuyPage({ params, searchParams }: Props) {
         <Link href={back} className="-ml-2 grid size-10 place-items-center rounded-full hover:bg-navy-50" aria-label="Back to the listing">
           <ArrowLeft className="size-5" aria-hidden="true" />
         </Link>
-        <h1 className="text-xl font-extrabold">Buy with Safe pay</h1>
+        <h1 className="grid text-xl font-extrabold">
+          Buy with {payName}
+          <span className="text-xs font-semibold text-navy-500">by {connectName}</span>
+        </h1>
       </header>
       <Link href={back} className="flex items-center gap-3 rounded-2xl border border-navy-200 bg-white p-3">
         <span className="size-16 shrink-0 overflow-hidden rounded-xl bg-navy-100">{listing.photos[0] ? <img src={listing.photos[0].url} alt="" className="size-full object-cover" /> : null}</span>
@@ -96,7 +99,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
         <>
           <section aria-labelledby="how" className="grid gap-3">
             <h2 id="how" className="text-base font-bold">
-              How Safe pay protects you
+              How UdozoPay protects you
             </h2>
             <ol className="grid gap-2">
               {steps.map((text, index) => (
@@ -111,7 +114,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
           <WalletLine balance={balance} total={quote.data.total} currency={currency} addFunds={addFunds} />
           {quote.data.reserved ? <p className="rounded-2xl bg-navy-50 p-3.5 text-sm">{unavailable.listing_reserved}</p> : <SafePayRequest quote={quote.data} sellerName={listing.seller.name} acceptHours={quote.data.accept_hours} stateName={listing.area.state.name} />}
           <details className="text-sm text-navy-700">
-            <summary className="cursor-pointer font-semibold">What Safe pay covers</summary>
+            <summary className="cursor-pointer font-semibold">What UdozoPay covers</summary>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               {quote.data.covers.map(item => (
                 <li key={item}>{item}</li>
@@ -121,7 +124,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
         </>
       ) : (
         <section className="grid gap-3 rounded-2xl bg-navy-50 p-4 text-sm">
-          <p>{(quote && !quote.ok && quote.code && unavailable[quote.code]) || quote?.message || "Safe pay could not be opened just now. Try again shortly."}</p>
+          <p>{(quote && !quote.ok && quote.code && unavailable[quote.code]) || quote?.message || "UdozoPay could not be opened just now. Try again shortly."}</p>
           <Link href={back} className="font-semibold text-brand-700 hover:underline">
             Back to the listing
           </Link>
@@ -148,7 +151,7 @@ function Money({ price, delivery = 0, fee, total, currency, note }: { price: num
         </div>
       ) : null}
       <div className="flex justify-between">
-        <span>Safe pay fee</span>
+        <span>UdozoPay fee</span>
         <span className="font-semibold">{shopMoney(fee, currency)}</span>
       </div>
       <div className="my-1 h-px bg-navy-100" />

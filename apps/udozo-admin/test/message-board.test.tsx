@@ -16,7 +16,7 @@ const existing = {
   object: "board_post",
   id: "p1",
   country: "NG",
-  title: "Safe pay in Lagos",
+  title: "UdozoPay in Lagos",
   body: "Pay through Udozo.",
   tone: "tip",
   href: "/safe-trade",
@@ -77,11 +77,11 @@ const long = { timeout: 30000 };
 describe("the message board", () => {
   test("each post shows its kind, market and state; the switch turns it off", long, async () => {
     show();
-    expect((await screen.findAllByText("Safe pay in Lagos", {}, slow)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("UdozoPay in Lagos", {}, slow)).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Tip · Pinned").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nigeria").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Showing").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByRole("switch", { name: "Show the post “Safe pay in Lagos”" })[0]!);
+    fireEvent.click(screen.getAllByRole("switch", { name: "Show the post “UdozoPay in Lagos”" })[0]!);
     await waitFor(() => expect(sent.find(item => item.method === "PATCH")).toEqual({ method: "PATCH", path: "/v1/admin/classifieds/board/p1", body: { enabled: false } }), slow);
   });
 
@@ -104,7 +104,7 @@ describe("the message board", () => {
   test("support reads the posts and cannot change them", long, async () => {
     roles = ["support"];
     show();
-    expect((await screen.findAllByText("Safe pay in Lagos", {}, slow)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("UdozoPay in Lagos", {}, slow)).length).toBeGreaterThan(0);
     expect(screen.getByText("Only operations admins write and change posts.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "New post" })).toBeNull();
     expect((screen.getAllByRole("switch", { name: /Show the post/ })[0] as HTMLButtonElement).disabled).toBe(true);

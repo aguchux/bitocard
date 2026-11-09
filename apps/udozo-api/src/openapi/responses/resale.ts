@@ -69,7 +69,7 @@ const price = objectSchema('ResalePrice', {
   margin: minor('Your margin: your price less what the supplier receives'),
   reseller_fee: minor('BitoCard’s fee on your margin'),
   earnings: minor('What you keep per sale'),
-  buyer_fee: minor('The buyer’s Safe pay fee, paid on top'),
+  buyer_fee: minor('The buyer’s UdozoPay fee, paid on top'),
   buyer_pays: minor('What the buyer pays in all'),
 });
 

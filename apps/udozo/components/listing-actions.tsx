@@ -195,7 +195,7 @@ function Action({ signedIn, label, icon, onClick, reason, disabled, title, expan
 }
 
 /**
- * What a buyer can do on a listing: **Buy with Safe pay**, **Chat with seller** in place, **Call seller** in the browser
+ * What a buyer can do on a listing: **Buy with UdozoPay**, **Chat with seller** in place, **Call seller** in the browser
  * while the seller is on Udozo (relayed: no numbers shared), **Request call back** (the buyer's details to the seller),
  * **Request contact** (the seller's phone and email, shown here once they accept), and **Report**. Nobody's details are
  * on the page for everyone. A visitor is asked to sign in first and comes back here.

@@ -1,4 +1,4 @@
-// BitoCard Shop, phase 1 step 1: the seeded feature registry, categories, Nigerian, Ghanaian and Kenyan areas, Safe pay
+// BitoCard Shop, phase 1 step 1: the seeded feature registry, categories, Nigerian, Ghanaian and Kenyan areas, UdozoPay
 // settings and switches.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -236,7 +236,7 @@ describe('areas', () => {
     assert.ok(!of('KE', 'nairobi').some(a => a.slug === 'thika'), "Thika is Kiambu's, though GeoNames files it under Nairobi's old code");
     assert.ok(!of('GH', 'greater-accra').some(a => a.slug === 'kasoa'), "Kasoa is in Central region");
 
-    // Like Nigeria, both markets have Safe pay and market settings, with no fees until finance sets them.
+    // Like Nigeria, both markets have UdozoPay and market settings, with no fees until finance sets them.
     for (const country of ['GH', 'KE']) {
       const settings = await prisma.classifiedSafePaySettings.findUniqueOrThrow({ where: { country } });
       assert.deepEqual([settings.buyerFeeBps, settings.sellerFeeBps], [null, null]);
@@ -254,7 +254,7 @@ describe('areas', () => {
   });
 });
 
-describe('Safe pay settings', () => {
+describe('UdozoPay settings', () => {
   test('Nigeria has its time limits and no fees until finance sets them', async () => {
     const ng = await prisma.classifiedSafePaySettings.findUniqueOrThrow({ where: { country: 'NG' } });
     assert.deepEqual([ng.buyerFeeBps, ng.buyerFeeCapMinor, ng.sellerFeeBps, ng.sellerFeeCapMinor], [null, null, null, null]);
@@ -266,7 +266,7 @@ describe('Safe pay settings', () => {
 });
 
 describe('switches', () => {
-  test('the Shop, Safe pay and shop assistants are off until an admin opens them, globally or per market', async () => {
+  test('the Shop, UdozoPay and shop assistants are off until an admin opens them, globally or per market', async () => {
     const admin = await adminClient(server);
     const { status, json } = await admin.get('/v1/admin/switches');
     assert.equal(status, 200);

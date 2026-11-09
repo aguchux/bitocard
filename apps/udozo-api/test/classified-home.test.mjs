@@ -120,7 +120,7 @@ describe('the pages', () => {
     const group = await admin.put('/v1/admin/classifieds/home/NG/draft', { rows: [row([{ id: 'c', type: 'listing_group', span: { lg: 12, md: 6 }, title: 'By place', by: 'area' }])] });
     assert.equal(group.json.error.param, 'rows[0].blocks[0].value');
     // The editor of before still saves sections, as rows.
-    const sections = await admin.put('/v1/admin/classifieds/home/NG/draft', { sections: [{ id: 'd', type: 'trust_bar', span: { lg: 12, md: 6 }, items: [{ icon: 'shield', title: 'Safe pay' }] }] });
+    const sections = await admin.put('/v1/admin/classifieds/home/NG/draft', { sections: [{ id: 'd', type: 'trust_bar', span: { lg: 12, md: 6 }, items: [{ icon: 'shield', title: 'UdozoPay' }] }] });
     assert.equal(sections.status, 200, JSON.stringify(sections.json));
     assert.deepEqual(sections.json.rows.map(item => item.blocks.map(block => block.id)), [['d']]);
     // Support reads, never changes.
@@ -229,7 +229,7 @@ describe('what the pages show', () => {
     assert.ok(!idsIn(sectionOf(await fresh('NG'), 'sponsored_rail') ?? { data: {} }).includes(made.gh.id));
   });
 
-  test('top selling is released Safe pay sales; with too few, the most contacted, titled Popular, never both', async () => {
+  test('top selling is released UdozoPay sales; with too few, the most contacted, titled Popular, never both', async () => {
     const section = { id: 't', type: 'top_selling_rail', span: full, minimum: 1 };
     await prisma.classifiedListing.update({ where: { id: made.fridge.id }, data: { leads: 5 } });
     const popular = sectionOf(await page([section]), 'top_selling_rail');

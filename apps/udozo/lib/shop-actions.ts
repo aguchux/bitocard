@@ -49,7 +49,7 @@ const id = (value: string) => uuidPattern.test(value);
 
 // ---- The Udozo terms ----
 
-/** The terms' current version and whether this customer accepted it (needed to post and to use Safe pay). */
+/** The terms' current version and whether this customer accepted it (needed to post and to use UdozoPay). */
 export async function shopTerms(): Promise<TermsStatus | null> {
   const result = await customerApi<TermsStatus>("GET", "/v1/classifieds/terms");
   return result.ok ? result.data : null;
@@ -278,7 +278,7 @@ export async function reportChat(chatId: string, reason: ShopChatReportReason, d
   return answer(await customerApi("POST", `/v1/classifieds/conversations/${chatId}/report`, { reason, ...(details.trim() ? { details: details.trim().slice(0, 1000) } : {}) }));
 }
 
-// ---- Safe pay orders ----
+// ---- UdozoPay orders ----
 
 type OrderStep = "accept" | "decline" | "pay" | "sent" | "received" | "cancel";
 

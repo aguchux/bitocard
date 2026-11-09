@@ -96,12 +96,12 @@ describe("places and categories", () => {
   });
 });
 
-describe("Buy with Safe pay", () => {
+describe("Buy with UdozoPay", () => {
   const listing = { status: "active" as const, reserved: false, price: { kind: "fixed" as const, amount: 52000000, currency: "NGN" } };
   const viewer = { object: "classified_listing_viewer" as const, listing_id: "l1", own: false, favourite: false, conversation_id: null, order: null, can_contact: true };
   test("offered on live listings with a price; continues an open order; never on one's own, reserved or sold ones", () => {
-    expect(buyButton(listing, null, "/ng/l/1/buy", true)).toEqual({ href: "/ng/l/1/buy", label: "Buy with Safe pay" });
-    expect(buyButton(listing, { ...viewer, order: { id: "o1", number: "SP-100001", status: "awaiting_payment" } }, "/b", true)?.label).toBe("Continue Safe pay order SP-100001");
+    expect(buyButton(listing, null, "/ng/l/1/buy", true)).toEqual({ href: "/ng/l/1/buy", label: "Buy with UdozoPay" });
+    expect(buyButton(listing, { ...viewer, order: { id: "o1", number: "SP-100001", status: "awaiting_payment" } }, "/b", true)?.label).toBe("Continue UdozoPay order SP-100001");
     expect(buyButton({ ...listing, reserved: true }, { ...viewer, order: { id: "o1", number: "SP-100001", status: "paid" } }, "/b", true)?.label).toMatch(/Continue/);
     expect(buyButton(listing, { ...viewer, own: true }, "/b", true)).toBeNull();
     expect(buyButton({ ...listing, reserved: true }, viewer, "/b", true)).toBeNull();

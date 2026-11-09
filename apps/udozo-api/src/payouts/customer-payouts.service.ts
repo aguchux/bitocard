@@ -61,7 +61,7 @@ export function presentCustomerPayout(payout: CustomerPayout & { bankAccount?: C
 }
 
 /**
- * Store customers' withdrawable money (`customer_withdrawable`, from BitoCard Shop's Safe pay sales) paid out to their
+ * Store customers' withdrawable money (`customer_withdrawable`, from BitoCard Shop's UdozoPay sales) paid out to their
  * own bank account through BitoCard's transfer provider. Live accounts must be in the customer's verified name and wait
  * 24 hours after they are added; money from sales becomes withdrawable after the country's payout hold (the same days as resellers'
  * earnings), so a sale paid with money that is later reversed can still be put right. The amount moves to
@@ -112,7 +112,7 @@ export class CustomerPayoutsService {
   }
 
   /**
-   * Money not withdrawable yet: from Safe pay sales credited inside the hold, and Safe
+   * Money not withdrawable yet: from UdozoPay sales credited inside the hold, and Safe
    * pay money finance has not approved (the buyer paid from a recent card or mobile money top-up), whenever released.
    */
   private async held(
@@ -251,7 +251,7 @@ export class CustomerPayoutsService {
           HttpStatus.PAYMENT_REQUIRED,
           'invalid_request_error',
           'insufficient_funds',
-          `You can pay out up to ${formatMoney(available > 0n ? available : 0n, currency)} now. Money from P2P and Shop sales can be paid out ${country.payoutHoldDays} days after each sale, and Safe pay money Udozo is checking once it is approved.`,
+          `You can pay out up to ${formatMoney(available > 0n ? available : 0n, currency)} now. Money from P2P and Shop sales can be paid out ${country.payoutHoldDays} days after each sale, and UdozoPay money Udozo is checking once it is approved.`,
           'amount',
         );
       }

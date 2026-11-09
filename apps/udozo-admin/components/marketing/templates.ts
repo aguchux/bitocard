@@ -2,7 +2,7 @@ import type { MarketingProspect, MarketingStage } from "@bitocard/api-client/adm
 
 /**
  * Ready messages for each stage, filled with the seller's details and their own invite link. The admin edits them
- * before sending; nothing promises what Udozo does not do (listing is free, Safe pay holds the money, Seller HQ is free
+ * before sending; nothing promises what Udozo does not do (listing is free, UdozoPay holds the money, Seller HQ is free
  * while paid plans are off).
  */
 export type MessageTemplate = { key: string; stage: MarketingStage; label: string; text: string };
@@ -18,7 +18,7 @@ export const messageTemplates: MessageTemplate[] = [
     key: "invitation",
     stage: "invitation",
     label: "Invitation with link",
-    text: "Thanks {first}! Here is your invitation to sell on Udozo: {link}\n\nSigning up takes two minutes with your email and mobile, and listing is free. With Safe pay the buyer's money is held until they have the item, so no fake transfer alerts. You can also open your own store on Seller HQ, free.",
+    text: "Thanks {first}! Here is your invitation to sell on Udozo: {link}\n\nSigning up takes two minutes with your email and mobile, and listing is free. With UdozoPay the buyer's money is held until they have the item, so no fake transfer alerts. You can also open your own store on Seller HQ, free.",
   },
   {
     key: "onboarding",

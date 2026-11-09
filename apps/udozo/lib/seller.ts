@@ -65,7 +65,7 @@ export function sellerStats(profile: Pick<ShopSellerProfile, "active_listings" |
   return [
     { key: "live", value: profile.active_listings.toLocaleString("en-GB"), label: profile.active_listings === 1 ? "Listing for sale" : "Listings for sale" },
     { key: "sold", value: profile.sold_listings.toLocaleString("en-GB"), label: "Sold on Udozo" },
-    { key: "safe_pay", value: profile.safe_pay_sales.toLocaleString("en-GB"), label: profile.safe_pay_sales === 1 ? "Safe pay sale" : "Safe pay sales" },
+    { key: "safe_pay", value: profile.safe_pay_sales.toLocaleString("en-GB"), label: profile.safe_pay_sales === 1 ? "UdozoPay sale" : "UdozoPay sales" },
     { key: "answers", value: profile.response_rate === null ? "New" : `${profile.response_rate}%`, label: profile.response_rate === null ? "Too few chats to say" : "Of chats answered" },
   ];
 }

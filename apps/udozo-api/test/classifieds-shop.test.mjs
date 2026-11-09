@@ -27,7 +27,7 @@ before(async () => {
 });
 
 after(async () => {
-  // Leave Ghana and Nigeria's Safe pay as they were for the files that follow (Docker runs share one database).
+  // Leave Ghana and Nigeria's UdozoPay as they were for the files that follow (Docker runs share one database).
   await admin?.put('/v1/admin/switches/classifieds', { country_code: 'GH', enabled: null });
   await admin?.put('/v1/admin/switches/classifieds_safe_pay', { country_code: 'NG', enabled: null });
   if (made.fees) await prisma.classifiedSafePaySettings.update({ where: { country: 'NG' }, data: made.fees });
@@ -62,7 +62,7 @@ async function customer(name, country = 'NG') {
   await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  // The BitoCard Shop terms, accepted before posting or UdozoPay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   return shopper;
@@ -118,7 +118,7 @@ describe('markets and the global showcase', () => {
     const before = await prisma.classifiedSafePaySettings.findUniqueOrThrow({ where: { country: 'NG' } });
     made.fees = { buyerFeeBps: before.buyerFeeBps, buyerFeeCapMinor: before.buyerFeeCapMinor, sellerFeeBps: before.sellerFeeBps, sellerFeeCapMinor: before.sellerFeeCapMinor };
     assert.equal((await admin.put('/v1/admin/switches/classifieds_safe_pay', { country_code: 'NG', enabled: false })).status, 200);
-    assert.equal((await get('/v1/classifieds/markets')).json.data.find(row => row.country === 'NG').safe_pay, false, 'Safe pay is not open until its switch is on');
+    assert.equal((await get('/v1/classifieds/markets')).json.data.find(row => row.country === 'NG').safe_pay, false, 'UdozoPay is not open until its switch is on');
     assert.equal((await admin.put('/v1/admin/switches/classifieds_safe_pay', { country_code: 'NG', enabled: true })).status, 200);
     await prisma.classifiedSafePaySettings.update({ where: { country: 'NG' }, data: { buyerFeeBps: null } });
     assert.equal((await get('/v1/classifieds/markets')).json.data.find(row => row.country === 'NG').safe_pay, false, 'nor until both fees are set');

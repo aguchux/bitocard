@@ -12,7 +12,7 @@ export const heldReasonLabels: Record<string, string> = { words: "It uses a word
 export const aspectLabels: Record<string, string> = { described: "As described", communication: "Communication", handover: "Hand-over" };
 export const roleLabels: Record<string, string> = { seller: "Seller", reviewer: "Reviewer", buyer: "Buyer" };
 export const stanceLabels: Record<string, string> = { agree: "agrees", disagree: "disagrees", context: "adds context" };
-export const sourceLabels: Record<string, string> = { safe_pay: "Safe pay purchase", buy_order: "Buy order" };
+export const sourceLabels: Record<string, string> = { safe_pay: "UdozoPay purchase", buy_order: "Buy order" };
 export const reportReasonLabels: Record<string, string> = {
   fake: "Looks fake",
   not_a_buyer: "Not a buyer",

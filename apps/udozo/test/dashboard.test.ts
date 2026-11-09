@@ -30,7 +30,7 @@ const dashboard: AccountDashboard = {
   series,
   top_listings: [{ id: "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d", title: "Hisense 50 inch TV", status: "active", views: 15, leads: 2 }],
   board: [
-    { object: "board_post", id: "p1", title: "Safe pay in Lagos", body: "Pay through Udozo.\nThe seller is paid once you have it.", tone: "tip", href: "/safe-trade", link_label: "How it works", pinned: true, posted_at: "2026-11-07T10:00:00Z" },
+    { object: "board_post", id: "p1", title: "UdozoPay in Lagos", body: "Pay through Udozo.\nThe seller is paid once you have it.", tone: "tip", href: "/safe-trade", link_label: "How it works", pinned: true, posted_at: "2026-11-07T10:00:00Z" },
     { object: "board_post", id: "p2", title: "Partner offer", body: "Delivery at half price.", tone: "news", href: "https://partner.example.com/offer", link_label: null, pinned: false, posted_at: "2026-11-06T10:00:00Z" },
   ],
 };
@@ -89,7 +89,7 @@ describe("the dashboard page", () => {
     for (const words of ["Up 110%", "Down 50%", "New this period", "Same as before", "vs 20 before"]) expect(html).toContain(words);
     // The message board: pinned first, its kind in words, the body's lines kept, links only to safe places.
     expect(html).toContain("Message board");
-    expect(html.indexOf("Safe pay in Lagos")).toBeLessThan(html.indexOf("Partner offer"));
+    expect(html.indexOf("UdozoPay in Lagos")).toBeLessThan(html.indexOf("Partner offer"));
     expect(html).toContain("Pinned");
     expect(html).toContain("Pay through Udozo.\nThe seller is paid once you have it.");
     expect(html).toContain('href="/safe-trade"');

@@ -342,7 +342,7 @@ export class ListingSearchService {
       photos: photos.map(item => ({ url: this.watermarks.url(item, 1600), width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
-      /** In stock, but every unit is held for buyers (paid with Safe pay, or buy orders the seller accepted). */
+      /** In stock, but every unit is held for buyers (paid with UdozoPay, or buy orders the seller accepted). */
       reserved: row.stock > 0 && holding >= row.stock,
       /** The seller has some: out of stock (none), buying is closed until they restock. */
       in_stock: row.stock > 0,

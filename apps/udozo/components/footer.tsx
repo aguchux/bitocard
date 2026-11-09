@@ -11,7 +11,7 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
       <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-8 text-sm text-navy-600 sm:flex-row sm:items-start sm:justify-between sm:px-6 lg:px-8">
         <div className="grid gap-1.5">
           <strong className="text-navy-900">Udozo{country ? ` ${country.name}` : ""}</strong>
-          <p className="max-w-sm">Buy and sell near you. Safe pay holds the money until you have the item.</p>
+          <p className="max-w-sm">Buy and sell near you. UdozoPay holds the money until you have the item.</p>
         </div>
         <nav aria-label="Udozo links" className="flex flex-wrap gap-x-5 gap-y-2">
           <Link href="/start-here" className="font-semibold text-brand-600 hover:underline">
@@ -30,8 +30,8 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           <Link href="/safe-trade" className="font-semibold text-navy-900 hover:underline">
             Safe Trade Guide
           </Link>
-          <Link href="/safe-trade#safe-pay" className="hover:underline">
-            Safe pay
+          <Link href="/safe-trade#udozopay" className="hover:underline">
+            UdozoPay
           </Link>
           <Link href="/help/faqs" className="hover:underline">
             FAQs
@@ -42,8 +42,8 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           <Link href="/legal/terms" className="hover:underline">
             Terms of use
           </Link>
-          <Link href="/legal/safe-pay" className="hover:underline">
-            Safe pay rules
+          <Link href="/legal/udozopay" className="hover:underline">
+            UdozoPay rules
           </Link>
           <Link href="/legal/sellers" className="hover:underline">
             Seller terms

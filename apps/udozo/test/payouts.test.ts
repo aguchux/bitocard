@@ -1,4 +1,4 @@
-// Payouts (the Shop tab): the money from a customer's Safe pay sales paid into their own bank account, at /v1/store/cash
+// Payouts (the Shop tab): the money from a customer's UdozoPay sales paid into their own bank account, at /v1/store/cash
 // (crypto, which used to own this page, has left Udozo).
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setRequest } from "./request";
@@ -37,13 +37,13 @@ afterEach(() => {
 });
 
 describe("payouts", () => {
-  test("adding a bank account sends the bank and the digits only, to /v1/store/cash; Payouts and Safe pay refresh", async () => {
+  test("adding a bank account sends the bank and the digits only, to /v1/store/cash; Payouts and UdozoPay refresh", async () => {
     const fetch = vi.fn(async () => reply({ object: "customer_bank_account", id: account, bank_name: "Sandbox Bank", account_number_last4: "6789", account_name: "ADA SELLER" }, 201));
     vi.stubGlobal("fetch", fetch);
     expect(await addPayoutAccount({}, form({ bank_code: "SBX001", account_number: "0123 456 789" }))).toEqual({ notice: "Added Sandbox Bank ending 6789 (ADA SELLER)." });
     expect(calls(fetch)[0][0]).toBe("http://api.test/v1/store/cash/bank-accounts");
     expect(bodyOf(calls(fetch)[0])).toEqual({ bank_code: "SBX001", account_number: "0123456789" });
-    expect(revalidatePath.mock.calls.map(([path]) => path)).toEqual(["/account/payouts", "/account/safe-pay"]);
+    expect(revalidatePath.mock.calls.map(([path]) => path)).toEqual(["/account/payouts", "/account/udozopay"]);
     expect(await addPayoutAccount({}, form({ bank_code: "", account_number: "0123456789" }))).toEqual({ error: "Choose your bank.", field: "bank_code" });
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "account_name_mismatch", message: "This account is in the name of SOMEONE ELSE.", param: "account_number" } }, 400)));
     expect(await addPayoutAccount({}, form({ bank_code: "SBX001", account_number: "0123456789" }))).toEqual({ error: "This account is in the name of SOMEONE ELSE.", field: "account_number" });

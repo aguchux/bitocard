@@ -92,7 +92,7 @@ const publish = async rows => {
 
 describe('rows', () => {
   test('rows of up to six blocks, each id its own, a photo for a photo background; refusals name the field', async () => {
-    const seven = Array.from({ length: 7 }, (_, n) => ({ id: `t${n}`, type: 'trust_bar', span: full, items: [{ icon: 'shield', title: 'Safe pay' }] }));
+    const seven = Array.from({ length: 7 }, (_, n) => ({ id: `t${n}`, type: 'trust_bar', span: full, items: [{ icon: 'shield', title: 'UdozoPay' }] }));
     assert.equal((await save([row(seven)])).json.error.param, 'rows[0].blocks');
     assert.equal((await save([row([seven[0]]), row([seven[0]])])).json.error.code, 'layout_invalid', 'a block id used twice');
     const photo = await save([row([seven[0]], { background: 'image' })]);

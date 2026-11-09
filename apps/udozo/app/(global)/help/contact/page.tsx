@@ -8,13 +8,13 @@ import { supportEmail, supportPhone, supportWhatsApp } from "@/lib/help";
 
 export const metadata: Metadata = {
   title: "Contact us",
-  description: "Write to Udozo's support team about an order, Safe pay, your account, selling or reselling. We reply by email.",
+  description: "Write to Udozo's support team about an order, UdozoPay, your account, selling or reselling. We reply by email.",
   alternates: { canonical: "/help/contact" },
 };
 
 /**
  * Contact us: the form to Udozo's support team (worked in Udozo's admin, Support > Contact us), and beside it the other
- * ways to get help: email, WhatsApp, a phone line, Safe pay and the FAQs. A signed-in customer's name and email start filled in.
+ * ways to get help: email, WhatsApp, a phone line, UdozoPay and the FAQs. A signed-in customer's name and email start filled in.
  */
 export default async function ContactPage() {
   const [customer, all] = await Promise.all([currentCustomer(), markets()]);
@@ -89,11 +89,11 @@ export default async function ContactPage() {
               <div className="flex gap-3">
                 <ShieldCheck className="mt-0.5 size-6 shrink-0 text-mint-700" aria-hidden="true" />
                 <div>
-                  <h2 className="font-bold text-navy-900">A problem with a Safe pay order?</h2>
+                  <h2 className="font-bold text-navy-900">A problem with a UdozoPay order?</h2>
                   <p className="text-sm text-navy-600">
                     Open a dispute from the order itself, before you confirm you received it: it reaches our team fastest.{" "}
-                    <Link href="/safe-trade#safe-pay" className="font-semibold text-navy-900 hover:underline">
-                      How Safe pay works
+                    <Link href="/safe-trade#udozopay" className="font-semibold text-navy-900 hover:underline">
+                      How UdozoPay works
                     </Link>
                   </p>
                 </div>
@@ -103,7 +103,7 @@ export default async function ContactPage() {
                 <div>
                   <h2 className="font-bold text-navy-900">Quick answers</h2>
                   <p className="text-sm text-navy-600">
-                    Buying, selling, Safe pay and your account:{" "}
+                    Buying, selling, UdozoPay and your account:{" "}
                     <Link href="/help/faqs" className="font-semibold text-navy-900 hover:underline">
                       read the FAQs
                     </Link>
@@ -112,7 +112,7 @@ export default async function ContactPage() {
                 </div>
               </div>
             </div>
-            <p className="rounded-2xl bg-white px-5 py-4 text-sm text-navy-600 ring-1 ring-navy-100">Udozo will never ask for your password, a code we texted or emailed you, or a Safe pay release code.</p>
+            <p className="rounded-2xl bg-white px-5 py-4 text-sm text-navy-600 ring-1 ring-navy-100">Udozo will never ask for your password, a code we texted or emailed you, or a UdozoPay release code.</p>
           </aside>
         </div>
       </div>

@@ -17,7 +17,7 @@ const secondary = "flex h-12 w-full items-center justify-center rounded-2xl bord
 const green = "flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 font-bold text-white hover:bg-emerald-800 disabled:opacity-60";
 
 /**
- * What the reader of a Safe pay order does now, by side and state (the design canvas's SellerAccept, BuyerOrder,
+ * What the reader of a UdozoPay order does now, by side and state (the design canvas's SellerAccept, BuyerOrder,
  * EnterCode and Dispute boards): the seller accepts (set-up first), hands over and enters the buyer's code or marks it
  * sent; the buyer pays from their wallet, shows their release code, confirms a delivery or reports a problem; either
  * side cancels before the hand-over. The API decides; this only offers what it would allow.
@@ -76,7 +76,7 @@ export function OrderPanel({
           {order.kind === "resale" ? <p className="text-sm text-slate-600">The buyer has paid: their money is locked until you accept, then held by Udozo until they have the item. Accept only if you can hand it over or ship it in time.</p> : null}
           {readiness && !readiness.ready ? (
             <div className="grid gap-2">
-              <p className="text-sm text-slate-600">{readiness.limited ? `You cannot take Safe pay orders right now (${readiness.strikes} of ${readiness.strike_limit} strikes in 90 days). You can still chat and sell directly.` : `First Safe pay sale: ${readiness.identity_required !== false ? "two quick steps" : "one quick step"}.`}</p>
+              <p className="text-sm text-slate-600">{readiness.limited ? `You cannot take UdozoPay orders right now (${readiness.strikes} of ${readiness.strike_limit} strikes in 90 days). You can still chat and sell directly.` : `First UdozoPay sale: ${readiness.identity_required !== false ? "two quick steps" : "one quick step"}.`}</p>
               {!readiness.limited ? (
                 <ol className="grid gap-2">
                   {readiness.identity_required !== false ? <SetupStep done={readiness.identity_checked} label={readiness.identity_checked ? "Identity check passed" : "Pass the identity check"} href="/account/verification" /> : null}
@@ -112,8 +112,8 @@ export function OrderPanel({
                   title: order.kind === "resale" ? "Accept this order?" : "Accept this request?",
                   body:
                     order.kind === "resale"
-                      ? "The buyer's money moves into Safe pay and the hand-over time starts. Accept only if you can hand it over or ship it in time."
-                      : `${order.with.name} can then pay with Safe pay. Accept only if you can hand it over in time.`,
+                      ? "The buyer's money moves into UdozoPay and the hand-over time starts. Accept only if you can hand it over or ship it in time."
+                      : `${order.with.name} can then pay with UdozoPay. Accept only if you can hand it over in time.`,
                   action: order.kind === "resale" ? "Accept order" : "Accept request",
                   tone: "money",
                 });
@@ -146,7 +146,7 @@ export function OrderPanel({
             onClick={async () => {
               const ok = await confirm({
                 title: `Pay ${shopMoney(total, order.currency)} from your wallet?`,
-                body: `Udozo holds it with Safe pay until you have the item and release it to ${order.with.name}.`,
+                body: `Udozo holds it with UdozoPay until you have the item and release it to ${order.with.name}.`,
                 action: `Pay ${shopMoney(total, order.currency)}`,
                 tone: "money",
               });

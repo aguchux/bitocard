@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("Udozo's legal documents", () => {
   test("every document has its page, no draft notice, contents and anchored sections; the hub lists them all", async () => {
-    expect(generateStaticParams().map(item => item.doc)).toEqual(["terms", "safe-pay", "sellers", "privacy", "cookies"]);
+    expect(generateStaticParams().map(item => item.doc)).toEqual(["terms", "udozopay", "sellers", "privacy", "cookies"]);
     const hub = render(LegalPage());
     expect(hub).not.toContain("Draft for lawyers");
     expect(hub).not.toContain("not open for real payments");
@@ -104,7 +104,7 @@ describe("Udozo's legal documents", () => {
 
   test("the footer and the sitemap list the documents", async () => {
     const footer = render(createElement(SiteFooter));
-    for (const slug of ["terms", "safe-pay", "sellers", "privacy", "cookies"]) expect(footer).toContain(`href="/legal/${slug}"`);
+    for (const slug of ["terms", "udozopay", "sellers", "privacy", "cookies"]) expect(footer).toContain(`href="/legal/${slug}"`);
     expect(footer).not.toContain("legals.bitocard.com");
     vi.stubGlobal("fetch", async () => Response.json({ object: "list", data: [], showcase: false }));
     const xml = await (await sitemapMain()).text();

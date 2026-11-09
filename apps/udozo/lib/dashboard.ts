@@ -12,7 +12,7 @@ export const metricLabels: Record<DashboardMetric, { name: string; detail: strin
   leads: { name: "Leads", detail: "Buyers who chatted, called or asked for your number", one: "lead", many: "leads" },
   chats: { name: "Chats", detail: "New chats buyers started with you", one: "chat", many: "chats" },
   saves: { name: "Saves", detail: "Times buyers saved your listings", one: "save", many: "saves" },
-  sales: { name: "Sales", detail: "Sales completed through Safe pay or a buy order", one: "sale", many: "sales" },
+  sales: { name: "Sales", detail: "Sales completed through UdozoPay or a buy order", one: "sale", many: "sales" },
 };
 export const metricOrder: DashboardMetric[] = ["views", "leads", "chats", "saves", "sales"];
 

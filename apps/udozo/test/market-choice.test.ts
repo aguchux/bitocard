@@ -25,9 +25,16 @@ const card = (id: string, country: string, area: string) => ({
   seller: { badges: [] },
 });
 vi.mock("@/lib/api", () => ({
+  query: (values: Record<string, string | undefined>) => {
+    const text = new URLSearchParams(Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+    return text ? `?${text}` : "";
+  },
   markets: async () => ({ showcase: true, data: open }),
   // No managed home page here (the API cannot give one), so the plain showcase shows.
-  shopApi: async (path: string) => (path.startsWith("/v1/classifieds/home") ? { ok: false, status: 0, code: null } : { ok: true, data: { trending: [card("1", "NG", "Ikeja")], recent: [card("2", "KE", "Westlands")] } }),
+  shopApi: async (path: string) =>
+    path.startsWith("/v1/classifieds/home") ? { ok: false, status: 0, code: null }
+    : path.startsWith("/v1/classifieds/hero-slides") ? { ok: true, data: { data: [] } }
+    : { ok: true, data: { trending: [card("1", "NG", "Ikeja")], recent: [card("2", "KE", "Westlands")] } },
 }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {

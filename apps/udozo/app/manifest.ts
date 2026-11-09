@@ -9,7 +9,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     id: "/",
     name: "Udozo – Buy and sell near you",
     short_name: "Udozo",
-    description: "Buy and sell near you, protected by Safe pay.",
+    description: "Buy and sell near you, protected by UdozoPay.",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -232,7 +232,7 @@ export async function changePassword(_state: FormState, form: FormData): Promise
 type Verification = { url?: string | null; status: string };
 
 /**
- * Starts the identity check (Udozo Verify) and sends the customer to it, returning to this site's own page. Safe pay
+ * Starts the identity check (Udozo Verify) and sends the customer to it, returning to this site's own page. UdozoPay
  * sellers pass it once before they are paid.
  */
 export async function startVerification(_state: FormState, form: FormData): Promise<FormState> {

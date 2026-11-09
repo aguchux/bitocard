@@ -2,7 +2,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 
 /**
  * In stock and out of stock (6 November 2026, the owner's request). Every listing's stock is tracked from posting: a
- * new one starts at none (out of stock) until its seller says how many they have, and buying (Safe pay, buy orders,
+ * new one starts at none (out of stock) until its seller says how many they have, and buying (UdozoPay, buy orders,
  * offers) needs some. A live listing at none stays on Udozo, out of stock, for `outOfStockDays`, then Anjio (the
  * `classifieds` job) takes it off; restocking gives it a listing period again.
  */

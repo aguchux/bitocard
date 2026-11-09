@@ -50,7 +50,7 @@ async function customer() {
   await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  // The BitoCard Shop terms, accepted before posting or UdozoPay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   shopper.email = email;
@@ -215,7 +215,7 @@ describe('moderators', () => {
     await admin.put('/v1/admin/classifieds/market-settings/NG', { listing_days: 30, max_photos: 12 });
   });
 
-  test('sellers are listed and opened with their listings, reports and Safe pay standing', async () => {
+  test('sellers are listed and opened with their listings, reports and UdozoPay standing', async () => {
     const seller = await customer();
     const live = (await submit(seller, await draft(seller, { title: 'Standing fan, 18 inch', category: 'home-appliances' }))).json;
     await (await customer()).post('/v1/classifieds/reports', { listing_id: live.id, reason: 'duplicate' });

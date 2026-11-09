@@ -15,7 +15,7 @@ const when = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "med
 const statusLabel: Record<StoreCustomerPayout["status"], string> = { pending: "Sending", processing: "Sending", paid: "Paid", failed: "Failed" };
 
 /**
- * Paying the money from the customer's Safe pay sales out to their own bank account (`/v1/store/cash`): what can be
+ * Paying the money from the customer's UdozoPay sales out to their own bank account (`/v1/store/cash`): what can be
  * paid out now and what waits for the payout hold, their bank accounts (in their verified name) and their payouts.
  */
 export default async function PayoutsPage() {

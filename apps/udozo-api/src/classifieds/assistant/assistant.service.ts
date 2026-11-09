@@ -50,9 +50,9 @@ export const suggestionKinds = ['draft', 'price', 'improve', 'reply'] as const;
 export type SuggestionKind = (typeof suggestionKinds)[number];
 
 const suggestedQuestions: Record<ShopSurface, string[]> = {
-  browse: ['A used phone under ₦300,000 near me', 'What should I check before buying a car?', 'How does Safe pay work?'],
-  sell: ['What should I write in my title?', 'Which features should I fill in?', 'How do I get paid with Safe pay?'],
-  help: ['How does Safe pay work?', 'What is a release code?', 'Where are my orders?'],
+  browse: ['A used phone under ₦300,000 near me', 'What should I check before buying a car?', 'How does UdozoPay work?'],
+  sell: ['What should I write in my title?', 'Which features should I fill in?', 'How do I get paid with UdozoPay?'],
+  help: ['How does UdozoPay work?', 'What is a release code?', 'Where are my orders?'],
 };
 
 /**
@@ -545,7 +545,7 @@ export class ShopAssistantService {
     const done = await this.structured(
       bot,
       scope,
-      `Suggest the person's next reply in this chat about "${chat.title ?? 'a listing'}" (they are the ${chat.side}): short, polite, keeping the trade on Udozo, recommending Safe pay or a public meet-up where money is involved, never asking for or sharing codes, phone numbers or bank details.\n\n${quoted('Messages', chat.lines.join('\n'), 3000) ?? '(no messages yet)'}`,
+      `Suggest the person's next reply in this chat about "${chat.title ?? 'a listing'}" (they are the ${chat.side}): short, polite, keeping the trade on Udozo, recommending UdozoPay or a public meet-up where money is involved, never asking for or sharing codes, phone numbers or bank details.\n\n${quoted('Messages', chat.lines.join('\n'), 3000) ?? '(no messages yet)'}`,
       { name: 'propose_reply', description: 'The suggested reply.', parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
     );
     const raw = typeof done.args?.text === 'string' ? done.args.text : '';

@@ -51,7 +51,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const description = `Shop from ${profile.name}${where ? ` in ${where}` : ""} on Udozo: ${profile.categories
     .slice(0, 3)
     .map(item => item.name.toLowerCase())
-    .join(", ")}${profile.categories.length ? ". " : ""}Chat with the seller and pay with Safe pay.`;
+    .join(", ")}${profile.categories.length ? ". " : ""}Chat with the seller and pay with UdozoPay.`;
   const query = await searchParams;
   // Indexed while they have something for sale, and only the page itself (not filtered or later pages).
   const filtered = Object.keys(query).some(key => ["category", "sort", "page", "rv_product", "rv_sort", "rv_page"].includes(key));
@@ -391,7 +391,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
                   ) : null}
                 </>
               ) : (
-                <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-600">No reviews yet. Buyers can rate {profile.name} after buying with Safe pay or a buy order.</p>
+                <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-600">No reviews yet. Buyers can rate {profile.name} after buying with UdozoPay or a buy order.</p>
               )}
             </section>
           ) : null}
@@ -416,7 +416,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
               <ShieldCheck className="size-5" aria-hidden="true" /> Buy safely
             </h2>
             <ul className="list-disc space-y-1 pl-5 text-sm text-navy-800">
-              <li>Pay with Safe pay: the seller is paid only once you have the item.</li>
+              <li>Pay with UdozoPay: the seller is paid only once you have the item.</li>
               <li>Meeting? Choose a busy public place and check the item first.</li>
               <li>Never pay in advance. Udozo never asks for your codes.</li>
             </ul>

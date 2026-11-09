@@ -89,7 +89,7 @@ export default async function ReviewsPage({ searchParams }: Props) {
             ))}
           </ul>
         ) : (
-          <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">Nothing to rate. When you buy with Safe pay or a buy order, you can rate the seller here.</p>
+          <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">Nothing to rate. When you buy with UdozoPay or a buy order, you can rate the seller here.</p>
         )
       ) : list.length ? (
         <ul className="grid gap-4">

@@ -1,5 +1,5 @@
 // BitoCard's other twelve African markets on Udozo, added closed: nobody can sign up in them or see them as a market
-// until an admin opens one, and each comes with its currency, every category as Nigeria has it, Safe pay and market
+// until an admin opens one, and each comes with its currency, every category as Nigeria has it, UdozoPay and market
 // settings, and its divisions with their towns (from GeoNames, a few old names as they are now).
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
@@ -50,11 +50,11 @@ describe('the twelve markets', () => {
     await admin.put('/v1/admin/switches/classifieds', { enabled: null });
   });
 
-  test('each has every category as Nigeria has it, Safe pay and market settings', async () => {
+  test('each has every category as Nigeria has it, UdozoPay and market settings', async () => {
     const nigeria = await prisma.classifiedCategoryCountry.count({ where: { country: 'NG' } });
     for (const country of added) {
       assert.equal(await prisma.classifiedCategoryCountry.count({ where: { country } }), nigeria, country);
-      assert.ok(await prisma.classifiedSafePaySettings.findUnique({ where: { country } }), `${country} Safe pay settings`);
+      assert.ok(await prisma.classifiedSafePaySettings.findUnique({ where: { country } }), `${country} UdozoPay settings`);
       assert.ok(await prisma.classifiedMarketSettings.findUnique({ where: { country } }), `${country} market settings`);
     }
   });

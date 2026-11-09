@@ -24,10 +24,10 @@ function toMinor(value: string) {
   return Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
-/** Refreshes the pages showing the payout accounts: Payouts and Safe pay's set-up. */
+/** Refreshes the pages showing the payout accounts: Payouts and UdozoPay's set-up. */
 function refresh() {
   revalidatePath(page);
-  revalidatePath("/account/safe-pay");
+  revalidatePath("/account/udozopay");
 }
 
 /** Adds a bank account to be paid into (in the customer's verified name; usable after 24 hours on live stores). */

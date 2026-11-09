@@ -22,7 +22,7 @@ after(async () => {
 });
 
 const visitor = () => client(server.base, { autoIdempotency: true });
-const message = (over = {}) => ({ kind: 'safe_pay', name: 'Chiamaka Eze', email: `chiamaka${Math.random().toString(36).slice(2, 8)}@example.com`, phone: '+234 803 112 0042', body: 'I paid with Safe pay but the seller has not answered.', country: 'ng', ...over });
+const message = (over = {}) => ({ kind: 'safe_pay', name: 'Chiamaka Eze', email: `chiamaka${Math.random().toString(36).slice(2, 8)}@example.com`, phone: '+234 803 112 0042', body: 'I paid with UdozoPay but the seller has not answered.', country: 'ng', ...over });
 
 describe('Contact us', () => {
   test('anyone sends a message: it is kept, the team told, the sender emailed its reference and nothing they wrote', async () => {

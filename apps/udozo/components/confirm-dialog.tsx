@@ -77,9 +77,9 @@ export function ConfirmBody({ options, onConfirm, onDismiss, titleId }: { option
   );
 }
 
-/** What answering an offer asks first: accepting fixes the price for Safe pay; declining and withdrawing end it. */
+/** What answering an offer asks first: accepting fixes the price for UdozoPay; declining and withdrawing end it. */
 export function offerQuestion(action: "accept" | "decline" | "withdraw", price: string, name: string): ConfirmOptions {
-  if (action === "accept") return { title: `Accept ${price}?`, body: `The price is agreed: the buyer can pay ${price} with Safe pay for the next 7 days. ${name} is told.`, action: `Accept ${price}`, tone: "money" };
+  if (action === "accept") return { title: `Accept ${price}?`, body: `The price is agreed: the buyer can pay ${price} with UdozoPay for the next 7 days. ${name} is told.`, action: `Accept ${price}`, tone: "money" };
   if (action === "decline") return { title: `Decline ${price}?`, body: `${name} is told, and can make another offer.`, action: "Decline offer", tone: "danger" };
   return { title: `Withdraw your offer of ${price}?`, body: "It can no longer be accepted. You can make another.", action: "Withdraw offer", dismiss: "Keep it", tone: "danger" };
 }

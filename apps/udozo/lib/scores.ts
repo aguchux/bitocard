@@ -21,7 +21,7 @@ export const anjioMethod = {
     "Anjio, Udozo's assistant, works out each seller's scores every night from what happens on Udozo: replies, answers to buyers, prices and completed sales. Nobody pays for a better score, and a score never changes how listings are ranked.",
   measures: [
     measure("response", "How long the seller usually takes to send a first reply in a chat over the last 90 days. A chat left without a reply counts as a week.", "Public, in words, from 5 chats."),
-    measure("attention", "How many buyers' chats, calls, call backs, offers and Safe pay requests the seller answered over 90 days.", "Public, in words, from 8 requests."),
+    measure("attention", "How many buyers' chats, calls, call backs, offers and UdozoPay requests the seller answered over 90 days.", "Public, in words, from 8 requests."),
     measure("pricing", "Whether prices stay as listed: prices raised within a week of a buyer asking, \"price on request\" and sales above the listed price count against it.", "Public only when strong, from 5 listings."),
     measure("costing", "How the seller's live prices compare with similar listings (same category, condition, brand and model) on Udozo. Very low prices are never rewarded.", "Public only when strong, from 3 listings."),
     measure("reliability", "Over 180 days: sales completed, against those cancelled after accepting, not answered in time, or that the buyer said did not happen.", "Public only when strong, from 3 sales."),

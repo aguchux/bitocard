@@ -144,7 +144,7 @@ function Examples({ currency, discountMin, markupMax, feeBps, feeCap }: { curren
         ) : (
           <p className="text-sm text-muted">Enter the smallest discount, the markup limit and the reseller fee with its cap to see examples.</p>
         )}
-        <p className="text-xs text-muted">The Safe pay fees apply on top, as for any Safe pay order.</p>
+        <p className="text-xs text-muted">The UdozoPay fees apply on top, as for any UdozoPay order.</p>
         <Notice tone="amber">Keep resale off in a market until the legal advice on holding money for supplier and reseller there is done.</Notice>
       </div>
     </Card>

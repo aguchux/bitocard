@@ -5,7 +5,7 @@ import type { MarketingChannel, MarketingOutcome, MarketingStage, MarketingStatu
 /** Marketing's five stages, in order, with what each one is for. */
 export const stageLabels: Record<MarketingStage, { title: string; text: string }> = {
   reach_out: { title: "Reach out", text: "First contact on WhatsApp (or Jiji chat). Open a conversation, not a hard sell." },
-  invitation: { title: "Invitation", text: "Send their invite link: Safe pay, buyers near them, their own store." },
+  invitation: { title: "Invitation", text: "Send their invite link: UdozoPay, buyers near them, their own store." },
   onboarding: { title: "Onboarding", text: "Help them sign up, confirm their email and mobile, and post a first listing." },
   follow_up: { title: "Follow-up", text: "Check in on day 1, 3 and 7: posted, stuck or no reply, and the next touch." },
   feedback: { title: "Feedback", text: "What worked, what blocked them, would they recommend Udozo." },

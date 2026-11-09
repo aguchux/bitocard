@@ -195,7 +195,7 @@ function Detail({ review }: { review: AdminReviewDetail }) {
               <span>Completed {formatDateTime(review.purchase.completed_at)}</span>
               {review.purchase.order ? (
                 <AppLink href={`/classifieds/orders/${review.purchase.order.id}`} className="w-fit font-semibold text-brand-600 hover:underline">
-                  Safe pay order {review.purchase.order.number}
+                  UdozoPay order {review.purchase.order.number}
                 </AppLink>
               ) : null}
               {review.purchase.buy_order ? (

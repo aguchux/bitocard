@@ -321,7 +321,7 @@ export function ChatThread({ initial, buy, assistant = null, fill = false }: { i
 }
 
 /**
- * An offer in the chat. An accepted one, to the buyer, leads to Buy with Safe pay at that price on Udozo
+ * An offer in the chat. An accepted one, to the buyer, leads to Buy with UdozoPay at that price on Udozo
  * (`buy`: the listing's buy page).
  */
 function OfferCard({ message, busy, onAnswer, buy, withName }: { message: ShopMessage; busy: boolean; onAnswer: (id: string, action: "accept" | "decline" | "withdraw") => void; buy: { path: string } | null; withName: string }) {
@@ -346,7 +346,7 @@ function OfferCard({ message, busy, onAnswer, buy, withName }: { message: ShopMe
       </span>
       {offer.status === "accepted" && buy ? (
         <a href={`${buy.path}?offer=${offer.id}`} className="mt-1 flex h-10 items-center justify-center rounded-xl bg-emerald-700 text-sm font-bold text-white">
-          Buy with Safe pay at this price
+          Buy with UdozoPay at this price
         </a>
       ) : null}
       {open ? (

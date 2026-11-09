@@ -172,7 +172,7 @@ describe("listing actions", () => {
     expect(await startChat(listing, "Hello")).toMatchObject({ ok: false, signIn: true });
   });
 
-  test("a Safe pay request: the delivery address only for deliveries", async () => {
+  test("a UdozoPay request: the delivery address only for deliveries", async () => {
     reply = () => Response.json({ object: "classified_order" }, { status: 201 });
     await requestSafePay({ listingId: listing, fulfilment: "meet_up", address: "ignored" });
     await requestSafePay({ listingId: listing, offerId: listing, fulfilment: "delivery", address: " 12 Allen Avenue, Ikeja " });

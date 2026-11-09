@@ -32,7 +32,7 @@ export const kindLabels: Record<string, string> = {
   contact: "Contact or call back asked",
   call: "Call",
   offer: "Offer made",
-  order: "Safe pay order",
+  order: "UdozoPay order",
 };
 
 export const kindLabel = (kind: string) => kindLabels[kind] ?? kind.replace(/_/g, " ");

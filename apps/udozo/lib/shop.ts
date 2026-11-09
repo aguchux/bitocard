@@ -169,7 +169,7 @@ export function featureValue(feature: Pick<ShopFeature, "data_type" | "choices">
   return text.slice(0, 120);
 }
 
-// ---- Safe pay orders ----
+// ---- UdozoPay orders ----
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 

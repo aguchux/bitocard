@@ -273,7 +273,7 @@ export const eventObjectSchemas: Record<string, Schema> = {
       currency: str('ISO 4217 currency of every amount.'),
       price: money('Your price for the units'),
       delivery_fee: money('The supplier’s delivery charge the buyer pays on top (0 for a hand-over in person)'),
-      buyer_fee: money('BitoCard’s Safe pay fee the buyer pays on top'),
+      buyer_fee: money('BitoCard’s UdozoPay fee the buyer pays on top'),
       total: money('What the buyer paid in all'),
       supplier_net: money('What the supplier gets before their fee: their price less your discount'),
       margin: money('Your margin before BitoCard’s fee: your price less the supplier’s net'),

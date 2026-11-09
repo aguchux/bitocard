@@ -9,7 +9,7 @@ const icons: Record<HelpIcon, typeof LifeBuoy> = { help: LifeBuoy, shield: Shiel
 
 /**
  * The header's **Get help** button (the icon alone on phones) and its menu, dropped from the button with a pointer
- * joining them: Help Centre, Safe pay, Track orders, FAQs, Resell on Udozo, Pickup centres and Contact us. What is not
+ * joining them: Help Centre, UdozoPay, Track orders, FAQs, Resell on Udozo, Pickup centres and Contact us. What is not
  * open yet is shown, marked Soon, and is not a link. It closes on choosing, on Escape and on a click outside.
  */
 export function HelpMenu() {

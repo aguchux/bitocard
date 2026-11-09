@@ -124,7 +124,7 @@ export function ResaleListingDetail({ item, storeName, buy }: { item: ResaleStor
             <ShieldCheck className="size-5" aria-hidden="true" /> Your payment is protected
           </p>
           <p>You pay from your wallet; the money is held, never sent to anyone, until you confirm you have the item. If it does not arrive or is not as described, you get it back.</p>
-          {item.buyer_fee ? <p className="text-xs opacity-80">A Safe pay fee of {shopMoney(item.buyer_fee, item.currency)} is added at checkout.</p> : null}
+          {item.buyer_fee ? <p className="text-xs opacity-80">A UdozoPay fee of {shopMoney(item.buyer_fee, item.currency)} is added at checkout.</p> : null}
         </div>
         {buy}
         {item.safety_checklist.length ? (

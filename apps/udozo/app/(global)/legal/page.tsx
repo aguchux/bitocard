@@ -5,7 +5,7 @@ import { legalContact, legalDocuments, legalVersion, operator, supportContact } 
 
 export const metadata: Metadata = {
   title: "Legal",
-  description: "Udozo's terms of use, Safe pay rules, seller terms, privacy notice and cookie notice.",
+  description: "Udozo's terms of use, UdozoPay rules, seller terms, privacy notice and cookie notice.",
   alternates: { canonical: "/legal" },
 };
 
@@ -16,7 +16,7 @@ export default function LegalPage() {
       <header className="grid gap-2">
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Legal</h1>
         <p className="text-navy-600">
-          How Udozo works, how Safe pay holds your money, the terms for sellers, and how your data is used. Version {legalVersion}, last updated {legalDate}.
+          How Udozo works, how UdozoPay holds your money, the terms for sellers, and how your data is used. Version {legalVersion}, last updated {legalDate}.
         </p>
       </header>
       <ul className="grid gap-3 sm:grid-cols-2">

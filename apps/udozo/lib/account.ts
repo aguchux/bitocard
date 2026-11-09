@@ -42,7 +42,7 @@ export async function requireCustomer(path: string) {
 }
 
 /**
- * Every selling page (listings, messages, orders, Safe pay, payouts): the customer as `requireCustomer`, and their
+ * Every selling page (listings, messages, orders, UdozoPay, payouts): the customer as `requireCustomer`, and their
  * market. Udozo not open in their country: not found, as there is nothing to sell into.
  */
 export async function requireSeller(path: string) {

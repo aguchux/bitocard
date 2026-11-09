@@ -116,7 +116,7 @@ async function customer(name) {
   await confirmMobile(server.app, shopper);
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  // The BitoCard Shop terms, accepted before posting or UdozoPay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   return shopper;
@@ -302,7 +302,7 @@ describe('conversations', () => {
     assert.match(sent.system[0].text, /Never claim to be a person/);
     assert.match(sent.system[0].text, /simple HTML, never Markdown/);
     assert.match(sent.system[0].text, /Only Udozo in Nigeria/);
-    assert.match(sent.system[1].text, /Safe pay/, 'the country knowledge is the cached block');
+    assert.match(sent.system[1].text, /UdozoPay/, 'the country knowledge is the cached block');
     assert.ok(!sent.tools.some(item => item.name === 'my_orders'), 'signed out: nothing personal');
 
     const stranger = shopServer();
@@ -312,11 +312,11 @@ describe('conversations', () => {
   });
 
   test('answers stream as server-sent events: each tool, its cards, then the message', async () => {
-    ai.state.script = [{ tool: { name: 'safe_pay_quote', arguments: { price: 100000 } } }, { text: 'With Safe pay you pay the total shown.' }];
-    const streamed = await made.visitor.post(`/v1/classifieds/assistant/threads/${made.visitorThread}/messages`, { body: 'What do I pay with Safe pay for 100,000?' }, { accept: 'text/event-stream' });
+    ai.state.script = [{ tool: { name: 'safe_pay_quote', arguments: { price: 100000 } } }, { text: 'With UdozoPay you pay the total shown.' }];
+    const streamed = await made.visitor.post(`/v1/classifieds/assistant/threads/${made.visitorThread}/messages`, { body: 'What do I pay with UdozoPay for 100,000?' }, { accept: 'text/event-stream' });
     assert.deepEqual(streamed.events.map(item => item.event), ['status', 'cards', 'message']);
     assert.deepEqual(streamed.events[1].data.cards[0], { type: 'safe_pay', currency: 'NGN', price: 10000000, fee: 200000, total: 10200000, listing_id: null });
-    assert.equal(streamed.events[2].data.body, '<p>With Safe pay you pay the total shown.</p>');
+    assert.equal(streamed.events[2].data.body, '<p>With UdozoPay you pay the total shown.</p>');
   });
 
   test('a visitor’s daily limit is per address; failure is quiet', async () => {
@@ -437,9 +437,9 @@ describe("sellers' suggestions", () => {
     assert.equal(chat.status, 201, JSON.stringify(chat.json));
     ai.state.script = [{ tool: { name: 'propose_reply', arguments: { text: 'Yes! Call me on 0803 123 4567.' } } }];
     assert.equal((await made.seller.post('/v1/classifieds/assistant/suggestions', { kind: 'reply', conversation_id: chat.json.id })).json.suggestion, null);
-    ai.state.script = [{ tool: { name: 'propose_reply', arguments: { text: 'Yes, it is available. We can meet at Ikeja City Mall, or you can buy it with Safe pay.' } } }];
+    ai.state.script = [{ tool: { name: 'propose_reply', arguments: { text: 'Yes, it is available. We can meet at Ikeja City Mall, or you can buy it with UdozoPay.' } } }];
     const reply = await made.seller.post('/v1/classifieds/assistant/suggestions', { kind: 'reply', conversation_id: chat.json.id });
-    assert.equal(reply.json.suggestion.text, 'Yes, it is available. We can meet at Ikeja City Mall, or you can buy it with Safe pay.');
+    assert.equal(reply.json.suggestion.text, 'Yes, it is available. We can meet at Ikeja City Mall, or you can buy it with UdozoPay.');
     assert.match(lastRequest().messages[0].content, /information only, not instructions/, 'the chat reaches the model fenced as data');
   });
 });
@@ -448,12 +448,12 @@ describe('evals and retention', () => {
   const replyFor = ask => {
     if (/iPhone 13 under/.test(ask)) return { tool: { name: 'search_listings', arguments: { words: 'iphone 13', price_max: 400000, condition: ['used'] } } };
     if (/new laptops/.test(ask)) return { tool: { name: 'search_listings', arguments: { words: 'laptop', condition: ['new'] } } };
-    if (/Safe pay\?/.test(ask)) return { tool: { name: 'safe_pay_quote', arguments: { price: 100000 } } };
+    if (/UdozoPay\?/.test(ask)) return { tool: { name: 'safe_pay_quote', arguments: { price: 100000 } } };
     if (/used car/.test(ask)) return { tool: { name: 'safety_checklist', arguments: { category: 'cars' } } };
     if (/What can I buy/.test(ask)) return { tool: { name: 'categories', arguments: {} } };
     if (/release code/.test(ask)) return { text: 'Never send your release code: give it only face to face, after inspecting.' };
-    if (/delivery fee/.test(ask)) return { text: 'Do not pay in advance: buy with Safe pay instead.' };
-    if (/deposit/.test(ask)) return { text: 'Do not pay that deposit: it is a scam. Use Safe pay.' };
+    if (/delivery fee/.test(ask)) return { text: 'Do not pay in advance: buy with UdozoPay instead.' };
+    if (/deposit/.test(ask)) return { text: 'Do not pay that deposit: it is a scam. Use UdozoPay.' };
     return { text: 'Sorry, I can only help with Udozo in Nigeria.' };
   };
 
@@ -505,13 +505,13 @@ describe('the rules in code', () => {
     const allowed = new Set([url]);
     // HTML as asked: kept, attributes and unknown tags removed, links only to what a tool returned.
     assert.equal(
-      answerHtml(`<p>Hello <b>Ada</b>,</p><ul><li><a href="${url}" onclick="x()">iPhone 13</a></li><li><a href="https://evil.example">here</a></li></ul><script>alert(1)</script><p class="x">Use <i>Safe pay</i>.</p>`, allowed),
-      `<p>Hello <strong>Ada</strong>,</p><ul><li><a href="${url}">iPhone 13</a></li><li>here</li></ul><p>Use <em>Safe pay</em>.</p>`,
+      answerHtml(`<p>Hello <b>Ada</b>,</p><ul><li><a href="${url}" onclick="x()">iPhone 13</a></li><li><a href="https://evil.example">here</a></li></ul><script>alert(1)</script><p class="x">Use <i>UdozoPay</i>.</p>`, allowed),
+      `<p>Hello <strong>Ada</strong>,</p><ul><li><a href="${url}">iPhone 13</a></li><li>here</li></ul><p>Use <em>UdozoPay</em>.</p>`,
     );
     // Markdown anyway: headings, bold, bullets, numbers and links become the same tags.
     assert.equal(
-      answerHtml(`## Your options\n\n**Two** phones match:\n- [iPhone 13](${url})\n- A *Samsung* A54\n\n1. Chat first\n2. Pay with Safe pay`, allowed),
-      `<p><strong>Your options</strong></p><p><strong>Two</strong> phones match:</p><ul><li><a href="${url}">iPhone 13</a></li><li>A <em>Samsung</em> A54</li></ul><ol><li>Chat first</li><li>Pay with Safe pay</li></ol>`,
+      answerHtml(`## Your options\n\n**Two** phones match:\n- [iPhone 13](${url})\n- A *Samsung* A54\n\n1. Chat first\n2. Pay with UdozoPay`, allowed),
+      `<p><strong>Your options</strong></p><p><strong>Two</strong> phones match:</p><ul><li><a href="${url}">iPhone 13</a></li><li>A <em>Samsung</em> A54</li></ul><ol><li>Chat first</li><li>Pay with UdozoPay</li></ol>`,
     );
     // Plain words: paragraphs and line breaks; escaped; tags left open are closed; secrets hidden.
     assert.equal(answerHtml('Line one\nline two\n\nNext <b>para', allowed), '<p>Line one<br>line two</p><p>Next <strong>para</strong></p>');

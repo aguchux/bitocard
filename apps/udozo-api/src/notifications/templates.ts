@@ -268,7 +268,7 @@ export function marketingInviteEmail(to: string, input: { name: string; from: st
       ...(input.message?.trim()
         ? input.message.trim().split(/\n{2,}/).map(paragraph => paragraph.replace(/\s*\n\s*/g, ' '))
         : [
-            `${input.from} from Udozo here. Udozo is a marketplace where buyers near you find what you sell, and can pay safely with Safe pay: the money is held until they have the item.`,
+            `${input.from} from Udozo here. Udozo is a marketplace where buyers near you find what you sell, and can pay safely with UdozoPay: the money is held until they have the item.`,
             'Signing up takes two minutes and listing is free. You can also open your own store on Seller HQ, at no cost.',
           ]),
       `Create your account: ${input.link}`,
@@ -293,7 +293,7 @@ export function contactReceivedEmail(to: string, input: { name: string; referenc
     [
       `Hi ${first}, thank you for writing to Udozo. Our support team will reply to this email address, usually within one working day.`,
       `If you write again about the same thing, mention ${input.reference}.`,
-      'Udozo will never ask for your password, a code we texted you, or a Safe pay release code.',
+      'Udozo will never ask for your password, a code we texted you, or a UdozoPay release code.',
       'If you did not write to us, you can ignore this email.',
     ],
     undefined,

@@ -20,7 +20,7 @@ function moneyLines(order: ShopOrder): Line[] {
     return [
       { label: order.quantity > 1 ? `Item × ${order.quantity}` : "Item", value: order.price },
       ...delivery,
-      { label: "Safe pay fee", value: order.buyer_fee ?? 0 },
+      { label: "UdozoPay fee", value: order.buyer_fee ?? 0 },
       { label: ["requested", "awaiting_payment"].includes(order.status) ? "Total to pay" : order.status === "locked" ? "Paid: locked in your wallet" : "Paid from wallet", value: order.total ?? order.price, strong: true },
     ];
   }
@@ -29,13 +29,13 @@ function moneyLines(order: ShopOrder): Line[] {
     { label: order.resale ? (order.quantity > 1 ? `Your price × ${order.quantity}` : "Your price") : "Price agreed", value: order.price },
     ...(order.resale ? [{ label: "Reseller’s discount", value: -(order.resale.supplier_price - order.resale.supplier_net) }] : []),
     ...delivery,
-    { label: "Your Safe pay fee", value: -(order.seller_fee ?? 0) },
+    { label: "Your UdozoPay fee", value: -(order.seller_fee ?? 0) },
     { label: settled ? "Paid to you" : "You will be paid", value: order.payout ?? order.price, strong: true },
   ];
 }
 
 /**
- * A Safe pay order, from the reader's side: its status, what to do now, a resale order's buyer details (for the
+ * A UdozoPay order, from the reader's side: its status, what to do now, a resale order's buyer details (for the
  * supplier) and its threads, the shipment with its tracking and dispatch photos, the dispute, progress and money.
  * Shared by the account (`/account/orders/<id>`) and a Resale shop's buyer (`/account/purchases/<id>`).
  */

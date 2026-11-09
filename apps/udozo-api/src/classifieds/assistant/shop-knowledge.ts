@@ -12,7 +12,7 @@ export const shopKnowledgeTitles: Record<ShopKnowledgeKey, string> = {
   shop: 'Udozo',
   categories: 'Categories and what to fill in',
   posting: 'Posting rules and limits',
-  safe_pay: 'Safe pay',
+  safe_pay: 'UdozoPay',
   safe_trade: 'Safe Trade Guide',
   prohibited: 'Prohibited items',
   badges: 'Seller badges',
@@ -46,7 +46,7 @@ export type ShopKnowledgeData = Awaited<ReturnType<ShopKnowledgeService['gather'
 
 /**
  * A shop assistant's knowledge for one country, generated from what BitoCard holds (no AI, so every fact is exact): the
- * Shop, its categories and their suggested features and checks, the posting rules, Safe pay with the market's own fees
+ * Shop, its categories and their suggested features and checks, the posting rules, UdozoPay with the market's own fees
  * and deadlines, the Safe Trade Guide, prohibited items, badges and help. Wholly BitoCard's: regenerated whenever the
  * market's settings change. The admin's own sections live in the assistant's shared document.
  */
@@ -116,7 +116,7 @@ export class ShopKnowledgeService {
         `# ${shopKnowledgeTitles.shop}`,
         `- Udozo in ${data.name}: udozo.com/${data.country.toLowerCase()}. People buy and sell near them: phones, cars, property, electronics and more.`,
         `- Prices are in ${data.currency}. Every account can buy and sell; sellers post from their account on udozo.com (Sell).`,
-        '- Buyers chat with sellers on Udozo, make offers, and can pay with Safe pay where it is open.',
+        '- Buyers chat with sellers on Udozo, make offers, and can pay with UdozoPay where it is open.',
       ].join('\n'),
       categories: [
         `# ${shopKnowledgeTitles.categories}`,
@@ -129,22 +129,22 @@ export class ShopKnowledgeService {
         `- A listing needs a title (5 to 90 characters), a category, a price (or "on request"), its area, ${data.minPhotos} to ${data.maxPhotos} photos and, optionally, a video of up to 60 seconds.`,
         '- Titles and descriptions cannot contain links, web addresses, phone numbers to take buyers elsewhere, or HTML.',
         `- A listing stays up ${data.listingDays} days and can be renewed. Each seller can post ${data.monthlyLimit} listings a month.`,
-        `- Every listing says how many the seller has in stock (none until they say). Out of stock, nobody can buy it (Safe pay, buy orders and offers are closed) and it stays up ${outOfStockDays} days, then Anjio takes it off unless the seller restocks it from My listings. A sale that takes the last one leaves it out of stock.`,
+        `- Every listing says how many the seller has in stock (none until they say). Out of stock, nobody can buy it (UdozoPay, buy orders and offers are closed) and it stays up ${outOfStockDays} days, then Anjio takes it off unless the seller restocks it from My listings. A sale that takes the last one leaves it out of stock.`,
         `- A new seller's first ${data.firstReviewed} listings are checked by a moderator before they go live; so are listings that look doubtful.`,
         '- Sellers mark a listing sold, renew it or delete it from My listings.',
       ].join('\n'),
       safe_pay: sp
         ? [
             `# ${shopKnowledgeTitles.safe_pay}`,
-            '- The buyer asks to buy with Safe pay at the listed price or an accepted offer; the seller accepts; the buyer pays from their Udozo wallet and Udozo holds the money.',
+            '- The buyer asks to buy with UdozoPay at the listed price or an accepted offer; the seller accepts; the buyer pays from their Udozo wallet and Udozo holds the money.',
             `- Fees: the buyer pays ${sp.buyer} on top; the seller pays ${sp.seller} out of what they are paid. The total is shown before paying.`,
             `- Deadlines: the seller accepts within ${sp.acceptHours} hours, the buyer pays within ${sp.payHours} hours, the hand-over happens within ${sp.handoverDays} days, and a delivery is confirmed within ${sp.confirmDays} days (then it is released by itself).`,
             '- At a meet-up the buyer gives the seller their release code only once they have inspected the item; the seller enters it and is paid. For a delivery the buyer confirms it arrived.',
             '- Never share the release code before inspecting, and never anywhere but face to face. Udozo never asks for it.',
             '- If the seller cancels or does not hand over in time, the buyer is refunded in full, fee included. Not as described, or it never came: the buyer opens a dispute and Udozo decides (a refund, part refund or release).',
-            '- Sellers need an identity check and a payout bank account in their verified name before their first Safe pay sale; what they are paid can be withdrawn after the payout hold.',
+            '- Sellers need an identity check and a payout bank account in their verified name before their first UdozoPay sale; what they are paid can be withdrawn after the payout hold.',
           ].join('\n')
-        : `# ${shopKnowledgeTitles.safe_pay}\n- Safe pay is not open in ${data.name} yet: buyers and sellers arrange payment themselves. Follow the Safe Trade Guide.`,
+        : `# ${shopKnowledgeTitles.safe_pay}\n- UdozoPay is not open in ${data.name} yet: buyers and sellers arrange payment themselves. Follow the Safe Trade Guide.`,
       safe_trade: [
         `# ${shopKnowledgeTitles.safe_trade}`,
         ...safeTradeGuide.map(group => `## ${group.title}\n${group.items.map(item => `- ${item}`).join('\n')}`),
@@ -165,7 +165,7 @@ export class ShopKnowledgeService {
       contact: [
         `# ${shopKnowledgeTitles.contact}`,
         '- Report a listing or a chat from its menu; enough reports send it back to a moderator.',
-        '- A Safe pay order’s problems go through its dispute, from the order.',
+        '- A UdozoPay order’s problems go through its dispute, from the order.',
         '- Anything else: Talk to a person opens a chat with Udozo’s support.',
       ].join('\n'),
     };

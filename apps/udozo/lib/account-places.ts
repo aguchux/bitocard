@@ -1,7 +1,7 @@
 /** What the account's places show beside their names: unread messages, requests and resellers waiting on the seller. */
 export type PlaceCounts = { unread: number; resellers: { count: number; waiting: number }; requests?: number; buyOrders?: number; reviews?: number; notifications?: number };
 
-export type PlaceKey = "dashboard" | "listings" | "notifications" | "messages" | "requests" | "buy-orders" | "orders" | "reviews" | "favourites" | "wanted" | "resellers" | "wallet" | "safe-pay" | "payouts" | "profile";
+export type PlaceKey = "dashboard" | "listings" | "notifications" | "messages" | "requests" | "buy-orders" | "orders" | "reviews" | "favourites" | "wanted" | "resellers" | "wallet" | "udozopay" | "payouts" | "profile";
 
 export type Place = { key: PlaceKey; href: string; label: string; badge?: number; also?: string[] };
 
@@ -19,13 +19,13 @@ export function accountPlaces(counts: PlaceCounts): Place[] {
     { key: "notifications", href: "/account/notifications", label: "Notifications", ...(counts.notifications ? { badge: counts.notifications } : {}) },
     { key: "requests", href: "/account/requests", label: "Requests", ...(counts.requests ? { badge: counts.requests } : {}) },
     { key: "buy-orders", href: "/account/buy-orders", label: "Buy orders", ...(counts.buyOrders ? { badge: counts.buyOrders } : {}) },
-    { key: "orders", href: "/account/orders", label: "Safe pay orders" },
+    { key: "orders", href: "/account/orders", label: "UdozoPay orders" },
     { key: "reviews", href: "/account/reviews", label: "Reviews", also: ["/account/ratings"], ...(counts.reviews ? { badge: counts.reviews } : {}) },
     { key: "favourites", href: "/account/favourites", label: "Favourites" },
     { key: "wanted", href: "/account/wanted", label: "Wanted requests" },
     ...(counts.resellers.count ? [{ key: "resellers" as const, href: "/account/resellers", label: "My Resellers", ...(counts.resellers.waiting ? { badge: counts.resellers.waiting } : {}) }] : []),
     { key: "wallet", href: "/account/wallet", label: "Wallet" },
-    { key: "safe-pay", href: "/account/safe-pay", label: "Safe pay" },
+    { key: "udozopay", href: "/account/udozopay", label: "UdozoPay" },
     { key: "payouts", href: "/account/payouts", label: "Payouts" },
     { key: "profile", href: "/account/profile", label: "Profile", also: ["/account/verification", "/account/privacy"] },
   ];

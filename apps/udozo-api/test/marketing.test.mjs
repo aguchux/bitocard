@@ -146,8 +146,8 @@ describe('working a seller', () => {
 
     const assigned = await support.patch(`/v1/admin/marketing/prospects/${id}`, { owner_id: (await prisma.user.findFirstOrThrow({ where: { realm: 'admin', adminRoles: { has: 'finance' } } })).id });
     assert.ok(assigned.json.owner);
-    const fed = await support.post(`/v1/admin/marketing/prospects/${id}/feedback`, { rating: 4, would_recommend: true, notes: 'Liked Safe pay', advocacy: 'advocate' });
-    assert.deepEqual(fed.json.feedback, { rating: 4, would_recommend: true, notes: 'Liked Safe pay', advocacy: 'advocate' });
+    const fed = await support.post(`/v1/admin/marketing/prospects/${id}/feedback`, { rating: 4, would_recommend: true, notes: 'Liked UdozoPay', advocacy: 'advocate' });
+    assert.deepEqual(fed.json.feedback, { rating: 4, would_recommend: true, notes: 'Liked UdozoPay', advocacy: 'advocate' });
     assert.deepEqual(
       fed.json.activities.map(item => item.kind).reverse(),
       ['imported', 'message', 'invite', 'follow_up', 'stage', 'assigned', 'feedback'],

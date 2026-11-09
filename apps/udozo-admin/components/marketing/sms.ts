@@ -7,7 +7,7 @@ import type { MessageTemplate } from "./templates";
  */
 export const smsTemplates: MessageTemplate[] = [
   { key: "sms_reach_out", stage: "reach_out", label: "First contact", text: "Hi {first}, I'm {me} from Udozo. I saw your {category} adverts on {source}. Udozo is a new marketplace where buyers near you can pay safely. Can I tell you more?" },
-  { key: "sms_invitation", stage: "invitation", label: "Invitation with link", text: "Hi {first}, here is your invitation to sell on Udozo: {link} Listing is free, and Safe pay holds the buyer's money until they have the item. - {me}, Udozo" },
+  { key: "sms_invitation", stage: "invitation", label: "Invitation with link", text: "Hi {first}, here is your invitation to sell on Udozo: {link} Listing is free, and UdozoPay holds the buyer's money until they have the item. - {me}, Udozo" },
   { key: "sms_onboarding", stage: "onboarding", label: "Onboarding nudge", text: "Hi {first}, how did sign-up go? Post your first listing at {sell} - a few clear photos and your price are enough. Reply if you need help. - {me}, Udozo" },
   { key: "sms_follow_up", stage: "follow_up", label: "Follow-up", text: "Hi {first}, {me} from Udozo again. Your invitation is still open: {link} Reply if you'd like help with your first listing." },
   { key: "sms_feedback", stage: "feedback", label: "Ask for feedback", text: "Hi {first}, thanks for trying Udozo. From 1 to 5, how likely are you to recommend it to another seller? Reply with a number and a line on why." },

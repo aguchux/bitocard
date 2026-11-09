@@ -8,7 +8,7 @@ import { faqJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "FAQs",
-  description: "Answers about buying and selling on Udozo, Safe pay, calls and contact requests, reselling on Seller HQ, and your account.",
+  description: "Answers about buying and selling on Udozo, UdozoPay, calls and contact requests, reselling on Seller HQ, and your account.",
   alternates: { canonical: "/help/faqs" },
 };
 

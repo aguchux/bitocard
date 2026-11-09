@@ -25,7 +25,7 @@ const icons = {
   wanted: Megaphone,
   resellers: Store,
   wallet: WalletMinimal,
-  "safe-pay": ShieldCheck,
+  udozopay: ShieldCheck,
   payouts: Landmark,
   profile: UserRound,
 };

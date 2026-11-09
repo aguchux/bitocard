@@ -134,7 +134,7 @@ export function ContactForm({ initial, country }: { initial: { name: string; ema
           required
         />
         <p id="contact-body-hint" className="text-xs text-navy-500">
-          Never send a password, a code we texted you or a Safe pay release code. We will never ask for them.
+          Never send a password, a code we texted you or a UdozoPay release code. We will never ask for them.
         </p>
       </div>
       {problem ? (

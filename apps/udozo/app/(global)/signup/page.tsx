@@ -32,7 +32,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
     <div className="mx-auto grid max-w-md gap-4 px-4 py-8">
       <SignupVisit />
       <h1 className="text-2xl leading-tight font-extrabold">Create your Udozo account</h1>
-      <p className="text-sm text-navy-600">Buy and sell near you, and pay safely with Safe pay. One account works on udozo.com and every Udozo store.</p>
+      <p className="text-sm text-navy-600">Buy and sell near you, and pay safely with UdozoPay. One account works on udozo.com and every Udozo store.</p>
       <section className="rounded-3xl border border-navy-200 bg-white p-5">
         {authErrorText(params.auth_error) ? (
           <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">

@@ -149,7 +149,7 @@ export const switchDefinitions = {
   },
   classifieds_safe_pay: {
     scopes: ['global', 'country'],
-    description: "Safe pay on Udozo: buyers pay from their wallet, Udozo holds the money until they confirm, then pays the seller. Needs classifieds on and the market's Safe pay fees set. Off until holding buyers' money is cleared there.",
+    description: "UdozoPay on Udozo: buyers pay from their wallet, Udozo holds the money until they confirm, then pays the seller. Needs classifieds on and the market's UdozoPay fees set. Off until holding buyers' money is cleared there.",
   },
   classifieds_buy_orders: {
     scopes: ['global', 'country'],
@@ -179,7 +179,7 @@ export const switchDefinitions = {
   classifieds_reviews: {
     scopes: ['global', 'country'],
     description:
-      "Reviews on Udozo: buyers who completed a purchase (a Safe pay order or a buy order the seller marked sold) review the seller, positive or negative (neutral where the market allows it), and the seller and other buyers of the same item reply. Purchases are recorded while it is off. Off: no reviews are written or shown there.",
+      "Reviews on Udozo: buyers who completed a purchase (a UdozoPay order or a buy order the seller marked sold) review the seller, positive or negative (neutral where the market allows it), and the seller and other buyers of the same item reply. Purchases are recorded while it is off. Off: no reviews are written or shown there.",
   },
   classifieds_interaction_ratings: {
     scopes: ['global', 'country'],
@@ -223,7 +223,7 @@ export const switchDefinitions = {
   customer_identity_check: {
     scopes: ['global', 'country'],
     description:
-      "Udozo customers must pass an identity check (live) before they accept Safe pay orders, open listings to resellers or pay money out, and payout accounts must carry the name it verified. Off (the default): the check is optional, offered but never required, and payout accounts must carry the name on the customer's Udozo account.",
+      "Udozo customers must pass an identity check (live) before they accept UdozoPay orders, open listings to resellers or pay money out, and payout accounts must carry the name it verified. Off (the default): the check is optional, offered but never required, and payout accounts must carry the name on the customer's Udozo account.",
   },
   personalisation: {
     scopes: ['global', 'country'],
@@ -299,7 +299,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
 
 /**
  * Udozo's switches: the marketplace's and B2B reselling's, plus the shared ones it uses (resellers' own domains, the
- * Udozo wallet Safe pay is paid from, resellers' two-step sign-in, Seller HQ's install prompt and manual approval of
+ * Udozo wallet UdozoPay is paid from, resellers' two-step sign-in, Seller HQ's install prompt and manual approval of
  * resellers). Everything else is BitoCard's and never listed or set on Udozo: the startup allowance, the welcome bonus,
  * reserved accounts, resellers' own suppliers and payment gateways (resellers never integrate on Udozo), spin and win,
  * the digital-product store templates (every Udozo store is a resale shop), bitocard.com and its country stores. Unlisted,

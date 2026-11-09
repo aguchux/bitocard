@@ -31,9 +31,9 @@ export default async function BuyOrdersPage({ searchParams }: Props) {
     <div className="grid gap-5">
       <PageTitle title="Buy orders" />
       <p className="-mt-2 text-sm text-slate-600">
-        Ask to buy at your price; once the seller accepts, it is held for you while you meet and pay in person. Paying with Safe pay instead? Those are in{" "}
+        Ask to buy at your price; once the seller accepts, it is held for you while you meet and pay in person. Paying with UdozoPay instead? Those are in{" "}
         <Link href="/account/orders" className="font-semibold underline">
-          Safe pay orders
+          UdozoPay orders
         </Link>
         .
       </p>

@@ -9,7 +9,7 @@ import { disputeReasonLabels, ListingCell, PersonCell } from "@/components/class
 
 const decisionLabels: Record<string, string> = { release: "Released to the seller", refund: "Refunded in full", partial: "Part refunded" };
 
-/** Udozo > Disputes: Safe pay orders a buyer disputed, oldest first. Open one to read it and decide. */
+/** Udozo > Disputes: UdozoPay orders a buyer disputed, oldest first. Open one to read it and decide. */
 export default function ClassifiedDisputesPage() {
   const [status, setStatus] = useState<"open" | "decided">("open");
   const disputes = useClassifiedDisputesQuery({ status });
@@ -52,7 +52,7 @@ export default function ClassifiedDisputesPage() {
 
   return (
     <UdozoShell section="marketplace" current="/classifieds/disputes" crumbs={[{ label: "Marketplace", href: "/classifieds" }, { label: "Disputes" }]}>
-      <PageHeader title="Disputes" description="Safe pay orders a buyer disputed: the money stays in escrow until Udozo decides. Write to both sides, then release, refund or part refund (refunds are finance's)." />
+      <PageHeader title="Disputes" description="UdozoPay orders a buyer disputed: the money stays in escrow until Udozo decides. Write to both sides, then release, refund or part refund (refunds are finance's)." />
       <div className="mt-6">
         <Tabs
           label="Dispute status"

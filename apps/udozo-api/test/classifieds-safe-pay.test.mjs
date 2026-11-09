@@ -1,4 +1,4 @@
-// BitoCard Shop, phase 1 step 4: Safe pay. The buyer asks (their fee fixed, capped), the seller accepts once checked,
+// BitoCard Shop, phase 1 step 4: UdozoPay. The buyer asks (their fee fixed, capped), the seller accepts once checked,
 // the buyer pays from the wallet into escrow, hand-over by release code or delivery, release with both fees to revenue,
 // refunds in full when cancelled or not handed over, disputes decided by BitoCard, and deadlines in the job.
 import assert from 'node:assert/strict';
@@ -54,7 +54,7 @@ async function customer(name) {
   const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG', phone: testMobile('NG') });
   await confirmMobile(server.app, shopper);
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
-  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  // The BitoCard Shop terms, accepted before posting or UdozoPay.
   await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   shopper.name = name;
@@ -110,7 +110,7 @@ async function paidOrder(title, extra = {}) {
   return { seller, buyer, listing, order };
 }
 
-describe('Safe pay', () => {
+describe('UdozoPay', () => {
   test('closed until the switch is on and finance sets both fees', async () => {
     const seller = await customer('Ada Eze');
     const buyer = await customer('Musa Bello');
@@ -276,7 +276,7 @@ describe('Safe pay', () => {
     await seller.post(`/v1/classifieds/offers/${offer.id}/accept`);
     const order = (await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, offer_id: offer.id, fulfilment: 'meet_up' })).json;
     assert.equal(order.price, 28000000);
-    const note = await prisma.classifiedMessage.findFirst({ where: { conversationId: chat.id, kind: 'system', body: { contains: 'Safe pay' } } });
+    const note = await prisma.classifiedMessage.findFirst({ where: { conversationId: chat.id, kind: 'system', body: { contains: 'UdozoPay' } } });
     assert.ok(note, 'the request is noted in the chat');
 
     const big = await live(seller, 'Samsung 85 inch QLED TV', { price: 90000000 });
@@ -365,7 +365,7 @@ describe('Safe pay', () => {
   });
 });
 
-describe('Safe pay protections', () => {
+describe('UdozoPay protections', () => {
   /** A BitoCard Verify case for the customer with these details. */
   async function verifyCase(customer, details) {
     const house = await services.house.resellerFor('NG');
@@ -404,7 +404,7 @@ describe('Safe pay protections', () => {
     assert.equal((await stranger.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).status, 201);
   });
 
-  test('a seller with three strikes in 90 days cannot take Safe pay orders until an admin lifts it', async () => {
+  test('a seller with three strikes in 90 days cannot take UdozoPay orders until an admin lifts it', async () => {
     const seller = await customer('Bayo Ola');
     await ready(seller);
     for (const n of [1, 2, 3]) {

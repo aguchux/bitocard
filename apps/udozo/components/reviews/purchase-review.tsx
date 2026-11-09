@@ -6,7 +6,7 @@ import { ReviewCard } from "./review-view";
 const statusWords = { held: "Waiting for a moderator before it shows.", removed: "Udozo removed this review.", withdrawn: "You withdrew this review.", published: null } as const;
 
 /**
- * The review of a purchase on its order page (a Safe pay order or a buy order): the form while it can be written, else the
+ * The review of a purchase on its order page (a UdozoPay order or a buy order): the form while it can be written, else the
  * buyer's review with what they can still do. Nothing while there is no purchase (not completed, or reviews are off).
  */
 export async function PurchaseReview({ orderId, buyOrderId }: { orderId?: string; buyOrderId?: string }) {

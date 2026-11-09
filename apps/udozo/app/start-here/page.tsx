@@ -11,7 +11,7 @@ import { categoriesOf } from "@/lib/reference";
 import { campaignOf, faqs, reasons, startLinks, steps } from "@/lib/start-here";
 
 const title = "Start selling on Udozo: free to list, paid safely";
-const description = "Sign up in two minutes and post your first listing free. Buyers near you pay with Safe pay, so the money is held until they have the item. Or open your own store with every feature, free.";
+const description = "Sign up in two minutes and post your first listing free. Buyers near you pay with UdozoPay, so the money is held until they have the item. Or open your own store with every feature, free.";
 
 export const metadata: Metadata = {
   title: { absolute: title },
@@ -37,10 +37,10 @@ function SellButton({ href, label = "Start selling free", light = false }: { hre
   );
 }
 
-/** A phone showing a listing and a Safe pay order, drawn in code; labelled as an illustration. */
+/** A phone showing a listing and a UdozoPay order, drawn in code; labelled as an illustration. */
 function PhoneIllustration() {
   return (
-    <figure className="relative mx-auto w-full max-w-[300px]" aria-label="Illustration of a listing on Udozo with a Safe pay order">
+    <figure className="relative mx-auto w-full max-w-[300px]" aria-label="Illustration of a listing on Udozo with a UdozoPay order">
       <div className="rounded-[2.2rem] border-[10px] border-navy-950 bg-white shadow-2xl">
         <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-navy-200" />
         <div className="grid gap-3 p-4">
@@ -57,7 +57,7 @@ function PhoneIllustration() {
           </div>
           <div className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-3">
             <p className="flex items-center gap-1.5 text-xs font-bold text-mint-700">
-              <ShieldCheck className="size-4" aria-hidden="true" /> Safe pay order
+              <ShieldCheck className="size-4" aria-hidden="true" /> UdozoPay order
             </p>
             <ol className="grid gap-1 text-[11px] text-navy-700">
               {["Buyer paid: Udozo holds it", "You hand it over", "Released to you"].map((item, i) => (
@@ -98,7 +98,7 @@ function Categories({ categories }: { categories: ShopTopCategory[] }) {
 
 /**
  * Start here: where Udozo's marketers and ads send people to sign up and start selling. A focused page (Udozo's mark,
- * Sign in and the sign-up button, no other navigation): what selling on Udozo is, how Safe pay pays them, the two ways
+ * Sign in and the sign-up button, no other navigation): what selling on Udozo is, how UdozoPay pays them, the two ways
  * to sell (their own things, or a store reselling suppliers' listings on Seller HQ), and answers, every button to
  * sign-up with the visit's referral and campaign tags (`lib/start-here.ts`). Indexed, so it also answers searches.
  */
@@ -143,7 +143,7 @@ export default async function StartHerePage({ searchParams }: Props) {
                 <span className="block text-brand-300">Start selling on Udozo today.</span>
               </h1>
               <p className="max-w-xl text-lg text-white/85">
-                Post your first listing free in minutes. Buyers near you pay with Safe pay, so the money is held until they have the item, and then it is yours.
+                Post your first listing free in minutes. Buyers near you pay with UdozoPay, so the money is held until they have the item, and then it is yours.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <SellButton href={links.sell} />
@@ -152,7 +152,7 @@ export default async function StartHerePage({ searchParams }: Props) {
                 </Link>
               </div>
               <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-white/80">
-                {["Free to list", "No setup fee", "Paid safely with Safe pay"].map(item => (
+                {["Free to list", "No setup fee", "Paid safely with UdozoPay"].map(item => (
                   <li key={item} className="flex items-center gap-1.5">
                     <Check className="size-4 text-mint-500" aria-hidden="true" /> {item}
                   </li>
@@ -195,7 +195,7 @@ export default async function StartHerePage({ searchParams }: Props) {
                 <h3 className="text-xl font-extrabold text-navy-900">Sell your own things</h3>
                 <p className="text-navy-600">A phone you have upgraded from, a car, furniture, clothes or stock from your shop. Post it, chat with buyers near you and get paid safely.</p>
                 <ul className="grid gap-2 text-sm text-navy-700">
-                  {["Free listings with photos and video", "Offers and questions in Udozo's chat", "Safe pay or cash when you meet"].map(item => (
+                  {["Free listings with photos and video", "Offers and questions in Udozo's chat", "UdozoPay or cash when you meet"].map(item => (
                     <li key={item} className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-mint-500" aria-hidden="true" /> {item}
                     </li>
@@ -208,7 +208,7 @@ export default async function StartHerePage({ searchParams }: Props) {
                 <h3 className="text-xl font-extrabold">Run your own store, without stock</h3>
                 <p className="text-white/80">On Seller HQ, choose listings suppliers open to resellers, set your own price and sell them on your own branded store. The supplier delivers; you earn the difference.</p>
                 <ul className="grid gap-2 text-sm text-white/85">
-                  {["No stock to buy or store", "Your own domain and brand, every feature free", "Buyers pay with Safe pay: no chasing payments"].map(item => (
+                  {["No stock to buy or store", "Your own domain and brand, every feature free", "Buyers pay with UdozoPay: no chasing payments"].map(item => (
                     <li key={item} className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-mint-500" aria-hidden="true" /> {item}
                     </li>

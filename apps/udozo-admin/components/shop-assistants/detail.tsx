@@ -53,7 +53,7 @@ export function CardPreview({ card }: { card: ShopAssistantCard }) {
     case "price_range":
       return <p className={box}>{`${card.category}: usually ${shopMoney(card.low, card.currency)} to ${shopMoney(card.high, card.currency)} (median ${shopMoney(card.median, card.currency)}, ${card.count} listings)`}</p>;
     case "safe_pay":
-      return <p className={box}>{`Safe pay: ${shopMoney(card.price, card.currency)} + fee ${shopMoney(card.fee, card.currency)} = ${shopMoney(card.total, card.currency)}`}</p>;
+      return <p className={box}>{`UdozoPay: ${shopMoney(card.price, card.currency)} + fee ${shopMoney(card.fee, card.currency)} = ${shopMoney(card.total, card.currency)}`}</p>;
     case "checklist":
       return (
         <ul className={`${box} list-disc pl-6`}>
@@ -164,7 +164,7 @@ function Knowledge({ bot }: { bot: SupportBot }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-bold text-ink">Udozo’s sections, per country</h3>
-            <p className="text-sm text-muted">Generated from each market’s live data (categories, posting rules, Safe pay fees and deadlines, the Safe Trade Guide), refreshed every day by themselves.</p>
+            <p className="text-sm text-muted">Generated from each market’s live data (categories, posting rules, UdozoPay fees and deadlines, the Safe Trade Guide), refreshed every day by themselves.</p>
           </div>
           <Button loading={refreshState.isLoading} onClick={() => void refresh({ id: bot.id })}>
             {stale.length ? `Update ${stale.map(item => item.country).join(", ")}` : "Check for changes"}

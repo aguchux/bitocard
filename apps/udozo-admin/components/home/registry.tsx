@@ -240,8 +240,8 @@ function TopSellingForm({ section, onChange }: Props<"top_selling_rail">) {
   return (
     <>
       <TextField label="Title" value={section.title} max={80} onChange={title => onChange({ ...section, title })} />
-      <TextField label="Title while few have sold" value={section.fallbackTitle} max={80} hint="Until enough sell with Safe pay, the most contacted listings show under this title instead." onChange={fallbackTitle => onChange({ ...section, fallbackTitle })} />
-      <NumberField label="Sales needed" value={section.minimum} min={1} max={12} hint="Listings sold with Safe pay in 30 days before the rail shows sales." onChange={minimum => onChange({ ...section, minimum })} />
+      <TextField label="Title while few have sold" value={section.fallbackTitle} max={80} hint="Until enough sell with UdozoPay, the most contacted listings show under this title instead." onChange={fallbackTitle => onChange({ ...section, fallbackTitle })} />
+      <NumberField label="Sales needed" value={section.minimum} min={1} max={12} hint="Listings sold with UdozoPay in 30 days before the rail shows sales." onChange={minimum => onChange({ ...section, minimum })} />
       <NumberField label="Listings" value={section.limit} min={4} max={24} onChange={limit => onChange({ ...section, limit })} />
     </>
   );
@@ -475,7 +475,7 @@ function newSection(type: HomeSection["type"], id: string): HomeSection {
     case "country_tiles":
       return { ...base, type, title: "Shop by country", countries: [] };
     case "trust_bar":
-      return { ...base, type, items: [{ icon: "shield", title: "Safe pay", body: "Udozo holds the money until you have the item." }] };
+      return { ...base, type, items: [{ icon: "shield", title: "UdozoPay", body: "Udozo holds the money until you have the item." }] };
     case "listing_marquee":
       return { ...base, type, title: "", picks: [], fill: { by: "trending", value: null }, limit: 12, speed: "normal", direction: "left", cards: "standard" };
     case "store_marquee":
@@ -502,7 +502,7 @@ function summary(section: HomeSection): string {
     case "sponsored_rail":
       return `Sponsored placements · up to ${section.limit}`;
     case "top_selling_rail":
-      return `Safe pay sales in 30 days (else “${section.fallbackTitle}”) · up to ${section.limit}`;
+      return `UdozoPay sales in 30 days (else “${section.fallbackTitle}”) · up to ${section.limit}`;
     case "listing_group":
       return [groupLabels[section.by] + (section.value ? `: ${section.value}` : ""), section.display, `up to ${section.limit}`].join(" · ");
     case "banner":
@@ -545,11 +545,11 @@ export const homeRegistry = defineRegistry<HomeSection>({
     { type: "category_masonry", label: "Category tiles", description: "Categories as photo tiles of different sizes: chosen, or the busiest." },
     { type: "deals_rail", label: "Trending deals", description: "Listings whose price came down lately (a country’s page)." },
     { type: "sponsored_rail", label: "Sponsored", description: "Listings placed by Udozo’s team, labelled Sponsored." },
-    { type: "top_selling_rail", label: "Top selling", description: "What sold most with Safe pay; until then, the most contacted." },
+    { type: "top_selling_rail", label: "Top selling", description: "What sold most with UdozoPay; until then, the most contacted." },
     { type: "listing_group", label: "Listing group", description: "Newest, trending, or one category’s, area’s or condition’s listings." },
     { type: "banner", label: "Banners", description: "One or two banners linking to a category, a search or a page." },
     { type: "country_tiles", label: "Countries", description: "Each open market, for the page across countries." },
-    { type: "trust_bar", label: "Trust bar", description: "Up to four short reassurances, such as Safe pay." },
+    { type: "trust_bar", label: "Trust bar", description: "Up to four short reassurances, such as UdozoPay." },
     { type: "listing_marquee", label: "Moving listings", description: "Listings sliding past on their own: the ones you pick, topped up from trending, newest or a category." },
     { type: "store_marquee", label: "Moving stores", description: "Resellers' stores live on their own domain, sliding past: picked, or those with most listings." },
     { type: "masonry_grid", label: "Masonry grid", description: "Tiles of different sizes: categories, listings, or photos linking anywhere." },

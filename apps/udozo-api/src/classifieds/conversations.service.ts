@@ -390,7 +390,7 @@ export class ConversationsService {
     return this.presentOffer(offer, customer.id);
   }
 
-  /** The other side accepts an open offer: that is the agreed price (and what Safe pay starts from). */
+  /** The other side accepts an open offer: that is the agreed price (and what UdozoPay starts from). */
   async acceptOffer(customer: CustomerWithStore, offerId: string) {
     return this.decide(customer, offerId, 'accepted');
   }
@@ -436,7 +436,7 @@ export class ConversationsService {
       await this.inbox.customer({ customerId: maker.id, storeId: maker.storeId }, outcome === 'accepted' ? 'customer.classifieds.offer_accepted' : 'customer.classifieds.offer_declined', {
         subject: `${offer.id}:${outcome}`,
         title: `Your offer of ${amount} was ${outcome}`,
-        body: outcome === 'accepted' ? `For "${chat.listing.title}". Agree how to pay and hand over in the chat, or use Safe pay.` : `For "${chat.listing.title}". You can make another offer in the chat.`,
+        body: outcome === 'accepted' ? `For "${chat.listing.title}". Agree how to pay and hand over in the chat, or use UdozoPay.` : `For "${chat.listing.title}". You can make another offer in the chat.`,
         link: `/account/messages/${chat.id}`,
       });
     }

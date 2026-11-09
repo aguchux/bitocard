@@ -18,7 +18,7 @@ import { CustomerPayoutsService } from './customer-payouts.service.js';
 import { PayoutsModule } from './payouts.module.js';
 
 /**
- * Who may pay out their withdrawable money (Safe pay sales, and a resale supplier's share) and in what: the store's
+ * Who may pay out their withdrawable money (UdozoPay sales, and a resale supplier's share) and in what: the store's
  * seller and mode, the market's currency, and, live, the name the bank account must carry: the one their identity check
  * verified, else (where the market's `customer_identity_check` switch is off, so the check is optional) the name on
  * their account. An email confirmed and, live where the switch requires it, the identity check; never whether the store

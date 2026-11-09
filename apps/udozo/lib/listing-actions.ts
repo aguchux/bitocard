@@ -15,7 +15,7 @@ function answer<T>(result: CustomerResult<T>): ActionResult<T> {
   return { ok: false, message: result.status === 401 ? "Sign in again to carry on." : result.message, code: result.code, signIn: result.status === 401 };
 }
 
-/** The Udozo terms' current version and whether this customer accepted it (needed for Safe pay). */
+/** The Udozo terms' current version and whether this customer accepted it (needed for UdozoPay). */
 export async function shopTerms(): Promise<TermsStatus | null> {
   const result = await customerApi<TermsStatus>("GET", "/v1/classifieds/terms");
   return result.ok ? result.data : null;
@@ -95,7 +95,7 @@ export async function answerOffer(offerId: string, action: "accept" | "decline" 
   return answer(await customerApi("POST", `/v1/classifieds/offers/${offerId}/${action}`, {}));
 }
 
-/** Asks to buy with Safe pay: the listed price or an accepted offer, a meet-up or a delivery. */
+/** Asks to buy with UdozoPay: the listed price or an accepted offer, a meet-up or a delivery. */
 export async function requestSafePay(input: { listingId: string; offerId?: string | null; fulfilment: "meet_up" | "delivery"; address?: string; stateId?: string; nonce?: string }): Promise<ActionResult<ShopOrder>> {
   if (!uuid.test(input.listingId) || (input.offerId && !uuid.test(input.offerId)) || (input.stateId && !uuid.test(input.stateId))) return refused("No such listing.");
   if (!["meet_up", "delivery"].includes(input.fulfilment)) return refused("Choose how you will get it.");
@@ -114,7 +114,7 @@ export async function requestSafePay(input: { listingId: string; offerId?: strin
   );
 }
 
-/** Pays an accepted Safe pay order from the wallet (Udozo holds the money until the hand-over). */
+/** Pays an accepted UdozoPay order from the wallet (Udozo holds the money until the hand-over). */
 export async function paySafePay(orderId: string, nonce?: string): Promise<ActionResult<ShopOrder>> {
   if (!uuid.test(orderId)) return refused("No such order.");
   return answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/pay`, {}, { idempotencyKey: nonce }));
