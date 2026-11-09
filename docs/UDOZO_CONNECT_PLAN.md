@@ -111,7 +111,7 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
 | **Shelve** | Put a received item in a storage place: the centre sets up its places (`A-01`, `Shelf 3`, `Back room`), each with how much it holds. An item is not "ready to collect" until it is shelved, and every move is kept, so staff always know where it is |
 | **Release** | The buyer gives their 6-digit code (or shows its QR code); staff enter or scan it, see the item, its shelf and check-in photos, hand it over and confirm. Five wrong codes lock it for Udozo to look into |
 | **Updates** | Notes and photos on any item to the buyer, the seller or Udozo (for example "Box was wet on arrival", "Buyer came, will return tomorrow"). Buyer and seller read them on the order's timeline |
-| **Returns** | Request a return to the seller (not collected in time, refused at check-in, or damaged), with why. Udozo or the seller agrees; the seller collects it with their own **return code**, or the centre sends it by the seller's chosen courier; and the trade is settled as the return requires |
+| **Returns** | Request a return to the seller (not collected in time, refused at check-in, or damaged), with why and photos. The seller accepts it, or Udozo approves it; unanswered after 48 hours it is accepted automatically (see Return requests below). The seller then collects it with their own **return code** |
 | **Stock check** | List what should be on each shelf and mark what is there; anything missing is flagged to Udozo at once |
 | **History** | Every item the centre has handled, with its steps, photos and who did each |
 | **Centre** | Opening hours, holiday closures (pausing new orders), phone, photos, capacity, holding days, and staff |
@@ -157,8 +157,8 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
 | Shelved | centre | Staff put it in one of the centre's storage places |
 | Ready | Udozo | The buyer is told by inbox, push, email and, where switched on, WhatsApp, with the centre's address, hours and the date it is held until |
 | Collected | centre | The buyer shows their 6-digit release code; staff enter it (5 tries) and hand the item over; UdozoPay pays the seller as on release today, and the centre its fee |
-| Not collected | centre and Udozo | Past the holding days the buyer is reminded; after a grace period the centre requests a return to the seller and the buyer is refunded less the shipping (see the open questions) |
-| Returned | seller | The seller collects it with their return code, or it is sent back by their courier |
+| Not collected | centre | Past the holding days the buyer is reminded; after a grace period the centre requests a return to the seller (see Return requests below) |
+| Returned | seller | Once the return is accepted, the seller collects it with their return code and the trade is settled |
 
 - **Order statuses:** the existing ones plus `at_centre` and `returning`. Each step is a shipment event with `reported_by: 'centre'`.
 - **Concurrency:** each step claims the order in one conditional update, as Safe pay's steps do.
@@ -169,6 +169,35 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
   - not collected within the holding days: reminders, then the return.
 - **A centre's record:** items refused in error, lost or handed to the wrong person count against the centre. Past a
   limit, Udozo pauses it, as seller strikes do today.
+
+### 6a. Return requests
+
+The owner's rules (9 November 2026):
+
+- **Who asks:** a centre requests a return to the seller on its dashboard, with the reason (not collected in time,
+  refused at check-in, damaged) and photos. It is stored in `connect_return_requests` (`RR-000123`), with the order, the
+  centre, the reason, who asked and when.
+- **Who answers:**
+  - the **seller** sees the request in their account (inbox, push, email and the order page) and **accepts** it;
+  - **Udozo's admins** see every request in the admin (Connect > **Returns**) and can **approve** it at any time;
+  - whichever comes first settles it, claimed in one conditional update so it is decided once.
+- **Unanswered after 48 hours:** if neither the seller nor an admin has answered, the `classifieds` job **accepts it
+  automatically** (`decided_by: auto`). The 48 hours are a setting per market, default 48.
+- **Everyone is told** when a return is requested and again when it is accepted, approved or auto-accepted:
+  - the **seller**, with what to do next and their return code;
+  - the **buyer**, with what it means for their money;
+  - the **centre**, which keeps the item for the seller;
+  - **Udozo's admins** (operations and support).
+
+  By inbox and push, and by email (WhatsApp where switched on). An auto-acceptance says it was accepted because nobody
+  answered in 48 hours.
+- **After it is accepted:**
+  - the seller gets a 6-digit **return code** and collects the item at the centre; staff enter or scan it on the
+    Release screen, marked as a return;
+  - the order moves to `returning`, then, once collected, settles as the reason requires: refunded to the buyer for an
+    item refused at check-in or damaged; for one not collected, as the open question on uncollected items decides.
+- **Records:** every request and decision is in the order's timeline and Udozo's audit log. A seller whose returns
+  pile up, or who does not collect an accepted return, is told and counted, as strikes are today.
 
 ### 7. Tracking
 
@@ -249,5 +278,6 @@ centres are ready on the day it switches on.
    approving it? Does a centre pay a deposit or need insurance?
 7. **Home delivery:** does it stay alongside Connect, or does Connect replace it?
 8. **First market:** Nigeria only, and which cities should take applications first?
-9. **Returns:** when an item goes back to the seller, does the seller collect it from the centre, or does the centre
-   send it (and who pays that shipping)? Does Udozo approve every return, or only disputed ones?
+9. **Returns, still open:** how long a seller has to collect an accepted return, and what happens if they never
+   do. Can the seller ask the centre to send it by courier instead, and who pays? (Answered: the seller accepts or an
+   admin approves, auto-accepted after 48 hours, everyone told; see Return requests.)
