@@ -102,6 +102,10 @@ describe("a brand's page", () => {
     expect([...html.querySelectorAll("dl dd")].map(item => item.textContent)).toEqual(["30", "7", "2", "2"]);
     expect(hrefs(html, '[aria-labelledby="by-category"] a')).toEqual(["/ng/brand/hp?category=laptops#listings", "/ng/brand/hp?category=printers#listings"]);
     expect(hrefs(html, '[aria-labelledby="models"] a')).toEqual(["/ng/brand/hp?model=EliteBook+840+G5#listings", "/ng/brand/hp?model=ProBook+450+G8#listings"]);
+    // The models are one row slid sideways by hand (9 November 2026, the owner's request), never wrapping down the page.
+    const models = html.querySelector('[aria-labelledby="models"] ul[aria-label="Popular HP models"]');
+    expect(models?.className).toContain("overflow-x-auto");
+    expect(models?.className).not.toContain("flex-wrap");
     // Its places open the state's page with the brand filter on.
     expect(hrefs(html, '[aria-labelledby="where"] a')).toEqual(["/ng/lagos?f=brand%3Ahp", "/ng/fct?f=brand%3Ahp"]);
     expect(html.querySelector("#listings-heading")?.textContent).toBe("All HP (30)");

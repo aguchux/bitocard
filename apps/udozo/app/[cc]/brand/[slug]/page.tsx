@@ -8,6 +8,7 @@ import { ShopIcon } from "@/components/icon";
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
 import { SellerShare } from "@/components/seller-share";
+import { SideScroller } from "@/components/side-scroller";
 import { marketFor, shopApi } from "@/lib/api";
 import { brandHref, brandIn, brandListingsQuery, brandPageSize, brandSlugPattern, brandSortLabels, brandSorts, brandStats, categoriesText, isBrandFiltered, readBrandFilters } from "@/lib/brand-page";
 import { siteOrigin } from "@/lib/customer";
@@ -188,7 +189,8 @@ export default async function BrandPage({ params, searchParams }: Props) {
               <h2 id="models" className="mb-3 text-base font-bold">
                 Popular {brand.name} models
               </h2>
-              <ul className="flex flex-wrap gap-2">
+              {/* One row slid sideways by hand, so the models never push the listings down the page. */}
+              <SideScroller label={`Popular ${brand.name} models`} more="Show more models" earlier="Show earlier models">
                 {brand.models.slice(0, 24).map(model => (
                   <li key={model.name}>
                     <Link
@@ -201,7 +203,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
                     </Link>
                   </li>
                 ))}
-              </ul>
+              </SideScroller>
             </section>
           ) : null}
 
