@@ -214,7 +214,7 @@ function NameCheckBanner() {
  */
 export function UdozoShell({ section, current, crumbs, actions, children }: { section: UdozoSection; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   return (
-    <ConsoleShell brand="Udozo" logo="/udozo-mark-light.png" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<InboxBell />} account={<AccountArea />} banner={<NameCheckBanner />}>
+    <ConsoleShell brand="Udozo" tagline="Admin" logo="/udozo-mark.png" variant="sidebar" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<InboxBell />} account={<AccountArea />} banner={<NameCheckBanner />}>
       {children}
       <StepUpPrompt />
     </ConsoleShell>

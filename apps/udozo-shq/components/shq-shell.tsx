@@ -86,8 +86,10 @@ export function ShqShell({ section, current, crumbs, actions, children }: { sect
   const menus = menusFor(usePaidPlans());
   return (
     <ConsoleShell
-      brand="Seller HQ"
-      logo="/udozo-mark-light.png"
+      brand="Udozo"
+      tagline="Seller HQ"
+      logo="/udozo-mark.png"
+      variant="sidebar"
       sections={sections}
       menus={menus}
       section={section}
