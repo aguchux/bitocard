@@ -17,12 +17,12 @@ type Answer = { ok: true; data: unknown } | { ok: false; message: string; code: 
 let terms = { version: "2026-11-01", path: "/legal/terms", accepted: false, previous_version: null as string | null };
 let submitAnswer: Answer;
 const createListing = vi.fn(async (): Promise<Answer> => ({ ok: true, data: { id: "11111111-1111-4111-8111-111111111111" } }));
-const updateListing = vi.fn(async (): Promise<Answer> => ({ ok: true, data: {} }));
+const updateListing = vi.fn<(id: string, fields: Record<string, unknown>) => Promise<Answer>>(async () => ({ ok: true, data: {} }));
 const submitListing = vi.fn(async () => submitAnswer);
 const acceptShopTerms = vi.fn(async (version: string): Promise<Answer> => ({ ok: true, data: { ...terms, version, accepted: true } }));
 vi.mock("@/lib/shop-actions", () => ({
   createListing: () => createListing(),
-  updateListing: () => updateListing(),
+  updateListing: (id: string, fields: Record<string, unknown>) => updateListing(id, fields),
   submitListing: () => submitListing(),
   shopTerms: async () => terms,
   acceptShopTerms: (version: string) => acceptShopTerms(version),
@@ -208,6 +208,47 @@ describe("posting an ad", () => {
     expect(acceptShopTerms).not.toHaveBeenCalled();
     expect(stepLine(host)).toBe("Step 2 of 6: Photos and video");
     expect(alert(host)).toBe("Remove the photo that could not be used, or add it again.");
+  });
+});
+
+describe("editing a live ad", () => {
+  const live = () => draft({ status: "active", price: { kind: "on_request", amount: null }, area: { id: "33333333-3333-4333-8333-333333333333", state: { slug: "lagos" } } });
+  const pause = (ms: number) => act(async () => void (await new Promise(resolve => setTimeout(resolve, ms))));
+  const steps = (host: HTMLElement) => [...host.querySelectorAll("nav[aria-label='Steps'] ol button")] as HTMLButtonElement[];
+  const refusal: Answer = { ok: false, message: "Add a price.", code: "listing_incomplete", param: "price", signIn: false };
+
+  it("keeps Fixed when it is refused for want of a price, and sends it again with the price", async () => {
+    updateListing.mockResolvedValueOnce(refusal);
+    const host = mount(live());
+    await click(steps(host)[2]!);
+    await click(button(host, "Fixed"));
+    await pause(800);
+    expect(updateListing).toHaveBeenCalledTimes(1);
+    expect(alert(host)).toBe("Add a price.");
+
+    await type(host.querySelector("#price") as HTMLInputElement, "41,000");
+    await pause(800);
+    expect(updateListing).toHaveBeenCalledTimes(2);
+    expect(updateListing.mock.calls[1]![1]).toEqual({ price_kind: "fixed", price: "41,000" });
+    expect(alert(host)).toBeUndefined();
+  });
+
+  it("Save changes stays on the ad, showing why, while the last change is refused", async () => {
+    const tooHigh: Answer = { ok: false, message: "That price is too high.", code: "parameter_invalid", param: "price", signIn: false };
+    updateListing.mockResolvedValue(tooHigh);
+    const host = mount(live());
+    await click(steps(host)[2]!);
+    await click(button(host, "Fixed"));
+    await type(host.querySelector("#price") as HTMLInputElement, "41,000");
+    await click(steps(host)[5]!);
+    await click(button(host, "Save changes"));
+    await pause(0);
+    expect(updateListing.mock.calls.at(-1)![1]).toEqual({ price_kind: "fixed", price: "41,000" });
+    expect(push).not.toHaveBeenCalled();
+    expect(stepLine(host)).toBe("Step 3 of 6: Price and details");
+    expect(alert(host)).toBe("That price is too high.");
+    updateListing.mockReset();
+    updateListing.mockResolvedValue({ ok: true, data: {} });
   });
 });
 

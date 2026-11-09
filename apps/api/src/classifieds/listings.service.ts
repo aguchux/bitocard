@@ -390,6 +390,10 @@ export class ListingsService {
     }
     const priceKind = input.price_kind ?? current?.priceKind ?? 'fixed';
     if (input.price_kind !== undefined) fields.priceKind = input.price_kind;
+    // A price for a "contact for price" listing is refused, never dropped: the seller must say how it is priced.
+    if (input.price !== undefined && input.price !== null && input.price_kind === undefined && priceKind === 'on_request') {
+      throw invalid('parameter_invalid', 'This ad says "Contact for price": choose Fixed or Negotiable to give it a price.', 'price_kind');
+    }
     if (input.price !== undefined) {
       if (input.price === null) fields.priceMinor = null;
       else {

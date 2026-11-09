@@ -199,6 +199,7 @@ export function ListingForm({
   const pending = useRef<ListingFields>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const refusedParam = useRef<string | null>(null);
 
   // The posting journey (Udozo's Reports > Posting journeys): the steps reached and what a step still needed, never
   // anything typed. Only while the ad is being posted (new, a draft, or sent back), never for edits of a live ad.
@@ -218,19 +219,24 @@ export function ListingForm({
     void recordPostingStep({ type: "step_reached", step: postSteps[step]!.key, listing_id: idRef.current }).catch(() => undefined);
   }, [step, tracking]);
 
+  // Resolves true once everything typed is saved; false while a change is refused (it is kept and sent again with the
+  // next one, so a live ad switched to Fixed keeps that choice until its price arrives, never saved without it).
   const flush = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    const next = chain.current.then(async () => {
+    const next = chain.current.then(async (): Promise<boolean> => {
       const changes = pending.current;
-      if (idRef.current && !Object.keys(changes).length) return;
+      if (idRef.current && !Object.keys(changes).length) return true;
       pending.current = {};
       setSaveState("saving");
       const result = idRef.current ? await updateListing(idRef.current, changes) : await createListing(changes, nonce());
       if (!result.ok) {
+        // Changes made since win over the refused ones.
+        pending.current = { ...changes, ...pending.current };
+        refusedParam.current = result.param;
         setSaveState("error");
         setProblem({ message: result.message, param: result.param });
-        return;
+        return false;
       }
       setProblem(null);
       setSaveState("saved");
@@ -240,6 +246,7 @@ export function ListingForm({
         // A reload carries on with this draft.
         window.history.replaceState(null, "", `/account/listings/${result.data.id}`);
       }
+      return true;
     });
     chain.current = next.catch(() => undefined);
     return next;
@@ -387,8 +394,18 @@ export function ListingForm({
     }
     setSubmitting(true);
     setProblem(null);
-    await flush();
+    const saved = await flush();
     await queue.current;
+    if (!saved) {
+      // The refusal is shown (flush set it) on the step holding what it names; nothing is posted or left.
+      setSubmitting(false);
+      const at = stepOf(refusedParam.current);
+      if (at !== null && at !== step) {
+        setStep(at);
+        setReached(current => Math.max(current, at));
+      }
+      return;
+    }
     if (!idRef.current) {
       setSubmitting(false);
       return setProblem({ message: "Add your photos and details first.", param: null });

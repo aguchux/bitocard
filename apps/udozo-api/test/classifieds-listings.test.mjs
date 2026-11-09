@@ -209,6 +209,16 @@ describe('submitting', () => {
     assert.deepEqual((await prisma.classifiedPriceHistory.findMany({ where: { listingId: next.id }, orderBy: { from: 'asc' } })).map(row => [Number(row.priceMinor), row.to === null]), [[36500000, false], [34000000, true]]);
     const emptied = await shopper.patch(`/v1/classifieds/listings/${next.id}`, { title: null });
     assert.equal(emptied.json.error.code, 'listing_incomplete', 'a live listing keeps everything a buyer needs');
+
+    // Contact for price, then a price again: a price alone is refused, never dropped; with Fixed it is saved.
+    const onRequest = await shopper.patch(`/v1/classifieds/listings/${next.id}`, { price_kind: 'on_request' });
+    assert.deepEqual([onRequest.json.price.kind, onRequest.json.price.amount], ['on_request', null]);
+    const fixedWithout = await shopper.patch(`/v1/classifieds/listings/${next.id}`, { price_kind: 'fixed', price: null });
+    assert.deepEqual([fixedWithout.json.error.code, fixedWithout.json.error.param], ['listing_incomplete', 'price']);
+    const priceAlone = await shopper.patch(`/v1/classifieds/listings/${next.id}`, { price: 4100000 });
+    assert.deepEqual([priceAlone.status, priceAlone.json.error.param], [400, 'price_kind']);
+    const priced = await shopper.patch(`/v1/classifieds/listings/${next.id}`, { price_kind: 'fixed', price: 4100000 });
+    assert.deepEqual([priced.json.price.kind, priced.json.price.amount], ['fixed', 4100000]);
   });
 
   test('posting needs the current Udozo terms accepted, recorded by version', async () => {
