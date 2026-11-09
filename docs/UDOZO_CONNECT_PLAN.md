@@ -13,6 +13,8 @@ owner's answers go into this file before the work starts.
   - **Logistics**: shipping and tracking. Items go to a Connect Centre the buyer chose, and both sides follow every step.
   - **Connect Centres**: shipment offices run by members of the public. They **apply** to have their office used as a
     Connect Centre, and Udozo approves them. A centre receives items from sellers and hands them to buyers.
+- **connect.udozo.com** is Udozo Connect's dashboard, where centres apply and then run their office: items on their
+  way, receiving, shelving, releasing, updates and returns to sellers.
 
 A buyer who wants an item shipped chooses an approved Connect Centre, never a home address. **Every Connect trade is
 paid with UdozoPay.**
@@ -51,7 +53,7 @@ today.
 ### 1. Applying to be a Connect Centre
 
 Anyone with a confirmed Udozo account can apply to have their office used as a Connect Centre, at **Become a Connect
-Centre** (`/connect/centres/apply` on udozo.com).
+Centre** on connect.udozo.com (linked from udozo.com's footer, help menu and Connect Centres page).
 
 - **What they give:**
   - the business name, and its registration number where it has one;
@@ -80,17 +82,47 @@ Centre** (`/connect/centres/apply` on udozo.com).
 - **Public:** `GET /v1/connect/centres?country=&state=` lists the active centres. udozo.com's **Connect Centres** page
   replaces the help menu's "Pickup centres (Soon)" and shows each centre with its map and hours.
 
-### 3. The centre's own screens (partners and their staff)
+### 3. The Connect dashboard (connect.udozo.com)
 
-- **Who:** partners are ordinary Udozo accounts, not admins. A partner can add staff by email (other Udozo accounts with
-  a confirmed mobile) and remove them. Staff act only for their own centre.
-- **Where:** Account > **My Connect Centre** on udozo.com, built for phones:
-  - **Receive:** check an item in;
-  - **Hand over:** release an item to its buyer;
-  - **At this centre:** what is held, due and overdue;
-  - **Earnings:** what the centre was paid and its payouts to the bank.
-- **API:** `/v1/connect/my-centre/...`, open only to the centre's partner and staff (`centre_staff`), every step
-  recorded with who did it.
+A Next.js app of its own, `apps/udozo-connect` (package `@udozo/connect`, Vercel project `udozo-connect`, private and
+never indexed), built mobile first, since centre staff work from a phone at the counter. It is built like Seller HQ on
+the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-ui`, `@bitocard/api-client`).
+
+- **Who signs in:** partners and their staff, with their ordinary **Udozo account**: email and password, Google,
+  Facebook or WhatsApp, as on udozo.com. They are never admins. The dashboard's server keeps the session in its own
+  host-only cookie.
+- **Roles per centre:**
+  - `owner`: the partner who applied, with staff, settings and earnings;
+  - `manager`: everything but earnings and staff;
+  - `staff`: receive, shelve, release and update.
+
+  The owner adds staff by email (Udozo accounts with a confirmed mobile) and removes them. One person can work at
+  more than one centre and picks the centre in the menu.
+- **API:** `/v1/connect/...`, open only to the centre's own people by role (`centre_unknown` for anyone else), every
+  step recorded with who did it and when.
+
+**What the dashboard does:**
+
+| Screen | What it is for |
+|---|---|
+| **Overview** | Today at the centre: items expected, waiting to be received, on the shelf, due for collection today, overdue, and returns to send back |
+| **Expected** | Orders on their way to this centre: the order number, the item and its listing photos, the seller, the courier and tracking, and when it was sent, with late ones marked |
+| **Receive** | Find the order by its number or by scanning the label's QR code; check the item against the listing and the seller's dispatch photos; take check-in photos; **Received** or **Refuse** with a reason (wrong item, damaged, missing parts, not allowed at centres). Refusing opens a dispute and a return |
+| **Shelve** | Put a received item in a storage place: the centre sets up its places (`A-01`, `Shelf 3`, `Back room`), each with how much it holds. An item is not "ready to collect" until it is shelved, and every move is kept, so staff always know where it is |
+| **Release** | The buyer gives their 6-digit code (or shows its QR code); staff enter or scan it, see the item, its shelf and check-in photos, hand it over and confirm. Five wrong codes lock it for Udozo to look into |
+| **Updates** | Notes and photos on any item to the buyer, the seller or Udozo (for example "Box was wet on arrival", "Buyer came, will return tomorrow"). Buyer and seller read them on the order's timeline |
+| **Returns** | Request a return to the seller (not collected in time, refused at check-in, or damaged), with why. Udozo or the seller agrees; the seller collects it with their own **return code**, or the centre sends it by the seller's chosen courier; and the trade is settled as the return requires |
+| **Stock check** | List what should be on each shelf and mark what is there; anything missing is flagged to Udozo at once |
+| **History** | Every item the centre has handled, with its steps, photos and who did each |
+| **Centre** | Opening hours, holiday closures (pausing new orders), phone, photos, capacity, holding days, and staff |
+| **Earnings** | Fees earned per item, what is held and what can be paid out, and payouts to the bank (through the customer payouts) |
+
+- **Labels:** every Connect order has a printable **label** with a QR code (the order number and centre, never the
+  buyer's details). The seller prints it or writes the number on the parcel, and centres scan it to receive.
+- **Notifications:** the centre's people are told of new expected items, items arriving late, collections due, return
+  requests and Udozo's decisions (inbox and push in the dashboard, and email for what matters).
+- **Udozo's admin** (admin.udozo.com, Connect section) keeps oversight: applications, centres, every centre's items and
+  shelves, overdue and lost items, disputes, returns, centres' records, pausing and closing.
 
 ### 4. Listings: shipping through Connect
 
@@ -121,12 +153,14 @@ Centre** (`/connect/centres/apply` on udozo.com).
 |---|---|---|
 | Paid | buyer | UdozoPay holds the money; the seller has `handover_days` to send the item |
 | Sent | seller | Dispatch photos (at least two), then the courier and tracking, or "dropping it off myself" |
-| Received | centre | Staff find the order by its number, check the item against the listing and its photos, take photos at check-in, and mark it received or refused (wrong item, damaged, missing parts); refused means a dispute |
+| Received | centre | Staff scan the label or find the order by its number, check the item against the listing and its photos, take photos at check-in, and mark it received or refused (wrong item, damaged, missing parts); refused means a dispute and a return |
+| Shelved | centre | Staff put it in one of the centre's storage places |
 | Ready | Udozo | The buyer is told by inbox, push, email and, where switched on, WhatsApp, with the centre's address, hours and the date it is held until |
 | Collected | centre | The buyer shows their 6-digit release code; staff enter it (5 tries) and hand the item over; UdozoPay pays the seller as on release today, and the centre its fee |
-| Not collected | Udozo | Past the holding days the buyer is reminded, then, after a grace period, the item goes back to the seller and the buyer is refunded less the shipping (see the open questions) |
+| Not collected | centre and Udozo | Past the holding days the buyer is reminded; after a grace period the centre requests a return to the seller and the buyer is refunded less the shipping (see the open questions) |
+| Returned | seller | The seller collects it with their return code, or it is sent back by their courier |
 
-- **Order statuses:** the existing ones plus `at_centre`. Each step is a shipment event with `reported_by: 'centre'`.
+- **Order statuses:** the existing ones plus `at_centre` and `returning`. Each step is a shipment event with `reported_by: 'centre'`.
 - **Concurrency:** each step claims the order in one conditional update, as Safe pay's steps do.
 - **Inspection at collection:** whether the buyer can refuse the item at the counter is an open question.
 - **Deadlines** (the `classifieds` job):
@@ -171,12 +205,13 @@ assistants' knowledge, help, terms and privacy.
 ## Phases
 
 1. **UdozoPay rename**: words only, as above, with Udozo Connect named as the home of payments and logistics.
-2. **Connect Centre applications**: the apply page, identity and mobile checks, the admin's review, and the agreement.
-3. **Centres**: the centres table, the admin's Centres page, My Connect Centre with staff and its phone screens, and
-   udozo.com's Connect Centres page.
+2. **Connect Centre applications**: the apply page on connect.udozo.com, identity and mobile checks, the admin's review,
+   and the agreement.
+3. **Centres and the dashboard**: the centres table, connect.udozo.com (sign-in, centre roles and staff, Centre,
+   shelves), the admin's Centres page, and udozo.com's Connect Centres page.
 4. **Listings**: shipping states and centres in Post an ad, and the listing page's shipping line.
-5. **Orders**: buying with a centre, received, ready, collected with the code, not collected, the timeline, and centre
-   earnings and payouts.
+5. **Orders**: buying with a centre, labels, and on the dashboard Expected, Receive, Shelve, Release, Updates, Returns
+   and Stock check; the order timeline, and centre earnings and payouts.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 
@@ -214,3 +249,5 @@ centres are ready on the day it switches on.
    approving it? Does a centre pay a deposit or need insurance?
 7. **Home delivery:** does it stay alongside Connect, or does Connect replace it?
 8. **First market:** Nigeria only, and which cities should take applications first?
+9. **Returns:** when an item goes back to the seller, does the seller collect it from the centre, or does the centre
+   send it (and who pays that shipping)? Does Udozo approve every return, or only disputed ones?
