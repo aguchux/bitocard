@@ -68,8 +68,9 @@ Centre** on connect.udozo.com (linked from udozo.com's footer, help menu and Con
   `changes_requested`, `visit_scheduled`, `visited`, `approved` and `rejected`, with the reason.
 - **Udozo's review** (admin Connect > **Applications**, operations), in two parts, both needed before approval:
   1. **Online:** read the application, its photos and the identity check; ask for changes or reject.
-  2. **A visit:** Udozo's team visits the office (`visit_scheduled`, then `visited` with the visitor's notes and photos,
-     and whether it passed), arranged with the applicant on their application page.
+  2. **A visit:** **Udozo's own staff or trained agents** visit the office (`visit_scheduled`, then `visited` with the
+     visitor's name, notes and photos, and whether it passed), arranged with the applicant on their application page.
+     Agents are trained and recorded by Udozo (`connect_visitors`) before they can be assigned a visit.
 
   Only then can it be **approved**. Every step is audited, and the applicant is told at each one by inbox, push and
   email.
@@ -140,7 +141,8 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
   - the **states** the seller ships to, with **All states** as one tick;
   - the **centres** in those states, with every centre in a ticked state chosen unless the seller unticks some;
   - a **shipping charge for each ticked state**, set by the seller (with one box to use the same charge for all).
-    It covers getting the item to a centre in that state **and the centre's handling fee** (see Money).
+    It covers getting the item to a centre in that state and is the seller's in full; the **Connect fee** is separate
+    and paid by the buyer (see Money).
 - **Stored:** `classified_listings.connect` (on or off), `classified_listing_connect_states` (state and its shipping
   charge) and `classified_listing_connect_centres`. The API checks that each centre is active and sits in a state the seller ticked.
 - **Shown to buyers:** the listing page shows "Ship to a Udozo Connect Centre" with the states it reaches, and the
@@ -150,9 +152,9 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
 
 - **Choosing a centre:** Buy with UdozoPay gets a third choice, **Collect at a Connect Centre**. The buyer picks a
   state, then one of that listing's centres there (nearest first, from the buyer's area), and sees that state's
-  shipping charge and the total before paying.
-- **On the order:** `fulfilment: 'connect'`, `connect_centre_id`, and the shipping charge in `delivery_fee_minor`. No
-  address is kept.
+  shipping charge, the Connect fee and the total before paying.
+- **On the order:** `fulfilment: 'connect'`, `connect_centre_id`, the shipping charge in `delivery_fee_minor` and the
+  Connect fee in `connect_fee_minor`, fixed when paid. No address is kept.
 - **Only through UdozoPay:** an order with `connect` cannot be paid any other way, and the API refuses one without a
   centre (`centre_required`) or with a centre the listing does not ship to, or one that is not active
   (`centre_unavailable`).
@@ -208,8 +210,12 @@ The owner's rules (9 November 2026):
   By inbox and push, and by email (WhatsApp where switched on). An auto-acceptance says it was accepted because nobody
   answered in 48 hours.
 - **After it is accepted:**
-  - the seller gets a 6-digit **return code** and collects the item at the centre; staff enter or scan it on the
-    Release screen, marked as a return;
+  - the seller gets a 6-digit **return code** and either **collects the item at the centre**, or has it **shipped to a
+    Connect Centre near them** and collects it there; centres never send returns anywhere else (no courier to the
+    seller's door);
+  - **every return shipping fee is the seller's**, charged before the item leaves (from what UdozoPay owes them, else
+    their wallet); the centre-to-centre trip is tracked like any Connect shipment;
+  - at whichever centre they collect, staff enter or scan the return code on the Release screen, marked as a return;
   - the order moves to `returning`, then, once collected, settles as the reason requires: refunded to the buyer for an
     item refused at check-in, refused at the counter (when Udozo decides for the buyer) or damaged; for one the buyer
     did not collect, refunded less the shipping and the buyer's demurrage.
@@ -312,12 +318,20 @@ of care and charges each day, each step claimed once, so a run twice charges not
 
 ### 8. Money
 
-- **Paid in:** the buyer pays price + the shipping charge for the centre's state + the UdozoPay buyer fee.
-- **The centre's fee is wired into shipping:** it is a share of the order's shipping charge, never a charge of its own
-  (`centre_fee_bps`, per market, set by finance; Connect does not open in a market until it is set). The seller sees it
-  when setting each state's charge ("Of ₦3,000 shipping, ₦X goes to the Connect Centre").
-- **Paid out on collection:** the seller gets the price and the shipping less the centre's share, less the UdozoPay
-  seller fee. The centre's share goes to its earnings, paid to its bank through the customer payouts.
+- **Paid in:** the buyer pays the price + the shipping charge for the centre's state + the **Connect fee** + the
+  UdozoPay buyer fee.
+- **The Connect fee** is the charge for using a Connect Centre, **paid by the buyer** on every Connect order, set by
+  finance per market (`connect_fee`; whether a fixed amount or a percentage is an open question below). Connect does
+  not open in a market until it is set.
+- **The Connect fee is shared 70:30:** **70% to the Connect Centre** that hands the item over, **30% to Udozo**
+  (`centre_share_bps`, default 7,000, the same split as demurrage and penalties). The centre's share goes to its
+  earnings, paid to its bank through the customer payouts; Udozo's to `connect_revenue`.
+- **Paid out on collection:** the seller gets the price and the **full shipping charge**, less the UdozoPay seller fee.
+- **Refunds:** a buyer refunded because the item was refused at check-in, refused at the counter (decided for them) or
+  damaged gets the Connect fee back; one who did not collect does not.
+- **Pickups** of abandoned items to a Udozo warehouse are **paid by Udozo**, never charged to the seller or recovered
+  from the auction.
+- **Return shipping** is always the seller's (see Return requests).
 - **Demurrage and Loss of care penalties:** see Holding times, demurrage and Loss of care.
 - **Ledger:** Connect's fees and centres' earnings have their own ledger accounts (`connect_revenue`,
   `connect_centre_earnings`), never mixed with UdozoPay's.
@@ -367,7 +381,7 @@ centres are ready on the day it switches on. Within a market, every state is ope
   and loss while an item is at a centre, inspection, and prohibited items for centres. Lawyers to confirm the
   Loss of care penalty and the end of liability are enforceable in each market.
 - **Connect Centre agreement** (accepted when applying, recorded by version): custody of items, liability for loss and
-  damage, any insurance or deposit, fees and payouts, staff, keeping buyers' details private, pausing and closing.
+  damage, any insurance or deposit, the centre's 70% of Connect fees, demurrage and penalties, and payouts, staff, keeping buyers' details private, pausing and closing.
 - **Privacy notice:**
   - what an application keeps (the business, the office's photos, the identity check);
   - the buyer's name, phone and order shown to centre staff;
@@ -378,16 +392,11 @@ centres are ready on the day it switches on. Within a market, every state is ope
 
 ## Open questions for the owner
 
-1. **The centre's share of shipping:** what percentage of each order's shipping charge goes to the Connect Centre in
-   Nigeria (`centre_fee_bps`)?
-2. **Returns by courier:** can a seller ask a centre to send a return by courier instead of collecting it, and who
-   pays?
-3. **Lawyers:** confirm that auctioning abandoned goods, and Udozo keeping unclaimed money after 90 days, are allowed in
-   each market, and what notice the seller must be given.
-4. **Pickups:** is their cost part of what the auction recovers, or also charged to a seller who collects from the
-   warehouse? And while Lagos is the only warehouse, how are centres far from it picked up (and at what cost)?
-5. **Visits:** who visits applicants' offices (Udozo's staff, or agents paid per visit), and is there a deposit or
-   insurance for centres?
+1. **The Connect fee for Nigeria:** a fixed amount per order (for example ₦500), or a percentage of the price or the
+   shipping, and how much?
+2. **Return shipping charge:** how is the centre-to-centre charge for a return set (the seller's own charge for that
+   state, or a Udozo rate per route)?
+3. **Deposit or insurance:** do centres pay a deposit or need insurance before they are approved?
 (Answered on 9 November 2026: demurrage 2.1% of the shipping charge daily, no cap, the same for buyer and seller; the
 seller's 7 free days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split
 70% centre, 30% Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30
@@ -395,6 +404,8 @@ days, Udozo picking it up to the centre's Final Return Address (a Udozo warehous
 what is left over the seller's on a claim request within 90 days of the sale, unclaimed money Udozo's; the first
 warehouse in Lagos; Loss of care ends the centre's liability,
 not its responsibility. Also: the seller gets the item to the centre; the seller sets a shipping charge per state;
-the centre's fee is wired into shipping; the buyer inspects at the counter and can refuse; centres are approved
+the buyer inspects at the counter and can refuse; centres are approved
 after an online review and a visit; home delivery deferred; applications from every state, admins switching states
-off.)
+off. And: the buyer pays shipping plus a Connect fee shared 70:30 between centre and Udozo; returns are collected at the
+centre or shipped to a centre near the seller, every return shipping fee the seller's; lawyers confirm auctions and
+unclaimed money; Udozo pays for pickups; visits by Udozo's staff or trained agents.)
