@@ -1,7 +1,7 @@
 # Udozo Connect: UdozoPay, logistics and Connect Centres
 
-Status: **planned** (9 November 2026, the owner's request). Nothing is built yet. Open questions are at the end; the
-owner's answers go into this file before the work starts.
+Status: **planned** (9 November 2026, the owner's request). Nothing is built yet. The owner has answered every open
+question (recorded at the end); building starts with phase 1.
 
 ## Udozo's two halves
 
@@ -64,6 +64,10 @@ Centre** on connect.udozo.com (linked from udozo.com's footer, help menu and Con
   - the person in charge.
 - **What they must pass:** the applicant's identity check (Udozo Verify), required for centres whatever the
   `customer_identity_check` switch says, a confirmed mobile number, and the Connect Centre agreement.
+- **A deposit:** every centre pays a **deposit** before it is approved (`centre_deposit_minor`, per market, set by
+  finance), paid with UdozoPay into its own held ledger account (`connect_centre_deposits`, the centre's, never
+  spent). It covers what the centre owes Udozo, buyers or sellers for items it loses or mishandles while liable. When a
+  centre closes and holds nothing, the deposit is returned less anything still owed, audited.
 - **Stored:** `connect_centre_applications`, numbered `CA-000123`. Statuses are `submitted`, `in_review`,
   `changes_requested`, `visit_scheduled`, `visited`, `approved` and `rejected`, with the reason.
 - **Udozo's review** (admin Connect > **Applications**, operations), in two parts, both needed before approval:
@@ -213,8 +217,10 @@ The owner's rules (9 November 2026):
   - the seller gets a 6-digit **return code** and either **collects the item at the centre**, or has it **shipped to a
     Connect Centre near them** and collects it there; centres never send returns anywhere else (no courier to the
     seller's door);
-  - **every return shipping fee is the seller's**, charged before the item leaves (from what UdozoPay owes them, else
-    their wallet); the centre-to-centre trip is tracked like any Connect shipment;
+  - **the seller bears every return fee**: the return shipping (the listing's own shipping charge for the state of the
+    centre it goes to, else a rate Udozo's finance sets per market), and the Connect fee of the centre that hands it
+    back. It is charged before the item leaves (from what UdozoPay owes them, else their wallet); the centre-to-centre
+    trip is tracked like any Connect shipment;
   - at whichever centre they collect, staff enter or scan the return code on the Release screen, marked as a return;
   - the order moves to `returning`, then, once collected, settles as the reason requires: refunded to the buyer for an
     item refused at check-in, refused at the counter (when Udozo decides for the buyer) or damaged; for one the buyer
@@ -320,9 +326,10 @@ of care and charges each day, each step claimed once, so a run twice charges not
 
 - **Paid in:** the buyer pays the price + the shipping charge for the centre's state + the **Connect fee** + the
   UdozoPay buyer fee.
-- **The Connect fee** is the charge for using a Connect Centre, **paid by the buyer** on every Connect order, set by
-  finance per market (`connect_fee`; whether a fixed amount or a percentage is an open question below). Connect does
-  not open in a market until it is set.
+- **The Connect fee** is the charge for using a Connect Centre, **paid by the buyer** on every Connect order. Finance
+  sets it per market and chooses its kind (`connect_fee_kind`): a **percentage of the order's shipping charge**
+  (`connect_fee_bps`) or a **fixed amount** per order (`connect_fee_minor`). Connect does not open in a market until it
+  is set.
 - **The Connect fee is shared 70:30:** **70% to the Connect Centre** that hands the item over, **30% to Udozo**
   (`centre_share_bps`, default 7,000, the same split as demurrage and penalties). The centre's share goes to its
   earnings, paid to its bank through the customer payouts; Udozo's to `connect_revenue`.
@@ -331,7 +338,7 @@ of care and charges each day, each step claimed once, so a run twice charges not
   damaged gets the Connect fee back; one who did not collect does not.
 - **Pickups** of abandoned items to a Udozo warehouse are **paid by Udozo**, never charged to the seller or recovered
   from the auction.
-- **Return shipping** is always the seller's (see Return requests).
+- **Return fees** are always the seller's (see Return requests).
 - **Demurrage and Loss of care penalties:** see Holding times, demurrage and Loss of care.
 - **Ledger:** Connect's fees and centres' earnings have their own ledger accounts (`connect_revenue`,
   `connect_centre_earnings`), never mixed with UdozoPay's.
@@ -381,7 +388,7 @@ centres are ready on the day it switches on. Within a market, every state is ope
   and loss while an item is at a centre, inspection, and prohibited items for centres. Lawyers to confirm the
   Loss of care penalty and the end of liability are enforceable in each market.
 - **Connect Centre agreement** (accepted when applying, recorded by version): custody of items, liability for loss and
-  damage, any insurance or deposit, the centre's 70% of Connect fees, demurrage and penalties, and payouts, staff, keeping buyers' details private, pausing and closing.
+  damage, the deposit (what it covers and when it is returned), the centre's 70% of Connect fees, demurrage and penalties, and payouts, staff, keeping buyers' details private, pausing and closing.
 - **Privacy notice:**
   - what an application keeps (the business, the office's photos, the identity check);
   - the buyer's name, phone and order shown to centre staff;
@@ -392,11 +399,8 @@ centres are ready on the day it switches on. Within a market, every state is ope
 
 ## Open questions for the owner
 
-1. **The Connect fee for Nigeria:** a fixed amount per order (for example ₦500), or a percentage of the price or the
-   shipping, and how much?
-2. **Return shipping charge:** how is the centre-to-centre charge for a return set (the seller's own charge for that
-   state, or a Udozo rate per route)?
-3. **Deposit or insurance:** do centres pay a deposit or need insurance before they are approved?
+None open. To set before Connect opens in Nigeria (all admin settings): the Connect fee's kind and amount, the
+deposit, the return rate where a listing has no charge for a state, and every time and rate above.
 (Answered on 9 November 2026: demurrage 2.1% of the shipping charge daily, no cap, the same for buyer and seller; the
 seller's 7 free days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split
 70% centre, 30% Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30
@@ -408,4 +412,5 @@ the buyer inspects at the counter and can refuse; centres are approved
 after an online review and a visit; home delivery deferred; applications from every state, admins switching states
 off. And: the buyer pays shipping plus a Connect fee shared 70:30 between centre and Udozo; returns are collected at the
 centre or shipped to a centre near the seller, every return shipping fee the seller's; lawyers confirm auctions and
-unclaimed money; Udozo pays for pickups; visits by Udozo's staff or trained agents.)
+unclaimed money; Udozo pays for pickups; visits by Udozo's staff or trained agents. Last: the Connect fee a percentage of shipping or a
+fixed amount, as admins choose per market; the seller bears every return fee; centres pay a deposit.)
