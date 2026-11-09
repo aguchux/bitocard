@@ -10,7 +10,7 @@ import { Flag } from "../flag";
 import { ShopIcon } from "../icon";
 import { ListingGrid, ListingTile } from "../listing-card";
 import { Slider } from "../slider";
-import { CategoryBannerBlock, ListingMarqueeBlock, MasonryGridBlock, StoreMarqueeBlock } from "./row-blocks";
+import { CategoryBannerBlock, CategorySpotlightsBlock, ListingMarqueeBlock, MasonryGridBlock, StoreMarqueeBlock } from "./row-blocks";
 
 type Of<T extends ResolvedHomeSection["type"]> = Extract<ResolvedHomeSection, { type: T }>;
 type Card = ShopListingCard | ShopShowcaseCard;
@@ -53,6 +53,8 @@ export function showsSomething(section: ResolvedHomeSection) {
       return section.data.tiles.length > 0;
     case "category_banner":
       return section.data.category !== null;
+    case "category_spotlights":
+      return section.data.tiles.length > 0;
     default:
       return true;
   }
@@ -269,6 +271,8 @@ function One({ section, look, country }: { section: ResolvedHomeSection; look: H
       return <MasonryGridBlock section={section} look={look} />;
     case "category_banner":
       return <CategoryBannerBlock section={section} look={look} />;
+    case "category_spotlights":
+      return <CategorySpotlightsBlock section={section} look={look} />;
     case "personal_rail":
       // Filled for the person after the page loads (countries only); nothing across countries.
       return country ? <PersonalRail id={id} country={country} kind={section.data.kind} title={section.title} limit={section.limit} itemClass={railItem(look)} /> : null;

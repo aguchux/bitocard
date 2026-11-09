@@ -188,6 +188,22 @@ const categoryBanner = z.object({
   showCount: z.boolean().default(true),
 });
 
+/**
+ * Top categories as a grid of their spotlight images (a cut-out of what is sold there on a circle, else the category's
+ * icon), in two rows (or one or three) sliding past on their own and moved by hand: the ones chosen, in order, or every
+ * top category open on the page.
+ */
+const categorySpotlights = z.object({
+  ...base,
+  type: z.literal('category_spotlights'),
+  title: text(80).default(''),
+  categories: z.array(slug).max(30).default([]),
+  rows: z.number().int().min(1).max(3).default(2),
+  speed,
+  direction,
+  showCount: z.boolean().default(true),
+});
+
 export const personalRailKinds = ['for_you', 'recent', 'searched', 'price_drops'] as const;
 
 /**
@@ -202,8 +218,8 @@ const personalRail = z.object({
   limit: z.number().int().min(4).max(24).default(12),
 });
 
-/** A block: what a row holds. Every section type of before, and the marquees, masonry grids and category banners. */
-export const homeBlock = z.discriminatedUnion('type', [homeHero, categoryMasonry, dealsRail, sponsoredRail, topSellingRail, listingGroup, banner, countryTiles, trustBar, listingMarquee, storeMarquee, masonryGrid, categoryBanner, personalRail]);
+/** A block: what a row holds. Every section type of before, and the marquees, masonry grids, category banners and spotlights. */
+export const homeBlock = z.discriminatedUnion('type', [homeHero, categoryMasonry, dealsRail, sponsoredRail, topSellingRail, listingGroup, banner, countryTiles, trustBar, listingMarquee, storeMarquee, masonryGrid, categoryBanner, categorySpotlights, personalRail]);
 export type HomeBlock = z.infer<typeof homeBlock>;
 export type HomeBlockType = HomeBlock['type'];
 export const homeBlockTypes = [
@@ -220,6 +236,7 @@ export const homeBlockTypes = [
   'store_marquee',
   'masonry_grid',
   'category_banner',
+  'category_spotlights',
   'personal_rail',
 ] as const satisfies readonly HomeBlockType[];
 /** A block is what a section was (the resolver and the old editor's word). */

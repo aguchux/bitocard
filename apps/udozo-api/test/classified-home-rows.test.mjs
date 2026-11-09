@@ -206,6 +206,41 @@ describe('blocks', () => {
     assert.deepEqual([tiles[0].size, tiles[0].href, tiles[2].href], ['lg', '/ng/c/mobile-phones', '/sell']);
   });
 
+  test('category spotlights: every top category (or those chosen, in order) with its spotlight image and listings', async () => {
+    const phones = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'phones-tablets' } });
+    await prisma.classifiedCategory.update({ where: { id: phones.id }, data: { spotlightUrl: 'https://media.test/spot-phones.png' } });
+    try {
+      const result = await publish([
+        row([{ id: 'sa', type: 'category_spotlights', span: full }]),
+        row([{ id: 'sb', type: 'category_spotlights', span: full, categories: ['vehicles', 'phones-tablets', 'mobile-phones', 'no-such'], rows: 1, speed: 'fast' }]),
+      ]);
+      assert.equal(result.status, 200, JSON.stringify(result.json));
+      const every = result.json.rows[0].blocks[0];
+      assert.deepEqual([every.rows, every.speed, every.direction, every.showCount], [2, 'normal', 'left', true], 'two rows by default');
+      const tops = await prisma.classifiedCategory.count({ where: { enabled: true, parentId: null, countries: { some: { country: 'NG', enabled: true } } } });
+      assert.equal(every.data.tiles.length, tops, 'every top category open in the market');
+      const tile = every.data.tiles.find(item => item.slug === 'phones-tablets');
+      assert.deepEqual([tile.image, tile.href, tile.icon], ['https://media.test/spot-phones.png', '/ng/c/phones-tablets', phones.icon]);
+      assert.ok(tile.listings >= 2, 'its subcategories counted');
+      assert.equal(every.data.tiles.find(item => item.slug === 'vehicles').image, null, 'no spotlight image: udozo.com draws its icon');
+      const chosen = result.json.rows[1].blocks[0].data.tiles;
+      assert.deepEqual(chosen.map(item => item.slug), ['vehicles', 'phones-tablets'], 'in the order chosen; subcategories and unknown slugs left out');
+      const invalid = await admin.put('/v1/admin/classifieds/home/NG/draft', { rows: [row([{ id: 'sc', type: 'category_spotlights', span: full, rows: 4 }])] });
+      assert.equal(invalid.json.error.param, 'rows[0].blocks[0].rows');
+    } finally {
+      await prisma.classifiedCategory.update({ where: { id: phones.id }, data: { spotlightUrl: null } });
+    }
+  });
+
+  test('the starter pages show the categories as spotlights, never the two category banners', async () => {
+    for (const layout of ['marketplace', 'deals']) {
+      const chosen = await admin.post('/v1/admin/classifieds/home/NG/layout', { layout, replace: true });
+      const types = chosen.json.rows.flatMap(item => item.blocks.map(block => block.type));
+      assert.ok(types.includes('category_spotlights'), layout);
+      assert.ok(!types.includes('category_banner'), layout);
+    }
+  });
+
   test("the editor's view: rows not saved yet filled as visitors would see them, for operations and support", async () => {
     const preview = await support.post('/v1/admin/classifieds/home/NG/resolve', { rows: [row([{ id: 'p', type: 'listing_marquee', span: full, picks: [made.phone.ref], fill: { by: 'none' } }])] });
     assert.equal(preview.status, 200, JSON.stringify(preview.json));

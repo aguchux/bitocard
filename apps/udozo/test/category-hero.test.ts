@@ -32,7 +32,7 @@ describe("the category header", () => {
   });
 
   it("without pictures, Udozo's drawn banner; while listings cannot be counted, where it is for sale", () => {
-    const html = draw({ category: { ...top, banner_url: null, spotlight_url: null }, top: { ...top, banner_url: null, spotlight_url: null }, place: "Ghana", listings: null });
+    const html = draw({ category: { slug: top.slug, name: top.name, icon: top.icon }, top: { ...top, banner_url: null, spotlight_url: null }, place: "Ghana", listings: null });
     expect(html).not.toContain("<img");
     expect(html).toContain("For sale in Ghana");
   });

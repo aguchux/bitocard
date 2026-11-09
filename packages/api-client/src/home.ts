@@ -66,7 +66,10 @@ export type CategoryBannerSection = Base<'category_banner'> & {
   showCount: boolean;
 };
 
-/** A block of a row: every section type of before, the marquees, masonry grids and category banners. */
+/** Top categories' spotlight images (else their icons) in rows sliding past: the ones chosen, or every top category. */
+export type CategorySpotlightsSection = Base<'category_spotlights'> & { title: string; categories: string[]; rows: number; speed: HomeMarqueeSpeed; direction: 'left' | 'right'; showCount: boolean };
+
+/** A block of a row: every section type of before, the marquees, masonry grids, category banners and spotlights. */
 export type HomeSection =
   | HomeHeroSection
   | CategoryMasonrySection
@@ -81,6 +84,7 @@ export type HomeSection =
   | StoreMarqueeSection
   | MasonryGridSection
   | CategoryBannerSection
+  | CategorySpotlightsSection
   | PersonalRailSection;
 export type HomeSectionType = HomeSection['type'];
 export type HomeBlock = HomeSection;
@@ -125,8 +129,11 @@ export type ResolvedHomeSection =
   | (StoreMarqueeSection & { data: { stores: HomeStoreCard[] } })
   | (MasonryGridSection & { data: { tiles: HomeMasonryCell[] } })
   | (PersonalRailSection & { data: { kind: PersonalRailKind } })
+  | (CategorySpotlightsSection & { data: { tiles: HomeSpotlightTile[] } })
   | (CategoryBannerSection & { data: { category: { slug: string; name: string; icon: string; listings: number } | null; title?: string; image?: string | null; href?: string } });
 
+/** A top category in the spotlight grid: its spotlight image (null: draw its icon) and live listings. */
+export type HomeSpotlightTile = { slug: string; name: string; icon: string; listings: number; image: string | null; href: string };
 /** A reseller's store live on its own domain, in a stores marquee. */
 export type HomeStoreCard = { object: 'home_store'; id: string; name: string; logo_url: string | null; primary_color: string; url: string; country: string | null; listings: number };
 /** A masonry grid's tile as shown: a category (its count), a listing (its card) or a photo. */

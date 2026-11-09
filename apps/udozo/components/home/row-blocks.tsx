@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Store } from "lucide-react";
 import type { ShopListingCard, ShopShowcaseCard } from "@bitocard/api-client/classifieds";
-import type { HomeLook, HomeStoreCard, HomeTileSize, ResolvedHomeSection } from "@bitocard/api-client/home";
+import type { HomeLook, HomeSpotlightTile, HomeStoreCard, HomeTileSize, ResolvedHomeSection } from "@bitocard/api-client/home";
 import { ShopIcon } from "../icon";
 import { ListingTile } from "../listing-card";
 import { Marquee } from "../marquee";
@@ -155,5 +155,57 @@ export function CategoryBannerBlock({ section, look }: { section: Of<"category_b
         </span>
       )}
     </Link>
+  );
+}
+
+/** Splits tiles into columns of `rows` (top to bottom, then the next column), so a marquee slides them in rows. */
+export function spotlightColumns<T>(tiles: T[], rows: number): T[][] {
+  const size = Math.max(1, Math.min(3, Math.round(rows) || 1));
+  const columns: T[][] = [];
+  for (let index = 0; index < tiles.length; index += size) columns.push(tiles.slice(index, index + size));
+  return columns;
+}
+
+/** A top category in the spotlight grid: its spotlight image on a circle (else its icon), its name and listings. */
+function SpotlightTile({ tile, showCount, look }: { tile: HomeSpotlightTile; showCount: boolean; look: HomeLook }) {
+  return (
+    <Link href={tile.href} className={`group flex h-full flex-col items-center gap-2 border border-navy-100 bg-white p-3 text-center text-navy-900 hover:border-brand-300 hover:shadow-md ${rounded(look)}`}>
+      <span aria-hidden="true" className="relative grid aspect-square w-full place-items-center">
+        <span className="absolute inset-[4%] rounded-full bg-gradient-to-br from-navy-50 via-white to-brand-50 ring-1 ring-navy-100" />
+        {tile.image ? (
+          <img src={tile.image} alt="" loading="lazy" className="relative size-[88%] object-contain drop-shadow-lg transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none" />
+        ) : (
+          <ShopIcon name={tile.icon} className="relative size-1/3 text-brand-600" />
+        )}
+      </span>
+      <span className="grid w-full min-w-0 gap-0.5">
+        <strong className="line-clamp-2 text-[13px] leading-tight font-bold sm:text-sm">{tile.name}</strong>
+        {showCount ? <span className="text-xs text-navy-600">{tile.listings ? count(tile.listings) : "Be the first to sell"}</span> : null}
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * Top categories as a grid of their spotlight images, in rows (two by default) sliding past on their own; swiped,
+ * dragged or scrolled by hand, paused on a pointer, focus or its Pause button, still for reduced motion (`Marquee`).
+ */
+export function CategorySpotlightsBlock({ section, look }: { section: Of<"category_spotlights">; look: HomeLook }) {
+  const id = `home-${section.id}`;
+  const label = section.title || "Categories";
+  const columns = spotlightColumns(section.data.tiles, section.rows);
+  return (
+    <section aria-labelledby={section.title ? id : undefined} aria-label={section.title ? undefined : label}>
+      <Title id={id} title={section.title} />
+      <Marquee label={label} count={columns.length} speed={section.speed} direction={section.direction}>
+        {columns.map(column => (
+          <li key={column[0]!.slug} className="grid w-32 shrink-0 gap-3 sm:w-40 lg:w-44">
+            {column.map(tile => (
+              <SpotlightTile key={tile.slug} tile={tile} showCount={section.showCount} look={look} />
+            ))}
+          </li>
+        ))}
+      </Marquee>
+    </section>
   );
 }

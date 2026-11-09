@@ -1,13 +1,13 @@
 "use client";
 
 import { createContext, useContext, useId, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, BadgePercent, Globe2, ImageIcon, LayoutDashboard, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, Sparkles, Store, Tag, TrendingUp, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgePercent, CircleDot, Globe2, ImageIcon, LayoutDashboard, LayoutGrid, LayoutPanelTop, Megaphone, Plus, Rows3, ShieldCheck, Sparkles, Store, Tag, TrendingUp, X } from "lucide-react";
 import { Button, Field, ImageField, Input, Select, Textarea, Toggle } from "@bitocard/admin-ui";
 import { defineRegistry, type EditorRow, StoreSectionForm } from "@bitocard/admin-ui/storefront";
 import { conditionLabels } from "@bitocard/api-client/classifieds";
 import type { StoreSection } from "@bitocard/api-client/storefront";
 import { homeLinkText, type HomeGroupKind, type HomeLink, type HomeSection, type HomeTileSize, type HomeTone, type PersonalRailKind } from "@bitocard/api-client/home";
-import { CategoryBannerForm, ListingMarqueeForm, MasonryGridForm, RowSettingsForm, type RowFormKit, StoreMarqueeForm } from "./row-forms";
+import { CategoryBannerForm, CategorySpotlightsForm, ListingMarqueeForm, MasonryGridForm, RowSettingsForm, type RowFormKit, StoreMarqueeForm } from "./row-forms";
 
 /** What the forms choose from: the page's scope, the categories (with their subcategories) and the open markets. */
 export type HomeFormContext = {
@@ -398,6 +398,8 @@ function NewerBlockForm({ section, onChange }: { section: HomeSection; onChange:
       return <MasonryGridForm kit={kit} section={section} onChange={onChange} ItemList={ItemList as never} />;
     case "category_banner":
       return <CategoryBannerForm kit={kit} section={section} onChange={onChange} />;
+    case "category_spotlights":
+      return <CategorySpotlightsForm kit={kit} section={section} onChange={onChange} ItemList={ItemList as never} />;
     default:
       return null;
   }
@@ -409,6 +411,7 @@ function HomeSectionForm({ section, onChange }: { section: HomeSection; onChange
     case "store_marquee":
     case "masonry_grid":
     case "category_banner":
+    case "category_spotlights":
       return <NewerBlockForm section={section} onChange={onChange} />;
     case "home_hero":
       return <HeroForm section={section} onChange={onChange} />;
@@ -447,6 +450,7 @@ const icons = {
   store_marquee: Store,
   masonry_grid: LayoutDashboard,
   category_banner: Tag,
+  category_spotlights: CircleDot,
   personal_rail: Sparkles,
 };
 
@@ -480,6 +484,8 @@ function newSection(type: HomeSection["type"], id: string): HomeSection {
       return { ...base, type, title: "", tiles: [{ kind: "image", image: "", title: "Sell what you no longer use", link: { kind: "href", href: "/sell" }, size: "wide" }] };
     case "category_banner":
       return { ...base, type, category: "phones-tablets", title: "", body: "", image: null, tone: "navy", style: "split", cta: "Shop now", showCount: true };
+    case "category_spotlights":
+      return { ...base, type, title: "", categories: [], rows: 2, speed: "slow", direction: "left", showCount: true };
     case "personal_rail":
       return { ...base, type, title: personalKinds.for_you.title, kind: "for_you", limit: 12 };
   }
@@ -513,6 +519,8 @@ function summary(section: HomeSection): string {
       return `${section.tiles.length} tile${section.tiles.length === 1 ? "" : "s"}: ${section.tiles.map(tile => (tile.kind === "category" ? tile.slug || "—" : tile.kind === "listing" ? `listing ${tile.ref || "—"}` : tile.title || "photo")).join(", ")}`;
     case "category_banner":
       return [`Opens ${section.category || "—"}`, section.style === "overlay" ? "words on the photo" : "words beside the photo", section.image ? "its own photo" : "a listing's photo"].join(" · ");
+    case "category_spotlights":
+      return [section.categories.length ? section.categories.join(", ") : "Every top category", `${section.rows} row${section.rows === 1 ? "" : "s"}`, `${section.speed} speed`].join(" · ");
     case "personal_rail":
       return [personalKinds[section.kind].label, "filled for each visitor", `up to ${section.limit}`].join(" · ");
   }
@@ -525,6 +533,7 @@ function title(section: HomeSection): string {
   if (section.type === "listing_marquee") return section.title || "Moving listings";
   if (section.type === "store_marquee") return section.title || "Moving stores";
   if (section.type === "masonry_grid") return section.title || "Masonry grid";
+  if (section.type === "category_spotlights") return section.title || "Category spotlights";
   if (section.type === "personal_rail") return section.title || personalKinds[section.kind].label;
   return section.title;
 }
@@ -545,6 +554,7 @@ export const homeRegistry = defineRegistry<HomeSection>({
     { type: "store_marquee", label: "Moving stores", description: "Resellers' stores live on their own domain, sliding past: picked, or those with most listings." },
     { type: "masonry_grid", label: "Masonry grid", description: "Tiles of different sizes: categories, listings, or photos linking anywhere." },
     { type: "category_banner", label: "Category banner", description: "A banner opening one category, with its name, a listing's photo and its count unless you set them." },
+    { type: "category_spotlights", label: "Category spotlights", description: "Top categories' spotlight images in rows sliding past: every top category, or the ones you choose." },
     { type: "personal_rail", label: "Personal listings", description: "For you, Recently viewed, Because you searched or Price dropped: filled for each visitor (a country’s page)." },
   ],
   newSection,

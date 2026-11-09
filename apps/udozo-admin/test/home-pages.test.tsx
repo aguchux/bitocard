@@ -46,7 +46,7 @@ const page = (layout = "marketplace") => ({
   updated_at: "2026-11-01T10:00:00.000Z",
   versions: [],
   layouts,
-  blocks_allowed: ["home_hero", "category_masonry", "deals_rail", "sponsored_rail", "top_selling_rail", "listing_group", "banner", "trust_bar", "listing_marquee", "store_marquee", "masonry_grid", "category_banner", "personal_rail"],
+  blocks_allowed: ["home_hero", "category_masonry", "deals_rail", "sponsored_rail", "top_selling_rail", "listing_group", "banner", "trust_bar", "listing_marquee", "store_marquee", "masonry_grid", "category_banner", "category_spotlights", "personal_rail"],
   sections_allowed: ["home_hero"],
 });
 // The page across countries. Its allowed blocks name a personal row as if the API offered one: the editor still never does.
@@ -158,6 +158,24 @@ describe("Home pages", () => {
         const saved = sent.filter(item => item.path === "/v1/admin/classifieds/home/NG/draft").at(-1)?.body as { rows: Array<{ blocks: Array<{ type: string; picks?: string[] }> }> } | undefined;
         expect(saved?.rows).toHaveLength(3);
         expect(saved!.rows[2]!.blocks[0]).toMatchObject({ type: "listing_marquee", picks: ["100031"] });
+      },
+      { timeout: 10000 },
+    );
+  });
+
+  test("a row of category spotlights added: two rows by default, set to one, saved", slow, async () => {
+    show(<HomePagesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add row" }, { timeout: 10000 }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /Category spotlights/ }));
+    const rows = (await screen.findByLabelText("Rows", {}, { timeout: 10000 })) as HTMLSelectElement;
+    expect(rows.value).toBe("2");
+    expect(screen.getByText(/None chosen: every top category/)).toBeTruthy();
+    fireEvent.change(rows, { target: { value: "1" } });
+    await waitFor(
+      () => {
+        const saved = sent.filter(item => item.path === "/v1/admin/classifieds/home/NG/draft").at(-1)?.body as { rows: Array<{ blocks: Array<Record<string, unknown>> }> } | undefined;
+        expect(saved?.rows).toHaveLength(3);
+        expect(saved!.rows[2]!.blocks[0]).toMatchObject({ type: "category_spotlights", rows: 1, categories: [], speed: "slow", showCount: true });
       },
       { timeout: 10000 },
     );

@@ -42,11 +42,8 @@ const trust = (scope: HomeScope): Block => ({
 
 const sellBanner = (tone: 'navy' | 'brand' | 'light') => ({ title: 'Sell what you no longer use', body: 'Post an ad in minutes. Listing is free.', link: { kind: 'href', href: '/sell' }, tone });
 const safePayBanner = (tone: 'navy' | 'brand' | 'light') => ({ title: 'Pay safely with Safe pay', body: 'Your money is held until you have the item.', link: { kind: 'href', href: '/safe-trade#safe-pay' }, tone });
-/** Two category banners side by side: phones and vehicles, what sells most in every market. */
-const categoryBanners = (tone: 'navy' | 'brand' | 'light'): Block[] => [
-  { type: 'category_banner', span: half, category: 'phones-tablets', tone, body: 'Phones and tablets from sellers near you.' },
-  { type: 'category_banner', span: half, category: 'vehicles', tone: tone === 'navy' ? 'brand' : 'navy', body: 'Cars, motorbikes and kekes.' },
-];
+/** Every top category's spotlight image, in two rows sliding past. */
+const spotlights = (speed: 'slow' | 'normal' | 'fast' = 'slow') => row([{ type: 'category_spotlights', title: '', speed }], { title: 'Shop by category' });
 const storesRow = (scope: HomeScope) => (scope === 'country' ? [row([{ type: 'store_marquee', title: '' }], { title: 'Shops on Udozo', subtitle: 'Stores selling across the marketplace.' })] : []);
 
 /**
@@ -67,7 +64,7 @@ export const homeLayouts: HomeLayout[] = [
           row([{ type: 'sponsored_rail' }]),
           row([scope === 'global' ? { type: 'listing_group', title: 'Trending across countries', by: 'trending' } : { type: 'deals_rail' }]),
           row([{ type: 'listing_marquee', title: '', fill: { by: 'trending', value: null } }], { title: 'Trending now', background: 'soft' }),
-          row(categoryBanners('navy')),
+          spotlights(),
           row([{ type: 'top_selling_rail' }]),
           ...storesRow(scope),
           row([{ type: 'banner', items: [sellBanner('brand'), safePayBanner('navy')] }]),
@@ -91,7 +88,7 @@ export const homeLayouts: HomeLayout[] = [
           row([{ type: 'sponsored_rail' }]),
           row([{ type: 'banner', items: [safePayBanner('brand')] }]),
           row([{ type: 'top_selling_rail' }]),
-          row(categoryBanners('brand')),
+          spotlights('normal'),
           row([{ type: 'category_masonry', title: 'Browse categories', limit: 6 }]),
           row([{ type: 'listing_group', title: 'Newest', by: 'newest', display: 'grid', limit: 12 }]),
         ],

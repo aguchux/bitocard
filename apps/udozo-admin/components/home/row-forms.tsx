@@ -254,6 +254,30 @@ export function CategoryBannerForm({ kit, section, onChange }: { kit: RowFormKit
   );
 }
 
+type ListOf = <T>(props: { items: T[]; max: number; label: string; render: (item: T, change: (next: T) => void, index: number) => React.ReactNode; onChange: (next: T[]) => void; make: () => T }) => React.ReactNode;
+
+export function CategorySpotlightsForm({ kit, section, onChange, ItemList }: { kit: RowFormKit; section: Of<"category_spotlights">; onChange: (next: HomeSection) => void; ItemList: ListOf }) {
+  return (
+    <>
+      <kit.TextField label="Title" value={section.title} max={80} hint="Optional: the row's heading usually names it." onChange={title => onChange({ ...section, title })} />
+      <p className="text-xs text-muted">Each category&apos;s spotlight image is set on Marketplace › Categories (Pictures); a category without one shows its icon.</p>
+      <ItemList<string>
+        items={section.categories}
+        max={30}
+        label="Category"
+        make={() => ""}
+        onChange={categories => onChange({ ...section, categories })}
+        render={(slug, change) => <kit.CategorySelect label="Category" value={slug || null} onChange={next => change(next ?? "")} />}
+      />
+      <p className="text-xs text-muted">None chosen: every top category open on the page, in its own order.</p>
+      <Choice label="Rows" value={String(section.rows) as "1" | "2" | "3"} options={{ 1: "One row", 2: "Two rows", 3: "Three rows" }} onChange={rows => onChange({ ...section, rows: Number(rows) })} />
+      <Choice label="Speed" value={section.speed} options={speedLabels} onChange={speed => onChange({ ...section, speed })} />
+      <Choice label="Moves towards" value={section.direction} options={{ left: "The left", right: "The right" }} onChange={direction => onChange({ ...section, direction })} />
+      <Toggle label="Show how many listings each has" checked={section.showCount} onChange={showCount => onChange({ ...section, showCount })} />
+    </>
+  );
+}
+
 /** A row's own settings: its heading, "See all", background, width and spacing. */
 export function RowSettingsForm({ kit, row, onChange }: { kit: RowFormKit; row: EditorRow<HomeSection>; onChange: (next: EditorRow<HomeSection>) => void }) {
   const value = row as unknown as HomeRow;

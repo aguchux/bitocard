@@ -115,6 +115,8 @@ export class HomeResolver {
       case 'personal_rail':
         // Filled for the person by udozo.com after the page loads; the shared (cached) page only holds its place.
         return { ...section, data: { kind: section.kind } };
+      case 'category_spotlights':
+        return { ...section, data: { tiles: await this.spotlights(section, ctx) } };
       case 'category_banner': {
         const found = await this.categoryCover(section.category, ctx.countries);
         if (!found) return { ...section, data: { category: null } };
@@ -386,11 +388,21 @@ export class HomeResolver {
       .map((cover, index) => tile(cover, tileSizes[index % tileSizes.length]!, null));
   }
 
+  /**
+   * The spotlight grid's tiles: the categories chosen (in their order), else every top category open on the page in its
+   * own order; each with its spotlight image (null: udozo.com draws its icon) and live listings.
+   */
+  private async spotlights(section: Extract<HomeSection, { type: 'category_spotlights' }>, ctx: HomeContext) {
+    const covers = await this.covers(ctx.countries);
+    const chosen = section.categories.length ? section.categories.flatMap(slug => covers.filter(cover => cover.slug === slug)) : covers;
+    return chosen.map(cover => ({ slug: cover.slug, name: cover.name, icon: cover.icon, listings: cover.listings, image: cover.spotlight, href: this.href({ kind: 'category', slug: cover.slug }, ctx) }));
+  }
+
   /** Every top category open in the countries, with its live listings (subcategories counted) and a photo of one. */
   private async covers(countries: string[]) {
     const categories = await this.prisma.classifiedCategory.findMany({
       where: { enabled: true, parentId: null, countries: { some: { country: { in: countries }, enabled: true } } },
-      select: { id: true, slug: true, name: true, icon: true },
+      select: { id: true, slug: true, name: true, icon: true, spotlightUrl: true },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
     const rows = await this.prisma.$queryRaw<{ top: string; listings: bigint; media_id: string | null; url: string | null }[]>`
@@ -412,7 +424,7 @@ export class HomeResolver {
         ORDER BY random() LIMIT 1
       ) pick ON true`;
     const byTop = new Map(rows.map(row => [row.top, row]));
-    return categories.map(category => ({ slug: category.slug, name: category.name, icon: category.icon, listings: Number(byTop.get(category.id)?.listings ?? 0), photo: this.coverPhoto(byTop.get(category.id)) }));
+    return categories.map(category => ({ slug: category.slug, name: category.name, icon: category.icon, spotlight: category.spotlightUrl, listings: Number(byTop.get(category.id)?.listings ?? 0), photo: this.coverPhoto(byTop.get(category.id)) }));
   }
 
   /** A category tile's photo: the picked listing's cover, watermarked while watermarks are on. */

@@ -144,6 +144,39 @@ describe("category banners and masonry grids", () => {
   });
 });
 
+describe("category spotlights", () => {
+  const tiles = ["phones-tablets", "vehicles", "property", "fashion", "pets"].map((slug, index) => ({
+    slug,
+    name: `Category ${index}`,
+    icon: "package",
+    listings: index === 4 ? 0 : 10 * (index + 1),
+    image: index === 0 ? "https://media.test/spot.png" : null,
+    href: `/ng/c/${slug}`,
+  }));
+  const block = (extra: Record<string, unknown> = {}) =>
+    ({ id: "sp", type: "category_spotlights", span, hidden: false, title: "", categories: [], rows: 2, speed: "slow", direction: "left", showCount: true, data: { tiles }, ...extra }) as ResolvedHomeSection;
+
+  it("slides the categories in columns of two (top, then bottom), each opening its category with its spotlight image or icon", async () => {
+    const { spotlightColumns } = await import("@/components/home/row-blocks");
+    expect(spotlightColumns([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(spotlightColumns([1, 2, 3], 1)).toEqual([[1], [2], [3]]);
+    const out = html(page([row("r", [block()], { title: "Shop by category" })]));
+    expect(out).toContain("Shop by category");
+    for (const tile of tiles) expect(out).toContain(`href="${tile.href}"`);
+    expect(out).toContain('src="https://media.test/spot.png" alt=""');
+    expect(out).toContain("10 listings");
+    expect(out).toContain("Be the first to sell");
+    expect(out).toContain("Pause");
+    // Three columns of two, each a list item holding its tiles; the copy repeats them for the loop.
+    expect(out.match(/<li class="grid w-32/g)!.length).toBe(6);
+  });
+
+  it("without counts, or with no categories, says nothing more", () => {
+    expect(html(page([row("r", [block({ showCount: false })])]))).not.toContain("listings");
+    expect(html(page([row("r", [block({ data: { tiles: [] } })], { title: "Empty row" })]))).not.toContain("Empty row");
+  });
+});
+
 describe("the editor's preview", () => {
   it("is framed only on /home-preview and only by Udozo's admin", async () => {
     const config = (await import("../next.config")).default;
