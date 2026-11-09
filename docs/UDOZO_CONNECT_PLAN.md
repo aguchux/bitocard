@@ -250,8 +250,8 @@ finance and operations, audited), with these defaults; admins can change any of 
 - **What is left over is the seller's, but only on a claim:** the seller files a **claim request** (on the order page;
   `connect_auction_claims`), Udozo's finance checks it and pays the rest into the seller's UdozoPay earnings, audited.
   The seller has **90 days from the sale** to claim (`claim_days`, default 90), and is told when the item sells and
-  again before the 90 days end. Without a claim nothing is paid out (what happens to unclaimed money is an open question
-  below).
+  again before the 90 days end. Without a claim nothing is paid out: **unclaimed money is Udozo's** after the 90 days
+  (moved to `connect_revenue`, audited).
 
 **Udozo auctions (on udozo.com):**
 - **What is auctioned:** abandoned Connect items Udozo holds in its warehouses, sold by **Udozo itself** (never the
@@ -278,7 +278,8 @@ Connect again. Each day's charge is its own ledger entry (`connect_demurrage:<or
 
 **Udozo warehouses and Final Return Addresses (FRA):**
 - **Udozo runs its own warehouses** (`connect_warehouses`: address, state, hours, contact; admin Connect >
-  **Warehouses**, operations).
+  **Warehouses**, operations). **The first is in Lagos**, and it is every centre's Final Return Address until more
+  open.
 - **Every centre has a Final Return Address**: the warehouse its abandoned items go to, set by Udozo's operations
   (`connect_centres.fra_warehouse_id`). The centre sees it on its dashboard (Centre and Overview), with the next pickup.
 - **Udozo collects:** Udozo's operations schedule pickups from centres (`connect_pickups`: the centre, the items, the
@@ -377,13 +378,14 @@ centres are ready on the day it switches on.
 9. **Returns, still open:** can the seller ask the centre to send a return by courier instead, and who pays?
    (Answered: the seller accepts or an admin approves, auto-accepted after 48 hours, everyone told; 7 days to collect,
    then Loss of care.)
-10. **Unclaimed auction money:** after the seller's 90 days, does Udozo keep it? Lawyers must confirm keeping it, and
-    selling abandoned goods at all, is allowed in each market, and what notice the seller must be given.
-11. **Warehouses:** where the first one is, and the cost of pickups: is it part of what the auction recovers, or also
-    charged to the seller who collects from the warehouse?
+10. **Lawyers:** confirm that auctioning abandoned goods, and Udozo keeping unclaimed money after 90 days, are allowed
+    in each market, and what notice the seller must be given.
+11. **Pickups:** is their cost part of what the auction recovers, or also charged to a seller who collects from the
+    warehouse? And while Lagos is the only warehouse, how are centres far from it picked up (and at what cost)?
 (Answered on 9 November 2026: demurrage 2.1% of the shipping charge daily, no cap, the same for buyer and seller; the
 seller's 7 free days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split
 70% centre, 30% Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30
 days, Udozo picking it up to the centre's Final Return Address (a Udozo warehouse), auctioned from 90 days on udozo.com,
-what is left over the seller's on a claim request within 90 days of the sale; Loss of care ends the centre's liability,
+what is left over the seller's on a claim request within 90 days of the sale, unclaimed money Udozo's; the first
+warehouse in Lagos; Loss of care ends the centre's liability,
 not its responsibility.)
