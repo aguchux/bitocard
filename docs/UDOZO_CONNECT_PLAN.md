@@ -158,7 +158,7 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
 | Shelved | centre | Staff put it in one of the centre's storage places |
 | Ready | Udozo | The buyer is told by inbox, push, email and, where switched on, WhatsApp, with the centre's address, hours, the 72 hours they have to collect free, and the demurrage after them |
 | Collected | centre | The buyer pays any demurrage due, then shows their 6-digit release code; staff enter it (5 tries) and hand the item over; UdozoPay pays the seller as on release today, and the centre its fee |
-| Not collected | centre | Demurrage from 72 hours after Ready; at 7 days the return to the seller is due and the centre requests it (see Return requests below) |
+| Not collected | centre | Daily demurrage from 72 hours after Ready; at 7 days the return to the seller is due and the centre requests it (see Return requests below) |
 | Returned | seller | Once the return is accepted, the seller collects it with their return code and the trade is settled |
 
 - **Order statuses:** the existing ones plus `at_centre` and `returning`. Each step is a shipment event with `reported_by: 'centre'`.
@@ -206,37 +206,46 @@ The owner's rules (9 November 2026):
 ### 6b. Holding times, demurrage and Loss of care
 
 The owner's rules (9 November 2026). Every time and rate is a setting per market (Connect settings in Udozo's admin,
-finance and operations, audited), with these defaults.
+finance and operations, audited), with these defaults; admins can change any of them.
 
-**Demurrage** is the charge for keeping an item at a centre past its free time. It is the **same amount as the order's
-shipping charge** (whether per day or once is an open question below).
+**Demurrage** is the charge for keeping an item at a centre past its free time:
+- charged **every day**, as a **percentage of the order's shipping charge** (`demurrage_bps`, default 10,000 = 100%,
+  the same as the shipping charge each day; to confirm);
+- with **no cap**: it runs for as long as the item stays.
 
 **The buyer:**
 - **72 hours free** from the moment the item is Ready (`buyer_free_hours`, default 72). Reminders go out before they
   end.
-- **After 72 hours, demurrage** is charged to the buyer. It must be paid (from their UdozoPay wallet) before the release
-  code is accepted, and the order page and dashboard show what is due.
+- **After 72 hours, demurrage** is charged to the buyer each day. It must be paid (from their UdozoPay wallet) before
+  the release code is accepted, and the order page and dashboard show what is due.
 - **At 7 days** from Ready (`return_due_days`, default 7) the **return to the seller is due**: the centre requests it
   and it follows Return requests above (seller accepts or admin approves, automatic after 48 hours, everyone told).
 - The buyer's refund is the price less the shipping and less the demurrage that ran up.
 
 **The seller:**
-- Once the return is accepted, the seller has **7 days** to collect it with their return code (`seller_collect_days`,
-  default 7). Demurrage runs on the seller's side too (when it starts is an open question below).
-- **Not collected in 7 days:** the item goes into **Loss of care**:
+- The seller has **7 days** to collect the return with their return code (`seller_collect_days`, default 7), counted
+  from the day the return was **accepted by the seller, approved by an admin or accepted automatically**. Those 7 days
+  are free.
+- **Not collected in 7 days:** the item goes into **Loss of care**, and from then on, **every day**:
   - the **centre is no longer liable** for any damage to or loss of the item;
-  - **demurrage still runs**;
-  - the seller is charged a **penalty of x% of the product's price, capped at y** (`loc_penalty_bps` and
-    `loc_penalty_cap_minor`, per market; Connect does not open in a market until finance has set both);
-  - the seller, centre and Udozo's admins are told, and the order's timeline and the centre's dashboard mark it Loss of care.
-- A seller can still collect an item in Loss of care, after paying the demurrage and penalty.
+  - **demurrage** is charged to the seller (as above, no cap);
+  - a **Loss of care penalty** is charged to the seller: **2.1% of the order's shipping charge, capped at ₦500 a day**
+    (`loc_penalty_bps`, default 210, and `loc_penalty_cap_minor`, default 50,000 kobo, per market; a percentage of
+    the shipping, never of the product's price);
+  - the seller, centre and Udozo's admins are told when it goes into Loss of care, and the order's timeline and the
+    centre's dashboard mark it.
+- A seller can still collect an item in Loss of care, after paying the demurrage and penalties that ran up.
 
-**Taking the money:** the buyer's demurrage is paid before collection; the seller's demurrage and penalty come out of
+**Who receives it:** demurrage and Loss of care penalties are split between the **Connect Centre** that holds the item
+and **Udozo**, **70% to the centre and 30% to Udozo** by default (`centre_share_bps`, default 7,000; Udozo has the
+rest). The centre's share goes to its earnings, and Udozo's to `connect_revenue`.
+
+**Taking the money:** the buyer's demurrage is paid before collection. The seller's demurrage and penalties come out of
 what UdozoPay owes them, else their wallet, else they are owed and must be paid before the seller trades through
-Connect again. Who receives demurrage and penalties is an open question below. Each is its own ledger entry.
+Connect again. Each day's charge is its own ledger entry (`connect_demurrage:<order>:<day>`), so it is charged once.
 
-**Order statuses** add `loss_of_care`. The `classifieds` job starts demurrage, makes returns due and moves items into
-Loss of care, each step claimed once, so a run twice charges nothing twice.
+**Order statuses** add `loss_of_care`. The `classifieds` job starts demurrage, makes returns due, moves items into Loss
+of care and charges each day, each step claimed once, so a run twice charges nothing twice.
 
 ### 7. Tracking
 
@@ -291,7 +300,8 @@ centres are ready on the day it switches on.
 ## Legal owed before it opens
 
 - **Terms:** a new Connect section covering what a centre does and does not do, the 72 free hours, demurrage, returns
-  due at 7 days, Loss of care (the centre no longer liable, demurrage running, the penalty of x% capped at y), damage
+  due at 7 days, Loss of care (the centre no longer liable, daily demurrage with no cap, and the daily penalty of 2.1% of the
+  shipping charge capped at ₦500), damage
   and loss while an item is at a centre, inspection, and prohibited items for centres. Lawyers to confirm the
   Loss of care penalty and the end of liability are enforceable in each market.
 - **Connect Centre agreement** (accepted when applying, recorded by version): custody of items, liability for loss and
@@ -314,7 +324,7 @@ centres are ready on the day it switches on.
    UdozoPay fees)?
 4. **Inspection at the counter:** can the buyer look at the item at the centre and refuse it there (opening a dispute)
    before entering the code?
-5. **Uncollected items** (answered: 72 hours free, then demurrage, the return due at 7 days; still open, see 10 to 13).
+5. **Uncollected items** (answered: 72 hours free, then daily demurrage, the return due at 7 days; still open, see 10 and 11).
 6. **Approving centres:** is the online review enough, or does Udozo visit an office (or ask for a video tour) before
    approving it? Does a centre pay a deposit or need insurance?
 7. **Home delivery:** does it stay alongside Connect, or does Connect replace it?
@@ -322,9 +332,10 @@ centres are ready on the day it switches on.
 9. **Returns, still open:** can the seller ask the centre to send a return by courier instead, and who pays?
    (Answered: the seller accepts or an admin approves, auto-accepted after 48 hours, everyone told; 7 days to collect,
    then Loss of care.)
-10. **Demurrage rate:** the shipping charge **per day** after the free time, or **once**? Is there a most it can reach
-    (for example the item's price)?
-11. **Seller's demurrage:** does it start when the return is accepted, or only after their 7 days?
-12. **Who receives** demurrage and Loss of care penalties: the centre, Udozo, or shared (and how)?
-13. **x and y:** the Loss of care penalty's percentage and cap for Nigeria; and what happens to an item still in Loss of care after a
-    long time (for example 30 days: the centre may dispose of it or Udozo sells it to cover what is owed)?
+10. **Demurrage percentage:** what percentage of the shipping charge each day? The plan assumes 100% (your first rule,
+    "same as shipping"), which an admin can change.
+11. **Items left in Loss of care:** charges run with no cap, so what happens after a long time, for example 30 days?
+    May the centre dispose of it, or does Udozo sell it to cover what is owed?
+(Answered on 9 November 2026: demurrage daily with no cap; the seller's 7 free days counted from acceptance, admin
+approval or automatic acceptance, demurrage after them; the split 70% centre, 30% Udozo; the Loss of care penalty 2.1%
+of the shipping charge, capped at ₦500 a day.)
