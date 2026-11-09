@@ -245,11 +245,27 @@ finance and operations, audited), with these defaults; admins can change any of 
   photos and a handover record, and Udozo then keeps it. Charges keep running either way, and until the auction the
   seller can still collect it (at the centre, or at the warehouse once it is there) after paying what is owed.
 - **90 days:** Udozo **may auction** the item to recover the storage loss (`auction_after_days`, default 90). The seller
-  is told before it is listed. What the sale raises pays what is owed (demurrage, penalties, and the cost of the
+  is told before it is listed. **Auctions run on udozo.com** (see Udozo auctions below). What the sale raises pays what is owed (demurrage, penalties, and the cost of the
   auction and moving it).
 - **What is left over is the seller's, but only on a claim:** the seller files a **claim request** (on the order page;
   `connect_auction_claims`), Udozo's finance checks it and pays the rest into the seller's UdozoPay earnings, audited.
-  Without a claim nothing is paid out (how long a seller has to claim is an open question below).
+  The seller has **90 days from the sale** to claim (`claim_days`, default 90), and is told when the item sells and
+  again before the 90 days end. Without a claim nothing is paid out (what happens to unclaimed money is an open question
+  below).
+
+**Udozo auctions (on udozo.com):**
+- **What is auctioned:** abandoned Connect items Udozo holds in its warehouses, sold by **Udozo itself** (never the
+  seller), each as an auction listing with its photos from check-in and the warehouse, an honest description of its
+  state ("sold as seen", from an abandoned shipment) and where it is collected (the warehouse, or shipped through
+  Connect like any item).
+- **Where:** a section of udozo.com, **Udozo auctions** (`/<cc>/auctions` and each lot's page), linked from the
+  market's footer and help, with its own terms.
+- **Bidding:** signed-in Udozo accounts with a confirmed mobile, a starting price set by operations (at least what is
+  owed, where it can be), bids in steps, an end time extended by a few minutes when a bid comes in at the end, and the
+  winner paying with **UdozoPay** within a set time (else the next highest bidder is offered it).
+- **Admin:** Connect > **Auctions** (operations list a lot, set its start price and end, cancel it before bids if the
+  seller pays up; finance sees what each sale paid off and what is left for the seller), audited.
+- The bidding rules (steps, time extension, payment window, a reserve) are settled when this phase is built.
 - Each step is in the order's timeline and Udozo's audit log, and is claimed once by the `classifieds` job.
 
 **Who receives it:** demurrage and Loss of care penalties are split between the **Connect Centre** that holds the item
@@ -317,6 +333,8 @@ assistants' knowledge, help, terms and privacy.
    and Stock check; the order timeline, and centre earnings and payouts.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
+7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo
+   auctions on udozo.com, and auction claims.
 
 Each phase is behind the switch `connect_shipping` (Udozo's own, global or per country, **off by default**), with
 tests in the API, the site and the admin, as the other Udozo plans are. Applications can open before shipping does, so
@@ -327,7 +345,8 @@ centres are ready on the day it switches on.
 - **Terms:** a new Connect section covering what a centre does and does not do, the 72 free hours, demurrage, returns
   due at 7 days, Loss of care (the centre no longer liable, daily demurrage with no cap, and the daily penalty of 2.1% of the
   shipping charge capped at ₦500; the centre still responsible for the item), abandonment at 30 days, Udozo's pickup to a
-  Udozo warehouse, auction from 90 days, and claiming what is left over, damage
+  Udozo warehouse, auction from 90 days on udozo.com (with Udozo
+  auctions' own terms), and claiming what is left over within 90 days, damage
   and loss while an item is at a centre, inspection, and prohibited items for centres. Lawyers to confirm the
   Loss of care penalty and the end of liability are enforceable in each market.
 - **Connect Centre agreement** (accepted when applying, recorded by version): custody of items, liability for loss and
@@ -358,13 +377,13 @@ centres are ready on the day it switches on.
 9. **Returns, still open:** can the seller ask the centre to send a return by courier instead, and who pays?
    (Answered: the seller accepts or an admin approves, auto-accepted after 48 hours, everyone told; 7 days to collect,
    then Loss of care.)
-10. **Auction claims:** how long a seller has to file a claim for what is left over after an auction (for example 90
-    days), and what happens to it if they never do. Does the auction run on udozo.com or elsewhere? Lawyers must
-    confirm selling abandoned goods is allowed in each market, and what notice the seller must be given.
+10. **Unclaimed auction money:** after the seller's 90 days, does Udozo keep it? Lawyers must confirm keeping it, and
+    selling abandoned goods at all, is allowed in each market, and what notice the seller must be given.
 11. **Warehouses:** where the first one is, and the cost of pickups: is it part of what the auction recovers, or also
     charged to the seller who collects from the warehouse?
 (Answered on 9 November 2026: demurrage 2.1% of the shipping charge daily, no cap, the same for buyer and seller; the
 seller's 7 free days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split
 70% centre, 30% Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30
-days, Udozo picking it up to the centre's Final Return Address (a Udozo warehouse), auctioned from 90 days, what is left
-over the seller's on a claim request; Loss of care ends the centre's liability, not its responsibility.)
+days, Udozo picking it up to the centre's Final Return Address (a Udozo warehouse), auctioned from 90 days on udozo.com,
+what is left over the seller's on a claim request within 90 days of the sale; Loss of care ends the centre's liability,
+not its responsibility.)
