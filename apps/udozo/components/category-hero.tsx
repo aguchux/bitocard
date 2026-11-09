@@ -6,9 +6,9 @@ type Pictures = { banner_url?: string | null; spotlight_url?: string | null };
 
 /**
  * A category page's header: the top category's banner (an admin's upload, 4:1, else Udozo's drawn one) with the name
- * written over its calmer left side, and on the right a circle holding the top category's spotlight image (a cut-out of
- * what is sold there). A subcategory shows its top category's banner and its own icon in the circle, as does a top
- * category without a spotlight image. The pictures are decoration: the name and figures are the page's words.
+ * written over its calmer left side, and on the right the top category's spotlight image (a cut-out of what is sold
+ * there) sitting straight on the banner, with no backing. A subcategory shows its top category's banner and its own icon
+ * on a faint circle, as does a top category without a spotlight image. The pictures are decoration: the name and figures are the page's words.
  */
 export function CategoryHero({
   category,
@@ -51,16 +51,15 @@ export function CategoryHero({
             {listings === null ? `For sale in ${place}` : `${listings.toLocaleString("en-GB")} ${listings === 1 ? "listing" : "listings"} in ${place}`}
           </p>
         </div>
-        <div aria-hidden="true" className="relative grid size-28 shrink-0 place-items-center sm:size-44 lg:size-56">
-          <span className="absolute inset-0 rounded-full bg-white shadow-2xl ring-4 ring-white/25 sm:ring-8" />
-          <span className="absolute inset-[8%] rounded-full bg-gradient-to-br from-navy-50 to-white" />
-          {spotlight ? (
-            // eslint-disable-next-line @next/next/no-img-element -- an admin's checked upload on the media CDN.
-            <img src={spotlight} alt="" className="relative size-[86%] object-contain drop-shadow-xl" />
-          ) : (
-            <ShopIcon name={category.icon} className="relative size-12 text-brand-600 sm:size-20 lg:size-24" />
-          )}
-        </div>
+        {spotlight ? (
+          // Straight on the banner, no backing: a cut-out on a clear background.
+          // eslint-disable-next-line @next/next/no-img-element -- an admin's checked upload on the media CDN.
+          <img src={spotlight} alt="" aria-hidden="true" className="size-32 shrink-0 object-contain drop-shadow-2xl sm:size-52 lg:size-64" />
+        ) : (
+          <span aria-hidden="true" className="grid size-24 shrink-0 place-items-center rounded-full bg-white/10 ring-1 ring-white/20 sm:size-36 lg:size-44">
+            <ShopIcon name={category.icon} className="size-12 text-white sm:size-16 lg:size-20" />
+          </span>
+        )}
       </div>
     </section>
   );

@@ -21,6 +21,7 @@ describe("the category header", () => {
     expect(html).toContain("1,234 listings in Nigeria");
     expect(html).toContain('src="https://cdn.test/banner.webp" alt=""');
     expect(html).toContain('src="https://cdn.test/spot.png" alt=""');
+    expect(html, "the spotlight image sits on the banner with no white circle behind it").not.toContain("bg-white");
   });
 
   it("a subcategory: its top category's banner and name above, never the spotlight image", () => {
