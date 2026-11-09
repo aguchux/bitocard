@@ -114,6 +114,9 @@ export function ResaleFields({
 
       {value.resale ? (
         <div className="grid gap-4 border-t border-slate-100 pt-4">
+          {availability?.checks_waived && open ? (
+            <p className="rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">Udozo is testing reselling here: no identity check or payout account is needed to let resellers sell this item for now.</p>
+          ) : null}
           {availability && !availability.ready && open ? (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Before posting:{" "}

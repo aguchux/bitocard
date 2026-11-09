@@ -28,4 +28,12 @@ describe("Let resellers sell this", () => {
     expect(resaleBox(setting)).toContain("disabled");
     expect(setting).toContain("Udozo is still setting up selling through resellers in your country.");
   });
+
+  it("while Udozo tests reselling, says no identity check or payout account is needed, and asks for neither", () => {
+    const value = { ...availability(true, null), identity_required: false, identity_checked: true, payout_account: true, checks_waived: true, ready: true };
+    const html = renderToStaticMarkup(createElement(ResaleFields, { value: { ...sellWhereFrom(null, value), resale: true }, availability: value, priceMinor: 100000, priceOnRequest: false, currency: "NGN", invalid: () => false, onChange: () => undefined }));
+    expect(html).toContain("Udozo is testing reselling here");
+    expect(html).not.toContain("Before posting");
+    expect(render(availability(true, null))).not.toContain("Udozo is testing reselling here");
+  });
 });

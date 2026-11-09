@@ -26,6 +26,7 @@ import {
   useStoreDomainsQuery,
   useSubdomainCheckQuery,
   useUnpublishStoreMutation,
+  useResellerSettingsQuery,
   useUpdateStoreMutation,
   watermarkTextMax,
   watermarkTextProblem,
@@ -142,7 +143,10 @@ export function StoreLiveSwitch({ store, canManage }: { store: Store; canManage:
   const domains = useStoreDomainsQuery(store.id);
   const setupFee = useSetupFeeQuery();
   const live = store.checkout_mode === "live";
-  const verified = membership.reseller.status === "active";
+  const settings = useResellerSettingsQuery();
+  // While Udozo tests reselling, a Resale shop of a reseller not yet verified (never suspended) can go live too.
+  const testing = membership.reseller.status === "pending" && store.template === "resale_shop" && settings.data?.features.resale_skip_reseller_checks === true;
+  const verified = membership.reseller.status === "active" || testing;
   const hasDomain = domains.data ? domains.data.data.some(domain => domain.status === "active") : null;
   const feeDue = setupFee.data?.due === true;
   const refused = errorCode(state.error);

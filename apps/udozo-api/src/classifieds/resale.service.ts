@@ -58,18 +58,20 @@ export class ResaleService {
 
   /**
    * What stops this customer opening listings to resellers, if anything (live: a payout account, and their identity
-   * check where the market's `customer_identity_check` switch requires it).
+   * check where the market's `customer_identity_check` switch requires it). Neither while admins test reselling in the
+   * market (`resale_skip_supplier_checks`, `checks_waived`).
    */
   private async readiness(customer: CustomerWithStore, country: string) {
     const mode = this.stores.mode(customer.store);
+    if (await this.settings.isOnForCountry('resale_skip_supplier_checks', country)) return { identity_required: false, identity_checked: true, payout_account: true, checks_waived: true };
     const required = await this.settings.isOnForCountry('customer_identity_check', country);
-    if (mode === 'test') return { identity_required: required, identity_checked: true, payout_account: true };
+    if (mode === 'test') return { identity_required: required, identity_checked: true, payout_account: true, checks_waived: false };
     const house = await this.stores.sellerFor(customer);
     const [checked, account] = await Promise.all([
       this.identity.isCustomerVerified(house.id, mode, customer.id),
       this.prisma.customerBankAccount.findFirst({ where: { customerId: customer.id, mode, country, removedAt: null }, select: { id: true } }),
     ]);
-    return { identity_required: required, identity_checked: checked, payout_account: Boolean(account) };
+    return { identity_required: required, identity_checked: checked, payout_account: Boolean(account), checks_waived: false };
   }
 
   /** Before a listing is opened to resellers: resale open in the country, and the supplier ready. */

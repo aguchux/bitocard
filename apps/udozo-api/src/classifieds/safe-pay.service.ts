@@ -631,7 +631,8 @@ export class SafePayService {
   /**
    * The supplier accepts a resale order (or it is accepted by itself, with auto-accept): the buyer's locked money goes
    * into escrow in the same transaction that marks it paid, the hand-over time starts and a meet-up's release code is
-   * made. Needs what accepting any Safe pay order needs (terms, strikes, identity check and payout account).
+   * made. Needs what accepting any Safe pay order needs (terms, strikes, identity check and payout account; the last two
+   * not while admins test reselling in the market, `resale_skip_supplier_checks`).
    */
   async acceptResale(order: OrderRow, houseId: string, settings: Settings, auto = false) {
     const now = new Date();
@@ -639,9 +640,11 @@ export class SafePayService {
     await this.terms.require(order.sellerId);
     await this.guards.requireNotLimited(order.sellerId, order.country, true);
     await this.guards.requireDifferentPeople(order.buyerId, order.sellerId);
-    const ready = await this.readinessOf(order.sellerId, order.mode, houseId, order.country);
-    if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
-    if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting Safe pay orders.`, 'payout_account');
+    if (!(await this.settings.isOnForCountry('resale_skip_supplier_checks', order.country))) {
+      const ready = await this.readinessOf(order.sellerId, order.mode, houseId, order.country);
+      if (ready.identity_required && !ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
+      if (!ready.payout_account) throw conflict('seller_not_ready', `Add a payout bank account in your ${ready.identity_required ? 'verified' : 'own'} name before accepting Safe pay orders.`, 'payout_account');
+    }
     const total = totalOf(order);
     const entry = await this.ledger.prepare({
       mode: order.mode,

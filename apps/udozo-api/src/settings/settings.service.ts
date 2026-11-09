@@ -210,6 +210,16 @@ export const switchDefinitions = {
     description:
       "B2B reselling for resellers: a verified reseller with a Resale shop store browses Udozo suppliers' resale listings in their country, adds them to the store at their own price within the supplier's limits, and works with suppliers in a chat with deals (docs/BITOCARD_B2B_RESELLING_PLAN.md). Needs classifieds_resale open in the country. Every plan.",
   },
+  resale_skip_supplier_checks: {
+    scopes: ['global', 'country'],
+    description:
+      "For testing B2B reselling: Udozo sellers open their listings to resellers (Let resellers sell this item) and accept resale orders without an identity check or a payout bank account. Off (the default): both are needed as usual (the identity check where customer_identity_check is on). Turn it off again before real sellers rely on it; paying money out still needs a payout account.",
+  },
+  resale_skip_reseller_checks: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "For testing B2B reselling: resellers who have not finished verifying (never suspended ones) open a Resale shop, resell suppliers' listings and take the store live on its domain, without the identity check. Off (the default): only verified resellers resell. Withdrawing earnings to a bank still needs the check and a bank account.",
+  },
   customer_identity_check: {
     scopes: ['global', 'country'],
     description:
@@ -276,6 +286,8 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'seller_score_summaries',
   'classifieds_install_prompt',
   'classifieds_resale',
+  'resale_skip_supplier_checks',
+  'resale_skip_reseller_checks',
   'customer_identity_check',
   'reseller_resale',
   'store_template_resale_shop',

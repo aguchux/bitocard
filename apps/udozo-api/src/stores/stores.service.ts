@@ -245,7 +245,7 @@ export class StoresService {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'setup_fee_unpaid', 'Pay your Seller HQ setup fee first: Settings > Plans.', 'checkout_mode');
       }
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-      if (reseller.status !== 'active') {
+      if (reseller.status !== 'active' && !(await this.resaleChecksSkipped(reseller.status, resellerId, store.template))) {
         throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'reseller_not_verified', 'Your store can take real payments once your business is verified. Use test checkout until then.', 'checkout_mode');
       }
     }
@@ -381,9 +381,18 @@ export class StoresService {
       // B2B reselling: the reseller's own switch and a verified account (the resale catalogue checks the rest).
       if (!(await this.settings.isOn('reseller_resale', resellerId))) return { available: false, reason: 'Reselling Udozo listings is not open to your account yet.' };
       const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { status: true } });
-      return reseller?.status === 'active' ? { available: true, reason: null } : { available: false, reason: 'Finish your identity check to open a Resale shop.' };
+      if (reseller?.status === 'active' || (reseller && (await this.resaleChecksSkipped(reseller.status, resellerId, template.key)))) return { available: true, reason: null };
+      return { available: false, reason: 'Finish your identity check to open a Resale shop.' };
     }
     return { available: true, reason: null };
+  }
+
+  /**
+   * Whether admins let this reseller resell before finishing verification, to test reselling (`resale_skip_reseller_checks`):
+   * a pending reseller (never a suspended one), and only for a Resale shop.
+   */
+  private async resaleChecksSkipped(status: string, resellerId: string, template: string) {
+    return status === 'pending' && template === 'resale_shop' && (await this.settings.isOn('resale_skip_reseller_checks', resellerId));
   }
 
   /** Every template, its variants and themes, and whether each is open to the reseller. */

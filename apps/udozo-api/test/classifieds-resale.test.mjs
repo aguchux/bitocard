@@ -165,6 +165,28 @@ describe('resale: BitoCard limits and the switch', () => {
     assert.equal((await seller.patch(`/v1/classifieds/listings/${plain.id}`, { resale_discount_bps: 9000 })).json.error.code, 'resale_discount_out_of_range', 'terms stay inside the limits');
     assert.equal((await seller.patch(`/v1/classifieds/listings/${plain.id}`, { resale_paused: true })).json.resale.paused, true);
   });
+
+  test('while admins test reselling (resale_skip_supplier_checks), a seller opens listings to resellers without an identity check or payout account; switched back, both are needed again', async () => {
+    const seller = await customer('Tunde Bakare');
+    assert.equal((await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: true })).status, 200);
+    try {
+      assert.equal((await admin.put('/v1/admin/switches/resale_skip_supplier_checks', { country_code: 'NG', enabled: true })).status, 200);
+      const waived = (await seller.get('/v1/classifieds/me/resale')).json;
+      assert.deepEqual([waived.ready, waived.checks_waived, waived.identity_required, waived.payout_account], [true, true, false, true]);
+      const resold = await draft(seller, 'Hisense 50 inch TV', resaleTerms);
+      const live = (await seller.post(`/v1/classifieds/listings/${resold.id}/submit`)).json;
+      assert.deepEqual([live.status, live.resale?.enabled], ['active', true], JSON.stringify(live));
+
+      assert.equal((await admin.put('/v1/admin/switches/resale_skip_supplier_checks', { country_code: 'NG', enabled: false })).status, 200);
+      const back = (await seller.get('/v1/classifieds/me/resale')).json;
+      assert.deepEqual([back.ready, back.checks_waived, back.identity_required], [false, false, true]);
+      const another = await draft(seller, 'Hisense soundbar', resaleTerms);
+      assert.equal((await seller.post(`/v1/classifieds/listings/${another.id}/submit`)).json.error.code, 'supplier_not_ready');
+    } finally {
+      await admin.put('/v1/admin/switches/resale_skip_supplier_checks', { country_code: 'NG', enabled: null });
+      await admin.put('/v1/admin/switches/customer_identity_check', { country_code: 'NG', enabled: null });
+    }
+  });
 });
 
 describe('resale-only listings are never on BitoCard Shop', () => {

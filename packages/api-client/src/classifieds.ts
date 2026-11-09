@@ -596,6 +596,8 @@ export type ShopResaleAvailability = {
   identity_required?: boolean;
   identity_checked: boolean;
   payout_account: boolean;
+  /** Admins are testing reselling in the market: neither the identity check nor a payout account is needed. */
+  checks_waived?: boolean;
   ready: boolean;
   discount_min_bps: number;
   discount_max_bps: number;

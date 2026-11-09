@@ -111,6 +111,27 @@ describe('who may resell', () => {
 
     await prisma.reseller.update({ where: { id: shop.resellerId }, data: { status: 'pending' } });
     assert.equal((await shop.api.get('/v1/resale')).json.reason, 'not_verified');
+    const template = async () => (await shop.api.get('/v1/store-templates')).json.data.find(item => item.key === 'resale_shop');
+    assert.equal((await template()).available, false);
+
+    // While admins test reselling, a reseller not yet verified resells, opens a Resale shop and takes it live.
+    assert.equal((await admin.put('/v1/admin/switches/resale_skip_reseller_checks', { reseller_id: shop.resellerId, enabled: true })).status, 200);
+    try {
+      assert.deepEqual([(await shop.api.get('/v1/resale')).json.available, (await template()).available], [true, true]);
+      await prisma.storeDomain.create({ data: { resellerId: shop.resellerId, storeId: shop.store.id, name: `${shop.store.subdomain}.shop.test`, source: 'connected', status: 'active', primary: true } });
+      const live = await shop.api.patch(`/v1/stores/${shop.store.id}`, { checkout_mode: 'live' });
+      assert.equal(live.json.checkout_mode, 'live', JSON.stringify(live.json));
+      await shop.api.patch(`/v1/stores/${shop.store.id}`, { checkout_mode: 'test' });
+      // Never a suspended reseller.
+      await prisma.reseller.update({ where: { id: shop.resellerId }, data: { status: 'suspended' } });
+      assert.equal((await shop.api.get('/v1/resale')).json.reason, 'not_verified');
+      await prisma.reseller.update({ where: { id: shop.resellerId }, data: { status: 'pending' } });
+    } finally {
+      assert.equal((await admin.put('/v1/admin/switches/resale_skip_reseller_checks', { reseller_id: shop.resellerId, enabled: null })).status, 200);
+    }
+    // Switched back, verification is needed again.
+    assert.equal((await shop.api.get('/v1/resale')).json.reason, 'not_verified');
+    assert.equal((await shop.api.patch(`/v1/stores/${shop.store.id}`, { checkout_mode: 'live' })).json.error.code, 'reseller_not_verified');
     await prisma.reseller.update({ where: { id: shop.resellerId }, data: { status: 'active' } });
 
     const other = await prisma.store.create({ data: { resellerId: shop.resellerId, name: 'Gift shop', subdomain: `plain${Date.now() % 100000}`, template: 'gift_cards' } });

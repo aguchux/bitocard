@@ -106,7 +106,7 @@ export class ResaleStoresService {
       ? 'switch_off'
       : reseller.house
         ? 'house_account'
-        : reseller.status !== 'active'
+        : reseller.status !== 'active' && !(reseller.status === 'pending' && (await this.settings.isOn('resale_skip_reseller_checks', resellerId)))
           ? 'not_verified'
           : !reseller.country
             ? 'no_country'
