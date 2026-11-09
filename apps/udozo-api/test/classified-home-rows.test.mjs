@@ -216,7 +216,10 @@ describe('blocks', () => {
       ]);
       assert.equal(result.status, 200, JSON.stringify(result.json));
       const every = result.json.rows[0].blocks[0];
-      assert.deepEqual([every.rows, every.speed, every.direction, every.showCount], [2, 'normal', 'left', true], 'two rows by default');
+      assert.deepEqual([every.rows, every.showCount, every.viewAll], [2, true, true], 'two rows on computers, counts and View all by default');
+      assert.equal(every.data.view_all_href, '/ng/search', 'View all opens everything for sale in the country');
+      const counts = every.data.tiles.map(item => item.listings > 0);
+      assert.ok(counts.indexOf(false) === -1 || !counts.slice(counts.indexOf(false)).includes(true), 'the categories with listings come first');
       const tops = await prisma.classifiedCategory.count({ where: { enabled: true, parentId: null, countries: { some: { country: 'NG', enabled: true } } } });
       assert.equal(every.data.tiles.length, tops, 'every top category open in the market');
       const tile = every.data.tiles.find(item => item.slug === 'phones-tablets');
@@ -225,6 +228,8 @@ describe('blocks', () => {
       assert.equal(every.data.tiles.find(item => item.slug === 'vehicles').image, null, 'no spotlight image: udozo.com draws its icon');
       const chosen = result.json.rows[1].blocks[0].data.tiles;
       assert.deepEqual(chosen.map(item => item.slug), ['vehicles', 'phones-tablets'], 'in the order chosen; subcategories and unknown slugs left out');
+      const hidden = await publish([row([{ id: 'sd', type: 'category_spotlights', span: full, viewAll: false }])]);
+      assert.equal(hidden.json.rows[0].blocks[0].data.view_all_href, null);
       const invalid = await admin.put('/v1/admin/classifieds/home/NG/draft', { rows: [row([{ id: 'sc', type: 'category_spotlights', span: full, rows: 4 }])] });
       assert.equal(invalid.json.error.param, 'rows[0].blocks[0].rows');
     } finally {
@@ -232,11 +237,13 @@ describe('blocks', () => {
     }
   });
 
-  test('the starter pages show the categories as spotlights, never the two category banners', async () => {
+  test('the starter pages show the categories as spotlights right under the hero, never the two category banners', async () => {
     for (const layout of ['marketplace', 'deals']) {
       const chosen = await admin.post('/v1/admin/classifieds/home/NG/layout', { layout, replace: true });
       const types = chosen.json.rows.flatMap(item => item.blocks.map(block => block.type));
-      assert.ok(types.includes('category_spotlights'), layout);
+      assert.deepEqual(types.slice(0, 2), ['home_hero', 'category_spotlights'], layout);
+      assert.equal(types.filter(type => type === 'category_spotlights').length, 1, layout);
+      assert.equal(chosen.json.rows[1].blocks[0].title, 'Shop by category', layout);
       assert.ok(!types.includes('category_banner'), layout);
     }
   });

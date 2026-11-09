@@ -66,8 +66,8 @@ export type CategoryBannerSection = Base<'category_banner'> & {
   showCount: boolean;
 };
 
-/** Top categories' spotlight images (else their icons) in rows sliding past: the ones chosen, or every top category. */
-export type CategorySpotlightsSection = Base<'category_spotlights'> & { title: string; categories: string[]; rows: number; speed: HomeMarqueeSpeed; direction: 'left' | 'right'; showCount: boolean };
+/** Top categories' spotlight images (else their icons): one row to swipe on phones, a grid of `rows` on computers. */
+export type CategorySpotlightsSection = Base<'category_spotlights'> & { title: string; categories: string[]; rows: number; speed: HomeMarqueeSpeed; direction: 'left' | 'right'; showCount: boolean; viewAll: boolean };
 
 /** A block of a row: every section type of before, the marquees, masonry grids, category banners and spotlights. */
 export type HomeSection =
@@ -129,7 +129,7 @@ export type ResolvedHomeSection =
   | (StoreMarqueeSection & { data: { stores: HomeStoreCard[] } })
   | (MasonryGridSection & { data: { tiles: HomeMasonryCell[] } })
   | (PersonalRailSection & { data: { kind: PersonalRailKind } })
-  | (CategorySpotlightsSection & { data: { tiles: HomeSpotlightTile[] } })
+  | (CategorySpotlightsSection & { data: { tiles: HomeSpotlightTile[]; view_all_href: string | null } })
   | (CategoryBannerSection & { data: { category: { slug: string; name: string; icon: string; listings: number } | null; title?: string; image?: string | null; href?: string } });
 
 /** A top category in the spotlight grid: its spotlight image (null: draw its icon) and live listings. */

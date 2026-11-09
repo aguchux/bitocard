@@ -42,8 +42,8 @@ const trust = (scope: HomeScope): Block => ({
 
 const sellBanner = (tone: 'navy' | 'brand' | 'light') => ({ title: 'Sell what you no longer use', body: 'Post an ad in minutes. Listing is free.', link: { kind: 'href', href: '/sell' }, tone });
 const safePayBanner = (tone: 'navy' | 'brand' | 'light') => ({ title: 'Pay safely with Safe pay', body: 'Your money is held until you have the item.', link: { kind: 'href', href: '/safe-trade#safe-pay' }, tone });
-/** Every top category's spotlight image, in two rows sliding past. */
-const spotlights = (speed: 'slow' | 'normal' | 'fast' = 'slow') => row([{ type: 'category_spotlights', title: '', speed }], { title: 'Shop by category' });
+/** Every top category's spotlight image: one row to swipe on phones, all of them in two rows on computers. */
+const spotlights = () => row([{ type: 'category_spotlights', title: 'Shop by category' }]);
 const storesRow = (scope: HomeScope) => (scope === 'country' ? [row([{ type: 'store_marquee', title: '' }], { title: 'Shops on Udozo', subtitle: 'Stores selling across the marketplace.' })] : []);
 
 /**
@@ -60,11 +60,11 @@ export const homeLayouts: HomeLayout[] = [
       parseHomeRows(
         [
           row([{ type: 'home_hero', style: 'search', title: scope === 'global' ? 'Udozo across Africa' : 'Buy and sell near you', accent: 'protected by Safe pay' }], { width: 'full' }),
+          spotlights(),
           row([{ type: 'category_masonry' }]),
           row([{ type: 'sponsored_rail' }]),
           row([scope === 'global' ? { type: 'listing_group', title: 'Trending across countries', by: 'trending' } : { type: 'deals_rail' }]),
           row([{ type: 'listing_marquee', title: '', fill: { by: 'trending', value: null } }], { title: 'Trending now', background: 'soft' }),
-          spotlights(),
           row([{ type: 'top_selling_rail' }]),
           ...storesRow(scope),
           row([{ type: 'banner', items: [sellBanner('brand'), safePayBanner('navy')] }]),
@@ -83,12 +83,12 @@ export const homeLayouts: HomeLayout[] = [
       parseHomeRows(
         [
           row([{ type: 'home_hero', style: 'carousel', title: scope === 'global' ? 'Deals across Africa' : 'Deals near you', subtitle: 'Prices that just came down, from sellers near you.' }], { width: 'full' }),
+          spotlights(),
           row([scope === 'global' ? { type: 'listing_group', title: 'Trending now', by: 'trending' } : { type: 'deals_rail', title: 'Price drops' }]),
           row([{ type: 'listing_marquee', title: '', cards: 'compact', speed: 'fast', fill: { by: scope === 'global' ? 'newest' : 'deals', value: null } }], { title: scope === 'global' ? 'Just in' : 'More deals', background: 'brand' }),
           row([{ type: 'sponsored_rail' }]),
           row([{ type: 'banner', items: [safePayBanner('brand')] }]),
           row([{ type: 'top_selling_rail' }]),
-          spotlights('normal'),
           row([{ type: 'category_masonry', title: 'Browse categories', limit: 6 }]),
           row([{ type: 'listing_group', title: 'Newest', by: 'newest', display: 'grid', limit: 12 }]),
         ],

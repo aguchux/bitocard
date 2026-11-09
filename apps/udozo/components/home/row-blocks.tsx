@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- sellers' and stores' photos and logos come from the media CDN at their own sizes. */
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Store } from "lucide-react";
 import type { ShopListingCard, ShopShowcaseCard } from "@bitocard/api-client/classifieds";
@@ -158,14 +159,6 @@ export function CategoryBannerBlock({ section, look }: { section: Of<"category_b
   );
 }
 
-/** Splits tiles into columns of `rows` (top to bottom, then the next column), so a marquee slides them in rows. */
-export function spotlightColumns<T>(tiles: T[], rows: number): T[][] {
-  const size = Math.max(1, Math.min(3, Math.round(rows) || 1));
-  const columns: T[][] = [];
-  for (let index = 0; index < tiles.length; index += size) columns.push(tiles.slice(index, index + size));
-  return columns;
-}
-
 /** A top category in the spotlight grid: its spotlight image on a circle (else its icon), its name and listings. */
 function SpotlightTile({ tile, showCount, look }: { tile: HomeSpotlightTile; showCount: boolean; look: HomeLook }) {
   return (
@@ -186,26 +179,51 @@ function SpotlightTile({ tile, showCount, look }: { tile: HomeSpotlightTile; sho
   );
 }
 
+/** How many columns the computer grid needs to hold every tile in `rows` rows. */
+export function spotlightColumnCount(tiles: number, rows: number) {
+  const size = Math.max(1, Math.min(3, Math.round(rows) || 1));
+  return Math.max(1, Math.ceil(tiles / size));
+}
+
 /**
- * Top categories as a grid of their spotlight images, in rows (two by default) sliding past on their own; swiped,
- * dragged or scrolled by hand, paused on a pointer, focus or its Pause button, still for reduced motion (`Marquee`).
+ * Top categories as their spotlight images: on phones and tablets one row swiped or scrolled by hand (snapping, no
+ * scroll bar); on computers every one of them on a grid of `rows` rows (two by default) in equal columns, filled
+ * row by row, so the categories with listings (first, from the API) lead. Nothing moves by itself. "View all" beside
+ * the title opens everything for sale in the country.
  */
 export function CategorySpotlightsBlock({ section, look }: { section: Of<"category_spotlights">; look: HomeLook }) {
   const id = `home-${section.id}`;
   const label = section.title || "Categories";
-  const columns = spotlightColumns(section.data.tiles, section.rows);
+  const href = section.data.view_all_href;
+  const columns = spotlightColumnCount(section.data.tiles.length, section.rows);
   return (
     <section aria-labelledby={section.title ? id : undefined} aria-label={section.title ? undefined : label}>
-      <Title id={id} title={section.title} />
-      <Marquee label={label} count={columns.length} speed={section.speed} direction={section.direction}>
-        {columns.map(column => (
-          <li key={column[0]!.slug} className="grid w-32 shrink-0 gap-3 sm:w-40 lg:w-44">
-            {column.map(tile => (
-              <SpotlightTile key={tile.slug} tile={tile} showCount={section.showCount} look={look} />
-            ))}
+      {section.title || href ? (
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          {section.title ? (
+            <h2 id={id} className="text-base font-bold sm:text-lg">
+              {section.title}
+            </h2>
+          ) : (
+            <span />
+          )}
+          {href ? (
+            <Link href={href} className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-brand-700 hover:underline sm:text-sm">
+              View all <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      <ul
+        style={{ "--spotlight-cols": columns } as CSSProperties}
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-[repeat(var(--spotlight-cols),minmax(0,1fr))] lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
+      >
+        {section.data.tiles.map(tile => (
+          <li key={tile.slug} className="w-32 shrink-0 snap-start sm:w-40 lg:w-auto">
+            <SpotlightTile tile={tile} showCount={section.showCount} look={look} />
           </li>
         ))}
-      </Marquee>
+      </ul>
     </section>
   );
 }

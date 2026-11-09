@@ -116,7 +116,7 @@ export class HomeResolver {
         // Filled for the person by udozo.com after the page loads; the shared (cached) page only holds its place.
         return { ...section, data: { kind: section.kind } };
       case 'category_spotlights':
-        return { ...section, data: { tiles: await this.spotlights(section, ctx) } };
+        return { ...section, data: { tiles: await this.spotlights(section, ctx), view_all_href: section.viewAll && ctx.country ? `/${ctx.country.toLowerCase()}/search` : null } };
       case 'category_banner': {
         const found = await this.categoryCover(section.category, ctx.countries);
         if (!found) return { ...section, data: { category: null } };
@@ -394,7 +394,10 @@ export class HomeResolver {
    */
   private async spotlights(section: Extract<HomeSection, { type: 'category_spotlights' }>, ctx: HomeContext) {
     const covers = await this.covers(ctx.countries);
-    const chosen = section.categories.length ? section.categories.flatMap(slug => covers.filter(cover => cover.slug === slug)) : covers;
+    // The ones chosen, in the order chosen; else every top category, those with listings first (each group in its own order).
+    const chosen = section.categories.length
+      ? section.categories.flatMap(slug => covers.filter(cover => cover.slug === slug))
+      : [...covers.filter(cover => cover.listings > 0), ...covers.filter(cover => cover.listings === 0)];
     return chosen.map(cover => ({ slug: cover.slug, name: cover.name, icon: cover.icon, listings: cover.listings, image: cover.spotlight, href: this.href({ kind: 'category', slug: cover.slug }, ctx) }));
   }
 

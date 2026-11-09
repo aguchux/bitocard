@@ -269,11 +269,11 @@ export function CategorySpotlightsForm({ kit, section, onChange, ItemList }: { k
         onChange={categories => onChange({ ...section, categories })}
         render={(slug, change) => <kit.CategorySelect label="Category" value={slug || null} onChange={next => change(next ?? "")} />}
       />
-      <p className="text-xs text-muted">None chosen: every top category open on the page, in its own order.</p>
+      <p className="text-xs text-muted">None chosen: every top category open on the page, those with listings first.</p>
       <Choice label="Rows" value={String(section.rows) as "1" | "2" | "3"} options={{ 1: "One row", 2: "Two rows", 3: "Three rows" }} onChange={rows => onChange({ ...section, rows: Number(rows) })} />
-      <Choice label="Speed" value={section.speed} options={speedLabels} onChange={speed => onChange({ ...section, speed })} />
-      <Choice label="Moves towards" value={section.direction} options={{ left: "The left", right: "The right" }} onChange={direction => onChange({ ...section, direction })} />
+      <p className="text-xs text-muted">Rows on computers, showing every category. Phones show one row to swipe.</p>
       <Toggle label="Show how many listings each has" checked={section.showCount} onChange={showCount => onChange({ ...section, showCount })} />
+      <Toggle label="Show View all beside the title" checked={section.viewAll !== false} onChange={viewAll => onChange({ ...section, viewAll })} />
     </>
   );
 }

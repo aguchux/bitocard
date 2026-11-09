@@ -154,26 +154,32 @@ describe("category spotlights", () => {
     href: `/ng/c/${slug}`,
   }));
   const block = (extra: Record<string, unknown> = {}) =>
-    ({ id: "sp", type: "category_spotlights", span, hidden: false, title: "", categories: [], rows: 2, speed: "slow", direction: "left", showCount: true, data: { tiles }, ...extra }) as ResolvedHomeSection;
+    ({ id: "sp", type: "category_spotlights", span, hidden: false, title: "Shop by category", categories: [], rows: 2, speed: "slow", direction: "left", showCount: true, viewAll: true, data: { tiles, view_all_href: "/ng/search" }, ...extra }) as ResolvedHomeSection;
 
-  it("slides the categories in columns of two (top, then bottom), each opening its category with its spotlight image or icon", async () => {
-    const { spotlightColumns } = await import("@/components/home/row-blocks");
-    expect(spotlightColumns([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
-    expect(spotlightColumns([1, 2, 3], 1)).toEqual([[1], [2], [3]]);
-    const out = html(page([row("r", [block()], { title: "Shop by category" })]));
+  it("one row to swipe on phones, every category on a grid of two rows on computers; nothing moves by itself", async () => {
+    const { spotlightColumnCount } = await import("@/components/home/row-blocks");
+    expect(spotlightColumnCount(16, 2)).toBe(8);
+    expect(spotlightColumnCount(5, 2)).toBe(3);
+    expect(spotlightColumnCount(3, 1)).toBe(3);
+    const out = html(page([row("r", [block()])]));
     expect(out).toContain("Shop by category");
-    for (const tile of tiles) expect(out).toContain(`href="${tile.href}"`);
+    for (const tile of tiles) expect(out.match(new RegExp(`href="${tile.href}"`, "g"))).toHaveLength(1);
     expect(out).toContain('src="https://media.test/spot.png" alt=""');
     expect(out).toContain("10 listings");
     expect(out).toContain("Be the first to sell");
-    expect(out).toContain("Pause");
-    // Three columns of two, each a list item holding its tiles; the copy repeats them for the loop.
-    expect(out.match(/<li class="grid w-32/g)!.length).toBe(6);
+    expect(out).toContain("--spotlight-cols:3");
+    expect(out).toMatch(/class="[^"]*overflow-x-auto[^"]*lg:grid lg:grid-cols-\[repeat\(var\(--spotlight-cols\)/);
+    expect(out, "no marquee, no Pause button").not.toMatch(/marquee|Pause/);
+  });
+
+  it("View all beside the title opens everything for sale; none without its address", () => {
+    expect(html(page([row("r", [block()])]))).toMatch(/<h2[^>]*>Shop by category<\/h2><a [^>]*href="\/ng\/search"[^>]*>View all/);
+    expect(html(page([row("r", [block({ data: { tiles, view_all_href: null } })])]))).not.toContain("View all");
   });
 
   it("without counts, or with no categories, says nothing more", () => {
     expect(html(page([row("r", [block({ showCount: false })])]))).not.toContain("listings");
-    expect(html(page([row("r", [block({ data: { tiles: [] } })], { title: "Empty row" })]))).not.toContain("Empty row");
+    expect(html(page([row("r", [block({ data: { tiles: [], view_all_href: null } })], { title: "Empty row" })]))).not.toContain("Empty row");
   });
 });
 

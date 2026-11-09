@@ -198,10 +198,14 @@ const categorySpotlights = z.object({
   type: z.literal('category_spotlights'),
   title: text(80).default(''),
   categories: z.array(slug).max(30).default([]),
+  /** Rows on computers (all the categories in a grid); phones always show one row to swipe. */
   rows: z.number().int().min(1).max(3).default(2),
+  /** Kept for pages saved when the spotlights slid by themselves; no longer used. */
   speed,
   direction,
   showCount: z.boolean().default(true),
+  /** "View all" beside the title, to everything for sale in the page's country. */
+  viewAll: z.boolean().default(true),
 });
 
 export const personalRailKinds = ['for_you', 'recent', 'searched', 'price_drops'] as const;

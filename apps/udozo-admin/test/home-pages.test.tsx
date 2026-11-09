@@ -163,7 +163,7 @@ describe("Home pages", () => {
     );
   });
 
-  test("a row of category spotlights added: two rows by default, set to one, saved", slow, async () => {
+  test("a row of category spotlights added: two rows on computers by default, set to one, saved with View all", slow, async () => {
     show(<HomePagesPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Add row" }, { timeout: 10000 }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /Category spotlights/ }));
@@ -175,7 +175,7 @@ describe("Home pages", () => {
       () => {
         const saved = sent.filter(item => item.path === "/v1/admin/classifieds/home/NG/draft").at(-1)?.body as { rows: Array<{ blocks: Array<Record<string, unknown>> }> } | undefined;
         expect(saved?.rows).toHaveLength(3);
-        expect(saved!.rows[2]!.blocks[0]).toMatchObject({ type: "category_spotlights", rows: 1, categories: [], speed: "slow", showCount: true });
+        expect(saved!.rows[2]!.blocks[0]).toMatchObject({ type: "category_spotlights", rows: 1, categories: [], showCount: true, viewAll: true, title: "Shop by category" });
       },
       { timeout: 10000 },
     );

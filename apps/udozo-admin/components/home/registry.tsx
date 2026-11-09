@@ -485,7 +485,7 @@ function newSection(type: HomeSection["type"], id: string): HomeSection {
     case "category_banner":
       return { ...base, type, category: "phones-tablets", title: "", body: "", image: null, tone: "navy", style: "split", cta: "Shop now", showCount: true };
     case "category_spotlights":
-      return { ...base, type, title: "", categories: [], rows: 2, speed: "slow", direction: "left", showCount: true };
+      return { ...base, type, title: "Shop by category", categories: [], rows: 2, speed: "slow", direction: "left", showCount: true, viewAll: true };
     case "personal_rail":
       return { ...base, type, title: personalKinds.for_you.title, kind: "for_you", limit: 12 };
   }
@@ -520,7 +520,7 @@ function summary(section: HomeSection): string {
     case "category_banner":
       return [`Opens ${section.category || "—"}`, section.style === "overlay" ? "words on the photo" : "words beside the photo", section.image ? "its own photo" : "a listing's photo"].join(" · ");
     case "category_spotlights":
-      return [section.categories.length ? section.categories.join(", ") : "Every top category", `${section.rows} row${section.rows === 1 ? "" : "s"}`, `${section.speed} speed`].join(" · ");
+      return [section.categories.length ? section.categories.join(", ") : "Every top category", `${section.rows} row${section.rows === 1 ? "" : "s"} on computers`, "one row to swipe on phones"].join(" · ");
     case "personal_rail":
       return [personalKinds[section.kind].label, "filled for each visitor", `up to ${section.limit}`].join(" · ");
   }
@@ -554,7 +554,7 @@ export const homeRegistry = defineRegistry<HomeSection>({
     { type: "store_marquee", label: "Moving stores", description: "Resellers' stores live on their own domain, sliding past: picked, or those with most listings." },
     { type: "masonry_grid", label: "Masonry grid", description: "Tiles of different sizes: categories, listings, or photos linking anywhere." },
     { type: "category_banner", label: "Category banner", description: "A banner opening one category, with its name, a listing's photo and its count unless you set them." },
-    { type: "category_spotlights", label: "Category spotlights", description: "Top categories' spotlight images in rows sliding past: every top category, or the ones you choose." },
+    { type: "category_spotlights", label: "Category spotlights", description: "Top categories' spotlight images: a grid on computers, one row to swipe on phones. Every top category, or the ones you choose." },
     { type: "personal_rail", label: "Personal listings", description: "For you, Recently viewed, Because you searched or Price dropped: filled for each visitor (a country’s page)." },
   ],
   newSection,
