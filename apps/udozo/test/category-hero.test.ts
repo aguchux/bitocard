@@ -22,6 +22,10 @@ describe("the category header", () => {
     expect(html).toContain('src="https://cdn.test/banner.webp" alt=""');
     expect(html).toContain('src="https://cdn.test/spot.png" alt=""');
     expect(html, "the spotlight image sits on the banner with no white circle behind it").not.toContain("bg-white");
+    // The left side is washed whitish (9 November 2026, the owner's request), so the words are dark, not white.
+    expect(html).toContain("bg-gradient-to-r from-white/95 via-white/75 to-white/15");
+    expect(html).not.toContain("from-navy-900/85");
+    expect(html).toMatch(/<section[^>]*text-navy-900/);
   });
 
   it("a subcategory: its top category's banner and name above, never the spotlight image", () => {
