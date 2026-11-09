@@ -46,7 +46,8 @@ has.
 - **Help menu:** "Pickup centres" is listed and marked Soon (`apps/udozo/lib/help.ts`).
 
 Connect adds a third way to hand over an item, **at a Connect Centre**, to the meet-up and the delivery Safe pay has
-today.
+today. **Home delivery is left as it is for now:** whether Connect replaces it is deferred (the owner, 9 November
+2026).
 
 ## Design
 
@@ -64,11 +65,18 @@ Centre** on connect.udozo.com (linked from udozo.com's footer, help menu and Con
 - **What they must pass:** the applicant's identity check (Udozo Verify), required for centres whatever the
   `customer_identity_check` switch says, a confirmed mobile number, and the Connect Centre agreement.
 - **Stored:** `connect_centre_applications`, numbered `CA-000123`. Statuses are `submitted`, `in_review`,
-  `changes_requested`, `approved` and `rejected`, with the reason.
-- **Udozo's review** (admin Connect > **Applications**, operations): read the application, its photos and the identity
-  check, ask for changes, approve or reject, all audited. Approving can include a visit (see the open questions). The
-  applicant is told at each step by inbox, push and email.
+  `changes_requested`, `visit_scheduled`, `visited`, `approved` and `rejected`, with the reason.
+- **Udozo's review** (admin Connect > **Applications**, operations), in two parts, both needed before approval:
+  1. **Online:** read the application, its photos and the identity check; ask for changes or reject.
+  2. **A visit:** Udozo's team visits the office (`visit_scheduled`, then `visited` with the visitor's notes and photos,
+     and whether it passed), arranged with the applicant on their application page.
+
+  Only then can it be **approved**. Every step is audited, and the applicant is told at each one by inbox, push and
+  email.
 - **Approved:** the application becomes a **centre** (`connect_centres`), owned by the applicant, its **partner**.
+- **Where applications are taken:** **every state** of a market where Connect is on, until an admin switches a state
+  off (`connect_states`, per state, on by default; admin Connect > **States**, operations, audited). A state switched
+  off takes no new applications and its centres take no new orders, while what they hold finishes.
 
 ### 2. Centres (`connect_centres`)
 
@@ -110,7 +118,7 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
 | **Expected** | Orders on their way to this centre: the order number, the item and its listing photos, the seller, the courier and tracking, and when it was sent, with late ones marked |
 | **Receive** | Find the order by its number or by scanning the label's QR code; check the item against the listing and the seller's dispatch photos; take check-in photos; **Received** or **Refuse** with a reason (wrong item, damaged, missing parts, not allowed at centres). Refusing opens a dispute and a return |
 | **Shelve** | Put a received item in a storage place: the centre sets up its places (`A-01`, `Shelf 3`, `Back room`), each with how much it holds. An item is not "ready to collect" until it is shelved, and every move is kept, so staff always know where it is |
-| **Release** | The buyer gives their 6-digit code (or shows its QR code); staff enter or scan it, see the item, its shelf and check-in photos, hand it over and confirm. Five wrong codes lock it for Udozo to look into |
+| **Release** | The buyer inspects the item first; if they accept it they give their 6-digit code (or show its QR code), and staff enter or scan it, see the item, its shelf and check-in photos, hand it over and confirm. If they refuse it, staff record why with photos and keep it. Five wrong codes lock it for Udozo to look into |
 | **Updates** | Notes and photos on any item to the buyer, the seller or Udozo (for example "Box was wet on arrival", "Buyer came, will return tomorrow"). Buyer and seller read them on the order's timeline |
 | **Returns** | Request a return to the seller (not collected in time, refused at check-in, or damaged), with why and photos. The seller accepts it, or Udozo approves it; unanswered after 48 hours it is accepted automatically (see Return requests below). The seller then collects it with their own **return code** |
 | **Stock check** | List what should be on each shelf and mark what is there; anything missing is flagged to Udozo at once |
@@ -131,17 +139,18 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
   - a new **Ship through Udozo Connect** switch;
   - the **states** the seller ships to, with **All states** as one tick;
   - the **centres** in those states, with every centre in a ticked state chosen unless the seller unticks some;
-  - the shipping charge (see the open questions).
-- **Stored:** `classified_listings.connect` (on or off), `classified_listing_connect_states` and
-  `classified_listing_connect_centres`. The API checks that each centre is active and sits in a state the seller ticked.
+  - a **shipping charge for each ticked state**, set by the seller (with one box to use the same charge for all).
+    It covers getting the item to a centre in that state **and the centre's handling fee** (see Money).
+- **Stored:** `classified_listings.connect` (on or off), `classified_listing_connect_states` (state and its shipping
+  charge) and `classified_listing_connect_centres`. The API checks that each centre is active and sits in a state the seller ticked.
 - **Shown to buyers:** the listing page shows "Ship to a Udozo Connect Centre" with the states it reaches, and the
   structured data marks the offer as shipped.
 
 ### 5. Buying through Connect
 
 - **Choosing a centre:** Buy with UdozoPay gets a third choice, **Collect at a Connect Centre**. The buyer picks a
-  state, then one of that listing's centres there (nearest first, from the buyer's area), and sees the shipping charge
-  and the total before paying.
+  state, then one of that listing's centres there (nearest first, from the buyer's area), and sees that state's
+  shipping charge and the total before paying.
 - **On the order:** `fulfilment: 'connect'`, `connect_centre_id`, and the shipping charge in `delivery_fee_minor`. No
   address is kept.
 - **Only through UdozoPay:** an order with `connect` cannot be paid any other way, and the API refuses one without a
@@ -153,17 +162,21 @@ the shared console (`ConsoleShell` with Udozo's light sidebar, `@bitocard/admin-
 | Step | Who | What happens |
 |---|---|---|
 | Paid | buyer | UdozoPay holds the money; the seller has `handover_days` to send the item |
-| Sent | seller | Dispatch photos (at least two), then the courier and tracking, or "dropping it off myself" |
+| Sent | seller | **The seller gets the item to the centre**, by dropping it off or by any courier they choose. Dispatch photos (at least two), then the courier and tracking, or "dropping it off myself" |
 | Received | centre | Staff scan the label or find the order by its number, check the item against the listing and its photos, take photos at check-in, and mark it received or refused (wrong item, damaged, missing parts); refused means a dispute and a return |
 | Shelved | centre | Staff put it in one of the centre's storage places |
 | Ready | Udozo | The buyer is told by inbox, push, email and, where switched on, WhatsApp, with the centre's address, hours, the 72 hours they have to collect free, and the demurrage after them |
-| Collected | centre | The buyer pays any demurrage due, then shows their 6-digit release code; staff enter it (5 tries) and hand the item over; UdozoPay pays the seller as on release today, and the centre its fee |
+| Inspected | buyer | At the counter the buyer pays any demurrage due, then **inspects the item** before giving their code: they accept it, or refuse it with a reason and photos the staff take |
+| Collected | centre | Accepted: the buyer shows their 6-digit release code; staff enter it (5 tries) and hand the item over; UdozoPay pays the seller as on release today, and the centre its fee |
+| Refused at the counter | buyer | The item stays at the centre, a dispute opens with the reason and photos, and Udozo decides it; a decision for the buyer returns the item to the seller (Return requests below) and refunds the buyer |
 | Not collected | centre | Daily demurrage from 72 hours after Ready; at 7 days the return to the seller is due and the centre requests it (see Return requests below) |
 | Returned | seller | Once the return is accepted, the seller collects it with their return code and the trade is settled |
 
 - **Order statuses:** the existing ones plus `at_centre` and `returning`. Each step is a shipment event with `reported_by: 'centre'`.
 - **Concurrency:** each step claims the order in one conditional update, as Safe pay's steps do.
-- **Inspection at collection:** whether the buyer can refuse the item at the counter is an open question.
+- **Inspection at collection** (the owner's rule: important): the buyer always inspects the item at the counter
+  before the code is entered, and the centre's dashboard asks staff to wait for the buyer's yes or no. The code is
+  never entered for an item the buyer refused.
 - **Deadlines** (the `classifieds` job):
   - not sent in time: refund and a seller strike, as today;
   - sent but not received within `transit_days`: the seller is asked and operations are told;
@@ -198,8 +211,8 @@ The owner's rules (9 November 2026):
   - the seller gets a 6-digit **return code** and collects the item at the centre; staff enter or scan it on the
     Release screen, marked as a return;
   - the order moves to `returning`, then, once collected, settles as the reason requires: refunded to the buyer for an
-    item refused at check-in or damaged; for one the buyer did not collect, refunded less the buyer's demurrage (and
-    what else the open questions decide).
+    item refused at check-in, refused at the counter (when Udozo decides for the buyer) or damaged; for one the buyer
+    did not collect, refunded less the shipping and the buyer's demurrage.
 - **Records:** every request and decision is in the order's timeline and Udozo's audit log. A seller whose returns
   pile up, or who does not collect an accepted return, is told and counted, as strikes are today.
 
@@ -299,10 +312,12 @@ of care and charges each day, each step claimed once, so a run twice charges not
 
 ### 8. Money
 
-- **Paid in:** the buyer pays price + shipping + the UdozoPay buyer fee.
-- **Paid out on collection:** the seller gets the price and the shipping, less the UdozoPay seller fee and any Connect
-  fee. The centre gets its handling fee into its earnings, paid to its bank through the customer payouts.
-- **Connect fee:** how much the centre's fee is and who pays it are open questions.
+- **Paid in:** the buyer pays price + the shipping charge for the centre's state + the UdozoPay buyer fee.
+- **The centre's fee is wired into shipping:** it is a share of the order's shipping charge, never a charge of its own
+  (`centre_fee_bps`, per market, set by finance; Connect does not open in a market until it is set). The seller sees it
+  when setting each state's charge ("Of ₦3,000 shipping, ₦X goes to the Connect Centre").
+- **Paid out on collection:** the seller gets the price and the shipping less the centre's share, less the UdozoPay
+  seller fee. The centre's share goes to its earnings, paid to its bank through the customer payouts.
 - **Demurrage and Loss of care penalties:** see Holding times, demurrage and Loss of care.
 - **Ledger:** Connect's fees and centres' earnings have their own ledger accounts (`connect_revenue`,
   `connect_centre_earnings`), never mixed with UdozoPay's.
@@ -339,7 +354,8 @@ assistants' knowledge, help, terms and privacy.
 
 Each phase is behind the switch `connect_shipping` (Udozo's own, global or per country, **off by default**), with
 tests in the API, the site and the admin, as the other Udozo plans are. Applications can open before shipping does, so
-centres are ready on the day it switches on.
+centres are ready on the day it switches on. Within a market, every state is open until an admin switches it off
+(`connect_states`).
 
 ## Legal owed before it opens
 
@@ -362,30 +378,23 @@ centres are ready on the day it switches on.
 
 ## Open questions for the owner
 
-1. **Who carries the item to the centre?** The seller (dropping it off, or by any courier they choose), or Udozo
-   through couriers it contracts between centres?
-2. **Shipping charge:** does the seller set it (one price per state, or one for all states), or does Udozo set it per
-   route?
-3. **The centre's fee:** how much a centre earns per item, and who pays it (buyer, seller or Udozo's share of the
-   UdozoPay fees)?
-4. **Inspection at the counter:** can the buyer look at the item at the centre and refuse it there (opening a dispute)
-   before entering the code?
-5. **Uncollected items** (answered: 72 hours free, then daily demurrage, the return due at 7 days; still open, see 10 and 11).
-6. **Approving centres:** is the online review enough, or does Udozo visit an office (or ask for a video tour) before
-   approving it? Does a centre pay a deposit or need insurance?
-7. **Home delivery:** does it stay alongside Connect, or does Connect replace it?
-8. **First market:** Nigeria only, and which cities should take applications first?
-9. **Returns, still open:** can the seller ask the centre to send a return by courier instead, and who pays?
-   (Answered: the seller accepts or an admin approves, auto-accepted after 48 hours, everyone told; 7 days to collect,
-   then Loss of care.)
-10. **Lawyers:** confirm that auctioning abandoned goods, and Udozo keeping unclaimed money after 90 days, are allowed
-    in each market, and what notice the seller must be given.
-11. **Pickups:** is their cost part of what the auction recovers, or also charged to a seller who collects from the
-    warehouse? And while Lagos is the only warehouse, how are centres far from it picked up (and at what cost)?
+1. **The centre's share of shipping:** what percentage of each order's shipping charge goes to the Connect Centre in
+   Nigeria (`centre_fee_bps`)?
+2. **Returns by courier:** can a seller ask a centre to send a return by courier instead of collecting it, and who
+   pays?
+3. **Lawyers:** confirm that auctioning abandoned goods, and Udozo keeping unclaimed money after 90 days, are allowed in
+   each market, and what notice the seller must be given.
+4. **Pickups:** is their cost part of what the auction recovers, or also charged to a seller who collects from the
+   warehouse? And while Lagos is the only warehouse, how are centres far from it picked up (and at what cost)?
+5. **Visits:** who visits applicants' offices (Udozo's staff, or agents paid per visit), and is there a deposit or
+   insurance for centres?
 (Answered on 9 November 2026: demurrage 2.1% of the shipping charge daily, no cap, the same for buyer and seller; the
 seller's 7 free days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split
 70% centre, 30% Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30
 days, Udozo picking it up to the centre's Final Return Address (a Udozo warehouse), auctioned from 90 days on udozo.com,
 what is left over the seller's on a claim request within 90 days of the sale, unclaimed money Udozo's; the first
 warehouse in Lagos; Loss of care ends the centre's liability,
-not its responsibility.)
+not its responsibility. Also: the seller gets the item to the centre; the seller sets a shipping charge per state;
+the centre's fee is wired into shipping; the buyer inspects at the counter and can refuse; centres are approved
+after an online review and a visit; home delivery deferred; applications from every state, admins switching states
+off.)
