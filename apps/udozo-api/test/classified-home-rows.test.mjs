@@ -245,6 +245,8 @@ describe('blocks', () => {
       assert.equal(types.filter(type => type === 'category_spotlights').length, 1, layout);
       assert.equal(chosen.json.rows[1].blocks[0].title, 'Shop by category', layout);
       assert.equal(chosen.json.rows[1].spacing, 'tight', `${layout}: close under the hero`);
+      const grid = chosen.json.rows.flatMap(item => item.blocks).find(block => block.type === 'listing_group' && block.display === 'grid');
+      assert.equal(grid.limit, 10, `${layout}: two full rows of five on computers`);
       assert.ok(!types.includes('category_banner'), layout);
     }
   });

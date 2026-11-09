@@ -66,7 +66,7 @@ export function ListingTile({ card, now, badge, was, position, className = "" }:
         ) : null}
         {hasPrice(card) ? (
           <span className="flex flex-wrap items-baseline gap-x-1.5">
-            <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong>
+            <strong className="text-base leading-tight font-extrabold text-navy-900 sm:text-lg">{shopPriceText(card.price)}</strong>
             {was && card.price.amount !== null && was > card.price.amount ? (
               <s className="text-xs text-navy-500">
                 <span className="sr-only">was </span>
@@ -75,9 +75,10 @@ export function ListingTile({ card, now, badge, was, position, className = "" }:
             ) : null}
           </span>
         ) : null}
-        <span className="line-clamp-2 text-[13px] leading-snug font-medium">{card.title}</span>
+        {/* Always two lines tall, so the cards in a row line up. */}
+        <span className="line-clamp-2 min-h-[2.75em] text-[13px] leading-snug font-semibold text-navy-900 sm:text-sm">{card.title}</span>
         {hasPrice(card) ? (
-          <span className="truncate text-xs text-navy-600">
+          <span className="truncate text-xs text-navy-700">
             {card.area.name} · {postedAgo(card.published_at, now)}
           </span>
         ) : (
@@ -136,9 +137,9 @@ export function ListingRow({ card, now, position, menu = false }: { card: ShopRe
 }
 
 /** A grid of tiles: two across on phones, more as the screen widens. `source`: where discovery says its clicks came from. */
-export function ListingGrid({ cards, now, source }: { cards: Card[]; now?: number; source?: string }) {
+export function ListingGrid({ cards, now, source, wide = false }: { cards: Card[]; now?: number; source?: string; /** Five across on computers, closer together (the home page's grids). */ wide?: boolean }) {
   return (
-    <div data-discovery-source={source} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div data-discovery-source={source} className={wide ? "grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5" : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"}>
       {cards.map(card => (
         <ListingTile key={card.id} card={card} now={now} />
       ))}

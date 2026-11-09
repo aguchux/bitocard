@@ -120,6 +120,18 @@ describe("marquees", () => {
   });
 });
 
+describe("listing grids", () => {
+  it("five across on computers, close together; the price large and the title always two lines", () => {
+    const items = Array.from({ length: 10 }, (_, index) => card(String(index)));
+    const grid: ResolvedHomeSection = { id: "jl", type: "listing_group", span, hidden: false, title: "Just listed", by: "newest", value: null, display: "grid", limit: 10, viewAll: true, data: { items, view_all_href: "/ng/search" } } as ResolvedHomeSection;
+    const out = html(page([row("r", [grid])]));
+    expect(out).toContain('class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5"');
+    expect(out.match(/Item \d/g)).toHaveLength(10);
+    expect(out).toMatch(/<strong class="text-base[^"]*sm:text-lg">₦20,000<\/strong>/);
+    expect(out).toContain("line-clamp-2 min-h-[2.75em]");
+  });
+});
+
 describe("category banners and masonry grids", () => {
   it("a banner opens its category with its name, count and call; a masonry grid links each tile", () => {
     const out = html(

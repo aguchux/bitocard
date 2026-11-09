@@ -81,7 +81,7 @@ function Listings({ id, title, items, look, display = "rail", href, badge }: { i
     <section aria-labelledby={id}>
       <Heading id={id} title={title} href={href} />
       {display === "grid" && !badge ? (
-        <ListingGrid cards={items as Card[]} />
+        <ListingGrid cards={items as Card[]} wide />
       ) : (
         <Slider label={title}>
           {items.map(card => (
