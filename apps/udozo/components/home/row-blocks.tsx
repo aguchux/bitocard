@@ -1,5 +1,4 @@
 /* eslint-disable @next/next/no-img-element -- sellers' and stores' photos and logos come from the media CDN at their own sizes. */
-import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Store } from "lucide-react";
 import type { ShopListingCard, ShopShowcaseCard } from "@bitocard/api-client/classifieds";
@@ -7,6 +6,7 @@ import type { HomeLook, HomeSpotlightTile, HomeStoreCard, HomeTileSize, Resolved
 import { ShopIcon } from "../icon";
 import { ListingTile } from "../listing-card";
 import { Marquee } from "../marquee";
+import { SpotlightScroller } from "./spotlight-scroller";
 
 type Of<T extends ResolvedHomeSection["type"]> = Extract<ResolvedHomeSection, { type: T }>;
 type Card = ShopListingCard | ShopShowcaseCard;
@@ -186,8 +186,8 @@ export function spotlightColumnCount(tiles: number, rows: number) {
 }
 
 /**
- * Top categories as their spotlight images: on phones and tablets one row swiped or scrolled by hand (snapping, no
- * scroll bar); on computers every one of them on a grid of `rows` rows (two by default) in equal columns, filled
+ * Top categories as their spotlight images: on phones and tablets one row swiped, dragged or stepped with its arrows,
+ * either way (`SpotlightScroller`); on computers every one of them on a grid of `rows` rows (two by default) in equal columns, filled
  * row by row, so the categories with listings (first, from the API) lead. Nothing moves by itself. "View all" beside
  * the title opens everything for sale in the country.
  */
@@ -214,16 +214,13 @@ export function CategorySpotlightsBlock({ section, look }: { section: Of<"catego
           ) : null}
         </div>
       ) : null}
-      <ul
-        style={{ "--spotlight-cols": columns } as CSSProperties}
-        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-[repeat(var(--spotlight-cols),minmax(0,1fr))] lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
-      >
+      <SpotlightScroller columns={columns} label={label}>
         {section.data.tiles.map(tile => (
           <li key={tile.slug} className="w-32 shrink-0 snap-start sm:w-40 lg:w-auto">
             <SpotlightTile tile={tile} showCount={section.showCount} look={look} />
           </li>
         ))}
-      </ul>
+      </SpotlightScroller>
     </section>
   );
 }

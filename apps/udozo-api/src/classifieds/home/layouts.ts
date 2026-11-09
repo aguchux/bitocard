@@ -43,7 +43,7 @@ const trust = (scope: HomeScope): Block => ({
 const sellBanner = (tone: 'navy' | 'brand' | 'light') => ({ title: 'Sell what you no longer use', body: 'Post an ad in minutes. Listing is free.', link: { kind: 'href', href: '/sell' }, tone });
 const safePayBanner = (tone: 'navy' | 'brand' | 'light') => ({ title: 'Pay safely with Safe pay', body: 'Your money is held until you have the item.', link: { kind: 'href', href: '/safe-trade#safe-pay' }, tone });
 /** Every top category's spotlight image: one row to swipe on phones, all of them in two rows on computers. */
-const spotlights = () => row([{ type: 'category_spotlights', title: 'Shop by category' }]);
+const spotlights = () => row([{ type: 'category_spotlights', title: 'Shop by category' }], { spacing: 'tight' });
 const storesRow = (scope: HomeScope) => (scope === 'country' ? [row([{ type: 'store_marquee', title: '' }], { title: 'Shops on Udozo', subtitle: 'Stores selling across the marketplace.' })] : []);
 
 /**

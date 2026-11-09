@@ -168,8 +168,10 @@ describe("category spotlights", () => {
     expect(out).toContain("10 listings");
     expect(out).toContain("Be the first to sell");
     expect(out).toContain("--spotlight-cols:3");
-    expect(out).toMatch(/class="[^"]*overflow-x-auto[^"]*lg:grid lg:grid-cols-\[repeat\(var\(--spotlight-cols\)/);
+    expect(out).toMatch(/class="[^"]*overflow-x-auto[^"]*lg:grid [^"]*lg:grid-cols-\[repeat\(var\(--spotlight-cols\)/);
     expect(out, "no marquee, no Pause button").not.toMatch(/marquee|Pause/);
+    expect(out, "a mouse can drag it too, below computer width").toMatch(/class="[^"]*cursor-grab[^"]*lg:cursor-auto/);
+    expect(out).toContain('aria-label="Shop by category"');
   });
 
   it("View all beside the title opens everything for sale; none without its address", () => {

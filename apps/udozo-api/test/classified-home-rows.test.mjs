@@ -244,6 +244,7 @@ describe('blocks', () => {
       assert.deepEqual(types.slice(0, 2), ['home_hero', 'category_spotlights'], layout);
       assert.equal(types.filter(type => type === 'category_spotlights').length, 1, layout);
       assert.equal(chosen.json.rows[1].blocks[0].title, 'Shop by category', layout);
+      assert.equal(chosen.json.rows[1].spacing, 'tight', `${layout}: close under the hero`);
       assert.ok(!types.includes('category_banner'), layout);
     }
   });
