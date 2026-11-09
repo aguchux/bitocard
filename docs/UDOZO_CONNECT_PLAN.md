@@ -210,7 +210,7 @@ finance and operations, audited), with these defaults; admins can change any of 
 
 **Demurrage** is the charge for keeping an item at a centre past its free time:
 - charged **every day**, as a **percentage of the order's shipping charge**, at **the same rate for the buyer and the
-  seller** (`demurrage_bps`, one setting for both; default 210 = 2.1%, the Loss of care penalty's rate);
+  seller**: **2.1%** (`demurrage_bps`, one setting for both, default 210; the owner confirmed 9 November 2026);
 - with **no cap**: it runs for as long as the item stays.
 
 **The buyer:**
@@ -240,12 +240,16 @@ finance and operations, audited), with these defaults; admins can change any of 
 
 **Abandoned and auctioned** (counted from the day the item went into Loss of care):
 - **30 days:** the item is marked **abandoned** (`abandoned_after_days`, default 30). The seller, centre and Udozo's
-  admins are told. The centre may then **send it to a Udozo warehouse** (requested on its dashboard and approved by
-  Udozo's operations, with check-out photos and a handover record), which takes over its keeping; charges keep running
-  either way. Until then the seller can still collect it, after paying what is owed.
+  admins are told. **Udozo picks it up** from the centre and takes it to the centre's **Final Return Address** (below);
+  centres never send items themselves. The centre hands it to Udozo's pickup against a pickup code, with check-out
+  photos and a handover record, and Udozo then keeps it. Charges keep running either way, and until the auction the
+  seller can still collect it (at the centre, or at the warehouse once it is there) after paying what is owed.
 - **90 days:** Udozo **may auction** the item to recover the storage loss (`auction_after_days`, default 90). The seller
   is told before it is listed. What the sale raises pays what is owed (demurrage, penalties, and the cost of the
-  auction and moving it); anything left over is the open question below.
+  auction and moving it).
+- **What is left over is the seller's, but only on a claim:** the seller files a **claim request** (on the order page;
+  `connect_auction_claims`), Udozo's finance checks it and pays the rest into the seller's UdozoPay earnings, audited.
+  Without a claim nothing is paid out (how long a seller has to claim is an open question below).
 - Each step is in the order's timeline and Udozo's audit log, and is claimed once by the `classifieds` job.
 
 **Who receives it:** demurrage and Loss of care penalties are split between the **Connect Centre** that holds the item
@@ -256,7 +260,16 @@ rest). The centre's share goes to its earnings, and Udozo's to `connect_revenue`
 what UdozoPay owes them, else their wallet, else they are owed and must be paid before the seller trades through
 Connect again. Each day's charge is its own ledger entry (`connect_demurrage:<order>:<day>`), so it is charged once.
 
-**Order statuses** add `loss_of_care` and `abandoned`, and the item's place adds `udozo_warehouse` and `auctioned`. The `classifieds` job starts demurrage, makes returns due, moves items into Loss
+**Udozo warehouses and Final Return Addresses (FRA):**
+- **Udozo runs its own warehouses** (`connect_warehouses`: address, state, hours, contact; admin Connect >
+  **Warehouses**, operations).
+- **Every centre has a Final Return Address**: the warehouse its abandoned items go to, set by Udozo's operations
+  (`connect_centres.fra_warehouse_id`). The centre sees it on its dashboard (Centre and Overview), with the next pickup.
+- **Udozo collects:** Udozo's operations schedule pickups from centres (`connect_pickups`: the centre, the items, the
+  day, who collects). The centre sees what is due to be picked up; each item is checked out with its pickup code and
+  photos, and checked in at the warehouse, so it is never unaccounted for.
+
+**Order statuses** add `loss_of_care` and `abandoned`, and the item's place adds `awaiting_pickup`, `udozo_warehouse` and `auctioned`. The `classifieds` job starts demurrage, makes returns due, moves items into Loss
 of care and charges each day, each step claimed once, so a run twice charges nothing twice.
 
 ### 7. Tracking
@@ -313,8 +326,8 @@ centres are ready on the day it switches on.
 
 - **Terms:** a new Connect section covering what a centre does and does not do, the 72 free hours, demurrage, returns
   due at 7 days, Loss of care (the centre no longer liable, daily demurrage with no cap, and the daily penalty of 2.1% of the
-  shipping charge capped at ₦500; the centre still responsible for the item), abandonment at 30 days, the move to a Udozo
-  warehouse, and auction from 90 days, damage
+  shipping charge capped at ₦500; the centre still responsible for the item), abandonment at 30 days, Udozo's pickup to a
+  Udozo warehouse, auction from 90 days, and claiming what is left over, damage
   and loss while an item is at a centre, inspection, and prohibited items for centres. Lawyers to confirm the
   Loss of care penalty and the end of liability are enforceable in each market.
 - **Connect Centre agreement** (accepted when applying, recorded by version): custody of items, liability for loss and
@@ -345,15 +358,13 @@ centres are ready on the day it switches on.
 9. **Returns, still open:** can the seller ask the centre to send a return by courier instead, and who pays?
    (Answered: the seller accepts or an admin approves, auto-accepted after 48 hours, everyone told; 7 days to collect,
    then Loss of care.)
-10. **Udozo warehouses:** where they are, who runs them, and whether a centre may send an abandoned item there at once
-    or only when it needs the space.
-11. **After an auction:** what happens to money left over once what is owed is paid (back to the seller, or kept by
-    Udozo), and does the auction run on udozo.com or elsewhere? Lawyers must confirm selling abandoned goods is allowed
-    in each market, and what notice the seller must be given.
-12. **One rate or two:** "same as seller" is read as the buyer and the seller paying demurrage at the same daily rate,
-    2.1% of the shipping charge. If you meant demurrage is something else (for example the full shipping charge each
-    day) for both, say so.
-(Answered on 9 November 2026: demurrage daily with no cap, the same rate for buyer and seller; the seller's 7 free
-days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split 70% centre, 30%
-Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30 days, auctioned from
-90; Loss of care ends the centre's liability, not its responsibility.)
+10. **Auction claims:** how long a seller has to file a claim for what is left over after an auction (for example 90
+    days), and what happens to it if they never do. Does the auction run on udozo.com or elsewhere? Lawyers must
+    confirm selling abandoned goods is allowed in each market, and what notice the seller must be given.
+11. **Warehouses:** where the first one is, and the cost of pickups: is it part of what the auction recovers, or also
+    charged to the seller who collects from the warehouse?
+(Answered on 9 November 2026: demurrage 2.1% of the shipping charge daily, no cap, the same for buyer and seller; the
+seller's 7 free days counted from acceptance, admin approval or automatic acceptance, demurrage after them; the split
+70% centre, 30% Udozo; the Loss of care penalty 2.1% of the shipping charge, capped at ₦500 a day; abandoned at 30
+days, Udozo picking it up to the centre's Final Return Address (a Udozo warehouse), auctioned from 90 days, what is left
+over the seller's on a claim request; Loss of care ends the centre's liability, not its responsibility.)
