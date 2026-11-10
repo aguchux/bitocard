@@ -138,6 +138,8 @@ export type ConnectAuction = {
   title: string;
   order: { id: string; number: string };
   warehouse: { id: string; name: string };
+  /** Its auction listing on udozo.com, where people bid (null for lots made before lots were listings). */
+  listing: { ref: number; slug: string } | null;
   start_price: number;
   current_price: number | null;
   /** What its seller owed when it was listed, and what Udozo spent selling it: paid from the sale before what is left over. */

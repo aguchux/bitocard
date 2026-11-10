@@ -9,7 +9,10 @@ import { LedgerService, type Line } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
+import { houseStoreId } from '../checkout/house-ids.js';
 import { ConnectChargesService } from './connect-charges.service.js';
+import { ListingsService } from './listings.service.js';
+import { slugify } from './rules.js';
 import { SafePayService } from './safe-pay.service.js';
 
 const dayMs = 86_400_000;
@@ -36,6 +39,7 @@ const lotInclude = {
   warehouse: { select: { id: true, name: true, address: true, hours: true, phone: true, state: { select: { name: true } } } },
   bids: { orderBy: [{ amountMinor: 'desc' as const }, { createdAt: 'asc' as const }], include: { bidder: { select: { id: true, name: true, firstName: true, lastName: true, email: true } } } },
   order: { select: { id: true, number: true, sellerId: true, connectReturn: { select: { id: true, lossOfCareAt: true } } } },
+  listing: { select: { id: true, ref: true, slug: true } },
 } satisfies Prisma.ConnectAuctionInclude;
 type LotRow = Prisma.ConnectAuctionGetPayload<{ include: typeof lotInclude }>;
 
@@ -65,7 +69,32 @@ export class ConnectAuctionsService {
     private readonly charges: ConnectChargesService,
     private readonly safePay: SafePayService,
     private readonly watermarks: WatermarkService,
+    private readonly listings: ListingsService,
   ) {}
+
+  /**
+   * Udozo's own seller account in a market, which sells abandoned items at auction (made the first time; it never signs
+   * in: no password, and its address is Udozo's own).
+   */
+  async udozoSeller(country: string) {
+    const email = `auctions-${country.toLowerCase()}@udozo.com`;
+    const found = await this.prisma.customer.findFirst({ where: { storeId: houseStoreId, email } });
+    if (found) return found;
+    try {
+      return await this.prisma.customer.create({ data: { storeId: houseStoreId, email, name: 'Udozo Auctions', firstName: 'Udozo', lastName: 'Auctions', nameConfirmedAt: new Date(), country, emailVerifiedAt: new Date() } });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') return this.prisma.customer.findFirstOrThrow({ where: { storeId: houseStoreId, email } });
+      throw error;
+    }
+  }
+
+  /** The listing behind a lot leaves the market: sold, not sold (until relisted) or withdrawn. */
+  private async closeListing(listingId: string | null, how: 'sold' | 'unsold' | 'withdrawn') {
+    if (!listingId) return;
+    const now = new Date();
+    const data = how === 'sold' ? { status: 'sold', soldAt: now } : how === 'unsold' ? { status: 'expired', expiredReason: 'auction_unsold' } : { status: 'deleted', closedAt: now };
+    await this.prisma.classifiedListing.updateMany({ where: { id: listingId, status: 'active' }, data });
+  }
 
   async rules(country: string): Promise<Rules> {
     const row = await this.prisma.connectSettings.findUnique({ where: { country } });
@@ -114,6 +143,8 @@ export class ConnectAuctionsService {
       title: row.title,
       description: row.description,
       photos: row.photos,
+      /** The auction listing it is sold through on udozo.com (its page is where people bid). */
+      listing: row.listing ? { ref: Number(row.listing.ref), slug: row.listing.slug } : null,
       warehouse: { name: row.warehouse!.name, state: row.warehouse!.state.name },
       start_price: Number(row.startPriceMinor),
       current_price: top ? Number(top.amountMinor) : null,
@@ -205,6 +236,7 @@ export class ConnectAuctionsService {
       await this.charges.settleFromRefund(tx, cover.ids);
       await tx.connectAuctionBid.update({ where: { id: offered.id }, data: { status: 'won' } });
       await tx.classifiedOrder.update({ where: { id: lot.orderId! }, data: { connectPlace: 'auctioned' } });
+      if (lot.listingId) await tx.classifiedListing.updateMany({ where: { id: lot.listingId, status: 'active' }, data: { status: 'sold', soldAt: now } });
       // Sold: the return is over, so no more storage runs.
       if (lot.order!.connectReturn) await tx.connectReturnRequest.updateMany({ where: { id: lot.order!.connectReturn.id, status: 'accepted' }, data: { status: 'cancelled' } });
       await tx.classifiedShipmentEvent.create({ data: { orderId: lot.orderId!, status: 'note', reportedBy: 'bitocard', note: `Sold at Udozo auction ${lotNumber(lot.number)}.` } });
@@ -264,6 +296,7 @@ export class ConnectAuctionsService {
     const from = lot.status;
     if (!next) {
       const done = await this.prisma.connectAuction.updateMany({ where: { id: lot.id, status: from, offeredBidId: lot.offeredBidId }, data: { status: 'unsold', offeredBidId: null, payBy: null } });
+      if (done.count) await this.closeListing(lot.listingId, 'unsold');
       if (done.count) await this.inbox.admins('admin.connect.alert', { subject: `auction_unsold:${lot.id}`, title: `${lotNumber(lot.number)} did not sell`, body: lot.bids.length ? 'No bidder paid.' : 'Nobody bid.', link: `/connect/auctions/${lot.id}` });
       return false;
     }
@@ -303,7 +336,7 @@ export class ConnectAuctionsService {
     if (!adminId) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'admin_session_required', 'Sign in as an admin to list a lot.');
     const order = await this.prisma.classifiedOrder.findUnique({
       where: { id: input.order_id },
-      include: { listing: { select: { title: true, description: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 8 } } }, connectReturn: true },
+      include: { listing: { select: { title: true, description: true, categoryId: true, areaId: true, stateId: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 8 } } }, connectReturn: true, connectWarehouse: { select: { stateId: true } } },
     });
     if (!order || order.connectPlace !== 'udozo_warehouse' || !order.connectWarehouseId || order.connectReturn?.status !== 'accepted' || !order.connectReturn.lossOfCareAt) throw conflict('not_auctionable', 'Only an abandoned item at a Udozo warehouse can be auctioned.');
     const rules = await this.rules(order.country);
@@ -322,13 +355,53 @@ export class ConnectAuctionsService {
     const title = input.title?.trim() || order.listing.title || 'An item';
     const description = input.description?.trim() || `Sold as seen, from an abandoned shipment: its seller did not collect it. ${order.listing.description ?? ''}`.trim();
     const photos = order.listing.media.map(media => this.watermarks.url(media, 960)).filter((url): url is string => Boolean(url));
-    const row = await this.prisma.connectAuction.create({
-      data: { orderId: order.id, country: order.country, currency: order.currency, title: title.slice(0, 140), description: description.slice(0, 3000), photos, warehouseId: order.connectWarehouseId, startPriceMinor: start, owedMinor: owed, costsMinor: costs, startsAt, endsAt, createdById: adminId },
-      include: lotInclude,
+    // Sold through an ordinary auction listing of Udozo's in the market, placed where the warehouse is.
+    const seller = await this.udozoSeller(order.country);
+    const warehouseState = order.connectWarehouse?.stateId ?? order.listing.stateId;
+    const area =
+      order.listing.stateId === warehouseState && order.listing.areaId
+        ? { id: order.listing.areaId, parentId: warehouseState }
+        : await this.prisma.classifiedArea.findFirst({ where: { parentId: warehouseState, kind: 'area', enabled: true }, orderBy: [{ position: 'asc' }, { name: 'asc' }], select: { id: true, parentId: true } });
+    if (!area || !order.listing.categoryId) throw conflict('not_auctionable', 'Its listing has no category, or the warehouse no area to show it in.');
+    const row = await this.prisma.$transaction(async tx => {
+      const listing = await tx.classifiedListing.create({
+        data: {
+          customerId: seller.id,
+          country: order.country,
+          currency: order.currency,
+          title: title.slice(0, 140),
+          slug: slugify(title.slice(0, 140)),
+          description: description.slice(0, 3000),
+          priceKind: 'fixed',
+          priceMinor: start,
+          saleMethod: 'auction',
+          condition: 'used',
+          categoryId: order.listing.categoryId,
+          areaId: area.id,
+          stateId: area.parentId,
+          delivery: 'none',
+          pickup: true,
+          contact: 'chat',
+          stock: 1,
+          status: 'active',
+          submittedAt: now,
+          publishedAt: now,
+          expiresAt: new Date(endsAt.getTime() + 30 * dayMs),
+        },
+      });
+      // Its photos are the abandoned listing's own (the same stored files).
+      if (order.listing.media.length) {
+        await tx.classifiedMedia.createMany({ data: order.listing.media.map(media => ({ listingId: listing.id, kind: 'photo', position: media.position, url: media.url, storageKey: media.storageKey, width: media.width, height: media.height, contentHash: media.contentHash, status: 'ready', privateAt: media.privateAt })) });
+      }
+      return tx.connectAuction.create({
+        data: { orderId: order.id, listingId: listing.id, sellerId: seller.id, country: order.country, currency: order.currency, title: title.slice(0, 140), description: description.slice(0, 3000), photos, warehouseId: order.connectWarehouseId!, startPriceMinor: start, owedMinor: owed, costsMinor: costs, startsAt, endsAt, createdById: adminId },
+        include: lotInclude,
+      });
     });
+    await this.listings.indexForSearch(row.listingId!);
     await this.audit.record({ actorId: adminId, action: 'connect_auction.listed', targetType: 'connect_auction', targetId: row.id, before: null, after: { order: order.id, start_price: input.start_price, owed: Number(owed) } });
-    const seller = await this.safePay.load(order.id);
-    await this.safePay.tellParty(seller, 'seller', 'customer.connect.auction', `"${title}" will be auctioned`, `Bidding opens ${startsAt.toUTCString()}. Until the first bid you can still collect it at the warehouse after paying what is owed.`);
+    const original = await this.safePay.load(order.id);
+    await this.safePay.tellParty(original, 'seller', 'customer.connect.auction', `"${title}" will be auctioned`, `Bidding opens ${startsAt.toUTCString()}. Until the first bid you can still collect it at the warehouse after paying what is owed.`);
     return this.adminPresent(row);
   }
 
@@ -337,6 +410,7 @@ export class ConnectAuctionsService {
     if (!['scheduled', 'live'].includes(row.status) || row.bids.length) throw conflict('auction_has_bids', 'Only a lot nobody has bid on can be cancelled.');
     const done = await this.prisma.connectAuction.updateMany({ where: { id, status: row.status }, data: { status: 'cancelled', cancelReason: reason.trim().slice(0, 300) } });
     if (!done.count) throw conflict('auction_changed', 'This lot changed: refresh and try again.');
+    await this.closeListing(row.listingId, 'withdrawn');
     await this.audit.record({ actorId: adminId, action: 'connect_auction.cancelled', targetType: 'connect_auction', targetId: id, before: { status: row.status }, after: { status: 'cancelled', reason } });
     return this.adminPresent(await this.load(id));
   }
@@ -378,6 +452,8 @@ export class ConnectAuctionsService {
       title: row.title,
       order: { id: row.order!.id, number: `SP-${row.order!.number}` },
       warehouse: { id: row.warehouse!.id, name: row.warehouse!.name },
+      /** Its auction listing on udozo.com, where people bid. */
+      listing: row.listing ? { ref: Number(row.listing.ref), slug: row.listing.slug } : null,
       start_price: Number(row.startPriceMinor),
       current_price: top ? Number(top.amountMinor) : null,
       owed: Number(row.owedMinor),
@@ -402,6 +478,10 @@ export class ConnectAuctionsService {
 
   /** Once its seller collected it, a lot nobody bid on is cancelled. */
   async cancelForCollection(orderId: string) {
-    await this.prisma.connectAuction.updateMany({ where: { orderId, status: { in: ['scheduled', 'live'] }, bids: { none: {} } }, data: { status: 'cancelled', cancelReason: 'Collected by its seller before any bid.' } });
+    const lots = await this.prisma.connectAuction.findMany({ where: { orderId, status: { in: ['scheduled', 'live'] }, bids: { none: {} } }, select: { id: true, listingId: true } });
+    for (const lot of lots) {
+      const done = await this.prisma.connectAuction.updateMany({ where: { id: lot.id, status: { in: ['scheduled', 'live'] } }, data: { status: 'cancelled', cancelReason: 'Collected by its seller before any bid.' } });
+      if (done.count) await this.closeListing(lot.listingId, 'withdrawn');
+    }
   }
 }

@@ -192,6 +192,10 @@ describe('Udozo auctions', () => {
     const start = owed + 100_000;
     const lot = (await admin.post('/v1/admin/connect/auctions', { order_id: item.order.id, start_price: start, ends_at: soon(48), costs: 20_000 })).json;
     assert.equal(lot.status, 'scheduled', JSON.stringify(lot));
+    // Sold through an ordinary auction listing of Udozo's seller account in the market.
+    const row = await prisma.connectAuction.findUniqueOrThrow({ where: { id: lot.id }, include: { listing: { include: { customer: true, media: true } } } });
+    assert.deepEqual([row.listing.saleMethod, row.listing.status, row.listing.customer.email, row.listing.stock], ['auction', 'active', 'auctions-ng@udozo.com', 1]);
+    assert.ok(row.listing.media.length > 0, "its photos are the abandoned listing's");
     assert.ok(await prisma.notification.findFirst({ where: { customerId: item.seller.id, title: { contains: 'will be auctioned' } } }), 'its seller told first');
     assert.equal((await admin.post('/v1/admin/connect/auctions', { order_id: item.order.id, start_price: start, ends_at: soon(48) })).json.error.code, 'auction_exists');
 
@@ -202,6 +206,9 @@ describe('Udozo auctions', () => {
     await services.auctions.runDue();
     const open = (await alice.get(lotPath(lot))).json;
     assert.deepEqual([open.status, open.next_bid], ['live', start]);
+    const found = await fetch(`${server.base}/v1/classifieds/listings?country=NG&sale=auction`).then(res => res.json());
+    assert.ok(found.data.some(card => card.id === row.listingId), 'among the listings at auction');
+    assert.equal((await item.seller.post(`/v1/classifieds/listings/${row.listingId}/bids`, { amount: start })).json.error.code, 'own_item', 'its original seller never bids');
     assert.ok((await alice.get('/v1/classifieds/auctions?country=NG')).json.data.some(row => row.id === lot.id), 'listed publicly');
 
     assert.equal((await item.seller.post(`${lotPath(lot)}/bids`, { amount: start })).json.error.code, 'own_item');
@@ -241,6 +248,7 @@ describe('Udozo auctions', () => {
     assert.equal(await prisma.connectCharge.count({ where: { orderId: item.order.id, payer: 'seller', status: 'owed' } }), 0, 'the storage owed paid off');
     assert.equal((await prisma.connectReturnRequest.findUniqueOrThrow({ where: { id: item.returnId } })).status, 'cancelled');
     assert.equal((await prisma.classifiedOrder.findUniqueOrThrow({ where: { id: item.order.id } })).connectPlace, 'auctioned');
+    assert.equal((await prisma.classifiedListing.findUniqueOrThrow({ where: { id: row.listingId } })).status, 'sold', 'its listing is sold');
     assert.ok(await prisma.notification.findFirst({ where: { customerId: item.seller.id, title: { contains: 'was sold at auction' } } }));
 
     // Collected at the warehouse with the buyer's code.

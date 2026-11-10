@@ -225,7 +225,7 @@ export class ListingSearchService {
   private async auctionCards(listingIds: string[]) {
     const out = new Map<string, { status: string; current_price: number | null; bids: number; ends_at: string }>();
     if (!listingIds.length) return out;
-    const lots = await this.prisma.connectAuction.findMany({ where: { listingId: { in: listingIds }, kind: 'listing' }, orderBy: { createdAt: 'desc' }, include: { bids: { select: { amountMinor: true, status: true } } } });
+    const lots = await this.prisma.connectAuction.findMany({ where: { listingId: { in: listingIds } }, orderBy: { createdAt: 'desc' }, include: { bids: { select: { amountMinor: true, status: true } } } });
     for (const lot of lots) {
       if (!lot.listingId || out.has(lot.listingId)) continue;
       const top = lot.bids.filter(bid => bid.status !== 'lapsed').reduce<bigint | null>((max, bid) => (max === null || bid.amountMinor > max ? bid.amountMinor : max), null);

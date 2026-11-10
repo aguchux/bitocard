@@ -5,7 +5,8 @@ export function buyButton(listing: Pick<ShopListingPage, "status" | "reserved" |
   if (listing.status !== "active" || viewer?.own) return null;
   if (viewer?.order) return { href: buyPath, label: `Continue UdozoPay order ${viewer.order.number}` };
   // Sold by auction: only its winner pays, at their bid.
-  if (listing.sale_method === "auction") return viewer?.auction?.viewer?.to_pay ? { href: buyPath, label: "Pay for your winning bid" } : null;
+  // (Udozo's own lots are paid from the wallet on the auction panel, and collected at its warehouse.)
+  if (listing.sale_method === "auction") return viewer?.auction?.kind === "listing" && viewer.auction.viewer?.to_pay ? { href: buyPath, label: "Pay for your winning bid" } : null;
   if (!safePayOpen) return null;
   // Out of stock (none to sell) or every unit held for other buyers: nothing to pay for.
   if (listing.in_stock === false || listing.reserved) return null;

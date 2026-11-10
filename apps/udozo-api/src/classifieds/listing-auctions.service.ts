@@ -23,6 +23,9 @@ const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 're
 const lotInclude = {
   bids: { orderBy: [{ amountMinor: 'desc' as const }, { createdAt: 'asc' as const }], include: { bidder: { select: { id: true, name: true, firstName: true, lastName: true } } } },
   listing: { select: { id: true, ref: true, slug: true, title: true, country: true, customerId: true, customer: { select: { id: true, storeId: true } } } },
+  // An abandoned item's lot (Udozo's): its original seller, and the warehouse it is collected from.
+  order: { select: { sellerId: true } },
+  warehouse: { select: { name: true, address: true, hours: true, state: { select: { name: true } } } },
 } satisfies Prisma.ConnectAuctionInclude;
 type LotRow = Prisma.ConnectAuctionGetPayload<{ include: typeof lotInclude }>;
 type Bid = LotRow['bids'][number];
@@ -109,7 +112,7 @@ export class ListingAuctionsService implements OnModuleInit {
 
   /** The listing's latest lot, as everyone sees it on its page and cards. */
   private async latest(listingId: string) {
-    return this.prisma.connectAuction.findFirst({ where: { listingId, kind: 'listing' }, orderBy: { createdAt: 'desc' }, include: lotInclude });
+    return this.prisma.connectAuction.findFirst({ where: { listingId }, orderBy: { createdAt: 'desc' }, include: lotInclude });
   }
 
   private top(row: LotRow): Bid | null {
@@ -127,7 +130,11 @@ export class ListingAuctionsService implements OnModuleInit {
     return {
       object: 'listing_auction' as const,
       number: `AU-${String(row.number).padStart(6, '0')}`,
-      status: row.status as 'live' | 'awaiting_payment' | 'sold' | 'unsold' | 'cancelled',
+      ref: String(row.number),
+      /** listing (a seller's: the winner pays with UdozoPay) or abandoned (Udozo's: paid from the wallet, collected at its warehouse). */
+      kind: row.kind as 'listing' | 'abandoned',
+      warehouse: row.warehouse ? { name: row.warehouse.name, address: row.warehouse.address, hours: row.warehouse.hours, state: row.warehouse.state.name } : null,
+      status: row.status as 'scheduled' | 'live' | 'awaiting_payment' | 'sold' | 'unsold' | 'cancelled',
       start_price: Number(row.startPriceMinor),
       current_price: top ? Number(top.amountMinor) : null,
       next_bid: row.status === 'live' ? Number(nextBid(row.startPriceMinor, top?.amountMinor ?? null, rules)) : null,
@@ -145,7 +152,7 @@ export class ListingAuctionsService implements OnModuleInit {
               leading: Boolean(top && top.bidderId === viewer && row.status === 'live'),
               to_pay: offered?.bidderId === viewer && row.status === 'awaiting_payment' ? { amount: Number(offered.amountMinor), pay_by: row.payBy?.toISOString() ?? null, order_id: row.saleOrderId } : null,
               won: row.status === 'sold' && row.buyerId === viewer,
-              seller: row.sellerId === viewer,
+              seller: row.sellerId === viewer || row.order?.sellerId === viewer,
             },
           }
         : {}),
@@ -155,7 +162,7 @@ export class ListingAuctionsService implements OnModuleInit {
   /** What cards show of each auction listing: the price to beat and when it ends. */
   async cards(listingIds: string[]) {
     if (!listingIds.length) return new Map<string, { current_price: number | null; bids: number; ends_at: string; status: string }>();
-    const rows = await this.prisma.connectAuction.findMany({ where: { listingId: { in: listingIds }, kind: 'listing' }, orderBy: { createdAt: 'desc' }, include: { bids: { select: { amountMinor: true, status: true } } } });
+    const rows = await this.prisma.connectAuction.findMany({ where: { listingId: { in: listingIds } }, orderBy: { createdAt: 'desc' }, include: { bids: { select: { amountMinor: true, status: true } } } });
     const out = new Map<string, { current_price: number | null; bids: number; ends_at: string; status: string }>();
     for (const row of rows) {
       if (!row.listingId || out.has(row.listingId)) continue;
@@ -168,17 +175,17 @@ export class ListingAuctionsService implements OnModuleInit {
   /** A bid on a listing's running lot: a confirmed mobile, never the seller, at least the next step. */
   async bid(customer: CustomerWithStore, listingId: string, amount: number) {
     if (!Number.isSafeInteger(amount) || amount <= 0) throw invalid('parameter_invalid', 'Give your bid in minor units.', 'amount');
-    const lot = await this.prisma.connectAuction.findFirst({ where: { listingId, kind: 'listing', status: { in: openStatuses } }, include: lotInclude });
+    const lot = await this.prisma.connectAuction.findFirst({ where: { listingId, status: { in: openStatuses } }, include: lotInclude });
     if (!lot) throw conflict('auction_not_live', 'Bidding on this listing has ended.');
     if (!customer.phoneVerifiedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'phone_required', 'Confirm your mobile number to bid.');
-    if (lot.sellerId === customer.id) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'own_item', 'You cannot bid on your own listing.');
+    if (lot.sellerId === customer.id || lot.order?.sellerId === customer.id) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'own_item', 'You cannot bid on your own item.');
     const rules = await this.lots.rules(lot.country);
     const now = new Date();
     const previous = this.top(lot);
     await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM connect_auctions WHERE id = ${lot.id}::uuid FOR UPDATE`;
       const fresh = await tx.connectAuction.findUniqueOrThrow({ where: { id: lot.id } });
-      if (fresh.status !== 'live' || fresh.endsAt <= now) throw conflict('auction_not_live', 'Bidding on this listing has ended.');
+      if (fresh.status !== 'live' || fresh.endsAt <= now) throw conflict('auction_not_live', fresh.status === 'scheduled' ? 'Bidding has not opened yet.' : 'Bidding on this listing has ended.');
       const top = await tx.connectAuctionBid.findFirst({ where: { auctionId: lot.id }, orderBy: { amountMinor: 'desc' } });
       const least = nextBid(fresh.startPriceMinor, top?.amountMinor ?? null, rules);
       if (BigInt(amount) < least) throw invalid('bid_too_low', `Bid at least ${formatMoney(least, fresh.currency)}.`, 'amount');

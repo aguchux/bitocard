@@ -342,6 +342,11 @@ export class ListingsService {
       WHERE l."id" = ${listingId}::uuid`;
   }
 
+  /** Puts a listing made outside this service (Udozo's own auction listings) into the search's words. */
+  async indexForSearch(listingId: string) {
+    await this.refreshSearch(this.prisma, listingId);
+  }
+
   /** Closes the current price and opens the new one (or none, for "contact for price"). */
   private async recordPrice(tx: Prisma.TransactionClient, listingId: string, price: bigint | null) {
     const now = new Date();

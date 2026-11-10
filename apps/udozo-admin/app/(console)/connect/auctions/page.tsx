@@ -15,6 +15,7 @@ import {
 import { MarketFilter } from "@/components/classifieds";
 import { isoFromLocal, money, toMinor } from "@/components/connect";
 import { UdozoShell } from "@/components/shell";
+import { udozoOrigin } from "@/components/theme";
 
 const auctionStatusLabels: Record<ConnectAuction["status"], string> = {
   scheduled: "Opens soon",
@@ -154,7 +155,7 @@ export default function ConnectAuctionsPage() {
 
   return (
     <UdozoShell section="connect" current="/connect/auctions" crumbs={[{ label: "Connect", href: "/connect/applications" }, { label: "Auctions" }]}>
-      <PageHeader title="Auctions" description="Abandoned items at Udozo's warehouses, sold on udozo.com to recover the storage their sellers owe." />
+      <PageHeader title="Auctions" description="Abandoned items at Udozo's warehouses, sold on udozo.com as auction listings of Udozo's own to recover the storage their sellers owe. Sellers' own auctions are ordinary listings (Marketplace > Listings)." />
       <div className="mt-6">
         <MarketFilter id="auctions-market" value={country} onChange={setCountry} />
       </div>
@@ -234,7 +235,17 @@ export default function ConnectAuctionsPage() {
       ) : null}
       {open ? (
         <Dialog open onClose={() => setOpen(null)} title={`${open.number}: ${open.title}`}>
-          <p className="mb-3 text-sm text-muted">{auctionStatusLabels[open.status]}</p>
+          <p className="mb-3 text-sm text-muted">
+            {auctionStatusLabels[open.status]}
+            {open.listing ? (
+              <>
+                {" · "}
+                <a href={`${udozoOrigin()}/${open.country.toLowerCase()}/l/${open.listing.ref}-${open.listing.slug}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 hover:underline">
+                  Open its listing on udozo.com
+                </a>
+              </>
+            ) : null}
+          </p>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
             <dt className="text-muted">Starting price</dt>
             <dd>{money(open.start_price, open.currency)}</dd>

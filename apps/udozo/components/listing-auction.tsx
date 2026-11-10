@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { Gavel } from "lucide-react";
 import { payName, type ShopListingAuction, shopMoney } from "@bitocard/api-client/classifieds";
 import { useConfirm } from "@/components/confirm-dialog";
-import { bidOnListing } from "@/lib/auction-actions";
+import { bidOnListing, lotCollectionCode, payLot } from "@/lib/auction-actions";
 import { timeLeft } from "@/lib/auctions";
 import { fromMinor, toMinor } from "@/lib/shop";
 
@@ -16,8 +16,12 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "
 export function auctionNote(auction: ShopListingAuction, currency: string) {
   const viewer = auction.viewer;
   if (viewer?.seller) return auction.status === "live" ? "Your listing is at auction: it sells to the highest bid at or above your reserve." : null;
-  if (viewer?.won) return "You bought it at auction.";
-  if (viewer?.to_pay) return `You won it at ${shopMoney(viewer.to_pay.amount, currency)}. Pay with ${payName}${viewer.to_pay.pay_by ? ` by ${when(viewer.to_pay.pay_by)}` : ""}, or it goes to the next bidder.`;
+  const udozos = auction.kind === "abandoned";
+  if (viewer?.won) return udozos ? "You bought it at auction. Show your collection code at the warehouse to collect it." : "You bought it at auction.";
+  if (viewer?.to_pay) {
+    const by = viewer.to_pay.pay_by ? ` by ${when(viewer.to_pay.pay_by)}` : "";
+    return `You won it at ${shopMoney(viewer.to_pay.amount, currency)}. Pay ${udozos ? "from your Udozo wallet" : `with ${payName}`}${by}, or it goes to the next bidder.`;
+  }
   if (auction.status === "live" && viewer?.leading) return "You are the highest bidder.";
   if (auction.status === "live" && viewer?.highest) return "You were outbid.";
   return null;
@@ -25,6 +29,7 @@ export function auctionNote(auction: ShopListingAuction, currency: string) {
 
 /** Where the auction stands, in words: open with time left, waiting for the winner, sold or not sold. */
 export function auctionState(auction: ShopListingAuction, now = Date.now()) {
+  if (auction.status === "scheduled") return `Bidding opens ${when(auction.starts_at)}`;
   if (auction.status === "live") return `Ends in ${timeLeft(auction.ends_at, now)} (${when(auction.ends_at)})`;
   if (auction.status === "awaiting_payment") return "Bidding has ended: the winner is paying.";
   if (auction.status === "sold") return "Sold at auction.";
@@ -35,7 +40,8 @@ export function auctionState(auction: ShopListingAuction, now = Date.now()) {
 /**
  * A listing sold by auction, on its page: the price to beat, how many bids and when it ends, the reserve's state, the
  * latest bids, and bidding (signed in with a confirmed mobile, at least the next step, confirmed first: a bid cannot be
- * taken back). Its winner pays through the listing's UdozoPay button.
+ * taken back). A seller's winner pays through the listing's UdozoPay button; a lot of Udozo's (an abandoned item) is
+ * paid here from the wallet and collected at Udozo's warehouse with a code.
  */
 export function AuctionPanel({ listingId, currency, auction, signedIn, phoneConfirmed }: { listingId: string; currency: string; auction: ShopListingAuction; signedIn: boolean; phoneConfirmed: boolean }) {
   const router = useRouter();
@@ -43,6 +49,7 @@ export function AuctionPanel({ listingId, currency, auction, signedIn, phoneConf
   const [amount, setAmount] = useState(fromMinor(auction.next_bid));
   const [problem, setProblem] = useState<{ message: string; signIn: boolean } | null>(null);
   const [busy, start] = useTransition();
+  const [code, setCode] = useState<string | null>(null);
   const [confirm, dialog] = useConfirm();
   const viewer = auction.viewer;
   const note = auctionNote(auction, currency);
@@ -55,7 +62,7 @@ export function AuctionPanel({ listingId, currency, auction, signedIn, phoneConf
     if (auction.next_bid !== null && minor < auction.next_bid) return setProblem({ message: `Bid at least ${shopMoney(auction.next_bid, currency)}.`, signIn: false });
     const answer = await confirm({
       title: `Bid ${shopMoney(minor, currency)}?`,
-      body: `If you win, you pay this with ${payName} within ${auction.rules.pay_hours} hours. A bid cannot be taken back.`,
+      body: `If you win, you pay this ${auction.kind === "abandoned" ? "from your Udozo wallet" : `with ${payName}`} within ${auction.rules.pay_hours} hours. A bid cannot be taken back.`,
       action: "Place my bid",
       tone: "money",
     });
@@ -68,6 +75,31 @@ export function AuctionPanel({ listingId, currency, auction, signedIn, phoneConf
       router.refresh();
     });
   };
+
+  const pay = async () => {
+    if (!viewer?.to_pay) return;
+    const answer = await confirm({
+      title: `Pay ${shopMoney(viewer.to_pay.amount, currency)}?`,
+      body: "It is taken from your Udozo wallet. You then collect the item at Udozo's warehouse with your code.",
+      action: "Pay from my wallet",
+      tone: "money",
+    });
+    if (!answer) return;
+    start(async () => {
+      setProblem(null);
+      const result = await payLot(auction.ref);
+      if (!result.ok) return setProblem({ message: result.message, signIn: result.signIn });
+      router.refresh();
+    });
+  };
+
+  const showCode = () =>
+    start(async () => {
+      setProblem(null);
+      const result = await lotCollectionCode(auction.ref);
+      if (!result.ok) return setProblem({ message: result.message, signIn: result.signIn });
+      setCode(result.data.collected_at ? "collected" : result.data.code);
+    });
 
   return (
     <section aria-labelledby="auction-heading" className="grid gap-3 rounded-2xl border-2 border-navy-900 bg-white p-4">
@@ -85,6 +117,31 @@ export function AuctionPanel({ listingId, currency, auction, signedIn, phoneConf
       {note ? (
         <p className="rounded-xl bg-navy-50 p-3 text-sm font-semibold text-navy-900" role="status">
           {note}
+        </p>
+      ) : null}
+      {auction.kind === "abandoned" && viewer?.to_pay && auction.status === "awaiting_payment" ? (
+        <button type="button" onClick={pay} disabled={busy} className="min-h-11 rounded-xl bg-navy-900 px-4 font-semibold text-white disabled:opacity-60">
+          Pay {shopMoney(viewer.to_pay.amount, currency)} from your wallet
+        </button>
+      ) : null}
+      {auction.kind === "abandoned" && viewer?.won ? (
+        code === "collected" ? (
+          <p className="text-sm font-semibold text-navy-900">You have collected it.</p>
+        ) : code ? (
+          <p className="rounded-xl border border-navy-200 p-3 text-center" role="status">
+            <span className="block text-xs text-navy-600">Your collection code</span>
+            <span className="text-2xl font-extrabold tracking-widest text-navy-900">{code}</span>
+          </p>
+        ) : (
+          <button type="button" onClick={showCode} disabled={busy} className="min-h-11 rounded-xl border border-navy-300 px-4 font-semibold text-navy-900 disabled:opacity-60">
+            Show my collection code
+          </button>
+        )
+      ) : null}
+      {auction.kind === "abandoned" && auction.warehouse ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          Sold by Udozo as seen, from a shipment nobody collected: Udozo has not tested it. Collected at {auction.warehouse.name}, {auction.warehouse.address}, {auction.warehouse.state}
+          {auction.warehouse.hours ? ` (${auction.warehouse.hours})` : ""}.
         </p>
       ) : null}
       {auction.status === "live" && !viewer?.seller ? (

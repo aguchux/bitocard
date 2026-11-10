@@ -281,7 +281,7 @@ const shown = (children: React.ReactNode) =>
 
 const openDialog = () => within(document.querySelector<HTMLElement>("dialog[open]")!);
 function auction(patch: Record<string, unknown>) {
-  return { object: "connect_auction", id: "au1", number: "AU-000001", ref: "1", status: "scheduled", country: "NG", currency: "NGN", title: "Rice cooker", order: { id: "o9", number: "SP-90" }, warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, start_price: 2_400_000, current_price: null, owed: 2_400_000, costs: 0, starts_at: "2026-11-11T10:00:00.000Z", ends_at: "2026-11-14T10:00:00.000Z", pay_by: null, sale: null, left_over: null, paid_at: null, collected_at: null, cancel_reason: null, bids: [], ...patch };
+  return { object: "connect_auction", id: "au1", number: "AU-000001", ref: "1", status: "scheduled", country: "NG", currency: "NGN", title: "Rice cooker", order: { id: "o9", number: "SP-90" }, warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, listing: { ref: 100_042, slug: "rice-cooker" }, start_price: 2_400_000, current_price: null, owed: 2_400_000, costs: 0, starts_at: "2026-11-11T10:00:00.000Z", ends_at: "2026-11-14T10:00:00.000Z", pay_by: null, sale: null, left_over: null, paid_at: null, collected_at: null, cancel_reason: null, bids: [], ...patch };
 }
 const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" && item.path.endsWith(suffix)).at(-1);
 
@@ -597,6 +597,7 @@ describe("Connect", () => {
     const lot = openDialog();
     expect(lot.getByText("Alice Bidder")).toBeTruthy();
     expect(lot.getByText("Won", { exact: false })).toBeTruthy();
+    expect(lot.getByRole("link", { name: "Open its listing on udozo.com" }).getAttribute("href")).toMatch(/\/ng\/l\/100042-rice-cooker$/);
     expect(screen.queryByRole("button", { name: "List at auction" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hand over" })).toBeNull();
   });

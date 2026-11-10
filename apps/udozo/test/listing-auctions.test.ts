@@ -21,6 +21,9 @@ const now = Date.parse("2026-11-10T10:00:00Z");
 const lot = (patch: Partial<ShopListingAuction> = {}): ShopListingAuction => ({
   object: "listing_auction",
   number: "AU-000007",
+  ref: "7",
+  kind: "listing",
+  warehouse: null,
   status: "live",
   start_price: 10_000_000,
   current_price: null,

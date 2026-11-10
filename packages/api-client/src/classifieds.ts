@@ -45,9 +45,14 @@ export type ShopAuctionCard = { status: string; current_price: number | null; bi
 /** A listing's auction as its page shows it; signed in, `viewer` is the reader's own place in it. */
 export type ShopListingAuction = {
   object: 'listing_auction';
-  /** AU-000123 */
+  /** AU-000123, and its number alone (for paying and collecting a lot of Udozo's). */
   number: string;
-  status: 'live' | 'awaiting_payment' | 'sold' | 'unsold' | 'cancelled';
+  ref: string;
+  /** listing (a seller's: the winner pays with UdozoPay) or abandoned (Udozo's: paid from the wallet, collected at its warehouse). */
+  kind: 'listing' | 'abandoned';
+  /** Where a lot of Udozo's is collected. */
+  warehouse: { name: string; address: string; hours: string; state: string } | null;
+  status: 'scheduled' | 'live' | 'awaiting_payment' | 'sold' | 'unsold' | 'cancelled';
   start_price: number;
   current_price: number | null;
   /** The least the next bid may be, while bidding is open. */
