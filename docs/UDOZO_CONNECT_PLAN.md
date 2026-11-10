@@ -653,6 +653,10 @@ assistants' knowledge, help, terms and privacy.
      - **The seller may still collect** after paying what is owed until the first bid (the hand-back refuses
        `auction_has_bids` after, and cancels a lot with no bids).
      - **Not built:** shipping lots through Connect (buyers collect at the warehouse).
+     - **Since `docs/UDOZO_AUCTIONS_PLAN.md`** (10 November 2026): auction is a way to sell any listing, and a lot is
+       made as an auction listing of Udozo's own seller account in the market; people bid on that listing's page
+       (`POST /v1/classifieds/listings/:id/bids`), where its winner pays and finds the collection code, and
+       `/<cc>/auctions/<ref>` redirects to it. The money, the hand-over and the claims are as below.
      - **Screens:** udozo.com's **Udozo auctions** (`/<cc>/auctions`, its lots; `/<cc>/auctions/<ref>`: photos, price,
        bids, rules, Sign in to bid, Place bid, Pay, the collection code; `noindex` lots; footer links), the **Udozo
        auctions terms** (`/legal/auctions`) and the privacy notice's section 4c; admin Connect > **Auctions**

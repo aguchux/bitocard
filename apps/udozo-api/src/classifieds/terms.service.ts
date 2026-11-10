@@ -7,7 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
  * Bump both when the terms change in a way people must accept again; everyone is then asked once more before they next
  * post or use UdozoPay.
  */
-export const shopTermsVersion = '2026-11-09';
+export const shopTermsVersion = '2026-11-10';
 /** Their path on udozo.com, where the apps link it (the UdozoPay rules and privacy notice are beside it, under `/legal`). */
 export const shopTermsPath = '/legal/terms';
 

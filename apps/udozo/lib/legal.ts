@@ -4,7 +4,7 @@
  * or use UdozoPay (the API's `shopTermsVersion`): change both together when people must accept again.
  */
 
-export const legalVersion = "2026-11-09";
+export const legalVersion = "2026-11-10";
 /** Privacy and legal requests. */
 export const legalContact = "legal@udozo.com";
 /** Help with an account, a listing or an order. */
@@ -109,6 +109,7 @@ const terms: LegalDocument = {
             "How long and how many. A listing is live for 30 days unless you renew it. There is a limit on how many listings you post in each category every 30 days, shown when you post.",
             "What is public. Live listings are public, on Udozo and in search engines: the title, description, features, photos, video, price, condition, the area you chose, and your first name and initial with your badges (for example a confirmed phone or a passed identity check). If you add a profile photo (a picture of you, or a logo or icon), it is public too, beside your name on your listings and seller page, and so is a cover you put across the top of your seller page; each is stored with our file storage provider in the United States, deleted when you replace or remove it, and Udozo's team may remove one that breaks the rules. Your seller page gathers the same: your first name and initial, your photo and cover, your badges, when you joined, your live listings with their categories and states, how many you have sold, your UdozoPay sales and how often you answer chats; never your full name, phone, email or where you live. Never put anyone's personal details in a listing.",
             "Usernames. Once you have posted enough ads, you may choose a username, and your seller page's address becomes it. It is public, on your seller page's address and beside your listings. It may not pretend to be another person, business or Udozo, mislead buyers, or carry a phone number, email address, link, social media handle or words we do not allow. You can change it once every 30 days; your old one then leads to your new page for 90 days, and nobody else can take it meanwhile. We may remove a username that breaks these rules, and your page goes back to its first address.",
+            "Selling by auction. Instead of a price, you may sell one item by auction where Udozo offers it: you set a starting price, how long it runs (1 to 10 days) and, if you like, a reserve that bidders never see. Once someone bids you cannot change its price, reserve or length, mark it sold or delete it. When it ends, the highest bid at or above your reserve buys it, paid with UdozoPay, and you must sell it at that bid; the Udozo auctions terms say how.",
             "Sold listings stay visible, marked sold, for about 30 days, then leave the market.",
             "Your content. You keep the rights in your words, photos and video. You give us a free, worldwide licence to host, show, resize and share them, including in previews on other sites and apps, to run and promote Udozo while the listing is live and for a reasonable time after.",
             "Listing is free for now. If we add paid features, we publish their prices and terms first, and you choose whether to use them.",
@@ -749,7 +750,8 @@ const privacy: LegalDocument = {
       id: "auctions",
       heading: "4c. Udozo auctions",
       body: [
-        "If you bid at a Udozo auction we keep each bid (the amount and when you made it), whether you were offered the lot and paid, and when you collected it. Other bidders see your bids beside your first name and the initial of your last name, never your account, email or phone.",
+        "If you bid at an auction on Udozo we keep each bid (the amount and when you made it), whether you were offered it and paid, and, for an item Udozo sells, when you collected it. Other bidders and the seller see your bids beside your first name and the initial of your last name, never your account, email or phone; the seller then sees the winner as for any UdozoPay order.",
+        "If you sell by auction we keep your starting price, reserve (never shown to bidders) and length, and how the auction ended.",
         "If your item was abandoned at a Connect Centre and auctioned, we keep what the sale raised, what it paid of the storage you owed, what was left over for you and your claim for it.",
         "We keep auction records for six years, as we keep payment records.",
       ],
@@ -1049,61 +1051,72 @@ const connectCentres: LegalDocument = {
 const auctions: LegalDocument = {
   slug: "auctions",
   title: "Udozo auctions terms",
-  summary: "What is sold at Udozo auctions and by whom, bidding and its steps, late bids, winning and paying with UdozoPay, collecting, and the seller's claim to what is left over.",
+  summary: "Selling a listing by auction and its reserve, bidding and its steps, late bids, winning and paying with UdozoPay, and the items Udozo itself sells at auction.",
   sections: [
     {
       id: "about",
-      heading: "1. About Udozo auctions",
+      heading: "1. About auctions on Udozo",
       body: [
         whoWeAre,
-        "Udozo auctions sell items their sellers abandoned at Udozo Connect Centres: items returned to a seller who did not collect them, a month into Loss of care, that Udozo picked up to its own warehouse. Udozo sells them itself, to recover the storage the seller owed. The seller is told before an item is listed, and can still collect it after paying what is owed until the first bid.",
-        "These terms apply when you bid. They sit alongside the terms of use, the UdozoPay rules and the privacy notice.",
+        "An auction is a way to sell a listing on Udozo: instead of a price, people bid until it ends and the highest bid buys it. Any seller may sell a listing by auction where Udozo offers it, and Udozo also sells, by auction, items abandoned at Udozo Connect Centres (section 7).",
+        "These terms apply when you sell or bid by auction. They sit alongside the terms of use, the UdozoPay rules and the privacy notice.",
       ],
     },
     {
-      id: "items",
-      heading: "2. What you are buying",
+      id: "selling",
+      heading: "2. Selling by auction",
       body: [
-        "Every lot is sold as seen, from an abandoned shipment. Its photos and description are the best we have: they may come from the original listing. We do not test lots or promise that they work, are complete or match their first listing. Look at what is shown and ask before you bid.",
-        "Each lot says which Udozo warehouse holds it. You collect it there.",
+        "An auction listing is one item, sold on Udozo only (never on resellers' stores), with a starting price, a length of 1, 3, 5, 7 or 10 days from when it goes live, and, if you choose, a reserve: the least you will take, at least the starting price and never shown to bidders. You need what UdozoPay needs to accept an order (a payout account, and an identity check where Udozo asks for one).",
+        "Until the first bid you may change it, or take it down. Once someone has bid, its price, reserve and length are fixed, and you cannot mark it sold, delete it or sell it elsewhere: buyers' bids are promises, and so is your listing.",
+        "When it ends, the highest bid at or above your reserve buys it, and you must sell it at that bid, as for any UdozoPay order you accepted. If nobody bid, no bid reached your reserve, or nobody who won paid, it is not sold and leaves the market until you renew it, which starts a new auction.",
+        "Your item, your listing and what you say of it are yours, under the terms of use, as for any listing. Udozo does not inspect auction items.",
       ],
     },
     {
       id: "bidding",
       heading: "3. Bidding",
       body: [
-        "To bid you need a Udozo account with a confirmed mobile number. The seller of the item may not bid.",
-        "Bidding opens and closes at the times the lot shows. Each bid must be at least the lot's starting price, then at least the step the lot shows above the highest bid (a share of it, with a least amount). A bid is a promise to pay it if you win: you cannot take it back.",
-        "A bid in the last minutes of a lot moves its end to that many minutes after the bid, as the lot shows, so the others can answer it.",
-        "There is no hidden reserve: the starting price is the least we will sell for.",
+        "To bid you need a Udozo account with a confirmed mobile number. The seller may not bid on their own item.",
+        "Each bid must be at least the starting price, then at least the step the listing shows above the highest bid (a share of it, with a least amount). A bid is a promise to pay it if you win: you cannot take it back.",
+        "A bid in the last minutes moves the end to that many minutes after the bid, as the listing shows, so the others can answer it.",
+        "The listing says whether a reserve has been met, never what it is. Below it, the item does not sell.",
       ],
     },
     {
       id: "winning",
       heading: "4. Winning and paying",
       body: [
-        "When bidding closes, the highest bidder is offered the lot at their bid and has the hours the lot shows to pay for it with UdozoPay, from their Udozo wallet. If they do not pay in time, the lot is offered to the next highest bidder at their own bid, and so on; if nobody pays, it is not sold and may be listed again.",
-        "Not paying for a lot you won may stop you bidding again.",
+        "When bidding closes, the highest bidder at or above any reserve is offered the item at their bid and has the hours the listing shows to pay for it with UdozoPay. If they do not pay in time, it is offered to the next highest bidder at or above the reserve at their own bid, and so on; if nobody pays, it is not sold.",
+        "Paid, it is a UdozoPay order like any other: the money is held until you receive the item and confirm it, and the UdozoPay rules on hand-over, delivery, shipping through Udozo Connect, refunds and disputes apply. You cannot make an offer on an auction listing or buy it at a price.",
+        "Not paying for an item you won may stop you bidding again.",
       ],
     },
     {
-      id: "collecting",
-      heading: "5. Collecting",
+      id: "fees",
+      heading: "5. Fees",
+      body: ["Selling and bidding by auction is free. An auction sale pays UdozoPay's fees, as any UdozoPay order does, shown before you pay or accept."],
+    },
+    {
+      id: "conduct",
+      heading: "6. Fair bidding",
       body: [
-        "Once you pay, the lot's page shows your collection code. Collect the lot at its warehouse, in its opening hours, and give the code to our team there only when you have it in your hands.",
+        "Never bid on your own item, from another account or through someone else, and never agree with others to keep bids down. We may cancel bids or an auction that breaks this, and suspend the accounts behind them.",
       ],
     },
     {
-      id: "money",
-      heading: "6. Where the money goes",
+      id: "udozo",
+      heading: "7. Items Udozo sells",
       body: [
+        "Udozo sells, by auction, items abandoned at Udozo Connect Centres: items returned to a seller who did not collect them, a month into Loss of care, that Udozo picked up to its own warehouse. They are listed under Udozo's own name, to recover the storage the seller owed. The seller is told before one is listed, and can still collect it after paying what is owed until the first bid.",
+        "These items are sold as seen, from an abandoned shipment. Their photos and description are the best we have and may come from the original listing. We do not test them or promise that they work, are complete or match their first listing. Look at what is shown and ask before you bid. There is no reserve: the starting price is the least we will sell for.",
+        "The winner pays from their Udozo wallet, on the listing, within the hours it shows. Once paid, the listing shows the collection code: collect the item at the warehouse it names, in its opening hours, and give the code to our team there only when you have it in your hands.",
         "What a sale raises pays, first, the storage its seller owed and, then, what Udozo spent selling and moving it (never the pickup, which Udozo pays). What is left over is the seller's, but only if they claim it within the days their order shows, from the sale; unclaimed, it becomes Udozo's.",
       ],
     },
     {
       id: "changes",
-      heading: "7. Changes",
-      body: ["We may change these terms. A change applies to lots listed after it; we say so on this page and in the account of anyone bidding."],
+      heading: "8. Changes",
+      body: ["We may change these terms. A change applies to auctions that start after it; we say so on this page and in the account of anyone selling or bidding."],
     },
   ],
 };
