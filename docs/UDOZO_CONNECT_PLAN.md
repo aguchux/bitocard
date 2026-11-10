@@ -486,9 +486,20 @@ assistants' knowledge, help, terms and privacy.
      /v1/connect/centres/:centre/orders/summary` (on their way, to shelve, ready, due today, overdue). Scanning a label's
      QR code is the phone's own camera app reading the order number into Find. Tests:
      `apps/udozo-connect/test/centres.test.ts`, `centre-screens.test.tsx`, `counter-photos.test.ts`.
-   - **5c:** returns (requests, 48 hours, return codes), demurrage and Loss of care, stock checks, earnings and payouts.
-   - **5d:** udozo.com's Collect at a Connect Centre at checkout, the order's Connect timeline, and the printable label
-     (with its QR code: the order number and centre, never the buyer's details) on the seller's order.
+   - **5d, udozo.com (built before 5c, so a Connect order works end to end):**
+     - **Checkout:** Buy with UdozoPay offers **Collect at a Udozo Connect Centre** (`SafePayRequest` in
+       `components/safe-pay.tsx`): the state, its centres with their address and hours, that state's shipping charge,
+       the Connect fee and the free time to collect (`free_hours` on the quote). The request sends `connect_centre_id`.
+     - **The order** (`lib/shop.ts` `orderActions`, `orderNext`, `orderSteps`; `order-detail.tsx`, `order-panel.tsx`):
+       the buyer's release code from paid until collected, never Received at home; the seller's Get it to <centre> (I
+       will drop it off myself, or a courier; dispatch photos first); the steps Sent to the centre, Received at the
+       centre, Ready to collect, Inspected and collected; Where you collect it or Where it goes (the centre's address,
+       hours, phone, free until); and the centre's events on the timeline (`shipmentLabels`, status `at_centre`).
+     - **The parcel label** (`/account/orders/<id>/label`, `lib/connect-label.ts`): the seller prints it for a paid or
+       sent Connect order. It carries the order number, its QR code (`SP-000123 CC-000001`, which connect.udozo.com's
+       Find reads) and the centre, never the buyer's details.
+     - Tests: `apps/udozo/test/connect-orders.test.ts`.
+   - **5c (next):** returns (requests, 48 hours, return codes), demurrage and Loss of care, stock checks, earnings and payouts.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo

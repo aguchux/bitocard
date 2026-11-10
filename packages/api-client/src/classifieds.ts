@@ -26,7 +26,7 @@ export type ShopTier = 'area' | 'nearby' | 'state' | 'country';
 export type ShopReportReason = 'scam' | 'prohibited' | 'wrong_category' | 'duplicate' | 'sold' | 'offensive' | 'other';
 /** Chats are also reported for pressure over a review (Udozo). */
 export type ShopChatReportReason = ShopReportReason | 'review_pressure';
-export type ShopOrderStatus = 'requested' | 'declined' | 'lapsed' | 'awaiting_payment' | 'cancelled' | 'locked' | 'paid' | 'sent' | 'disputed' | 'released' | 'refunded' | 'partly_refunded';
+export type ShopOrderStatus = 'requested' | 'declined' | 'lapsed' | 'awaiting_payment' | 'cancelled' | 'locked' | 'paid' | 'sent' | 'at_centre' | 'disputed' | 'released' | 'refunded' | 'partly_refunded';
 export type ShopFeatureType = 'text' | 'number' | 'choice' | 'boolean';
 
 export type ShopPrice = { kind: ShopPriceKind; amount: number | null; currency: string };
@@ -453,7 +453,9 @@ export type ShopSafePayQuote = {
   price: number;
   buyer_fee: number;
   total: number;
-  fulfilment: Array<'meet_up' | 'delivery'>;
+  fulfilment: Array<ShopFulfilment>;
+  /** Collect at a Udozo Connect Centre (null: not offered for this item). */
+  connect?: ShopConnectCheckout | null;
   /** The delivery charge on top: within the seller's state, and elsewhere (null where they do not deliver). */
   delivery: ShopDeliveryCharges | null;
   reserved: boolean;
@@ -465,13 +467,13 @@ export type ShopSafePayQuote = {
 export type ShopDeliveryCharges = { state_id: string | null; within_state: number; nationwide: number | null };
 
 /** What a seller reports about a parcel after shipping it. */
-export type ShopShipmentStatus = 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'returned';
+export type ShopShipmentStatus = 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'returned' | 'received' | 'refused' | 'ready' | 'collected' | 'collection_refused' | 'note';
 export type ShopShipment = {
   courier: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
   delivered_at: string | null;
-  events: Array<{ status: ShopShipmentStatus; note: string | null; reported_by: 'seller' | 'courier' | 'bitocard'; at: string }>;
+  events: Array<{ status: ShopShipmentStatus; note: string | null; reported_by: 'seller' | 'courier' | 'bitocard' | 'centre'; at: string }>;
   dispatch_photos: Array<{ id: string; url: string; content_type: string; width: number | null; height: number | null }>;
 };
 export const shipmentLabels: Record<ShopShipmentStatus, string> = {
@@ -481,6 +483,36 @@ export const shipmentLabels: Record<ShopShipmentStatus, string> = {
   delivered: 'Delivered',
   failed_attempt: 'Delivery attempt failed',
   returned: 'Returned to the seller',
+  received: 'Received at the Connect Centre',
+  refused: 'Refused at the Connect Centre',
+  ready: 'Ready to collect',
+  collected: 'Collected',
+  collection_refused: 'Refused at the counter',
+  note: 'Update from the Connect Centre',
+};
+
+/** How an order is handed over: in person, delivered, or collected at a Udozo Connect Centre. */
+export type ShopFulfilment = 'meet_up' | 'delivery' | 'connect';
+
+/** A Connect Centre a buyer can collect an item at, as checkout lists it. */
+export type ShopCheckoutCentre = { id: string; number: string; name: string; area: { id: string; name: string; latitude: number; longitude: number }; address: string; landmark: string | null; hours: string; phone: string };
+
+/** Collecting at a Connect Centre at checkout: each state's centres, its shipping charge and the Connect fee there. */
+export type ShopConnectCheckout = {
+  fee: { kind: 'percent'; bps: number } | { kind: 'fixed'; amount: number };
+  /** How long the buyer may collect it free once it is ready. */
+  free_hours: number;
+  states: Array<{ id: string; name: string; slug: string; shipping: number; connect_fee: number; centres: ShopCheckoutCentre[] }>;
+};
+
+/** An order's Connect Centre and its steps there, as the buyer and seller see them. */
+export type ShopOrderConnect = {
+  centre: { id: string; number: string; name: string; address: string; landmark: string | null; area: string; state: string; hours: string; phone: string };
+  /** The buyer's and Udozo's view only. */
+  connect_fee?: number;
+  received_at: string | null;
+  ready_at: string | null;
+  collect_by: string | null;
 };
 export type ShopCourier = { name: string; tracking_url: string | null };
 /** A message in a resale order's threads, as one side reads it (the buyer sees the store's side as the store). */
@@ -514,7 +546,9 @@ export type ShopOrder = {
   store: { id: string; name: string; subdomain: string; logo_url: string | null } | null;
   /** Resale, to the buyer: the supplier (the seller of record). */
   supplier: { name: string } | null;
-  fulfilment: 'meet_up' | 'delivery';
+  fulfilment: ShopFulfilment;
+  /** Collected at a Udozo Connect Centre: where, and its steps. */
+  connect?: ShopOrderConnect | null;
   currency: string;
   /** The price: on a resale order, the supplier sees their own price, never the store's. */
   price: number;
@@ -816,8 +850,9 @@ export const buyerOrderLabels: Record<ShopOrderStatus, string> = {
   awaiting_payment: 'Accepted: pay to reserve it',
   cancelled: 'Cancelled',
   locked: 'Paid: waiting for the store to confirm',
-  paid: 'Paid: BitoCard holds the money',
+  paid: 'Paid: Udozo holds the money',
   sent: 'Sent: confirm when it arrives',
+  at_centre: 'At the Connect Centre',
   disputed: 'In dispute',
   released: 'Complete',
   refunded: 'Refunded',
@@ -834,6 +869,7 @@ export const sellerOrderLabels: Record<ShopOrderStatus, string> = {
   locked: 'Paid and locked: accept or decline',
   paid: 'Paid: hand it over or ship it',
   sent: 'Sent: waiting for the buyer',
+  at_centre: 'At the Connect Centre: waiting for the buyer',
   disputed: 'In dispute',
   released: 'Paid to you',
   refunded: 'Refunded to the buyer',

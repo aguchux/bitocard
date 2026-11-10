@@ -155,7 +155,7 @@ describe("the counter's rules and actions", () => {
 
   it("finds an item by its label's number, and says when none is coming here", async () => {
     reply = () => Response.json({ object: "connect_order", id: other });
-    expect(await actions.findOrder(id, "SP-000042")).toEqual({ ok: true, data: { id: other } });
+    expect(await actions.findOrder(id, "SP-000042 CC-000001")).toEqual({ ok: true, data: { id: other } });
     expect(sent[0]!.url).toBe(`https://api.udozo.test/v1/connect/centres/${id}/orders/lookup?number=SP-000042`);
     reply = () => Response.json({ error: { code: "resource_missing", message: "No such order at this centre." } }, { status: 404 });
     expect(await actions.findOrder(id, "42")).toMatchObject({ ok: false, message: "No order with that number is coming to this centre." });

@@ -105,7 +105,8 @@ const counter = (id: string, order: string, step: string) => `/v1/connect/centre
 /** Finds an order of this centre by its number (from its label), for its page. */
 export async function findOrder(id: string, number: string): Promise<CentreResult<{ id: string }>> {
   if (!uuid.test(id)) return unknown;
-  const typed = number.trim();
+  // A label's QR code holds the order number, then the centre: the number is what is looked up.
+  const typed = number.trim().split(/\s+/)[0] ?? "";
   if (!/^(?:sp[-\s]?)?\d{1,12}$/i.test(typed)) return { ok: false, message: "Give the order number on the label, such as SP-000123.", code: "parameter_invalid", param: "number" };
   const found = await customerApi<CounterOrder>("GET", `/v1/connect/centres/${id}/orders/lookup?number=${encodeURIComponent(typed)}`);
   if (!found.ok) return { ok: false, message: found.status === 404 ? "No order with that number is coming to this centre." : found.message, code: found.code, param: "number" };

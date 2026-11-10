@@ -165,7 +165,11 @@ export function OrderPanel({
           <h2 id="code" className="font-bold">
             Your release code
           </h2>
-          <p className="text-sm text-white/80">Check the item first. Then tell {order.with.name} this code: it releases the payment to them at once.</p>
+          <p className="text-sm text-white/80">
+            {order.fulfilment === "connect"
+              ? `Inspect it at ${order.connect?.centre.name ?? "the Connect Centre"} first. If you take it, give the staff this code: it releases the payment to the seller at once.`
+              : `Check the item first. Then tell ${order.with.name} this code: it releases the payment to them at once.`}
+          </p>
           <div aria-label={code ? `Release code ${code.value.split("").join(" ")}` : "Release code hidden"} className="flex justify-center gap-2">
             {(code?.value ?? "••••••").split("").map((digit, index) => (
               <span key={index} className="grid h-14 w-11 place-items-center rounded-xl bg-white/10 text-2xl font-extrabold">
@@ -358,8 +362,11 @@ export function OrderPanel({
  * Shipping a paid delivery: at least two dispatch photos (the item, the parcel sealed), the courier (the country's, or
  * another by name) and its tracking number, then Mark as shipped. Photos go up through this site to the order.
  */
-function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; couriers: ShopCourier[]; pending: boolean; onShip: (input: { courier: string; tracking_number: string; tracking_url?: string; tracking_note?: string }) => void }) {
+function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; couriers: ShopCourier[]; pending: boolean; onShip: (input: { courier?: string; tracking_number?: string; tracking_url?: string; tracking_note?: string; dropOff?: boolean }) => void }) {
   const router = useRouter();
+  // A Connect order goes to the buyer's Connect Centre: dropped off by the seller, or with any courier.
+  const centre = order.fulfilment === "connect" ? (order.connect?.centre ?? null) : null;
+  const [dropOff, setDropOff] = useState(Boolean(centre));
   const [courier, setCourier] = useState(couriers[0]?.name ?? "");
   const [other, setOther] = useState("");
   const [number, setNumber] = useState("");
@@ -370,7 +377,7 @@ function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; cour
   const photos = order.shipment?.dispatch_photos ?? [];
   const listed = couriers.find(item => item.name === courier);
   const name = courier === "other" || !couriers.length ? other.trim() : courier;
-  const ready = photos.length >= 2 && name.length >= 2 && number.trim().length >= 3;
+  const ready = photos.length >= 2 && (dropOff || (name.length >= 2 && number.trim().length >= 3));
   const upload = async (files: File[]) => {
     if (!files.length) return;
     setUploading(true);
@@ -392,9 +399,15 @@ function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; cour
   return (
     <section aria-labelledby="ship" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
       <h2 id="ship" className="flex items-center gap-2 font-bold">
-        <Truck className="size-5" aria-hidden="true" /> Ship it with tracking
+        <Truck className="size-5" aria-hidden="true" /> {centre ? `Get it to ${centre.name}` : "Ship it with tracking"}
       </h2>
-      {order.delivery_address || order.buyer_details?.address ? (
+      {centre ? (
+        <p className="rounded-xl bg-slate-50 p-3 text-sm">
+          <strong className="block text-xs text-slate-500">Take it to</strong>
+          {centre.name}, {centre.address}, {centre.area} ({centre.hours}). Write {order.number} on the parcel, or print its label.
+        </p>
+      ) : null}
+      {!centre && (order.delivery_address || order.buyer_details?.address) ? (
         <p className="rounded-xl bg-slate-50 p-3 text-sm whitespace-pre-line">
           <strong className="block text-xs text-slate-500">Deliver to</strong>
           {order.buyer_details?.address ?? order.delivery_address}
@@ -402,7 +415,7 @@ function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; cour
       ) : null}
       <div className="grid gap-2">
         <p className="text-sm font-semibold">1. Photos before you send it</p>
-        <p className="text-xs text-slate-600">At least two: the item itself, and the parcel sealed for shipping. They settle any question of damage.</p>
+        <p className="text-xs text-slate-600">At least two: the item itself, and the parcel sealed for {centre ? "the centre" : "shipping"}. They settle any question of damage.</p>
         <ul className="flex flex-wrap gap-2">
           {photos.map(photo =>
             localPhotoUrl(photo.url) ? (
@@ -427,8 +440,19 @@ function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; cour
         </ul>
         <span className="text-xs text-slate-500">{photos.length} of at least 2</span>
       </div>
-      <div className="grid gap-2">
-        <p className="text-sm font-semibold">2. The courier and tracking number</p>
+      {centre ? (
+        <fieldset className="grid gap-2">
+          <legend className="text-sm font-semibold">2. How it gets there</legend>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="how" checked={dropOff} onChange={() => setDropOff(true)} className="size-4 accent-navy-900" /> I will drop it off myself
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="how" checked={!dropOff} onChange={() => setDropOff(false)} className="size-4 accent-navy-900" /> A courier takes it
+          </label>
+        </fieldset>
+      ) : null}
+      <div className={`grid gap-2 ${dropOff ? "hidden" : ""}`}>
+        <p className="text-sm font-semibold">{centre ? "The courier and tracking number" : "2. The courier and tracking number"}</p>
         {couriers.length ? (
           <label className="grid gap-1.5 text-sm">
             Courier
@@ -463,8 +487,13 @@ function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; cour
           <input value={note} onChange={event => setNote(event.target.value)} maxLength={300} className="h-11 rounded-xl border border-slate-300 px-3" />
         </label>
       </div>
-      <button type="button" disabled={pending || uploading || !ready} onClick={() => onShip({ courier: name, tracking_number: number, tracking_url: link || undefined, tracking_note: note || undefined })} className={primary}>
-        Mark as shipped
+      <button
+        type="button"
+        disabled={pending || uploading || !ready}
+        onClick={() => onShip(dropOff ? { dropOff: true, tracking_note: note || undefined } : { courier: name, tracking_number: number, tracking_url: link || undefined, tracking_note: note || undefined })}
+        className={primary}
+      >
+        {centre ? "Mark as sent" : "Mark as shipped"}
       </button>
       {error ? (
         <p role="alert" className="text-sm font-semibold text-brand-700">

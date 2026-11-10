@@ -300,11 +300,14 @@ export async function reportChat(chatId: string, reason: ShopChatReportReason, d
 type OrderStep = "accept" | "decline" | "pay" | "sent" | "received" | "cancel";
 
 /** A step on an order: the seller accepts or declines, the buyer pays or confirms it arrived, the seller marks it sent, either side cancels. */
-export async function orderStep(orderId: string, step: OrderStep, input: { reason?: string; tracking_note?: string; courier?: string; tracking_number?: string; tracking_url?: string; nonce?: string } = {}): Promise<ShopResult<ShopOrder>> {
+export async function orderStep(orderId: string, step: OrderStep, input: { reason?: string; tracking_note?: string; courier?: string; tracking_number?: string; tracking_url?: string; nonce?: string; dropOff?: boolean } = {}): Promise<ShopResult<ShopOrder>> {
   if (!id(orderId) || !["accept", "decline", "pay", "sent", "received", "cancel"].includes(step)) return refused("No such order.");
   const sent: Record<string, string> = {};
   if ((step === "decline" || step === "cancel") && input.reason?.trim()) sent.reason = input.reason.trim().slice(0, 300);
-  if (step === "sent") {
+  if (step === "sent" && input.dropOff) {
+    // A Connect order the seller drops off at the centre themselves: no courier.
+    if (input.tracking_note?.trim()) sent.tracking_note = input.tracking_note.trim().slice(0, 300);
+  } else if (step === "sent") {
     if (!input.courier?.trim()) return refused("Choose the courier.", "courier");
     if (!input.tracking_number?.trim()) return refused("Enter the tracking number.", "tracking_number");
     sent.courier = input.courier.trim().slice(0, 60);

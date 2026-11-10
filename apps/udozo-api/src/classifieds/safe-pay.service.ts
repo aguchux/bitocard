@@ -685,7 +685,7 @@ export class SafePayService {
   async addDispatchPhoto(customer: CustomerWithStore, id: string, file: MediaUpload) {
     await this.listings.sellerCountry(customer);
     const order = await this.mine(customer, id, 'seller');
-    if (order.fulfilment !== 'delivery' || order.status !== 'paid') throw conflict('order_changed', 'Dispatch photos are added to a paid delivery before it is shipped.');
+    if (order.fulfilment === 'meet_up' || order.status !== 'paid') throw conflict('order_changed', 'Dispatch photos are added to a paid delivery, or a Connect order, before it is sent.');
     if (!this.storage.configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'storage_not_configured', 'Photos cannot be added yet.');
     if (file.size > maxDocumentBytes) throw invalid('file_too_large', 'Photos can be at most 4 MB.', 'file');
     const checked = checkDocument(file.buffer, file.mimetype, false);

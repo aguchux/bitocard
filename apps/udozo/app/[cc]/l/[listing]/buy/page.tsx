@@ -86,12 +86,12 @@ export default async function BuyPage({ params, searchParams }: Props) {
             {order.data.status === "requested" ? <p className="text-sm text-navy-600">We will tell you when {order.data.with.name} answers, by {new Date(order.data.deadlines.accept_by).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })}.</p> : null}
             {order.data.status === "awaiting_payment" && order.data.deadlines.pay_by ? <p className="text-sm text-navy-600">Pay by {new Date(order.data.deadlines.pay_by).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })} to reserve it for you.</p> : null}
           </div>
-          <Money price={order.data.price} delivery={order.data.delivery_fee} fee={order.data.buyer_fee ?? 0} total={total} currency={currency} />
+          <Money price={order.data.price} delivery={order.data.delivery_fee} connectFee={order.data.connect?.connect_fee ?? 0} shipping={order.data.fulfilment === "connect"} fee={order.data.buyer_fee ?? 0} total={total} currency={currency} />
           {order.data.status === "awaiting_payment" ? <WalletLine balance={balance} total={total} currency={currency} addFunds={addFunds} /> : null}
           <SafePayOrderActions orderId={order.data.id} canPay={order.data.status === "awaiting_payment"} canCancel={["requested", "awaiting_payment"].includes(order.data.status)} addFundsHref={addFunds} total={total} currency={currency} />
           {myOrder && !["requested", "awaiting_payment"].includes(order.data.status) ? (
             <a href={myOrder} className="flex h-12 items-center justify-center rounded-2xl bg-navy-900 font-bold text-white">
-              {order.data.fulfilment === "meet_up" && order.data.status === "paid" ? "See my release code" : "Open the order"}
+              {(order.data.fulfilment === "meet_up" && order.data.status === "paid") || (order.data.fulfilment === "connect" && ["paid", "sent", "at_centre"].includes(order.data.status)) ? "See my release code" : "Open the order"}
             </a>
           ) : null}
         </section>
@@ -137,7 +137,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
   );
 }
 
-function Money({ price, delivery = 0, fee, total, currency, note }: { price: number; delivery?: number; fee: number; total: number; currency: string; note?: string }) {
+function Money({ price, delivery = 0, connectFee = 0, shipping = false, fee, total, currency, note }: { price: number; delivery?: number; connectFee?: number; shipping?: boolean; fee: number; total: number; currency: string; note?: string }) {
   return (
     <section aria-label="What you pay" className="grid gap-2 rounded-2xl border border-navy-200 bg-white p-4 text-sm">
       <div className="flex justify-between">
@@ -146,8 +146,14 @@ function Money({ price, delivery = 0, fee, total, currency, note }: { price: num
       </div>
       {delivery ? (
         <div className="flex justify-between">
-          <span>Delivery</span>
+          <span>{shipping ? "Shipping to the centre" : "Delivery"}</span>
           <span className="font-semibold">{shopMoney(delivery, currency)}</span>
+        </div>
+      ) : null}
+      {connectFee ? (
+        <div className="flex justify-between">
+          <span>{connectName} fee</span>
+          <span className="font-semibold">{shopMoney(connectFee, currency)}</span>
         </div>
       ) : null}
       <div className="flex justify-between">

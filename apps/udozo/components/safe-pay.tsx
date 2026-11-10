@@ -4,19 +4,24 @@ import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { shopMoney, type ShopSafePayQuote } from "@bitocard/api-client/classifieds";
+import { connectName, type ShopFulfilment, shopMoney, type ShopSafePayQuote } from "@bitocard/api-client/classifieds";
 import { TermsAccept, termsCode } from "@/components/terms-accept";
 import { acceptShopTerms, cancelSafePay, paySafePay, requestSafePay, shopTerms } from "@/lib/listing-actions";
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
 
 /**
- * The buyer's request: meet-up or delivery (where it goes, with its delivery charge, and the address), then sent to the
- * seller, who has the accept time to answer.
+ * The buyer's request: meet-up, delivery (where it goes, with its delivery charge, and the address) or collected at a
+ * Udozo Connect Centre (the state, then the centre, with that state's shipping charge and the Connect fee), then sent
+ * to the seller, who has the accept time to answer.
  */
 export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { quote: ShopSafePayQuote; sellerName: string; acceptHours: number | null; stateName?: string | null }) {
   const router = useRouter();
-  const [fulfilment, setFulfilment] = useState<"meet_up" | "delivery">(quote.fulfilment[0] ?? "meet_up");
+  const [fulfilment, setFulfilment] = useState<ShopFulfilment>(quote.fulfilment[0] ?? "meet_up");
+  const connect = quote.connect ?? null;
+  const [connectState, setConnectState] = useState(connect?.states[0]?.id ?? "");
+  const chosenState = connect?.states.find(state => state.id === connectState) ?? null;
+  const [centreId, setCentreId] = useState(chosenState?.centres[0]?.id ?? "");
   const [address, setAddress] = useState("");
   const charges = quote.delivery;
   const [zone, setZone] = useState<"state" | "elsewhere">("state");
@@ -29,7 +34,15 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
   const send = async (attempt: string) => {
     setBusy(true);
     setError(null);
-    const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, stateId: fulfilment === "delivery" && zone === "state" ? (charges?.state_id ?? undefined) : undefined, nonce: attempt });
+    const result = await requestSafePay({
+      listingId: quote.listing_id,
+      offerId: quote.offer_id,
+      fulfilment,
+      address,
+      stateId: fulfilment === "delivery" && zone === "state" ? (charges?.state_id ?? undefined) : undefined,
+      centreId: fulfilment === "connect" ? centreId : undefined,
+      nonce: attempt,
+    });
     if (result.ok) return router.refresh();
     setBusy(false);
     // UdozoPay needs the Udozo terms accepted: ask, then send again (a refused request is final, so a new key).
@@ -69,7 +82,66 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
             </span>
           </label>
         ) : null}
+        {quote.fulfilment.includes("connect") && connect ? (
+          <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
+            <input type="radio" name="fulfilment" value="connect" checked={fulfilment === "connect"} onChange={() => setFulfilment("connect")} className="mt-1 size-4 accent-navy-900" />
+            <span className="grid gap-0.5">
+              <strong>Collect at a {connectName} Centre</strong>
+              <span className="text-sm text-navy-600">The seller sends it to a centre near you. Inspect it at the counter, then give your release code.</span>
+            </span>
+          </label>
+        ) : null}
       </fieldset>
+      {fulfilment === "connect" && connect ? (
+        <fieldset className="grid gap-3">
+          <legend className="mb-1 text-sm font-semibold">Where you collect it</legend>
+          <label className="grid gap-1.5 text-sm font-semibold">
+            State
+            <select
+              value={connectState}
+              onChange={event => {
+                setConnectState(event.target.value);
+                setCentreId(connect.states.find(state => state.id === event.target.value)?.centres[0]?.id ?? "");
+              }}
+              className="h-12 rounded-xl border border-navy-200 bg-white px-3 text-base font-normal"
+            >
+              {connect.states.map(state => (
+                <option key={state.id} value={state.id}>
+                  {state.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {chosenState ? (
+            <div className="grid gap-2">
+              {chosenState.centres.map(centre => (
+                <label key={centre.id} className="flex gap-3 rounded-xl border border-navy-200 bg-white px-3 py-2.5 text-sm has-checked:border-2 has-checked:border-navy-900">
+                  <input type="radio" name="centre" value={centre.id} checked={centreId === centre.id} onChange={() => setCentreId(centre.id)} className="mt-0.5 size-4 accent-navy-900" />
+                  <span className="grid gap-0.5">
+                    <strong>{centre.name}</strong>
+                    <span className="text-navy-700">
+                      {centre.address}
+                      {centre.landmark ? ` (${centre.landmark})` : ""}, {centre.area.name}
+                    </span>
+                    <span className="text-xs text-navy-600">{centre.hours}</span>
+                  </span>
+                </label>
+              ))}
+              <p className="flex flex-wrap justify-between gap-2 rounded-xl bg-navy-50 px-3 py-2 text-sm">
+                <span>Shipping to {chosenState.name}</span>
+                <strong>{chosenState.shipping ? shopMoney(chosenState.shipping, quote.currency) : "Free"}</strong>
+              </p>
+              <p className="flex flex-wrap justify-between gap-2 rounded-xl bg-navy-50 px-3 py-2 text-sm">
+                <span>{connectName} fee</span>
+                <strong>{chosenState.connect_fee ? shopMoney(chosenState.connect_fee, quote.currency) : "Free"}</strong>
+              </p>
+              <span className="text-xs text-navy-600">
+                Both are added to the total. Collect it free within {connect.free_hours >= 48 && connect.free_hours % 24 === 0 ? `${connect.free_hours / 24} days` : `${connect.free_hours} hours`} of it being ready; storage is charged daily after that. If it is refused at the centre, you get everything back.
+              </span>
+            </div>
+          ) : null}
+        </fieldset>
+      ) : null}
       {fulfilment === "delivery" && charges ? (
         <fieldset className="grid gap-2">
           <legend className="mb-1 text-sm font-semibold">Where it goes</legend>
@@ -105,7 +177,7 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
         </p>
       ) : null}
       {needsTerms ? <TermsAccept load={shopTerms} accept={acceptShopTerms} onAccepted={afterTerms} /> : null}
-      <button type="submit" disabled={busy || needsTerms} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
+      <button type="submit" disabled={busy || needsTerms || (fulfilment === "connect" && !centreId)} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
         <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Sending…" : "Send request to seller"}
       </button>
       <p className="text-center text-sm text-navy-600">

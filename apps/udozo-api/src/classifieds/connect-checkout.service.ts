@@ -50,6 +50,8 @@ export class ConnectCheckoutService {
     });
     return {
       fee: terms.fee.kind === 'percent' ? { kind: 'percent' as const, bps: terms.fee.bps } : { kind: 'fixed' as const, amount: Number(terms.fee.minor) },
+      /** How long the buyer may collect it free once it is ready (storage is charged daily after). */
+      free_hours: terms.buyerFreeHours,
       states: reach.states.map(state => ({
         id: state.id,
         name: state.name,

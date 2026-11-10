@@ -73,7 +73,7 @@ export function OrderDetail({
         <span className="grid min-w-0 flex-1 gap-0.5">
           <h1 className="truncate text-xl font-extrabold">{order.listing.title ?? "Order"}</h1>
           <span className="text-sm text-slate-600">
-            {order.number} · {buyer ? "from" : "to"} {order.with.name} · {order.fulfilment === "meet_up" ? "in person" : "delivery"}
+            {order.number} · {buyer ? "from" : "to"} {order.with.name} · {order.fulfilment === "meet_up" ? "in person" : order.fulfilment === "connect" ? "at a Connect Centre" : "delivery"}
             {order.quantity > 1 ? ` · ${order.quantity} units` : ""}
           </span>
         </span>
@@ -91,6 +91,8 @@ export function OrderDetail({
       {order.payout_review === "pending" ? <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900">Udozo is checking this payment before it can be cashed out. Nothing is needed from you.</p> : null}
 
       <OrderPanel order={order} actions={actions} readiness={readiness} balance={balance} addFundsHref={addFundsHref} chatHref={chatHref} couriers={couriers} />
+
+      {order.connect ? <ConnectCentreCard order={order} buyer={buyer} /> : null}
 
       {!buyer && order.buyer_details ? (
         <section aria-labelledby="buyer" className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
@@ -119,10 +121,10 @@ export function OrderDetail({
 
       {dispute ? <DisputeThread dispute={dispute} /> : null}
 
-      {shipment && (shipment.courier || shipment.dispatch_photos.length) ? (
+      {shipment && (shipment.courier || shipment.dispatch_photos.length || (order.fulfilment === "connect" && shipment.events.length)) ? (
         <section aria-labelledby="shipment" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           <h2 id="shipment" className="font-bold">
-            Delivery
+            {order.fulfilment === "connect" ? "Its way to the centre" : "Delivery"}
           </h2>
           {shipment.courier ? (
             <p>
@@ -213,5 +215,47 @@ export function OrderDetail({
         </Link>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Where a Connect order is collected: the centre's address, hours and phone, and for the buyer when it is free to
+ * collect; for the seller where to take it and the label to print for the parcel.
+ */
+function ConnectCentreCard({ order, buyer }: { order: ShopOrder; buyer: boolean }) {
+  const connect = order.connect!;
+  const centre = connect.centre;
+  const open = ["paid", "sent", "at_centre"].includes(order.status);
+  return (
+    <section aria-labelledby="connect-centre" className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+      <h2 id="connect-centre" className="font-bold">
+        {buyer ? "Where you collect it" : "Where it goes"}
+      </h2>
+      <p className="font-semibold">
+        {centre.name} <span className="font-normal text-slate-500">· {centre.number}</span>
+      </p>
+      <span className="flex items-start gap-2 text-slate-700">
+        <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          {centre.address}
+          {centre.landmark ? ` (${centre.landmark})` : ""}, {centre.area}, {centre.state}
+        </span>
+      </span>
+      <span className="text-slate-600">{centre.hours}</span>
+      <a href={`tel:${centre.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-2 font-semibold text-brand-700 hover:underline">
+        <Phone className="size-4" aria-hidden="true" /> {centre.phone}
+      </a>
+      {buyer && connect.collect_by && order.status === "at_centre" ? (
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-emerald-900">
+          Ready to collect. Free until {new Date(connect.collect_by).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}; storage is charged daily after that.
+        </p>
+      ) : null}
+      {buyer && open ? <p className="text-slate-600">Inspect it at the counter first. Give your release code only if you take it; if not, tell the staff why.</p> : null}
+      {!buyer && open && order.status !== "at_centre" ? (
+        <Link href={`/account/orders/${order.id}/label`} className="font-semibold text-brand-700 hover:underline">
+          Print the parcel label
+        </Link>
+      ) : null}
+    </section>
   );
 }

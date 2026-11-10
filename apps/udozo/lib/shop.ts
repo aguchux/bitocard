@@ -174,8 +174,17 @@ export function featureValue(feature: Pick<ShopFeature, "data_type" | "choices">
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 /** The order list's line under its status: what the reader does next, or what happened. */
-export function orderNext(order: Pick<ShopOrder, "role" | "status" | "fulfilment" | "deadlines" | "with">) {
+export function orderNext(order: Pick<ShopOrder, "role" | "status" | "fulfilment" | "deadlines" | "with"> & { connect?: ShopOrder["connect"] }) {
   const buyer = order.role === "buyer";
+  const centre = order.connect?.centre.name ?? "the Connect Centre";
+  if (order.fulfilment === "connect") {
+    if (order.status === "paid") return buyer ? `Paid. ${order.with.name} sends it to ${centre}${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""}.` : `Photograph it and the sealed parcel, get it to ${centre}${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""} and mark it sent.`;
+    if (order.status === "sent") return buyer ? `On its way to ${centre}. We will tell you when it is ready.` : `On its way to ${centre}. You are paid once ${order.with.name} collects it.`;
+    if (order.status === "at_centre") {
+      if (!order.connect?.ready_at) return buyer ? `At ${centre}: being checked in and shelved.` : `${centre} received it.`;
+      return buyer ? `Ready at ${centre}. Inspect it at the counter, then give your release code${order.connect.collect_by ? `; free to collect until ${when(order.connect.collect_by)}` : ""}.` : `Ready at ${centre}: waiting for ${order.with.name} to collect it.`;
+    }
+  }
   switch (order.status) {
     case "requested":
       return buyer ? `Waiting for ${order.with.name} to accept, by ${when(order.deadlines.accept_by)}.` : `Accept or decline by ${when(order.deadlines.accept_by)}, or it lapses.`;
@@ -186,6 +195,8 @@ export function orderNext(order: Pick<ShopOrder, "role" | "status" | "fulfilment
     case "paid":
       if (order.fulfilment === "meet_up") return buyer ? `Meet ${order.with.name}, check it, then give your release code.` : `Meet ${order.with.name} and enter their release code.`;
       return buyer ? `Paid. ${order.with.name} ships it${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""}.` : `Photograph it and the sealed parcel, ship it with tracking${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""}, and mark it shipped.`;
+    case "at_centre":
+      return buyer ? `At ${centre}.` : `At ${centre}: waiting for the buyer.`;
     case "sent":
       return buyer ? `On its way. Confirm when it arrives in good condition${order.deadlines.confirm_by ? `, or it releases on ${when(order.deadlines.confirm_by)}` : ""}.` : `Shipped. Keep the tracking up to date; you are paid once ${order.with.name} confirms${order.deadlines.confirm_by ? `, or on ${when(order.deadlines.confirm_by)}` : ""}.`;
     case "disputed":
@@ -208,7 +219,7 @@ export function orderNext(order: Pick<ShopOrder, "role" | "status" | "fulfilment
 /** Status pill colours for orders. */
 export function orderTone(status: ShopOrder["status"]) {
   if (status === "released") return "bg-emerald-700 text-white";
-  if (["paid", "sent"].includes(status)) return "bg-emerald-50 text-emerald-800";
+  if (["paid", "sent", "at_centre"].includes(status)) return "bg-emerald-50 text-emerald-800";
   if (["requested", "awaiting_payment", "locked"].includes(status)) return "bg-amber-50 text-amber-800";
   if (status === "disputed") return "bg-brand-50 text-brand-700";
   return "bg-slate-100 text-slate-700";
@@ -230,16 +241,21 @@ export function orderActions(order: Pick<ShopOrder, "role" | "status" | "fulfilm
       return buyer ? ["pay", "cancel"] : ["cancel"];
     case "paid":
       if (order.fulfilment === "meet_up") return buyer ? ["release_code", "cancel", "dispute"] : ["enter_code", "cancel"];
+      if (order.fulfilment === "connect") return buyer ? ["release_code", "cancel", "dispute"] : ["sent", "cancel"];
       return buyer ? ["cancel", "dispute"] : ["sent", "cancel"];
     case "sent":
+      // At a Connect Centre the centre hands it over: the buyer never confirms it at home, nor the seller reports delivery.
+      if (order.fulfilment === "connect") return buyer ? ["release_code", "dispute"] : [];
       return buyer ? ["received", "dispute"] : order.shipment?.delivered_at ? [] : ["shipment"];
+    case "at_centre":
+      return buyer ? ["release_code", "dispute"] : [];
     default:
       return [];
   }
 }
 
 /** The order's steps for its progress list: done, now or later, with when each happened. */
-export function orderSteps(order: Pick<ShopOrder, "status" | "fulfilment" | "timeline" | "with" | "role"> & { kind?: ShopOrder["kind"]; store?: ShopOrder["store"]; shipment?: ShopOrder["shipment"] }) {
+export function orderSteps(order: Pick<ShopOrder, "status" | "fulfilment" | "timeline" | "with" | "role"> & { kind?: ShopOrder["kind"]; store?: ShopOrder["store"]; shipment?: ShopOrder["shipment"]; connect?: ShopOrder["connect"] }) {
   const t = order.timeline;
   const ended = ["declined", "lapsed", "cancelled", "refunded", "partly_refunded"].includes(order.status);
   const resale = order.kind === "resale";
@@ -259,7 +275,14 @@ export function orderSteps(order: Pick<ShopOrder, "status" | "fulfilment" | "tim
           { title: "Shipped", at: t?.sent_at ?? null },
           { title: "Delivered", at: order.shipment?.delivered_at ?? null },
         ]
-      : [{ title: "Met and checked", at: t?.released_at ?? null }]),
+      : order.fulfilment === "connect"
+        ? [
+            { title: `Sent to ${order.connect?.centre.name ?? "the Connect Centre"}`, at: t?.sent_at ?? null },
+            { title: "Received at the centre", at: order.connect?.received_at ?? null },
+            { title: "Ready to collect", at: order.connect?.ready_at ?? null },
+            { title: "Inspected and collected", at: t?.released_at ?? null },
+          ]
+        : [{ title: "Met and checked", at: t?.released_at ?? null }]),
     { title: order.role === "buyer" ? (resale ? "Complete" : "Released to the seller") : "Paid to you", at: t?.released_at ?? null },
   ];
   const now = steps.findIndex(step => !step.at);

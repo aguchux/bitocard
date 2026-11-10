@@ -1,6 +1,6 @@
 "use server";
 
-import type { ShopChat, ShopContactRequest, ShopMessage, ShopOrder, ShopReportReason, ShopViewer } from "@bitocard/api-client/classifieds";
+import type { ShopChat, ShopContactRequest, ShopFulfilment, ShopMessage, ShopOrder, ShopReportReason, ShopViewer } from "@bitocard/api-client/classifieds";
 import type { TermsStatus } from "@/components/terms-accept";
 import { type CustomerResult, customerApi } from "@/lib/customer";
 
@@ -95,10 +95,11 @@ export async function answerOffer(offerId: string, action: "accept" | "decline" 
   return answer(await customerApi("POST", `/v1/classifieds/offers/${offerId}/${action}`, {}));
 }
 
-/** Asks to buy with UdozoPay: the listed price or an accepted offer, a meet-up or a delivery. */
-export async function requestSafePay(input: { listingId: string; offerId?: string | null; fulfilment: "meet_up" | "delivery"; address?: string; stateId?: string; nonce?: string }): Promise<ActionResult<ShopOrder>> {
+/** Asks to buy with UdozoPay: the listed price or an accepted offer, a meet-up, a delivery or a Connect Centre. */
+export async function requestSafePay(input: { listingId: string; offerId?: string | null; fulfilment: ShopFulfilment; address?: string; stateId?: string; centreId?: string; nonce?: string }): Promise<ActionResult<ShopOrder>> {
   if (!uuid.test(input.listingId) || (input.offerId && !uuid.test(input.offerId)) || (input.stateId && !uuid.test(input.stateId))) return refused("No such listing.");
-  if (!["meet_up", "delivery"].includes(input.fulfilment)) return refused("Choose how you will get it.");
+  if (!["meet_up", "delivery", "connect"].includes(input.fulfilment)) return refused("Choose how you will get it.");
+  if (input.fulfilment === "connect" && !(input.centreId && uuid.test(input.centreId))) return refused("Choose the Connect Centre you will collect it from.");
   return answer(
     await customerApi<ShopOrder>(
       "POST",
@@ -108,6 +109,7 @@ export async function requestSafePay(input: { listingId: string; offerId?: strin
         ...(input.offerId ? { offer_id: input.offerId } : {}),
         fulfilment: input.fulfilment,
         ...(input.fulfilment === "delivery" ? { delivery_address: (input.address ?? "").trim(), ...(input.stateId ? { delivery_state_id: input.stateId } : {}) } : {}),
+        ...(input.fulfilment === "connect" ? { connect_centre_id: input.centreId } : {}),
       },
       { idempotencyKey: input.nonce },
     ),
