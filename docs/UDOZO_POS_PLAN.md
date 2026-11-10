@@ -44,8 +44,7 @@ That removes the OAuth app, the webhooks, the 15-minute reconcile and the mock U
   - `pos` (global or country) opens sign-up and the product in a market. Where it is off, the public pages still show, and sign-up says POS is coming to that country.
   - POS has **its own three plans** (below): Free, Premium and Multi-shop. They do not follow `paid_plans`, which keeps Seller HQ free.
 - **Who owns a POS account:** a udozo.com customer who sells. One account per customer, holding one or more shops.
-- **Card payments:** recorded only. No terminal.
-- **Sales money never enters Udozo's ledger:** cash, transfer and card belong to the shop. Only the plan charge moves wallet money. Paying with a buyer's Udozo wallet at the till is deferred (it needs UdozoPay-style consent).
+- **Payments at the till:** see How buyers pay at the till.
 - **Offline:** online-first at launch. Every sale still carries a client-made UUID (`client_sale_id`, unique) from the first milestone, so offline replay can come later without changing the API.
 - **Native apps:** part of the product (Android, iOS, Windows, called Udozo POS), wrapping the same web app's screens, built once the web app works. Before that, the web app installs from the browser.
 
@@ -91,7 +90,9 @@ The listing's own `stock` is the shop's inventory. There is no second count and 
 - **Sales**:
   - `pos_sales` (shop, till, staff, `POS-000123` numbered per shop, client sale id, subtotal, discount, VAT, total, currency, status `completed`, `voided` or `refunded`, client created at);
   - `pos_sale_lines` (listing, quantity, unit price and discount copied at sale);
-  - `pos_payments` (method `cash`, `transfer` or `card`, amount, reference);
+  - `pos_payments` (method `cash`, `transfer`, `card`, `wallet` or `other`, amount, cash handed and change, reference, the buyer's customer for `wallet`);
+  - `pos_wallet_requests` (sale, amount, code hash, buyer, status `waiting`, `paid`, `declined` or `expired`, expires in 5 minutes);
+  - `pos_shops` also keeps the shop's bank details for transfers (shown, never used to move money);
   - `pos_customers` (optional, the shop's own).
 - **Receipts and shifts**:
   - `pos_receipts` (sale, kind `receipt` or `invoice`, storage key, QR token hash expiring in 10 minutes, delivered via and to);
@@ -146,6 +147,24 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
   - **Invoices:** one for every charge, on Billing (PDF).
   - The `pos` cron job runs renewals.
 
+## How buyers pay at the till (decided, 10 November 2026)
+
+A sale can be paid by **cash**, **bank transfer**, **card**, **Udozo wallet** or **other** (the shop names it, such as a cheque or a POS terminal's own slip). It can also be **split** across methods, the payments adding up to the total, with change worked out for cash.
+
+- **Cash:** the amount handed over, with the change shown. It counts towards the shift's expected cash at cash-up.
+- **Bank transfer:** to the shop's own account, shown on the till and the receipt (the shop's bank details, set on the shop). The cashier records the sender's name or reference once the money shows in the shop's bank.
+- **Card:** recorded only, with the terminal's reference. Udozo integrates no card terminal in version one.
+- **Other:** recorded with its name and reference.
+- **Udozo wallet:** the only method where money moves through Udozo.
+  - The till shows a QR code for the amount (`udozo.com/pay/<code>`, valid 5 minutes, one sale). Alternatively, the cashier types the buyer's Udozo phone number, and the buyer is asked on udozo.com (push and inbox) or on WhatsApp.
+  - The buyer, signed in on udozo.com, sees the shop's name, the amount and the items, then confirms with **Pay** (`useConfirm`), so nothing is ever taken without them.
+  - The till sees it paid within seconds (polled) and completes the sale.
+  - **The money:** one ledger entry (`pos_wallet:<payment>`) moves it from the buyer's `customer_wallet` to the owner's `customer_withdrawable`, less Udozo's wallet-payment fee, if admins set one (`pos_wallet_fee_bps` per market, default 0), which goes to `pos_revenue`. The owner withdraws it to a bank from udozo.com's Payouts as UdozoPay sales are paid.
+  - **The payout hold:** the money is paid out only after the market's payout hold, and after the check of reversible card top-ups, as UdozoPay's money is.
+  - **Refunds:** a refunded or voided wallet sale returns the money from the owner's withdrawable to the buyer's wallet (`pos_wallet_refund:<payment>`). Where the owner has already withdrawn it, the refund waits until enough has come in, and the owner is told.
+  - **Limits:** the buyer needs a confirmed mobile, and never pays their own shop (`same_person`). It is off unless the market's `pos_wallet_payments` switch is on (global or country, off by default), pending the licensing advice below.
+- **Every other method's money is the shop's own and never enters Udozo's ledger.** The POS only records it, for receipts, cash-up and reports.
+
 ## The three plans (decided, 10 November 2026)
 
 | | **Free** | **Premium** | **Multi-shop** |
@@ -180,7 +199,8 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
    - the POS catalogue reads listings live;
    - unticking removes an item from the register.
 3. **Register and inventory (S1, S3):**
-   - product grid, categories, search, barcode (camera through `BarcodeDetector` or zxing, and keyboard-wedge scanners), cart, payments, sale complete;
+   - product grid, categories, search, barcode (camera through `BarcodeDetector` or zxing, and keyboard-wedge scanners), cart, sale complete;
+   - payments: cash with change, bank transfer, card and other (recorded), split payments, and Udozo wallet by QR or phone with the buyer confirming on udozo.com, refunds included;
    - till sales taking the listing's stock (`takeStockAtTill`), never what online orders hold;
    - inventory with adjust, count, history and low stock, all on the listing's own stock.
 4. **Staff, roles, tills (S6–S8):**
@@ -205,6 +225,7 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
 ## Legal owed before `pos` goes on anywhere
 
 - POS terms: the shop is the seller at its till, Udozo provides the software, and the shop handles its own tax and VAT on receipts.
+- **Udozo wallet payments at the till:** lawyers' advice per market before `pos_wallet_payments` goes on. Money moves from one customer's wallet to another's withdrawable balance, held through Udozo's licensed payment partners as for UdozoPay. The buyer and shop terms must cover it (confirming, refunds, the payout hold), and the privacy notice must say the shop sees the buyer's name.
 - Privacy notice: staff names and phones, the shop's customers on receipts, WhatsApp delivery of receipts, retention.
 - Plan and fee terms, before sign-up opens: the monthly fee from the wallet, the trial, renewal, grace, cancelling, and what happens to the shop's data after the POS stops.
 
