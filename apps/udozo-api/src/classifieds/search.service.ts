@@ -218,6 +218,19 @@ export class ListingSearchService {
   }
 
   /** The buyer's card for each listing, in one read. */
+  /** Auction listings' latest lots, as cards show them: the bid to beat, how many bids and when it ends. */
+  private async auctionCards(listingIds: string[]) {
+    const out = new Map<string, { status: string; current_price: number | null; bids: number; ends_at: string }>();
+    if (!listingIds.length) return out;
+    const lots = await this.prisma.connectAuction.findMany({ where: { listingId: { in: listingIds }, kind: 'listing' }, orderBy: { createdAt: 'desc' }, include: { bids: { select: { amountMinor: true, status: true } } } });
+    for (const lot of lots) {
+      if (!lot.listingId || out.has(lot.listingId)) continue;
+      const top = lot.bids.filter(bid => bid.status !== 'lapsed').reduce<bigint | null>((max, bid) => (max === null || bid.amountMinor > max ? bid.amountMinor : max), null);
+      out.set(lot.listingId, { status: lot.status, current_price: top === null ? null : Number(top), bids: lot.bids.length, ends_at: lot.endsAt.toISOString() });
+    }
+    return out;
+  }
+
   async cards(ids: string[]) {
     const rows = await this.prisma.classifiedListing.findMany({
       where: { id: { in: ids } },
@@ -230,6 +243,7 @@ export class ListingSearchService {
       },
     });
     const checked = await this.idChecked(rows.map(row => row.customerId));
+    const auctions = await this.auctionCards(rows.filter(row => row.saleMethod === 'auction').map(row => row.id));
     // Sellers' positive share, per market where reviews are open (one read per market on the page).
     const ratings = new Map<string, { positive_pct: number; counted: number } | null>();
     for (const country of new Set(rows.map(row => row.country))) {
@@ -250,6 +264,9 @@ export class ListingSearchService {
             country: row.country,
             url: `${shopOrigin}/${row.country.toLowerCase()}/l/${row.ref}-${row.slug}`,
             price: { kind: row.priceKind, amount: row.priceMinor === null ? null : Number(row.priceMinor), currency: row.currency },
+            /** Sold at its price, or by auction: then the bid to beat and when it ends. */
+            sale_method: row.saleMethod as 'fixed' | 'auction',
+            auction: auctions.get(row.id) ?? null,
             condition: row.condition,
             category: row.category ? { slug: row.category.slug, name: row.category.name } : null,
             area: { slug: row.area!.slug, name: row.area!.name, state: { slug: row.area!.parent!.slug, name: row.area!.parent!.name } },
@@ -329,6 +346,7 @@ export class ListingSearchService {
       url: `${shopOrigin}/${row.country.toLowerCase()}/l/${row.ref}-${row.slug}`,
       description: row.description,
       price: { kind: row.priceKind, amount: row.priceMinor === null ? null : Number(row.priceMinor), currency: row.currency },
+      sale_method: row.saleMethod as 'fixed' | 'auction',
       condition: row.condition,
       category: {
         slug: category.slug,

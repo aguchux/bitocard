@@ -94,7 +94,7 @@ export function safePayFee(amount: bigint, bps: number, cap: bigint) {
 }
 
 export const orderInclude = {
-  listing: { select: { id: true, ref: true, title: true, slug: true, status: true, onShop: true, delivery: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { id: true, url: true } } } },
+  listing: { select: { id: true, ref: true, title: true, slug: true, status: true, onShop: true, delivery: true, saleMethod: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { id: true, url: true } } } },
   buyer: { select: { id: true, name: true, email: true, storeId: true } },
   seller: { select: { id: true, name: true, email: true, storeId: true } },
   store: { select: { id: true, name: true, subdomain: true, logoUrl: true } },
@@ -208,6 +208,16 @@ export class SafePayService {
     return done;
   }
 
+  private auctions?: {
+    winner(customer: CustomerWithStore, listingId: string): Promise<{ lotId: string; price: bigint; payBy: Date }>;
+    paid(tx: Prisma.TransactionClient, orderId: string): Promise<void>;
+  };
+
+  /** Listings sold by auction: the winner's price and time to pay, and the lot sold once paid (registered by them). */
+  useAuctions(hooks: NonNullable<SafePayService['auctions']>) {
+    this.auctions = hooks;
+  }
+
   // ---- Gates ----
 
   /** The country's UdozoPay settings, once UdozoPay is open there for this customer. */
@@ -248,18 +258,23 @@ export class SafePayService {
     const listing = await this.prisma.classifiedListing.findUnique({ where: { id: listingId } });
     if (!listing || !isOnShop(listing) || listing.country !== country) throw notFound('listing');
     if (listing.customerId === customer.id) throw invalid('parameter_invalid', 'This is your own listing.', 'listing_id');
+    if (listing.saleMethod === 'auction') {
+      if (!this.auctions) throw conflict('auction_not_won', 'This listing is sold by auction.', 'listing_id');
+      const won = await this.auctions.winner(customer, listing.id);
+      return { listing, price: won.price, offerId: null, auction: won };
+    }
     if (offerId) {
       const offer = await this.prisma.classifiedOffer.findUnique({ where: { id: offerId }, include: { conversation: true } });
       if (!offer || offer.listingId !== listing.id || offer.conversation.buyerId !== customer.id) throw notFound('offer');
       if (offer.status !== 'accepted' || !offer.decidedAt || Date.now() - offer.decidedAt.getTime() > acceptedOfferMs) {
         throw conflict('offer_not_accepted', 'Use an offer the seller accepted in the last 7 days.', 'offer_id');
       }
-      return { listing, price: offer.priceMinor, offerId: offer.id };
+      return { listing, price: offer.priceMinor, offerId: offer.id, auction: null };
     }
     if (listing.priceKind === 'on_request' || listing.priceMinor === null || listing.priceMinor <= 0n) {
       throw conflict('price_required', 'This listing has no price: agree one by offer in the chat first.', 'offer_id');
     }
-    return { listing, price: listing.priceMinor, offerId: null };
+    return { listing, price: listing.priceMinor, offerId: null, auction: null };
   }
 
   // ---- The buyer ----
@@ -298,7 +313,7 @@ export class SafePayService {
   /** The buyer asks: the price and both sides' rates are fixed now; the seller has the accept time to answer. */
   async request(customer: CustomerWithStore, input: { listing_id: string; offer_id?: string; fulfilment: 'meet_up' | 'delivery' | 'connect'; delivery_address?: string; delivery_state_id?: string; connect_centre_id?: string }) {
     const { country, mode, settings } = await this.open(customer);
-    const { listing, price, offerId } = await this.priceFor(customer, country, input.listing_id, input.offer_id);
+    const { listing, price, offerId, auction } = await this.priceFor(customer, country, input.listing_id, input.offer_id);
     await this.terms.require(customer.id);
     await this.guards.requireDifferentPeople(customer.id, listing.customerId);
     await this.guards.requireNotLimited(listing.customerId, country, false);
@@ -338,12 +353,20 @@ export class SafePayService {
           deliveryStateId: stateId,
           ...(connect ? { connectCentreId: connect.centreId, connectFeeMinor: connect.feeMinor, centreShareMinor: centreShareOf(connect.feeMinor, share) } : {}),
           acceptBy: new Date(now.getTime() + settings.acceptHours * hourMs),
+          // Won at auction: the seller committed by auctioning it, so it waits only for the payment.
+          ...(auction ? { status: 'awaiting_payment', acceptedAt: now, payBy: auction.payBy } : {}),
         },
         include: orderInclude,
       });
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') throw conflict('order_exists', 'You have already asked for this with UdozoPay.');
       throw error;
+    }
+    if (auction) {
+      await this.prisma.connectAuction.updateMany({ where: { id: auction.lotId, status: 'awaiting_payment' }, data: { saleOrderId: order.id } });
+      await this.noteInChat(order, `${publicName(customer.name)} won the auction at ${priceText(price, order.currency)} and is paying with UdozoPay.`);
+      await this.tell(order, 'seller', 'customer.classifieds.order_requested', `"${order.listing.title}": the winner is paying`, `${publicName(customer.name)} won it at ${priceText(price, order.currency)} and has until the deadline to pay with UdozoPay.`);
+      return this.present(order, 'buyer');
     }
     await this.discovery.record(customer.id, country, 'order', listing.id);
     await this.noteInChat(order, `${publicName(customer.name)} asked to buy with UdozoPay for ${priceText(price, order.currency)}.`);
@@ -411,6 +434,7 @@ export class SafePayService {
         if (row?.stock === 0) throw this.outOfStock();
         if (!row || (await heldUnits(tx, order.listingId, order.id)) + order.quantity > row.stock) throw conflict('listing_reserved', 'Someone else has just paid for this with UdozoPay.');
         await this.ledger.write(tx, entry);
+        await this.auctions?.paid(tx, order.id);
       });
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') throw conflict('listing_reserved', 'Someone else has just paid for this with UdozoPay.');
@@ -1374,6 +1398,11 @@ export class SafePayService {
       }
       // Released (wholly or in part): its units are sold; with none left, the listing is out of stock (live 90 days).
       if (status !== 'refunded') ranOut = (await takeStock(tx, order.listingId, order.quantity, now)).ranOut;
+      // Sold by auction: its one item is gone, so the listing is sold, not out of stock.
+      if (status !== 'refunded' && order.listing.saleMethod === 'auction') {
+        await tx.classifiedListing.updateMany({ where: { id: order.listingId, status: 'active' }, data: { status: 'sold', soldAt: now, outOfStockAt: null } });
+        ranOut = false;
+      }
       if (order.kind === 'resale') await this.resaleEvents?.changed(tx, order.id);
       // A live direct sale released (wholly or in part) is a purchase: its buyer may review the seller.
       if (status !== 'refunded' && order.kind === 'direct' && order.mode === 'live') {

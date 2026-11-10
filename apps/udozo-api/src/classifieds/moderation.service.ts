@@ -133,6 +133,13 @@ export class ModerationService {
     return this.inbox.customer({ customerId: listing.customer.id, storeId: listing.customer.storeId }, type, { subject: `${listing.id}:${Date.now()}`, title, body, link: '/account/listings' });
   }
 
+  private auctions?: { live(listingId: string): Promise<unknown> };
+
+  /** The auctions service opens bidding when an auction listing is approved (registered by it). */
+  useAuctions(hooks: { live(listingId: string): Promise<unknown> }) {
+    this.auctions = hooks;
+  }
+
   /** A listing waiting for review goes live. */
   async approve(actorId: string | null, id: string, note?: string) {
     const listing = await this.listingFor(id);
@@ -147,6 +154,7 @@ export class ModerationService {
     await this.prisma.classifiedReport.updateMany({ where: { listingId: id, status: 'open' }, data: { status: 'dismissed', decidedById: actorId, decidedAt: now, note: note ?? 'Listing approved' } });
     await this.audit.record({ actorId, action: 'classifieds.listing_approved', targetType: 'classified_listing', targetId: id, before: { status: 'pending_review', flags: listing.reviewFlags }, after: { status: 'active', note: note ?? null } });
     this.postings.reviewed(id, 'approved');
+    await this.auctions?.live(id);
     await this.notify(listing, 'customer.classifieds.listing_live', 'Your ad is live', `"${listing.title}" is now on Udozo.`);
   }
 

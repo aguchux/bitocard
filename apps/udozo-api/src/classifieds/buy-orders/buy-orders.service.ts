@@ -49,6 +49,7 @@ const tooMany = (message: string) => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 
 
 const listingSelect = {
   id: true,
+  saleMethod: true,
   ref: true,
   slug: true,
   title: true,
@@ -119,6 +120,7 @@ export class BuyOrdersService {
     if (!customer.phone || !customer.phoneVerifiedAt) throw conflict('phone_required', 'Confirm your mobile number on your profile first: the seller needs to know they can reach you.', 'phone');
     if (await this.contacts.blocked(listing.customerId, customer.id)) throw forbidden('seller_unavailable', 'You cannot buy from this seller.');
     await this.requireNotPaused(listing.customerId);
+    if (listing.saleMethod === 'auction') throw conflict('auction_listing', 'This is sold by auction: bid on its page instead.', 'listing_id');
     if (listing.stock === 0) throw conflict('out_of_stock', 'This is out of stock: the seller has none to sell right now.', 'quantity');
     const quantity = input.quantity ?? 1;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > Math.min(listing.stock, 100)) throw invalid('parameter_invalid', listing.stock === 1 ? 'There is one of these.' : `Choose 1 to ${Math.min(listing.stock, 100)}.`, 'quantity');

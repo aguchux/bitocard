@@ -156,6 +156,11 @@ export const switchDefinitions = {
     description:
       "Buy orders on Udozo: a buyer asks to buy a listing at a price, the seller accepts (holding it for them) or offers another price before they meet, they pay each other in person off Udozo, and the seller marks it sold. The record of who bought what, which reviews will use. Needs classifieds on. Off: listings show no Buy this.",
   },
+  classifieds_auctions: {
+    scopes: ['global', 'country'],
+    description:
+      "Auctions on Udozo: a seller may sell a listing by auction instead of at a fixed price (a starting price, an optional hidden reserve, 1 to 10 days). The highest bid at or above the reserve wins and pays with UdozoPay, so UdozoPay must be open there too. Off: sellers sell at a fixed price only; auctions already running carry on.",
+  },
   classifieds_post_reminders: {
     scopes: ['global', 'country'],
     description:
@@ -286,6 +291,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_safe_pay',
   'classifieds_assistant',
   'classifieds_buy_orders',
+  'classifieds_auctions',
   'classifieds_post_reminders',
   'whatsapp_channel',
   'whatsapp_assistant',

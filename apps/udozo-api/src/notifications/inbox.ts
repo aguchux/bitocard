@@ -235,6 +235,7 @@ export const notificationTypes = {
   'customer.classifieds.wanted_response': { realm: 'customer', severity: 'info', label: 'A seller answered your request', push: true },
   'customer.connect.application': { realm: 'customer', severity: 'info', label: 'Your Connect Centre application', push: true },
   'customer.connect.return': { realm: 'customer', severity: 'info', label: 'An item returning to its seller', push: true },
+  'customer.classifieds.auction': { realm: 'customer', severity: 'info', label: 'Auctions you bid on or run', push: true },
   'customer.connect.auction': { realm: 'customer', severity: 'info', label: 'Udozo auctions', push: true },
   'customer.connect.centre': { realm: 'customer', severity: 'info', label: 'Your Connect Centre', push: true },
   'customer.classifieds.contact_request': { realm: 'customer', severity: 'info', label: 'A buyer asked for your contact details', push: true },

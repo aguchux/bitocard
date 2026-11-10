@@ -84,7 +84,7 @@ export class ConnectAuctionsService {
   }
 
   private async load(id: string) {
-    const row = await this.prisma.connectAuction.findUnique({ where: { id }, include: lotInclude });
+    const row = await this.prisma.connectAuction.findUnique({ where: { id, kind: 'abandoned' }, include: lotInclude });
     if (!row) throw notFound();
     return row;
   }
@@ -92,7 +92,7 @@ export class ConnectAuctionsService {
   private async byNumber(ref: string) {
     const number = Number(ref.replace(/^AU-?/i, ''));
     if (!Number.isSafeInteger(number) || number <= 0) throw notFound();
-    const row = await this.prisma.connectAuction.findUnique({ where: { number }, include: lotInclude });
+    const row = await this.prisma.connectAuction.findFirst({ where: { number, kind: 'abandoned' }, include: lotInclude });
     if (!row || row.status === 'cancelled') throw notFound();
     return row;
   }
@@ -114,7 +114,7 @@ export class ConnectAuctionsService {
       title: row.title,
       description: row.description,
       photos: row.photos,
-      warehouse: { name: row.warehouse.name, state: row.warehouse.state.name },
+      warehouse: { name: row.warehouse!.name, state: row.warehouse!.state.name },
       start_price: Number(row.startPriceMinor),
       current_price: top ? Number(top.amountMinor) : null,
       next_bid: ['scheduled', 'live'].includes(row.status) ? Number(nextBid(row.startPriceMinor, top?.amountMinor ?? null, rules)) : null,
@@ -130,7 +130,7 @@ export class ConnectAuctionsService {
               leading: Boolean(top && top.bidderId === viewer),
               to_pay: offered?.bidderId === viewer && row.status === 'awaiting_payment' ? { amount: Number(offered.amountMinor), pay_by: row.payBy?.toISOString() ?? null } : null,
               won: row.status === 'sold' && row.buyerId === viewer,
-              seller: row.order.sellerId === viewer,
+              seller: row.order!.sellerId === viewer,
             },
           }
         : {}),
@@ -140,7 +140,7 @@ export class ConnectAuctionsService {
   // ---- Public ----
 
   async publicList(country: string) {
-    const rows = await this.prisma.connectAuction.findMany({ where: { country: country.toUpperCase(), status: { in: ['scheduled', 'live'] } }, orderBy: [{ status: 'asc' }, { endsAt: 'asc' }], take: 100, include: lotInclude });
+    const rows = await this.prisma.connectAuction.findMany({ where: { kind: 'abandoned', country: country.toUpperCase(), status: { in: ['scheduled', 'live'] } }, orderBy: [{ status: 'asc' }, { endsAt: 'asc' }], take: 100, include: lotInclude });
     return { object: 'list' as const, data: await Promise.all(rows.map(row => this.present(row))) };
   }
 
@@ -152,7 +152,7 @@ export class ConnectAuctionsService {
     if (!Number.isSafeInteger(amount) || amount <= 0) throw invalid('parameter_invalid', 'Give your bid in minor units.', 'amount');
     const lot = await this.byNumber(ref);
     if (!customer.phoneVerifiedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'phone_required', 'Confirm your mobile number to bid.');
-    if (lot.order.sellerId === customer.id) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'own_item', 'You cannot bid on your own item: collect it at the warehouse after paying what is owed instead.');
+    if (lot.order!.sellerId === customer.id) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'own_item', 'You cannot bid on your own item: collect it at the warehouse after paying what is owed instead.');
     const rules = await this.rules(lot.country);
     const now = new Date();
     const previous = this.top(lot);
@@ -179,11 +179,11 @@ export class ConnectAuctionsService {
     if (lot.status !== 'awaiting_payment' || !offered || offered.bidderId !== customer.id) throw conflict('not_yours_to_pay', 'This lot is not waiting for your payment.');
     if (lot.payBy && lot.payBy < new Date()) throw conflict('payment_window_closed', 'The time to pay for this lot has passed.');
     const sale = offered.amountMinor;
-    const order = await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: lot.orderId }, select: { mode: true } });
+    const order = await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: lot.orderId! }, select: { mode: true } });
     const wallet = (await this.prisma.ledgerAccount.findFirst({ where: { kind: 'customer_wallet', mode: order.mode, currency: lot.currency, customerId: customer.id } }))?.balanceMinor ?? 0n;
     if (wallet < sale) throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'wallet_balance_low', `Add ${formatMoney(sale - wallet, lot.currency)} to your Udozo wallet to pay.`);
     // What the sale pays: the seller's storage owed (oldest first, shared as storage always is), then Udozo's costs; the rest waits for the seller's claim.
-    const cover = await this.charges.saleCover(lot.orderId, sale);
+    const cover = await this.charges.saleCover(lot.orderId!, sale);
     const costs = sale - cover.covered < lot.costsMinor ? sale - cover.covered : lot.costsMinor;
     const leftOver = sale - cover.covered - costs;
     const lines: Line[] = [
@@ -204,12 +204,12 @@ export class ConnectAuctionsService {
       await this.ledger.write(tx, entry);
       await this.charges.settleFromRefund(tx, cover.ids);
       await tx.connectAuctionBid.update({ where: { id: offered.id }, data: { status: 'won' } });
-      await tx.classifiedOrder.update({ where: { id: lot.orderId }, data: { connectPlace: 'auctioned' } });
+      await tx.classifiedOrder.update({ where: { id: lot.orderId! }, data: { connectPlace: 'auctioned' } });
       // Sold: the return is over, so no more storage runs.
-      if (lot.order.connectReturn) await tx.connectReturnRequest.updateMany({ where: { id: lot.order.connectReturn.id, status: 'accepted' }, data: { status: 'cancelled' } });
-      await tx.classifiedShipmentEvent.create({ data: { orderId: lot.orderId, status: 'note', reportedBy: 'bitocard', note: `Sold at Udozo auction ${lotNumber(lot.number)}.` } });
+      if (lot.order!.connectReturn) await tx.connectReturnRequest.updateMany({ where: { id: lot.order!.connectReturn.id, status: 'accepted' }, data: { status: 'cancelled' } });
+      await tx.classifiedShipmentEvent.create({ data: { orderId: lot.orderId!, status: 'note', reportedBy: 'bitocard', note: `Sold at Udozo auction ${lotNumber(lot.number)}.` } });
     });
-    const seller = await this.safePay.load(lot.orderId);
+    const seller = await this.safePay.load(lot.orderId!);
     await this.safePay.tellParty(
       seller,
       'seller',
@@ -217,7 +217,7 @@ export class ConnectAuctionsService {
       `"${lot.title}" was sold at auction`,
       leftOver > 0n ? `It paid the storage owed. ${formatMoney(leftOver, lot.currency)} is left over for you: claim it on your order within ${rules.claimDays} days, or it becomes Udozo's.` : 'It paid what it could of the storage owed. Nothing is left over.',
     );
-    await this.tellCustomer(customer.id, `auction_paid:${lot.id}`, `You bought "${lot.title}"`, `Collect it at ${lot.warehouse.name}, ${lot.warehouse.address} (${lot.warehouse.hours}) with your collection code from the lot's page.`, `/${lot.country.toLowerCase()}/auctions/${lot.number}`);
+    await this.tellCustomer(customer.id, `auction_paid:${lot.id}`, `You bought "${lot.title}"`, `Collect it at ${lot.warehouse!.name}, ${lot.warehouse!.address} (${lot.warehouse!.hours}) with your collection code from the lot's page.`, `/${lot.country.toLowerCase()}/auctions/${lot.number}`);
     await this.inbox.admins('admin.connect.alert', { subject: `auction_sold:${lot.id}`, title: `${lotNumber(lot.number)} sold for ${formatMoney(sale, lot.currency)}`, body: `${formatMoney(leftOver, lot.currency)} left over for the seller's claim.`, link: `/connect/auctions/${lot.id}` });
     return this.publicGet(ref, customer);
   }
@@ -233,14 +233,14 @@ export class ConnectAuctionsService {
 
   async runDue(now = new Date()) {
     const result = { opened: 0, ended: 0, offered: 0, lapsed: 0, unsold: 0 };
-    result.opened = (await this.prisma.connectAuction.updateMany({ where: { status: 'scheduled', startsAt: { lte: now } }, data: { status: 'live' } })).count;
-    const ended = await this.prisma.connectAuction.findMany({ where: { status: 'live', endsAt: { lte: now } }, take: 200, include: lotInclude });
+    result.opened = (await this.prisma.connectAuction.updateMany({ where: { kind: 'abandoned', status: 'scheduled', startsAt: { lte: now } }, data: { status: 'live' } })).count;
+    const ended = await this.prisma.connectAuction.findMany({ where: { kind: 'abandoned', status: 'live', endsAt: { lte: now } }, take: 200, include: lotInclude });
     for (const lot of ended) {
       result.ended += 1;
       if (await this.offerNext(lot, now)) result.offered += 1;
       else result.unsold += 1;
     }
-    const lapsed = await this.prisma.connectAuction.findMany({ where: { status: 'awaiting_payment', payBy: { lt: now } }, take: 200, include: lotInclude });
+    const lapsed = await this.prisma.connectAuction.findMany({ where: { kind: 'abandoned', status: 'awaiting_payment', payBy: { lt: now } }, take: 200, include: lotInclude });
     for (const lot of lapsed) {
       const offered = lot.bids.find(bid => bid.id === lot.offeredBidId);
       if (offered) {
@@ -350,13 +350,13 @@ export class ConnectAuctionsService {
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) throw invalid('collection_code_wrong', 'That is not the buyer’s collection code.', 'code');
     const done = await this.prisma.connectAuction.updateMany({ where: { id, status: 'sold', collectedAt: null }, data: { collectedAt: new Date() } });
     if (!done.count) throw conflict('auction_changed', 'This lot changed: refresh and try again.');
-    await this.prisma.classifiedOrder.update({ where: { id: row.orderId }, data: { connectWarehouseId: null } });
+    await this.prisma.classifiedOrder.update({ where: { id: row.orderId! }, data: { connectWarehouseId: null } });
     await this.audit.record({ actorId: adminId, action: 'connect_auction.collected', targetType: 'connect_auction', targetId: id, before: null, after: { collected: true } });
     return this.adminPresent(await this.load(id));
   }
 
   async adminList(filter: { status?: string; country?: string }) {
-    const rows = await this.prisma.connectAuction.findMany({ where: { ...(filter.status ? { status: filter.status } : {}), ...(filter.country ? { country: filter.country.toUpperCase() } : {}) }, orderBy: { createdAt: 'desc' }, take: 200, include: lotInclude });
+    const rows = await this.prisma.connectAuction.findMany({ where: { kind: 'abandoned', ...(filter.status ? { status: filter.status } : {}), ...(filter.country ? { country: filter.country.toUpperCase() } : {}) }, orderBy: { createdAt: 'desc' }, take: 200, include: lotInclude });
     return { object: 'list' as const, data: rows.map(row => this.adminPresent(row)) };
   }
 
@@ -376,8 +376,8 @@ export class ConnectAuctionsService {
       country: row.country,
       currency: row.currency,
       title: row.title,
-      order: { id: row.order.id, number: `SP-${row.order.number}` },
-      warehouse: { id: row.warehouse.id, name: row.warehouse.name },
+      order: { id: row.order!.id, number: `SP-${row.order!.number}` },
+      warehouse: { id: row.warehouse!.id, name: row.warehouse!.name },
       start_price: Number(row.startPriceMinor),
       current_price: top ? Number(top.amountMinor) : null,
       owed: Number(row.owedMinor),

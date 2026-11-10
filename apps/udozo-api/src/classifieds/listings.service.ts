@@ -61,7 +61,20 @@ export type ListingInput = ConnectInput & {
   resale_paused?: boolean;
   /** Units to sell, shared by every channel. */
   stock?: number;
+  /** Sold at its price (fixed) or by auction: then its price is the starting price, with an optional hidden reserve and a length. */
+  sale_method?: 'fixed' | 'auction';
+  auction_reserve?: number | null;
+  auction_days?: number | null;
 };
+
+/** What the auctions service does around a listing's life (registered by it, so this file never imports it). */
+export type ListingAuctionHooks = {
+  beforeSubmit(customer: CustomerWithStore, listing: { saleMethod: string; country: string }): Promise<void>;
+  live(listingId: string): Promise<unknown>;
+  running(listingId: string): Promise<{ id: string; bids: { id: string }[] } | null>;
+};
+/** How long an auction listing runs, in days. */
+const auctionLengths = [1, 3, 5, 7, 10];
 
 const dayMs = 86_400_000;
 /** A listing can be renewed from this long before it expires (and any time after). */
@@ -70,7 +83,7 @@ export const renewWindowMs = 3 * dayMs;
 const limitWindowMs = 30 * dayMs;
 
 /** What submitting an ad needs filled in. */
-export type ListingParts = { categoryId: string | null; areaId: string | null; title: string | null; condition: string | null; priceKind: string; priceMinor: bigint | null };
+export type ListingParts = { categoryId: string | null; areaId: string | null; title: string | null; condition: string | null; priceKind: string; priceMinor: bigint | null; saleMethod?: string; auctionDays?: number | null };
 
 /** What a draft still lacks before it can be submitted (photos apart), as the field and how a seller reads it. */
 export function missingParts(listing: ListingParts): [string, string][] {
@@ -78,7 +91,8 @@ export function missingParts(listing: ListingParts): [string, string][] {
   if (!listing.title) missing.push(['title', 'a title']);
   if (!listing.categoryId) missing.push(['category_id', 'a category']);
   if (!listing.condition) missing.push(['condition', 'its condition']);
-  if (listing.priceKind !== 'on_request' && listing.priceMinor === null) missing.push(['price', 'a price']);
+  if (listing.priceKind !== 'on_request' && listing.priceMinor === null) missing.push(['price', listing.saleMethod === 'auction' ? 'a starting price' : 'a price']);
+  if (listing.saleMethod === 'auction' && !listing.auctionDays) missing.push(['auction_days', 'how long the auction runs']);
   if (!listing.areaId) missing.push(['area_id', 'where it is']);
   return missing;
 }
@@ -117,6 +131,9 @@ type ListingFields = {
   stock?: number;
   connect?: boolean;
   connectAllCentres?: boolean;
+  saleMethod?: string;
+  auctionReserveMinor?: bigint | null;
+  auctionDays?: number | null;
 };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
@@ -147,6 +164,20 @@ export class ListingsService {
     private readonly inbox: InboxService,
     private readonly shipping: ListingShippingService,
   ) {}
+
+  private auctions?: ListingAuctionHooks;
+
+  /** The auctions service registers what it does when an auction listing is submitted and goes live. */
+  useAuctions(hooks: ListingAuctionHooks) {
+    this.auctions = hooks;
+  }
+
+  /** An auction running with bids fixes its listing's price, reserve and length, and it cannot be sold another way. */
+  private async requireNoBids(listingId: string, message: string) {
+    const lot = await this.auctions?.running(listingId);
+    if (lot?.bids.length) throw conflict('auction_has_bids', message);
+    return lot;
+  }
 
   /** The seller's country, once they may sell there. */
   async sellerCountry(customer: CustomerWithStore) {
@@ -328,6 +359,7 @@ export class ListingsService {
     this.requireComplete(listing);
     await this.shipping.requireComplete(this.prisma, listing.id, listing);
     if (listing.resale) await this.resale.requireSupplier(customer, country);
+    await this.auctions?.beforeSubmit(customer, listing);
     const photos = listing.media.filter(item => item.kind === 'photo' && item.status === 'ready').length;
     if (photos < settings.minPhotos) throw invalid('photos_required', `Add at least ${settings.minPhotos} photos.`, 'photos');
     if (listing.media.some(item => item.kind === 'photo' && item.status === 'failed')) throw invalid('media_failed', 'Remove the photo that could not be used, or add it again.', 'photos');
@@ -360,6 +392,8 @@ export class ListingsService {
       if (!(await tx.classifiedPriceHistory.count({ where: { listingId: id } })) && listing.priceMinor !== null) await this.recordPrice(tx, id, listing.priceMinor);
     });
     await this.noteBrand(customer.id, listing);
+    // Live at once: an auction listing's bidding opens now (one held for review opens when it is approved).
+    await this.auctions?.live(id);
     return this.present(await this.own(customer, id));
   }
 
@@ -378,6 +412,8 @@ export class ListingsService {
       data: { status: 'active', expiresAt: new Date(now + settings.listingDays * dayMs), outOfStockAt: null, expiredReason: null },
     });
     if (!claimed.count) throw conflict('listing_not_renewable', 'This listing changed: refresh and try again.');
+    // An auction listing renewed after it did not sell is auctioned again.
+    await this.auctions?.live(id);
     return this.present(await this.own(customer, id));
   }
 
@@ -385,6 +421,7 @@ export class ListingsService {
     await this.sellerCountry(customer);
     const listing = await this.own(customer, id);
     if (listing.status !== 'active') throw conflict('listing_not_active', 'Only a live listing is marked sold.');
+    if (listing.saleMethod === 'auction' && (await this.auctions?.running(id))) throw conflict('auction_running', 'It is at auction: it sells to the winning bid.');
     const now = new Date();
     const claimed = await this.prisma.classifiedListing.updateMany({ where: { id, status: 'active' }, data: { status: 'sold', soldAt: now } });
     if (!claimed.count) throw conflict('listing_not_active', 'This listing changed: refresh and try again.');
@@ -403,8 +440,10 @@ export class ListingsService {
       if (keys.length && this.storage.configured()) await Promise.all(keys.map(key => this.storage.remove(key))).catch(() => undefined);
       return;
     }
+    await this.requireNoBids(id, 'People have bid on it: it sells to the winning bid.');
     const now = new Date();
     await this.prisma.classifiedListing.updateMany({ where: { id, status: listing.status }, data: { status: 'deleted', closedAt: now } });
+    await this.prisma.connectAuction.updateMany({ where: { listingId: id, status: { in: ['scheduled', 'live'] } }, data: { status: 'cancelled', cancelReason: 'Listing deleted' } });
     await this.prisma.classifiedPriceHistory.updateMany({ where: { listingId: id, to: null }, data: { to: now } });
   }
 
@@ -495,6 +534,40 @@ export class ListingsService {
     }
     if (priceKind === 'on_request' && (input.price_kind !== undefined || input.price !== undefined)) fields.priceMinor = null;
 
+    // Sold by auction: one item, a starting price, an optional reserve (at least the starting price) and a length.
+    const saleMethod = input.sale_method ?? current?.saleMethod ?? 'fixed';
+    if (input.sale_method !== undefined) fields.saleMethod = input.sale_method;
+    if (input.auction_days !== undefined) {
+      if (input.auction_days !== null && !auctionLengths.includes(input.auction_days)) throw invalid('parameter_invalid', `An auction runs ${auctionLengths.join(', ')} days.`, 'auction_days');
+      fields.auctionDays = input.auction_days;
+    }
+    if (input.auction_reserve !== undefined) {
+      if (input.auction_reserve !== null && (!Number.isSafeInteger(input.auction_reserve) || input.auction_reserve <= 0 || BigInt(input.auction_reserve) > maxPriceMinor)) throw invalid('parameter_invalid', 'Give the reserve in minor units, a whole number above zero.', 'auction_reserve');
+      fields.auctionReserveMinor = input.auction_reserve === null ? null : BigInt(input.auction_reserve);
+    }
+    if (saleMethod === 'auction') {
+      if (priceKind !== 'fixed') {
+        if (input.price_kind !== undefined) throw invalid('parameter_invalid', 'An auction starts at a price: it cannot be negotiable or contact for price.', 'price_kind');
+        fields.priceKind = 'fixed';
+      }
+      if (current?.saleMethod === 'auction') {
+        const changed = (['priceMinor', 'priceKind', 'auctionReserveMinor', 'auctionDays'] as const).some(key => key in fields && fields[key] !== current[key]);
+        if (changed) await this.requireNoBids(current.id, 'People have bid on it: its price, reserve and length are fixed until the auction ends.');
+      }
+      const start = 'priceMinor' in fields ? fields.priceMinor! : (current?.priceMinor ?? null);
+      const reserve = 'auctionReserveMinor' in fields ? fields.auctionReserveMinor! : (current?.auctionReserveMinor ?? null);
+      if (reserve !== null && start !== null && reserve < start) throw invalid('reserve_below_start', 'The reserve is at least the starting price.', 'auction_reserve');
+      if ((input.resale ?? current?.resale) === true) throw invalid('parameter_invalid', 'A listing sold by auction is sold on Udozo only, not through resellers.', 'resale');
+    } else if (input.sale_method === 'fixed') {
+      fields.auctionReserveMinor = null;
+      fields.auctionDays = null;
+    }
+    // Once people have bid, the price, reserve, length and way of selling are fixed.
+    if (current?.saleMethod === 'auction') {
+      const changed = (['priceMinor', 'priceKind', 'saleMethod', 'auctionReserveMinor', 'auctionDays'] as const).some(key => key in fields && fields[key] !== current[key]);
+      if (changed) await this.requireNoBids(current.id, 'People have bid on it: its price, reserve and length are fixed until the auction ends.');
+    }
+
     // Shipping through Udozo Connect: the states, their charges and the centres, each checked.
     const connect: ConnectChanges = await this.shipping.check(country, input, current, priceKind);
     Object.assign(fields, connect.fields);
@@ -542,6 +615,8 @@ export class ListingsService {
       const markup = 'resaleMarkupMaxBps' in fields ? fields.resaleMarkupMaxBps! : (current?.resaleMarkupMaxBps ?? null);
       this.resale.checkTerms(await this.resale.limits(country), discount, markup);
     }
+    // An auction sells one item.
+    if (saleMethod === 'auction') fields.stock = 1;
     return { fields, features, connect };
   }
 
@@ -561,6 +636,10 @@ export class ListingsService {
       title: listing.title,
       description: listing.description,
       price: { kind: listing.priceKind, amount: listing.priceMinor === null ? null : Number(listing.priceMinor), currency: listing.currency },
+      /** Sold at its price, or by auction (the price its starting price; the reserve is the seller's only). */
+      sale_method: listing.saleMethod as 'fixed' | 'auction',
+      auction_reserve: listing.auctionReserveMinor === null ? null : Number(listing.auctionReserveMinor),
+      auction_days: listing.auctionDays,
       condition: listing.condition,
       category: listing.category ? { id: listing.category.id, slug: listing.category.slug, name: listing.category.name, parent: listing.category.parent ? { id: listing.category.parent.id, slug: listing.category.parent.slug, name: listing.category.parent.name } : null } : null,
       country: listing.country,

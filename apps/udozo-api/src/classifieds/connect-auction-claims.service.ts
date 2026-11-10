@@ -70,7 +70,7 @@ export class ConnectAuctionClaimsService {
     if (claim.status !== 'requested') throw conflict('claim_decided', 'This claim was decided.');
     const { auction } = claim;
     const entry = await this.ledger.prepare({
-      mode: auction.order.mode,
+      mode: auction.order!.mode,
       type: 'connect_auction_claim',
       reference: `connect_auction:${auction.id}:claim`,
       description: `Claim ${claimNumber(claim.number)} on Udozo auction ${lotNumber(auction.number)}`,
@@ -86,7 +86,7 @@ export class ConnectAuctionClaimsService {
       await this.ledger.write(tx, entry);
     });
     await this.audit.record({ actorId: adminId, action: 'connect_auction_claim.paid', targetType: 'connect_auction_claim', targetId: id, before: { status: 'requested' }, after: { status: 'paid', amount: Number(claim.amountMinor), currency: claim.currency } });
-    await this.tellSeller(auction.orderId, `"${auction.title}": your claim was paid`, `${formatMoney(claim.amountMinor, claim.currency)} from its auction is in your Udozo money, to pay out to your bank.`);
+    await this.tellSeller(auction.orderId!, `"${auction.title}": your claim was paid`, `${formatMoney(claim.amountMinor, claim.currency)} from its auction is in your Udozo money, to pay out to your bank.`);
     return this.present(await this.load(id));
   }
 
@@ -99,7 +99,7 @@ export class ConnectAuctionClaimsService {
     await this.audit.record({ actorId: adminId, action: 'connect_auction_claim.rejected', targetType: 'connect_auction_claim', targetId: id, before: { status: 'requested' }, after: { status: 'rejected', reason } });
     const { auction } = claim;
     const open = !auction.claimBy || auction.claimBy > new Date();
-    await this.tellSeller(auction.orderId, `"${auction.title}": your claim was not paid`, `${reason.trim()}${open && auction.claimBy ? ` You can claim again on your order until ${auction.claimBy.toUTCString().slice(0, 16)}.` : ''}`);
+    await this.tellSeller(auction.orderId!, `"${auction.title}": your claim was not paid`, `${reason.trim()}${open && auction.claimBy ? ` You can claim again on your order until ${auction.claimBy.toUTCString().slice(0, 16)}.` : ''}`);
     return this.present(await this.load(id));
   }
 
@@ -124,13 +124,13 @@ export class ConnectAuctionClaimsService {
       const claimed = await this.prisma.connectAuction.updateMany({ where: { id: lot.id, claimRemindedAt: null }, data: { claimRemindedAt: now } });
       if (!claimed.count) continue;
       result.reminded += 1;
-      await this.tellSeller(lot.orderId, `Claim what "${lot.title}" left over`, `${formatMoney(lot.leftOverMinor!, lot.currency)} from its auction is yours if you claim it on your order by ${lot.claimBy!.toUTCString().slice(0, 16)}. After that it becomes Udozo's.`);
+      await this.tellSeller(lot.orderId!, `Claim what "${lot.title}" left over`, `${formatMoney(lot.leftOverMinor!, lot.currency)} from its auction is yours if you claim it on your order by ${lot.claimBy!.toUTCString().slice(0, 16)}. After that it becomes Udozo's.`);
     }
     const expired = await this.prisma.connectAuction.findMany({ where: { ...unclaimedLot, claimBy: { lte: now } }, take: 200, include: { order: { select: { mode: true } } } });
     for (const lot of expired) {
       const amount = lot.leftOverMinor!;
       const entry = await this.ledger.prepare({
-        mode: lot.order.mode,
+        mode: lot.order!.mode,
         type: 'connect_auction_unclaimed',
         reference: `connect_auction:${lot.id}:unclaimed`,
         description: `Unclaimed from Udozo auction ${lotNumber(lot.number)}`,
@@ -150,7 +150,7 @@ export class ConnectAuctionClaimsService {
       if (!moved) continue;
       result.unclaimed += 1;
       await this.audit.record({ actorId: null, action: 'connect_auction.unclaimed', targetType: 'connect_auction', targetId: lot.id, before: { left_over: Number(amount) }, after: { to: 'connect_revenue' } });
-      await this.tellSeller(lot.orderId, `What "${lot.title}" left over was not claimed`, `${formatMoney(amount, lot.currency)} from its auction was not claimed in time, so it is now Udozo's.`);
+      await this.tellSeller(lot.orderId!, `What "${lot.title}" left over was not claimed`, `${formatMoney(amount, lot.currency)} from its auction was not claimed in time, so it is now Udozo's.`);
     }
     if (result.reminded || result.unclaimed) this.logger.log(result, 'Udozo auction claims');
     return result;
@@ -183,7 +183,7 @@ export class ConnectAuctionClaimsService {
       decided_at: row.decidedAt?.toISOString() ?? null,
       created_at: row.createdAt.toISOString(),
       auction: { id: row.auction.id, number: lotNumber(row.auction.number), title: row.auction.title, country: row.auction.country, sale: row.auction.saleMinor === null ? null : Number(row.auction.saleMinor), claim_by: row.auction.claimBy?.toISOString() ?? null },
-      order: { id: row.auction.order.id, number: `SP-${row.auction.order.number}` },
+      order: { id: row.auction.order!.id, number: `SP-${row.auction.order!.number}` },
       seller: row.seller,
     };
   }

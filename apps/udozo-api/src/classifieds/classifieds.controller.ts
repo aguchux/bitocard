@@ -12,6 +12,7 @@ import { PageDto } from '../ledger/wallet.controller.js';
 import { sendPhoto } from './chat-files.js';
 import { ConversationsService, maxMessage } from './conversations.service.js';
 import { LeadsService } from './leads.service.js';
+import { ListingAuctionsService } from './listing-auctions.service.js';
 import { ListingsService } from './listings.service.js';
 import { type DisputeReason, disputeReasons, SafePayService, type ShipmentUpdate, shipmentUpdates } from './safe-pay.service.js';
 import { FavouritesService } from './favourites.service.js';
@@ -204,6 +205,18 @@ class ListingDto {
   /** Units to sell, shared by Udozo and resellers' stores; 0 is out of stock (live 90 days, nobody can buy it). */
   @IsOptional() @IsInt() @Min(0) @Max(maxStock)
   stock?: number;
+
+  /** Sold at its price, or by auction (its price the starting price). */
+  @IsOptional() @IsIn(['fixed', 'auction'])
+  sale_method?: 'fixed' | 'auction';
+
+  /** An auction's hidden reserve in minor units (null: none). */
+  @IsOptional() @IsInt()
+  auction_reserve?: number | null;
+
+  /** How long an auction runs: 1, 3, 5, 7 or 10 days. */
+  @IsOptional() @IsInt()
+  auction_days?: number | null;
 }
 
 class PhotoOrderDto {
@@ -311,6 +324,7 @@ export class ClassifiedReferenceController {
     private readonly directory: ShopDirectoryService,
     private readonly sellers: SellerProfilesService,
     private readonly reviews: ReviewsService,
+    private readonly auctions: ListingAuctionsService,
   ) {}
 
   /** The countries BitoCard Shop is open in, with their live listings, and whether the global showcase is on. */
@@ -361,7 +375,8 @@ export class ClassifiedReferenceController {
   async listing(@Param('ref', ParseIntPipe) ref: number, @Query() query: CountryDto) {
     const page = await this.search.listing(query.country, ref);
     // Udozo: the latest reviews of this product (same brand and model) from this seller, where reviews are open.
-    return { ...page, product_reviews: await this.reviews.forListing(page.id) };
+    // Sold by auction: its bidding as anyone sees it (signed in, the viewer adds their own).
+    return { ...page, product_reviews: await this.reviews.forListing(page.id), auction: page.sale_method === 'auction' ? await this.auctions.view(page.id) : null };
   }
 
   /**
@@ -587,6 +602,7 @@ export class ClassifiedChatsController {
     private readonly contacts: ContactRequestsService,
     private readonly calls: CallsService,
     private readonly buyOrders: BuyOrdersService,
+    private readonly auctions: ListingAuctionsService,
   ) {}
 
   /**
@@ -595,7 +611,9 @@ export class ClassifiedChatsController {
    */
   @Get('listings/:id/viewer')
   async viewer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    const viewer = await this.directory.viewer(caller.customer, id);
+    const base = await this.directory.viewer(caller.customer, id);
+    // Sold by auction: the lot as this person sees it (their bid, leading, theirs to pay, their own listing).
+    const viewer = { ...base, auction: await this.auctions.view(id, caller.customer.id) };
     if (viewer.own || !viewer.can_contact) return { ...viewer, contact: null, callback: null, seller_online: false, calls: false, buy_orders: false, buy_order: null };
     const listing = await this.directory.contactOf(id);
     const [contact, online, buyOrders, buyOrder] = await Promise.all([

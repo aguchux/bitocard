@@ -12,6 +12,7 @@ import { ConnectReportsService } from '../classifieds/connect-reports.service.js
 import { ConnectWarehousesService } from '../classifieds/connect-warehouses.service.js';
 import { ConnectAuctionClaimsService } from '../classifieds/connect-auction-claims.service.js';
 import { ConnectAuctionsService } from '../classifieds/connect-auctions.service.js';
+import { ListingAuctionsService } from '../classifieds/listing-auctions.service.js';
 import { ConnectReturnsService } from '../classifieds/connect-returns.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { BuyOrdersService } from '../classifieds/buy-orders/buy-orders.service.js';
@@ -126,6 +127,7 @@ export class CronController {
     connectWarehouses: ConnectWarehousesService,
     connectAuctions: ConnectAuctionsService,
     connectClaims: ConnectAuctionClaimsService,
+    listingAuctions: ListingAuctionsService,
     resale: ResaleStoresService,
     resaleOrders: ResaleOrdersService,
     marketing: MarketingService,
@@ -254,6 +256,7 @@ export class CronController {
         connect_abandoned: await connectWarehouses.abandon(),
         connect_auctions: await connectAuctions.runDue(),
         connect_claims: await connectClaims.runDue(),
+        listing_auctions: await listingAuctions.runDue(),
         buy_orders: await buyOrders.job(),
         reviews: await reviews.remind(),
         listings: await listings.expireDue(),
