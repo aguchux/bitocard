@@ -447,7 +447,38 @@ assistants' knowledge, help, terms and privacy.
      `shippingDetails` (an `OfferShippingDetails` per state). Tests: `apps/udozo/test/connect-shipping.test.ts`,
      `post-wizard.test.ts`.
 5. **Orders**: buying with a centre, labels, and on the dashboard Expected, Receive, Shelve, Release, Updates, Returns
-   and Stock check; the order timeline, and centre earnings and payouts.
+   and Stock check; the order timeline, and centre earnings and payouts. Built in slices:
+   - **5a, the API's orders through a centre (built):**
+     - **Settings and money:** finance sets each market's Connect fee on Connect > States, deposit and fee (`PUT
+       /v1/admin/connect/settings/:country { fee_kind: percent|fixed|null, fee_bps | fee, centre_share_bps,
+       buyer_free_hours }`, each field changed only when sent; migration `20270310100000_connect_orders`; audited
+       `connect_settings.changed`). Until it is set, buyers cannot choose a centre.
+     - **The quote:** `GET /v1/classifieds/listings/:id/safe-pay` offers `fulfilment: connect` with `connect { fee,
+       states: [{ shipping, connect_fee, centres }] }` (`ConnectCheckoutService`): only centres the listing ships to,
+       open, in a state open for Connect.
+     - **The order:** `POST /v1/classifieds/orders { fulfilment: connect, connect_centre_id }` (`centre_required`,
+       `centre_unavailable`) keeps the state's shipping charge as `delivery_fee_minor`, `connect_fee_minor` and the
+       centre's part (`centre_share_minor`, fixed when asked). The buyer pays them with the price and their UdozoPay
+       fee, and gets a release code (as at a meet-up).
+     - **The seller's step:** `POST …/orders/:id/sent` with no courier (dropping it off) or with one, after two dispatch
+       photos. Nothing is released by the clock (no `confirm_by`), and the buyer cannot confirm it at home
+       (`connect_collect_at_centre`).
+     - **The centre's counter** (`ConnectCounterService`, `/v1/connect/centres/:centre/orders`, any member of the
+       centre; `centre_unknown` for anyone else): `?view=expected|at_centre|done`, `lookup?number=`, `:order`,
+       `receive` (status `at_centre`), `refuse { wrong_item|damaged|missing_parts|not_allowed }`, `shelve { shelf_id }`
+       (ready, `collect_by` the free hours later, the buyer told), `release { code }` (after the buyer inspected it; 5
+       tries, `release_code_wrong`, `order_not_ready` unshelved), `refuse-collection { reason }` and `updates { body }`.
+       The refusals are disputes in Udozo's words (`SafePayService.centreDispute`), decided as any other. Each step is
+       on the order's timeline (shipment events `reported_by: centre`; `received`, `refused`, `ready`, `collected`,
+       `collection_refused`, `note`).
+     - **Release:** the seller's price and shipping less their UdozoPay fee; the centre's part of the Connect fee to
+       its partner's `connect_centre_earnings`; Udozo's part to `connect_revenue` (in revenue reports as Udozo Connect
+       fees). A refund returns everything, the Connect fee too.
+     - **Presenter and tests:** orders carry `connect { centre, connect_fee, received_at, ready_at, collect_by }`.
+       Tests: `apps/udozo-api/test/connect-orders.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`.
+   - **5b (next):** connect.udozo.com's Expected, Receive, Shelve, Release and Updates screens and the printable label.
+   - **5c:** returns (requests, 48 hours, return codes), demurrage and Loss of care, stock checks, earnings and payouts.
+   - **5d:** udozo.com's Collect at a Connect Centre at checkout and the order's Connect timeline.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo

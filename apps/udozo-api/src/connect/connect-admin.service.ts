@@ -2,7 +2,11 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { ConnectApplicationsService, centreNumber } from './applications.service.js';
+
+/** What finance and operations may change on a market's Connect settings (anything left out stays). */
+export type ConnectSettingsInput = { deposit?: number | null; fee_kind?: 'percent' | 'fixed' | null; fee_bps?: number; fee?: number; centre_share_bps?: number; buyer_free_hours?: number };
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
@@ -105,26 +109,68 @@ export class ConnectAdminService {
     return { object: 'connect_state' as const, id: state.id, name: state.name, country: state.country, open: enabled };
   }
 
-  // ---- Each market's deposit ----
+  // ---- Each market's deposit, Connect fee and holding times ----
 
   async settings(code: string) {
     const country = await this.market(code);
     const row = await this.prisma.connectSettings.findUnique({ where: { country: country.code } });
-    return this.presentSettings(country, row?.depositMinor ?? null);
+    return this.presentSettings(country, row);
   }
 
-  async setSettings(adminId: string | null, code: string, deposit: number | null) {
+  /**
+   * Changes what was sent (anything left out stays): the deposit, the Connect fee (a percentage of the shipping charge or
+   * a fixed amount; null switches Connect orders off), the centre's share, and the buyer's free time to collect.
+   */
+  async setSettings(adminId: string | null, code: string, input: ConnectSettingsInput) {
     const country = await this.market(code);
-    if (deposit !== null && (!Number.isSafeInteger(deposit) || deposit < 0)) throw invalid('parameter_invalid', 'Give the deposit in minor units, 0 or more.', 'deposit');
-    const before = (await this.prisma.connectSettings.findUnique({ where: { country: country.code } }))?.depositMinor ?? null;
-    const value = deposit === null ? null : BigInt(deposit);
-    await this.prisma.connectSettings.upsert({ where: { country: country.code }, create: { country: country.code, depositMinor: value, updatedById: adminId }, update: { depositMinor: value, updatedById: adminId } });
-    await this.audit.record({ actorId: adminId, action: 'connect_settings.changed', targetType: 'country', targetId: country.code, before: { deposit: before === null ? null : Number(before) }, after: { deposit } });
-    return this.presentSettings(country, value);
+    const before = await this.prisma.connectSettings.findUnique({ where: { country: country.code } });
+    const data: Prisma.ConnectSettingsUncheckedUpdateInput = {};
+    if (input.deposit !== undefined) {
+      if (input.deposit !== null && (!Number.isSafeInteger(input.deposit) || input.deposit < 0)) throw invalid('parameter_invalid', 'Give the deposit in minor units, 0 or more.', 'deposit');
+      data.depositMinor = input.deposit === null ? null : BigInt(input.deposit);
+    }
+    if (input.fee_kind !== undefined) {
+      if (input.fee_kind === null) Object.assign(data, { feeKind: null, feeBps: null, feeMinor: null });
+      else if (input.fee_kind === 'percent') {
+        if (!Number.isInteger(input.fee_bps) || input.fee_bps! < 0 || input.fee_bps! > 10000) throw invalid('parameter_invalid', 'Give the Connect fee as a share of the shipping charge, 0 to 100%.', 'fee_bps');
+        Object.assign(data, { feeKind: 'percent', feeBps: input.fee_bps, feeMinor: null });
+      } else {
+        if (!Number.isSafeInteger(input.fee) || input.fee! < 0) throw invalid('parameter_invalid', 'Give the Connect fee in minor units, 0 or more.', 'fee');
+        Object.assign(data, { feeKind: 'fixed', feeMinor: BigInt(input.fee!), feeBps: null });
+      }
+    }
+    if (input.centre_share_bps !== undefined) {
+      if (!Number.isInteger(input.centre_share_bps) || input.centre_share_bps < 0 || input.centre_share_bps > 10000) throw invalid('parameter_invalid', "Give the centre's share as 0 to 100%.", 'centre_share_bps');
+      data.centreShareBps = input.centre_share_bps;
+    }
+    if (input.buyer_free_hours !== undefined) {
+      if (!Number.isInteger(input.buyer_free_hours) || input.buyer_free_hours < 1 || input.buyer_free_hours > 720) throw invalid('parameter_invalid', 'Give the free time to collect as 1 to 720 hours.', 'buyer_free_hours');
+      data.buyerFreeHours = input.buyer_free_hours;
+    }
+    const saved = await this.prisma.connectSettings.upsert({
+      where: { country: country.code },
+      create: { ...(data as Prisma.ConnectSettingsUncheckedCreateInput), country: country.code, updatedById: adminId },
+      update: { ...data, updatedById: adminId },
+    });
+    await this.audit.record({ actorId: adminId, action: 'connect_settings.changed', targetType: 'country', targetId: country.code, before: before ? this.presentSettings(country, before) : null, after: this.presentSettings(country, saved) });
+    return this.presentSettings(country, saved);
   }
 
-  private presentSettings(country: { code: string; currency: string; name: string }, deposit: bigint | null) {
-    return { object: 'connect_settings' as const, country: country.code, name: country.name, currency: country.currency, deposit: deposit === null ? null : Number(deposit) };
+  private presentSettings(
+    country: { code: string; currency: string; name: string },
+    row: { depositMinor: bigint | null; feeKind: string | null; feeBps: number | null; feeMinor: bigint | null; centreShareBps: number; buyerFreeHours: number } | null,
+  ) {
+    return {
+      object: 'connect_settings' as const,
+      country: country.code,
+      name: country.name,
+      currency: country.currency,
+      deposit: row?.depositMinor === null || row?.depositMinor === undefined ? null : Number(row.depositMinor),
+      /** The Connect fee buyers pay on each Connect order: a share of the shipping charge, or fixed (null: not set, so no Connect orders). */
+      fee: row?.feeKind === 'percent' ? { kind: 'percent' as const, bps: row.feeBps! } : row?.feeKind === 'fixed' ? { kind: 'fixed' as const, amount: Number(row.feeMinor) } : null,
+      centre_share_bps: row?.centreShareBps ?? 7000,
+      buyer_free_hours: row?.buyerFreeHours ?? 72,
+    };
   }
 
   // ---- Centres (approval makes them; one centre's page is ConnectCentresService.adminGet) ----

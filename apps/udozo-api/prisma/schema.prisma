@@ -1069,6 +1069,11 @@ enum AccountKind {
   /// when they submit, returned if the application is rejected or withdrawn, kept for the centre while it runs. The
   /// applicant's own; never below zero.
   connect_centre_deposit
+  /// Udozo's share of Connect fees (docs/UDOZO_CONNECT_PLAN.md, Money): 30% by default; never mixed with UdozoPay's.
+  connect_revenue
+  /// A Connect Centre partner's earnings: their centre's share of Connect fees on items handed over. Their own; never
+  /// below zero.
+  connect_centre_earnings
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -5690,8 +5695,20 @@ model ClassifiedOrder {
   trackingNumber           String?            @map("tracking_number")
   trackingUrl              String?            @map("tracking_url")
   deliveredAt              DateTime?          @map("delivered_at")
-  /// meet_up or delivery.
+  /// meet_up, delivery or connect (collected at a Udozo Connect Centre).
   fulfilment               String
+  /// Connect: the centre the buyer chose, the Connect fee they pay (fixed when paid), and the centre's part of it.
+  connectCentreId          String?            @map("connect_centre_id") @db.Uuid
+  connectFeeMinor          BigInt             @default(0) @map("connect_fee_minor")
+  centreShareMinor         BigInt?            @map("centre_share_minor")
+  /// Connect: received and checked in at the centre, shelved in one of its storage places (then ready to collect).
+  receivedAt               DateTime?          @map("received_at")
+  connectShelfId           String?            @map("connect_shelf_id") @db.Uuid
+  readyAt                  DateTime?          @map("ready_at")
+  /// Connect: the end of the buyer's free time to collect it (ready plus the market's free hours).
+  collectBy                DateTime?          @map("collect_by")
+  /// The centre member who handed it over (no foreign key: kept if they leave).
+  releasedById             String?            @map("released_by_id") @db.Uuid
   /// Encrypted; shown to the seller only once paid, and only for delivery.
   deliveryAddress          String?            @map("delivery_address")
   trackingNote             String?            @map("tracking_note")
@@ -5743,6 +5760,8 @@ model ClassifiedOrder {
   reseller                 Reseller?          @relation(fields: [resellerId], references: [id], onDelete: Restrict)
   dispute                  ClassifiedDispute?
   shipmentEvents           ClassifiedShipmentEvent[]
+  connectCentre            ConnectCentre?     @relation(fields: [connectCentreId], references: [id], onDelete: Restrict)
+  connectShelf             ConnectShelf?      @relation(fields: [connectShelfId], references: [id], onDelete: SetNull)
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
@@ -7188,6 +7207,15 @@ model WhatsappDirectContact {
 model ConnectSettings {
   country      String   @id @db.Char(2)
   depositMinor BigInt?  @map("deposit_minor")
+  /// The Connect fee buyers pay on each Connect order: `percent` of the shipping charge (`feeBps`) or `fixed`
+  /// (`feeMinor`); Connect orders are refused until it is set.
+  feeKind      String?  @map("fee_kind")
+  feeBps       Int?     @map("fee_bps")
+  feeMinor     BigInt?  @map("fee_minor")
+  /// The centre's part of Connect fees, demurrage and penalties, in basis points (Udozo has the rest).
+  centreShareBps Int    @default(7000) @map("centre_share_bps")
+  /// The buyer's free time to collect once an item is ready.
+  buyerFreeHours Int    @default(72) @map("buyer_free_hours")
   updatedAt    DateTime @updatedAt @map("updated_at")
   /// The admin who last changed them (no foreign key: admins are never deleted).
   updatedById  String?  @map("updated_by_id") @db.Uuid
@@ -7357,6 +7385,7 @@ model ConnectCentre {
   application  ConnectCentreApplication?
   members      ConnectCentreMember[]
   listings     ClassifiedListingConnectCentre[]
+  orders       ClassifiedOrder[]
   shelves      ConnectShelf[]
 
   @@index([country, stateId, status])
@@ -7396,6 +7425,7 @@ model ConnectShelf {
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
   centre    ConnectCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  orders    ClassifiedOrder[]
 
   @@unique([centreId, code])
   @@index([centreId, position])

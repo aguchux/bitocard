@@ -20,6 +20,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { cleanMessage } from './conversations.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { ShopEmails } from './shop-emails.service.js';
+import { centreShareOf, ConnectCheckoutService } from './connect-checkout.service.js';
 import { ListingsService } from './listings.service.js';
 import type { MediaUpload } from './media.service.js';
 import { heldUnits, invalid, isOnShop, priceText } from './rules.js';
@@ -64,8 +65,8 @@ const conflict = (code: string, message: string, param?: string) => new ApiError
 const unavailable = (message: string) => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'safe_pay_unavailable', message);
 const notYours = (message: string) => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'order_not_yours', message);
 
-/** What the buyer pays in all: the price, any delivery charge and their fee. */
-export const totalOf = (order: { priceMinor: bigint; deliveryFeeMinor: bigint; buyerFeeMinor: bigint }) => order.priceMinor + order.deliveryFeeMinor + order.buyerFeeMinor;
+/** What the buyer pays in all: the price, any delivery or shipping charge, their fee and any Connect fee. */
+export const totalOf = (order: { priceMinor: bigint; deliveryFeeMinor: bigint; buyerFeeMinor: bigint; connectFeeMinor?: bigint }) => order.priceMinor + order.deliveryFeeMinor + order.buyerFeeMinor + (order.connectFeeMinor ?? 0n);
 
 /**
  * The delivery charge for a listing to a state: within the seller's state, or elsewhere where they deliver nationwide.
@@ -101,6 +102,8 @@ export const orderInclude = {
   dispute: true,
   shipmentEvents: { orderBy: { createdAt: 'asc' } },
   dispatchPhotos: { orderBy: { createdAt: 'asc' }, select: { id: true, contentType: true, width: true, height: true, createdAt: true } },
+  connectCentre: { select: { id: true, number: true, name: true, partnerId: true, address: true, landmark: true, hours: true, phone: true, area: { select: { name: true } }, state: { select: { name: true } } } },
+  connectShelf: { select: { id: true, code: true, label: true } },
 } satisfies Prisma.ClassifiedOrderInclude;
 export type OrderRow = Prisma.ClassifiedOrderGetPayload<{ include: typeof orderInclude }>;
 
@@ -148,6 +151,7 @@ export class SafePayService {
     private readonly discovery: DiscoveryRecorder,
     private readonly watermarks: WatermarkService,
     private readonly reviews: ReviewsService,
+    private readonly connect: ConnectCheckoutService,
   ) {}
 
   private encryption() {
@@ -247,6 +251,7 @@ export class SafePayService {
     const { listing, price, offerId: offer } = await this.priceFor(customer, country, listingId, offerId);
     const fee = safePayFee(price, settings.buyerFeeBps, settings.buyerFeeCapMinor);
     const available = Math.max(listing.stock - (await this.held(listing.id)), 0);
+    const connect = listing.connect ? await this.connect.options(listing) : null;
     return {
       object: 'classified_safe_pay_quote' as const,
       listing_id: listing.id,
@@ -255,9 +260,11 @@ export class SafePayService {
       price: Number(price),
       buyer_fee: Number(fee),
       total: Number(price + fee),
-      fulfilment: fulfilmentOf(listing),
+      fulfilment: [...fulfilmentOf(listing), ...(connect ? (['connect'] as const) : [])],
       /** The delivery charge on top, within the seller's state and elsewhere (null where they do not deliver there). */
       delivery: deliveryOptions(listing),
+      /** Collect at a Udozo Connect Centre: each state's centres, its shipping charge and the Connect fee (null: not offered). */
+      connect,
       /** Every unit is paid for and waiting to be handed over. */
       reserved: available === 0,
       /** Units still to be had (its stock less those held by paid orders). */
@@ -270,13 +277,18 @@ export class SafePayService {
   }
 
   /** The buyer asks: the price and both sides' rates are fixed now; the seller has the accept time to answer. */
-  async request(customer: CustomerWithStore, input: { listing_id: string; offer_id?: string; fulfilment: 'meet_up' | 'delivery'; delivery_address?: string; delivery_state_id?: string }) {
+  async request(customer: CustomerWithStore, input: { listing_id: string; offer_id?: string; fulfilment: 'meet_up' | 'delivery' | 'connect'; delivery_address?: string; delivery_state_id?: string; connect_centre_id?: string }) {
     const { country, mode, settings } = await this.open(customer);
     const { listing, price, offerId } = await this.priceFor(customer, country, input.listing_id, input.offer_id);
     await this.terms.require(customer.id);
     await this.guards.requireDifferentPeople(customer.id, listing.customerId);
     await this.guards.requireNotLimited(listing.customerId, country, false);
-    const { address, fee: delivery, stateId } = await this.checkFulfilment(listing, input);
+    // Collected at a Connect Centre: the listing's shipping charge for its state and the market's Connect fee.
+    const connect = input.fulfilment === 'connect' ? await this.connect.check(listing, input.connect_centre_id) : null;
+    const share = connect ? (await this.connect.terms(country)).centreShareBps : 0;
+    const { address, fee: delivery, stateId } = connect
+      ? { address: '', fee: connect.shippingMinor, stateId: connect.stateId }
+      : await this.checkFulfilment(listing, { ...input, fulfilment: input.fulfilment as 'meet_up' | 'delivery' });
     if (listing.stock === 0) throw this.outOfStock();
     if ((await this.held(listing.id)) >= listing.stock) throw this.reserved(listing.stock);
     if (settings.newSellerOrderLimitMinor !== null && price > settings.newSellerOrderLimitMinor) {
@@ -305,6 +317,7 @@ export class SafePayService {
           deliveryAddress: address ? this.encryption().encrypt(address) : null,
           deliveryFeeMinor: delivery,
           deliveryStateId: stateId,
+          ...(connect ? { connectCentreId: connect.centreId, connectFeeMinor: connect.feeMinor, centreShareMinor: centreShareOf(connect.feeMinor, share) } : {}),
           acceptBy: new Date(now.getTime() + settings.acceptHours * hourMs),
         },
         include: orderInclude,
@@ -364,7 +377,8 @@ export class SafePayService {
         { account: { kind: 'classified_escrow', currency: order.currency }, credit: total },
       ],
     });
-    const code = order.fulfilment === 'meet_up' ? String(randomInt(0, 1_000_000)).padStart(6, '0') : null;
+    // In person and at a Connect Centre, the buyer gives a 6-digit code once they have it.
+    const code = order.fulfilment === 'meet_up' || order.fulfilment === 'connect' ? String(randomInt(0, 1_000_000)).padStart(6, '0') : null;
     try {
       await this.prisma.$transaction(async tx => {
         // One payment at a time per listing (its row locked): each holds one unit, never more than its stock. The order is
@@ -398,7 +412,11 @@ export class SafePayService {
       'seller',
       'customer.classifieds.order_paid',
       `UdozoPay order SP-${paid.number} is paid`,
-      paid.fulfilment === 'meet_up' ? `Meet the buyer and hand "${paid.listing.title}" over; enter their release code to be paid.` : `Send "${paid.listing.title}" to the buyer and mark it sent.`,
+      paid.fulfilment === 'meet_up'
+        ? `Meet the buyer and hand "${paid.listing.title}" over; enter their release code to be paid.`
+        : paid.fulfilment === 'connect'
+          ? `Get "${paid.listing.title}" to ${paid.connectCentre?.name ?? "the buyer's Connect Centre"} (drop it off or send it with any courier) and mark it sent. You are paid once the buyer collects it.`
+          : `Send "${paid.listing.title}" to the buyer and mark it sent.`,
     );
     return this.present(paid, 'buyer');
   }
@@ -406,13 +424,15 @@ export class SafePayService {
   /** The buyer's release code (a meet-up, once paid): never shown to the seller, never sent in chat. */
   async releaseCode(customer: CustomerWithStore, id: string) {
     const order = await this.forParty(customer, id, 'buyer');
-    if (order.fulfilment !== 'meet_up' || order.status !== 'paid' || !order.releaseCode) throw conflict('release_code_unavailable', 'A release code is shown once a meet-up order is paid, until it is released.');
+    const showing = order.fulfilment === 'meet_up' ? order.status === 'paid' : order.fulfilment === 'connect' && ['paid', 'sent', 'at_centre'].includes(order.status);
+    if (!showing || !order.releaseCode) throw conflict('release_code_unavailable', 'A release code is shown once a meet-up or Connect order is paid, until it is released.');
     return { object: 'classified_release_code' as const, order_id: order.id, code: this.encryption().decrypt(order.releaseCode), tries_left: releaseCodeTries - order.releaseAttempts };
   }
 
   /** The buyer confirms a delivery arrived: the money is released. */
   async received(customer: CustomerWithStore, id: string) {
     const order = await this.forParty(customer, id, 'buyer');
+    if (order.fulfilment === 'connect') throw conflict('connect_collect_at_centre', 'Collect it at the Connect Centre: give your release code there once you have inspected it.');
     if (order.status !== 'sent') throw this.wrongStatus(order, 'confirmed');
     await this.settle(order, { kind: 'release' }, ['sent']);
     return this.present(await this.reload(order.id), 'buyer');
@@ -421,11 +441,11 @@ export class SafePayService {
   /** The buyer opens a dispute before release (not received, not as described, damaged): the release stops. */
   async dispute(customer: CustomerWithStore, id: string, input: { reason: DisputeReason; details: string }) {
     const order = await this.forParty(customer, id, 'buyer');
-    if (!['paid', 'sent'].includes(order.status)) throw this.wrongStatus(order, 'disputed');
+    if (!['paid', 'sent', 'at_centre'].includes(order.status)) throw this.wrongStatus(order, 'disputed');
     const details = cleanMessage(input.details);
     if (details.length < 10) throw invalid('parameter_invalid', 'Say what went wrong (at least 10 characters).', 'details');
     const opened = await this.prisma.$transaction(async tx => {
-      const claimed = await tx.classifiedOrder.updateMany({ where: { id: order.id, status: { in: ['paid', 'sent'] } }, data: { status: 'disputed' } });
+      const claimed = await tx.classifiedOrder.updateMany({ where: { id: order.id, status: { in: ['paid', 'sent', 'at_centre'] } }, data: { status: 'disputed' } });
       if (!claimed.count) return false;
       const dispute = await tx.classifiedDispute.create({ data: { orderId: order.id, reason: input.reason } });
       await tx.classifiedDisputeMessage.create({ data: { disputeId: dispute.id, author: 'buyer', authorId: customer.id, body: details } });
@@ -439,6 +459,37 @@ export class SafePayService {
     await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} is disputed`, `The buyer says there is a problem with "${disputed.listing.title}". The money stays held until Udozo decides; add your side in the dispute.`);
     await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `UdozoPay dispute on SP-${disputed.number}`, body: `${input.reason.replace(/_/g, ' ')}: ${details.slice(0, 120)}`, link: `/classifieds/orders/${disputed.id}` });
     return this.present(disputed, 'buyer');
+  }
+
+  /**
+   * A Connect Centre stops an order: it refused the item at check-in, or the buyer refused it at the counter. The release
+   * stops and Udozo decides, as for a buyer's dispute; the centre's words are recorded as Udozo's.
+   */
+  async centreDispute(order: OrderRow, from: string[], reason: DisputeReason, words: string) {
+    const opened = await this.prisma.$transaction(async tx => {
+      const claimed = await tx.classifiedOrder.updateMany({ where: { id: order.id, status: { in: from } }, data: { status: 'disputed' } });
+      if (!claimed.count) return false;
+      const dispute = await tx.classifiedDispute.create({ data: { orderId: order.id, reason } });
+      await tx.classifiedDisputeMessage.create({ data: { disputeId: dispute.id, author: 'bitocard', body: words } });
+      return true;
+    });
+    if (!opened) throw conflict('order_changed', 'This order changed: refresh and try again.');
+    const disputed = await this.reload(order.id);
+    const body = `${words} The money stays held until Udozo decides; add your side in the dispute.`;
+    await this.tell(disputed, 'buyer', 'customer.classifieds.order_disputed', `SP-${disputed.number} needs Udozo to decide`, body);
+    await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} needs Udozo to decide`, body);
+    await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `Connect Centre stopped SP-${disputed.number}`, body: words.slice(0, 160), link: `/classifieds/orders/${disputed.id}` });
+    return disputed;
+  }
+
+  /** Tells the buyer or the seller of an order (the Connect counter's steps). */
+  tellParty(order: OrderRow, to: 'buyer' | 'seller', type: Parameters<InboxService['customer']>[1], title: string, body: string) {
+    return this.tell(order, to, type, title, body);
+  }
+
+  /** The order, reloaded with everything its presenters read. */
+  load(id: string) {
+    return this.reload(id);
   }
 
   // ---- The seller ----
@@ -488,7 +539,18 @@ export class SafePayService {
     await this.listings.sellerCountry(customer);
     const order = await this.mine(customer, id, 'seller');
     if (order.fulfilment !== 'meet_up' || order.status !== 'paid' || !order.releaseCode) throw this.wrongStatus(order, 'released');
-    const tried = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: 'paid', releaseAttempts: { lt: releaseCodeTries } }, data: { releaseAttempts: { increment: 1 } } });
+    await this.checkReleaseCode(order, 'paid', code);
+    await this.settle(order, { kind: 'release' }, ['paid']);
+    return this.present(await this.reload(order.id), 'seller');
+  }
+
+  /**
+   * The buyer's release code, checked in constant time against the order in `status`, each try counted first (5 in all):
+   * by the seller at a meet-up, or by a Connect Centre's staff at the counter.
+   */
+  async checkReleaseCode(order: OrderRow, status: string, code: string) {
+    if (!order.releaseCode) throw this.wrongStatus(order, 'released');
+    const tried = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status, releaseAttempts: { lt: releaseCodeTries } }, data: { releaseAttempts: { increment: 1 } } });
     if (!tried.count) throw conflict('release_locked', 'The code was entered wrongly too many times. Ask the buyer to confirm it in their app, or contact Udozo.');
     const expected = Buffer.from(this.encryption().decrypt(order.releaseCode));
     const given = Buffer.from(code.trim());
@@ -496,8 +558,6 @@ export class SafePayService {
       const left = releaseCodeTries - order.releaseAttempts - 1;
       throw invalid('release_code_wrong', left > 0 ? `That is not the code. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'That is not the code, and no tries are left.', 'code');
     }
-    await this.settle(order, { kind: 'release' }, ['paid']);
-    return this.present(await this.reload(order.id), 'seller');
   }
 
   /**
@@ -505,12 +565,13 @@ export class SafePayService {
    * the item and the sealed parcel). The buyer confirms once it arrives or disputes it; without a delivery reported,
    * the confirm time starts once the country's longest transit time has passed.
    */
-  async markSent(customer: CustomerWithStore, id: string, input: { courier: string; tracking_number: string; tracking_url?: string; note?: string }) {
+  async markSent(customer: CustomerWithStore, id: string, input: { courier?: string; tracking_number?: string; tracking_url?: string; note?: string }) {
     const { settings, country } = await this.open(customer);
     const order = await this.mine(customer, id, 'seller');
+    if (order.fulfilment === 'connect') return this.sentToCentre(customer, order, input);
     if (order.fulfilment !== 'delivery' || order.status !== 'paid') throw this.wrongStatus(order, 'sent');
     if (order.dispatchPhotos.length < minDispatchPhotos) throw conflict('dispatch_photos_required', `Add at least ${minDispatchPhotos} photos first: the item, and the parcel sealed for shipping.`, 'photos');
-    const shipment = await this.checkShipment(country, input);
+    const shipment = await this.checkShipment(country, { courier: input.courier ?? '', tracking_number: input.tracking_number ?? '', tracking_url: input.tracking_url });
     const now = new Date();
     const transit = await this.transitDays(order.country);
     const claimed = await this.claim(
@@ -527,6 +588,38 @@ export class SafePayService {
     await this.tell(sent, 'buyer', 'customer.classifieds.order_sent', `"${sent.listing.title}" is on its way`, body);
     await this.tellReseller(sent, `SP-${sent.number} was shipped`, `${shipment.courier}, tracking ${shipment.trackingNumber}.`);
     return this.present(sent, 'seller');
+  }
+
+  /**
+   * A Connect order on its way to the buyer's Connect Centre: dropped off by the seller (no courier), or sent with any
+   * courier and its tracking number; at least two dispatch photos first. Nothing is released by the clock: the centre
+   * receives it, then hands it over against the buyer's code.
+   */
+  private async sentToCentre(customer: CustomerWithStore, order: OrderRow, input: { courier?: string; tracking_number?: string; tracking_url?: string; note?: string }) {
+    if (order.status !== 'paid') throw this.wrongStatus(order, 'sent');
+    if (order.dispatchPhotos.length < minDispatchPhotos) throw conflict('dispatch_photos_required', `Add at least ${minDispatchPhotos} photos first: the item, and the parcel sealed for the centre.`, 'photos');
+    const byCourier = Boolean(input.courier?.trim());
+    const shipment = byCourier ? await this.checkShipment(order.country, { courier: input.courier!, tracking_number: input.tracking_number ?? '', tracking_url: input.tracking_url }) : { courier: null, trackingNumber: null, trackingUrl: null };
+    const centre = order.connectCentre!;
+    const claimed = await this.claim(
+      order,
+      { status: 'paid' },
+      { status: 'sent', sentAt: new Date(), confirmBy: null, trackingNote: input.note ? cleanMessage(input.note).slice(0, 300) : null, ...shipment },
+      async tx => {
+        await tx.classifiedShipmentEvent.create({ data: { orderId: order.id, status: 'shipped', reportedBy: 'seller', note: byCourier ? `${shipment.courier} ${shipment.trackingNumber}` : `Dropping it off at ${centre.name}` } });
+      },
+    );
+    if (!claimed) throw conflict('order_changed', 'This order changed: refresh and try again.');
+    const sent = await this.reload(order.id);
+    await this.tell(sent, 'buyer', 'customer.classifieds.order_sent', `"${sent.listing.title}" is on its way to ${centre.name}`, `You will be told when it is ready to collect. Inspect it at the counter, then give your release code.`);
+    await this.connectTell?.(sent, `SP-${sent.number} is on its way to you`, `"${sent.listing.title}" is coming${byCourier ? ` with ${shipment.courier}, tracking ${shipment.trackingNumber}` : ': the seller is dropping it off'}. Receive it when it arrives.`);
+    return this.present(sent, 'seller');
+  }
+
+  /** Tells a Connect Centre's people about an order (set by the Connect counter, which knows them). */
+  private connectTell?: (order: OrderRow, title: string, body: string) => Promise<void>;
+  useConnectTell(tell: (order: OrderRow, title: string, body: string) => Promise<void>) {
+    this.connectTell = tell;
   }
 
   /** A courier from the country's list (its tracking link made from the number) or another named one, and the number. */
@@ -1143,7 +1236,7 @@ export class SafePayService {
    * and the buyer's fee back to their wallet. Partial: part of the price back, the rest to the seller less their fee
    * on it, both fees to revenue.
    */
-  private async settle(order: OrderRow, decision: { kind: 'release' } | { kind: 'refund'; endedBy: string; reason: string | null } | { kind: 'partial'; refund: bigint }, from: string[], extra?: (tx: Prisma.TransactionClient) => Promise<void>) {
+  async settle(order: OrderRow, decision: { kind: 'release' } | { kind: 'refund'; endedBy: string; reason: string | null } | { kind: 'partial'; refund: bigint }, from: string[], extra?: (tx: Prisma.TransactionClient) => Promise<void>) {
     const total = totalOf(order);
     const escrow = { kind: 'classified_escrow' as const, currency: order.currency };
     const buyerWallet = { kind: 'customer_wallet' as const, currency: order.currency, customerId: order.buyerId };
@@ -1164,6 +1257,12 @@ export class SafePayService {
       credit(sellerMoney, split!.sellerPayout);
       if (order.resellerId && split!.resellerPayout > 0n) credit({ kind: 'reseller_earnings_held', currency: order.currency, resellerId: order.resellerId }, split!.resellerPayout);
       credit(revenue, order.buyerFeeMinor + split!.sellerFee + split!.resellerFee);
+      // The Connect fee: the centre's part to its partner's earnings, the rest Udozo's (never mixed with UdozoPay's).
+      if (order.connectFeeMinor > 0n && order.connectCentre) {
+        const centre = order.centreShareMinor ?? 0n;
+        credit({ kind: 'connect_centre_earnings', currency: order.currency, customerId: order.connectCentre.partnerId }, centre);
+        credit({ kind: 'connect_revenue', currency: order.currency }, order.connectFeeMinor - centre);
+      }
       refund = decision.kind === 'partial' ? decision.refund : null;
       [status, type] = decision.kind === 'partial' ? ['partly_refunded', 'classified_partial'] : ['released', 'classified_release'];
     }
@@ -1425,7 +1524,7 @@ export class SafePayService {
       buyer_details: details,
       tracking_note: order.trackingNote,
       shipment:
-        order.fulfilment === 'delivery'
+        order.fulfilment === 'delivery' || order.fulfilment === 'connect'
           ? {
               courier: order.courier,
               tracking_number: order.trackingNumber,
@@ -1436,6 +1535,28 @@ export class SafePayService {
             }
           : null,
       release_tries_left: order.fulfilment === 'meet_up' && viewer !== 'buyer' ? releaseCodeTries - order.releaseAttempts : null,
+      /** Collected at a Udozo Connect Centre: where, the Connect fee, and the centre's steps. */
+      connect:
+        order.fulfilment === 'connect' && order.connectCentre
+          ? {
+              centre: {
+                id: order.connectCentre.id,
+                number: `CC-${String(order.connectCentre.number).padStart(6, '0')}`,
+                name: order.connectCentre.name,
+                address: order.connectCentre.address,
+                landmark: order.connectCentre.landmark,
+                area: order.connectCentre.area.name,
+                state: order.connectCentre.state.name,
+                hours: order.connectCentre.hours,
+                phone: order.connectCentre.phone,
+              },
+              ...(viewer !== 'seller' ? { connect_fee: Number(order.connectFeeMinor) } : {}),
+              ...(viewer === 'admin' ? { centre_share: Number(order.centreShareMinor ?? 0n), shelf: order.connectShelf?.code ?? null } : {}),
+              received_at: order.receivedAt?.toISOString() ?? null,
+              ready_at: order.readyAt?.toISOString() ?? null,
+              collect_by: order.collectBy?.toISOString() ?? null,
+            }
+          : null,
       deadlines: { accept_by: order.acceptBy.toISOString(), pay_by: order.payBy?.toISOString() ?? null, handover_by: order.handoverBy?.toISOString() ?? null, confirm_by: order.confirmBy?.toISOString() ?? null },
       timeline: {
         requested_at: order.createdAt.toISOString(),

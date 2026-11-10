@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { Button, Card, CardHeader, currencyDigits, errorMessage, Field, Input, Notice, PageHeader, QueryView, Skeleton, Toggle } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, currencyDigits, errorMessage, Field, Input, Notice, PageHeader, QueryView, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type ConnectSettings, type ConnectState, useConnectSettingsQuery, useConnectStatesQuery, useSetConnectSettingsMutation, useSetConnectStateMutation } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
@@ -55,6 +55,91 @@ function DepositCard({ settings, changes }: { settings: ConnectSettings; changes
   );
 }
 
+/** A percentage typed as people write it ("10", "2.5") as basis points, or null when it is not 0 to 100. */
+const bpsOf = (value: string) => {
+  const number = Number(value.trim().replace(/%$/, ""));
+  return value.trim() && Number.isFinite(number) && number >= 0 && number <= 100 ? Math.round(number * 100) : null;
+};
+const percent = (bps: number) => `${bps / 100}%`;
+
+function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: boolean }) {
+  const id = useId();
+  const [save, state] = useSetConnectSettingsMutation();
+  const [kind, setKind] = useState<"percent" | "fixed" | "">(settings.fee?.kind ?? "");
+  const [fee, setFee] = useState(settings.fee?.kind === "percent" ? String(settings.fee.bps / 100) : settings.fee?.kind === "fixed" ? toMajor(settings.fee.amount, settings.currency) : "");
+  const [share, setShare] = useState(String(settings.centre_share_bps / 100));
+  const [hours, setHours] = useState(String(settings.buyer_free_hours));
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const now = settings.fee === null ? "Not set" : settings.fee.kind === "percent" ? `${percent(settings.fee.bps)} of the shipping charge` : `${money(settings.fee.amount, settings.currency)} an order`;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    setSaved(false);
+    const centreShare = bpsOf(share);
+    if (centreShare === null) return setProblem("Give the centre's share as 0 to 100%.");
+    const freeHours = Number(hours);
+    if (!Number.isInteger(freeHours) || freeHours < 1 || freeHours > 720) return setProblem("Give the free time to collect as 1 to 720 hours.");
+    const change = { country: settings.country, centre_share_bps: centreShare, buyer_free_hours: freeHours };
+    let done;
+    if (kind === "") done = await save({ ...change, fee_kind: null }).unwrap().catch(() => null);
+    else if (kind === "percent") {
+      const bps = bpsOf(fee);
+      if (bps === null) return setProblem("Give the Connect fee as 0 to 100% of the shipping charge.");
+      done = await save({ ...change, fee_kind: "percent", fee_bps: bps }).unwrap().catch(() => null);
+    } else {
+      const minor = toMinor(fee, settings.currency);
+      if (minor === null) return setProblem(`Give the Connect fee in ${settings.currency}, for example 500.`);
+      done = await save({ ...change, fee_kind: "fixed", fee: minor }).unwrap().catch(() => null);
+    }
+    if (done) setSaved(true);
+  };
+
+  return (
+    <Card>
+      <CardHeader title="Connect fee" description="What buyers pay on each order collected at a Connect Centre, on top of the seller's shipping charge. The centre's share goes to its earnings, the rest to Udozo." />
+      <div className="space-y-4 px-5 pb-5 sm:px-6">
+        <p className="text-sm text-ink">
+          Now: <span className="font-semibold">{now}</span> · centre&apos;s share <span className="font-semibold">{percent(settings.centre_share_bps)}</span> · free to collect for{" "}
+          <span className="font-semibold">{settings.buyer_free_hours} hours</span>
+        </p>
+        {settings.fee === null ? <Notice tone="amber">Buyers in {settings.name} cannot choose a Connect Centre until the fee is set.</Notice> : null}
+        {changes ? (
+          <form onSubmit={submit} className="space-y-3">
+            {problem ? <Notice tone="red">{problem}</Notice> : null}
+            {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+            {saved ? <Notice tone="green">Saved. New Connect orders use these.</Notice> : null}
+            <Field label="Kind" htmlFor={`${id}-kind`}>
+              <Select id={`${id}-kind`} value={kind} onChange={event => setKind(event.target.value as "percent" | "fixed" | "")} className="max-w-xs">
+                <option value="">Not set (no Connect orders)</option>
+                <option value="percent">A share of the shipping charge</option>
+                <option value="fixed">A fixed amount an order</option>
+              </Select>
+            </Field>
+            {kind ? (
+              <Field label={kind === "percent" ? "Fee (% of shipping)" : `Fee (${settings.currency})`} htmlFor={`${id}-fee`}>
+                <Input id={`${id}-fee`} inputMode="decimal" value={fee} onChange={event => setFee(event.target.value)} className="max-w-xs" />
+              </Field>
+            ) : null}
+            <Field label="Centre's share (%)" htmlFor={`${id}-share`} hint="Of the Connect fee, demurrage and penalties; Udozo has the rest.">
+              <Input id={`${id}-share`} inputMode="decimal" value={share} onChange={event => setShare(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Free time to collect (hours)" htmlFor={`${id}-hours`} hint="From the moment an item is ready at the centre.">
+              <Input id={`${id}-hours`} inputMode="numeric" value={hours} onChange={event => setHours(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Button type="submit" loading={state.isLoading}>
+              Save Connect fee
+            </Button>
+          </form>
+        ) : (
+          <p className="text-xs text-muted">Only finance can change the Connect fee.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function StatesCard({ country, changes }: { country: string; changes: boolean }) {
   const states = useConnectStatesQuery(country);
   const [setState, state] = useSetConnectStateMutation();
@@ -88,22 +173,28 @@ function StatesCard({ country, changes }: { country: string; changes: boolean })
 }
 
 /**
- * Connect > States and deposit, per market: the deposit applicants pay when they submit (finance, inside the step-up
- * window) and the states that take applications (operations), each open unless switched off.
+ * Connect > States, deposit and fee, per market: the deposit applicants pay when they submit and the Connect fee buyers
+ * pay with its centre's share and free time to collect (finance, inside the step-up window), and the states that take
+ * applications (operations), each open unless switched off.
  */
 export default function ConnectSettingsPage() {
   const admin = useAdmin();
   const [country, setCountry] = useState("NG");
   const settings = useConnectSettingsQuery(country);
   return (
-    <UdozoShell section="connect" current="/connect/settings" crumbs={[{ label: "Connect", href: "/connect/applications" }, { label: "States and deposit" }]}>
-      <PageHeader title="States and deposit" description="Applications open in a market with the connect_applications switch (Settings > Feature switches), once its deposit is set here." />
+    <UdozoShell section="connect" current="/connect/settings" crumbs={[{ label: "Connect", href: "/connect/applications" }, { label: "States, deposit and fee" }]}>
+      <PageHeader title="States, deposit and fee" description="Applications open in a market with the connect_applications switch (Settings > Feature switches), once its deposit is set here; buyers choose Connect Centres where connect_shipping is on, once the Connect fee is set." />
       <div className="mt-6 flex flex-wrap gap-3">
         <MarketFilter id="connect-settings-market" value={country} onChange={setCountry} all={false} />
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <QueryView query={settings} loading={<Skeleton className="h-64 w-full" />}>
-          {data => <DepositCard key={`${data.country}:${data.deposit}`} settings={data} changes={can(admin, "finance")} />}
+          {data => (
+            <div className="grid gap-4">
+              <DepositCard key={`${data.country}:${data.deposit}`} settings={data} changes={can(admin, "finance")} />
+              <FeeCard key={`${data.country}:${JSON.stringify(data.fee)}:${data.centre_share_bps}:${data.buyer_free_hours}`} settings={data} changes={can(admin, "finance")} />
+            </div>
+          )}
         </QueryView>
         <StatesCard key={country} country={country} changes={can(admin, "operations")} />
       </div>

@@ -96,7 +96,20 @@ export type ConnectState = { id: string; name: string; slug: string; open: boole
 export type ConnectStateList = { object: 'list'; country: string; data: ConnectState[] };
 
 /** A market's deposit, in minor units; null until finance sets it (applications cannot be submitted). */
-export type ConnectSettings = { object: 'connect_settings'; country: string; name: string; currency: string; deposit: number | null };
+export type ConnectSettings = {
+  object: 'connect_settings';
+  country: string;
+  name: string;
+  currency: string;
+  deposit: number | null;
+  /** The Connect fee buyers pay on each Connect order (null: not set, so no Connect orders in the market). */
+  fee: { kind: 'percent'; bps: number } | { kind: 'fixed'; amount: number } | null;
+  /** The centre's part of Connect fees (Udozo has the rest), and the buyer's free time to collect. */
+  centre_share_bps: number;
+  buyer_free_hours: number;
+};
+/** What a change sends (anything left out stays). */
+export type ConnectSettingsChange = { country: string; deposit?: number | null; fee_kind?: 'percent' | 'fixed' | null; fee_bps?: number; fee?: number; centre_share_bps?: number; buyer_free_hours?: number };
 
 export type ConnectCentre = {
   object: 'connect_centre';
@@ -221,8 +234,8 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: country => `/v1/admin/connect/settings/${country}`,
       providesTags: (_result, _error, country) => [{ type: 'ConnectSettings', id: country }],
     }),
-    setConnectSettings: build.mutation<ConnectSettings, { country: string; deposit: number | null }>({
-      query: ({ country, deposit }) => ({ url: `/v1/admin/connect/settings/${country}`, method: 'PUT', body: { deposit } }),
+    setConnectSettings: build.mutation<ConnectSettings, ConnectSettingsChange>({
+      query: ({ country, ...body }) => ({ url: `/v1/admin/connect/settings/${country}`, method: 'PUT', body }),
       invalidatesTags: (_result, _error, { country }) => [{ type: 'ConnectSettings', id: country }, 'ConnectApplications', 'Activity'],
     }),
 

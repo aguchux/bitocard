@@ -168,7 +168,25 @@ class StateDto {
 class SettingsDto {
   /** Minor units; null clears it (applications cannot be submitted until it is set). */
   @IsOptional() @Type(() => Number) @IsInt() @Min(0)
-  deposit: number | null;
+  deposit?: number | null;
+
+  /** The Connect fee: a share of the shipping charge (`fee_bps`) or fixed (`fee`, minor units); null: no Connect orders. */
+  @IsOptional() @IsIn(['percent', 'fixed'])
+  fee_kind?: 'percent' | 'fixed' | null;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  fee_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  fee?: number;
+
+  /** The centre's part of Connect fees, demurrage and penalties (Udozo has the rest). */
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  centre_share_bps?: number;
+
+  /** The buyer's free time to collect once an item is ready. */
+  @IsOptional() @IsInt() @Min(1) @Max(720)
+  buyer_free_hours?: number;
 }
 
 /**
@@ -349,7 +367,7 @@ export class AdminConnectController {
   @AdminRoles('finance')
   @StepUp()
   setSettings(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: SettingsDto) {
-    return this.admin.setSettings(adminId(caller), country, body.deposit ?? null);
+    return this.admin.setSettings(adminId(caller), country, body);
   }
 
   @Get('centres')

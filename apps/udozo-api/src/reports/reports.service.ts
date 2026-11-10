@@ -18,7 +18,7 @@ const retailMargin = 'retail_margin';
 type ReportLine = AccountKind | typeof retailMargin;
 
 /** Revenue BitoCard keeps for itself, in money (never the crypto-denominated kinds: no fiat price feed behind them here). */
-const revenueLines: ReportLine[] = ['platform_revenue', retailMargin, 'platform_fees', 'domain_revenue', 'classifieds_revenue'];
+const revenueLines: ReportLine[] = ['platform_revenue', retailMargin, 'platform_fees', 'domain_revenue', 'classifieds_revenue', 'connect_revenue'];
 /** What suppliers charge BitoCard for fulfilled orders. */
 const costOfSalesLines: ReportLine[] = ['cost_of_sales'];
 /** Everything else BitoCard spends to run the business; `adjustments` is what finance credited (or took back) by hand. */
@@ -36,6 +36,7 @@ const labels: Record<ReportLine, string> = {
   platform_fees: "Fees on resellers' own suppliers",
   domain_revenue: 'Domain sales',
   classifieds_revenue: 'Marketplace and resale fees',
+  connect_revenue: 'Udozo Connect fees',
   cost_of_sales: 'Cost of sales',
   processing_fees: 'Payment processing fees',
   chargebacks: 'Chargebacks',

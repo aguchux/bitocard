@@ -709,8 +709,9 @@ class SafePayRequestDto {
   @IsOptional() @IsUUID()
   offer_id?: string;
 
-  @IsIn(['meet_up', 'delivery'])
-  fulfilment: 'meet_up' | 'delivery';
+  /** In person, delivered, or collected at a Udozo Connect Centre. */
+  @IsIn(['meet_up', 'delivery', 'connect'])
+  fulfilment: 'meet_up' | 'delivery' | 'connect';
 
   @IsOptional() @IsString() @MaxLength(500)
   delivery_address?: string;
@@ -718,6 +719,10 @@ class SafePayRequestDto {
   /** The state a delivery goes to (it decides the delivery charge). */
   @IsOptional() @IsUUID()
   delivery_state_id?: string;
+
+  /** The Connect Centre the buyer collects it from (`connect`). */
+  @IsOptional() @IsUUID()
+  connect_centre_id?: string;
 }
 
 class ReasonOptionalDto {
@@ -731,12 +736,12 @@ class ReleaseDto {
 }
 
 class SentDto {
-  /** The courier: one of the country's (`GET /v1/classifieds/safe-pay/couriers`) or another by name. */
-  @IsString() @MaxLength(60)
-  courier: string;
+  /** The courier: one of the country's (`GET /v1/classifieds/safe-pay/couriers`) or another by name. Left out of a Connect order the seller drops off at the centre. */
+  @IsOptional() @IsString() @MaxLength(60)
+  courier?: string;
 
-  @IsString() @MaxLength(60)
-  tracking_number: string;
+  @IsOptional() @IsString() @MaxLength(60)
+  tracking_number?: string;
 
   /** The parcel's tracking page (https); made from the courier's own link when left out. */
   @IsOptional() @IsString() @MaxLength(500)

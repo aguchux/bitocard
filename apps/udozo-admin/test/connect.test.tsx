@@ -102,6 +102,7 @@ const centre = (over: Record<string, unknown> = {}) => ({
 let roles: string[];
 let centreNow: ReturnType<typeof centre>;
 let deposit: number | null;
+let fee: { kind: "percent"; bps: number } | { kind: "fixed"; amount: number } | null;
 let current: ReturnType<typeof application>;
 let sent: Array<{ method: string; path: string; search: string; body: unknown }>;
 
@@ -119,6 +120,7 @@ beforeEach(() => {
   pushed.length = 0;
   roles = ["operations"];
   deposit = 5_000_000;
+  fee = null;
   current = application();
   centreNow = centre();
   params.id = "app1";
@@ -151,8 +153,12 @@ beforeEach(() => {
     if (path === "/v1/admin/connect/states/NG") return ok({ object: "list", country: "NG", data: [{ id: "s1", name: "Lagos", slug: "lagos", open: true }, { id: "s2", name: "Kano", slug: "kano", open: false }] });
     if (path === "/v1/admin/connect/states/s1") return ok({ object: "connect_state", id: "s1", name: "Lagos", country: "NG", open: (body as { enabled: boolean }).enabled });
     if (path === "/v1/admin/connect/settings/NG") {
-      if (input.method === "PUT") deposit = (body as { deposit: number | null }).deposit;
-      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit });
+      if (input.method === "PUT" && "deposit" in (body as object)) deposit = (body as { deposit: number | null }).deposit;
+      if (input.method === "PUT" && "fee_kind" in (body as object)) {
+        const sent = body as { fee_kind: "percent" | "fixed" | null; fee_bps?: number; fee?: number; centre_share_bps: number; buyer_free_hours: number };
+        fee = sent.fee_kind === "percent" ? { kind: "percent", bps: sent.fee_bps! } : sent.fee_kind === "fixed" ? { kind: "fixed", amount: sent.fee! } : null;
+      }
+      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72 });
     }
     if (path === "/v1/admin/connect/centres")
       return ok({
@@ -296,6 +302,22 @@ describe("Connect", () => {
 
     fireEvent.click(await screen.findByRole("switch", { name: "Open in Lagos" }));
     await waitFor(() => expect(lastSent("/connect/states/s1")?.body).toEqual({ enabled: false }), slow);
+  });
+
+  test("finance sets the Connect fee: a share of shipping or a fixed amount, with the centre's share", async () => {
+    roles = ["finance"];
+    shown(<SettingsPage />);
+    expect(await screen.findByText(/cannot choose a Connect Centre until the fee is set/, {}, slow)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "percent" } });
+    fireEvent.change(screen.getByLabelText("Fee (% of shipping)"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72 }), slow);
+    expect(await screen.findByText(/10% of the shipping charge/, {}, slow)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "fixed" } });
+    fireEvent.change(screen.getByLabelText("Fee (NGN)"), { target: { value: "500" } });
+    fireEvent.change(screen.getByLabelText("Centre's share (%)"), { target: { value: "65" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72 }), slow);
   });
 
   test("support cannot change the deposit or states", async () => {

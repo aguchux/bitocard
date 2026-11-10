@@ -810,7 +810,7 @@ export class AdminClassifiedsController {
 }
 
 class AdminOrdersDto {
-  @IsOptional() @IsIn(['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'locked', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded'])
+  @IsOptional() @IsIn(['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'locked', 'paid', 'sent', 'at_centre', 'disputed', 'released', 'refunded', 'partly_refunded'])
   status?: string;
 
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)

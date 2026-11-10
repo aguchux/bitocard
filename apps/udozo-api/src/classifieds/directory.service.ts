@@ -28,7 +28,7 @@ const sectionCards = 8;
 const trendingDays = 14;
 
 /** Requests and orders still holding a listing for a buyer (the listing page's Buy with UdozoPay continues them). */
-const openOrders = ['requested', 'awaiting_payment', 'paid', 'sent', 'disputed'] as const;
+const openOrders = ['requested', 'awaiting_payment', 'paid', 'sent', 'at_centre', 'disputed'] as const;
 
 /**
  * BitoCard Shop across its markets, for shop.bitocard.com: which countries it is open in, the price-free global showcase

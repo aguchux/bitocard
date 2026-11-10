@@ -26,7 +26,7 @@ export const contacts = ['chat', 'phone', 'both'] as const;
 export const onShopWhere = { status: 'active', onShop: true } as const;
 export const isOnShop = (listing: { status: string; onShop: boolean }) => listing.status === 'active' && listing.onShop;
 /** Statuses in which an order holds units of its listing: a resale order's locked money, and paid orders not yet released. */
-export const holdingStatuses = ['locked', 'paid', 'sent', 'disputed'];
+export const holdingStatuses = ['locked', 'paid', 'sent', 'at_centre', 'disputed'];
 
 /** Udozo buy orders hold their units once the seller accepts (`docs/UDOZO_RATINGS_PLAN.md` phase 0). */
 export const buyOrderHoldingStatuses = ['accepted'];

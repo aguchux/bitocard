@@ -66,7 +66,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
     items: [
       { label: "Applications", href: "/connect/applications", icon: ClipboardList },
       { label: "Visitors", href: "/connect/visitors", icon: UserCheck },
-      { label: "States and deposit", href: "/connect/settings", icon: MapPinned },
+      { label: "States, deposit and fee", href: "/connect/settings", icon: MapPinned },
       { label: "Centres", href: "/connect/centres", icon: Warehouse },
     ],
   },
