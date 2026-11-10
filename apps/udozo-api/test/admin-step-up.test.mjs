@@ -90,6 +90,7 @@ const protectedRoutes = [
   ['post', `/v1/admin/team/${randomId}/suspend`, { reason: 'Left' }],
   ['post', `/v1/admin/team/${randomId}/restore`, { reason: 'Back' }],
   ['put', '/v1/admin/connect/settings/NG', { deposit: 5000000 }],
+  ['post', `/v1/admin/connect/claims/${randomId}/pay`, {}],
 ];
 
 describe('admin step-up window', () => {

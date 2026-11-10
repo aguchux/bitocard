@@ -112,6 +112,7 @@ model User {
   @@unique([realm, email])
   @@unique([realm, phone])
   @@map("users")
+  connectAuctionClaimsDecided ConnectAuctionClaim[] @relation("ConnectAuctionClaimDecider")
 }
 
 model OAuthAccount {
@@ -2848,6 +2849,7 @@ model Customer {
   connectMemberships        ConnectCentreMember[]
   connectAuctionsWon        ConnectAuction[]          @relation("ConnectAuctionBuyer")
   connectAuctionBids        ConnectAuctionBid[]
+  connectAuctionClaims      ConnectAuctionClaim[]     @relation("ConnectAuctionClaimSeller")
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
@@ -7709,6 +7711,10 @@ model ConnectAuction {
   collectionCode String?             @map("collection_code")
   collectedAt    DateTime?           @map("collected_at")
   cancelReason   String?             @map("cancel_reason")
+  /// What is left over is claimed by then (the sale plus the market's claim days); reminded once, then Udozo's.
+  claimBy        DateTime?           @map("claim_by")
+  claimRemindedAt DateTime?          @map("claim_reminded_at")
+  unclaimedAt    DateTime?           @map("unclaimed_at")
   createdById    String              @map("created_by_id") @db.Uuid
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
@@ -7716,9 +7722,35 @@ model ConnectAuction {
   warehouse      ConnectWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   buyer          Customer?           @relation("ConnectAuctionBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
   bids           ConnectAuctionBid[]
+  claims         ConnectAuctionClaim[]
 
   @@index([country, status, endsAt])
+  @@index([status, claimBy])
   @@map("connect_auctions")
+}
+
+/// A seller's claim to what an auction of their abandoned item left over (`CL-000123`), checked and paid by finance.
+model ConnectAuctionClaim {
+  id           String         @id @default(uuid()) @db.Uuid
+  number       Int            @unique @default(autoincrement())
+  auctionId    String         @map("auction_id") @db.Uuid
+  sellerId     String         @map("seller_id") @db.Uuid
+  amountMinor  BigInt         @map("amount_minor")
+  currency     String         @db.Char(3)
+  /// requested, paid or rejected.
+  status       String         @default("requested")
+  note         String?
+  decisionNote String?        @map("decision_note")
+  decidedById  String?        @map("decided_by_id") @db.Uuid
+  decidedAt    DateTime?      @map("decided_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  auction      ConnectAuction @relation(fields: [auctionId], references: [id], onDelete: Restrict)
+  seller       Customer       @relation("ConnectAuctionClaimSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  decidedBy    User?          @relation("ConnectAuctionClaimDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("connect_auction_claims")
 }
 
 /// A bid on a Udozo auction lot.

@@ -519,6 +519,20 @@ export type ShopOrderConnect = {
   loss_of_care_at?: string | null;
   /** Its return to the seller, once the centre asked. */
   return?: ShopConnectReturn | null;
+  /** Abandoned and sold at a Udozo auction (the seller's view): what it raised, what is left over and their claim to it. */
+  auction?: ShopConnectAuction | null;
+};
+
+/** An abandoned item's Udozo auction on its seller's order: what is left over is theirs only on a claim within the days. */
+export type ShopConnectAuction = {
+  /** AU-000123 */
+  number: string;
+  sale: number | null;
+  left_over: number | null;
+  claim_by: string | null;
+  /** When what nobody claimed became Udozo's. */
+  unclaimed_at: string | null;
+  claim: { number: string; status: 'requested' | 'paid' | 'rejected'; amount: number; decision_note: string | null; decided_at: string | null } | null;
 };
 
 /** A Connect item's return to its seller, as the buyer and seller see it. */

@@ -490,6 +490,14 @@ export async function returnCode(orderId: string): Promise<ShopResult<{ code: st
 }
 
 /** The buyer pays the storage owed on their Connect order from their wallet, before they collect it. */
+/** The seller claims what the Udozo auction of their abandoned item left over. */
+export async function claimAuction(orderId: string, note: string): Promise<ShopResult<{ status: string; amount: number; number: string }>> {
+  if (!id(orderId)) return refused("No such order.");
+  const result = answer(await customerApi<{ status: string; amount: number; number: string }>("POST", `/v1/classifieds/orders/${orderId}/auction-claim`, { note: note.trim() || null }));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
 export async function payStorage(orderId: string): Promise<ShopResult<{ owed: number; paid: number }>> {
   if (!id(orderId)) return refused("No such order.");
   const result = answer(await customerApi<{ owed: number; paid: number }>("POST", `/v1/classifieds/orders/${orderId}/storage/pay`, {}));

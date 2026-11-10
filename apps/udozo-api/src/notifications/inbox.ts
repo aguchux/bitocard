@@ -170,6 +170,7 @@ export const notificationTypes = {
   'admin.connect.application': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'A Connect Centre application to review' },
   'admin.connect.return': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'A Connect Centre return to the seller' },
   'admin.connect.alert': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'A Connect Centre needs attention' },
+  'admin.connect.claim': { realm: 'admin', roles: ['finance', 'operations'], severity: 'info', label: 'A seller claims what a Udozo auction left over' },
   'admin.connect.missing': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'An item missing at a Connect Centre' },
   'admin.support.issue_closed': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'Engineering closed a ticket’s issue' },
   'admin.chargeback.opened': { realm: 'admin', roles: ['finance'], severity: 'warning', label: 'Chargeback opened' },

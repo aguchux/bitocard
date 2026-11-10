@@ -589,7 +589,7 @@ assistants' knowledge, help, terms and privacy.
    - **Screens:** admin Connect > **Reports** (`/connect/reports`: the period, four figures, the money, every centre
      with its flags, sellers and buyers) and **What it holds** on each centre's page.
    - Tests: `apps/udozo-api/test/connect-reports.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`.
-7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo
+7. **Warehouses, pickups and auctions** (**built**): Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo
    auctions on udozo.com, and auction claims. Built in slices:
    - **7a, warehouses, abandonment and pickups (built):** migration `20270310600000_connect_warehouses`
      (`connect_warehouses`; `connect_centres.fra_warehouse_id`; the market's `abandoned_after_days` 30,
@@ -660,7 +660,27 @@ assistants' knowledge, help, terms and privacy.
        Cancel, Hand over) and the four auction rules on Connect > Settings.
      - Tests: `apps/udozo-api/test/connect-auctions.test.mjs`, `apps/udozo/test/auctions.test.ts`,
        `apps/udozo/test/legal.test.ts`, `apps/udozo-admin/test/connect.test.tsx`.
-   - **7c (next):** claims, and unclaimed money becoming Udozo's.
+   - **7c, claims (built):** migration `20270310800000_connect_auction_claims` (`connect_auctions.claim_by`, set at
+     the sale to the market's `claim_days` (90) after it, `claim_reminded_at`, `unclaimed_at`; `connect_auction_claims`,
+     numbered **`CL-000123`**, at most one requested or paid per lot by a partial unique index).
+     `ConnectAuctionClaimsService`:
+     - **Claiming** (`POST /v1/classifieds/orders/:id/auction-claim { note? }`, the order's seller only; `nothing_to_claim`,
+       `claim_window_closed`, `claim_exists`): what the lot left over, for finance to check (`admin.connect.claim`).
+     - **Deciding** (`GET /v1/admin/connect/claims?status&country`, finance, operations and support read): finance
+       **pays** (`POST …/:id/pay { note? }`, step-up: `connect_auction_held` to the seller's `customer_withdrawable`,
+       reference `connect_auction:<lot>:claim`, so paid once) or **rejects** with why (`…/:id/reject { reason }`; the
+       seller may claim again while their days last); `claim_decided` once decided; audited
+       `connect_auction_claim.paid|rejected`; the seller told either way.
+     - **The job** (the `classifieds` job's `connect_claims`, `runDue`): the seller reminded once a week before
+       `claim_by`; after it, what nobody claimed moves from `connect_auction_held` to `connect_revenue` (once,
+       `unclaimed_at`, audited `connect_auction.unclaimed`, the seller told). A claim waiting for finance, or paid, is
+       never swept.
+     - **Screens:** udozo.com's seller order page shows the sale (`AuctionClaim` in
+       `components/account/connect-return.tsx`: what it raised, what is left over, **Claim what is left over** with an
+       optional note, the claim's outcome; `claimWords`, `canClaim`), and an auctioned return says so; admin Connect >
+       **Claims** (`/connect/claims`: Pay and Reject for finance).
+     - Tests: `apps/udozo-api/test/connect-auctions.test.mjs` (claims), `apps/udozo-api/test/admin-step-up.test.mjs`,
+       `apps/udozo/test/connect-orders.test.ts`, `apps/udozo-admin/test/connect.test.tsx`.
 
 Each phase is behind the switch `connect_shipping` (Udozo's own, global or per country, **off by default**), with
 tests in the API, the site and the admin, as the other Udozo plans are. Applications can open before shipping does, so

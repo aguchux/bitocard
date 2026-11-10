@@ -107,8 +107,24 @@ export const orderInclude = {
   connectReturn: { select: { id: true, number: true, reason: true, status: true, answerBy: true, decidedBy: true, collectBy: true, collectedAt: true, returnFeeMinor: true, lossOfCareAt: true, abandonedAt: true } },
   connectWarehouse: { select: { name: true, address: true, hours: true, phone: true, state: { select: { name: true } } } },
   connectCharges: { select: { payer: true, status: true, amountMinor: true } },
+  connectAuctions: { where: { status: 'sold' }, take: 1, select: { number: true, saleMinor: true, leftOverMinor: true, claimBy: true, unclaimedAt: true, claims: { orderBy: { createdAt: 'desc' }, take: 1, select: { number: true, status: true, amountMinor: true, decisionNote: true, decidedAt: true } } } },
 } satisfies Prisma.ClassifiedOrderInclude;
 export type OrderRow = Prisma.ClassifiedOrderGetPayload<{ include: typeof orderInclude }>;
+
+/** An abandoned item's auction as its seller sees it on their order, with their claim to what was left over. */
+function auctionOf(order: OrderRow) {
+  const lot = order.connectAuctions[0];
+  if (!lot) return null;
+  const claim = lot.claims[0];
+  return {
+    number: `AU-${String(lot.number).padStart(6, '0')}`,
+    sale: lot.saleMinor === null ? null : Number(lot.saleMinor),
+    left_over: lot.leftOverMinor === null ? null : Number(lot.leftOverMinor),
+    claim_by: lot.claimBy?.toISOString() ?? null,
+    unclaimed_at: lot.unclaimedAt?.toISOString() ?? null,
+    claim: claim ? { number: `CL-${String(claim.number).padStart(6, '0')}`, status: claim.status as 'requested' | 'paid' | 'rejected', amount: Number(claim.amountMinor), decision_note: claim.decisionNote, decided_at: claim.decidedAt?.toISOString() ?? null } : null,
+  };
+}
 
 /** Where each market's deadlines are told in (its own time; UTC elsewhere). */
 const marketZones: Record<string, string> = { NG: 'Africa/Lagos', GH: 'Africa/Accra', KE: 'Africa/Nairobi', ZA: 'Africa/Johannesburg', GB: 'Europe/London' };
@@ -1629,6 +1645,8 @@ export class SafePayService {
                     ...(viewer !== 'buyer' && order.connectReturn.returnFeeMinor !== null ? { return_fee: Number(order.connectReturn.returnFeeMinor) } : {}),
                   }
                 : null,
+              /** Sold at a Udozo auction (the seller's and admins' view): what it raised, what is left over and the seller's claim to it. */
+              ...(viewer !== 'buyer' ? { auction: auctionOf(order) } : {}),
             }
           : null,
       deadlines: { accept_by: order.acceptBy.toISOString(), pay_by: order.payBy?.toISOString() ?? null, handover_by: order.handoverBy?.toISOString() ?? null, confirm_by: order.confirmBy?.toISOString() ?? null },

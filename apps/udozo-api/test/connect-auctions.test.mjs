@@ -21,6 +21,7 @@ before(async () => {
     charges: server.app.get((await import('../dist/classifieds/connect-charges.service.js')).ConnectChargesService),
     warehouses: server.app.get((await import('../dist/classifieds/connect-warehouses.service.js')).ConnectWarehousesService),
     auctions: server.app.get((await import('../dist/classifieds/connect-auctions.service.js')).ConnectAuctionsService),
+    claims: server.app.get((await import('../dist/classifieds/connect-auction-claims.service.js')).ConnectAuctionClaimsService),
     house: server.app.get((await import('../dist/checkout/house.service.js')).HouseService),
   };
   admin = await adminClient(server);
@@ -270,5 +271,82 @@ describe('Udozo auctions', () => {
     await services.auctions.runDue();
     assert.equal((await admin.get(`/v1/admin/connect/auctions/${unsold.id}`)).json.status, 'unsold');
     assert.equal((await admin.post(`/v1/admin/connect/auctions/${unsold.id}/cancel`, { reason: 'Again' })).json.error.code, 'auction_has_bids');
+  });
+});
+
+/** An abandoned item sold at auction for more than its seller owed: what is left over waits for their claim. */
+async function soldLot(name) {
+  const item = await atWarehouse(await centre(place.ikeja, name));
+  const owed = (await admin.get('/v1/admin/connect/auctions/eligible?country=NG')).json.data.find(row => row.order_id === item.order.id).owed;
+  const lot = (await admin.post('/v1/admin/connect/auctions', { order_id: item.order.id, start_price: owed + 300_000, ends_at: soon(48) })).json;
+  await prisma.connectAuction.update({ where: { id: lot.id }, data: { startsAt: new Date(Date.now() - 1000) } });
+  await services.auctions.runDue();
+  const buyer = await customer('Claim Bidder');
+  await buyer.post(`${lotPath(lot)}/bids`, { amount: owed + 300_000 });
+  await prisma.connectAuction.update({ where: { id: lot.id }, data: { endsAt: new Date(Date.now() - 1000) } });
+  await services.auctions.runDue();
+  await fund(buyer, owed + 300_000);
+  const paid = (await buyer.post(`${lotPath(lot)}/pay`)).json;
+  assert.equal(paid.viewer.won, true, JSON.stringify(paid));
+  const row = await prisma.connectAuction.findUniqueOrThrow({ where: { id: lot.id } });
+  assert.ok(row.claimBy > new Date(Date.now() + 89 * 86_400_000), "the market's 90 days to claim");
+  return { item, lot, buyer, leftOver: row.leftOverMinor };
+}
+
+describe('Claims on what an auction left over', () => {
+  test('the seller claims from their order; finance rejects, then pays it into their Udozo money; a claim waiting is never swept', async () => {
+    const { item, lot, buyer, leftOver } = await soldLot('Claim Hub');
+    assert.ok(leftOver > 0n);
+    const order = (await item.seller.get(`/v1/classifieds/orders/${item.order.id}`)).json;
+    assert.deepEqual([order.connect.auction.number, order.connect.auction.left_over, order.connect.auction.claim], [lot.number, Number(leftOver), null]);
+    const claimPath = `/v1/classifieds/orders/${item.order.id}/auction-claim`;
+    assert.equal((await buyer.post(claimPath, {})).status, 404, 'only its seller claims');
+
+    const filed = (await item.seller.post(claimPath, { note: 'My TV' })).json;
+    assert.deepEqual([filed.status, filed.amount, filed.number.slice(0, 3)], ['requested', Number(leftOver), 'CL-']);
+    assert.equal((await item.seller.post(claimPath, {})).json.error.code, 'claim_exists');
+    const listed = (await admin.get('/v1/admin/connect/claims?status=requested')).json.data.find(row => row.id === filed.id);
+    assert.equal(listed.seller.id, item.seller.id);
+
+    const rejected = (await admin.post(`/v1/admin/connect/claims/${filed.id}/reject`, { reason: 'Send a photo of your ID first.' })).json;
+    assert.equal(rejected.status, 'rejected');
+    assert.ok(await prisma.notification.findFirst({ where: { customerId: item.seller.id, title: { contains: 'claim was not paid' } } }));
+    assert.equal((await admin.post(`/v1/admin/connect/claims/${filed.id}/pay`, {})).json.error.code, 'claim_decided');
+
+    const again = (await item.seller.post(claimPath, {})).json;
+    assert.equal(again.status, 'requested', 'claimed again within the days');
+    // The days end while it waits for finance: never swept.
+    await prisma.connectAuction.update({ where: { id: lot.id }, data: { claimBy: new Date(Date.now() - 1000) } });
+    assert.equal((await services.claims.runDue()).unclaimed, 0);
+
+    const held = await balance('connect_auction_held');
+    const money = await balance('customer_withdrawable', item.seller.id);
+    const paid = (await admin.post(`/v1/admin/connect/claims/${again.id}/pay`, { note: 'ID checked' })).json;
+    assert.equal(paid.status, 'paid', JSON.stringify(paid));
+    assert.equal(held - (await balance('connect_auction_held')), leftOver);
+    assert.equal((await balance('customer_withdrawable', item.seller.id)) - money, leftOver, "into the seller's Udozo money");
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'connect_auction_claim.paid', targetId: again.id } }));
+    assert.equal((await item.seller.get(`/v1/classifieds/orders/${item.order.id}`)).json.connect.auction.claim.status, 'paid');
+    assert.equal((await services.claims.runDue()).unclaimed, 0, 'a paid claim is never swept');
+  });
+
+  test("reminded once a week before the days end, then unclaimed money becomes Udozo's", async () => {
+    const { item, lot, leftOver } = await soldLot('Unclaimed Hub');
+    await prisma.connectAuction.update({ where: { id: lot.id }, data: { claimBy: new Date(Date.now() + 3 * 86_400_000) } });
+    assert.ok((await services.claims.runDue()).reminded >= 1);
+    assert.equal(await prisma.notification.count({ where: { customerId: item.seller.id, title: { contains: 'Claim what' } } }), 1);
+    await services.claims.runDue();
+    assert.equal(await prisma.notification.count({ where: { customerId: item.seller.id, title: { contains: 'Claim what' } } }), 1, 'reminded once');
+
+    await prisma.connectAuction.update({ where: { id: lot.id }, data: { claimBy: new Date(Date.now() - 1000) } });
+    const held = await balance('connect_auction_held');
+    const revenue = await balance('connect_revenue');
+    assert.ok((await services.claims.runDue()).unclaimed >= 1);
+    assert.equal(held - (await balance('connect_auction_held')), leftOver);
+    assert.equal((await balance('connect_revenue')) - revenue, leftOver, "Udozo's");
+    assert.ok((await prisma.connectAuction.findUniqueOrThrow({ where: { id: lot.id } })).unclaimedAt);
+    assert.equal((await services.claims.runDue()).unclaimed, 0, 'once');
+    assert.equal((await item.seller.post(`/v1/classifieds/orders/${item.order.id}/auction-claim`, {})).json.error.code, 'claim_window_closed');
+    assert.ok((await item.seller.get(`/v1/classifieds/orders/${item.order.id}`)).json.connect.auction.unclaimed_at);
   });
 });

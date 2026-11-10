@@ -156,6 +156,23 @@ export type ConnectAuction = {
 
 /** An abandoned item at a warehouse that can be listed (`due`) or will be once `auction_from` passes. */
 export type ConnectAuctionEligible = { order_id: string; number: string; title: string | null; price: number; currency: string; warehouse: { id: string; name: string } | null; owed: number; auction_from: string; due: boolean };
+/** A seller's claim to what an auction left over (phase 7c): finance pays it into their Udozo money or rejects it. */
+export type ConnectAuctionClaim = {
+  object: 'connect_auction_claim';
+  id: string;
+  number: string;
+  status: 'requested' | 'paid' | 'rejected';
+  amount: number;
+  currency: string;
+  note: string | null;
+  decision_note: string | null;
+  decided_by: { id: string; name: string } | null;
+  decided_at: string | null;
+  created_at: string;
+  auction: { id: string; number: string; title: string; country: string; sale: number | null; claim_by: string | null };
+  order: { id: string; number: string };
+  seller: { id: string; name: string; email: string };
+};
 export type ConnectAuctionInput = { order_id: string; start_price: number; ends_at: string; starts_at?: string; costs?: number; title?: string; description?: string; below_owed?: boolean };
 
 /** A warehouse Udozo runs: the Final Return Address abandoned items are picked up to. */
@@ -561,6 +578,18 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: ({ id, code }) => ({ url: `/v1/admin/connect/auctions/${id}/hand-over`, method: 'POST', body: { code } }),
       invalidatesTags: ['ConnectAuctions', 'ConnectCentres', 'Activity'],
     }),
+    connectClaims: build.query<{ object: 'list'; data: ConnectAuctionClaim[] }, { status?: ConnectAuctionClaim['status']; country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/claims', params: clean({ status: filter?.status, country: filter?.country }) }),
+      providesTags: ['ConnectAuctions'],
+    }),
+    payConnectClaim: build.mutation<ConnectAuctionClaim, { id: string; note?: string | null }>({
+      query: ({ id, note }) => ({ url: `/v1/admin/connect/claims/${id}/pay`, method: 'POST', body: note ? { note } : {} }),
+      invalidatesTags: ['ConnectAuctions', 'Activity'],
+    }),
+    rejectConnectClaim: build.mutation<ConnectAuctionClaim, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/connect/claims/${id}/reject`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['ConnectAuctions', 'Activity'],
+    }),
     setConnectCentreStatus: build.mutation<ConnectCentreDetail, { id: string; action: 'pause' | 'reinstate' | 'close'; reason: string }>({
       query: ({ id, action, reason }) => ({ url: `/v1/admin/connect/centres/${id}/${action}`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => ['ConnectCentres', { type: 'ConnectCentres', id }, 'Activity'],
@@ -608,4 +637,7 @@ export const {
   useCreateConnectAuctionMutation,
   useCancelConnectAuctionMutation,
   useHandOverConnectAuctionMutation,
+  useConnectClaimsQuery,
+  usePayConnectClaimMutation,
+  useRejectConnectClaimMutation,
 } = connectApi;

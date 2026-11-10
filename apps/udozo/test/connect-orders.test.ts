@@ -9,8 +9,8 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 const { orderActions, orderNext, orderSteps } = await import("@/lib/shop");
 const { labelFor } = await import("@/lib/connect-label");
 const { requestSafePay } = await import("@/lib/listing-actions");
-const { acceptReturn, payStorage, orderStep, returnCode } = await import("@/lib/shop-actions");
-const { placeWords } = await import("@/components/account/connect-return");
+const { acceptReturn, claimAuction, payStorage, orderStep, returnCode } = await import("@/lib/shop-actions");
+const { canClaim, claimWords, placeWords } = await import("@/components/account/connect-return");
 
 const id = "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d";
 const centre = { id, number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue", landmark: null, area: "Ikeja", state: "Lagos", hours: "Mon to Sat, 8am to 6pm", phone: "08031234567" };
@@ -110,6 +110,16 @@ describe("asking and sending", () => {
     expect(await acceptReturn("../x")).toMatchObject({ ok: false });
   });
 
+  test("the seller claims what an auction left over, with an optional note", async () => {
+    await claimAuction(id, "  My TV ");
+    await claimAuction(id, "");
+    expect(calls).toEqual([
+      { path: `/v1/classifieds/orders/${id}/auction-claim`, body: { note: "My TV" } },
+      { path: `/v1/classifieds/orders/${id}/auction-claim`, body: { note: null } },
+    ]);
+    expect(await claimAuction("nope", "")).toMatchObject({ ok: false });
+  });
+
   test("the buyer pays the storage owed before collecting", async () => {
     await payStorage(id);
     expect(calls).toEqual([{ path: `/v1/classifieds/orders/${id}/storage/pay`, body: {} }]);
@@ -131,5 +141,27 @@ describe("an abandoned item's place", () => {
     const there = placeWords({ place: "udozo_warehouse", warehouse: { name: "Udozo Lagos warehouse", address: "4 Industrial Avenue", state: "Lagos", hours: "9 to 5", phone: "0803" } }, "Ikeja Parcel Hub");
     expect(there).toContain("Udozo Lagos warehouse, 4 Industrial Avenue, Lagos");
     expect(there).toContain("before Udozo auctions it");
+    expect(placeWords({ place: "auctioned", warehouse: null }, "Ikeja Parcel Hub")).toContain("sold at a Udozo auction");
+  });
+});
+
+describe("the seller's claim to what an auction left over", () => {
+  const now = Date.parse("2026-11-10T10:00:00Z");
+  const sold = { number: "AU-000007", sale: 3_000_000, left_over: 600_000, claim_by: "2027-02-08T10:00:00Z", unclaimed_at: null, claim: null };
+  test("claimable within the days, once; words for every outcome", () => {
+    expect(canClaim(sold, now)).toBe(true);
+    expect(claimWords(sold, "NGN", now)).toMatch(/^₦6,000 is left over for you after the storage owed\. Claim it by .+, or it becomes Udozo's\.$/);
+    const asked = { ...sold, claim: { number: "CL-000001", status: "requested" as const, amount: 600_000, decision_note: null, decided_at: null } };
+    expect(canClaim(asked, now)).toBe(false);
+    expect(claimWords(asked, "NGN", now)).toBe("Your claim CL-000001 for ₦6,000 is with Udozo.");
+    const rejected = { ...sold, claim: { ...asked.claim, status: "rejected" as const, decision_note: "Send your ID." } };
+    expect(canClaim(rejected, now)).toBe(true);
+    expect(claimWords(rejected, "NGN", now)).toMatch(/^Your claim was not paid: Send your ID\. ₦6,000 is left over/);
+    expect(claimWords({ ...sold, claim: { ...asked.claim, status: "paid" as const } }, "NGN", now)).toMatch(/was paid: ₦6,000 is in your Udozo money/);
+    expect(canClaim({ ...sold, unclaimed_at: "2027-02-09T00:00:00Z" }, now)).toBe(false);
+    expect(claimWords({ ...sold, unclaimed_at: "2027-02-09T00:00:00Z" }, "NGN", now)).toMatch(/not claimed in time/);
+    expect(canClaim({ ...sold, claim_by: "2026-11-01T00:00:00Z" }, now)).toBe(false);
+    expect(canClaim({ ...sold, left_over: 0 }, now)).toBe(false);
+    expect(claimWords({ ...sold, left_over: 0 }, "NGN", now)).toMatch(/Nothing is left over/);
   });
 });

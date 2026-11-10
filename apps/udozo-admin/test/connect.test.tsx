@@ -24,6 +24,7 @@ const { default: MissingPage } = await import("@/app/(console)/connect/missing/p
 const { default: WarehousesPage } = await import("@/app/(console)/connect/warehouses/page");
 const { default: PickupsPage } = await import("@/app/(console)/connect/pickups/page");
 const { default: AuctionsPage } = await import("@/app/(console)/connect/auctions/page");
+const { default: ClaimsPage } = await import("@/app/(console)/connect/claims/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -216,6 +217,30 @@ beforeEach(() => {
     if (path === "/v1/admin/connect/pickups") return ok(pickup);
     if (path === "/v1/admin/connect/pickups/pk2/receive") return ok({ ...collected, status: "delivered" });
     if (path === "/v1/admin/connect/warehouse-items") return ok({ object: "list", data: [{ object: "connect_warehouse_item", order_id: "o9", number: "SP-90", title: "Rice cooker", price: 1_500_000, currency: "NGN", warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, centre: { id: "cc1", name: "Ikeja Parcel Hub" }, return_id: "rt9", loss_of_care_at: "2026-09-01T00:00:00.000Z", abandoned_at: "2026-10-01T00:00:00.000Z", received_at: "2026-10-05T00:00:00.000Z" }] });
+    if (path === "/v1/admin/connect/claims")
+      return ok({
+        object: "list",
+        data: [
+          {
+            object: "connect_auction_claim",
+            id: "cl1",
+            number: "CL-000001",
+            status: "requested",
+            amount: 600_000,
+            currency: "NGN",
+            note: "My TV",
+            decision_note: null,
+            decided_by: null,
+            decided_at: null,
+            created_at: "2026-11-10T00:00:00.000Z",
+            auction: { id: "au2", number: "AU-000002", title: "Rice cooker", country: "NG", sale: 3_000_000, claim_by: "2027-02-08T00:00:00.000Z" },
+            order: { id: "o9", number: "SP-90" },
+            seller: { id: "c9", name: "Chinedu Okafor", email: "chinedu@example.com" },
+          },
+        ],
+      });
+    if (path === "/v1/admin/connect/claims/cl1/pay") return ok({ object: "connect_auction_claim", id: "cl1", status: "paid" });
+    if (path === "/v1/admin/connect/claims/cl1/reject") return ok({ object: "connect_auction_claim", id: "cl1", status: "rejected" });
     if (path === "/v1/admin/connect/auctions/eligible")
       return ok({ object: "list", data: [{ order_id: "o9", number: "SP-90", title: "Rice cooker", price: 1_500_000, currency: "NGN", warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, owed: 2_400_000, auction_from: "2026-11-01T00:00:00.000Z", due: true }] });
     if (path === "/v1/admin/connect/auctions" && input.method === "GET")
@@ -263,7 +288,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/auctions", "/connect/reports"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/auctions", "/connect/claims", "/connect/reports"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -574,6 +599,29 @@ describe("Connect", () => {
     expect(lot.getByText("Won", { exact: false })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "List at auction" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hand over" })).toBeNull();
+  });
+
+  test("claims: finance pays one with what they checked, or rejects it with why; operations only read", async () => {
+    roles = ["finance"];
+    shown(<ClaimsPage />);
+    expect((await screen.findAllByText("Chinedu Okafor", {}, slow)).length).toBeGreaterThan(0);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Pay" }, slow))[0]!);
+    const paying = openDialog();
+    fireEvent.change(paying.getByRole("textbox"), { target: { value: "Seller's account checked" } });
+    fireEvent.click(paying.getByRole("button", { name: "Pay claim" }));
+    await waitFor(() => expect(lastSent("/connect/claims/cl1/pay")?.body).toEqual({ note: "Seller's account checked" }), slow);
+    await waitFor(() => expect(document.querySelector("dialog[open]")).toBeNull(), slow);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Reject" }, slow))[0]!);
+    const rejecting = openDialog();
+    fireEvent.change(rejecting.getByRole("textbox"), { target: { value: "Not their order" } });
+    fireEvent.click(rejecting.getByRole("button", { name: "Reject claim" }));
+    await waitFor(() => expect(lastSent("/connect/claims/cl1/reject")?.body).toEqual({ reason: "Not their order" }), slow);
+  });
+
+  test("operations read claims without paying them", async () => {
+    shown(<ClaimsPage />);
+    expect((await screen.findAllByText("Chinedu Okafor", {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Pay" })).toBeNull();
   });
 
   test("a centre's Final Return Address is set by operations", async () => {

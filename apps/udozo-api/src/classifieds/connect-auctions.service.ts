@@ -195,8 +195,11 @@ export class ConnectAuctionsService {
     const entry = await this.ledger.prepare({ mode: order.mode, type: 'connect_auction_sale', reference: `connect_auction:${lot.id}:sale`, description: `Udozo auction ${lotNumber(lot.number)}`, metadata: { auction: lot.number }, lines });
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const now = new Date();
+    const rules = await this.rules(lot.country);
+    // What is left over waits for the seller's claim until then (7c).
+    const claimBy = new Date(now.getTime() + rules.claimDays * dayMs);
     await this.prisma.$transaction(async tx => {
-      const claimed = await tx.connectAuction.updateMany({ where: { id: lot.id, status: 'awaiting_payment', offeredBidId: offered.id }, data: { status: 'sold', buyerId: customer.id, saleMinor: sale, paidAt: now, leftOverMinor: leftOver, collectionCode: this.safePay.seal(code) } });
+      const claimed = await tx.connectAuction.updateMany({ where: { id: lot.id, status: 'awaiting_payment', offeredBidId: offered.id }, data: { status: 'sold', buyerId: customer.id, saleMinor: sale, paidAt: now, leftOverMinor: leftOver, claimBy, collectionCode: this.safePay.seal(code) } });
       if (!claimed.count) throw conflict('auction_changed', 'This lot changed: refresh and try again.');
       await this.ledger.write(tx, entry);
       await this.charges.settleFromRefund(tx, cover.ids);
@@ -206,7 +209,6 @@ export class ConnectAuctionsService {
       if (lot.order.connectReturn) await tx.connectReturnRequest.updateMany({ where: { id: lot.order.connectReturn.id, status: 'accepted' }, data: { status: 'cancelled' } });
       await tx.classifiedShipmentEvent.create({ data: { orderId: lot.orderId, status: 'note', reportedBy: 'bitocard', note: `Sold at Udozo auction ${lotNumber(lot.number)}.` } });
     });
-    const rules = await this.rules(lot.country);
     const seller = await this.safePay.load(lot.orderId);
     await this.safePay.tellParty(
       seller,

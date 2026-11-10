@@ -73,6 +73,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Pickups", href: "/connect/pickups", icon: Package },
       { label: "Warehouses", href: "/connect/warehouses", icon: Building2 },
       { label: "Auctions", href: "/connect/auctions", icon: Gavel },
+      { label: "Claims", href: "/connect/claims", icon: HandCoins },
       { label: "Reports", href: "/connect/reports", icon: ChartNoAxesColumn },
     ],
   },

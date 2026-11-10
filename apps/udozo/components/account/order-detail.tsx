@@ -5,7 +5,7 @@ import { buyerOrderLabels, sellerOrderLabels, shipmentLabels, shopMoney, type Sh
 import { localPhotoUrl, type OrderAction, orderSteps, orderTone } from "@/lib/shop";
 import { DisputeThread, OrderPanel } from "./order-panel";
 import { OrderThread } from "./order-thread";
-import { ConnectReturnPanel, PayStorage } from "./connect-return";
+import { AuctionClaim, ConnectReturnPanel, PayStorage } from "./connect-return";
 import { ReportStore } from "./report-store";
 import { Thumb } from "./thumb";
 
@@ -254,6 +254,7 @@ function ConnectCentreCard({ order, buyer }: { order: ShopOrder; buyer: boolean 
       {buyer && open ? <p className="text-slate-600">Inspect it at the counter first. Give your release code only if you take it; if not, tell the staff why.</p> : null}
       {buyer && connect.storage_owed ? <PayStorage orderId={order.id} owed={connect.storage_owed} currency={order.currency} /> : null}
       {connect.return ? <ConnectReturnPanel orderId={order.id} centreName={centre.name} seller={!buyer} item={connect.return} /> : null}
+      {!buyer && connect.auction ? <AuctionClaim orderId={order.id} auction={connect.auction} currency={order.currency} /> : null}
       {!buyer && connect.loss_of_care_at ? (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-950">
           In Loss of care since {new Date(connect.loss_of_care_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}: the centre is no longer liable for it, and storage with a daily penalty is charged until you collect it
