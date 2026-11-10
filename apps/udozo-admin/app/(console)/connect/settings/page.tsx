@@ -79,6 +79,7 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
   const [stepMin, setStepMin] = useState(toMajor(settings.auction_step_min, settings.currency));
   const [extendMinutes, setExtendMinutes] = useState(String(settings.auction_extend_minutes));
   const [payHours, setPayHours] = useState(String(settings.auction_pay_hours));
+  const [transferShip, setTransferShip] = useState(settings.transfer_ship == null ? "" : toMajor(settings.transfer_ship, settings.currency));
   const [demurrage, setDemurrage] = useState(String(settings.demurrage_bps / 100));
   const [penalty, setPenalty] = useState(String(settings.loc_penalty_bps / 100));
   const [penaltyCap, setPenaltyCap] = useState(toMajor(settings.loc_penalty_cap, settings.currency));
@@ -115,6 +116,8 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
     if (stepBps === null || stepBps < 1 || stepBps > 5000) return setProblem("Give the bid step as 0.01 to 50% of the bid.");
     if (stepLeast === null) return setProblem(`Give the least bid step in ${settings.currency}, for example 500.`);
     if (extend === null || pay === null) return setProblem("Give the late-bid extension as 0 to 60 minutes and the time to pay as 1 to 336 hours.");
+    const transfer = transferShip.trim() ? toMinor(transferShip, settings.currency) : null;
+    if (transferShip.trim() && transfer === null) return setProblem(`Give the transfer rate in ${settings.currency}, for example 2500, or leave it empty.`);
     const change = {
       country: settings.country,
       centre_share_bps: centreShare,
@@ -132,6 +135,7 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
       auction_step_min: stepLeast,
       auction_extend_minutes: extend,
       auction_pay_hours: pay,
+      transfer_ship: transfer,
     };
     let done;
     if (kind === "") done = await save({ ...change, fee_kind: null }).unwrap().catch(() => null);
@@ -205,6 +209,13 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
             </Field>
             <Field label="Days to claim what an auction left over" htmlFor={`${id}-claim`} hint="From the sale; unclaimed money is Udozo's.">
               <Input id={`${id}-claim`} inputMode="numeric" value={claimDays} onChange={event => setClaimDays(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field
+              label={`Transfer rate (${settings.currency})`}
+              htmlFor={`${id}-transfer`}
+              hint="What sending an item to another Connect Centre costs where its listing has no charge for that state (a return sent on, a lot from Udozo's warehouse). Empty: not offered there."
+            >
+              <Input id={`${id}-transfer`} inputMode="decimal" value={transferShip} onChange={event => setTransferShip(event.target.value)} className="max-w-xs" />
             </Field>
             <Field label="Each bid at least (% above the last)" htmlFor={`${id}-step`}>
               <Input id={`${id}-step`} inputMode="decimal" value={stepPct} onChange={event => setStepPct(event.target.value)} className="max-w-xs" />

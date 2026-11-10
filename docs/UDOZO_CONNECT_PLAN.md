@@ -521,7 +521,27 @@ assistants' knowledge, help, terms and privacy.
        seller on an item; udozo.com's return panel on the order (Accept the return, Show my return code); admin Connect >
        Returns and the return times on States, deposit and fee.
      - **Notices:** `customer.connect.return`, `admin.connect.return`.
-     - **Not built yet:** shipping a return to a Connect Centre near the seller (they collect it at this one for now).
+     - **Sent on to a centre near the seller** (built 10 November 2026; migration `20270311100000_connect_transfers`,
+       `connect_transfers`, numbered **`TF-000123`**, one open move per item by a partial unique index, and the market's
+       `transfer_ship_minor`, Connect > States, deposit and fee's Transfer rate; `ConnectTransfersService`): within their
+       free days to collect (never in Loss of care, `ship_too_late`), the seller chooses an open centre in their country
+       (`GET /v1/classifieds/orders/:id/return/ship-options`: each with its shipping, the listing's own Connect charge for
+       that centre's state, else the market's transfer rate, else not offered) and pays it up front
+       (`POST …/return/ship { centre_id, expected_shipping }`, `price_changed`, `transfer_exists`; storage owed first,
+       `storage_unpaid`; from their Udozo money, else wallet, `return_shipping_unpaid`), held in their
+       `customer_wallet_locked`; their days to collect stop. The centre holding it sends it to that centre only
+       (`POST /v1/connect/centres/:centre/transfers/:id/send { courier, tracking_number? }`): the shipping becomes the
+       sending centre's earnings (it pays the courier), the item leaves its shelves and stock, and it can no longer hand
+       it back there (`return_moving`). The centre it goes to checks it in (`…/transfers/:id/receive { shelf_id? }`): the
+       order and the return are that centre's from then on, the seller's days to collect start again, and they collect it
+       there with their return code as before (that centre's return fee). The seller cancels before it is sent
+       (`POST …/return/ship/cancel`), or operations do (`POST /v1/admin/connect/transfers/:id/cancel { reason }`, audited
+       `connect_transfer.cancelled`): the money back where it came from, the days to collect running again. Everyone is
+       told at each step. Screens: udozo.com's return panel (Send it to a centre near me, where it stands, Cancel sending
+       it), connect.udozo.com's **Transfers** (`/centre/<id>/transfers`: to send, on their way, here to collect), admin
+       Connect > **Transfers** and the Transfer rate. Tests: `apps/udozo-api/test/connect-transfers.test.mjs`,
+       `apps/udozo-connect/test/centres.test.ts`, `centre-screens.test.tsx`, `apps/udozo/test/connect-orders.test.ts`,
+       `apps/udozo-admin/test/connect.test.tsx`.
      - Tests: `apps/udozo-api/test/connect-returns.test.mjs`, `apps/udozo-connect/test/`, `apps/udozo/test/connect-orders.test.ts`,
        `apps/udozo-admin/test/connect.test.tsx`.
    - **5e, demurrage and Loss of care (built):** migration `20270310300000_connect_demurrage` (the market's

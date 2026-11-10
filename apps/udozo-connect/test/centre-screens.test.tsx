@@ -27,6 +27,8 @@ const actions = vi.hoisted(() => ({
   handBack: vi.fn(),
   recordStockCheck: vi.fn(),
   handOverPickup: vi.fn(),
+  sendTransfer: vi.fn(),
+  receiveTransfer: vi.fn(),
   removePickupPhoto: vi.fn(),
   moveEarnings: vi.fn(),
 }));
@@ -42,6 +44,7 @@ const { CounterOrderView, FindOrder } = await import("@/components/counter-order
 const { ReturnsList } = await import("@/components/centre-returns");
 const { StockShelf } = await import("@/components/centre-stock");
 const { PickupCard, FraPanel } = await import("@/components/centre-pickups");
+const { TransfersList } = await import("@/components/centre-transfers");
 const { EarningsCard, EarningsLines } = await import("@/components/centre-earnings");
 
 type Centre = import("@/lib/centres").Centre;
@@ -105,7 +108,7 @@ describe("the centre's menu", () => {
   it("marks the page it is on", () => {
     const host = mount(createElement(CentreNav, { id: "c1" }));
     expect(host.querySelector('[aria-current="page"]')!.textContent).toBe("Staff");
-    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/stock", "/centre/c1/pickups", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
+    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/transfers", "/centre/c1/stock", "/centre/c1/pickups", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
     const owner = mount(createElement(CentreNav, { id: "c1", role: "owner" }));
     expect([...owner.querySelectorAll("a")].map(link => link.textContent)).toContain("Earnings");
   });
@@ -452,5 +455,56 @@ describe("pickups", () => {
     expect(host.textContent).toContain("Udozo Lagos warehouse");
     expect(host.textContent).toContain("2 abandoned items wait");
     expect(host.textContent).toContain("with Tunde");
+  });
+});
+
+describe("transfers", () => {
+  const base = {
+    object: "connect_transfer" as const,
+    kind: "return" as const,
+    order: { id: "o1", number: "SP-41", title: "Samsung TV" },
+    return: { id: "rt1", number: "RT-000001" },
+    auction: null,
+    recipient: { name: "Chinedu O." },
+    shipping: 300000,
+    fee: 0,
+    currency: "NGN",
+    courier: null,
+    tracking_number: null,
+    shelf: null,
+    sent_at: null,
+    arrived_at: null,
+    collected_at: null,
+    cancelled_at: null,
+    cancel_reason: null,
+    created_at: "2026-11-10T00:00:00.000Z",
+  };
+  const here = { kind: "centre" as const, id: "c1", name: "Ikeja Hub", address: "12 Allen Avenue", state: "Lagos" };
+  const there = { id: "c2", number: "CC-000002", name: "Gwarinpa Hub", address: "3 Road", landmark: null, area: "Gwarinpa", state: "FCT", hours: "9 to 5", phone: "0803" };
+  const shelves = [{ object: "connect_shelf" as const, id: "s1", code: "A-01", label: null, capacity: null, active: true, position: 0 }];
+
+  it("sends a return on with its courier, after confirming", async () => {
+    actions.sendTransfer.mockResolvedValue({ ok: true, data: {} });
+    const host = mount(createElement(TransfersList, { centre: "c1", shelves, rows: [{ ...base, id: "t1", number: "TF-000001", status: "paid", from: here, to: there }] }));
+    expect(host.textContent).toContain("To Gwarinpa Hub, 3 Road, FCT");
+    act(() => type(host.querySelector('input[maxlength="80"]') as HTMLInputElement, "GIG Logistics"));
+    await act(async () => button(host, "Mark sent")!.click());
+    expect(document.querySelector("dialog")!.textContent).toContain("₦3,000");
+    await act(async () => dialogButton("Mark it sent").click());
+    expect(actions.sendTransfer).toHaveBeenCalledWith("c1", "t1", "GIG Logistics", "");
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("checks in what arrives, on a storage place", async () => {
+    actions.receiveTransfer.mockResolvedValue({ ok: true, data: {} });
+    const host = mount(createElement(TransfersList, { centre: "c2", shelves, rows: [{ ...base, id: "t2", number: "TF-000002", status: "sent", courier: "GIG", tracking_number: "G1", from: here, to: there }] }));
+    expect(host.textContent).toContain("With GIG (G1)");
+    act(() => {
+      const select = host.querySelector("select") as HTMLSelectElement;
+      select.value = "s1";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => button(host, "It arrived")!.click());
+    expect(actions.receiveTransfer).toHaveBeenCalledWith("c2", "t2", "s1");
   });
 });

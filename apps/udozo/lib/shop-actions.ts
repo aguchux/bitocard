@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type {
+  ShopReturnShipOption,
   ShopBrand,
   ShopModel,
   ShopModelMatch,
@@ -493,6 +494,29 @@ export async function setResellerStopped(relationshipId: string, stopped: boolea
 export async function acceptReturn(orderId: string): Promise<ShopResult<{ status: string }>> {
   if (!id(orderId)) return refused("No such order.");
   const result = answer(await customerApi<{ status: string }>("POST", `/v1/classifieds/orders/${orderId}/return/accept`, {}));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+/** The Connect Centres the seller may have their accepted return sent to, each with its shipping. */
+export async function returnShipOptions(orderId: string): Promise<ShopResult<{ currency: string; collect_by: string; data: ShopReturnShipOption[] }>> {
+  if (!id(orderId)) return refused("No such order.");
+  return answer(await customerApi<{ currency: string; collect_by: string; data: ShopReturnShipOption[] }>("GET", `/v1/classifieds/orders/${orderId}/return/ship-options`));
+}
+
+/** The seller pays the shipping and the centre holding their return sends it to the one they chose. */
+export async function shipReturn(orderId: string, centreId: string, expectedShipping: number): Promise<ShopResult<{ number: string; status: string }>> {
+  if (!id(orderId) || !id(centreId)) return refused("Choose a Connect Centre.");
+  if (!Number.isSafeInteger(expectedShipping) || expectedShipping < 0) return refused("Choose a Connect Centre.");
+  const result = answer(await customerApi<{ number: string; status: string }>("POST", `/v1/classifieds/orders/${orderId}/return/ship`, { centre_id: centreId, expected_shipping: expectedShipping }));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+/** The seller cancels sending it on, before it is sent: the shipping back where it came from. */
+export async function cancelReturnShip(orderId: string): Promise<ShopResult<{ status: string }>> {
+  if (!id(orderId)) return refused("No such order.");
+  const result = answer(await customerApi<{ status: string }>("POST", `/v1/classifieds/orders/${orderId}/return/ship/cancel`, {}));
   if (result.ok) revalidatePath(`/account/orders/${orderId}`);
   return result;
 }

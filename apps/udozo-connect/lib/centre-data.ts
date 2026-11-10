@@ -1,7 +1,7 @@
 import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
-import type { Centre, CentreReturn, CounterOrder, CounterSummary, CounterView, Earnings, List, Member, Pickups, Shelf, Stock, StockCheck } from "./centres";
+import type { Centre, CentreReturn, CounterOrder, CounterSummary, CounterView, Earnings, List, Member, Pickups, Shelf, Stock, StockCheck, Transfer } from "./centres";
 import { customerApi } from "./session";
 import { signInPath } from "./site";
 
@@ -41,4 +41,5 @@ export const readReturns = (id: string, status?: string) => read<List<CentreRetu
 export const readStock = (id: string) => read<Stock>(`/v1/connect/centres/${id}/stock`, `/centre/${id}/stock`);
 export const readStockChecks = (id: string) => read<List<StockCheck>>(`/v1/connect/centres/${id}/stock-checks`, `/centre/${id}/stock`);
 export const readEarnings = (id: string) => read<Earnings>(`/v1/connect/centres/${id}/earnings`, `/centre/${id}/earnings`);
+export const readTransfers = (id: string) => read<List<Transfer>>(`/v1/connect/centres/${id}/transfers`, `/centre/${id}/transfers`);
 export const readPickups = (id: string) => read<Pickups>(`/v1/connect/centres/${id}/pickups`, `/centre/${id}/pickups`);

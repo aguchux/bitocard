@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { type ShopConnectAuction, type ShopConnectReturn, shopMoney } from "@bitocard/api-client/classifieds";
+import { type ShopConnectAuction, type ShopConnectReturn, type ShopReturnShipOption, type ShopReturnTransfer, shopMoney } from "@bitocard/api-client/classifieds";
 import { useConfirm } from "@/components/confirm-dialog";
-import { acceptReturn, claimAuction, payStorage, returnCode } from "@/lib/shop-actions";
+import { acceptReturn, cancelReturnShip, claimAuction, payStorage, returnCode, returnShipOptions, shipReturn } from "@/lib/shop-actions";
 
 const reasonWords: Record<ShopConnectReturn["reason"], string> = {
   not_collected: "the buyer did not collect it in time",
@@ -22,12 +22,99 @@ export function placeWords(item: Pick<ShopConnectReturn, "place" | "warehouse">,
   return `Abandoned: it waits at ${centreName} for Udozo's pickup to its warehouse. You can still collect it there after paying what is owed.`;
 }
 
+/** Where a return sent on to a centre near its seller stands, in one sentence. */
+export function transferWords(move: ShopReturnTransfer, holding: string) {
+  const to = `${move.to.name}, ${move.to.address}, ${move.to.state}`;
+  if (move.status === "paid") return `Waiting for ${holding} to send it to ${to}. Your days to collect start again when it arrives.`;
+  if (move.status === "sent") return `On its way to ${to}${move.courier ? ` with ${move.courier}${move.tracking_number ? ` (tracking ${move.tracking_number})` : ""}` : ""}.`;
+  if (move.status === "arrived") return `It is at ${to} (${move.to.hours}, ${move.to.phone}). Collect it there with your return code.`;
+  return `Collected at ${move.to.name}.`;
+}
+
+/** Whether the seller can still have it sent on: accepted, at a centre, not moving, and within its free days. */
+export const canShip = (item: ShopConnectReturn, now = Date.now()) =>
+  item.status === "accepted" && !item.abandoned_at && (!item.place || item.place === "centre") && !(item.transfer && item.transfer.status !== "collected") && !!item.collect_by && new Date(item.collect_by).getTime() > now;
+
+/** Choosing a Connect Centre near them to have their return sent to, with its shipping, then paying for it. */
+function SendItOn({ orderId, holding }: { orderId: string; holding: string }) {
+  const router = useRouter();
+  const [options, setOptions] = useState<{ currency: string; data: ShopReturnShipOption[] } | null>(null);
+  const [chosen, setChosen] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  const [confirm, dialog] = useConfirm();
+  const open = () =>
+    start(async () => {
+      const result = await returnShipOptions(orderId);
+      if (!result.ok) return setProblem(result.message);
+      setProblem(null);
+      setOptions(result.data);
+    });
+  const choice = options?.data.find(option => option.centre.id === chosen);
+  const ship = async () => {
+    if (!choice || !options) return setProblem("Choose a Connect Centre.");
+    const answer = await confirm({
+      title: `Send it to ${choice.centre.name}?`,
+      body: `You pay ${shopMoney(choice.shipping, options.currency)} for the shipping now, from your Udozo money or wallet. ${holding} sends it there; you collect it with your return code and pay that centre's return fee.`,
+      action: "Pay and send it",
+      tone: "money",
+    });
+    if (!answer) return;
+    start(async () => {
+      const result = await shipReturn(orderId, choice.centre.id, choice.shipping);
+      if (!result.ok) return setProblem(result.message);
+      router.refresh();
+    });
+  };
+  return (
+    <div className="grid gap-2">
+      {dialog}
+      {!options ? (
+        <button type="button" disabled={busy} onClick={open} className="h-11 rounded-xl border border-navy-300 bg-white px-4 font-bold text-navy-900 disabled:opacity-60">
+          Send it to a centre near me
+        </button>
+      ) : options.data.length ? (
+        <>
+          <label htmlFor={`ship-${orderId}`} className="text-sm font-semibold">
+            Connect Centre to send it to
+          </label>
+          <select id={`ship-${orderId}`} value={chosen} onChange={event => setChosen(event.target.value)} className="h-11 rounded-xl border border-amber-300 bg-white px-3 text-navy-900">
+            <option value="">Choose a centre</option>
+            {options.data.map(option => (
+              <option key={option.centre.id} value={option.centre.id}>
+                {option.centre.state}: {option.centre.name}, {option.centre.area} ({shopMoney(option.shipping, options.currency)})
+              </option>
+            ))}
+          </select>
+          {choice ? (
+            <p className="text-sm">
+              {choice.centre.address}
+              {choice.centre.landmark ? `, ${choice.centre.landmark}` : ""} · {choice.centre.hours}
+            </p>
+          ) : null}
+          <button type="button" disabled={busy || !choice} onClick={ship} className="h-11 rounded-xl bg-navy-900 px-4 font-bold text-white disabled:opacity-60">
+            {choice ? `Pay ${shopMoney(choice.shipping, options.currency)} and send it` : "Pay and send it"}
+          </button>
+        </>
+      ) : (
+        <p className="text-sm">No other Connect Centre can take it yet: collect it at {holding}.</p>
+      )}
+      {problem ? (
+        <p role="alert" className="text-sm font-semibold text-brand-700">
+          {problem}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * A Connect item going back to its seller: why, and for the seller Accept the return (or it is accepted by itself when
  * nobody answers) and, once accepted, their return code to show at the centre, which takes its Connect fee as the return
  * fee. The buyer reads where it stands.
  */
-export function ConnectReturnPanel({ orderId, centreName, seller, item }: { orderId: string; centreName: string; seller: boolean; item: ShopConnectReturn }) {
+export function ConnectReturnPanel({ orderId, centreName, seller, item, currency = "NGN" }: { orderId: string; centreName: string; seller: boolean; item: ShopConnectReturn; currency?: string }) {
+  const router = useRouter();
   const [status, setStatus] = useState(item.status);
   const [code, setCode] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -66,9 +153,35 @@ export function ConnectReturnPanel({ orderId, centreName, seller, item }: { orde
           </button>
         </>
       ) : null}
+      {seller && item.transfer && item.transfer.status !== "collected" ? (
+        <div className="grid gap-2">
+          <p className="text-sm font-semibold">
+            {item.transfer.number}: {transferWords(item.transfer, centreName)}
+          </p>
+          {item.transfer.status === "paid" ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                const answer = await confirm({ title: "Keep it where it is?", body: `The ${shopMoney(item.transfer!.shipping, currency)} shipping goes back to you, and you collect it at ${centreName}.`, action: "Cancel sending it" });
+                if (!answer) return;
+                start(async () => {
+                  const result = await cancelReturnShip(orderId);
+                  if (result.ok) router.refresh();
+                  else setProblem(result.message);
+                });
+              }}
+              className="h-11 rounded-xl border border-amber-300 bg-white px-4 font-bold text-navy-900 disabled:opacity-60"
+            >
+              Cancel sending it
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {seller && status === "accepted" ? (
         <>
           {item.collect_by && !item.abandoned_at ? <p className="text-sm">Collect it by {when(item.collect_by)}: after that, storage is charged daily.</p> : null}
+          {canShip({ ...item, status }) ? <SendItOn orderId={orderId} holding={centreName} /> : null}
           {code ? (
             <p aria-label={`Return code ${code.split("").join(" ")}`} className="text-center font-mono text-3xl font-extrabold tracking-[0.3em]">
               {code}

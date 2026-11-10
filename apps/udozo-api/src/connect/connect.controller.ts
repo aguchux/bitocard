@@ -170,6 +170,10 @@ class SettingsDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0)
   deposit?: number | null;
 
+  /** What moving an item to another Connect place costs where no listing charge applies, in minor units; null: not offered. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  transfer_ship?: number | null;
+
   /** The Connect fee: a share of the shipping charge (`fee_bps`) or fixed (`fee`, minor units); null: no Connect orders. */
   @IsOptional() @IsIn(['percent', 'fixed'])
   fee_kind?: 'percent' | 'fixed' | null;

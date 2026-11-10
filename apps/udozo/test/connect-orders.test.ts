@@ -9,8 +9,8 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 const { orderActions, orderNext, orderSteps } = await import("@/lib/shop");
 const { labelFor } = await import("@/lib/connect-label");
 const { requestSafePay } = await import("@/lib/listing-actions");
-const { acceptReturn, claimAuction, payStorage, orderStep, returnCode } = await import("@/lib/shop-actions");
-const { canClaim, claimWords, placeWords } = await import("@/components/account/connect-return");
+const { acceptReturn, cancelReturnShip, claimAuction, payStorage, orderStep, returnCode, returnShipOptions, shipReturn } = await import("@/lib/shop-actions");
+const { canClaim, canShip, claimWords, placeWords, transferWords } = await import("@/components/account/connect-return");
 
 const id = "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d";
 const centre = { id, number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue", landmark: null, area: "Ikeja", state: "Lagos", hours: "Mon to Sat, 8am to 6pm", phone: "08031234567" };
@@ -110,6 +110,20 @@ describe("asking and sending", () => {
     expect(await acceptReturn("../x")).toMatchObject({ ok: false });
   });
 
+  test("the seller has their return sent on: the centres, paying for one, and cancelling; made-up ids never sent", async () => {
+    await returnShipOptions(id);
+    await shipReturn(id, id, 300000);
+    await cancelReturnShip(id);
+    expect(calls).toEqual([
+      { path: `/v1/classifieds/orders/${id}/return/ship-options`, body: undefined },
+      { path: `/v1/classifieds/orders/${id}/return/ship`, body: { centre_id: id, expected_shipping: 300000 } },
+      { path: `/v1/classifieds/orders/${id}/return/ship/cancel`, body: {} },
+    ]);
+    expect(await shipReturn(id, "../x", 300000)).toMatchObject({ ok: false });
+    expect(await shipReturn(id, id, -1)).toMatchObject({ ok: false });
+    expect(calls).toHaveLength(3);
+  });
+
   test("the seller claims what an auction left over, with an optional note", async () => {
     await claimAuction(id, "  My TV ");
     await claimAuction(id, "");
@@ -163,5 +177,36 @@ describe("the seller's claim to what an auction left over", () => {
     expect(canClaim({ ...sold, claim_by: "2026-11-01T00:00:00Z" }, now)).toBe(false);
     expect(canClaim({ ...sold, left_over: 0 }, now)).toBe(false);
     expect(claimWords({ ...sold, left_over: 0 }, "NGN", now)).toMatch(/Nothing is left over/);
+  });
+});
+
+describe("a return sent on to a centre near the seller", () => {
+  const ret = {
+    id,
+    number: "RT-000001",
+    reason: "not_collected" as const,
+    status: "accepted" as const,
+    answer_by: "2026-11-01T00:00:00.000Z",
+    decided_by: "seller" as const,
+    collect_by: "2026-11-20T00:00:00.000Z",
+    collected_at: null,
+    abandoned_at: null,
+    place: "centre" as const,
+  };
+  const now = Date.parse("2026-11-12T00:00:00.000Z");
+  const move = { number: "TF-000001", status: "paid" as const, to: { name: "Gwarinpa Hub", address: "3 Road", state: "FCT", hours: "9 to 5", phone: "0803" }, shipping: 300000, courier: null, tracking_number: null, sent_at: null, arrived_at: null };
+
+  test("offered within the free days, at a centre, while it is not already moving", () => {
+    expect(canShip(ret, now)).toBe(true);
+    expect(canShip({ ...ret, collect_by: "2026-11-10T00:00:00.000Z" }, now)).toBe(false);
+    expect(canShip({ ...ret, abandoned_at: "2026-11-10T00:00:00.000Z" }, now)).toBe(false);
+    expect(canShip({ ...ret, status: "requested" }, now)).toBe(false);
+    expect(canShip({ ...ret, transfer: move }, now)).toBe(false);
+  });
+
+  test("says where the move stands", () => {
+    expect(transferWords(move, "Ikeja Hub")).toBe("Waiting for Ikeja Hub to send it to Gwarinpa Hub, 3 Road, FCT. Your days to collect start again when it arrives.");
+    expect(transferWords({ ...move, status: "sent", courier: "GIG", tracking_number: "G1" }, "Ikeja Hub")).toBe("On its way to Gwarinpa Hub, 3 Road, FCT with GIG (tracking G1).");
+    expect(transferWords({ ...move, status: "arrived" }, "Ikeja Hub")).toMatch(/^It is at Gwarinpa Hub.*Collect it there with your return code\.$/);
   });
 });

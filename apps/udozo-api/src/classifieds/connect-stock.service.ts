@@ -31,6 +31,8 @@ export const heldWhere: Prisma.ClassifiedOrderWhereInput = {
     },
     // Abandoned items stay the centre's until Udozo's pickup collects them.
     { OR: [{ connectPlace: null }, { connectPlace: 'awaiting_pickup' }] },
+    // One sent on to another centre is on its way, off this centre's shelves, until that centre checks it in.
+    { connectTransfers: { none: { status: 'sent' } } },
   ],
 };
 export const atCentreWhere = (centreId: string): Prisma.ClassifiedOrderWhereInput => ({ ...heldWhere, connectCentreId: centreId });

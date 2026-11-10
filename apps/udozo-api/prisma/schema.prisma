@@ -2849,6 +2849,7 @@ model Customer {
   connectMemberships        ConnectCentreMember[]
   connectAuctionsWon        ConnectAuction[]          @relation("ConnectAuctionBuyer")
   auctionsSelling           ConnectAuction[]          @relation("ConnectAuctionSeller")
+  connectTransfers          ConnectTransfer[]         @relation("ConnectTransferRecipient")
   connectAuctionBids        ConnectAuctionBid[]
   connectAuctionClaims      ConnectAuctionClaim[]     @relation("ConnectAuctionClaimSeller")
 }
@@ -5792,6 +5793,7 @@ model ClassifiedOrder {
   connectWarehouse         ConnectWarehouse?  @relation(fields: [connectWarehouseId], references: [id], onDelete: SetNull)
   connectPickupItems       ConnectPickupItem[]
   connectAuctions          ConnectAuction[]
+  connectTransfers         ConnectTransfer[]
   auctionSale              ConnectAuction?           @relation("ConnectAuctionSaleOrder")
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
@@ -7266,6 +7268,9 @@ model ConnectSettings {
   auctionStepMinMinor  BigInt @default(50000) @map("auction_step_min_minor")
   auctionExtendMinutes Int    @default(5) @map("auction_extend_minutes")
   auctionPayHours      Int    @default(48) @map("auction_pay_hours")
+  /// What moving an item between Connect places costs where no listing's own charge applies (a return to a state the
+  /// listing does not ship to, a lot from Udozo's warehouse); null: such moves are not offered.
+  transferShipMinor    BigInt? @map("transfer_ship_minor")
   updatedAt    DateTime @updatedAt @map("updated_at")
   /// The admin who last changed them (no foreign key: admins are never deleted).
   updatedById  String?  @map("updated_by_id") @db.Uuid
@@ -7443,6 +7448,8 @@ model ConnectCentre {
   returns      ConnectReturnRequest[]
   shelves      ConnectShelf[]
   stockChecks  ConnectStockCheck[]
+  transfersIn  ConnectTransfer[]         @relation("ConnectTransferTo")
+  transfersOut ConnectTransfer[]         @relation("ConnectTransferFrom")
 
   @@index([country, stateId, status])
   @@index([partnerId])
@@ -7483,6 +7490,7 @@ model ConnectShelf {
   centre    ConnectCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
   orders    ClassifiedOrder[]
   stockChecks ConnectStockCheck[]
+  transfers ConnectTransfer[]
 
   @@unique([centreId, code])
   @@index([centreId, position])
@@ -7552,10 +7560,70 @@ model ConnectReturnRequest {
   updatedAt     DateTime        @updatedAt @map("updated_at")
   order         ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
   centre        ConnectCentre   @relation(fields: [centreId], references: [id], onDelete: Restrict)
+  transfers     ConnectTransfer[]
 
   @@index([status, answerBy])
   @@index([centreId, status])
   @@map("connect_return_requests")
+}
+
+/// An item moved to a Connect Centre for someone to collect there with their code (docs/UDOZO_CONNECT_PLAN.md):
+/// `return`, a seller's accepted return sent on by the centre holding it to one near them (collected with the return
+/// code); or `lot`, an abandoned item bought at a Udozo auction, sent from Udozo's warehouse (collected with the lot's
+/// collection code). Paid up front, held in the payer's `customer_wallet_locked` until it is sent (the shipping to who
+/// sends it) and, for a lot, handed over (the Connect fee, shared). TF-000123.
+model ConnectTransfer {
+  id              String                @id @default(uuid()) @db.Uuid
+  number          Int                   @unique @default(autoincrement())
+  /// return or lot.
+  kind            String
+  orderId         String                @map("order_id") @db.Uuid
+  returnId        String?               @map("return_id") @db.Uuid
+  auctionId       String?               @map("auction_id") @db.Uuid
+  fromCentreId    String?               @map("from_centre_id") @db.Uuid
+  fromWarehouseId String?               @map("from_warehouse_id") @db.Uuid
+  toCentreId      String                @map("to_centre_id") @db.Uuid
+  recipientId     String                @map("recipient_id") @db.Uuid
+  mode            LedgerMode
+  country         String                @db.Char(2)
+  currency        String                @db.VarChar(10)
+  shippingMinor   BigInt                @map("shipping_minor")
+  /// A lot's Connect fee at the centre that hands it over (0 for returns, whose return fee is taken at the hand-back).
+  feeMinor        BigInt                @default(0) @map("fee_minor")
+  /// Where the payer's money came from (returned there if it is cancelled before it is sent).
+  paidFrom        String                @map("paid_from")
+  /// paid (to send), sent, arrived (at the centre), collected or cancelled.
+  status          String                @default("paid")
+  courier         String?
+  trackingNumber  String?               @map("tracking_number")
+  sentAt          DateTime?             @map("sent_at")
+  sentById        String?               @map("sent_by_id") @db.Uuid
+  arrivedAt       DateTime?             @map("arrived_at")
+  receivedById    String?               @map("received_by_id") @db.Uuid
+  shelfId         String?               @map("shelf_id") @db.Uuid
+  collectedAt     DateTime?             @map("collected_at")
+  /// A lot's collection code tries at the centre (a return's are counted on the return).
+  codeAttempts    Int                   @default(0) @map("code_attempts")
+  cancelledAt     DateTime?             @map("cancelled_at")
+  cancelReason    String?               @map("cancel_reason")
+  cancelledById   String?               @map("cancelled_by_id") @db.Uuid
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  order           ClassifiedOrder       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  returnRequest   ConnectReturnRequest? @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  auction         ConnectAuction?       @relation(fields: [auctionId], references: [id], onDelete: Restrict)
+  fromCentre      ConnectCentre?        @relation("ConnectTransferFrom", fields: [fromCentreId], references: [id], onDelete: Restrict)
+  fromWarehouse   ConnectWarehouse?     @relation(fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toCentre        ConnectCentre         @relation("ConnectTransferTo", fields: [toCentreId], references: [id], onDelete: Restrict)
+  recipient       Customer              @relation("ConnectTransferRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  shelf           ConnectShelf?         @relation(fields: [shelfId], references: [id], onDelete: SetNull)
+
+  @@index([toCentreId, status])
+  @@index([fromCentreId, status])
+  @@index([orderId])
+  @@index([returnId])
+  @@index([auctionId])
+  @@map("connect_transfers")
 }
 
 /// A day's storage charge on a Connect item (docs/UDOZO_CONNECT_PLAN.md, Holding times, demurrage and Loss of care): the
@@ -7638,6 +7706,7 @@ model ConnectWarehouse {
   orders      ClassifiedOrder[]
   pickups     ConnectPickup[]
   auctions    ConnectAuction[]
+  transfers   ConnectTransfer[]
 
   @@index([country])
   @@map("connect_warehouses")
@@ -7760,6 +7829,7 @@ model ConnectAuction {
   buyer          Customer?           @relation("ConnectAuctionBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
   bids           ConnectAuctionBid[]
   claims         ConnectAuctionClaim[]
+  transfers      ConnectTransfer[]
 
   @@index([country, status, endsAt])
   @@index([status, claimBy])

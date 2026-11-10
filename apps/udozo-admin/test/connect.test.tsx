@@ -25,6 +25,7 @@ const { default: WarehousesPage } = await import("@/app/(console)/connect/wareho
 const { default: PickupsPage } = await import("@/app/(console)/connect/pickups/page");
 const { default: AuctionsPage } = await import("@/app/(console)/connect/auctions/page");
 const { default: ClaimsPage } = await import("@/app/(console)/connect/claims/page");
+const { default: TransfersPage } = await import("@/app/(console)/connect/transfers/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -170,7 +171,7 @@ beforeEach(() => {
         const sent = body as { fee_kind: "percent" | "fixed" | null; fee_bps?: number; fee?: number; centre_share_bps: number; buyer_free_hours: number };
         fee = sent.fee_kind === "percent" ? { kind: "percent", bps: sent.fee_bps! } : sent.fee_kind === "fixed" ? { kind: "fixed", amount: sent.fee! } : null;
       }
-      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48 });
+      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48, transfer_ship: null });
     }
     if (path === "/v1/admin/connect/centres")
       return ok({
@@ -217,6 +218,38 @@ beforeEach(() => {
     if (path === "/v1/admin/connect/pickups") return ok(pickup);
     if (path === "/v1/admin/connect/pickups/pk2/receive") return ok({ ...collected, status: "delivered" });
     if (path === "/v1/admin/connect/warehouse-items") return ok({ object: "list", data: [{ object: "connect_warehouse_item", order_id: "o9", number: "SP-90", title: "Rice cooker", price: 1_500_000, currency: "NGN", warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, centre: { id: "cc1", name: "Ikeja Parcel Hub" }, return_id: "rt9", loss_of_care_at: "2026-09-01T00:00:00.000Z", abandoned_at: "2026-10-01T00:00:00.000Z", received_at: "2026-10-05T00:00:00.000Z" }] });
+    if (path === "/v1/admin/connect/transfers" && input.method === "GET")
+      return ok({
+        object: "list",
+        data: [
+          {
+            object: "connect_transfer",
+            id: "tf1",
+            number: "TF-000001",
+            kind: "return",
+            status: "paid",
+            order: { id: "o9", number: "SP-90", title: "Rice cooker" },
+            return: { id: "rt9", number: "RT-000009" },
+            auction: null,
+            from: { kind: "centre", id: "cc1", name: "Ikeja Parcel Hub", address: "12 Allen Avenue", state: "Lagos" },
+            to: { id: "cc2", number: "CC-000002", name: "Gwarinpa Hub", address: "3 Road", landmark: null, area: "Gwarinpa", state: "FCT", hours: "9 to 5", phone: "0803" },
+            recipient: { name: "Chinedu Okafor" },
+            shipping: 300000,
+            fee: 0,
+            currency: "NGN",
+            courier: null,
+            tracking_number: null,
+            shelf: null,
+            sent_at: null,
+            arrived_at: null,
+            collected_at: null,
+            cancelled_at: null,
+            cancel_reason: null,
+            created_at: "2026-11-10T00:00:00.000Z",
+          },
+        ],
+      });
+    if (path === "/v1/admin/connect/transfers/tf1/cancel") return ok({ status: "cancelled" });
     if (path === "/v1/admin/connect/claims")
       return ok({
         object: "list",
@@ -288,7 +321,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/auctions", "/connect/claims", "/connect/reports"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/transfers", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/auctions", "/connect/claims", "/connect/reports"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -404,7 +437,7 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "percent" } });
     fireEvent.change(screen.getByLabelText("Fee (% of shipping)"), { target: { value: "10" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48, transfer_ship: null }), slow);
     expect(await screen.findByText(/10% of the shipping charge/, {}, slow)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "fixed" } });
     fireEvent.change(screen.getByLabelText("Fee (NGN)"), { target: { value: "500" } });
@@ -412,7 +445,7 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Hours to answer a return"), { target: { value: "24" } });
     fireEvent.change(screen.getByLabelText("Penalty cap a day (NGN)"), { target: { value: "400" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48, transfer_ship: null }), slow);
   });
 
   test("support cannot change the deposit or states", async () => {
@@ -605,6 +638,26 @@ describe("Connect", () => {
     expect(lot.getByRole("link", { name: "Open its listing on udozo.com" }).getAttribute("href")).toMatch(/\/ng\/l\/100042-rice-cooker$/);
     expect(screen.queryByRole("button", { name: "List at auction" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hand over" })).toBeNull();
+  });
+
+  test("transfers: operations cancel one not yet sent, with why; support only reads", async () => {
+    roles = ["operations"];
+    shown(<TransfersPage />);
+    expect((await screen.findAllByText(/TF-000001 · Rice cooker/, {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/To Gwarinpa Hub, FCT/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]!);
+    const dialog = openDialog();
+    expect(dialog.getByText(/3,000.* goes back to Chinedu Okafor/)).toBeTruthy();
+    fireEvent.change(dialog.getByRole("textbox"), { target: { value: "The courier cannot reach it" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel transfer" }));
+    await waitFor(() => expect(lastSent("/connect/transfers/tf1/cancel")?.body).toEqual({ reason: "The courier cannot reach it" }), slow);
+  });
+
+  test("transfers: support reads without acting", async () => {
+    roles = ["support"];
+    shown(<TransfersPage />);
+    expect((await screen.findAllByText(/TF-000001/, {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });
 
   test("claims: finance pays one with what they checked, or rejects it with why; operations only read", async () => {

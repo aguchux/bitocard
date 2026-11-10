@@ -590,6 +590,27 @@ export type ShopConnectReturn = {
   warehouse?: { name: string; address: string; state: string; hours: string; phone: string } | null;
   /** The seller's view: the return fee they paid. */
   return_fee?: number;
+  /** The seller's view: their choice to have it sent on to a Connect Centre near them, and where that stands. */
+  transfer?: ShopReturnTransfer | null;
+};
+
+/** A return sent on to a centre near its seller: waiting to be sent (`paid`), on its way, there to collect, or collected. */
+export type ShopReturnTransfer = {
+  /** TF-000123 */
+  number: string;
+  status: 'paid' | 'sent' | 'arrived' | 'collected';
+  to: { name: string; address: string; state: string; hours: string; phone: string };
+  shipping: number;
+  courier: string | null;
+  tracking_number: string | null;
+  sent_at: string | null;
+  arrived_at: string | null;
+};
+
+/** A Connect Centre a seller may have their return sent to, with what the shipping costs. */
+export type ShopReturnShipOption = {
+  centre: { id: string; number: string; name: string; address: string; landmark: string | null; area: string; state: string; hours: string; phone: string };
+  shipping: number;
 };
 export type ShopCourier = { name: string; tracking_url: string | null };
 /** A message in a resale order's threads, as one side reads it (the buyer sees the store's side as the store). */

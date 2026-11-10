@@ -124,6 +124,36 @@ export type ConnectSettings = {
   auction_step_min: number;
   auction_extend_minutes: number;
   auction_pay_hours: number;
+  /** What moving an item between Connect places costs where no listing charge applies (a return sent on, a lot from the warehouse); null: not offered. */
+  transfer_ship: number | null;
+};
+
+/** An item moved to a Connect Centre for someone to collect there: a seller's return sent on, or a lot from Udozo's warehouse. */
+export type ConnectTransfer = {
+  object: 'connect_transfer';
+  id: string;
+  /** TF-000123 */
+  number: string;
+  kind: 'return' | 'lot';
+  status: 'paid' | 'sent' | 'arrived' | 'collected' | 'cancelled';
+  order: { id: string; number: string; title: string };
+  return: { id: string; number: string } | null;
+  auction: { id: string; number: string } | null;
+  from: { kind: 'centre' | 'warehouse'; id: string; name: string; address: string; state: string };
+  to: { id: string; number: string; name: string; address: string; landmark: string | null; area: string; state: string; hours: string; phone: string };
+  recipient: { name: string };
+  shipping: number;
+  fee: number;
+  currency: string;
+  courier: string | null;
+  tracking_number: string | null;
+  shelf: string | null;
+  sent_at: string | null;
+  arrived_at: string | null;
+  collected_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  created_at: string;
 };
 
 /** An abandoned item at auction (phase 7b), as Udozo's team sees it: every bidder, and what the sale paid off. */
@@ -356,6 +386,7 @@ export type ConnectSettingsChange = {
   auction_step_min?: number;
   auction_extend_minutes?: number;
   auction_pay_hours?: number;
+  transfer_ship?: number | null;
 };
 
 export type ConnectCentre = {
@@ -562,6 +593,14 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: ({ id }) => ({ url: `/v1/admin/connect/returns/${id}/approve`, method: 'POST', body: {} }),
       invalidatesTags: ['ConnectCentres', 'Activity'],
     }),
+    connectTransfers: build.query<{ object: 'list'; data: ConnectTransfer[] }, { status?: ConnectTransfer['status']; kind?: ConnectTransfer['kind']; country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/transfers', params: clean({ status: filter?.status, kind: filter?.kind, country: filter?.country }) }),
+      providesTags: ['ConnectTransfers'],
+    }),
+    cancelConnectTransfer: build.mutation<ConnectTransfer, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/connect/transfers/${id}/cancel`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['ConnectTransfers', 'Activity'],
+    }),
     connectAuctions: build.query<{ object: 'list'; data: ConnectAuction[] }, { status?: ConnectAuction['status']; country?: string } | void>({
       query: filter => ({ url: '/v1/admin/connect/auctions', params: clean({ status: filter?.status, country: filter?.country }) }),
       providesTags: ['ConnectAuctions'],
@@ -640,6 +679,8 @@ export const {
   useConnectAuctionEligibleQuery,
   useCreateConnectAuctionMutation,
   useCancelConnectAuctionMutation,
+  useConnectTransfersQuery,
+  useCancelConnectTransferMutation,
   useHandOverConnectAuctionMutation,
   useConnectClaimsQuery,
   usePayConnectClaimMutation,

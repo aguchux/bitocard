@@ -224,3 +224,26 @@ describe("pickups", () => {
     expect(rules.centreNav(id).map(item => item.label)).toContain("Pickups");
   });
 });
+
+describe("transfers", () => {
+  it("sends and checks in through the centre's own routes, checked here first", async () => {
+    reply = () => Response.json({ object: "connect_transfer", id: other });
+    await actions.sendTransfer(id, other, " GIG Logistics ", "");
+    await actions.receiveTransfer(id, other, null);
+    expect(sent.map(item => [item.url.replace(`https://api.udozo.test/v1/connect/centres/${id}`, ""), item.body])).toEqual([
+      [`/transfers/${other}/send`, { courier: "GIG Logistics", tracking_number: null }],
+      [`/transfers/${other}/receive`, { shelf_id: null }],
+    ]);
+    sent.length = 0;
+    expect(await actions.sendTransfer(id, other, "  ", "")).toMatchObject({ ok: false, param: "courier" });
+    expect(await actions.receiveTransfer(id, "../x", null)).toMatchObject({ ok: false });
+    expect(sent).toHaveLength(0);
+    expect(rules.centreNav(id).map(item => item.label)).toContain("Transfers");
+  });
+
+  it("groups a centre's moves: to send, coming, here to collect, and the rest", () => {
+    const row = (patch: Record<string, unknown>) => ({ id: String(Math.random()), status: "paid", from: { kind: "centre", id }, to: { id: other }, ...patch }) as never;
+    const groups = rules.transferGroups(id, [row({}), row({ status: "sent", from: { kind: "centre", id: other }, to: { id } }), row({ status: "arrived", from: { kind: "warehouse", id: "wh" }, to: { id } }), row({ status: "sent" }), row({ status: "cancelled" })]);
+    expect([groups.toSend.length, groups.coming.length, groups.arrived.length, groups.done.length]).toEqual([1, 1, 1, 2]);
+  });
+});

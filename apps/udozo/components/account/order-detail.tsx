@@ -253,7 +253,7 @@ function ConnectCentreCard({ order, buyer }: { order: ShopOrder; buyer: boolean 
       ) : null}
       {buyer && open ? <p className="text-slate-600">Inspect it at the counter first. Give your release code only if you take it; if not, tell the staff why.</p> : null}
       {buyer && connect.storage_owed ? <PayStorage orderId={order.id} owed={connect.storage_owed} currency={order.currency} /> : null}
-      {connect.return ? <ConnectReturnPanel orderId={order.id} centreName={centre.name} seller={!buyer} item={connect.return} /> : null}
+      {connect.return ? <ConnectReturnPanel orderId={order.id} centreName={centre.name} seller={!buyer} item={connect.return} currency={order.currency} /> : null}
       {!buyer && connect.auction ? <AuctionClaim orderId={order.id} auction={connect.auction} currency={order.currency} /> : null}
       {!buyer && connect.loss_of_care_at ? (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-950">

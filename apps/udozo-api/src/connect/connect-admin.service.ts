@@ -8,6 +8,7 @@ import { ConnectApplicationsService, centreNumber } from './applications.service
 /** What finance and operations may change on a market's Connect settings (anything left out stays). */
 export type ConnectSettingsInput = {
   deposit?: number | null;
+  transfer_ship?: number | null;
   fee_kind?: 'percent' | 'fixed' | null;
   fee_bps?: number;
   fee?: number;
@@ -164,6 +165,10 @@ export class ConnectAdminService {
       if (input.deposit !== null && (!Number.isSafeInteger(input.deposit) || input.deposit < 0)) throw invalid('parameter_invalid', 'Give the deposit in minor units, 0 or more.', 'deposit');
       data.depositMinor = input.deposit === null ? null : BigInt(input.deposit);
     }
+    if (input.transfer_ship !== undefined) {
+      if (input.transfer_ship !== null && (!Number.isSafeInteger(input.transfer_ship) || input.transfer_ship < 0)) throw invalid('parameter_invalid', 'Give the transfer rate in minor units, 0 or more.', 'transfer_ship');
+      data.transferShipMinor = input.transfer_ship === null ? null : BigInt(input.transfer_ship);
+    }
     if (input.fee_kind !== undefined) {
       if (input.fee_kind === null) Object.assign(data, { feeKind: null, feeBps: null, feeMinor: null });
       else if (input.fee_kind === 'percent') {
@@ -227,6 +232,7 @@ export class ConnectAdminService {
       auctionStepMinMinor: bigint;
       auctionExtendMinutes: number;
       auctionPayHours: number;
+      transferShipMinor: bigint | null;
     } | null,
   ) {
     return {
@@ -256,6 +262,8 @@ export class ConnectAdminService {
       auction_step_min: Number(row?.auctionStepMinMinor ?? 50000n),
       auction_extend_minutes: row?.auctionExtendMinutes ?? 5,
       auction_pay_hours: row?.auctionPayHours ?? 48,
+      /** Moving an item to another Connect place where no listing charge applies (a return sent on, a lot from the warehouse); null: not offered. */
+      transfer_ship: row?.transferShipMinor === null || row?.transferShipMinor === undefined ? null : Number(row.transferShipMinor),
     };
   }
 

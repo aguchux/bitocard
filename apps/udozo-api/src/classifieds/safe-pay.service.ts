@@ -107,9 +107,26 @@ export const orderInclude = {
   connectReturn: { select: { id: true, number: true, reason: true, status: true, answerBy: true, decidedBy: true, collectBy: true, collectedAt: true, returnFeeMinor: true, lossOfCareAt: true, abandonedAt: true } },
   connectWarehouse: { select: { name: true, address: true, hours: true, phone: true, state: { select: { name: true } } } },
   connectCharges: { select: { payer: true, status: true, amountMinor: true } },
+  connectTransfers: { where: { kind: 'return', status: { not: 'cancelled' } }, orderBy: { createdAt: 'desc' }, take: 1, select: { number: true, status: true, shippingMinor: true, courier: true, trackingNumber: true, sentAt: true, arrivedAt: true, collectedAt: true, toCentre: { select: { name: true, address: true, hours: true, phone: true, state: { select: { name: true } } } } } },
   connectAuctions: { where: { status: 'sold' }, take: 1, select: { number: true, saleMinor: true, leftOverMinor: true, claimBy: true, unclaimedAt: true, claims: { orderBy: { createdAt: 'desc' }, take: 1, select: { number: true, status: true, amountMinor: true, decisionNote: true, decidedAt: true } } } },
 } satisfies Prisma.ClassifiedOrderInclude;
 export type OrderRow = Prisma.ClassifiedOrderGetPayload<{ include: typeof orderInclude }>;
+
+/** A return sent on to a centre near the seller, as the seller sees it on their order. */
+function transferOf(order: OrderRow) {
+  const move = order.connectTransfers[0];
+  if (!move) return null;
+  return {
+    number: `TF-${String(move.number).padStart(6, '0')}`,
+    status: move.status as 'paid' | 'sent' | 'arrived' | 'collected',
+    to: { name: move.toCentre.name, address: move.toCentre.address, state: move.toCentre.state.name, hours: move.toCentre.hours, phone: move.toCentre.phone },
+    shipping: Number(move.shippingMinor),
+    courier: move.courier,
+    tracking_number: move.trackingNumber,
+    sent_at: move.sentAt?.toISOString() ?? null,
+    arrived_at: move.arrivedAt?.toISOString() ?? null,
+  };
+}
 
 /** An abandoned item's auction as its seller sees it on their order, with their claim to what was left over. */
 function auctionOf(order: OrderRow) {
@@ -1672,6 +1689,8 @@ export class SafePayService {
                     place: order.connectPlace ?? 'centre',
                     warehouse: order.connectPlace === 'udozo_warehouse' && order.connectWarehouse ? { name: order.connectWarehouse.name, address: order.connectWarehouse.address, state: order.connectWarehouse.state.name, hours: order.connectWarehouse.hours, phone: order.connectWarehouse.phone } : null,
                     ...(viewer !== 'buyer' && order.connectReturn.returnFeeMinor !== null ? { return_fee: Number(order.connectReturn.returnFeeMinor) } : {}),
+                    /** The seller's choice to have it sent on to a centre near them (never shown to the buyer). */
+                    ...(viewer !== 'buyer' ? { transfer: transferOf(order) } : {}),
                   }
                 : null,
               /** Sold at a Udozo auction (the seller's and admins' view): what it raised, what is left over and the seller's claim to it. */

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Centre, CentreReturn, CounterOrder, Earnings, List, Member, Pickup, Shelf, StockCheck } from "./centres";
+import type { Centre, CentreReturn, CounterOrder, Earnings, List, Member, Pickup, Shelf, StockCheck, Transfer } from "./centres";
 import { customerApi } from "./session";
 
 /** What an action answers: what it changed as it now is, or Udozo's refusal in words with the field it names. */
@@ -177,6 +177,19 @@ export async function moveEarnings(id: string, mode: "live" | "test", currency: 
   if (!uuid.test(id)) return unknown;
   if (!Number.isSafeInteger(amount) || amount <= 0) return { ok: false, message: "Give an amount to move.", code: "parameter_invalid", param: "amount" };
   return answer(await customerApi<Earnings>("POST", `/v1/connect/centres/${id}/earnings/move`, { mode, currency, amount }));
+}
+
+/** Marks an item sent on to another centre: the courier, and its tracking number if it has one. */
+export async function sendTransfer(id: string, transfer: string, courier: string, tracking: string): Promise<CentreResult<Transfer>> {
+  if (!uuid.test(id) || !uuid.test(transfer)) return unknown;
+  if (!courier.trim()) return { ok: false, message: "Say which courier takes it.", code: "parameter_missing", param: "courier" };
+  return answer(await customerApi<Transfer>("POST", `/v1/connect/centres/${id}/transfers/${transfer}/send`, { courier: courier.trim().slice(0, 80), tracking_number: text(tracking) }));
+}
+
+/** Checks in an item sent to this centre, on a storage place if one is chosen. */
+export async function receiveTransfer(id: string, transfer: string, shelf: string | null): Promise<CentreResult<Transfer>> {
+  if (!uuid.test(id) || !uuid.test(transfer) || (shelf !== null && !uuid.test(shelf))) return unknown;
+  return answer(await customerApi<Transfer>("POST", `/v1/connect/centres/${id}/transfers/${transfer}/receive`, { shelf_id: shelf }));
 }
 
 /** Takes back a check-out photo before the hand-over (a blurred one, the wrong item). */

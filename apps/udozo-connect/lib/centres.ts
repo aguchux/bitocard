@@ -56,6 +56,7 @@ export const centreNav = (id: string, role?: CentreRole) => [
   { label: "Overview", href: `/centre/${id}` },
   { label: "Items", href: `/centre/${id}/orders` },
   { label: "Returns", href: `/centre/${id}/returns` },
+  { label: "Transfers", href: `/centre/${id}/transfers` },
   { label: "Stock check", href: `/centre/${id}/stock` },
   { label: "Pickups", href: `/centre/${id}/pickups` },
   ...(role === "owner" ? [{ label: "Earnings", href: `/centre/${id}/earnings` }] : []),
@@ -177,6 +178,47 @@ export const eventWords: Record<string, string> = {
   collection_refused: "Refused by the buyer at the counter",
   note: "Update",
 };
+
+// ---- Transfers between Connect places ----
+
+/** An item moved to a centre for someone to collect there: a seller's return sent on, or a lot bought at a Udozo auction. */
+export type Transfer = {
+  object: "connect_transfer";
+  id: string;
+  number: string;
+  kind: "return" | "lot";
+  status: "paid" | "sent" | "arrived" | "collected" | "cancelled";
+  order: { id: string; number: string; title: string };
+  return: { id: string; number: string } | null;
+  auction: { id: string; number: string } | null;
+  from: { kind: "centre" | "warehouse"; id: string; name: string; address: string; state: string };
+  to: { id: string; number: string; name: string; address: string; landmark: string | null; area: string; state: string; hours: string; phone: string };
+  recipient: { name: string };
+  shipping: number;
+  fee: number;
+  currency: string;
+  courier: string | null;
+  tracking_number: string | null;
+  shelf: string | null;
+  sent_at: string | null;
+  arrived_at: string | null;
+  collected_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  created_at: string;
+};
+
+export const transferStatusWords: Record<Transfer["status"], string> = { paid: "To send", sent: "On its way", arrived: "Here, to collect", collected: "Collected", cancelled: "Cancelled" };
+
+/** A centre's moves, as its pages group them: what it sends, what is coming, what waits to be collected, and the rest. */
+export function transferGroups(centre: string, rows: Transfer[]) {
+  return {
+    toSend: rows.filter(row => row.status === "paid" && row.from.kind === "centre" && row.from.id === centre),
+    coming: rows.filter(row => row.status === "sent" && row.to.id === centre),
+    arrived: rows.filter(row => row.status === "arrived" && row.to.id === centre),
+    done: rows.filter(row => ["collected", "cancelled"].includes(row.status) || (row.from.id === centre && ["sent", "arrived"].includes(row.status))),
+  };
+}
 
 // ---- Returns to sellers ----
 

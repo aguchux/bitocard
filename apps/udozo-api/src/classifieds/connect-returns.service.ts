@@ -10,6 +10,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { ConnectAuctionsService } from './connect-auctions.service.js';
 import { ConnectChargesService } from './connect-charges.service.js';
 import { connectFeeOf, centreShareOf, ConnectCheckoutService } from './connect-checkout.service.js';
+import { ConnectTransfersService } from './connect-transfers.service.js';
 import { cleanMessage } from './conversations.service.js';
 import { SafePayService } from './safe-pay.service.js';
 
@@ -52,6 +53,7 @@ export class ConnectReturnsService {
     private readonly audit: AuditService,
     private readonly charges: ConnectChargesService,
     private readonly auctions: ConnectAuctionsService,
+    private readonly transfers: ConnectTransfersService,
   ) {}
 
   private async settings(country: string) {
@@ -180,6 +182,8 @@ export class ConnectReturnsService {
     if (!row || row.centreId !== centreId) throw notFound();
     const place = (await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: row.orderId }, select: { connectPlace: true } })).connectPlace;
     if (place && place !== 'awaiting_pickup') throw conflict('with_udozo', 'This item is with Udozo now: the seller collects it at Udozo’s warehouse.');
+    // On its way to the centre the seller chose: handed back there once it arrives.
+    if (await this.transfers.moving(row.id)) throw conflict('return_moving', 'It is being sent to the centre the seller chose: they collect it there.');
     return this.complete(row, input.code, 'centre');
   }
 
@@ -239,6 +243,7 @@ export class ConnectReturnsService {
       const done = await tx.connectReturnRequest.updateMany({ where: { id, status: 'accepted' }, data: { status: 'collected', collectedAt: now, returnFeeMinor: fee } });
       if (!done.count) throw conflict('return_changed', 'This return changed: refresh and try again.');
       if (entry) await this.ledger.write(tx, entry);
+      await this.transfers.collected(tx, id);
       await tx.classifiedOrder.update({ where: { id: order.id }, data: { connectShelfId: null, connectMissingAt: null, connectPlace: null } });
       // A pickup that was to take it to the warehouse goes without it.
       await tx.connectPickupItem.updateMany({ where: { orderId: order.id, status: 'waiting' }, data: { status: 'removed' } });
