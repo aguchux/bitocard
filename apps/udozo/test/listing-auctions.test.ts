@@ -12,7 +12,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined
 const { auctionCard } = await import("@/lib/auctions");
 const { stepProblem, stepOf } = await import("@/lib/post-steps");
 const { buyButton } = await import("@/lib/buy");
-const { bidOnListing } = await import("@/lib/auction-actions");
+const { bidOnListing, cancelLotShip, lotShipOptions, shipLot } = await import("@/lib/auction-actions");
+const { lotTransferWords } = await import("@/components/lot-shipping");
 const { createListing } = await import("@/lib/shop-actions");
 const { AuctionPanel, auctionNote, auctionState } = await import("@/components/listing-auction");
 
@@ -73,6 +74,24 @@ describe("an auction on cards and its page", () => {
     expect(shown({ auction: lot({ viewer: { ...viewer, seller: true } }) })).not.toContain("Place bid");
     expect(shown({ auction: lot({ reserve_met: false, bids: 1, current_price: 10_000_000 }) })).toContain("Reserve not met");
   });
+
+  test("a won lot of Udozo's not collected yet can be sent to a Connect Centre, and says where its move stands", () => {
+    const shown = (auction: ShopListingAuction) => renderToStaticMarkup(createElement(AuctionPanel, { listingId: id, currency: "NGN", auction, signedIn: true, phoneConfirmed: true }));
+    const won = { ...viewer, won: true, collected: false, transfer: null };
+    const udozos = (patch: Partial<ShopListingAuction>) => lot({ kind: "abandoned", status: "sold", ...patch });
+    expect(shown(udozos({ viewer: won }))).toContain("Have it sent to a Connect Centre near me");
+    expect(shown(udozos({ viewer: { ...won, collected: true } }))).not.toContain("Have it sent");
+    expect(shown(lot({ status: "sold", viewer: { ...won } }))).not.toContain("Have it sent");
+    const move = { number: "TF-000004", status: "paid" as const, to: { name: "Gwarinpa Hub", address: "3 Road", state: "FCT", hours: "8 to 6", phone: "0803" }, shipping: 250_000, fee: 25_000, courier: null, tracking_number: null, sent_at: null, arrived_at: null };
+    const paid = shown(udozos({ viewer: { ...won, transfer: move } }));
+    expect(paid).toContain("TF-000004: Udozo is sending it from its warehouse to Gwarinpa Hub, 3 Road, FCT.");
+    expect(paid).toContain("Stop sending it");
+    expect(paid).toContain("Collect it at the Connect Centre you chose");
+    const sent = shown(udozos({ viewer: { ...won, transfer: { ...move, status: "sent", courier: "Udozo van", tracking_number: "UV-1" } } }));
+    expect(sent).not.toContain("Stop sending it");
+    expect(lotTransferWords({ ...move, status: "sent", courier: "Udozo van", tracking_number: "UV-1" })).toBe("On its way to Gwarinpa Hub, 3 Road, FCT with Udozo van (tracking UV-1).");
+    expect(lotTransferWords({ ...move, status: "arrived" })).toMatch(/Collect it there with your collection code\.$/);
+  });
 });
 
 describe("Post an ad", () => {
@@ -109,6 +128,20 @@ describe("sending to the API", () => {
       { title: "Sony TV", auction_reserve: null },
     ]);
     expect(await createListing({ auction_reserve: "lots" })).toMatchObject({ ok: false, param: "auction_reserve" });
+  });
+
+  test("a won lot's move to a centre: options, paying with the total shown, and stopping it", async () => {
+    await lotShipOptions("7");
+    await shipLot("7", id, 275_000);
+    await cancelLotShip("7");
+    expect(calls).toEqual([
+      { method: "GET", path: "/v1/classifieds/auctions/7/ship-options", body: undefined },
+      { method: "POST", path: "/v1/classifieds/auctions/7/ship", body: { centre_id: id, expected_total: 275_000 } },
+      { method: "POST", path: "/v1/classifieds/auctions/7/ship/cancel", body: {} },
+    ]);
+    expect(await shipLot("../7", id, 1)).toMatchObject({ ok: false });
+    expect(await shipLot("7", "nope", 1)).toMatchObject({ ok: false, param: "centre_id" });
+    expect(calls).toHaveLength(3);
   });
 
   test("a bid goes to the listing; a made-up listing or amount is never sent", async () => {

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { receiveTransfer, sendTransfer } from "@/lib/centre-actions";
+import { handOverTransfer, receiveTransfer, sendTransfer } from "@/lib/centre-actions";
 import { type Shelf, type Transfer, transferGroups, transferStatusWords } from "@/lib/centres";
 import { money, when } from "@/lib/connect";
 import { useConfirm } from "./confirm-dialog";
@@ -115,6 +115,39 @@ function ReceiveCard({ centre, row, shelves }: { centre: string; row: Transfer; 
   );
 }
 
+/** A lot that arrived here for its buyer: hand it over against the collection code on their lot's page. */
+function HandOverCard({ centre, row }: { centre: string; row: Transfer }) {
+  const router = useRouter();
+  const ids = useId();
+  const [code, setCode] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  const hand = () =>
+    start(async () => {
+      const result = await handOverTransfer(centre, row.id, code);
+      if (!result.ok) return setProblem(result.message);
+      setProblem(null);
+      setCode("");
+      router.refresh();
+    });
+  return (
+    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <div>
+        <label htmlFor={`${ids}-code`} className={label}>
+          Buyer&apos;s collection code
+        </label>
+        <input id={`${ids}-code`} value={code} inputMode="numeric" autoComplete="off" maxLength={11} onChange={event => setCode(event.target.value)} className={input} />
+      </div>
+      <button type="button" disabled={busy} onClick={hand} className={primary}>
+        Hand it over
+      </button>
+      <div className="sm:col-span-2">
+        <Problem message={problem} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * The centre's transfers: items it sends on to another Connect Centre (a seller's return), items on their way to it,
  * and items that arrived for someone to collect here.
@@ -154,8 +187,9 @@ export function TransfersList({ centre, rows, shelves }: { centre: string; rows:
                 <p className="text-sm text-slate-600">
                   Arrived {when(row.arrived_at)}
                   {row.shelf ? `, on ${row.shelf}` : ""}.{" "}
-                  {row.kind === "return" ? "Hand it back on Returns against the seller's return code." : "Hand it to its buyer against their collection code."}
+                  {row.kind === "return" ? "Hand it back on Returns against the seller's return code." : `Hand it to its buyer against their collection code. The ${money(row.fee, row.currency)} Connect fee is shared with your earnings then.`}
                 </p>
+                {row.kind === "lot" ? <HandOverCard centre={centre} row={row} /> : null}
               </li>
             ))}
           </ul>

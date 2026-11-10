@@ -247,9 +247,35 @@ beforeEach(() => {
             cancel_reason: null,
             created_at: "2026-11-10T00:00:00.000Z",
           },
+          {
+            object: "connect_transfer",
+            id: "tf2",
+            number: "TF-000002",
+            kind: "lot",
+            status: "paid",
+            order: { id: "o8", number: "SP-80", title: "Standing fan" },
+            return: null,
+            auction: { id: "au1", number: "AU-000001" },
+            from: { kind: "warehouse", id: "wh1", name: "Udozo Lagos warehouse", address: "1 Wharf Road", state: "Lagos" },
+            to: { id: "cc2", number: "CC-000002", name: "Gwarinpa Hub", address: "3 Road", landmark: null, area: "Gwarinpa", state: "FCT", hours: "9 to 5", phone: "0803" },
+            recipient: { name: "Amaka Obi" },
+            shipping: 250000,
+            fee: 25000,
+            currency: "NGN",
+            courier: null,
+            tracking_number: null,
+            shelf: null,
+            sent_at: null,
+            arrived_at: null,
+            collected_at: null,
+            cancelled_at: null,
+            cancel_reason: null,
+            created_at: "2026-11-10T00:00:00.000Z",
+          },
         ],
       });
     if (path === "/v1/admin/connect/transfers/tf1/cancel") return ok({ status: "cancelled" });
+    if (path === "/v1/admin/connect/transfers/tf2/send") return ok({ status: "sent" });
     if (path === "/v1/admin/connect/claims")
       return ok({
         object: "list",
@@ -653,11 +679,27 @@ describe("Connect", () => {
     await waitFor(() => expect(lastSent("/connect/transfers/tf1/cancel")?.body).toEqual({ reason: "The courier cannot reach it" }), slow);
   });
 
+  test("transfers: operations send an auction lot from the warehouse with its courier; a return has no Send", async () => {
+    roles = ["operations"];
+    shown(<TransfersPage />);
+    expect((await screen.findAllByText(/TF-000002 · Standing fan/, {}, slow)).length).toBeGreaterThan(0);
+    // Two rows paid, one of them a lot: Send only on the lot (every row is drawn twice, for wide screens and phones).
+    expect(screen.getAllByRole("button", { name: "Send" }).length * 2).toBe(screen.getAllByRole("button", { name: "Cancel" }).length);
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
+    const dialog = openDialog();
+    expect(dialog.getByText(/2,500.* shipping becomes Udozo's; Amaka Obi is told/)).toBeTruthy();
+    fireEvent.change(dialog.getByLabelText("Courier"), { target: { value: " Udozo van " } });
+    fireEvent.change(dialog.getByLabelText("Tracking number (optional)"), { target: { value: "UV-1" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Mark it sent" }));
+    await waitFor(() => expect(lastSent("/connect/transfers/tf2/send")?.body).toEqual({ courier: "Udozo van", tracking_number: "UV-1" }), slow);
+  });
+
   test("transfers: support reads without acting", async () => {
     roles = ["support"];
     shown(<TransfersPage />);
     expect((await screen.findAllByText(/TF-000001/, {}, slow)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 
   test("claims: finance pays one with what they checked, or rejects it with why; operations only read", async () => {

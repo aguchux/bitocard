@@ -230,11 +230,14 @@ describe("transfers", () => {
     reply = () => Response.json({ object: "connect_transfer", id: other });
     await actions.sendTransfer(id, other, " GIG Logistics ", "");
     await actions.receiveTransfer(id, other, null);
+    await actions.handOverTransfer(id, other, " 482 910 ");
     expect(sent.map(item => [item.url.replace(`https://api.udozo.test/v1/connect/centres/${id}`, ""), item.body])).toEqual([
       [`/transfers/${other}/send`, { courier: "GIG Logistics", tracking_number: null }],
       [`/transfers/${other}/receive`, { shelf_id: null }],
+      [`/transfers/${other}/hand-over`, { code: "482910" }],
     ]);
     sent.length = 0;
+    expect(await actions.handOverTransfer(id, other, "12345")).toMatchObject({ ok: false, param: "code" });
     expect(await actions.sendTransfer(id, other, "  ", "")).toMatchObject({ ok: false, param: "courier" });
     expect(await actions.receiveTransfer(id, "../x", null)).toMatchObject({ ok: false });
     expect(sent).toHaveLength(0);

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -9,6 +9,7 @@ import { LedgerService, type Line } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { ConnectChargesService } from './connect-charges.service.js';
+import { centreShareOf, ConnectCheckoutService, connectFeeOf } from './connect-checkout.service.js';
 import { SafePayService } from './safe-pay.service.js';
 
 const dayMs = 86_400_000;
@@ -24,6 +25,7 @@ const centreNumber = (number: number) => `CC-${String(number).padStart(6, '0')}`
 const text = (value: string | null | undefined, max: number) => (value?.trim() ? value.trim().slice(0, max) : null);
 type Source = 'customer_withdrawable' | 'customer_wallet';
 export const openTransferStatuses = ['paid', 'sent', 'arrived'];
+const codeTries = 5;
 
 const centreSelect = { id: true, number: true, name: true, address: true, landmark: true, hours: true, phone: true, partnerId: true, stateId: true, area: { select: { name: true } }, state: { select: { name: true } } } as const;
 const transferInclude = {
@@ -50,6 +52,12 @@ type CentreRow = Prisma.ConnectCentreGetPayload<{ select: typeof centreSelect }>
  * centre checks it in and the seller collects it with their return code as before, paying that centre's return fee.
  * Centres only ever send returns to another Connect Centre, never a door.
  *
+ * **A lot** (the buyer's): an abandoned item bought at a Udozo auction is collected at Udozo's warehouse, or, where the
+ * market has a transfer rate, sent to an open Connect Centre the buyer chooses. They pay the shipping (the rate) and the
+ * centre's Connect fee up front from their Udozo money or wallet, held in their locked wallet: the shipping is Udozo's when
+ * its team sends it from the warehouse, the fee is shared with the centre when the centre hands it over against the
+ * buyer's collection code.
+ *
  * Every step is claimed once, in the same transaction as the money it moves.
  */
 @Injectable()
@@ -61,6 +69,7 @@ export class ConnectTransfersService {
     private readonly charges: ConnectChargesService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly checkout: ConnectCheckoutService,
   ) {}
 
   /** The market's rate for a move where no listing charge applies (null: not offered), and the seller's days to collect. */
@@ -219,9 +228,12 @@ export class ConnectTransfersService {
       // This centre holds it now: its stock, its storage, its counter.
       await tx.classifiedOrder.update({ where: { id: row.orderId }, data: { connectCentreId: centreId, connectShelfId: input.shelf_id ?? null, connectSeenAt: now, connectMissingAt: null } });
       if (row.kind === 'return') await tx.connectReturnRequest.update({ where: { id: row.returnId! }, data: { centreId, collectBy: new Date(now.getTime() + sellerCollectDays * dayMs) } });
+      // A lot is held here for its buyer (counted in the centre's stock) until it hands it over.
+      else await tx.classifiedOrder.update({ where: { id: row.orderId }, data: { connectPlace: 'lot_at_centre' } });
       await tx.classifiedShipmentEvent.create({ data: { orderId: row.orderId, status: 'note', reportedBy: 'centre', note: `Arrived at ${row.toCentre.name}.` } });
     });
     if (row.kind === 'return') await this.tellRecipient(row, `arrived:${id}`, `Collect "${row.order.listing.title}" from ${row.toCentre.name}`, `It arrived. Show your return code on your order at the counter within ${sellerCollectDays} days (${row.toCentre.hours}).`);
+    else await this.tellRecipient(row, `arrived:${id}`, `Collect "${row.order.listing.title}" from ${row.toCentre.name}`, `It arrived. Show your collection code from the lot's page at the counter (${row.toCentre.hours}, ${row.toCentre.address}).`);
     return this.present(await this.load(id));
   }
 
@@ -233,6 +245,130 @@ export class ConnectTransfersService {
   /** Whether a return is moving between centres (its hand-back waits until it arrives). */
   async moving(returnId: string) {
     return (await this.prisma.connectTransfer.count({ where: { returnId, status: { in: ['paid', 'sent'] } } })) > 0;
+  }
+
+  // ---- A lot sent from Udozo's warehouse to a centre near its buyer ----
+
+  /** The buyer's sold lot, still at the warehouse and not moving. */
+  private async lotToShip(customer: CustomerWithStore, ref: string) {
+    if (!/^\d{1,9}$/.test(ref)) throw notFound('lot');
+    const lot = await this.prisma.connectAuction.findUnique({ where: { number: Number(ref) }, include: { transfers: { where: { status: { in: openTransferStatuses } }, select: { id: true } } } });
+    if (!lot || lot.kind !== 'abandoned' || lot.buyerId !== customer.id || lot.status !== 'sold') throw notFound('lot');
+    if (lot.collectedAt) throw conflict('lot_collected', 'You collected it already.');
+    if (lot.transfers.length) throw conflict('transfer_exists', 'It is already on its way to the centre you chose.');
+    if (!lot.warehouseId || !lot.orderId) throw conflict('lot_shipping_unavailable', 'It is collected at Udozo’s warehouse.');
+    const rate = (await this.settings(lot.country)).transferShipMinor;
+    if (rate === null) throw conflict('lot_shipping_unavailable', 'Sending lots to a Connect Centre is not offered here yet: collect it at Udozo’s warehouse.');
+    const fee = connectFeeOf(await this.checkout.terms(lot.country), rate);
+    if (fee === null) throw conflict('lot_shipping_unavailable', 'Sending lots to a Connect Centre is not offered here yet: collect it at Udozo’s warehouse.');
+    return { lot, rate, fee };
+  }
+
+  /** The open centres the buyer may have their lot sent to, with the shipping and the centre's Connect fee. */
+  async lotOptions(customer: CustomerWithStore, ref: string) {
+    const { lot, rate, fee } = await this.lotToShip(customer, ref);
+    const centres = await this.prisma.connectCentre.findMany({ where: { country: lot.country, status: 'active' }, orderBy: [{ state: { name: 'asc' } }, { name: 'asc' }], select: centreSelect, take: 500 });
+    return { object: 'list' as const, currency: lot.currency, shipping: Number(rate), fee: Number(fee), total: Number(rate + fee), data: centres.map(centre => ({ centre: this.presentCentre(centre) })) };
+  }
+
+  /** The buyer pays the shipping and the Connect fee, held until Udozo sends it and the centre hands it over. */
+  async shipLot(customer: CustomerWithStore, ref: string, input: { centre_id: string; expected_total?: number }) {
+    const { lot, rate, fee } = await this.lotToShip(customer, ref);
+    const total = rate + fee;
+    if (input.expected_total !== undefined && BigInt(input.expected_total) !== total) throw conflict('price_changed', `Sending it to a Connect Centre costs ${formatMoney(total, lot.currency)} now.`);
+    const centre = await this.prisma.connectCentre.findUnique({ where: { id: input.centre_id }, select: { ...centreSelect, country: true, status: true } });
+    if (!centre || centre.country !== lot.country || centre.status !== 'active') throw invalid('parameter_invalid', 'Choose an open Connect Centre in your country.', 'centre_id');
+    const order = await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: lot.orderId! }, select: { mode: true } });
+    const source = total === 0n ? 'customer_wallet' : await this.sourceFor(order.mode, lot.currency, customer.id, total, ['customer_withdrawable', 'customer_wallet']);
+    if (!source) throw unpaid('wallet_balance_low', `Add ${formatMoney(total, lot.currency)} to your Udozo wallet to send it.`);
+    const id = randomUUID();
+    const held = total > 0n ? await this.lock(id, order.mode, lot.currency, customer.id, source, total, `Sending AU-${String(lot.number).padStart(6, '0')} to ${centre.name}`) : null;
+    await this.prisma.$transaction(async tx => {
+      await tx.connectTransfer.create({
+        data: { id, kind: 'lot', orderId: lot.orderId!, auctionId: lot.id, fromWarehouseId: lot.warehouseId!, toCentreId: centre.id, recipientId: customer.id, mode: order.mode, country: lot.country, currency: lot.currency, shippingMinor: rate, feeMinor: fee, paidFrom: source },
+      });
+      if (held) await this.ledger.write(tx, held);
+    });
+    const full = await this.load(id);
+    await this.inbox.admins('admin.connect.alert', { subject: `connect_transfer_lot:${id}`, title: `Send ${transferNumber(full.number)} to ${centre.name}`, body: `"${full.order.listing.title}" from ${full.fromWarehouse!.name}, for its auction buyer.`, link: '/connect/transfers' });
+    await this.tellCentre(centre.id, `coming:${id}`, `${full.order.listing.title} is coming to you`, `A Udozo auction lot, from Udozo's warehouse. Check it in when it arrives, then hand it to its buyer against their collection code.`, `/connect/centre/${centre.id}/transfers`);
+    await this.tellRecipient(full, `paid:${id}`, `"${full.order.listing.title}" will be sent to ${centre.name}`, `You paid ${formatMoney(total, lot.currency)}. You are told when it arrives; collect it there with your collection code.`);
+    return this.present(full);
+  }
+
+  /** The buyer changes their mind before Udozo sends it: their money back, and they collect it at the warehouse. */
+  async cancelLot(customer: CustomerWithStore, ref: string) {
+    if (!/^\d{1,9}$/.test(ref)) throw notFound('lot');
+    const row = await this.prisma.connectTransfer.findFirst({ where: { kind: 'lot', recipientId: customer.id, status: 'paid', auction: { number: Number(ref) } }, select: { id: true } });
+    if (!row) throw conflict('transfer_not_waiting', 'Only a move not yet sent can be cancelled.');
+    return this.cancel(row.id, 'The buyer cancelled it.', customer.id, 'buyer');
+  }
+
+  /** Udozo's team sends a lot from its warehouse: the shipping is then Udozo's (audited). */
+  async sendLot(adminId: string | null, id: string, input: { courier: string; tracking_number?: string | null }) {
+    const row = await this.load(id);
+    if (row.kind !== 'lot') throw notFound();
+    if (row.status !== 'paid') throw conflict('transfer_not_waiting', 'This lot was already sent, or the move was cancelled.');
+    const courier = text(input.courier, 80);
+    if (!courier) throw invalid('parameter_missing', 'Say which courier takes it.', 'courier');
+    const tracking = text(input.tracking_number, 80);
+    const pay = row.shippingMinor > 0n ? await this.release(row, 'sent', [{ account: { kind: 'connect_revenue', currency: row.currency }, credit: row.shippingMinor }]) : null;
+    await this.prisma.$transaction(async tx => {
+      const claimed = await tx.connectTransfer.updateMany({ where: { id, status: 'paid' }, data: { status: 'sent', courier, trackingNumber: tracking, sentAt: new Date(), sentById: adminId } });
+      if (!claimed.count) throw conflict('transfer_not_waiting', 'This lot was already sent, or the move was cancelled.');
+      if (pay) await this.ledger.write(tx, pay);
+      await tx.classifiedShipmentEvent.create({ data: { orderId: row.orderId, status: 'in_transit', reportedBy: 'bitocard', note: `Auction lot sent from ${row.fromWarehouse?.name ?? 'Udozo’s warehouse'} to ${row.toCentre.name} with ${courier}.` } });
+    });
+    await this.audit.record({ actorId: adminId, action: 'connect_transfer.sent', targetType: 'connect_transfer', targetId: id, before: { status: 'paid' }, after: { status: 'sent', courier, tracking_number: tracking } });
+    await this.tellRecipient(row, `sent:${id}`, `"${row.order.listing.title}" is on its way to ${row.toCentre.name}`, `${courier}${tracking ? `, tracking ${tracking}` : ''}. You are told when it arrives.`);
+    await this.tellCentre(row.toCentreId, `sent:${id}`, `${row.order.listing.title} is on its way to you`, `With ${courier}${tracking ? ` (${tracking})` : ''}. Check it in when it arrives.`, `/connect/centre/${row.toCentreId}/transfers`);
+    return this.present(await this.load(id));
+  }
+
+  /** The centre hands a lot to its buyer against their collection code (5 tries): the Connect fee is then shared. */
+  async handOverLot(customer: CustomerWithStore, centreId: string, id: string, input: { code: string }) {
+    const member = await this.member(customer, centreId);
+    const row = await this.load(id);
+    if (row.kind !== 'lot' || row.toCentreId !== centreId) throw notFound();
+    if (row.status !== 'arrived') throw conflict('transfer_not_arrived', 'Check it in first.');
+    const lot = await this.prisma.connectAuction.findUniqueOrThrow({ where: { id: row.auctionId! }, select: { collectionCode: true, collectedAt: true } });
+    if (!lot.collectionCode || lot.collectedAt) throw conflict('lot_collected', 'It was collected already.');
+    const tried = await this.prisma.connectTransfer.updateMany({ where: { id, status: 'arrived', codeAttempts: { lt: codeTries } }, data: { codeAttempts: { increment: 1 } } });
+    if (!tried.count) throw conflict('collection_locked', 'The code was entered wrongly too many times. Ask Udozo to look into it.');
+    const expected = Buffer.from(this.safePay.unseal(lot.collectionCode));
+    const given = Buffer.from(input.code.replace(/\s/g, ''));
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      const left = codeTries - row.codeAttempts - 1;
+      throw invalid('collection_code_wrong', left > 0 ? `That is not the buyer’s collection code. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'That is not the buyer’s collection code, and no tries are left.', 'code');
+    }
+    const terms = await this.checkout.terms(row.country);
+    const share = centreShareOf(row.feeMinor, terms.centreShareBps);
+    const pay =
+      row.feeMinor > 0n
+        ? await this.release(row, 'collected', [
+            ...(share > 0n ? [{ account: { kind: 'connect_centre_earnings' as const, currency: row.currency, customerId: row.toCentre.partnerId }, credit: share }] : []),
+            ...(row.feeMinor - share > 0n ? [{ account: { kind: 'connect_revenue' as const, currency: row.currency }, credit: row.feeMinor - share }] : []),
+          ])
+        : null;
+    const now = new Date();
+    await this.prisma.$transaction(async tx => {
+      const claimed = await tx.connectTransfer.updateMany({ where: { id, status: 'arrived' }, data: { status: 'collected', collectedAt: now } });
+      if (!claimed.count) throw conflict('transfer_not_arrived', 'Check it in first.');
+      const done = await tx.connectAuction.updateMany({ where: { id: row.auctionId!, collectedAt: null }, data: { collectedAt: now } });
+      if (!done.count) throw conflict('lot_collected', 'It was collected already.');
+      if (pay) await this.ledger.write(tx, pay);
+      await tx.classifiedOrder.update({ where: { id: row.orderId }, data: { connectShelfId: null, connectMissingAt: null, connectPlace: 'auctioned', connectWarehouseId: null } });
+      await tx.classifiedShipmentEvent.create({ data: { orderId: row.orderId, status: 'note', reportedBy: 'centre', note: `Handed to its auction buyer at ${row.toCentre.name}.` } });
+    });
+    await this.audit.record({ actorId: member.customerId, action: 'connect_transfer.handed_over', targetType: 'connect_transfer', targetId: id, before: { status: 'arrived' }, after: { status: 'collected' } });
+    await this.tellRecipient(row, `collected:${id}`, `You collected "${row.order.listing.title}"`, `At ${row.toCentre.name}.`);
+    return this.present(await this.load(id));
+  }
+
+  /** A lot's open move, for its page (the buyer's view). */
+  async ofLot(auctionId: string) {
+    const row = await this.prisma.connectTransfer.findFirst({ where: { auctionId, status: { not: 'cancelled' } }, orderBy: { createdAt: 'desc' }, include: transferInclude });
+    return row ? this.present(row) : null;
   }
 
   // ---- Cancelling, before it is sent ----

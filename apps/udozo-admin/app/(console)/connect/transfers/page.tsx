@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, errorMessage, FilterSelect, formatDate, PageHeader, type Column } from "@bitocard/admin-ui";
+import { useId, useState } from "react";
+import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, errorMessage, Field, FilterSelect, formatDate, Input, PageHeader, type Column } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type ConnectTransfer, useCancelConnectTransferMutation, useConnectTransfersQuery } from "@bitocard/api-client/admin";
+import { type ConnectTransfer, useCancelConnectTransferMutation, useConnectTransfersQuery, useSendConnectTransferMutation } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
 import { money } from "@/components/connect";
 import { UdozoShell } from "@/components/shell";
@@ -15,8 +15,8 @@ const kindLabels: Record<ConnectTransfer["kind"], string> = { return: "Return se
 /**
  * Connect > Transfers: items moving to a Connect Centre for someone to collect there. A seller's return sent on from the
  * centre holding it to one near them, or an abandoned item bought at a Udozo auction sent from Udozo's warehouse. The
- * payer's money is held until it is sent. Operations cancel one not yet sent (the money back to the payer); finance and
- * support read.
+ * payer's money is held until it is sent. Operations send an auction lot from the warehouse (a courier, its tracking) and
+ * cancel one not yet sent (the money back to the payer); finance and support read.
  */
 export default function ConnectTransfersPage() {
   const admin = useAdmin();
@@ -26,6 +26,9 @@ export default function ConnectTransfersPage() {
   const transfers = useConnectTransfersQuery({ country: country || undefined, status: status || undefined });
   const [cancel] = useCancelConnectTransferMutation();
   const [cancelling, setCancelling] = useState<ConnectTransfer | null>(null);
+  const [send] = useSendConnectTransferMutation();
+  const [sending, setSending] = useState<{ row: ConnectTransfer; courier: string; tracking: string } | null>(null);
+  const id = useId();
 
   const columns: Array<Column<ConnectTransfer>> = [
     {
@@ -83,9 +86,16 @@ export default function ConnectTransfersPage() {
       align: "right",
       cell: row =>
         operations && row.status === "paid" ? (
-          <Button size="sm" variant="secondary" onClick={() => setCancelling(row)}>
-            Cancel
-          </Button>
+          <span className="flex flex-wrap justify-end gap-2">
+            {row.kind === "lot" ? (
+              <Button size="sm" onClick={() => setSending({ row, courier: "", tracking: "" })}>
+                Send
+              </Button>
+            ) : null}
+            <Button size="sm" variant="secondary" onClick={() => setCancelling(row)}>
+              Cancel
+            </Button>
+          </span>
         ) : null,
     },
   ];
@@ -113,6 +123,26 @@ export default function ConnectTransfersPage() {
         <DataTable<ConnectTransfer> caption="Transfers" columns={columns} rows={transfers.data?.data} loading={transfers.isLoading} error={transfers.error ? errorMessage(transfers.error) : null} onRetry={transfers.refetch} rowKey={row => row.id} empty="No transfers." />
       </Card>
 
+      {sending ? (
+        <ActionDialog
+          open
+          onClose={() => setSending(null)}
+          title={`Send ${sending.row.number} to ${sending.row.to.name}`}
+          description={`From ${sending.row.from.name} to ${sending.row.to.name}, ${sending.row.to.address}, ${sending.row.to.state}. The ${money(sending.row.shipping, sending.row.currency)} shipping becomes Udozo's; ${sending.row.recipient.name} is told it is on its way.`}
+          confirmLabel="Mark it sent"
+          requireReason={false}
+          onConfirm={async () => void (await send({ id: sending.row.id, courier: sending.courier.trim(), tracking_number: sending.tracking.trim() || null }).unwrap())}
+        >
+          <div className="grid gap-3">
+            <Field label="Courier" htmlFor={`${id}-courier`}>
+              <Input id={`${id}-courier`} value={sending.courier} maxLength={80} onChange={event => setSending({ ...sending, courier: event.target.value })} />
+            </Field>
+            <Field label="Tracking number (optional)" htmlFor={`${id}-tracking`}>
+              <Input id={`${id}-tracking`} value={sending.tracking} maxLength={80} onChange={event => setSending({ ...sending, tracking: event.target.value })} />
+            </Field>
+          </div>
+        </ActionDialog>
+      ) : null}
       {cancelling ? (
         <ActionDialog
           open

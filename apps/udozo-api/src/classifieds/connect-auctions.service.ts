@@ -419,6 +419,7 @@ export class ConnectAuctionsService {
   async handOver(adminId: string | null, id: string, code: string) {
     const row = await this.load(id);
     if (row.status !== 'sold' || !row.collectionCode || row.collectedAt) throw conflict('auction_not_collectable', 'This lot is not waiting to be collected.');
+    if (await this.prisma.connectTransfer.count({ where: { auctionId: id, status: { in: ['paid', 'sent', 'arrived'] } } })) throw conflict('lot_moving', 'Its buyer is having it sent to a Connect Centre: it is collected there.');
     const expected = Buffer.from(this.safePay.unseal(row.collectionCode));
     const given = Buffer.from(code.replace(/\s/g, ''));
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) throw invalid('collection_code_wrong', 'That is not the buyer’s collection code.', 'code');

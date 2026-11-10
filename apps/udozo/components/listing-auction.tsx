@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { Gavel } from "lucide-react";
 import { payName, type ShopListingAuction, shopMoney } from "@bitocard/api-client/classifieds";
 import { useConfirm } from "@/components/confirm-dialog";
+import { LotShipping } from "@/components/lot-shipping";
 import { bidOnListing, lotCollectionCode, payLot } from "@/lib/auction-actions";
 import { timeLeft } from "@/lib/auctions";
 import { fromMinor, toMinor } from "@/lib/shop";
@@ -17,6 +18,7 @@ export function auctionNote(auction: ShopListingAuction, currency: string) {
   const viewer = auction.viewer;
   if (viewer?.seller) return auction.status === "live" ? "Your listing is at auction: it sells to the highest bid at or above your reserve." : null;
   const udozos = auction.kind === "abandoned";
+  if (viewer?.won && udozos && viewer.transfer && viewer.transfer.status !== "collected") return "You bought it at auction. Collect it at the Connect Centre you chose with your collection code.";
   if (viewer?.won) return udozos ? "You bought it at auction. Show your collection code at the warehouse to collect it." : "You bought it at auction.";
   if (viewer?.to_pay) {
     const by = viewer.to_pay.pay_by ? ` by ${when(viewer.to_pay.pay_by)}` : "";
@@ -138,6 +140,7 @@ export function AuctionPanel({ listingId, currency, auction, signedIn, phoneConf
           </button>
         )
       ) : null}
+      {auction.kind === "abandoned" && viewer?.won && viewer.collected === false && code !== "collected" ? <LotShipping lotRef={auction.ref} transfer={viewer.transfer ?? null} /> : null}
       {auction.kind === "abandoned" && auction.warehouse ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
           Sold by Udozo as seen, from a shipment nobody collected: Udozo has not tested it. Collected at {auction.warehouse.name}, {auction.warehouse.address}, {auction.warehouse.state}

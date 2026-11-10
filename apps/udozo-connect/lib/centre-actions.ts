@@ -192,6 +192,14 @@ export async function receiveTransfer(id: string, transfer: string, shelf: strin
   return answer(await customerApi<Transfer>("POST", `/v1/connect/centres/${id}/transfers/${transfer}/receive`, { shelf_id: shelf }));
 }
 
+/** Hands a lot sent here to its buyer against their collection code. Never stored for replay (each try counts). */
+export async function handOverTransfer(id: string, transfer: string, code: string): Promise<CentreResult<Transfer>> {
+  if (!uuid.test(id) || !uuid.test(transfer)) return unknown;
+  const digits = code.replace(/\s/g, "");
+  if (!/^\d{6}$/.test(digits)) return { ok: false, message: "The collection code is 6 digits.", code: "parameter_invalid", param: "code" };
+  return answer(await customerApi<Transfer>("POST", `/v1/connect/centres/${id}/transfers/${transfer}/hand-over`, { code: digits }));
+}
+
 /** Takes back a check-out photo before the hand-over (a blurred one, the wrong item). */
 export async function removePickupPhoto(id: string, pickup: string, photo: string): Promise<CentreResult<Pickup>> {
   if (![id, pickup, photo].every(value => uuid.test(value))) return unknown;

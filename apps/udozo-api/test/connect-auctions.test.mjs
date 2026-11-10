@@ -360,3 +360,69 @@ describe('Claims on what an auction left over', () => {
     assert.ok((await item.seller.get(`/v1/classifieds/orders/${item.order.id}`)).json.connect.auction.unclaimed_at);
   });
 });
+
+describe('A lot sent to a Connect Centre near its buyer', () => {
+  test('the buyer pays the shipping and the fee; Udozo sends it; the centre checks it in and hands it over against the code', async () => {
+    const { lot, buyer } = await soldLot('Lot Hub');
+    const near = await centre(place.gwarinpa, 'Gwarinpa Lot Hub');
+    const path = `${lotPath(lot)}/ship`;
+    await admin.put('/v1/admin/connect/settings/NG', { transfer_ship: null });
+    assert.equal((await buyer.get(`${path}-options`)).json.error.code, 'lot_shipping_unavailable', 'only where the market has a transfer rate');
+    assert.equal((await admin.put('/v1/admin/connect/settings/NG', { transfer_ship: 250000 })).status, 200);
+    const options = (await buyer.get(`${path}-options`)).json;
+    const fee = options.fee;
+    assert.equal(options.shipping, 250000, JSON.stringify(options));
+    assert.ok(fee > 0, 'the centre’s Connect fee on the shipping');
+    assert.ok(options.data.some(option => option.centre.name === 'Gwarinpa Lot Hub'));
+    const stranger = await customer('Not The Buyer');
+    assert.equal((await stranger.get(`${path}-options`)).json.error.code, 'resource_missing');
+
+    const total = 250000 + fee;
+    assert.equal((await buyer.post(path, { centre_id: near.id, expected_total: total - 1 })).json.error.code, 'price_changed');
+    await fund(buyer, total);
+    const wallet = await balance('customer_wallet', buyer.id);
+    const first = (await buyer.post(path, { centre_id: near.id, expected_total: total })).json;
+    assert.deepEqual([first.status, first.kind, first.from.kind, first.to.name, first.fee], ['paid', 'lot', 'warehouse', 'Gwarinpa Lot Hub', fee], JSON.stringify(first));
+    assert.equal(await balance('customer_wallet_locked', buyer.id), BigInt(total), 'held');
+    // The buyer changes their mind before it is sent, then chooses it again.
+    assert.equal((await buyer.post(`${path}/cancel`)).json.status, 'cancelled');
+    assert.equal(await balance('customer_wallet', buyer.id), wallet, 'all of it back');
+    const moving = (await buyer.post(path, { centre_id: near.id, expected_total: total })).json;
+    assert.equal(moving.status, 'paid');
+    assert.equal((await buyer.post(path, { centre_id: near.id })).json.error.code, 'transfer_exists');
+
+    // Not handed over at the warehouse while it is moving; the buyer's lot page says where it stands.
+    const code = (await buyer.get(`${lotPath(lot)}/collection-code`)).json.code;
+    assert.equal((await admin.post(`/v1/admin/connect/auctions/${lot.id}/hand-over`, { code })).json.error.code, 'lot_moving');
+    const listingId = (await prisma.connectAuction.findUniqueOrThrow({ where: { id: lot.id } })).listingId;
+    const seen = (await buyer.get(`/v1/classifieds/listings/${listingId}/viewer`)).json.auction.viewer;
+    assert.deepEqual([seen.collected, seen.transfer.status, seen.transfer.to.name], [false, 'paid', 'Gwarinpa Lot Hub'], JSON.stringify(seen));
+
+    // Udozo sends it from its warehouse: the shipping is Udozo's.
+    const revenue = await balance('connect_revenue');
+    const sent = (await admin.post(`/v1/admin/connect/transfers/${moving.id}/send`, { courier: 'Udozo van', tracking_number: 'UV-1' })).json;
+    assert.deepEqual([sent.status, sent.courier], ['sent', 'Udozo van'], JSON.stringify(sent));
+    assert.equal((await balance('connect_revenue')) - revenue, 250000n);
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'connect_transfer.sent', targetId: moving.id } }));
+    assert.equal((await near.staff.post(`/v1/connect/centres/${near.id}/transfers/${moving.id}/send`, { courier: 'x' })).json.error.code, 'resource_missing', 'a centre never sends a lot');
+
+    // The centre checks it in (it counts in its stock), then hands it to the buyer against their collection code.
+    assert.equal((await near.staff.post(`/v1/connect/centres/${near.id}/transfers/${moving.id}/hand-over`, { code })).json.error.code, 'transfer_not_arrived');
+    const arrived = (await near.staff.post(`/v1/connect/centres/${near.id}/transfers/${moving.id}/receive`, { shelf_id: near.shelf.id })).json;
+    assert.equal(arrived.status, 'arrived', JSON.stringify(arrived));
+    assert.equal((await near.staff.get(`/v1/connect/centres/${near.id}/stock`)).json.total, 1, 'held for its buyer');
+    assert.equal((await near.staff.post(`/v1/connect/centres/${near.id}/transfers/${moving.id}/hand-over`, { code: code === '000000' ? '111111' : '000000' })).json.error.code, 'collection_code_wrong');
+    const partner = await balance('connect_centre_earnings', near.owner.id);
+    const before = await balance('connect_revenue');
+    const handed = (await near.staff.post(`/v1/connect/centres/${near.id}/transfers/${moving.id}/hand-over`, { code })).json;
+    assert.equal(handed.status, 'collected', JSON.stringify(handed));
+    const share = (BigInt(fee) * 7000n) / 10000n;
+    assert.equal((await balance('connect_centre_earnings', near.owner.id)) - partner, share, '70% of the fee to the centre');
+    assert.equal((await balance('connect_revenue')) - before, BigInt(fee) - share, 'the rest Udozo’s');
+    assert.equal(await balance('customer_wallet_locked', buyer.id), 0n);
+    assert.ok((await prisma.connectAuction.findUniqueOrThrow({ where: { id: lot.id } })).collectedAt);
+    assert.equal((await near.staff.get(`/v1/connect/centres/${near.id}/stock`)).json.total, 0);
+    assert.equal((await buyer.get(`${lotPath(lot)}/collection-code`)).json.code, null, 'collected');
+    await admin.put('/v1/admin/connect/settings/NG', { transfer_ship: null });
+  });
+});

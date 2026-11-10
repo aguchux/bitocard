@@ -64,7 +64,29 @@ export type ShopListingAuction = {
   ends_at: string;
   rules: { step_pct: number; step_min: number; extend_minutes: number; pay_hours: number };
   recent_bids: Array<{ name: string; amount: number; at: string }>;
-  viewer?: { highest: number | null; leading: boolean; to_pay: { amount: number; pay_by: string | null; order_id: string | null } | null; won: boolean; seller: boolean };
+  viewer?: {
+    highest: number | null;
+    leading: boolean;
+    to_pay: { amount: number; pay_by: string | null; order_id: string | null } | null;
+    won: boolean;
+    seller: boolean;
+    /** Udozo's own lots, for their buyer once paid: collected yet, and its move to a Connect Centre near them (null: none). */
+    collected?: boolean;
+    transfer?: ShopLotTransfer | null;
+  };
+};
+
+/** A won lot sent from Udozo's warehouse to a Connect Centre near its buyer. */
+export type ShopLotTransfer = ShopReturnTransfer & { fee: number };
+
+/** What sending a won lot to a Connect Centre costs, and the open centres to choose. */
+export type ShopLotShipOptions = {
+  object: 'list';
+  currency: string;
+  shipping: number;
+  fee: number;
+  total: number;
+  data: { centre: ShopReturnShipOption['centre'] }[];
 };
 export type ShopMarkets = { object: 'list'; data: ShopMarket[]; showcase: boolean };
 

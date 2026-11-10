@@ -120,6 +120,27 @@ export class ListingAuctionsService implements OnModuleInit {
   }
 
   /** A listing's auction as its page shows it; a signed-in viewer also sees their own bid and whether it is theirs to pay. */
+  /** Where a lot's move to the centre its buyer chose stands (null: collected at the warehouse). */
+  private async lotTransfer(auctionId: string) {
+    const move = await this.prisma.connectTransfer.findFirst({
+      where: { auctionId, status: { not: 'cancelled' } },
+      orderBy: { createdAt: 'desc' },
+      select: { number: true, status: true, shippingMinor: true, feeMinor: true, courier: true, trackingNumber: true, sentAt: true, arrivedAt: true, toCentre: { select: { name: true, address: true, hours: true, phone: true, state: { select: { name: true } } } } },
+    });
+    if (!move) return null;
+    return {
+      number: `TF-${String(move.number).padStart(6, '0')}`,
+      status: move.status as 'paid' | 'sent' | 'arrived' | 'collected',
+      to: { name: move.toCentre.name, address: move.toCentre.address, state: move.toCentre.state.name, hours: move.toCentre.hours, phone: move.toCentre.phone },
+      shipping: Number(move.shippingMinor),
+      fee: Number(move.feeMinor),
+      courier: move.courier,
+      tracking_number: move.trackingNumber,
+      sent_at: move.sentAt?.toISOString() ?? null,
+      arrived_at: move.arrivedAt?.toISOString() ?? null,
+    };
+  }
+
   async view(listingId: string, viewer?: string | null) {
     const row = await this.latest(listingId);
     if (!row) return null;
@@ -153,6 +174,7 @@ export class ListingAuctionsService implements OnModuleInit {
               to_pay: offered?.bidderId === viewer && row.status === 'awaiting_payment' ? { amount: Number(offered.amountMinor), pay_by: row.payBy?.toISOString() ?? null, order_id: row.saleOrderId } : null,
               won: row.status === 'sold' && row.buyerId === viewer,
               seller: row.sellerId === viewer || row.order?.sellerId === viewer,
+              ...(row.kind === 'abandoned' && row.status === 'sold' && row.buyerId === viewer ? { collected: Boolean(row.collectedAt), transfer: await this.lotTransfer(row.id) } : {}),
             },
           }
         : {}),

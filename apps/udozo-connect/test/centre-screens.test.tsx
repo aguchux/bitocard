@@ -29,6 +29,7 @@ const actions = vi.hoisted(() => ({
   handOverPickup: vi.fn(),
   sendTransfer: vi.fn(),
   receiveTransfer: vi.fn(),
+  handOverTransfer: vi.fn(),
   removePickupPhoto: vi.fn(),
   moveEarnings: vi.fn(),
 }));
@@ -506,5 +507,19 @@ describe("transfers", () => {
     });
     await act(async () => button(host, "It arrived")!.click());
     expect(actions.receiveTransfer).toHaveBeenCalledWith("c2", "t2", "s1");
+  });
+
+  it("hands a lot that arrived to its buyer against their collection code; a return goes back on Returns", async () => {
+    actions.handOverTransfer.mockResolvedValue({ ok: false, message: "That is not the buyer's collection code: 4 tries left.", code: "collection_code_wrong", param: "code" });
+    const warehouse = { kind: "warehouse" as const, id: "w1", name: "Udozo Lagos warehouse", address: "1 Wharf Road", state: "Lagos" };
+    const arrived = { ...base, kind: "lot" as const, return: null, auction: { id: "a1", number: "AU-000003" }, fee: 25000, status: "arrived" as const, arrived_at: "2026-11-10T09:00:00.000Z", from: warehouse, to: there };
+    const host = mount(createElement(TransfersList, { centre: "c2", shelves, rows: [{ ...arrived, id: "t3", number: "TF-000003" }, { ...base, id: "t4", number: "TF-000004", status: "arrived", arrived_at: "2026-11-10T09:00:00.000Z", from: here, to: there }] }));
+    expect(host.textContent).toContain("bought at Udozo auction AU-000003 by Chinedu O.");
+    expect(host.textContent).toContain("₦250 Connect fee");
+    expect(host.querySelectorAll("input[inputmode=numeric]")).toHaveLength(1);
+    act(() => type(host.querySelector("input[inputmode=numeric]") as HTMLInputElement, "482910"));
+    await act(async () => button(host, "Hand it over")!.click());
+    expect(actions.handOverTransfer).toHaveBeenCalledWith("c2", "t3", "482910");
+    expect(host.textContent).toContain("4 tries left");
   });
 });

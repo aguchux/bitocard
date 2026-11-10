@@ -601,6 +601,11 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: ({ id, reason }) => ({ url: `/v1/admin/connect/transfers/${id}/cancel`, method: 'POST', body: { reason } }),
       invalidatesTags: ['ConnectTransfers', 'Activity'],
     }),
+    /** Sends an auction lot from Udozo's warehouse to the centre its buyer chose: the shipping becomes Udozo's. */
+    sendConnectTransfer: build.mutation<ConnectTransfer, { id: string; courier: string; tracking_number?: string | null }>({
+      query: ({ id, courier, tracking_number }) => ({ url: `/v1/admin/connect/transfers/${id}/send`, method: 'POST', body: { courier, tracking_number: tracking_number || null } }),
+      invalidatesTags: ['ConnectTransfers', 'ConnectAuctions', 'Activity'],
+    }),
     connectAuctions: build.query<{ object: 'list'; data: ConnectAuction[] }, { status?: ConnectAuction['status']; country?: string } | void>({
       query: filter => ({ url: '/v1/admin/connect/auctions', params: clean({ status: filter?.status, country: filter?.country }) }),
       providesTags: ['ConnectAuctions'],
@@ -681,6 +686,7 @@ export const {
   useCancelConnectAuctionMutation,
   useConnectTransfersQuery,
   useCancelConnectTransferMutation,
+  useSendConnectTransferMutation,
   useHandOverConnectAuctionMutation,
   useConnectClaimsQuery,
   usePayConnectClaimMutation,

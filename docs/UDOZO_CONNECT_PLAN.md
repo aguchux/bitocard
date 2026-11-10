@@ -681,7 +681,25 @@ assistants' knowledge, help, terms and privacy.
        (`POST /v1/admin/connect/auctions/:id/hand-over { code }`, `collection_code_wrong`, audited).
      - **The seller may still collect** after paying what is owed until the first bid (the hand-back refuses
        `auction_has_bids` after, and cancels a lot with no bids).
-     - **Not built:** shipping lots through Connect (buyers collect at the warehouse).
+     - **Lots sent to a centre near the buyer** (built 10 November 2026; migration `20270311200000_connect_lot_transfers`,
+       which lets an order's `connect_place` be `lot_at_centre`; `connect_transfers` of `kind: lot`, `ConnectTransfersService`):
+       the buyer of a paid lot not yet collected chooses an open centre in the market
+       (`GET /v1/classifieds/auctions/:ref/ship-options`: the market's transfer rate as shipping, plus the market's Connect
+       fee on it; none while the rate is unset, `lot_shipping_unavailable`) and pays both up front
+       (`POST …/auctions/:ref/ship { centre_id, expected_total }`, `price_changed`, `transfer_exists`; from their Udozo money,
+       else wallet, `wallet_balance_low`), held in their `customer_wallet_locked`; the warehouse no longer hands it over
+       while it moves (`lot_moving`). Operations send it (`POST /v1/admin/connect/transfers/:id/send { courier,
+       tracking_number? }`, audited `connect_transfer.sent`): the shipping becomes Udozo's (`connect_revenue`). The centre
+       checks it in (`…/transfers/:id/receive`): held there for its buyer, in its stock (`connect_place: lot_at_centre`), and
+       hands it over against the buyer's own collection code (`POST /v1/connect/centres/:centre/transfers/:id/hand-over
+       { code }`, never stored for replay, 5 tries, `collection_code_wrong`, `collection_locked`; audited
+       `connect_transfer.handed_over`): the lot is collected and the Connect fee shared (the centre's part to its partner's
+       `connect_centre_earnings`, the rest `connect_revenue`). The buyer stops it before it is sent
+       (`POST …/auctions/:ref/ship/cancel`), or operations cancel it, the money back where it came from. The listing's viewer
+       carries `collected` and `transfer` for the lot's buyer. Screens: the lot's panel on udozo.com (Have it sent to a
+       Connect Centre near me, where it stands, Stop sending it), connect.udozo.com's Transfers (Hand it over), admin Connect
+       > Transfers (Send). Tests: `apps/udozo-api/test/connect-auctions.test.mjs`, `apps/udozo/test/listing-auctions.test.ts`,
+       `apps/udozo-connect/test/centres.test.ts`, `centre-screens.test.tsx`, `apps/udozo-admin/test/connect.test.tsx`.
      - **Since `docs/UDOZO_AUCTIONS_PLAN.md`** (10 November 2026): auction is a way to sell any listing, and a lot is
        made as an auction listing of Udozo's own seller account in the market; people bid on that listing's page
        (`POST /v1/classifieds/listings/:id/bids`), where its winner pays and finds the collection code, and
