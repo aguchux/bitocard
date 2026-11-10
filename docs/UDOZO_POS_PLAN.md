@@ -25,7 +25,7 @@ That removes the OAuth app, the webhooks, the 15-minute reconcile and the mock U
 | packages/core (kobo, VAT) | `apps/udozo-api/src/pos/money.ts` plus shared types and totals in `@bitocard/api-client/pos`. BigInt minor units, as the ledger uses |
 | packages/permissions | `src/pos/permissions.ts` (the matrix as data), mirrored in the client for hiding controls; the API decides |
 | Managed queue | `waitUntil` plus a Udozo cron job `pos` in `vercel.json` and `jobOwners` |
-| Subscription provider (Paystack/Flutterwave) | Paid from the seller's **Udozo wallet** (`customer_wallet`), behind its own switch. See Billing |
+| Subscription provider (Paystack/Flutterwave) | Paid from the owner's **Udozo wallet** (`customer_wallet`), topped up by card, bank or mobile money through Udozo's own gateways. See pos.udozo.com: the public site and sign-up |
 | WhatsApp receipt bot | The existing WhatsApp channel (`src/whatsapp/`): add a `document` message type and PDF media upload to `cloud-api.ts`, and a `RECEIPT` keyword in the bot |
 | PDFs | pdfkit, as `src/reports/statement-pdf.ts` uses, stored in the private bucket (`KycStorage`) behind signed, short-lived links |
 | Expo and Tauri apps | Last milestone. Before them, the web app installs as a PWA (`@bitocard/ui/install`) |
@@ -41,8 +41,8 @@ That removes the OAuth app, the webhooks, the 15-minute reconcile and the mock U
 ## Defaults I will use unless told otherwise
 
 - **Switches** (Udozo's, off by default):
-  - `pos` (global or country) opens the product;
-  - `pos_billing` (global) starts charging. While it is off, POS is free, as Seller HQ is under `paid_plans`.
+  - `pos` (global or country) opens sign-up and the product in a market. Where it is off, the public pages still show, and sign-up says POS is coming to that country.
+  - POS is **paid from the start**: a monthly fee, set by admins. It does not follow `paid_plans`, which keeps Seller HQ free.
 - **Who owns a POS account:** a udozo.com customer who sells. One account per customer, holding one or more shops.
 - **Card payments:** recorded only. No terminal.
 - **Sales money never enters Udozo's ledger:** cash, transfer and card belong to the shop. Only the plan charge moves wallet money. Paying with a buyer's Udozo wallet at the till is deferred (it needs UdozoPay-style consent).
@@ -51,6 +51,7 @@ That removes the OAuth app, the webhooks, the 15-minute reconcile and the mock U
 
 ## How the owner uses it (the owner's own words, 10 November 2026)
 
+0. **pos.udozo.com is a public page of its own**: a POS marketing site with app download buttons, pricing and **Sign up**. Sign-up takes a monthly fee and connects the shop to the owner's udozo.com account.
 1. The shop's owner lists products on udozo.com as today (category, price, quantity in stock) and ticks **Sell at POS** on the ones the shop sells.
 2. In the real shop, they open **pos.udozo.com**, sign in with their Udozo account, and get admin rights over the POS.
 3. They invite sales staff, managers, accountants and the rest.
@@ -101,15 +102,58 @@ The listing's own `stock` is the shop's inventory. There is no second count and 
 - **Devices:** a link code or QR (S19) gives a device token scoped to one shop. Unlinking ends its sessions at once.
 - **Manager approval:** "With approval" actions take a manager's PIN on the same till, recorded in the audit log.
 
+## pos.udozo.com: the public site and sign-up (decided)
+
+pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing site, with its own header and footer and none of udozo.com's marketplace navigation. The POS itself sits behind sign-in.
+
+- **Pages:**
+  - `/`:
+    - the hero: what it is, with an illustration of the register labelled as one;
+    - how it works: list on udozo.com, tick Sell at POS, sell in the shop, and stock follows itself;
+    - features: register and barcode, one inventory with udozo.com, staff and roles, receipts by print, WhatsApp and email, reports, offline later;
+    - the apps band, pricing, questions and a closing call;
+  - `/pricing`: the plans side by side (monthly, and yearly if admins set it), what each includes (tills, staff), the trial, and that it is paid from the Udozo wallet;
+  - `/download`: Android, iOS and Windows, plus Use it in your browser;
+  - `/signup` and `/signin`;
+  - legal pages: POS terms and privacy link to udozo.com's `/legal/pos` and `/legal/privacy`.
+- **App buttons** (Google Play, App Store, Microsoft Store or the Windows installer):
+  - each points at its store once that app is live, with the links set in admin (`pos_app_links`);
+  - until then the button says **Coming soon** and is not a link, so the site never claims an app that does not exist;
+  - Use in browser always works, and offers to install the web app (`@bitocard/ui/install`).
+- **Sign-up** (`/signup`, the owner only):
+  1. **Connect your Udozo account:** sign in, or create an account on udozo.com, through the handoff (`/signin?next=/signup`), returning signed in. An account without a confirmed email or country finishes udozo.com's onboarding first.
+  2. **Your shop:** shop name, address, phone and TIN. The shop is in the account's own country (fixed, with its currency), and `pos` must be on there.
+  3. **Choose a plan:** monthly (yearly where set), with the price in the account's currency and what it includes.
+  4. **Pay:**
+     - the first month comes from the Udozo wallet, shown with the balance;
+     - if the balance is short, **Add funds** opens udozo.com's own wallet top-up (card, bank or mobile money, `POST /v1/store/wallet/top-ups`) and returns here;
+     - with a trial, nothing is charged until it ends, but the wallet is checked and the date is shown.
+  5. **Done:** into first-run setup: tills, then the import of the listings ticked Sell at POS (S18). If none are ticked, setup links to udozo.com's My listings to tick some.
+- **Sign-in** (`/signin`) has two doors on one page:
+  - **Shop owner:** Continue with Udozo (the handoff);
+  - **Staff:** shop code, phone and PIN.
+  - Someone already signed in who goes to `/` sees the public page, with **Open POS** in the header.
+- **The monthly fee** (`PosBillingService`):
+  - **Plans** (`pos_plans`) are set in admin.udozo.com > POS > Plans: name, monthly price per market currency, an optional yearly price, the limits (tills, staff, shops), trial days (14 by default), and whether the plan is shown. Finance changes them after step-up, and every change is audited.
+  - **Charging:** the fee is taken from the owner's `customer_wallet` into `pos_revenue` (a new revenue ledger account). This happens at sign-up, or when the trial ends, then each month. Each period is one entry (`pos:<account>:<period>`), so a retry never charges twice.
+  - **Changing plan:** moving up is charged at once, less the unused part of what was paid; moving down takes effect at the end of the month.
+  - **A failed renewal:** 7 days' grace with notices (inbox, push and email) 3 days before renewal, on failure, and the day before the POS stops. After that, staff can no longer sign in or sell, and the owner sees only Billing, to pay. Nothing is deleted.
+  - **Cancelling:** the plan runs to the end of the paid month.
+  - **Invoices:** one for every charge, on Billing (PDF).
+  - The `pos` cron job runs renewals.
+
 ## Milestones (each a commit or a few, tested, deployable)
 
 0. **Plan:** this document saved and linked.
-1. **Foundation:**
-   - switches, the schema for accounts, shops and tills;
+1. **Foundation, public site and sign-up (S15–S18):**
+   - the `pos` switch, and the schema for accounts, shops, tills and plans;
    - `money.ts` (totals, discounts, VAT, rounding; the S9 sample sale totals ₦38,700);
    - `apps/udozo-pos` skeleton on the shared console UI with handoff sign-in;
+   - the public site (`/`, `/pricing`, `/download`), with each app's button saying Coming soon until its link is set;
+   - sign-up: connect the Udozo account, set up the shop, choose the plan, then pay the first month from the wallet (or start the trial), with Add funds through udozo.com's wallet top-up;
+   - the monthly fee: renewals, grace, notices and invoices (the `pos` cron job);
    - first-run setup (S18): shop, tills;
-   - admin.udozo.com **POS** section (accounts and shops; support reads).
+   - admin.udozo.com **POS** section: accounts, shops, plans and prices, app links (support reads, finance sets prices).
 2. **Catalogue (S4, S18):**
    - Sell at POS, shop only, barcode and reorder level on Post an ad;
    - the POS catalogue reads listings live;
@@ -131,21 +175,17 @@ The listing's own `stock` is the shop's inventory. There is no second count and 
    - totals, an hourly POS-versus-online chart, payment mix, top sellers, restock list;
    - shifts and cash-up, end of day;
    - CSV and PDF exports for the accountant.
-7. **Public site and billing (S15, S16):**
-   - marketing pages on pos.udozo.com;
-   - plans with tills, staff and shop limits through one `posLimit` check;
-   - trial and monthly charge from the wallet under `pos_billing`, with renewal, grace and failure notices.
+7. **Plan limits and plan changes:** tills, staff and shop limits through one `posLimit` check; upgrading and downgrading; yearly billing.
 8. **Offline and apps (S5, S19):**
    - an IndexedDB catalogue and outbox in the web app first;
-   - then Expo (camera, Bluetooth ESC/POS) and Tauri (USB printers, cash drawer).
-
-Billing moves to milestone 7 because Udozo launches free. The brief put it at M1.
+   - then Expo (camera, Bluetooth ESC/POS) and Tauri (USB printers, cash drawer);
+   - setting each app's store link in admin turns its Coming soon button on pos.udozo.com into a download.
 
 ## Legal owed before `pos` goes on anywhere
 
 - POS terms: the shop is the seller at its till, Udozo provides the software, and the shop handles its own tax and VAT on receipts.
 - Privacy notice: staff names and phones, the shop's customers on receipts, WhatsApp delivery of receipts, retention.
-- Plan terms before `pos_billing`.
+- Plan and fee terms, before sign-up opens: the monthly fee from the wallet, the trial, renewal, grace, cancelling, and what happens to the shop's data after the POS stops.
 
 ## Verification
 
@@ -165,5 +205,5 @@ Billing moves to milestone 7 because Udozo launches free. The brief put it at M1
 ## Still needed from the owner
 
 1. **The design canvas** (S1–S19). The doc link reaches only the written brief, so I need the canvas link or an export to match the screens.
-2. **Plan prices, trial length and yearly discount** (needed by milestone 7 only).
+2. **The monthly price per market, trial length and yearly discount.** Needed for milestone 1 now; admins can change them later.
 3. **Store accounts:** Apple, Google Play and a Windows code-signing certificate under Udozo's name (needed by milestone 8 only).
