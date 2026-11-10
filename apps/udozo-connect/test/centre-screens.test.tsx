@@ -25,6 +25,8 @@ const actions = vi.hoisted(() => ({
   postUpdate: vi.fn(),
   askReturn: vi.fn(),
   handBack: vi.fn(),
+  recordStockCheck: vi.fn(),
+  moveEarnings: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("@/lib/centre-actions", () => actions);
@@ -36,6 +38,8 @@ const { CentreSettings } = await import("@/components/centre-settings");
 const { CentreNav } = await import("@/components/centre-nav");
 const { CounterOrderView, FindOrder } = await import("@/components/counter-order");
 const { ReturnsList } = await import("@/components/centre-returns");
+const { StockShelf } = await import("@/components/centre-stock");
+const { EarningsCard, EarningsLines } = await import("@/components/centre-earnings");
 
 type Centre = import("@/lib/centres").Centre;
 type Member = import("@/lib/centres").Member;
@@ -98,7 +102,9 @@ describe("the centre's menu", () => {
   it("marks the page it is on", () => {
     const host = mount(createElement(CentreNav, { id: "c1" }));
     expect(host.querySelector('[aria-current="page"]')!.textContent).toBe("Staff");
-    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
+    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/stock", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
+    const owner = mount(createElement(CentreNav, { id: "c1", role: "owner" }));
+    expect([...owner.querySelectorAll("a")].map(link => link.textContent)).toContain("Earnings");
   });
 });
 
@@ -341,5 +347,56 @@ describe("returns to sellers", () => {
     act(() => type(host.querySelector<HTMLInputElement>("input")!, "654321"));
     await act(async () => button(host, "Hand it back")!.click());
     expect(actions.handBack).toHaveBeenCalledWith("c1", "r1", "654321");
+  });
+});
+
+describe("stock checks", () => {
+  const group = {
+    shelf: { id: "sh1", code: "A-01", label: "By the door", active: true },
+    items: [
+      { order_id: "o1", number: "SP-41", title: "Samsung TV", status: "at_centre", received_at: null, missing_since: null, seen_at: null },
+      { order_id: "o2", number: "SP-42", title: "Blender", status: "at_centre", received_at: null, missing_since: "2026-11-09T10:00:00.000Z", seen_at: null },
+    ],
+  };
+
+  it("saves what was ticked, asking first when something is not", async () => {
+    actions.recordStockCheck.mockResolvedValue({ ok: true, data: { object: "connect_stock_check", id: "k1", shelf: { id: "sh1", code: "A-01" }, checked_by: "Bola Ade", expected: 2, found: 1, missing: 1, flagged: 0, note: null, created_at: "2026-11-10T10:00:00.000Z" } });
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const host = mount(createElement(StockShelf, { centre: "c1", country: "NG", group }));
+    expect(host.textContent).toContain("A-01 · By the door");
+    expect(host.textContent).toContain("Missing since");
+    act(() => (host.querySelector('input[type="checkbox"]') as HTMLInputElement).click());
+    await act(async () => button(host, "Save the check")!.click());
+    expect(document.querySelector("dialog")!.textContent).toContain("1 item is not ticked");
+    await act(async () => dialogButton("Save the check").click());
+    expect(actions.recordStockCheck).toHaveBeenCalledWith("c1", "sh1", ["o1"], "");
+    expect(host.textContent).toContain("Saved: 1 of 2 missing.");
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("earnings", () => {
+  const account = { mode: "live" as const, currency: "NGN", balance: 24000, held: 10000, available: 14000 };
+
+  it("moves what is past the hold to the owner's payouts, in kobo, after confirming", async () => {
+    actions.moveEarnings.mockResolvedValue({ ok: true, data: {} });
+    const host = mount(createElement(EarningsCard, { centre: "c1", account, holdDays: 15, payoutsUrl: "https://udozo.com/account/payouts" }));
+    expect(host.textContent).toContain("Can move");
+    expect(host.textContent).toContain("15 days after they are earned");
+    const amount = host.querySelector("input") as HTMLInputElement;
+    expect(amount.value).toBe("140.00");
+    act(() => type(amount, "500"));
+    await act(async () => button(host, "Move to my payouts")!.click());
+    expect(host.textContent).toContain("You can move up to ₦140 now.");
+    act(() => type(amount, "100.50"));
+    await act(async () => button(host, "Move to my payouts")!.click());
+    await act(async () => dialogButton("Move it").click());
+    expect(actions.moveEarnings).toHaveBeenCalledWith("c1", "live", "NGN", 10050);
+    expect(host.querySelector('a[href="https://udozo.com/account/payouts"]')).toBeTruthy();
+  });
+
+  it("lists what was earned and moved", () => {
+    const host = mount(createElement(EarningsLines, { country: "NG", lines: [{ id: "l1", kind: "earned", description: "UdozoPay SP-41 released", amount: 14000, mode: "live", currency: "NGN", created_at: "2026-11-10T10:00:00.000Z" }] }));
+    expect(host.textContent).toContain("+₦140");
   });
 });

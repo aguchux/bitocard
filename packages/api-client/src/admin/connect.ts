@@ -117,6 +117,24 @@ export type ConnectSettings = {
   loc_penalty_cap: number;
 };
 
+/** An item a Connect Centre's stock check did not find, until found again or handed over. */
+export type ConnectMissingItem = {
+  object: 'connect_missing_item';
+  order_id: string;
+  number: string;
+  title: string;
+  status: string;
+  price: number;
+  currency: string;
+  centre: { id: string; name: string; number: string; country: string } | null;
+  /** The storage place it should be on. */
+  shelf: string | null;
+  received_at: string | null;
+  missing_since: string;
+  /** When a stock check last found it. */
+  seen_at: string | null;
+};
+
 /** A Connect Centre's return of an item to its seller. */
 export type ConnectReturn = {
   object: 'connect_return';
@@ -296,6 +314,10 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: filter => ({ url: '/v1/admin/connect/returns', params: clean({ status: filter?.status, country: filter?.country }) }),
       providesTags: ['ConnectCentres'],
     }),
+    connectMissing: build.query<{ object: 'list'; data: ConnectMissingItem[] }, { country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/missing', params: clean({ country: filter?.country }) }),
+      providesTags: ['ConnectCentres'],
+    }),
     approveConnectReturn: build.mutation<ConnectReturn, { id: string }>({
       query: ({ id }) => ({ url: `/v1/admin/connect/returns/${id}/approve`, method: 'POST', body: {} }),
       invalidatesTags: ['ConnectCentres', 'Activity'],
@@ -326,5 +348,6 @@ export const {
   useConnectCentreQuery,
   useSetConnectCentreStatusMutation,
   useConnectReturnsQuery,
+  useConnectMissingQuery,
   useApproveConnectReturnMutation,
 } = connectApi;

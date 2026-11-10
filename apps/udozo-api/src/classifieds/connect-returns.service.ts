@@ -214,6 +214,7 @@ export class ConnectReturnsService {
       const done = await tx.connectReturnRequest.updateMany({ where: { id, status: 'accepted' }, data: { status: 'collected', collectedAt: now, returnFeeMinor: fee } });
       if (!done.count) throw conflict('return_changed', 'This return changed: refresh and try again.');
       if (entry) await this.ledger.write(tx, entry);
+      await tx.classifiedOrder.update({ where: { id: order.id }, data: { connectShelfId: null, connectMissingAt: null } });
       await tx.classifiedShipmentEvent.create({ data: { orderId: order.id, status: 'returned', reportedBy: 'centre', note: 'Collected by the seller.' } });
     });
     await this.safePay.tellParty(order, 'seller', 'customer.connect.return', `You collected "${order.listing.title}"`, fee ? `The return fee was taken from your ${source === 'customer_wallet' ? 'wallet' : 'Udozo money'}.` : 'Return complete.');

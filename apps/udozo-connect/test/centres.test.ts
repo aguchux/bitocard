@@ -185,3 +185,29 @@ describe("returns", () => {
     expect(sent).toHaveLength(0);
   });
 });
+
+describe("stock checks and earnings", () => {
+  it("shows Earnings in the menu to the owner only", () => {
+    expect(rules.centreNav(id, "owner").map(item => item.label)).toContain("Earnings");
+    expect(rules.centreNav(id, "staff").map(item => item.label)).not.toContain("Earnings");
+    expect(rules.centreNav(id, "staff").map(item => item.label)).toContain("Stock check");
+    expect(rules.checkWords({ expected: 4, missing: 0 })).toBe("All 4 there");
+    expect(rules.checkWords({ expected: 4, missing: 1 })).toBe("1 of 4 missing");
+  });
+
+  it("records a check and moves earnings through the centre's own routes, checked here first", async () => {
+    reply = () => Response.json({ object: "connect_stock_check", id: other });
+    await actions.recordStockCheck(id, other, [other], " Box torn ");
+    await actions.recordStockCheck(id, null, [], null);
+    await actions.moveEarnings(id, "live", "NGN", 14000);
+    expect(sent.map(item => [item.method, item.url.replace(`https://api.udozo.test/v1/connect/centres/${id}`, ""), item.body])).toEqual([
+      ["POST", "/stock-checks", { shelf_id: other, found: [other], note: "Box torn" }],
+      ["POST", "/stock-checks", { shelf_id: null, found: [], note: null }],
+      ["POST", "/earnings/move", { mode: "live", currency: "NGN", amount: 14000 }],
+    ]);
+    sent.length = 0;
+    expect(await actions.recordStockCheck(id, null, ["../x"], null)).toMatchObject({ ok: false });
+    expect(await actions.moveEarnings(id, "live", "NGN", 0)).toMatchObject({ ok: false, param: "amount" });
+    expect(sent).toHaveLength(0);
+  });
+});

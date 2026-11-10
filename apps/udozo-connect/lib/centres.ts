@@ -52,18 +52,20 @@ export const canManage = (role: CentreRole) => role === "owner" || role === "man
 export const isOwner = (role: CentreRole) => role === "owner";
 
 /** The centre's places on connect.udozo.com, in the order of its menu. */
-export const centreNav = (id: string) => [
+export const centreNav = (id: string, role?: CentreRole) => [
   { label: "Overview", href: `/centre/${id}` },
   { label: "Items", href: `/centre/${id}/orders` },
   { label: "Returns", href: `/centre/${id}/returns` },
+  { label: "Stock check", href: `/centre/${id}/stock` },
+  ...(role === "owner" ? [{ label: "Earnings", href: `/centre/${id}/earnings` }] : []),
   { label: "Centre", href: `/centre/${id}/settings` },
   { label: "Staff", href: `/centre/${id}/staff` },
   { label: "Storage places", href: `/centre/${id}/shelves` },
 ];
 
 /** The menu item a path belongs to: the longest matching address, so Overview is current only on its own page. */
-export function currentNav(id: string, path: string) {
-  const items = centreNav(id);
+export function currentNav(id: string, path: string, role?: CentreRole) {
+  const items = centreNav(id, role);
   return items.filter(item => path === item.href || path.startsWith(`${item.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.href ?? items[0]!.href;
 }
 
@@ -219,4 +221,23 @@ export function returnReasonsFor(order: Pick<CounterOrder, "status" | "ready_at"
   if (order.status === "at_centre" && order.ready_at) return ["not_collected"];
   if (order.held_for_seller) return ["refused_at_check_in", "refused_at_counter", "damaged"];
   return null;
+}
+
+// ---- Stock checks and earnings (phase 5f) ----
+
+/** An item that should be at the centre, with whether a stock check could not find it. */
+export type StockItem = { order_id: string; number: string; title: string; status: string; received_at: string | null; missing_since: string | null; seen_at: string | null };
+/** One storage place and what should be on it; `shelf` null is what is at the centre but on no storage place. */
+export type StockGroup = { shelf: { id: string; code: string; label: string | null; active: boolean } | null; items: StockItem[] };
+export type Stock = { object: "connect_stock"; total: number; missing: number; groups: StockGroup[] };
+export type StockCheck = { object: "connect_stock_check"; id: string; shelf: { id: string; code: string | null } | null; checked_by: string | null; expected: number; found: number; missing: number; flagged?: number; note: string | null; created_at: string };
+
+export type EarningsAccount = { mode: "live" | "test"; currency: string; balance: number; held: number; available: number };
+export type EarningsLine = { id: string; kind: "earned" | "moved"; description: string; amount: number; mode: "live" | "test"; currency: string; created_at: string };
+export type Earnings = { object: "connect_earnings"; hold_days: number; accounts: EarningsAccount[]; lines: EarningsLine[]; centre: { handed_over: number; connect_fees: number } };
+
+/** A stock check's outcome in words. */
+export function checkWords(check: Pick<StockCheck, "expected" | "missing">) {
+  if (!check.missing) return `All ${check.expected} there`;
+  return `${check.missing} of ${check.expected} missing`;
 }

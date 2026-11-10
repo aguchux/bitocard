@@ -5709,6 +5709,10 @@ model ClassifiedOrder {
   collectBy                DateTime?          @map("collect_by")
   /// The centre member who handed it over (no foreign key: kept if they leave).
   releasedById             String?            @map("released_by_id") @db.Uuid
+  /// Connect: not found on its storage place at a stock check (flagged to Udozo), until found again or handed over.
+  connectMissingAt         DateTime?          @map("connect_missing_at")
+  /// Connect: when a stock check last found it at the centre.
+  connectSeenAt            DateTime?          @map("connect_seen_at")
   /// Encrypted; shown to the seller only once paid, and only for delivery.
   deliveryAddress          String?            @map("delivery_address")
   trackingNote             String?            @map("tracking_note")
@@ -5764,6 +5768,7 @@ model ClassifiedOrder {
   connectShelf             ConnectShelf?      @relation(fields: [connectShelfId], references: [id], onDelete: SetNull)
   connectReturn            ConnectReturnRequest?
   connectCharges           ConnectCharge[]
+  connectStockItems        ConnectStockCheckItem[]
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
@@ -7400,6 +7405,7 @@ model ConnectCentre {
   orders       ClassifiedOrder[]
   returns      ConnectReturnRequest[]
   shelves      ConnectShelf[]
+  stockChecks  ConnectStockCheck[]
 
   @@index([country, stateId, status])
   @@index([partnerId])
@@ -7439,6 +7445,7 @@ model ConnectShelf {
   updatedAt DateTime      @updatedAt @map("updated_at")
   centre    ConnectCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
   orders    ClassifiedOrder[]
+  stockChecks ConnectStockCheck[]
 
   @@unique([centreId, code])
   @@index([centreId, position])
@@ -7535,4 +7542,41 @@ model ConnectCharge {
   @@unique([orderId, payer, kind, day])
   @@index([orderId, status])
   @@map("connect_charges")
+}
+
+/// A centre's stock check: what should have been in one storage place (or the whole centre), and how much was there.
+model ConnectStockCheck {
+  id          String                  @id @default(uuid()) @db.Uuid
+  centreId    String                  @map("centre_id") @db.Uuid
+  /// The storage place checked, or null for the whole centre.
+  shelfId     String?                 @map("shelf_id") @db.Uuid
+  /// The centre member who checked (no foreign key: kept if they leave).
+  checkedById String                  @map("checked_by_id") @db.Uuid
+  expected    Int
+  found       Int
+  missing     Int
+  note        String?
+  createdAt   DateTime                @default(now()) @map("created_at")
+  centre      ConnectCentre           @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  shelf       ConnectShelf?           @relation(fields: [shelfId], references: [id], onDelete: SetNull)
+  items       ConnectStockCheckItem[]
+
+  @@index([centreId, createdAt])
+  @@map("connect_stock_checks")
+}
+
+/// One item a stock check expected, and whether it was there.
+model ConnectStockCheckItem {
+  id      String            @id @default(uuid()) @db.Uuid
+  checkId String            @map("check_id") @db.Uuid
+  orderId String            @map("order_id") @db.Uuid
+  /// The storage place it should have been on.
+  shelfId String?           @map("shelf_id") @db.Uuid
+  found   Boolean
+  check   ConnectStockCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  order   ClassifiedOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([checkId, orderId])
+  @@index([orderId])
+  @@map("connect_stock_check_items")
 }

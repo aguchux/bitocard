@@ -194,7 +194,7 @@ export class ConnectCounterService implements OnModuleInit {
     if (total > 0n) throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'storage_unpaid', 'The buyer pays the storage on their order first (Pay storage).');
     await this.safePay.checkReleaseCode(order, 'at_centre', input.code);
     await this.safePay.settle(order, { kind: 'release' }, ['at_centre'], async tx => {
-      await tx.classifiedOrder.update({ where: { id: order.id }, data: { releasedById: member.customerId, connectShelfId: null } });
+      await tx.classifiedOrder.update({ where: { id: order.id }, data: { releasedById: member.customerId, connectShelfId: null, connectMissingAt: null } });
       await tx.classifiedShipmentEvent.create({ data: { orderId: order.id, status: 'collected', reportedBy: 'centre' } });
     });
     const done = await this.safePay.load(order.id);

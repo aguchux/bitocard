@@ -45,7 +45,7 @@ export default async function CentreLayout({ children, params }: { children: Rea
         ) : null}
       </div>
       <div className="mt-5 grid gap-6 md:grid-cols-[12rem_minmax(0,1fr)]">
-        <CentreNav id={id} />
+        <CentreNav id={id} role={data.role} />
         <div className="min-w-0">{children}</div>
       </div>
     </div>

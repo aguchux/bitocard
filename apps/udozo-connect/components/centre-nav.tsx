@@ -1,16 +1,16 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { centreNav, currentNav } from "@/lib/centres";
+import { type CentreRole, centreNav, currentNav } from "@/lib/centres";
 
 /** The centre's menu: a row of tabs across the top on phones, a list beside the page from tablets up. */
-export function CentreNav({ id }: { id: string }) {
+export function CentreNav({ id, role }: { id: string; role?: CentreRole }) {
   const path = usePathname() ?? "";
-  const current = currentNav(id, path);
+  const current = currentNav(id, path, role);
   return (
     <nav aria-label="Centre" className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:overflow-visible md:px-0">
       <ul className="flex gap-1 border-b border-slate-200 md:grid md:gap-1 md:border-0">
-        {centreNav(id).map(item => {
+        {centreNav(id, role).map(item => {
           const on = item.href === current;
           return (
             <li key={item.href} className="shrink-0">

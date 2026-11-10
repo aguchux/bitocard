@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserCheck, Undo2, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, PackageSearch, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserCheck, Undo2, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -68,7 +68,8 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Visitors", href: "/connect/visitors", icon: UserCheck },
       { label: "States, deposit and fee", href: "/connect/settings", icon: MapPinned },
       { label: "Centres", href: "/connect/centres", icon: Warehouse },
-    { label: "Returns", href: "/connect/returns", icon: Undo2 },
+      { label: "Returns", href: "/connect/returns", icon: Undo2 },
+      { label: "Missing items", href: "/connect/missing", icon: PackageSearch },
     ],
   },
   assistants: {

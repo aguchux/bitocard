@@ -19,6 +19,7 @@ const { default: SettingsPage } = await import("@/app/(console)/connect/settings
 const { default: CentresPage } = await import("@/app/(console)/connect/centres/page");
 const { default: CentrePage } = await import("@/app/(console)/connect/centres/[id]/page");
 const { default: ReturnsPage } = await import("@/app/(console)/connect/returns/page");
+const { default: MissingPage } = await import("@/app/(console)/connect/missing/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -172,6 +173,11 @@ beforeEach(() => {
         object: "list",
         data: [{ object: "connect_return", id: "rt1", number: "RT-000003", order: { id: "o1", number: "SP-000042", title: "Samsung TV" }, centre: { id: "cc1", name: "Ikeja Parcel Hub" }, seller: { name: "Chinedu Okafor" }, reason: "not_collected", note: null, status: "requested", answer_by: "2026-11-12T10:00:00.000Z", decided_by: null, decided_at: null, collect_by: null, collected_at: null, return_fee: null, currency: "NGN", code_tries_left: null, created_at: "2026-11-10T10:00:00.000Z" }],
       });
+    if (path === "/v1/admin/connect/missing")
+      return ok({
+        object: "list",
+        data: [{ object: "connect_missing_item", order_id: "o2", number: "SP-43", title: "Blender", status: "at_centre", price: 4_500_000, currency: "NGN", centre: { id: "cc1", name: "Ikeja Parcel Hub", number: "CC-000001", country: "NG" }, shelf: "A-01", received_at: "2026-11-08T10:00:00.000Z", missing_since: "2026-11-10T09:00:00.000Z", seen_at: null }],
+      });
     if (path === "/v1/admin/connect/returns/rt1/approve") return ok({ object: "connect_return", id: "rt1", status: "accepted" });
     const status = /^\/v1\/admin\/connect\/centres\/cc1\/(pause|reinstate|close)$/.exec(path)?.[1];
     if (status && input.method === "POST") {
@@ -203,7 +209,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -400,6 +406,15 @@ describe("Connect", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Approve" })[0]!);
     fireEvent.click(openDialog().getByRole("button", { name: "Approve return" }));
     await waitFor(() => expect(lastSent("/connect/returns/rt1/approve")).toBeTruthy(), slow);
+  });
+
+  test("missing items: what stock checks did not find, with its centre and storage place", async () => {
+    roles = ["support"];
+    shown(<MissingPage />);
+    expect((await screen.findAllByText("Blender", {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/on A-01/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Never found at a check").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Ikeja Parcel Hub/ })[0]!.getAttribute("href")).toBe("/connect/centres/cc1");
   });
 
   test("support reads returns but cannot approve them", async () => {

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Centre, CentreReturn, CounterOrder, List, Member, Shelf } from "./centres";
+import type { Centre, CentreReturn, CounterOrder, Earnings, List, Member, Shelf, StockCheck } from "./centres";
 import { customerApi } from "./session";
 
 /** What an action answers: what it changed as it now is, or Udozo's refusal in words with the field it names. */
@@ -162,4 +162,19 @@ export async function handBack(id: string, returnId: string, code: string): Prom
   const digits = code.replace(/\s/g, "");
   if (!/^\d{6}$/.test(digits)) return { ok: false, message: "The return code is 6 digits.", code: "parameter_invalid", param: "code" };
   return answer(await customerApi<CentreReturn>("POST", `/v1/connect/centres/${id}/returns/${returnId}/hand-back`, { code: digits }));
+}
+
+// ---- Stock checks and earnings ----
+
+/** Records a stock check of one storage place (or the whole centre): the items that were there. The rest are flagged to Udozo. */
+export async function recordStockCheck(id: string, shelf: string | null, found: string[], note: string | null): Promise<CentreResult<StockCheck>> {
+  if (!uuid.test(id) || (shelf !== null && !uuid.test(shelf)) || found.some(item => !uuid.test(item))) return unknown;
+  return answer(await customerApi<StockCheck>("POST", `/v1/connect/centres/${id}/stock-checks`, { shelf_id: shelf, found, note: text(note) }));
+}
+
+/** The owner moves earnings past the payout hold into their payouts, paid to their bank from udozo.com. */
+export async function moveEarnings(id: string, mode: "live" | "test", currency: string, amount: number): Promise<CentreResult<Earnings>> {
+  if (!uuid.test(id)) return unknown;
+  if (!Number.isSafeInteger(amount) || amount <= 0) return { ok: false, message: "Give an amount to move.", code: "parameter_invalid", param: "amount" };
+  return answer(await customerApi<Earnings>("POST", `/v1/connect/centres/${id}/earnings/move`, { mode, currency, amount }));
 }

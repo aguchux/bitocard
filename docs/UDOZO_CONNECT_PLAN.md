@@ -446,7 +446,7 @@ assistants' knowledge, help, terms and privacy.
      Centre** card (`connectLine`) lists the states and charges with See the centres, and its Product offer carries
      `shippingDetails` (an `OfferShippingDetails` per state). Tests: `apps/udozo/test/connect-shipping.test.ts`,
      `post-wizard.test.ts`.
-5. **Orders**: buying with a centre, labels, and on the dashboard Expected, Receive, Shelve, Release, Updates, Returns
+5. **Orders** (**built**): buying with a centre, labels, and on the dashboard Expected, Receive, Shelve, Release, Updates, Returns
    and Stock check; the order timeline, and centre earnings and payouts. Built in slices:
    - **5a, the API's orders through a centre (built):**
      - **Settings and money:** finance sets each market's Connect fee on Connect > States, deposit and fee (`PUT
@@ -544,7 +544,29 @@ assistants' knowledge, help, terms and privacy.
        States, deposit and fee.
      - Tests: `apps/udozo-api/test/connect-storage.test.mjs`, `apps/udozo-connect/test/centre-screens.test.tsx`,
        `apps/udozo/test/connect-orders.test.ts`, `apps/udozo-admin/test/connect.test.tsx`.
-   - **5f (next):** stock checks, and centre earnings and payouts.
+   - **5f, stock checks and earnings (built):** migration `20270310400000_connect_stock_checks`
+     (`connect_stock_checks` with their `connect_stock_check_items`; `classified_orders.connect_missing_at` and
+     `connect_seen_at`). `ConnectStockService`:
+     - **What should be there** (`GET /v1/connect/centres/:centre/stock`, any of its people): every item received and not
+       handed over (at the centre, with Udozo after a refusal, or refunded and kept for its seller until collected,
+       `atCentreWhere`), grouped by storage place, those on none last, each with when it was last found and whether it is
+       missing.
+     - **A check** (`POST …/stock-checks { shelf_id?, found, note? }`, one storage place or the whole centre; `GET
+       …/stock-checks` the latest 30): what was found is marked seen; what was not is flagged missing at once
+       (`connect_missing_at`, admins told `admin.connect.missing` once a check, linking to Connect > Missing items);
+       `nothing_to_check` when nothing should be there, `parameter_invalid` for an item the check does not list. A flag
+       clears when a later check finds it, or when it is handed over or collected by its seller.
+     - **Earnings** (`GET …/earnings`, the owner only, `centre_role_required` otherwise): the partner's
+       `connect_centre_earnings` per mode and currency, what is still inside the market's payout hold (credits in the
+       last `payout_hold_days`), what can move, the latest 50 lines, and the centre's items handed over and Connect fees
+       earned. **Move to my payouts** (`POST …/earnings/move { mode, currency, amount }`, the accounts locked, 402
+       `insufficient_funds` past what can move) is one `connect_earnings_move` entry into their `customer_withdrawable`,
+       which udozo.com's Payouts (`/account/payouts`) pays to their bank like UdozoPay money.
+     - **Screens:** connect.udozo.com's **Stock check** (`/centre/<id>/stock`: each storage place's items to tick, Save the
+       check confirming how many are not ticked, the latest checks) and the owner's **Earnings** (`/centre/<id>/earnings`,
+       in the menu only for the owner); admin Connect > **Missing items** (`/connect/missing`, support and operations).
+     - Tests: `apps/udozo-api/test/connect-stock.test.mjs`, `apps/udozo-connect/test/centres.test.ts`,
+       `apps/udozo-connect/test/centre-screens.test.tsx`, `apps/udozo-admin/test/connect.test.tsx`.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo
