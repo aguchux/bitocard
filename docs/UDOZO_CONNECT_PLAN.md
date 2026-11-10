@@ -1,7 +1,7 @@
 # Udozo Connect: UdozoPay, logistics and Connect Centres
 
 Status: **being built** (9 November 2026, the owner's request). The owner has answered every open question
-(recorded at the end). Phases 1 to 3 are built; nothing is pushed until every phase is (the owner's rule).
+(recorded at the end). Phases 1 to 4 are built; nothing is pushed until every phase is (the owner's rule).
 
 ## Udozo's two halves
 
@@ -419,7 +419,33 @@ assistants' knowledge, help, terms and privacy.
      Pickup centres (Soon) is now **Connect Centres** (`/connect-centres`, which opens the chosen market's list, or the
      only market's, else a choice of markets), and the footer links it. Not in the sitemaps yet: that needs a count of
      centres on the classifieds sitemap API. Tests: `apps/udozo/test/connect.test.ts`, `help.test.ts`.
-4. **Listings**: shipping states and centres in Post an ad, and the listing page's shipping line.
+4. **Listings** (**built**): shipping states and centres in Post an ad, and the listing page's shipping line. As built:
+   - **Switch** `connect_shipping` (Udozo's, global or country, off by default), on `GET /v1/classifieds/markets` as
+     `connect_shipping`. Off: none can be set (`connect_unavailable`, `param: connect`; turning it off is always
+     allowed), and listings keep their choice but buyers see nothing of it.
+   - **API** (migration `20270310000000_connect_listings`; `ListingShippingService` in
+     `apps/udozo-api/src/classifieds/connect-shipping.service.ts`): `classified_listings.connect` and
+     `connect_all_centres` (every active centre in the ticked states, new ones too; the default), and
+     `classified_listing_connect_states` (state, the seller's `shipping_minor`) and `classified_listing_connect_centres`
+     (when the seller chose centres). Listings take `connect`, `connect_states: [{ state_id, shipping }]` (replacing them
+     all) and `connect_centres` (ids, or null for every centre): states of the seller's country (`parameter_invalid`
+     naming `connect_states[i].state_id`), not switched off for Connect (`state_unavailable`), each once; centres open,
+     in the country and in a ticked state (`centre_unavailable`, `connect_centres[i]`); unticking a state drops its
+     chosen centres. A Connect listing needs a price (`connect_price_required`: it is paid with UdozoPay), and past
+     draft its states and a centre (`listing_incomplete`, `connect_states` or `connect_centres`, also at submit).
+     Connect counts as a hand-over (`fulfilment_required` otherwise; the database check now allows `connect`). The
+     seller's listing carries `connect { enabled, states, all_centres, centres }`; the public listing page `connect
+     { states: [{ id, slug, name, shipping, centres }] }`, only states open for Connect with an open centre taking it,
+     else null. Tests: `apps/udozo-api/test/connect-listings.test.mjs`.
+   - **udozo.com:** Post an ad's Location and delivery step has **Ship through Udozo Connect** where the market has it
+     (`ConnectShipping` in `components/account/connect-shipping.tsx`, rules in `lib/connect-shipping.ts`; the market's
+     centres from `connectShippingFor`): the states with an open centre (and any already ticked), Every state with a
+     centre, a charge per state and one for all, then Every centre in the states I ticked or a choice of them; saved as
+     the form saves the rest, refusals opening this step (`stepOf`). In person can be left unticked when Connect hands it
+     over, and is ticked again when Connect is turned off with no delivery. The listing page's **Ship to a Udozo Connect
+     Centre** card (`connectLine`) lists the states and charges with See the centres, and its Product offer carries
+     `shippingDetails` (an `OfferShippingDetails` per state). Tests: `apps/udozo/test/connect-shipping.test.ts`,
+     `post-wizard.test.ts`.
 5. **Orders**: buying with a centre, labels, and on the dashboard Expected, Receive, Shelve, Release, Updates, Returns
    and Stock check; the order timeline, and centre earnings and payouts.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre

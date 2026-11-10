@@ -4653,6 +4653,7 @@ model ClassifiedArea {
   connectApplicationsInArea  ConnectCentreApplication[] @relation("ConnectApplicationArea")
   connectCentresInState      ConnectCentre[]            @relation("ConnectCentreState")
   connectCentresInArea       ConnectCentre[]            @relation("ConnectCentreArea")
+  connectListings            ClassifiedListingConnectState[]
 
   @@index([country, kind])
   @@index([parentId])
@@ -4796,6 +4797,11 @@ model ClassifiedListing {
   /// buyer on top, to the seller in full on release, refunded with the order.
   deliveryFeeStateMinor      BigInt       @default(0) @map("delivery_fee_state_minor")
   deliveryFeeNationwideMinor BigInt       @default(0) @map("delivery_fee_nationwide_minor")
+  /// Shipped through Udozo Connect (docs/UDOZO_CONNECT_PLAN.md, phase 4): to a Connect Centre in the states it ticks,
+  /// at its own charge per state (`connectStates`), through every active centre there or only those chosen.
+  connect                    Boolean      @default(false)
+  /// Every active centre in the ticked states (new ones too); false: only `connectCentres`.
+  connectAllCentres          Boolean      @default(true) @map("connect_all_centres")
   /// chat, phone or both.
   contact      String                     @default("both")
   /// draft, pending_review, active, sold, expired, rejected, removed (by BitoCard) or deleted (by the seller).
@@ -4850,6 +4856,8 @@ model ClassifiedListing {
   area         ClassifiedArea?            @relation("ClassifiedListingArea", fields: [areaId], references: [id], onDelete: Restrict)
   features     ClassifiedListingFeature[]
   media        ClassifiedMedia[]
+  connectStates  ClassifiedListingConnectState[]
+  connectCentres ClassifiedListingConnectCentre[]
   priceHistory ClassifiedPriceHistory[]
   reports      ClassifiedReport[]
   favourites   ClassifiedFavourite[]
@@ -7348,6 +7356,7 @@ model ConnectCentre {
   area         ClassifiedArea            @relation("ConnectCentreArea", fields: [areaId], references: [id], onDelete: Restrict)
   application  ConnectCentreApplication?
   members      ConnectCentreMember[]
+  listings     ClassifiedListingConnectCentre[]
   shelves      ConnectShelf[]
 
   @@index([country, stateId, status])
@@ -7391,4 +7400,30 @@ model ConnectShelf {
   @@unique([centreId, code])
   @@index([centreId, position])
   @@map("connect_shelves")
+}
+
+/// A state a listing ships to through Udozo Connect, with the seller's shipping charge to a centre there (all the seller's).
+model ClassifiedListingConnectState {
+  listingId     String            @map("listing_id") @db.Uuid
+  stateId       String            @map("state_id") @db.Uuid
+  /// Minor units; 0 is free.
+  shippingMinor BigInt            @map("shipping_minor")
+  listing       ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  state         ClassifiedArea    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, stateId])
+  @@index([stateId])
+  @@map("classified_listing_connect_states")
+}
+
+/// A Connect Centre a listing ships to, when the seller chose centres rather than every one in the ticked states.
+model ClassifiedListingConnectCentre {
+  listingId String            @map("listing_id") @db.Uuid
+  centreId  String            @map("centre_id") @db.Uuid
+  listing   ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  centre    ConnectCentre     @relation(fields: [centreId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, centreId])
+  @@index([centreId])
+  @@map("classified_listing_connect_centres")
 }

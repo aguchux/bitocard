@@ -41,6 +41,9 @@ import { ShopIcon } from "./icon";
 import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom, stockText } from "./resale-fields";
 import { type PostingStep, recordPostingStep } from "@/lib/posting-actions";
 import type { SellSource } from "@/lib/sell-sources";
+import type { ConnectCentre } from "@/lib/connect-centres";
+import { type ConnectChoice, connectChoiceOf, connectStateOptions, connectSummary } from "@/lib/connect-shipping";
+import { ConnectShipping } from "./connect-shipping";
 
 const maxPhotos = 12;
 const maxVideoBytes = 50 * 1024 * 1024;
@@ -121,6 +124,7 @@ export function ListingForm({
   assistant = null,
   resale = null,
   source = "direct",
+  connect = null,
 }: {
   listing: ShopMyListing | null;
   categories: ShopTopCategory[];
@@ -135,6 +139,8 @@ export function ListingForm({
   resale?: ShopResaleAvailability | null;
   /** Where Sell was pressed (`/sell?from=`), for the seller's posting journey. */
   source?: SellSource;
+  /** Where Udozo Connect shipping is open in the market: its open centres, to ship to (null: not offered). */
+  connect?: { centres: ConnectCentre[] } | null;
 }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(listing?.id ?? null);
@@ -149,6 +155,8 @@ export function ListingForm({
   const [feeState, setFeeState] = useState(listing?.delivery_fees.within_state ? fromMinor(listing.delivery_fees.within_state) : "");
   const [feeNation, setFeeNation] = useState(listing?.delivery_fees.nationwide ? fromMinor(listing.delivery_fees.nationwide) : "");
   const [contact, setContact] = useState<ShopContact>(listing?.contact ?? "both");
+  const [connectChoice, setConnectChoice] = useState<ConnectChoice>(() => connectChoiceOf(listing));
+  const connectOptions = useMemo(() => (connect ? connectStateOptions(connect.centres, listing) : []), [connect, listing]);
   const [stateSlug, setStateSlug] = useState<string>(listing?.area?.state?.slug ?? "");
   const [areaId, setAreaId] = useState<string | null>(listing?.area?.id ?? null);
   const [description, setDescription] = useState(listing?.description ?? "");
@@ -535,7 +543,7 @@ export function ListingForm({
     [1, "Photos and video", `${ready} photo${ready === 1 ? "" : "s"}${video && video.status !== "failed" ? " and a video" : ""}`],
     [2, "Price and condition", `${priceLine}${condition ? ` · ${conditionLabels[condition]}` : ""}`],
     [3, "Where to sell", `${places || "Nowhere yet"} · ${stockText(sellWhere.stock)}`],
-    [4, "Location and delivery", `${areaName && state ? `${areaName}, ${state.name}` : "No area yet"} · ${delivery === "none" ? "No delivery" : delivery === "state" ? `Delivers in the ${region}` : "Delivers nationwide"}`],
+    [4, "Location and delivery", `${areaName && state ? `${areaName}, ${state.name}` : "No area yet"} · ${delivery === "none" ? "No delivery" : delivery === "state" ? `Delivers in the ${region}` : "Delivers nationwide"}${connect && connectSummary(connectChoice) ? ` · ${connectSummary(connectChoice)}` : ""}`],
   ];
 
   return (
@@ -898,9 +906,10 @@ export function ListingForm({
               value={delivery}
               onChange={value => {
                 setDelivery(value);
-                // Without delivery, it must be handed over in person.
-                if (value === "none" && !pickup) setPickup(true);
-                save({ delivery: value, ...(value === "none" && !pickup ? { pickup: true } : {}) });
+                // Without delivery (or Udozo Connect), it must be handed over in person.
+                const needsPickup = value === "none" && !pickup && !connectChoice.enabled;
+                if (needsPickup) setPickup(true);
+                save({ delivery: value, ...(needsPickup ? { pickup: true } : {}) });
               }}
             />
             {delivery !== "none" ? (
@@ -922,7 +931,7 @@ export function ListingForm({
               <input
                 type="checkbox"
                 checked={pickup}
-                disabled={delivery === "none"}
+                disabled={delivery === "none" && !connectChoice.enabled}
                 onChange={event => {
                   setPickup(event.target.checked);
                   save({ pickup: event.target.checked });
@@ -931,9 +940,26 @@ export function ListingForm({
               />
               <span>
                 <strong className="block">Hand it over in person</strong>
-                <span className="text-slate-600">You meet the buyer; they check it and give you their release code.{delivery === "none" ? " Needed without delivery." : ""}</span>
+                <span className="text-slate-600">You meet the buyer; they check it and give you their release code.{delivery === "none" && !connectChoice.enabled ? " Needed without delivery." : ""}</span>
               </span>
             </label>
+            {connect ? (
+              <ConnectShipping
+                choice={connectChoice}
+                options={connectOptions}
+                region={region}
+                marks={marks}
+                priceOnRequest={priceKind === "on_request"}
+                onChange={(next, changes) => {
+                  setConnectChoice(next);
+                  if (!changes) return;
+                  // Turning it off with no delivery and no hand-over: it must be handed over in person.
+                  const needsPickup = changes.connect === false && delivery === "none" && !pickup;
+                  if (needsPickup) setPickup(true);
+                  save({ ...changes, ...(needsPickup ? { pickup: true } : {}) });
+                }}
+              />
+            ) : null}
             <div className="grid gap-2">
               <Chips
                 label="How buyers reach you"

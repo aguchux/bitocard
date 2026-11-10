@@ -6,6 +6,7 @@ import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { brandListingSql, ClassifiedBrandsService } from './brands.service.js';
+import { ListingShippingService } from './connect-shipping.service.js';
 import { brandFeatureKey, conditions, featureValueOut, heldUnits, invalid, onShopWhere, readSku } from './rules.js';
 import { ReviewStatsService } from './reviews/stats.service.js';
 
@@ -91,6 +92,7 @@ export class ListingSearchService {
     private readonly brands: ClassifiedBrandsService,
     private readonly watermarks: WatermarkService,
     private readonly reviewStats: ReviewStatsService,
+    private readonly shipping: ListingShippingService,
   ) {}
 
   private async features(filters: string[] | undefined) {
@@ -303,13 +305,14 @@ export class ListingSearchService {
     // A listing sold only through resellers' stores has no page on BitoCard Shop.
     if (!row || row.country !== code || !row.onShop || ['draft', 'pending_review'].includes(row.status)) throw notFound();
     if (row.status === 'sold' ? !row.soldAt || Date.now() - row.soldAt.getTime() > soldVisibleMs : row.status !== 'active') throw gone();
-    const [checked, active, responseRate, holding, brand, reviews] = await Promise.all([
+    const [checked, active, responseRate, holding, brand, reviews, connect] = await Promise.all([
       this.idChecked([row.customerId]),
       this.prisma.classifiedListing.count({ where: { customerId: row.customerId, ...onShopWhere } }),
       this.leads.responseRate(row.customerId),
       heldUnits(this.prisma, row.id),
       this.brands.lookup(row.features.find(value => value.feature.key === brandFeatureKey)?.valueText),
       this.reviewStats.summary(row.customerId, row.country),
+      this.shipping.presentPublic(row),
     ]);
     const order = new Map(row.category!.features.map(link => [link.featureId, link.position]));
     const photos = row.media.filter(item => item.kind === 'photo');
@@ -342,6 +345,8 @@ export class ListingSearchService {
       photos: photos.map(item => ({ url: this.watermarks.url(item, 1600), width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
+      /** Ships to a Udozo Connect Centre: the states it reaches now, each with its shipping charge and open centres; or null. */
+      connect,
       /** In stock, but every unit is held for buyers (paid with UdozoPay, or buy orders the seller accepted). */
       reserved: row.stock > 0 && holding >= row.stock,
       /** The seller has some: out of stock (none), buying is closed until they restock. */

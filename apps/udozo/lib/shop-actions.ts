@@ -89,6 +89,12 @@ export type ListingFields = Partial<{
   resale_markup_max_bps: number;
   /** Units to sell, shared by every channel. */
   stock: number;
+  /** Ship through Udozo Connect, to a Connect Centre in the states below. */
+  connect: boolean;
+  /** The states it ships to through Udozo Connect, each with its shipping charge as typed ("1,500"; empty is free). */
+  connect_states: Array<{ state_id: string; shipping: string }>;
+  /** The Connect Centres it ships to, or null for every open centre in those states. */
+  connect_centres: string[] | null;
 }>;
 
 function body(fields: ListingFields): { body: Record<string, unknown> } | { problem: ShopResult<never> } {
@@ -112,6 +118,17 @@ function body(fields: ListingFields): { body: Record<string, unknown> } | { prob
     out[key] = minor;
   }
   if (fields.pickup !== undefined) out.pickup = fields.pickup;
+  if (fields.connect !== undefined) out.connect = fields.connect;
+  if (fields.connect_states !== undefined) {
+    const states: Array<{ state_id: string; shipping: number }> = [];
+    for (const [index, item] of fields.connect_states.entries()) {
+      const minor = item.shipping.trim() ? toMinor(item.shipping) : 0;
+      if (minor === null) return { problem: refused("Give the shipping charge as an amount, such as 1,500 (or leave it empty for free).", `connect_states[${index}].shipping`) };
+      states.push({ state_id: item.state_id, shipping: minor });
+    }
+    out.connect_states = states;
+  }
+  if (fields.connect_centres !== undefined) out.connect_centres = fields.connect_centres;
   if (fields.features) out.features = fields.features.filter(item => item.value !== null && item.value !== "");
   for (const key of ["on_shop", "resale", "resale_discount_bps", "resale_markup_max_bps", "stock"] as const) if (fields[key] !== undefined) out[key] = fields[key];
   return { body: out };

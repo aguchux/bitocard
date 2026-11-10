@@ -28,7 +28,7 @@ export function stepOf(param: string | null | undefined): number | null {
   if (param === "photos" || param === "video" || param.startsWith("media")) return 1;
   if (param === "price" || param === "price_kind" || param === "condition" || param.startsWith("features") || param === "description") return 2;
   if (param === "on_shop" || param === "stock" || param.startsWith("resale")) return 3;
-  if (param === "area_id" || param.startsWith("delivery") || param === "pickup" || param === "contact") return 4;
+  if (param === "area_id" || param.startsWith("delivery") || param.startsWith("connect") || param === "pickup" || param === "contact") return 4;
   return null;
 }
 

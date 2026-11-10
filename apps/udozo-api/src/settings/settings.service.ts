@@ -176,6 +176,11 @@ export const switchDefinitions = {
     description:
       "Udozo Connect: applications to run a Connect Centre on connect.udozo.com (docs/UDOZO_CONNECT_PLAN.md). On: customers in the market apply, pay the market's deposit from their UdozoPay wallet, and Udozo's team reviews, visits and approves them. Each state is open unless switched off on Connect > States. Off: no new applications (those under way finish).",
   },
+  connect_shipping: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo Connect shipping (docs/UDOZO_CONNECT_PLAN.md): sellers ship their items to Connect Centres in the states they choose, at their own charge per state, and buyers collect them there. On: Post an ad offers Ship through Udozo Connect and listing pages say where they ship. Off: listings keep their choice but say nothing of it, and none can be set.",
+  },
   classifieds_wanted: {
     scopes: ['global', 'country'],
     description:
@@ -286,6 +291,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'whatsapp_assistant',
   'classifieds_wanted',
   'connect_applications',
+  'connect_shipping',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',

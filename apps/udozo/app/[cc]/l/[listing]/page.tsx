@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { BadgeCheck, ChevronRight, MapPin, MessageCircle, ShieldCheck, Star } from "lucide-react";
+import { connectLine } from "@/lib/connect-shipping";
+import { BadgeCheck, ChevronRight, MapPin, MessageCircle, ShieldCheck, Star, Truck } from "lucide-react";
 import {
   brandFeatureKey,
   brandPath,
@@ -128,6 +129,7 @@ export default async function ListingPage({ params }: Props) {
   }
   const path = listingPath(cc, listing.ref, listing.slug);
   if (segment !== `${listing.ref}-${listing.slug}`) permanentRedirect(path);
+  const shipsThrough = connectLine(listing.connect, listing.price.currency);
 
   const customer = await currentCustomer();
   const viewerResult = customer ? await customerApi<ShopViewer>("GET", `/v1/classifieds/listings/${listing.id}/viewer`) : null;
@@ -302,6 +304,20 @@ export default async function ListingPage({ params }: Props) {
               <Link href={reviewsHref(sellerPath(cc, sellerSlug(listing.seller)), { product: listing.product_reviews[0]!.product.key, sort: "newest", page: 1 }, {})} className="text-sm font-semibold text-brand-700 hover:underline">
                 All reviews of this item
               </Link>
+            </section>
+          ) : null}
+          {shipsThrough ? (
+            <section aria-labelledby="connect-shipping" className="grid gap-1.5 rounded-2xl border border-navy-100 bg-white p-4">
+              <h2 id="connect-shipping" className="flex items-center gap-2 font-bold">
+                <Truck className="size-5 text-navy-700" aria-hidden="true" /> {shipsThrough.title}
+              </h2>
+              <p className="text-sm text-navy-700">{shipsThrough.body}</p>
+              <p className="text-xs text-navy-500">
+                Collect it at a centre and inspect it before you take it.{" "}
+                <Link href={`/${cc}/connect-centres`} className="font-semibold text-brand-700 hover:underline">
+                  See the centres
+                </Link>
+              </p>
             </section>
           ) : null}
           <section aria-labelledby="safe-trade" className="grid gap-2 rounded-2xl border border-mint-500/30 bg-mint-50 p-4 text-mint-700">

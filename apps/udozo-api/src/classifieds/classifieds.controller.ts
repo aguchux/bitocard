@@ -120,6 +120,15 @@ class FeatureValueDto {
   value: unknown;
 }
 
+class ConnectStateDto {
+  @IsUUID()
+  state_id: string;
+
+  /** The seller's shipping charge to a centre in this state, in minor units (0: free). */
+  @IsInt() @Min(0)
+  shipping: number;
+}
+
 class ListingDto {
   @IsOptional() @IsUUID()
   category_id?: string | null;
@@ -156,6 +165,18 @@ class ListingDto {
 
   @IsOptional() @IsInt() @Min(0)
   delivery_fee_nationwide?: number;
+
+  /** Ship through Udozo Connect, to a Connect Centre in the states below. */
+  @IsOptional() @IsBoolean()
+  connect?: boolean;
+
+  /** The states it ships to through Udozo Connect, each with its shipping charge; replaces them all. */
+  @IsOptional() @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => ConnectStateDto)
+  connect_states?: ConnectStateDto[];
+
+  /** The Connect Centres it ships to, or null for every active centre in those states. */
+  @IsOptional() @IsArray() @ArrayMaxSize(500) @IsUUID('all', { each: true })
+  connect_centres?: string[] | null;
 
   @IsOptional() @IsIn(contacts)
   contact?: (typeof contacts)[number];

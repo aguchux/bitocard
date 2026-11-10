@@ -40,6 +40,16 @@ export function listingJsonLd(listing: ShopListingPage, origin: string, country:
           ...(listing.condition ? { itemCondition: itemCondition[listing.condition] } : {}),
           areaServed: { "@type": "Place", name: `${listing.area.name}, ${listing.area.state.name}` },
           seller: { "@type": "Person", name: listing.seller.name },
+          // Shipped through Udozo Connect: to a centre in each state, at the seller's charge there.
+          ...(listing.connect?.states.length
+            ? {
+                shippingDetails: listing.connect.states.map(state => ({
+                  "@type": "OfferShippingDetails",
+                  shippingRate: { "@type": "MonetaryAmount", value: schemaPrice(state.shipping), currency: listing.price.currency },
+                  shippingDestination: { "@type": "DefinedRegion", addressCountry: country.toUpperCase(), addressRegion: state.name },
+                })),
+              }
+            : {}),
         }
       : null;
   const brand = brandOf(listing);

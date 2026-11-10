@@ -11,6 +11,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { sendPhoto } from './chat-files.js';
 import { ConversationsService } from './conversations.service.js';
+import { connectInclude } from './connect-shipping.service.js';
 import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
@@ -259,6 +260,7 @@ const adminInclude = {
   media: { orderBy: [{ kind: 'asc' }, { position: 'asc' }] },
   customer: { select: { id: true, name: true, email: true, createdAt: true, phoneVerifiedAt: true, classifiedSeller: true } },
   reports: { where: { status: 'open' }, select: { id: true, reason: true, details: true, createdAt: true } },
+  ...connectInclude,
 } satisfies Prisma.ClassifiedListingInclude;
 
 const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, avatarUrl: true, bannerUrl: true, sellerHandle: true, username: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;

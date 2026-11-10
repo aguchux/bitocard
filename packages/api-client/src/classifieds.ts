@@ -8,6 +8,18 @@
 export type ShopCondition = 'new' | 'used' | 'untested' | 'parts';
 export type ShopPriceKind = 'fixed' | 'negotiable' | 'on_request';
 export type ShopDelivery = 'none' | 'state' | 'nationwide';
+
+/** A listing's shipping through Udozo Connect, as its seller sees it. */
+export type ShopListingConnectOwn = {
+  enabled: boolean;
+  states: { state: { id: string; slug: string; name: string }; shipping: number }[];
+  /** Every active centre in the ticked states (new ones too); false: only `centres`. */
+  all_centres: boolean;
+  centres: { id: string; number: string; name: string; state_id: string; active: boolean }[];
+};
+
+/** Where a listing ships through Udozo Connect, as buyers see it: each state with its charge and how many open centres. */
+export type ShopListingConnect = { states: { id: string; slug: string; name: string; shipping: number; centres: number }[] };
 export type ShopSort = 'relevant' | 'newest' | 'price_asc' | 'price_desc';
 export type ShopBadge = 'phone_confirmed' | 'id_checked';
 export type ShopTier = 'area' | 'nearby' | 'state' | 'country';
@@ -24,7 +36,7 @@ export type ShopPlace = { slug: string; name: string; state: { slug: string; nam
  * `safe_pay`: open there (its switch on and both fees set); a buyer's own wallet is checked when they ask.
  * `install_prompt`: the site asks visitors there to install it as an app (an admin switch).
  */
-export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean };
+export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean; /** Sellers ship through Udozo Connect there. */ connect_shipping?: boolean };
 export type ShopMarkets = { object: 'list'; data: ShopMarket[]; showcase: boolean };
 
 export type ShopFeature = {
@@ -231,6 +243,8 @@ export type ShopListingPage = {
   photos: Array<{ url: string; width: number | null; height: number | null }>;
   video: { url: string; poster_url: string | null; duration_ms: number | null; width: number | null; height: number | null } | null;
   delivery: ShopDelivery;
+  /** Ships to a Udozo Connect Centre: the states it reaches now; null when it does not. */
+  connect?: ShopListingConnect | null;
   reserved: boolean;
   /** Units still to be had: its stock less those held for buyers (UdozoPay, or buy orders the seller accepted). */
   available?: number;
@@ -693,6 +707,8 @@ export type ShopMyListing = {
   pickup: boolean;
   /** The delivery charge within the seller's state and elsewhere, in minor units (0: free). */
   delivery_fees: { within_state: number; nationwide: number };
+  /** Shipped through Udozo Connect: the states with the seller's charge (minor units), and every centre there or those chosen. */
+  connect?: ShopListingConnectOwn;
   contact: ShopContact;
   views: number;
   leads: number;

@@ -71,11 +71,11 @@ const draft = (extra: Partial<Record<string, unknown>> = {}) =>
   }) as unknown as ShopMyListing;
 
 const mounted: Array<() => void> = [];
-function mount(listing: ShopMyListing | null) {
+function mount(listing: ShopMyListing | null, extra: Record<string, unknown> = {}) {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
-  act(() => root.render(createElement(ListingForm, { listing, categories, states, currency: "NGN", country: "NG", phoneConfirmed: false, minPhotos: 4 })));
+  act(() => root.render(createElement(ListingForm, { listing, categories, states, currency: "NGN", country: "NG", phoneConfirmed: false, minPhotos: 4, ...extra })));
   mounted.push(() => act(() => root.unmount()));
   return host;
 }
@@ -287,5 +287,56 @@ describe("the posting journey", () => {
     mount(draft({ status: "active" }));
     await act(async () => void (await new Promise(resolve => setTimeout(resolve, 0))));
     expect(told).toEqual([]);
+  });
+});
+
+describe("shipping through Udozo Connect", () => {
+  const lagos = { id: "44444444-4444-4444-8444-444444444444", name: "Lagos", slug: "lagos" };
+  const fct = { id: "55555555-5555-4555-8555-555555555555", name: "Abuja (FCT)", slug: "abuja" };
+  const centre = (id: string, name: string, state: typeof lagos) => ({ object: "connect_centre", id, number: "CC-000001", name, state, area: { id: `${id}-area`, name: "Ikeja", slug: "ikeja" }, address: "1 Road", landmark: null, latitude: null, longitude: null, hours: "8am to 6pm", phone: "0803", photo: null });
+  const centres = [centre("c-lagos-1", "Ikeja Hub", lagos), centre("c-lagos-2", "Allen Point", lagos), centre("c-fct", "Wuse Hub", fct)];
+  const pause = (ms: number) => act(async () => void (await new Promise(resolve => setTimeout(resolve, ms))));
+  const box = (host: HTMLElement, text: string) => [...host.querySelectorAll("label")].find(label => label.textContent?.includes(text))!.querySelector("input")!;
+  const sent = () => Object.assign({}, ...updateListing.mock.calls.map(call => call[1]));
+
+  it("is offered only where the market opened it", () => {
+    expect(mount(draft()).textContent).not.toContain("Ship through Udozo Connect");
+    expect(mount(draft(), { connect: { centres } }).textContent).toContain("Ship through Udozo Connect");
+  });
+
+  it("ticks states with the centres there, a charge each, and every centre unless chosen", async () => {
+    const host = mount(draft(), { connect: { centres } });
+    await click(box(host, "Ship through Udozo Connect"));
+    expect(host.textContent).toContain("Lagos · 2 centres");
+    expect(host.textContent).toContain("Abuja (FCT) · 1 centre");
+    await click(box(host, "Lagos · 2 centres"));
+    const charge = host.querySelector<HTMLInputElement>("input[aria-label='Shipping charge to Lagos']")!;
+    type(charge, "1,500");
+    await act(async () => void charge.dispatchEvent(new FocusEvent("blur", { bubbles: false })));
+    await act(async () => void charge.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    await pause(800);
+    expect(sent()).toMatchObject({ connect: true, connect_states: [{ state_id: lagos.id, shipping: "1,500" }] });
+
+    // Choosing centres starts with every one in the ticked states, then the seller unticks some.
+    await click(box(host, "Every centre in the states I ticked"));
+    await click(box(host, "Allen Point"));
+    await pause(800);
+    expect(sent().connect_centres).toEqual(["c-lagos-1"]);
+    expect(host.textContent).not.toContain("Wuse Hub");
+  });
+
+  it("lets the hand-over be through Connect alone, and asks for it in person again when Connect is turned off", async () => {
+    const host = mount(draft({ connect: { enabled: true, states: [{ state: lagos, shipping: 0 }], all_centres: true, centres: [] } }), { connect: { centres } });
+    const inPerson = box(host, "Hand it over in person");
+    expect(inPerson.disabled).toBe(false);
+    await click(inPerson);
+    await click(box(host, "Ship through Udozo Connect"));
+    await pause(800);
+    expect(sent()).toMatchObject({ pickup: true, connect: false });
+    expect(inPerson.checked).toBe(true);
+  });
+
+  it("refusals about it open this step", () => {
+    expect(["connect", "connect_states[0].shipping", "connect_centres[1]"].map(stepOf)).toEqual([4, 4, 4]);
   });
 });

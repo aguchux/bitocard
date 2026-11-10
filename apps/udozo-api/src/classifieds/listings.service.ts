@@ -9,6 +9,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ClassifiedBrandsService } from './brands.service.js';
+import { connectInclude, type ConnectChanges, type ConnectInput, ListingShippingService } from './connect-shipping.service.js';
 import { ClassifiedModelsService } from './models.service.js';
 import { ModerationService, type ReviewFlag } from './moderation.service.js';
 import { ResaleService } from './resale.service.js';
@@ -35,7 +36,7 @@ import {
 } from './rules.js';
 import { liveUntil, outOfStockDays, stockChange } from './stock.js';
 
-export type ListingInput = {
+export type ListingInput = ConnectInput & {
   category_id?: string | null;
   area_id?: string | null;
   title?: string | null;
@@ -89,6 +90,7 @@ const listingInclude = {
   area: { include: { parent: true } },
   features: { include: { feature: true } },
   media: { orderBy: [{ kind: 'asc' }, { position: 'asc' }] },
+  ...connectInclude,
 } satisfies Prisma.ClassifiedListingInclude;
 
 type ListingRow = Prisma.ClassifiedListingGetPayload<{ include: typeof listingInclude }>;
@@ -113,6 +115,8 @@ type ListingFields = {
   resaleMarkupMaxBps?: number | null;
   resalePausedAt?: Date | null;
   stock?: number;
+  connect?: boolean;
+  connectAllCentres?: boolean;
 };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
@@ -141,6 +145,7 @@ export class ListingsService {
     private readonly watermarks: WatermarkService,
     private readonly postings: PostingJourneysService,
     private readonly inbox: InboxService,
+    private readonly shipping: ListingShippingService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -202,6 +207,7 @@ export class ListingsService {
       const sku = data.fields.categoryId ? await this.issueSku(tx, data.fields.categoryId) : null;
       const listing = await tx.classifiedListing.create({ data: { customerId: customer.id, country, currency: market.currency, ...data.fields, sku } });
       if (data.features) await tx.classifiedListingFeature.createMany({ data: data.features.map(value => ({ listingId: listing.id, ...value })) });
+      await this.shipping.write(tx, listing.id, data.connect);
       await this.refreshSearch(tx, listing.id);
       return listing;
     });
@@ -239,6 +245,9 @@ export class ListingsService {
       const moved = data.fields.categoryId !== undefined && data.fields.categoryId !== listing.categoryId;
       const sku = moved ? (data.fields.categoryId ? await this.issueSku(tx, data.fields.categoryId) : null) : undefined;
       await tx.classifiedListing.update({ where: { id }, data: { ...data.fields, ...(sku !== undefined ? { sku } : {}) } });
+      await this.shipping.write(tx, id, data.connect);
+      // A live listing shipping through Connect keeps saying where to, and through which centres.
+      if (listing.status !== 'draft' && !restocking) await this.shipping.requireComplete(tx, id, { connect: data.fields.connect ?? listing.connect, connectAllCentres: data.fields.connectAllCentres ?? listing.connectAllCentres });
       if (data.features) {
         await tx.classifiedListingFeature.deleteMany({ where: { listingId: id } });
         await tx.classifiedListingFeature.createMany({ data: data.features.map(value => ({ listingId: id, ...value })) });
@@ -317,6 +326,7 @@ export class ListingsService {
     if (!['draft', 'rejected'].includes(listing.status)) throw conflict('listing_not_draft', 'Only drafts and rejected listings are submitted.');
     await this.terms.require(customer.id);
     this.requireComplete(listing);
+    await this.shipping.requireComplete(this.prisma, listing.id, listing);
     if (listing.resale) await this.resale.requireSupplier(customer, country);
     const photos = listing.media.filter(item => item.kind === 'photo' && item.status === 'ready').length;
     if (photos < settings.minPhotos) throw invalid('photos_required', `Add at least ${settings.minPhotos} photos.`, 'photos');
@@ -451,9 +461,6 @@ export class ListingsService {
       if (!Number.isInteger(value) || value < 0 || BigInt(value) > maxPriceMinor) throw invalid('parameter_invalid', 'A delivery charge is 0 (free) or more, in minor units.', key);
       fields[field] = BigInt(value);
     }
-    if ((fields.pickup ?? current?.pickup ?? true) === false && (fields.delivery ?? current?.delivery ?? 'none') === 'none') {
-      throw invalid('fulfilment_required', 'Offer the hand-over in person, delivery, or both.', 'pickup');
-    }
     if (input.contact !== undefined) fields.contact = input.contact;
     if (input.category_id !== undefined) {
       if (input.category_id === null) fields.categoryId = null;
@@ -487,6 +494,13 @@ export class ListingsService {
       }
     }
     if (priceKind === 'on_request' && (input.price_kind !== undefined || input.price !== undefined)) fields.priceMinor = null;
+
+    // Shipping through Udozo Connect: the states, their charges and the centres, each checked.
+    const connect: ConnectChanges = await this.shipping.check(country, input, current, priceKind);
+    Object.assign(fields, connect.fields);
+    if ((fields.pickup ?? current?.pickup ?? true) === false && (fields.delivery ?? current?.delivery ?? 'none') === 'none' && !(fields.connect ?? current?.connect ?? false)) {
+      throw invalid('fulfilment_required', 'Offer the hand-over in person, delivery, shipping through Udozo Connect, or more than one.', 'pickup');
+    }
 
     let features: { featureId: string; valueText: string | null; valueNumber: number | null }[] | null = null;
     if (input.features !== undefined) {
@@ -528,7 +542,7 @@ export class ListingsService {
       const markup = 'resaleMarkupMaxBps' in fields ? fields.resaleMarkupMaxBps! : (current?.resaleMarkupMaxBps ?? null);
       this.resale.checkTerms(await this.resale.limits(country), discount, markup);
     }
-    return { fields, features };
+    return { fields, features, connect };
   }
 
   /** The seller's view of a listing. */
@@ -559,6 +573,8 @@ export class ListingsService {
       delivery: listing.delivery,
       pickup: listing.pickup,
       delivery_fees: { within_state: Number(listing.deliveryFeeStateMinor), nationwide: Number(listing.deliveryFeeNationwideMinor) },
+      /** Shipped through Udozo Connect: to a Connect Centre in its states, at its charge per state. */
+      connect: this.shipping.presentOwn(listing),
       contact: listing.contact,
       views: listing.views,
       leads: listing.leads,

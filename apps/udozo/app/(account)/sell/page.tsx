@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ListingForm } from "@/components/account/listing-form";
 import { SellVisit } from "@/components/account/sell-visit";
 import { requireSeller, sellerAssistant, sellReference, resaleAvailability } from "@/lib/account";
+import { connectShippingFor } from "@/lib/connect-centres";
 import { cleanSellSource, sellHref } from "@/lib/sell-sources";
 
 export const metadata: Metadata = { title: "Post an ad" };
@@ -14,11 +15,11 @@ export const metadata: Metadata = { title: "Post an ad" };
 export default async function PostAd({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   const source = cleanSellSource((await searchParams).from);
   const { customer, market } = await requireSeller(sellHref(source));
-  const [{ categories, states }, assistant, resale] = await Promise.all([sellReference(market.country), sellerAssistant(market.country), resaleAvailability()]);
+  const [{ categories, states }, assistant, resale, connect] = await Promise.all([sellReference(market.country), sellerAssistant(market.country), resaleAvailability(), connectShippingFor(market)]);
   return (
     <>
       <SellVisit source={source} signedIn />
-      <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} source={source} />
+      <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} source={source} connect={connect} />
     </>
   );
 }

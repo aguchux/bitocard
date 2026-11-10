@@ -52,3 +52,9 @@ export function centresPathFor<T extends { country: string }>(choice: MarketChoi
   const market = chosenOpenMarket(choice, open) ?? (open.length === 1 ? open[0]! : null);
   return market ? `/${market.country.toLowerCase()}/connect-centres` : null;
 }
+
+/** What Post an ad offers for shipping through Udozo Connect: the market's open centres, or null where it is closed. */
+export async function connectShippingFor(market: { country: string; connect_shipping?: boolean }) {
+  if (!market.connect_shipping) return null;
+  return { centres: (await centresOf(market.country)).centres };
+}
