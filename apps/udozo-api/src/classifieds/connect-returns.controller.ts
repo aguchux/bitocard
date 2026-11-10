@@ -7,6 +7,7 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { ProductOnly } from '../products/product.js';
+import { ConnectChargesService } from './connect-charges.service.js';
 import { type ReturnReason, returnReasons, ConnectReturnsService } from './connect-returns.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
@@ -70,7 +71,17 @@ export class ConnectCentreReturnsController {
 @Controller('classifieds/orders/:id')
 @ProductOnly('udozo')
 export class SellerReturnsController {
-  constructor(private readonly returns: ConnectReturnsService) {}
+  constructor(
+    private readonly returns: ConnectReturnsService,
+    private readonly charges: ConnectChargesService,
+  ) {}
+
+  /** The buyer pays the storage owed on their Connect order from their wallet, before they collect it. */
+  @Post('storage/pay')
+  @HttpCode(HttpStatus.OK)
+  payStorage(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.charges.payBuyer(caller.customer, id);
+  }
 
   @Post('return/accept')
   @HttpCode(HttpStatus.OK)

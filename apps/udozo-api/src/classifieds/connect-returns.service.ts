@@ -6,6 +6,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ConnectChargesService } from './connect-charges.service.js';
 import { connectFeeOf, centreShareOf, ConnectCheckoutService } from './connect-checkout.service.js';
 import { cleanMessage } from './conversations.service.js';
 import { SafePayService } from './safe-pay.service.js';
@@ -47,6 +48,7 @@ export class ConnectReturnsService {
     private readonly ledger: LedgerService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly charges: ConnectChargesService,
   ) {}
 
   private async settings(country: string) {
@@ -118,7 +120,7 @@ export class ConnectReturnsService {
       data: { status: 'accepted', decidedBy: by, decidedById: who, decidedAt: now, returnCode: this.safePay.seal(code), collectBy: new Date(now.getTime() + settings.sellerCollectDays * dayMs) },
     });
     if (!claimed.count) throw conflict('return_decided', 'This return was already answered.');
-    if (row.reason === 'not_collected' && order.status === 'at_centre') await this.safePay.settleNotCollected(order);
+    if (row.reason === 'not_collected' && order.status === 'at_centre') await this.settleNotCollected(order);
     const centre = order.connectCentre!;
     const why = by === 'auto' ? `It was accepted because nobody answered within ${settings.returnAnswerHours} hours. ` : '';
     await this.safePay.tellParty(order, 'seller', 'customer.connect.return', `Collect "${order.listing.title}" from ${centre.name}`, `${why}Show your return code on your order at the counter within ${settings.sellerCollectDays} days. You pay the centre's Connect fee as the return fee.`);
@@ -141,8 +143,21 @@ export class ConnectReturnsService {
     }
     // A settlement a crash interrupted (the return accepted, the item's money not yet moved): done now, once.
     const stuck = await this.prisma.connectReturnRequest.findMany({ where: { status: 'accepted', reason: 'not_collected', order: { status: 'at_centre' } }, select: { orderId: true }, take: 100 });
-    for (const row of stuck) await this.safePay.settleNotCollected(await this.safePay.load(row.orderId)).catch(() => undefined);
+    for (const row of stuck) await this.settleNotCollected(await this.safePay.load(row.orderId)).catch(() => undefined);
     return { accepted, settled: stuck.length };
+  }
+
+  /** An item not collected: refunded less the buyer's demurrage, which is shared as any paid storage. */
+  private async settleNotCollected(order: Awaited<ReturnType<SafePayService['load']>>) {
+    const owed = await this.charges.owed(order.id, 'buyer');
+    const rates = await this.charges.rates(order.country);
+    const kept = owed.total < order.priceMinor ? owed.total : order.priceMinor;
+    return this.safePay.settleNotCollected(
+      order,
+      owed.total > 0n
+        ? { amount: owed.total, lines: this.charges.shareLines(kept, order.currency, order.connectCentre!.partnerId, rates.centreShareBps), paid: tx => this.charges.settleFromRefund(tx, owed.rows.map(row => row.id)) }
+        : undefined,
+    );
   }
 
   /** The seller's return code, shown on their order once the return is accepted, until they collect it. */
@@ -170,6 +185,9 @@ export class ConnectReturnsService {
       throw invalid('return_code_wrong', left > 0 ? `That is not the code. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'That is not the code, and no tries are left.', 'code');
     }
     const order = await this.safePay.load(row.orderId);
+    // Storage owed (in Loss of care) is taken first; what their money cannot cover keeps the item at the centre.
+    await this.charges.collectSeller(order.id);
+    if ((await this.charges.owed(order.id, 'seller')).total > 0n) throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'return_fee_unpaid', 'The seller must add the storage owed to their Udozo wallet first.');
     const terms = await this.checkout.terms(order.country);
     const fee = connectFeeOf(terms, order.deliveryFeeMinor) ?? 0n;
     const share = centreShareOf(fee, terms.centreShareBps);

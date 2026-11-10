@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { ConnectChargesService } from './connect-charges.service.js';
 import { ListingShippingService } from './connect-shipping.service.js';
 
 /** The market's Connect fee and how it is shared, as orders use them (null fee: Connect orders are refused). */
@@ -28,6 +29,7 @@ export class ConnectCheckoutService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shipping: ListingShippingService,
+    private readonly charges: ConnectChargesService,
   ) {}
 
   async terms(country: string): Promise<ConnectTerms> {
@@ -38,9 +40,11 @@ export class ConnectCheckoutService {
   }
 
   /** The centres a buyer can collect this listing at, by state, with what each state costs; null when there are none. */
-  async options(listing: { id: string; country: string; connect: boolean; connectAllCentres: boolean }) {
+  async options(listing: { id: string; country: string; connect: boolean; connectAllCentres: boolean; customerId?: string }) {
     const reach = await this.shipping.presentPublic(listing);
     if (!reach) return null;
+    // A seller who owes storage on a Connect item ships nothing more through Connect until they pay it.
+    if (listing.customerId && (await this.charges.sellerOwes(listing.customerId))) return null;
     const terms = await this.terms(listing.country);
     if (!terms.fee) return null;
     const centres = await this.prisma.connectCentre.findMany({
@@ -75,7 +79,7 @@ export class ConnectCheckoutService {
   }
 
   /** The buyer's chosen centre for this listing, checked: its state's shipping charge, the Connect fee and the state. */
-  async check(listing: { id: string; country: string; connect: boolean; connectAllCentres: boolean }, centreId: string | undefined) {
+  async check(listing: { id: string; country: string; connect: boolean; connectAllCentres: boolean; customerId?: string }, centreId: string | undefined) {
     if (!centreId) throw invalid('centre_required', 'Choose the Connect Centre you will collect it from.', 'connect_centre_id');
     const options = await this.options(listing);
     if (!options) throw invalid('parameter_invalid', 'This item cannot be collected at a Connect Centre.', 'fulfilment');

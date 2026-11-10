@@ -234,6 +234,9 @@ const counterOrder = (over: Partial<import("@/lib/centres").CounterOrder> = {}):
   released_at: null,
   return: null,
   held_for_seller: false,
+  buyer_owed: 0,
+  seller_owed: 0,
+  loss_of_care_at: null,
   ...over,
 });
 const shelves = [shelf({}), shelf({ id: "sh2", code: "B-02", label: null })];
@@ -298,6 +301,15 @@ describe("the counter", () => {
     expect(actions.refuseCollection).toHaveBeenCalledWith("c1", "o1", "Not the colour in the photos");
     expect(host.textContent).toContain("With Udozo to decide");
     expect(confirmSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("storage at the counter", () => {
+  it("says the buyer's storage is owed before the hand-over, and a return in Loss of care", () => {
+    const owed = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "at_centre", ready_at: "2026-11-01T10:00:00.000Z", collect_by: "2026-11-04T10:00:00.000Z", buyer_owed: 8400, shelf: { id: "sh1", code: "A-01", label: null } }), shelves }));
+    expect(owed.textContent).toContain("Storage of ₦84 is owed");
+    const care = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "refunded", held_for_seller: true, loss_of_care_at: "2026-11-09T10:00:00.000Z", return: { id: "r1", number: "RT-000001", reason: "damaged", status: "accepted", collect_by: null } }), shelves }));
+    expect(care.textContent).toContain("In Loss of care since");
   });
 });
 

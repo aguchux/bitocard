@@ -488,3 +488,11 @@ export async function returnCode(orderId: string): Promise<ShopResult<{ code: st
   if (!id(orderId)) return refused("No such order.");
   return answer(await customerApi<{ code: string; tries_left: number }>("GET", `/v1/classifieds/orders/${orderId}/return-code`));
 }
+
+/** The buyer pays the storage owed on their Connect order from their wallet, before they collect it. */
+export async function payStorage(orderId: string): Promise<ShopResult<{ owed: number; paid: number }>> {
+  if (!id(orderId)) return refused("No such order.");
+  const result = answer(await customerApi<{ owed: number; paid: number }>("POST", `/v1/classifieds/orders/${orderId}/storage/pay`, {}));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}

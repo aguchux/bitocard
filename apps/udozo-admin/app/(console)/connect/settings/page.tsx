@@ -72,6 +72,9 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
   const [dueDays, setDueDays] = useState(String(settings.return_due_days));
   const [answerHours, setAnswerHours] = useState(String(settings.return_answer_hours));
   const [collectDays, setCollectDays] = useState(String(settings.seller_collect_days));
+  const [demurrage, setDemurrage] = useState(String(settings.demurrage_bps / 100));
+  const [penalty, setPenalty] = useState(String(settings.loc_penalty_bps / 100));
+  const [penaltyCap, setPenaltyCap] = useState(toMajor(settings.loc_penalty_cap, settings.currency));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const now = settings.fee === null ? "Not set" : settings.fee.kind === "percent" ? `${percent(settings.fee.bps)} of the shipping charge` : `${money(settings.fee.amount, settings.currency)} an order`;
@@ -89,7 +92,22 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
     const answer = whole(answerHours, 1, 720);
     const sellerDays = whole(collectDays, 1, 90);
     if (returnDue === null || answer === null || sellerDays === null) return setProblem("Give the return times as whole numbers: days 1 to 90, hours 1 to 720.");
-    const change = { country: settings.country, centre_share_bps: centreShare, buyer_free_hours: freeHours, return_due_days: returnDue, return_answer_hours: answer, seller_collect_days: sellerDays };
+    const demurrageBps = bpsOf(demurrage);
+    const penaltyBps = bpsOf(penalty);
+    const cap = toMinor(penaltyCap, settings.currency);
+    if (demurrageBps === null || penaltyBps === null) return setProblem("Give storage and the Loss of care penalty as 0 to 100% of the shipping charge.");
+    if (cap === null) return setProblem(`Give the penalty's daily cap in ${settings.currency}, for example 500.`);
+    const change = {
+      country: settings.country,
+      centre_share_bps: centreShare,
+      buyer_free_hours: freeHours,
+      return_due_days: returnDue,
+      return_answer_hours: answer,
+      seller_collect_days: sellerDays,
+      demurrage_bps: demurrageBps,
+      loc_penalty_bps: penaltyBps,
+      loc_penalty_cap: cap,
+    };
     let done;
     if (kind === "") done = await save({ ...change, fee_kind: null }).unwrap().catch(() => null);
     else if (kind === "percent") {
@@ -144,6 +162,15 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
             </Field>
             <Field label="Seller's days to collect a return" htmlFor={`${id}-collect`}>
               <Input id={`${id}-collect`} inputMode="numeric" value={collectDays} onChange={event => setCollectDays(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Storage a day (% of shipping)" htmlFor={`${id}-demurrage`} hint="Charged each day past the free time, to the buyer and the seller alike; no cap.">
+              <Input id={`${id}-demurrage`} inputMode="decimal" value={demurrage} onChange={event => setDemurrage(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Loss of care penalty a day (% of shipping)" htmlFor={`${id}-penalty`} hint="The seller's, once they did not collect a return in their free days.">
+              <Input id={`${id}-penalty`} inputMode="decimal" value={penalty} onChange={event => setPenalty(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label={`Penalty cap a day (${settings.currency})`} htmlFor={`${id}-cap`}>
+              <Input id={`${id}-cap`} inputMode="decimal" value={penaltyCap} onChange={event => setPenaltyCap(event.target.value)} className="max-w-xs" />
             </Field>
             <Button type="submit" loading={state.isLoading}>
               Save Connect fee

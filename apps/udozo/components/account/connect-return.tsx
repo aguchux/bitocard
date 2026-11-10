@@ -1,9 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { ShopConnectReturn } from "@bitocard/api-client/classifieds";
+import { type ShopConnectReturn, shopMoney } from "@bitocard/api-client/classifieds";
 import { useConfirm } from "@/components/confirm-dialog";
-import { acceptReturn, returnCode } from "@/lib/shop-actions";
+import { acceptReturn, payStorage, returnCode } from "@/lib/shop-actions";
 
 const reasonWords: Record<ShopConnectReturn["reason"], string> = {
   not_collected: "the buyer did not collect it in time",
@@ -82,6 +83,38 @@ export function ConnectReturnPanel({ orderId, centreName, seller, item }: { orde
           <p className="text-xs">Give it to the centre&apos;s staff only when you collect the item.</p>
         </>
       ) : null}
+      {problem ? (
+        <p role="alert" className="text-sm font-semibold text-brand-700">
+          {problem}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Storage the buyer owes before they collect it: what it is, and Pay storage from their wallet. */
+export function PayStorage({ orderId, owed, currency }: { orderId: string; owed: number; currency: string }) {
+  const router = useRouter();
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  return (
+    <div className="grid gap-2 rounded-xl bg-amber-50 p-3 text-amber-950">
+      <p className="font-semibold">Storage to pay: {shopMoney(owed, currency)}</p>
+      <p className="text-sm">Your free time to collect it is over, so storage is charged daily. Pay it before you collect it.</p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            const result = await payStorage(orderId);
+            if (result.ok) router.refresh();
+            else setProblem(result.message);
+          })
+        }
+        className="h-11 rounded-xl bg-navy-900 px-4 font-bold text-white disabled:opacity-60"
+      >
+        Pay storage
+      </button>
       {problem ? (
         <p role="alert" className="text-sm font-semibold text-brand-700">
           {problem}

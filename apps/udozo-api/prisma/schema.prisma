@@ -5763,6 +5763,7 @@ model ClassifiedOrder {
   connectCentre            ConnectCentre?     @relation(fields: [connectCentreId], references: [id], onDelete: Restrict)
   connectShelf             ConnectShelf?      @relation(fields: [connectShelfId], references: [id], onDelete: SetNull)
   connectReturn            ConnectReturnRequest?
+  connectCharges           ConnectCharge[]
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
@@ -7222,6 +7223,11 @@ model ConnectSettings {
   returnDueDays     Int @default(7) @map("return_due_days")
   returnAnswerHours Int @default(48) @map("return_answer_hours")
   sellerCollectDays Int @default(7) @map("seller_collect_days")
+  /// Demurrage: a share of the order's shipping charge each day an item stays past its free time (the buyer's and the
+  /// seller's alike, no cap); the Loss of care penalty: a share of it each day too, capped per day.
+  demurrageBps        Int    @default(210) @map("demurrage_bps")
+  locPenaltyBps       Int    @default(210) @map("loc_penalty_bps")
+  locPenaltyCapMinor  BigInt @default(50000) @map("loc_penalty_cap_minor")
   updatedAt    DateTime @updatedAt @map("updated_at")
   /// The admin who last changed them (no foreign key: admins are never deleted).
   updatedById  String?  @map("updated_by_id") @db.Uuid
@@ -7494,6 +7500,8 @@ model ConnectReturnRequest {
   collectBy     DateTime?       @map("collect_by")
   returnFeeMinor BigInt?        @map("return_fee_minor")
   collectedAt   DateTime?       @map("collected_at")
+  /// When the seller's free days to collect it ran out: the item is in Loss of care (the centre no longer liable for it).
+  lossOfCareAt  DateTime?       @map("loss_of_care_at")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
   order         ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -7502,4 +7510,29 @@ model ConnectReturnRequest {
   @@index([status, answerBy])
   @@index([centreId, status])
   @@map("connect_return_requests")
+}
+
+/// A day's storage charge on a Connect item (docs/UDOZO_CONNECT_PLAN.md, Holding times, demurrage and Loss of care): the
+/// buyer's demurrage past their free time, the seller's past theirs, and the seller's Loss of care penalty. One a day per
+/// order, payer and kind; shared between the centre and Udozo when paid.
+model ConnectCharge {
+  id          String          @id @default(uuid()) @db.Uuid
+  orderId     String          @map("order_id") @db.Uuid
+  /// buyer or seller.
+  payer       String
+  /// demurrage or loc_penalty.
+  kind        String
+  /// The day it is for (UTC), from the first day past the free time.
+  day         DateTime        @db.Date
+  amountMinor BigInt          @map("amount_minor")
+  currency    String          @db.Char(3)
+  /// owed, or paid (from the payer's money, or out of a refund).
+  status      String          @default("owed")
+  paidAt      DateTime?       @map("paid_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  order       ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, payer, kind, day])
+  @@index([orderId, status])
+  @@map("connect_charges")
 }

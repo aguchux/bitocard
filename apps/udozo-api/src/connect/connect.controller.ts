@@ -197,6 +197,16 @@ class SettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(90)
   seller_collect_days?: number;
+
+  /** Storage: a day's demurrage and Loss of care penalty as shares of the shipping charge, and the penalty's daily cap. */
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  demurrage_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  loc_penalty_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  loc_penalty_cap?: number;
 }
 
 /**

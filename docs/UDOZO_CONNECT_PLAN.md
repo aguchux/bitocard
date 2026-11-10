@@ -524,9 +524,27 @@ assistants' knowledge, help, terms and privacy.
      - **Not built yet:** shipping a return to a Connect Centre near the seller (they collect it at this one for now).
      - Tests: `apps/udozo-api/test/connect-returns.test.mjs`, `apps/udozo-connect/test/`, `apps/udozo/test/connect-orders.test.ts`,
        `apps/udozo-admin/test/connect.test.tsx`.
-   - **5e (next):** demurrage (the buyer's after the free hours, paid before collection; the seller's after their free
-     days) and Loss of care with its daily penalty.
-   - **5f:** stock checks, and centre earnings and payouts.
+   - **5e, demurrage and Loss of care (built):** migration `20270310300000_connect_demurrage` (the market's
+     `demurrage_bps` 210, `loc_penalty_bps` 210 and `loc_penalty_cap_minor` 50000, set with the Connect fee;
+     `connect_return_requests.loss_of_care_at`; `connect_charges`, one row per order, payer, kind and day, `owed` or
+     `paid`). `ConnectChargesService`:
+     - **Accruing** (`accrue`, the `classifieds` job's `connect_storage`): each full day past the free time is charged once
+       (`createMany` with `skipDuplicates`, at most 120 days an order a run): the buyer's demurrage on an item at the
+       centre past `collect_by`; the seller's on an accepted return past its `collect_by`, which puts it into **Loss of
+       care** (`loss_of_care_at`, the seller and admins told once) with a daily penalty beside the demurrage. Demurrage is
+       2.1% of the shipping charge (`demurrageOf`, no cap), the penalty the same capped at ₦500 a day (`penaltyOf`).
+     - **Paying:** the buyer pays from their wallet (`POST /v1/classifieds/orders/:id/storage/pay`, 402 without enough)
+       before the centre takes their code (`storage_unpaid`, 402, at the counter); an item never collected has it taken
+       out of the refund (`settleNotCollected`). The seller's is taken from their Udozo money, else their wallet, before a
+       return is handed back (`return_fee_unpaid` while owed), and while they owe any, Connect is not offered on their
+       listings. Every payment is shared 70:30 with the centre (`connect_charge:<id>`).
+     - **Shown:** the order's `connect.storage_owed` and `loss_of_care_at` (udozo.com's **Pay storage**, and Loss of care
+       on the seller's order), the counter's `buyer_owed`, `seller_owed` and `loss_of_care_at` (connect.udozo.com says the
+       storage is owed before the hand-over, and that a return is in Loss of care), and the three rates on admin Connect >
+       States, deposit and fee.
+     - Tests: `apps/udozo-api/test/connect-storage.test.mjs`, `apps/udozo-connect/test/centre-screens.test.tsx`,
+       `apps/udozo/test/connect-orders.test.ts`, `apps/udozo-admin/test/connect.test.tsx`.
+   - **5f (next):** stock checks, and centre earnings and payouts.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo

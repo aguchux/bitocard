@@ -111,6 +111,10 @@ export type ConnectSettings = {
   return_due_days: number;
   return_answer_hours: number;
   seller_collect_days: number;
+  /** Storage: a day's demurrage and Loss of care penalty as shares of the shipping charge, and the penalty's daily cap. */
+  demurrage_bps: number;
+  loc_penalty_bps: number;
+  loc_penalty_cap: number;
 };
 
 /** A Connect Centre's return of an item to its seller. */
@@ -147,6 +151,9 @@ export type ConnectSettingsChange = {
   return_due_days?: number;
   return_answer_hours?: number;
   seller_collect_days?: number;
+  demurrage_bps?: number;
+  loc_penalty_bps?: number;
+  loc_penalty_cap?: number;
 };
 
 export type ConnectCentre = {

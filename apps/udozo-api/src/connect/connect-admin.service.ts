@@ -16,6 +16,9 @@ export type ConnectSettingsInput = {
   return_due_days?: number;
   return_answer_hours?: number;
   seller_collect_days?: number;
+  demurrage_bps?: number;
+  loc_penalty_bps?: number;
+  loc_penalty_cap?: number;
 };
 
 /** The whole numbers each setting takes, and how it is told when out of range. */
@@ -23,6 +26,8 @@ const limits = {
   return_due_days: { field: 'returnDueDays', min: 1, max: 90, words: 'Give the days until a return is due as 1 to 90.' },
   return_answer_hours: { field: 'returnAnswerHours', min: 1, max: 720, words: 'Give the hours to answer a return as 1 to 720.' },
   seller_collect_days: { field: 'sellerCollectDays', min: 1, max: 90, words: "Give the seller's days to collect a return as 1 to 90." },
+  demurrage_bps: { field: 'demurrageBps', min: 0, max: 10000, words: 'Give the daily demurrage as 0 to 100% of the shipping charge.' },
+  loc_penalty_bps: { field: 'locPenaltyBps', min: 0, max: 10000, words: 'Give the daily Loss of care penalty as 0 to 100% of the shipping charge.' },
 } as const;
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -170,6 +175,10 @@ export class ConnectAdminService {
       if (!Number.isInteger(value) || value < rule.min || value > rule.max) throw invalid('parameter_invalid', rule.words, key);
       (data as Record<string, number>)[rule.field] = value;
     }
+    if (input.loc_penalty_cap !== undefined) {
+      if (!Number.isSafeInteger(input.loc_penalty_cap) || input.loc_penalty_cap < 0) throw invalid('parameter_invalid', "Give the penalty's daily cap in minor units, 0 or more.", 'loc_penalty_cap');
+      data.locPenaltyCapMinor = BigInt(input.loc_penalty_cap);
+    }
     const saved = await this.prisma.connectSettings.upsert({
       where: { country: country.code },
       create: { ...(data as Prisma.ConnectSettingsUncheckedCreateInput), country: country.code, updatedById: adminId },
@@ -181,7 +190,20 @@ export class ConnectAdminService {
 
   private presentSettings(
     country: { code: string; currency: string; name: string },
-    row: { depositMinor: bigint | null; feeKind: string | null; feeBps: number | null; feeMinor: bigint | null; centreShareBps: number; buyerFreeHours: number; returnDueDays: number; returnAnswerHours: number; sellerCollectDays: number } | null,
+    row: {
+      depositMinor: bigint | null;
+      feeKind: string | null;
+      feeBps: number | null;
+      feeMinor: bigint | null;
+      centreShareBps: number;
+      buyerFreeHours: number;
+      returnDueDays: number;
+      returnAnswerHours: number;
+      sellerCollectDays: number;
+      demurrageBps: number;
+      locPenaltyBps: number;
+      locPenaltyCapMinor: bigint;
+    } | null,
   ) {
     return {
       object: 'connect_settings' as const,
@@ -197,6 +219,10 @@ export class ConnectAdminService {
       return_due_days: row?.returnDueDays ?? 7,
       return_answer_hours: row?.returnAnswerHours ?? 48,
       seller_collect_days: row?.sellerCollectDays ?? 7,
+      /** Storage: a share of the shipping charge a day past the free time (both sides), and the Loss of care penalty, capped a day. */
+      demurrage_bps: row?.demurrageBps ?? 210,
+      loc_penalty_bps: row?.locPenaltyBps ?? 210,
+      loc_penalty_cap: Number(row?.locPenaltyCapMinor ?? 50000n),
     };
   }
 

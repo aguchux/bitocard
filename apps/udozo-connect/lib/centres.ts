@@ -128,6 +128,11 @@ export type CounterOrder = {
   return: { id: string; number: string; reason: ReturnReason; status: ReturnStatus; collect_by: string | null } | null;
   /** Still at the centre for its seller: refused, or refunded and never collected. */
   held_for_seller: boolean;
+  /** Storage owed: the buyer's before they collect it, the seller's before a return is handed back. */
+  buyer_owed: number;
+  seller_owed: number;
+  /** When the item went into Loss of care (its seller did not collect a return in time). */
+  loss_of_care_at: string | null;
 };
 export type CounterSummary = { object: "connect_counter_summary"; expected: number; to_shelve: number; ready: number; due_today: number; overdue: number };
 

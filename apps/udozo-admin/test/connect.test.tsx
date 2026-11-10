@@ -159,7 +159,7 @@ beforeEach(() => {
         const sent = body as { fee_kind: "percent" | "fixed" | null; fee_bps?: number; fee?: number; centre_share_bps: number; buyer_free_hours: number };
         fee = sent.fee_kind === "percent" ? { kind: "percent", bps: sent.fee_bps! } : sent.fee_kind === "fixed" ? { kind: "fixed", amount: sent.fee! } : null;
       }
-      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7 });
+      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000 });
     }
     if (path === "/v1/admin/connect/centres")
       return ok({
@@ -302,6 +302,7 @@ describe("Connect", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save deposit" }));
     await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ deposit: 7_500_050 }), slow);
 
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save deposit" }) as HTMLButtonElement).disabled).toBe(false), slow);
     fireEvent.change(await screen.findByLabelText("Deposit (NGN)"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Save deposit" }));
     await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ deposit: null }), slow);
@@ -318,14 +319,15 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "percent" } });
     fireEvent.change(screen.getByLabelText("Fee (% of shipping)"), { target: { value: "10" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000 }), slow);
     expect(await screen.findByText(/10% of the shipping charge/, {}, slow)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "fixed" } });
     fireEvent.change(screen.getByLabelText("Fee (NGN)"), { target: { value: "500" } });
     fireEvent.change(screen.getByLabelText("Centre's share (%)"), { target: { value: "65" } });
     fireEvent.change(screen.getByLabelText("Hours to answer a return"), { target: { value: "24" } });
+    fireEvent.change(screen.getByLabelText("Penalty cap a day (NGN)"), { target: { value: "400" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000 }), slow);
   });
 
   test("support cannot change the deposit or states", async () => {

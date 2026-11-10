@@ -200,6 +200,7 @@ export function CounterOrderView({ centre, country, order: initial, shelves }: {
       {next === "hand_over" ? (
         <Panel title="Hand it over">
           {order.collect_by ? <p className="text-sm">Free to collect until {when(order.collect_by, country)}.</p> : null}
+          {order.buyer_owed ? <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950">Storage of {money(order.buyer_owed, order.currency)} is owed: the buyer pays it on their order (Pay storage) before you take their code.</p> : null}
           {!accepted ? (
             <>
               <p className="mt-2">Give the item to the buyer to inspect. Wait for their answer: do they accept it?</p>
@@ -241,6 +242,7 @@ export function CounterOrderView({ centre, country, order: initial, shelves }: {
       {order.return ? (
         <Panel title={`Return ${order.return.number}`}>
           <p>{returnStatusWords[order.return.status]}.</p>
+          {order.loss_of_care_at ? <p className="mt-1 text-sm">In Loss of care since {when(order.loss_of_care_at, country)}: keep it safe; the seller pays storage and a daily penalty until they collect it.</p> : null}
           {order.return.status === "accepted" ? (
             <a href={`/centre/${centre}/returns`} className="mt-2 inline-block font-semibold text-brand-600 hover:underline">
               Hand it back on Returns

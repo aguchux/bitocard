@@ -9,7 +9,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 const { orderActions, orderNext, orderSteps } = await import("@/lib/shop");
 const { labelFor } = await import("@/lib/connect-label");
 const { requestSafePay } = await import("@/lib/listing-actions");
-const { acceptReturn, orderStep, returnCode } = await import("@/lib/shop-actions");
+const { acceptReturn, payStorage, orderStep, returnCode } = await import("@/lib/shop-actions");
 
 const id = "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d";
 const centre = { id, number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue", landmark: null, area: "Ikeja", state: "Lagos", hours: "Mon to Sat, 8am to 6pm", phone: "08031234567" };
@@ -107,6 +107,13 @@ describe("asking and sending", () => {
     await returnCode(id);
     expect(calls.map(call => call.path)).toEqual([`/v1/classifieds/orders/${id}/return/accept`, `/v1/classifieds/orders/${id}/return-code`]);
     expect(await acceptReturn("../x")).toMatchObject({ ok: false });
+  });
+
+  test("the buyer pays the storage owed before collecting", async () => {
+    await payStorage(id);
+    expect(calls).toEqual([{ path: `/v1/classifieds/orders/${id}/storage/pay`, body: {} }]);
+    expect(await payStorage("nope")).toMatchObject({ ok: false });
+    expect(calls).toHaveLength(1);
   });
 
   test("the seller drops it off at the centre with no courier, or names one", async () => {

@@ -4,6 +4,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
+import { ConnectChargesService } from './connect-charges.service.js';
 import { ConnectCheckoutService } from './connect-checkout.service.js';
 import { cleanMessage } from './conversations.service.js';
 import { type DisputeReason, type OrderRow, SafePayService } from './safe-pay.service.js';
@@ -43,6 +44,7 @@ export class ConnectCounterService implements OnModuleInit {
     private readonly checkout: ConnectCheckoutService,
     private readonly inbox: InboxService,
     private readonly watermarks: WatermarkService,
+    private readonly charges: ConnectChargesService,
   ) {}
 
   onModuleInit() {
@@ -187,6 +189,9 @@ export class ConnectCounterService implements OnModuleInit {
     const member = await this.member(customer, centreId);
     const order = await this.order(centreId, orderId);
     if (order.status !== 'at_centre' || !order.readyAt) throw conflict('order_not_ready', 'Shelve it first: it is handed over once it is ready.');
+    // Storage past the free time is paid before the code is taken.
+    const { total } = await this.charges.owed(order.id, 'buyer');
+    if (total > 0n) throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'storage_unpaid', 'The buyer pays the storage on their order first (Pay storage).');
     await this.safePay.checkReleaseCode(order, 'at_centre', input.code);
     await this.safePay.settle(order, { kind: 'release' }, ['at_centre'], async tx => {
       await tx.classifiedOrder.update({ where: { id: order.id }, data: { releasedById: member.customerId, connectShelfId: null } });
@@ -259,6 +264,10 @@ export class ConnectCounterService implements OnModuleInit {
       dispatch_photos: order.dispatchPhotos.map(photo => ({ id: photo.id, content_type: photo.contentType, width: photo.width, height: photo.height })),
       events: order.shipmentEvents.map(event => ({ status: event.status, note: event.note, reported_by: event.reportedBy, at: event.createdAt.toISOString() })),
       release_tries_left: order.status === 'at_centre' ? releaseCodeTries - order.releaseAttempts : null,
+      /** Storage the buyer must pay before collecting it, and the seller before collecting a return. */
+      buyer_owed: Number(order.connectCharges.filter(charge => charge.payer === 'buyer' && charge.status === 'owed').reduce((sum, charge) => sum + charge.amountMinor, 0n)),
+      seller_owed: Number(order.connectCharges.filter(charge => charge.payer === 'seller' && charge.status === 'owed').reduce((sum, charge) => sum + charge.amountMinor, 0n)),
+      loss_of_care_at: order.connectReturn?.lossOfCareAt?.toISOString() ?? null,
       paid_at: order.paidAt?.toISOString() ?? null,
       sent_at: order.sentAt?.toISOString() ?? null,
       handover_by: order.handoverBy?.toISOString() ?? null,

@@ -513,6 +513,10 @@ export type ShopOrderConnect = {
   received_at: string | null;
   ready_at: string | null;
   collect_by: string | null;
+  /** Storage owed by the reader's side: the buyer's demurrage, or the seller's (with Loss of care penalties). */
+  storage_owed?: number;
+  /** When the item went into Loss of care (its seller did not collect a return in time). */
+  loss_of_care_at?: string | null;
   /** Its return to the seller, once the centre asked. */
   return?: ShopConnectReturn | null;
 };
