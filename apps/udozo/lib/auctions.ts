@@ -58,3 +58,12 @@ export function lotNext(lot: AuctionLot) {
   if (lot.status === "scheduled") return "Bidding has not opened yet.";
   return null;
 }
+
+/** What a card shows of a listing at auction: the price to beat, and a line of bids and time left (null: not at auction). */
+export function auctionCard(card: { sale_method?: string; price: { amount: number | null }; auction?: { status: string; current_price: number | null; bids: number; ends_at: string } | null }, now = Date.now()) {
+  if (card.sale_method !== "auction" || !card.auction) return null;
+  const lot = card.auction;
+  const bids = `${lot.bids} ${lot.bids === 1 ? "bid" : "bids"}`;
+  const line = lot.status === "live" ? `Auction · ${bids} · ends in ${timeLeft(lot.ends_at, now)}` : lot.status === "awaiting_payment" || lot.status === "sold" ? "Auction ended" : "Auction";
+  return { amount: lot.current_price ?? card.price.amount, line };
+}

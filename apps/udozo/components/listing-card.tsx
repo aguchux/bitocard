@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- sellers' photos come from the media CDN at their own sizes; the card crops them. */
 import Link from "next/link";
 import { BadgeCheck, ImageIcon, Play, Star, Truck } from "lucide-react";
+import { auctionCard } from "@/lib/auctions";
 import { conditionLabels, listingPath, postedAgo, shopPriceText, type ShopListingCard, type ShopResult, type ShopShowcaseCard } from "@bitocard/api-client/classifieds";
 import { Flag } from "./flag";
 import { OutOfStockBadge } from "./stock";
@@ -66,7 +67,8 @@ export function ListingTile({ card, now, badge, was, position, className = "" }:
         ) : null}
         {hasPrice(card) ? (
           <span className="flex flex-wrap items-baseline gap-x-1.5">
-            <strong className="text-base leading-tight font-extrabold text-navy-900 sm:text-lg">{shopPriceText(card.price)}</strong>
+            <strong className="text-base leading-tight font-extrabold text-navy-900 sm:text-lg">{shopPriceText({ ...card.price, amount: auctionCard(card, now)?.amount ?? card.price.amount })}</strong>
+            {auctionCard(card, now) ? <span className="text-[11px] font-semibold text-navy-600">{auctionCard(card, now)!.line}</span> : null}
             {was && card.price.amount !== null && was > card.price.amount ? (
               <s className="text-xs text-navy-500">
                 <span className="sr-only">was </span>
@@ -106,8 +108,8 @@ export function ListingRow({ card, now, position, menu = false }: { card: ShopRe
       {/* `contain-inline-size`: the one-line highlights never make the card (and the page) wider than the screen. */}
       <span className={`flex min-w-0 flex-1 flex-col gap-1 contain-inline-size${menu ? " pr-8" : ""}`}>
         <span className="flex flex-wrap items-baseline gap-x-2">
-          <strong className="text-[15px] font-extrabold">{shopPriceText(card.price)}</strong>
-          {card.price.kind === "negotiable" ? <span className="text-xs font-semibold text-navy-500">Negotiable</span> : null}
+          <strong className="text-[15px] font-extrabold">{shopPriceText({ ...card.price, amount: auctionCard(card, now)?.amount ?? card.price.amount })}</strong>
+          {auctionCard(card, now) ? <span className="text-xs font-semibold text-navy-600">{auctionCard(card, now)!.line}</span> : card.price.kind === "negotiable" ? <span className="text-xs font-semibold text-navy-500">Negotiable</span> : null}
         </span>
         <span className="line-clamp-2 text-sm leading-snug font-medium">{card.title}</span>
         {card.highlights.length ? <span className="truncate text-xs text-navy-600">{card.highlights.join(" · ")}</span> : null}

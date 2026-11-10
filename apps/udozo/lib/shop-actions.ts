@@ -95,6 +95,10 @@ export type ListingFields = Partial<{
   connect_states: Array<{ state_id: string; shipping: string }>;
   /** The Connect Centres it ships to, or null for every open centre in those states. */
   connect_centres: string[] | null;
+  /** Sold at its price, or by auction: then its hidden reserve as typed (empty for none) and its length in days. */
+  sale_method: "fixed" | "auction";
+  auction_reserve: string;
+  auction_days: number | null;
 }>;
 
 function body(fields: ListingFields): { body: Record<string, unknown> } | { problem: ShopResult<never> } {
@@ -118,6 +122,16 @@ function body(fields: ListingFields): { body: Record<string, unknown> } | { prob
     out[key] = minor;
   }
   if (fields.pickup !== undefined) out.pickup = fields.pickup;
+  if (fields.sale_method !== undefined) out.sale_method = fields.sale_method;
+  if (fields.auction_days !== undefined) out.auction_days = fields.auction_days;
+  if (fields.auction_reserve !== undefined) {
+    if (!fields.auction_reserve.trim()) out.auction_reserve = null;
+    else {
+      const minor = toMinor(fields.auction_reserve);
+      if (minor === null) return { problem: refused("Give the reserve as an amount, such as 150,000 (or leave it empty for none).", "auction_reserve") };
+      out.auction_reserve = minor;
+    }
+  }
   if (fields.connect !== undefined) out.connect = fields.connect;
   if (fields.connect_states !== undefined) {
     const states: Array<{ state_id: string; shipping: number }> = [];

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { ShopListingAuction } from "@bitocard/api-client/classifieds";
 import type { AuctionLot } from "./auctions";
 import { auctionPath } from "./auctions";
 import { type CustomerResult, customerApi } from "./customer";
@@ -22,6 +23,13 @@ export async function placeBid(ref: string, amount: number): Promise<AuctionResu
   const result = answer(await customerApi<AuctionLot>("POST", `/v1/classifieds/auctions/${ref}/bids`, { amount }));
   if (result.ok) revalidatePath(auctionPath(result.data.country, ref));
   return result;
+}
+
+/** Bids an amount (minor units) on a listing sold by auction. */
+export async function bidOnListing(listingId: string, amount: number): Promise<AuctionResult<ShopListingAuction>> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(listingId)) return { ok: false, message: "No such listing.", code: "resource_missing", param: null, signIn: false };
+  if (!Number.isSafeInteger(amount) || amount <= 0) return { ok: false, message: "Give your bid.", code: "parameter_invalid", param: "amount", signIn: false };
+  return answer(await customerApi<ShopListingAuction>("POST", `/v1/classifieds/listings/${listingId}/bids`, { amount }));
 }
 
 /** Pays for a lot won, from the Udozo wallet. */

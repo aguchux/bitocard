@@ -24,6 +24,8 @@ export const tierNames = ['area', 'nearby', 'state', 'country'] as const;
 
 export type SearchInput = {
   country: string;
+  /** Only listings sold this way (auction: those at auction). */
+  sale?: 'fixed' | 'auction';
   q?: string;
   category?: string;
   area?: string;
@@ -161,6 +163,7 @@ export class ListingSearchService {
 
     const where: Prisma.Sql[] = [Prisma.sql`l."country" = ${country}`, Prisma.sql`l."status" = 'active'`, Prisma.sql`l."on_shop"`];
     if (seller) where.push(Prisma.sql`l."customer_id" = ${seller.id}::uuid`);
+    if (input.sale) where.push(Prisma.sql`l."sale_method" = ${input.sale}`);
     if (brand) where.push(brandListingSql(brand.keys));
     if (categoryIds) where.push(Prisma.sql`l."category_id" IN (${Prisma.join(categoryIds.map(id => Prisma.sql`${id}::uuid`))})`);
     if (input.price_min !== undefined) where.push(Prisma.sql`l."price_minor" >= ${BigInt(input.price_min)}`);

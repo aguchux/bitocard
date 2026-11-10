@@ -32,6 +32,7 @@ import { Gallery } from "@/components/gallery";
 import { ShopIcon } from "@/components/icon";
 import { JsonLd } from "@/components/json-ld";
 import { AskAboutListing } from "@/components/assistant";
+import { AuctionPanel } from "@/components/listing-auction";
 import { ListingActions, SaveShare } from "@/components/listing-actions";
 import { ListingGrid } from "@/components/listing-card";
 import { marketFor, shopApi } from "@/lib/api";
@@ -234,14 +235,17 @@ export default async function ListingPage({ params }: Props) {
           {sold ? (
             <p className="rounded-2xl bg-navy-50 p-4 text-sm text-navy-700">This was sold{listing.sold_at ? ` ${postedAgo(listing.sold_at).toLowerCase()}` : ""}. Similar listings are below.</p>
           ) : (
+            <>
+              {listing.sale_method === "auction" && (viewer?.auction ?? listing.auction) ? <AuctionPanel listingId={listing.id} currency={listing.price.currency} auction={(viewer?.auction ?? listing.auction)!} signedIn={Boolean(customer)} phoneConfirmed={Boolean(customer?.phone_verified)} /> : null}
             <ListingActions
-              listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href, currency: listing.price.currency, active: listing.status === "active", chat: listing.contact.chat, phone: listing.contact.phone, buyPath: `/${cc}/l/${listing.ref}/buy`, buyHref: buy?.href ?? null, buyLabel: buy?.label ?? "", price: listing.price.amount, available: listing.available, inStock: listing.in_stock !== false, buyOrders: Boolean(market.buy_orders), seller: listing.seller.name }}
+              listing={{ id: listing.id, title: listing.title, url: new URL(path, origin).href, currency: listing.price.currency, active: listing.status === "active", chat: listing.contact.chat, phone: listing.contact.phone, buyPath: `/${cc}/l/${listing.ref}/buy`, buyHref: buy?.href ?? null, buyLabel: buy?.label ?? "", price: listing.price.amount, available: listing.available, inStock: listing.in_stock !== false, buyOrders: Boolean(market.buy_orders), seller: listing.seller.name, auction: listing.sale_method === "auction" }}
               viewer={viewer}
               signedIn={Boolean(customer)}
               chat={chatResult?.ok ? chatResult.data : null}
               messagesHref={customer ? (viewer?.conversation_id ? `/account/messages/${viewer.conversation_id}` : "/account/messages") : null}
               myPhone={customer?.phone_verified ? customer.phone : null}
             />
+            </>
           )}
           {sold ? null : <AskAboutListing listingId={listing.id} title={listing.title} />}
           {sold || !whatsapp ? null : (

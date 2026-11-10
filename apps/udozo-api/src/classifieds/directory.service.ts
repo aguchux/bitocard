@@ -54,13 +54,14 @@ export class ShopDirectoryService {
     const countries = await this.prisma.country.findMany({ orderBy: { name: 'asc' } });
     const open = (await Promise.all(countries.map(async country => ((await this.settings.isOnForCountry('classifieds', country.code)) ? country : null)))).filter(country => country !== null);
     const codes = open.map(country => country.code);
-    const [counts, safePay, installPrompt, fees, buyOrders, connect] = await Promise.all([
+    const [counts, safePay, installPrompt, fees, buyOrders, connect, auctions] = await Promise.all([
       codes.length ? this.prisma.classifiedListing.groupBy({ by: ['country'], where: { country: { in: codes }, ...onShopWhere }, _count: { _all: true } }) : [],
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_safe_pay', code))),
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_install_prompt', code))),
       this.prisma.classifiedSafePaySettings.findMany({ where: { country: { in: codes } } }),
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_buy_orders', code))),
       Promise.all(codes.map(code => this.settings.isOnForCountry('connect_shipping', code))),
+      Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_auctions', code))),
     ]);
     const feesSet = (code: string) => {
       const row = fees.find(item => item.country === code);
@@ -80,6 +81,8 @@ export class ShopDirectoryService {
         buy_orders: buyOrders[index]!,
         /** Sellers ship through Udozo Connect there (`connect_shipping`), to Connect Centres buyers collect from. */
         connect_shipping: connect[index]!,
+        /** Sellers may sell by auction there (`classifieds_auctions`, with UdozoPay open for the winner to pay). */
+        auctions: auctions[index]! && safePay[index]! && feesSet(country.code),
       })),
       showcase: open.length >= showcaseFrom,
     };

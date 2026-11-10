@@ -36,7 +36,31 @@ export type ShopPlace = { slug: string; name: string; state: { slug: string; nam
  * `safe_pay`: open there (its switch on and both fees set); a buyer's own wallet is checked when they ask.
  * `install_prompt`: the site asks visitors there to install it as an app (an admin switch).
  */
-export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean; /** Sellers ship through Udozo Connect there. */ connect_shipping?: boolean };
+export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean; /** Sellers ship through Udozo Connect there. */ connect_shipping?: boolean; /** Sellers may sell by auction there. */ auctions?: boolean };
+
+/** How a listing is sold: at its price, or by auction (its price the starting price). */
+export type ShopSaleMethod = 'fixed' | 'auction';
+/** A listing's auction as cards show it: the bid to beat and when it ends. */
+export type ShopAuctionCard = { status: string; current_price: number | null; bids: number; ends_at: string };
+/** A listing's auction as its page shows it; signed in, `viewer` is the reader's own place in it. */
+export type ShopListingAuction = {
+  object: 'listing_auction';
+  /** AU-000123 */
+  number: string;
+  status: 'live' | 'awaiting_payment' | 'sold' | 'unsold' | 'cancelled';
+  start_price: number;
+  current_price: number | null;
+  /** The least the next bid may be, while bidding is open. */
+  next_bid: number | null;
+  bids: number;
+  /** Whether the seller's hidden reserve is met (null: they set none). */
+  reserve_met: boolean | null;
+  starts_at: string;
+  ends_at: string;
+  rules: { step_pct: number; step_min: number; extend_minutes: number; pay_hours: number };
+  recent_bids: Array<{ name: string; amount: number; at: string }>;
+  viewer?: { highest: number | null; leading: boolean; to_pay: { amount: number; pay_by: string | null; order_id: string | null } | null; won: boolean; seller: boolean };
+};
 export type ShopMarkets = { object: 'list'; data: ShopMarket[]; showcase: boolean };
 
 export type ShopFeature = {
@@ -212,6 +236,9 @@ export type ShopListingCard = {
   /** The first few feature values, as people read them ("256 GB"). */
   highlights: string[];
   delivery: ShopDelivery;
+  /** Sold at its price or by auction (Udozo), with the auction's bid to beat. */
+  sale_method?: ShopSaleMethod;
+  auction?: ShopAuctionCard | null;
   /** Some to buy (Udozo); out of stock, buying is closed and it comes after those in stock. */
   in_stock?: boolean;
   /** The seller by their public name; `handle` names their seller page (Udozo). */
@@ -234,6 +261,9 @@ export type ShopListingPage = {
   url: string;
   description: string | null;
   price: ShopPrice;
+  /** Sold at its price or by auction (Udozo): then `auction` is its bidding as anyone sees it. */
+  sale_method?: ShopSaleMethod;
+  auction?: ShopListingAuction | null;
   condition: ShopCondition | null;
   category: { slug: string; name: string; parent: { slug: string; name: string } | null; safety_checklist: string[] };
   area: ShopPlace;
@@ -342,6 +372,8 @@ export type ShopViewer = {
   conversation_id: string | null;
   order: { id: string; number: string; status: ShopOrderStatus } | null;
   can_contact: boolean;
+  /** Sold by auction: the lot as this reader sees it (Udozo). */
+  auction?: ShopListingAuction | null;
   /** The seller's contact details once they shared them with this buyer, else the buyer's request (Udozo). */
   contact?: ShopContactState | null;
   /** A call back the buyer asked for about this listing (Udozo). */
@@ -769,6 +801,10 @@ export type ShopMyListing = {
   title: string | null;
   description: string | null;
   price: ShopPrice;
+  /** Sold at its price or by auction (Udozo): its reserve (the seller's only) and length in days. */
+  sale_method?: ShopSaleMethod;
+  auction_reserve?: number | null;
+  auction_days?: number | null;
   condition: ShopCondition | null;
   category: { id: string; slug: string; name: string; parent: { id: string; slug: string; name: string } | null } | null;
   country: string;

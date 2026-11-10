@@ -15,7 +15,7 @@ const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? c
  * Udozo Connect Centre (the state, then the centre, with that state's shipping charge and the Connect fee), then sent
  * to the seller, who has the accept time to answer.
  */
-export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { quote: ShopSafePayQuote; sellerName: string; acceptHours: number | null; stateName?: string | null }) {
+export function SafePayRequest({ quote, sellerName, acceptHours, stateName, auction = false }: { quote: ShopSafePayQuote; sellerName: string; acceptHours: number | null; stateName?: string | null; /** Won at auction: no wait for the seller, paid straight after. */ auction?: boolean }) {
   const router = useRouter();
   const [fulfilment, setFulfilment] = useState<ShopFulfilment>(quote.fulfilment[0] ?? "meet_up");
   const connect = quote.connect ?? null;
@@ -178,11 +178,9 @@ export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { 
       ) : null}
       {needsTerms ? <TermsAccept load={shopTerms} accept={acceptShopTerms} onAccepted={afterTerms} /> : null}
       <button type="submit" disabled={busy || needsTerms || (fulfilment === "connect" && !centreId)} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
-        <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Sending…" : "Send request to seller"}
+        <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Sending…" : auction ? "Continue to pay" : "Send request to seller"}
       </button>
-      <p className="text-center text-sm text-navy-600">
-        You pay only after {sellerName} accepts{acceptHours ? `, within ${acceptHours} hours` : ""}.
-      </p>
+      <p className="text-center text-sm text-navy-600">{auction ? `You won it: ${sellerName} committed by auctioning it, so you pay straight after this.` : `You pay only after ${sellerName} accepts${acceptHours ? `, within ${acceptHours} hours` : ""}.`}</p>
     </form>
   );
 }

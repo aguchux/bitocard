@@ -19,7 +19,7 @@ export default async function PostAd({ searchParams }: { searchParams: Promise<{
   return (
     <>
       <SellVisit source={source} signedIn />
-      <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} source={source} connect={connect} />
+      <ListingForm listing={null} categories={categories} states={states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} source={source} connect={connect} auctions={Boolean(market.auctions)} />
     </>
   );
 }

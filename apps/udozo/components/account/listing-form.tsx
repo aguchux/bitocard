@@ -125,6 +125,7 @@ export function ListingForm({
   resale = null,
   source = "direct",
   connect = null,
+  auctions = false,
 }: {
   listing: ShopMyListing | null;
   categories: ShopTopCategory[];
@@ -141,6 +142,8 @@ export function ListingForm({
   source?: SellSource;
   /** Where Udozo Connect shipping is open in the market: its open centres, to ship to (null: not offered). */
   connect?: { centres: ConnectCentre[] } | null;
+  /** Sellers may sell by auction in the market (`classifieds_auctions`). */
+  auctions?: boolean;
 }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(listing?.id ?? null);
@@ -149,6 +152,12 @@ export function ListingForm({
   const [categoryId, setCategoryId] = useState<string | null>(listing?.category?.id ?? null);
   const [priceKind, setPriceKind] = useState<ShopPriceKind>(listing?.price.kind ?? "fixed");
   const [price, setPrice] = useState(fromMinor(listing?.price.amount ?? null));
+  const [saleMethod, setSaleMethod] = useState<"fixed" | "auction">(listing?.sale_method ?? "fixed");
+  const [reserve, setReserve] = useState(fromMinor(listing?.auction_reserve ?? null));
+  const [auctionDays, setAuctionDays] = useState<number | null>(listing?.auction_days ?? null);
+  const auction = saleMethod === "auction";
+  // A live auction's price, reserve and length are fixed once bid on: the API says so if they are changed.
+  const offerAuction = auctions || auction;
   const [condition, setCondition] = useState<ShopCondition | null>(listing?.condition ?? null);
   const [delivery, setDelivery] = useState<ShopDelivery>(listing?.delivery ?? "none");
   const [pickup, setPickup] = useState(listing?.pickup ?? true);
@@ -180,6 +189,8 @@ export function ListingForm({
     minPhotos,
     priceKind,
     priceMinor: toMinor(price),
+    saleMethod,
+    auctionDays,
     condition,
     onShop: sellWhere.onShop,
     resale: sellWhere.resale,
@@ -536,13 +547,19 @@ export function ListingForm({
   const marks = (param: string) => (problem?.param?.startsWith(param) ? "border-brand-700 ring-2 ring-brand-500/20" : "border-slate-300");
   // The last step's summary: each step's answers in a line, with Change opening it.
   const areaName = state?.areas.find(area => area.id === areaId)?.name ?? null;
-  const priceLine = priceKind === "on_request" ? "Contact for price" : price.trim() ? `${symbol}${price}${priceKind === "negotiable" ? ", negotiable" : ""}` : "No price yet";
+  const priceLine = auction
+    ? `Auction${price.trim() ? ` from ${symbol}${price}` : ""}${reserve.trim() ? `, reserve ${symbol}${reserve}` : ""}${auctionDays ? `, ${auctionDays} ${auctionDays === 1 ? "day" : "days"}` : ""}`
+    : priceKind === "on_request"
+      ? "Contact for price"
+      : price.trim()
+        ? `${symbol}${price}${priceKind === "negotiable" ? ", negotiable" : ""}`
+        : "No price yet";
   const places = [sellWhere.onShop ? "Udozo" : null, sellWhere.resale ? "resellers' stores" : null].filter(Boolean).join(" and ");
   const summary: Array<[number, string, string]> = [
     [0, "Title and category", `${title.trim() || "No title yet"}${found ? ` · ${found.top.name} › ${found.category.name}` : ""}`],
     [1, "Photos and video", `${ready} photo${ready === 1 ? "" : "s"}${video && video.status !== "failed" ? " and a video" : ""}`],
     [2, "Price and condition", `${priceLine}${condition ? ` · ${conditionLabels[condition]}` : ""}`],
-    [3, "Where to sell", `${places || "Nowhere yet"} · ${stockText(sellWhere.stock)}`],
+    [3, "Where to sell", auction ? "Udozo only, one item" : `${places || "Nowhere yet"} · ${stockText(sellWhere.stock)}`],
     [4, "Location and delivery", `${areaName && state ? `${areaName}, ${state.name}` : "No area yet"} · ${delivery === "none" ? "No delivery" : delivery === "state" ? `Delivers in the ${region}` : "Delivers nationwide"}${connect && connectSummary(connectChoice) ? ` · ${connectSummary(connectChoice)}` : ""}`],
   ];
 
@@ -739,11 +756,47 @@ export function ListingForm({
       {step === 2 ? (
         <>
           <section className="grid gap-5">
+            {offerAuction ? (
+              <fieldset className="grid gap-2">
+                <legend className="text-sm font-semibold">How do you want to sell it?</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["fixed", "At a price"],
+                      ["auction", "By auction"],
+                    ] as const
+                  ).map(([method, label]) => (
+                    <button
+                      key={method}
+                      type="button"
+                      aria-pressed={saleMethod === method}
+                      onClick={() => {
+                        setSaleMethod(method);
+                        if (method === "auction") {
+                          setPriceKind("fixed");
+                          const days = auctionDays ?? 7;
+                          setAuctionDays(days);
+                          save({ sale_method: "auction", price_kind: "fixed", auction_days: days, price });
+                        } else save({ sale_method: "fixed" });
+                      }}
+                      className={`h-9 rounded-full border px-3.5 text-[13px] font-semibold ${saleMethod === method ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white text-navy-900"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {auction ? (
+                  <p className="text-xs text-slate-500">
+                    People bid on your ad until it ends; the highest bid at or above your reserve wins and pays with UdozoPay, so set up your payout account first. One item, sold on Udozo only.
+                  </p>
+                ) : null}
+              </fieldset>
+            ) : null}
             <div className="grid gap-2">
               <label htmlFor="price" className="text-sm font-semibold">
-                Price
+                {auction ? "Starting price" : "Price"}
               </label>
-              {priceKind !== "on_request" ? (
+              {priceKind !== "on_request" || auction ? (
                 <span className={`flex h-12 items-center gap-2 rounded-xl border bg-white px-3.5 ${marks("price")}`}>
                   <span className="text-slate-500">{symbol}</span>
                   <input
@@ -763,7 +816,42 @@ export function ListingForm({
                   />
                 </span>
               ) : null}
-              <div className="flex flex-wrap gap-2">
+              {auction ? (
+                <>
+                  <label htmlFor="auction-reserve" className="mt-2 text-sm font-semibold">
+                    Reserve (optional)
+                  </label>
+                  <span className={`flex h-12 items-center gap-2 rounded-xl border bg-white px-3.5 ${marks("auction_reserve")}`}>
+                    <span className="text-slate-500">{symbol}</span>
+                    <input
+                      id="auction-reserve"
+                      inputMode="decimal"
+                      value={reserve}
+                      aria-describedby="auction-reserve-help"
+                      onChange={event => {
+                        setReserve(event.target.value);
+                        save({ auction_reserve: event.target.value });
+                      }}
+                      placeholder="None"
+                      className="min-w-0 flex-1 bg-transparent text-base outline-none"
+                    />
+                  </span>
+                  <p id="auction-reserve-help" className="text-xs text-slate-500">
+                    The least you will take, kept from bidders: below it, it does not sell. At least the starting price.
+                  </p>
+                  <Chips
+                    label="How long it runs"
+                    options={[1, 3, 5, 7, 10].map(days => ({ value: String(days), label: `${days} ${days === 1 ? "day" : "days"}` }))}
+                    value={auctionDays === null ? null : String(auctionDays)}
+                    onChange={value => {
+                      const days = value === null ? null : Number(value);
+                      setAuctionDays(days);
+                      save({ auction_days: days });
+                    }}
+                  />
+                </>
+              ) : null}
+              <div className={`flex flex-wrap gap-2 ${auction ? "hidden" : ""}`}>
                 {(
                   [
                     ["fixed", "Fixed"],
@@ -832,7 +920,10 @@ export function ListingForm({
         </>
       ) : null}
 
-      {step === 3 ? (
+      {step === 3 && auction ? (
+        <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">At auction it is sold on Udozo only, one item, to the winning bid. Choose At a price on the previous step to sell more than one or through resellers.</p>
+      ) : null}
+      {step === 3 && !auction ? (
         <>
           <ResaleFields
             value={sellWhere}

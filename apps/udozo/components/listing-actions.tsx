@@ -34,6 +34,8 @@ type Listing = {
   buyOrders?: boolean;
   /** The seller's public name, for rating how they dealt with the buyer. */
   seller?: string;
+  /** Sold by auction: bid on its page, never by offer or buy order. */
+  auction?: boolean;
 };
 
 /** A sheet over the page: from the bottom on phones, centred above (a native modal dialog: Escape closes it). */
@@ -247,7 +249,7 @@ export function ListingActions({
   const buyOrders = signedIn ? Boolean(viewer?.buy_orders) : Boolean(listing.buyOrders);
   const openOrder = buyOrder && ["requested", "countered", "accepted"].includes(buyOrder.status) ? buyOrder : null;
   const outOfStock = listing.inStock === false;
-  const offersBuy = buyOrders && canContact && (openOrder || (!outOfStock && (listing.available ?? 1) > 0));
+  const offersBuy = !listing.auction && buyOrders && canContact && (openOrder || (!outOfStock && (listing.available ?? 1) > 0));
 
   const report = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -349,7 +351,7 @@ export function ListingActions({
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s market.</p>
       )}
       {signedIn && viewer && canContact ? <RateSellerButton listingId={listing.id} seller={listing.seller ?? "the seller"} ask={Boolean(shared || viewer?.callback?.request?.status === "done")} /> : null}
-      {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} offers={!outOfStock} /> : null}
+      {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} offers={!outOfStock && !listing.auction} /> : null}
       <div className={variant === "seller" ? "hidden" : "text-center"}>
         {signedIn ? (
           <button type="button" onClick={() => reportSheet.current?.showModal()} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy-600 hover:underline">

@@ -19,6 +19,7 @@ const unavailable: Record<string, string> = {
   price_required: "This listing has no price: agree one by offer in the chat first, then buy at that price.",
   offer_not_accepted: "Use an offer the seller accepted in the last 7 days.",
   listing_reserved: "Someone has already paid for this with UdozoPay.",
+  auction_not_won: "This is sold by auction: bid on it, and pay here if your bid wins.",
   out_of_stock: "This is out of stock: the seller has none to sell right now. Chat with them to ask when more come in.",
   safe_pay_limited: "This seller cannot take UdozoPay orders right now. You can still chat with them.",
   classifieds_unavailable: "Udozo is not open in your country yet.",
@@ -112,7 +113,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
           </section>
           <Money price={quote.data.price} fee={quote.data.buyer_fee} total={quote.data.total} currency={currency} note="The fee comes back to you if the item does not change hands." />
           <WalletLine balance={balance} total={quote.data.total} currency={currency} addFunds={addFunds} />
-          {quote.data.reserved ? <p className="rounded-2xl bg-navy-50 p-3.5 text-sm">{unavailable.listing_reserved}</p> : <SafePayRequest quote={quote.data} sellerName={listing.seller.name} acceptHours={quote.data.accept_hours} stateName={listing.area.state.name} />}
+          {quote.data.reserved ? <p className="rounded-2xl bg-navy-50 p-3.5 text-sm">{unavailable.listing_reserved}</p> : <SafePayRequest quote={quote.data} sellerName={listing.seller.name} acceptHours={quote.data.accept_hours} stateName={listing.area.state.name} auction={listing.sale_method === "auction"} />}
           <details className="text-sm text-navy-700">
             <summary className="cursor-pointer font-semibold">What UdozoPay covers</summary>
             <ul className="mt-2 list-disc space-y-1 pl-5">

@@ -124,6 +124,12 @@ describe('Selling by auction', () => {
     const shown = await page(listing);
     assert.deepEqual([shown.sale_method, shown.auction.next_bid, shown.auction.reserve_met], ['auction', 10_000_000, null]);
     assert.equal(shown.auction_reserve, undefined, 'the reserve is never public');
+    const found = await fetch(`${server.base}/v1/classifieds/listings?country=NG&sale=auction`).then(res => res.json());
+    const card = found.data.find(row => row.id === listing.id);
+    assert.deepEqual([card?.sale_method, card?.auction?.status, card?.auction?.bids], ['auction', 'live', 0], 'the search finds it at auction');
+    assert.ok(!(await fetch(`${server.base}/v1/classifieds/listings?country=NG&sale=fixed`).then(res => res.json())).data.some(row => row.id === listing.id));
+    const markets = await fetch(`${server.base}/v1/classifieds/markets`).then(res => res.json());
+    assert.equal(markets.data.find(row => row.country === 'NG').auctions, true, 'the market says auctions are open');
   });
 
   test('bidding on its page; offers, buy orders and fixed-price UdozoPay refused; fixed once bid on', async () => {

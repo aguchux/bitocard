@@ -81,6 +81,10 @@ class SearchDto extends CountryDto {
   @IsOptional() @Matches(slug) @MaxLength(80)
   brand?: string;
 
+  /** Only listings sold this way: `auction` for those at auction. */
+  @IsOptional() @IsIn(['fixed', 'auction'])
+  sale?: 'fixed' | 'auction';
+
   @IsOptional() @IsIn(searchSorts)
   sort?: SearchSort;
 

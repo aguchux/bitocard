@@ -26,7 +26,7 @@ export function stepOf(param: string | null | undefined): number | null {
   if (param === "terms") return lastPostStep;
   if (param === "title" || param === "category_id") return 0;
   if (param === "photos" || param === "video" || param.startsWith("media")) return 1;
-  if (param === "price" || param === "price_kind" || param === "condition" || param.startsWith("features") || param === "description") return 2;
+  if (param === "price" || param === "price_kind" || param === "sale_method" || param.startsWith("auction") || param === "safe_pay" || param === "condition" || param.startsWith("features") || param === "description") return 2;
   if (param === "on_shop" || param === "stock" || param.startsWith("resale")) return 3;
   if (param === "area_id" || param.startsWith("delivery") || param.startsWith("connect") || param === "pickup" || param === "contact") return 4;
   return null;
@@ -42,6 +42,9 @@ export type PostValues = {
   minPhotos: number;
   priceKind: "fixed" | "negotiable" | "on_request";
   priceMinor: number | null;
+  /** Sold at its price, or by auction (its price the starting price, with a length in days). */
+  saleMethod?: "fixed" | "auction";
+  auctionDays?: number | null;
   condition: string | null;
   onShop: boolean;
   resale: boolean;
@@ -67,6 +70,10 @@ export function stepProblem(step: number, values: PostValues): StepProblem | nul
       if (values.readyPhotos < values.minPhotos) return { message: `Add at least ${values.minPhotos} photos.`, param: "photos" };
       return null;
     case 2:
+      if (values.saleMethod === "auction") {
+        if (!values.priceMinor) return { message: "Enter the starting price: bidding starts there.", param: "price" };
+        if (!values.auctionDays) return { message: "Choose how long the auction runs.", param: "auction_days" };
+      }
       if (values.priceKind !== "on_request" && !values.priceMinor) return { message: "Enter the price, or choose Contact for price.", param: "price" };
       if (!values.condition) return { message: "Choose its condition.", param: "condition" };
       return null;
