@@ -113,8 +113,8 @@ let fee: { kind: "percent"; bps: number } | { kind: "fixed"; amount: number } | 
 let current: ReturnType<typeof application>;
 const warehouse = { object: "connect_warehouse", id: "wh1", country: "NG", state: { id: "s1", name: "Lagos" }, name: "Udozo Lagos warehouse", address: "4 Industrial Avenue, Ilupeju", hours: "9am to 5pm", phone: "0803", contact_name: null, active: true, created_at: "2026-11-10T00:00:00.000Z", centres: 1, holding: 1 };
 const pickupItem = (over: Record<string, unknown> = {}) => ({ order_id: "o7", number: "SP-70", title: "Gas cooker", shelf: "A-01", status: "waiting", handed_over_at: null, received_at: null, ...over });
-const pickup = { object: "connect_pickup", id: "pk1", number: "PU-000001", day: "2026-11-12", collector: "Tunde", status: "scheduled", note: null, code: "482910", centre: { id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue" }, warehouse, items: [pickupItem()], collected_at: null, delivered_at: null, cancelled_at: null, created_at: "2026-11-10T00:00:00.000Z" };
-const collected = { ...pickup, id: "pk2", number: "PU-000002", status: "collected", code: null, items: [pickupItem({ status: "handed_over" }), pickupItem({ order_id: "o8", number: "SP-80", title: "Kettle", status: "handed_over" })] };
+const pickup = { object: "connect_pickup", id: "pk1", number: "PU-000001", day: "2026-11-12", collector: "Tunde", status: "scheduled", note: null, code: "482910", centre: { id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue" }, warehouse, items: [pickupItem()], photos: [], collected_at: null, delivered_at: null, cancelled_at: null, created_at: "2026-11-10T00:00:00.000Z" };
+const collected = { ...pickup, id: "pk2", number: "PU-000002", status: "collected", code: null, photos: [{ id: "ph1", content_type: "image/jpeg", width: 1600, height: 1200, created_at: "2026-11-12T09:00:00.000Z" }], items: [pickupItem({ status: "handed_over" }), pickupItem({ order_id: "o8", number: "SP-80", title: "Kettle", status: "handed_over" })] };
 let sentCollected = false;
 let sent: Array<{ method: string; path: string; search: string; body: unknown }>;
 
@@ -551,6 +551,11 @@ describe("Connect", () => {
     fireEvent.change(openDialog().getByLabelText("Who collects"), { target: { value: "Tunde (Udozo)" } });
     fireEvent.click(openDialog().getByRole("button", { name: "Schedule pickup" }));
     await waitFor(() => expect(lastSent("/connect/pickups")?.body).toMatchObject({ centre_id: "cc1", collector: "Tunde (Udozo)" }), slow);
+
+    // The centre's check-out photos of what it handed over.
+    fireEvent.click((await screen.findAllByRole("button", { name: "1 check-out photo" }, slow))[0]!);
+    expect(openDialog().getByText(/photographed as it handed the items to Tunde/)).toBeTruthy();
+    fireEvent.click(openDialog().getByRole("button", { name: /close/i }));
 
     fireEvent.click((await screen.findAllByRole("button", { name: "Check in at the warehouse" }, slow))[0]!);
     const check = openDialog();

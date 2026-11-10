@@ -618,7 +618,16 @@ assistants' knowledge, help, terms and privacy.
        at the warehouse once there (`POST /v1/admin/connect/returns/:id/hand-back { code }`, operations, the seller's
        return code; the return fee then all Udozo's), never at the centre once Udozo has it (`with_udozo`); storage owed
        first, as before. The order's `connect.return` carries `abandoned_at`, `place` and the `warehouse` holding it.
-     - **Not built:** check-out photos at the hand-over (a handover record and the code stand in for now).
+     - **Check-out photos** (built 10 November 2026; migration `20270311000000_connect_pickup_photos`,
+       `connect_pickup_photos`): before the hand-over the centre photographs what it gives the collector
+       (`POST /v1/connect/centres/:centre/pickups/:id/photos`, multipart `file`, JPEG or PNG up to 4 MB, metadata
+       stripped, sealed in the private bucket, at most 8; `DELETE …/photos/:photo` while it is scheduled; `GET` to read
+       one). The hand-over needs at least one (`checkout_photos_required`, refused before the code is tried, so no try is
+       used), and once handed over they stay as the record. The pickup carries `photos`; Udozo's team reads each with
+       `GET /v1/admin/connect/pickups/:id/photos/:photo` (audited `connect_pickup.photo_viewed`). connect.udozo.com's
+       pickup card adds and removes them through its own server (`app/api/centres/[id]/pickups/[pickup]/photos`), and
+       the admin's Pickups shows them. Tests: `apps/udozo-api/test/connect-warehouses.test.mjs`,
+       `apps/udozo-connect/test/pickup-photos.test.ts`, `centre-screens.test.tsx`, `apps/udozo-admin/test/connect.test.tsx`.
      - **Screens:** admin Connect > **Pickups** (`/connect/pickups`: waiting at centres with Schedule a pickup, pickups
        with their code, Check in at the warehouse, what the warehouses hold with Hand back to the seller), **Warehouses**
        (`/connect/warehouses`), the Final Return Address on each centre's page and the three day settings;

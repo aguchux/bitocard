@@ -7667,9 +7667,27 @@ model ConnectPickup {
   centre        ConnectCentre       @relation(fields: [centreId], references: [id], onDelete: Restrict)
   warehouse     ConnectWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   items         ConnectPickupItem[]
+  photos        ConnectPickupPhoto[]
 
   @@index([centreId, status])
   @@map("connect_pickups")
+}
+
+/// A check-out photo the centre takes at a pickup's hand-over (sealed in the private bucket; at most 8 a pickup).
+model ConnectPickupPhoto {
+  id          String        @id @default(uuid()) @db.Uuid
+  pickupId    String        @map("pickup_id") @db.Uuid
+  objectKey   String        @map("object_key")
+  contentType String        @map("content_type")
+  size        Int
+  width       Int?
+  height      Int?
+  takenById   String        @map("taken_by_id") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at")
+  pickup      ConnectPickup @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+
+  @@index([pickupId, createdAt])
+  @@map("connect_pickup_photos")
 }
 
 /// One item on a pickup, from the centre's shelf to the warehouse.

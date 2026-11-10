@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
@@ -6,7 +7,13 @@ import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../au
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+
+import { maxDocumentBytes } from '../kyc/files.js';
 import { ProductOnly } from '../products/product.js';
+import type { Response } from 'express';
+import { sendPhoto } from './chat-files.js';
+import type { MediaUpload } from './media.service.js';
+import { invalid } from './rules.js';
 import { ConnectReturnsService } from './connect-returns.service.js';
 import { ConnectWarehousesService } from './connect-warehouses.service.js';
 
@@ -149,6 +156,12 @@ export class AdminWarehousesController {
     return this.warehouses.pickup(id);
   }
 
+  /** A check-out photo the centre took at the hand-over (audited). */
+  @Get('pickups/:id/photos/:photo')
+  async photo(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('photo', ParseUUIDPipe) photo: string, @Res() res: Response) {
+    sendPhoto(res, await this.warehouses.adminPhoto(adminId(caller), id, photo));
+  }
+
   @Post('pickups')
   @AdminRoles('operations')
   schedule(@CurrentCaller() caller: Caller, @Body() body: ScheduleDto) {
@@ -196,6 +209,24 @@ export class ConnectCentrePickupsController {
   @Get()
   list(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string) {
     return this.warehouses.centrePickups(caller.customer, centre);
+  }
+
+  /** A check-out photo of what is handed over: multipart `file`, JPEG or PNG up to 4 MB. */
+  @Post(':id/photos')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 1 } }))
+  addPhoto(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file?: MediaUpload) {
+    if (!file) throw invalid('parameter_missing', 'Choose a photo.', 'file');
+    return this.warehouses.addPhoto(caller.customer, centre, id, file);
+  }
+
+  @Delete(':id/photos/:photo')
+  removePhoto(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string, @Param('id', ParseUUIDPipe) id: string, @Param('photo', ParseUUIDPipe) photo: string) {
+    return this.warehouses.removePhoto(caller.customer, centre, id, photo);
+  }
+
+  @Get(':id/photos/:photo')
+  async photo(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string, @Param('id', ParseUUIDPipe) id: string, @Param('photo', ParseUUIDPipe) photo: string, @Res() res: Response) {
+    sendPhoto(res, await this.warehouses.centrePhoto(caller.customer, centre, id, photo));
   }
 
   /** The collector's pickup code: never stored for replay (each try counts). */

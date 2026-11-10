@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, errorMessage, Field, FilterSelect, formatDate, Input, PageHeader, type Column } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, Dialog, errorMessage, Field, FilterSelect, formatDate, Input, PageHeader, type Column } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type ConnectAwaitingPickup,
@@ -15,7 +15,7 @@ import {
   useReceiveConnectPickupMutation,
   useScheduleConnectPickupMutation,
 } from "@bitocard/api-client/admin";
-import { MarketFilter } from "@/components/classifieds";
+import { MarketFilter, PrivatePhoto } from "@/components/classifieds";
 import { money } from "@/components/connect";
 import { UdozoShell } from "@/components/shell";
 
@@ -45,6 +45,7 @@ export default function ConnectPickupsPage() {
   const [receiving, setReceiving] = useState<{ pickup: ConnectPickup; arrived: Set<string>; restMissing: boolean } | null>(null);
   const [cancelling, setCancelling] = useState<ConnectPickup | null>(null);
   const [returning, setReturning] = useState<{ item: ConnectWarehouseItem; code: string } | null>(null);
+  const [viewing, setViewing] = useState<ConnectPickup | null>(null);
 
   const awaitingColumns: Array<Column<ConnectAwaitingPickup>> = [
     {
@@ -94,6 +95,11 @@ export default function ConnectPickupsPage() {
         <span className="grid gap-1">
           <Badge tone={statusTones[row.status]}>{statusLabels[row.status]}</Badge>
           <span className="text-xs text-muted">{row.items.filter(item => item.status !== "removed").length} items</span>
+          {row.photos?.length ? (
+            <button type="button" onClick={() => setViewing(row)} className="text-left text-xs font-semibold text-brand-600 hover:underline">
+              {row.photos.length === 1 ? "1 check-out photo" : `${row.photos.length} check-out photos`}
+            </button>
+          ) : null}
         </span>
       ),
     },
@@ -240,6 +246,16 @@ export default function ConnectPickupsPage() {
             What is not ticked never arrived: flag it missing
           </label>
         </ActionDialog>
+      ) : null}
+      {viewing ? (
+        <Dialog open onClose={() => setViewing(null)} title={`${viewing.number}: check-out photos`}>
+          <p className="mb-3 text-sm text-muted">What {viewing.centre.name} photographed as it handed the items to {viewing.collector}. Each view is recorded.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {viewing.photos.map((photo, index) => (
+              <PrivatePhoto key={photo.id} path={`/v1/admin/connect/pickups/${viewing.id}/photos/${photo.id}`} alt={`Check-out photo ${index + 1}`} />
+            ))}
+          </div>
+        </Dialog>
       ) : null}
       {cancelling ? (
         <ActionDialog open onClose={() => setCancelling(null)} title={`Cancel ${cancelling.number}?`} description="Its items wait for another pickup." confirmLabel="Cancel pickup" tone="danger" onConfirm={async reason => void (await cancel({ id: cancelling.id, reason }).unwrap())} />

@@ -218,6 +218,8 @@ export type ConnectPickup = {
   centre: { id: string; number: string; name: string; address: string };
   warehouse: ConnectWarehouse;
   items: Array<{ order_id: string; number: string; title: string; shelf: string | null; status: 'waiting' | 'handed_over' | 'received' | 'missing' | 'removed'; handed_over_at: string | null; received_at: string | null }>;
+  /** Check-out photos the centre took at the hand-over (private: read with `/v1/admin/connect/pickups/<id>/photos/<photo>`). */
+  photos: Array<{ id: string; content_type: string; width: number | null; height: number | null; created_at: string }>;
   collected_at: string | null;
   delivered_at: string | null;
   cancelled_at: string | null;

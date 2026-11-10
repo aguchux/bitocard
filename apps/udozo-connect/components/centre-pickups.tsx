@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
-import { handOverPickup } from "@/lib/centre-actions";
-import { day, type FinalReturnAddress, type Pickup, pickupStatusWords } from "@/lib/centres";
+import { useId, useRef, useState, useTransition } from "react";
+import { compressImage } from "@bitocard/ui/image";
+import { handOverPickup, removePickupPhoto } from "@/lib/centre-actions";
+import { day, type FinalReturnAddress, type Pickup, pickupPhotoUrl, pickupStatusWords } from "@/lib/centres";
 import { useConfirm } from "./confirm-dialog";
 import { input, label, Panel, primary, Problem } from "./centre-ui";
 
@@ -30,8 +31,9 @@ export function FraPanel({ fra }: { fra: FinalReturnAddress }) {
 }
 
 /**
- * One pickup: the items Udozo's collector takes, ticked as they are handed over, then the collector's pickup code (the
- * centre's proof it gave them to Udozo). Items left unticked stay for the next pickup.
+ * One pickup: the items Udozo's collector takes, ticked as they are handed over, check-out photos of what leaves (at
+ * least one), then the collector's pickup code (the centre's proof it gave them to Udozo). Items left unticked stay for
+ * the next pickup.
  */
 export function PickupCard({ centre, pickup }: { centre: string; pickup: Pickup }) {
   const router = useRouter();
@@ -41,7 +43,34 @@ export function PickupCard({ centre, pickup }: { centre: string; pickup: Pickup 
   const [code, setCode] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, start] = useTransition();
+  const [photos, setPhotos] = useState(pickup.photos ?? []);
+  const [sending, setSending] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
   const [confirm, dialog] = useConfirm();
+  const addPhoto = async (chosen: File) => {
+    setSending(true);
+    setProblem(null);
+    try {
+      const prepared = await compressImage(chosen).catch(() => chosen);
+      const body = new FormData();
+      body.append("file", prepared, chosen.name || "photo.jpg");
+      const res = await fetch(`/api/centres/${centre}/pickups/${pickup.id}/photos`, { method: "POST", body, credentials: "same-origin" });
+      const json = (await res.json().catch(() => null)) as { pickup?: Pickup; error?: { message?: string } } | null;
+      if (res.ok && json?.pickup) setPhotos(json.pickup.photos);
+      else setProblem(json?.error?.message ?? "The photo could not be added. Try again.");
+    } catch {
+      setProblem("The photo could not be sent. Check your connection and try again.");
+    } finally {
+      setSending(false);
+      if (file.current) file.current.value = "";
+    }
+  };
+  const removePhoto = (photo: string) =>
+    start(async () => {
+      const result = await removePickupPhoto(centre, pickup.id, photo);
+      if (!result.ok) return setProblem(result.message);
+      setPhotos(result.data.photos);
+    });
   const toggle = (id: string) =>
     setGiven(current => {
       const next = new Set(current);
@@ -89,6 +118,38 @@ export function PickupCard({ centre, pickup }: { centre: string; pickup: Pickup 
               </li>
             ))}
           </ul>
+          <div className="mt-3">
+            <p className={label}>Check-out photos</p>
+            <p className="text-sm text-slate-600">Photograph what you give the collector, with its labels where you can: they are the record of what left the centre.</p>
+            {photos.length ? (
+              <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {photos.map((photo, index) => (
+                  <li key={photo.id} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a private photo read through this site's server */}
+                    <img src={pickupPhotoUrl(centre, pickup.id, photo.id)} alt={`Check-out photo ${index + 1}`} className="aspect-square w-full rounded-xl object-cover" />
+                    <button type="button" disabled={busy} onClick={() => removePhoto(photo.id)} className="absolute right-1 top-1 rounded-full bg-white/90 px-2 text-xs font-semibold text-navy-900">
+                      Remove<span className="sr-only"> photo {index + 1}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <input
+              ref={file}
+              type="file"
+              accept="image/jpeg,image/png"
+              capture="environment"
+              className="sr-only"
+              aria-label="Add a check-out photo"
+              onChange={event => {
+                const chosen = event.target.files?.[0];
+                if (chosen) void addPhoto(chosen);
+              }}
+            />
+            <button type="button" disabled={sending || photos.length >= 8} onClick={() => file.current?.click()} className="mt-2 min-h-11 rounded-xl border border-navy-300 px-4 font-semibold text-navy-900 disabled:opacity-60">
+              {sending ? "Sending…" : "Add a photo"}
+            </button>
+          </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
               <label htmlFor={`${ids}-code`} className={label}>
@@ -96,10 +157,11 @@ export function PickupCard({ centre, pickup }: { centre: string; pickup: Pickup 
               </label>
               <input id={`${ids}-code`} inputMode="numeric" autoComplete="off" maxLength={7} value={code} onChange={event => setCode(event.target.value)} className={input} />
             </div>
-            <button type="button" disabled={busy || !given.size} onClick={handOver} className={primary}>
+            <button type="button" disabled={busy || !given.size || !photos.length} onClick={handOver} className={primary}>
               Hand over
             </button>
           </div>
+          {!photos.length ? <p className="mt-2 text-sm text-slate-600">Add a check-out photo before you hand over.</p> : null}
         </>
       ) : (
         <ul className="mt-3 grid gap-1 text-sm">

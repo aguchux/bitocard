@@ -256,8 +256,13 @@ export type Pickup = {
   status: "scheduled" | "collected" | "delivered" | "cancelled";
   warehouse: Warehouse;
   items: PickupItem[];
+  /** Check-out photos of what was handed over (at least one before the hand-over). */
+  photos: PickupPhoto[];
   collected_at: string | null;
 };
+export type PickupPhoto = { id: string; content_type: string; width: number | null; height: number | null; created_at: string };
+/** Where the centre's people see a pickup's photo: this site's own server, with their session. */
+export const pickupPhotoUrl = (centre: string, pickup: string, photo: string) => `/api/centres/${centre}/pickups/${pickup}/photos/${photo}`;
 export type FinalReturnAddress = { warehouse: Warehouse | null; awaiting_pickup: number; next_pickup: { id: string; number: string; day: string; collector: string } | null };
 export type Pickups = { object: "list"; data: Pickup[]; final_return_address: FinalReturnAddress };
 

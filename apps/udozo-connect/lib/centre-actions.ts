@@ -179,6 +179,12 @@ export async function moveEarnings(id: string, mode: "live" | "test", currency: 
   return answer(await customerApi<Earnings>("POST", `/v1/connect/centres/${id}/earnings/move`, { mode, currency, amount }));
 }
 
+/** Takes back a check-out photo before the hand-over (a blurred one, the wrong item). */
+export async function removePickupPhoto(id: string, pickup: string, photo: string): Promise<CentreResult<Pickup>> {
+  if (![id, pickup, photo].every(value => uuid.test(value))) return unknown;
+  return answer(await customerApi<Pickup>("DELETE", `/v1/connect/centres/${id}/pickups/${pickup}/photos/${photo}`));
+}
+
 /** Hands the ticked items to Udozo's collector against their pickup code. Never stored for replay. */
 export async function handOverPickup(id: string, pickup: string, code: string, orders: string[]): Promise<CentreResult<Pickup>> {
   if (!uuid.test(id) || !uuid.test(pickup) || orders.some(order => !uuid.test(order))) return unknown;

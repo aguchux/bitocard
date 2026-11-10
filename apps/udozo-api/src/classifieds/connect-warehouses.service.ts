@@ -1,15 +1,21 @@
-import { randomInt, timingSafeEqual } from 'node:crypto';
+import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { checkDocument, maxDocumentBytes } from '../kyc/files.js';
+import { KycStorage } from '../kyc/storage.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import type { MediaUpload } from './media.service.js';
 import { SafePayService } from './safe-pay.service.js';
 
 const dayMs = 86_400_000;
 const codeTries = 5;
+/** Check-out photos a pickup holds, and the least its hand-over needs. */
+export const maxPickupPhotos = 8;
+export const minPickupPhotos = 1;
 const unknown = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'centre_unknown', 'No such centre.');
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
 const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
@@ -26,6 +32,7 @@ const pickupInclude = {
   centre: { select: { id: true, number: true, name: true, address: true } },
   warehouse: { include: warehouseInclude },
   items: { orderBy: { id: 'asc' as const }, include: { order: { select: { id: true, number: true, listing: { select: { title: true } }, connectShelf: { select: { code: true } } } } } },
+  photos: { orderBy: { createdAt: 'asc' as const }, select: { id: true, contentType: true, width: true, height: true, createdAt: true } },
 } satisfies Prisma.ConnectPickupInclude;
 type PickupRow = Prisma.ConnectPickupGetPayload<{ include: typeof pickupInclude }>;
 
@@ -50,6 +57,7 @@ export class ConnectWarehousesService {
     private readonly safePay: SafePayService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly storage: KycStorage,
   ) {}
 
   // ---- Warehouses and Final Return Addresses ----
@@ -180,6 +188,8 @@ export class ConnectWarehousesService {
       ...(withCode ? { code: row.status === 'scheduled' ? this.safePay.unseal(row.pickupCode) : null } : {}),
       centre: { id: row.centre.id, number: centreNumber(row.centre.number), name: row.centre.name, address: row.centre.address },
       warehouse: this.presentWarehouse(row.warehouse),
+      /** Check-out photos the centre took at the hand-over (read through the API: they are private). */
+      photos: row.photos.map(photo => ({ id: photo.id, content_type: photo.contentType, width: photo.width, height: photo.height, created_at: photo.createdAt.toISOString() })),
       items: row.items.map(item => ({ order_id: item.order.id, number: orderNumber(item.order.number), title: item.order.listing.title ?? 'An item', shelf: item.order.connectShelf?.code ?? null, status: item.status, handed_over_at: item.handedOverAt?.toISOString() ?? null, received_at: item.receivedAt?.toISOString() ?? null })),
       collected_at: row.collectedAt?.toISOString() ?? null,
       delivered_at: row.deliveredAt?.toISOString() ?? null,
@@ -324,6 +334,8 @@ export class ConnectWarehousesService {
     const row = await this.prisma.connectPickup.findUnique({ where: { id }, include: { items: true } });
     if (!row || row.centreId !== centreId) throw notFound('pickup');
     if (row.status !== 'scheduled') throw conflict('pickup_not_scheduled', 'This pickup was already collected or cancelled.');
+    // The record of what left the centre: photographed before the code is taken, so a refusal never uses a try.
+    if ((await this.prisma.connectPickupPhoto.count({ where: { pickupId: id } })) < minPickupPhotos) throw conflict('checkout_photos_required', 'Photograph what you give the collector first: the items, and their labels where you can.');
     const waiting = new Set(row.items.filter(item => item.status === 'waiting').map(item => item.orderId));
     if (!input.order_ids.length || input.order_ids.some(orderId => !waiting.has(orderId))) throw invalid('parameter_invalid', 'Tick the items you give the collector.', 'order_ids');
     const tried = await this.prisma.connectPickup.updateMany({ where: { id, status: 'scheduled', codeAttempts: { lt: codeTries } }, data: { codeAttempts: { increment: 1 } } });
@@ -349,5 +361,59 @@ export class ConnectWarehousesService {
     await this.inbox.admins('admin.connect.alert', { subject: `connect_pickup_collected:${id}`, title: `Pickup ${pickupNumber(row.number)} collected`, body: `${given_.length === 1 ? '1 item' : `${given_.length} items`} on the way to the warehouse.`, link: `/connect/pickups/${id}` });
     const full = await this.prisma.connectPickup.findUniqueOrThrow({ where: { id }, include: pickupInclude });
     return this.presentPickup(full, false);
+  }
+
+  // ---- Check-out photos ----
+
+  /** The centre photographs what it gives the collector, before the hand-over: JPEG or PNG, sealed, at most 8. */
+  async addPhoto(customer: CustomerWithStore, centreId: string, id: string, file: MediaUpload) {
+    const member = await this.member(customer, centreId);
+    const row = await this.prisma.connectPickup.findUnique({ where: { id }, select: { id: true, centreId: true, status: true } });
+    if (!row || row.centreId !== centreId) throw notFound('pickup');
+    if (row.status !== 'scheduled') throw conflict('pickup_not_scheduled', 'Photos are added before the hand-over.');
+    if (!this.storage.configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'storage_not_configured', 'Photos cannot be added yet.');
+    if (file.size > maxDocumentBytes) throw invalid('file_too_large', 'Photos can be at most 4 MB.', 'file');
+    const checked = checkDocument(file.buffer, file.mimetype, false);
+    if ('problem' in checked) throw invalid('file_invalid', checked.problem, 'file');
+    if (checked.contentType === 'application/pdf') throw invalid('file_invalid', 'Send a photo (JPEG or PNG).', 'file');
+    if ((await this.prisma.connectPickupPhoto.count({ where: { pickupId: id } })) >= maxPickupPhotos) throw conflict('too_many_files', `A pickup can hold ${maxPickupPhotos} photos.`);
+    const objectKey = this.storage.shopChatKey(`pickup-${id}`, randomUUID());
+    await this.storage.put(objectKey, checked.bytes);
+    await this.prisma.connectPickupPhoto.create({ data: { pickupId: id, objectKey, contentType: checked.contentType, size: checked.bytes.length, width: checked.width, height: checked.height, takenById: member.customerId } });
+    return this.presentPickup(await this.prisma.connectPickup.findUniqueOrThrow({ where: { id }, include: pickupInclude }), false);
+  }
+
+  /** A photo not yet handed over may be taken back (a blurred one, the wrong item). */
+  async removePhoto(customer: CustomerWithStore, centreId: string, id: string, photoId: string) {
+    await this.member(customer, centreId);
+    const photo = await this.prisma.connectPickupPhoto.findFirst({ where: { id: photoId, pickupId: id, pickup: { centreId } }, include: { pickup: { select: { status: true } } } });
+    if (!photo) throw notFound('photo');
+    if (photo.pickup.status !== 'scheduled') throw conflict('pickup_not_scheduled', 'The photos of a pickup handed over are its record: they stay.');
+    await this.prisma.connectPickupPhoto.delete({ where: { id: photo.id } });
+    await this.storage.remove(photo.objectKey).catch(() => undefined);
+    return this.presentPickup(await this.prisma.connectPickup.findUniqueOrThrow({ where: { id }, include: pickupInclude }), false);
+  }
+
+  private async photoFile(pickupId: string, photoId: string) {
+    const photo = await this.prisma.connectPickupPhoto.findFirst({ where: { id: photoId, pickupId } });
+    if (!photo) throw notFound('photo');
+    const bytes = await this.storage.get(photo.objectKey);
+    if (!bytes) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'file_gone', 'This photo is no longer kept.');
+    return { contentType: photo.contentType, bytes, name: `checkout.${photo.contentType === 'image/png' ? 'png' : 'jpg'}` };
+  }
+
+  /** One of a pickup's photos, for the centre's people. */
+  async centrePhoto(customer: CustomerWithStore, centreId: string, id: string, photoId: string) {
+    await this.member(customer, centreId);
+    const row = await this.prisma.connectPickup.findUnique({ where: { id }, select: { centreId: true } });
+    if (!row || row.centreId !== centreId) throw notFound('pickup');
+    return this.photoFile(id, photoId);
+  }
+
+  /** One of a pickup's photos, for Udozo's team (audited: they are evidence of what left the centre). */
+  async adminPhoto(adminId: string | null, id: string, photoId: string) {
+    const file = await this.photoFile(id, photoId);
+    await this.audit.record({ actorId: adminId, action: 'connect_pickup.photo_viewed', targetType: 'connect_pickup', targetId: id, before: null, after: { photo_id: photoId } });
+    return file;
   }
 }

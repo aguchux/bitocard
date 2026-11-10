@@ -27,6 +27,7 @@ const actions = vi.hoisted(() => ({
   handBack: vi.fn(),
   recordStockCheck: vi.fn(),
   handOverPickup: vi.fn(),
+  removePickupPhoto: vi.fn(),
   moveEarnings: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
@@ -414,6 +415,7 @@ describe("pickups", () => {
     status: "scheduled" as const,
     warehouse,
     collected_at: null,
+    photos: [{ id: "ph1", content_type: "image/jpeg", width: 1600, height: 1200, created_at: "2026-11-12T09:00:00.000Z" }],
     items: [
       { order_id: "o1", number: "SP-41", title: "Gas cooker", shelf: "A-01", status: "waiting" as const, handed_over_at: null, received_at: null },
       { order_id: "o2", number: "SP-42", title: "Kettle", shelf: "A-02", status: "waiting" as const, handed_over_at: null, received_at: null },
@@ -430,6 +432,19 @@ describe("pickups", () => {
     await act(async () => dialogButton("Hand over").click());
     expect(actions.handOverPickup).toHaveBeenCalledWith("c1", "pk1", "482910", ["o1"]);
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("waits for a check-out photo, shows each through this site, and takes one back", async () => {
+    const host = mount(createElement(PickupCard, { centre: "c1", pickup: { ...pickup, photos: [] } }));
+    act(() => type(host.querySelector("input[inputmode=numeric]") as HTMLInputElement, "482910"));
+    expect(button(host, "Hand over")!.disabled).toBe(true);
+    expect(host.textContent).toContain("Add a check-out photo before you hand over");
+    const shown = mount(createElement(PickupCard, { centre: "c1", pickup }));
+    expect(shown.querySelector("img")!.getAttribute("src")).toBe("/api/centres/c1/pickups/pk1/photos/ph1");
+    actions.removePickupPhoto.mockResolvedValue({ ok: true, data: { ...pickup, photos: [] } });
+    await act(async () => button(shown, "Remove photo 1")!.click());
+    expect(actions.removePickupPhoto).toHaveBeenCalledWith("c1", "pk1", "ph1");
+    expect(shown.querySelector("img")).toBeNull();
   });
 
   it("says where abandoned items go and when Udozo comes", () => {

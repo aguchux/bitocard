@@ -170,6 +170,8 @@ async function atWarehouse(hub) {
   const item = await inLossOfCare(hub);
   await services.warehouses.abandon();
   const pickup = (await admin.post('/v1/admin/connect/pickups', { centre_id: hub.id, day: today(), collector: 'Tunde' })).json;
+  // The centre's check-out photo (its bytes are not needed here).
+  await prisma.connectPickupPhoto.create({ data: { pickupId: pickup.id, objectKey: `test/pickup/${pickup.id}`, contentType: 'image/jpeg', size: 1000, takenById: hub.staff.id } });
   await hub.staff.post(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/hand-over`, { code: pickup.code, order_ids: [item.order.id] });
   await admin.post(`/v1/admin/connect/pickups/${pickup.id}/receive`, { order_ids: [item.order.id] });
   return { ...item, warehouse };

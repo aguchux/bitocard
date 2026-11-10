@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
+import { adminClient, confirmMobile, fakeService, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
 let server;
 let prisma;
@@ -12,8 +12,25 @@ let admin;
 let services;
 let place;
 
+let bucket;
+const objects = new Map();
+
 before(async () => {
-  server = await startApp({ env: { APP_PRODUCT: 'udozo' } });
+  // The private bucket check-out photos are sealed in.
+  bucket = await fakeService(call => {
+    const key = decodeURIComponent(new URL(call.url, 'http://x').pathname);
+    if (call.method === 'PUT') {
+      objects.set(key, call.raw);
+      return { status: 200, body: '' };
+    }
+    if (call.method === 'GET') return objects.has(key) ? { status: 200, headers: { 'content-type': 'application/octet-stream' }, body: objects.get(key) } : { status: 404, body: '' };
+    if (call.method === 'DELETE') {
+      objects.delete(key);
+      return { status: 204, body: '' };
+    }
+    return { status: 405, body: '' };
+  });
+  server = await startApp({ env: { APP_PRODUCT: 'udozo', KYC_SPACES_KEY: 'kyc-key', KYC_SPACES_SECRET: 'kyc-secret', KYC_SPACES_BUCKET: 'kyc-private', KYC_SPACES_ENDPOINT: bucket.url } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   services = {
     ledger: server.app.get((await import('../dist/ledger/ledger.service.js')).LedgerService),
@@ -35,11 +52,14 @@ before(async () => {
   place = { tvs: tvs.id, ikeja, gwarinpa };
 });
 
-after(() => server?.close());
+after(async () => {
+  await server?.close();
+  await bucket?.close();
+});
 
 function storeServer() {
   let token = null;
-  const request = async (method, path, body) => {
+  const request = async (method, path, body, form) => {
     const res = await fetch(`${server.base}${path}`, {
       method,
       headers: {
@@ -47,14 +67,25 @@ function storeServer() {
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(method === 'POST' ? { 'idempotency-key': `connect-${Date.now()}-${Math.random()}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
+    const type = res.headers.get('content-type') ?? '';
+    if (!type.includes('json')) return { status: res.status, type, bytes: Buffer.from(await res.arrayBuffer()) };
     const text = await res.text();
     const json = text ? JSON.parse(text) : null;
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
+  return {
+    get: path => request('GET', path),
+    post: (path, body = {}) => request('POST', path, body),
+    delete: path => request('DELETE', path),
+    upload: (path, bytes, type = 'image/jpeg') => {
+      const form = new FormData();
+      form.append('file', new Blob([bytes], { type }), 'photo.jpg');
+      return request('POST', path, undefined, form);
+    },
+  };
 }
 
 let counter = 0;
@@ -189,10 +220,31 @@ describe('Abandoned items, pickups and warehouses', () => {
     assert.equal(seen.data[0].id, pickup.id);
     assert.equal('code' in seen.data[0], false);
     assert.equal(seen.final_return_address.warehouse.name, 'Udozo Lagos warehouse');
+    // Check-out photos first: with none, the hand-over is refused before any code is tried.
+    const bare = await hub.staff.post(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/hand-over`, { code: pickup.code, order_ids: [item.order.id] });
+    assert.equal(bare.json.error.code, 'checkout_photos_required');
+    assert.equal((await prisma.connectPickup.findUniqueOrThrow({ where: { id: pickup.id } })).codeAttempts, 0, 'no try used');
+    const photographed = await hub.staff.upload(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos`, jpeg());
+    assert.equal(photographed.status, 201, JSON.stringify(photographed.json));
+    assert.equal(photographed.json.photos.length, 1);
+    const blurred = (await hub.staff.upload(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos`, jpeg())).json.photos[1];
+    assert.equal((await hub.staff.delete(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos/${blurred.id}`)).json.photos.length, 1, 'taken back before the hand-over');
+    assert.equal((await hub.staff.upload(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos`, Buffer.from('not a photo'))).json.error.code, 'file_invalid');
+    const shot = photographed.json.photos[0];
+    const seenPhoto = await hub.staff.get(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos/${shot.id}`);
+    assert.deepEqual([seenPhoto.status, seenPhoto.type], [200, 'image/jpeg']);
+    assert.ok(!seenPhoto.bytes.includes(Buffer.from('GPSDATA')), 'its metadata stripped');
+    const stranger = await customer('Not Staff');
+    assert.equal((await stranger.get(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos/${shot.id}`)).status, 404);
     const wrong = await hub.staff.post(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/hand-over`, { code: pickup.code === '000000' ? '111111' : '000000', order_ids: [item.order.id] });
     assert.equal(wrong.json.error.code, 'pickup_code_wrong');
     const handed = (await hub.staff.post(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/hand-over`, { code: pickup.code, order_ids: [item.order.id] })).json;
     assert.equal(handed.status, 'collected', JSON.stringify(handed));
+    assert.equal((await hub.staff.delete(`/v1/connect/centres/${hub.id}/pickups/${pickup.id}/photos/${shot.id}`)).json.error.code, 'pickup_not_scheduled', 'the record stays');
+    assert.equal((await admin.get(`/v1/admin/connect/pickups/${pickup.id}`)).json.photos.length, 1, 'Udozo sees the photos');
+    const adminFile = await services.warehouses.adminPhoto(null, pickup.id, shot.id);
+    assert.equal(adminFile.contentType, 'image/jpeg');
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'connect_pickup.photo_viewed', targetId: pickup.id } }), 'viewing it is audited');
     const moving = await prisma.classifiedOrder.findUniqueOrThrow({ where: { id: item.order.id } });
     assert.equal(moving.connectPlace, 'in_transit');
     assert.ok(moving.connectWithUdozoAt);
@@ -239,3 +291,13 @@ describe('Abandoned items, pickups and warehouses', () => {
     assert.equal((await admin.post(`/v1/admin/connect/pickups/${pickup.id}/cancel`, { reason: 'Again' })).json.error.code, 'pickup_not_scheduled');
   });
 });
+
+/** A small JPEG with an EXIF block that must not survive. */
+function jpeg() {
+  const u16 = value => Buffer.from([value >> 8, value & 0xff]);
+  const exif = Buffer.concat([Buffer.from('Exif\0\0'), Buffer.from('GPSDATA-LAGOS')]);
+  const app1 = Buffer.concat([Buffer.from([0xff, 0xe1]), u16(exif.length + 2), exif]);
+  const sof = Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x20, 0x00, 0x30, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00]);
+  const sos = Buffer.from([0xff, 0xda, 0x00, 0x0c, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3f, 0x00]);
+  return Buffer.concat([Buffer.from([0xff, 0xd8]), app1, sof, sos, Buffer.from(`pixels-${Math.random()}`), Buffer.from([0xff, 0xd9])]);
+}
