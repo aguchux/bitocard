@@ -167,6 +167,28 @@ export class ConnectChargesService {
   }
 
   /** Marks the buyer's owed demurrage paid out of their refund (an item they never collected), in that refund's transaction. */
+  /**
+   * What an auction's sale pays of the seller's storage, oldest day first, up to what the sale raised: the charges it
+   * covers (to mark paid with `settleFromRefund` in the sale's transaction) and the shares they credit, the days after
+   * the hand-over to Udozo all Udozo's.
+   */
+  async saleCover(orderId: string, available: bigint) {
+    const order = await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: orderId }, select: { country: true, currency: true, connectWithUdozoAt: true, connectCentre: { select: { partnerId: true } } } });
+    const { rows } = await this.owed(orderId, 'seller');
+    const rates = await this.rates(order.country);
+    const udozoFrom = order.connectWithUdozoAt ? new Date(`${order.connectWithUdozoAt.toISOString().slice(0, 10)}T00:00:00.000Z`) : null;
+    const ids: string[] = [];
+    const lines: Line[] = [];
+    let covered = 0n;
+    for (const row of rows) {
+      if (covered + row.amountMinor > available || !order.connectCentre) break;
+      covered += row.amountMinor;
+      ids.push(row.id);
+      lines.push(...this.shareLines(row.amountMinor, order.currency, order.connectCentre.partnerId, udozoFrom && row.day >= udozoFrom ? 0 : rates.centreShareBps));
+    }
+    return { ids, lines, covered };
+  }
+
   async settleFromRefund(tx: Prisma.TransactionClient, ids: string[]) {
     if (ids.length) await tx.connectCharge.updateMany({ where: { id: { in: ids }, status: 'owed' }, data: { status: 'paid', paidAt: new Date() } });
   }

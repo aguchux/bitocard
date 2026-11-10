@@ -1074,6 +1074,7 @@ enum AccountKind {
   /// A Connect Centre partner's earnings: their centre's share of Connect fees on items handed over. Their own; never
   /// below zero.
   connect_centre_earnings
+  connect_auction_held
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -2845,6 +2846,8 @@ model Customer {
   connectAgreements         ConnectAgreementAcceptance[]
   connectCentres            ConnectCentre[]           @relation("ConnectCentrePartner")
   connectMemberships        ConnectCentreMember[]
+  connectAuctionsWon        ConnectAuction[]          @relation("ConnectAuctionBuyer")
+  connectAuctionBids        ConnectAuctionBid[]
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
@@ -5779,6 +5782,7 @@ model ClassifiedOrder {
   connectStockItems        ConnectStockCheckItem[]
   connectWarehouse         ConnectWarehouse?  @relation(fields: [connectWarehouseId], references: [id], onDelete: SetNull)
   connectPickupItems       ConnectPickupItem[]
+  connectAuctions          ConnectAuction[]
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
@@ -7247,6 +7251,11 @@ model ConnectSettings {
   abandonedAfterDays Int @default(30) @map("abandoned_after_days")
   auctionAfterDays   Int @default(90) @map("auction_after_days")
   claimDays          Int @default(90) @map("claim_days")
+  /// Auctions: each bid at least this share and this amount above the last, a late bid extending the end by these minutes, the winner paying within these hours.
+  auctionStepBps       Int    @default(500) @map("auction_step_bps")
+  auctionStepMinMinor  BigInt @default(50000) @map("auction_step_min_minor")
+  auctionExtendMinutes Int    @default(5) @map("auction_extend_minutes")
+  auctionPayHours      Int    @default(48) @map("auction_pay_hours")
   updatedAt    DateTime @updatedAt @map("updated_at")
   /// The admin who last changed them (no foreign key: admins are never deleted).
   updatedById  String?  @map("updated_by_id") @db.Uuid
@@ -7618,6 +7627,7 @@ model ConnectWarehouse {
   centres     ConnectCentre[]
   orders      ClassifiedOrder[]
   pickups     ConnectPickup[]
+  auctions    ConnectAuction[]
 
   @@index([country])
   @@map("connect_warehouses")
@@ -7667,4 +7677,63 @@ model ConnectPickupItem {
   @@unique([pickupId, orderId])
   @@index([orderId])
   @@map("connect_pickup_items")
+}
+
+/// A Udozo auction lot: an abandoned item at a Udozo warehouse, sold by Udozo on udozo.com to cover the storage owed.
+model ConnectAuction {
+  id             String              @id @default(uuid()) @db.Uuid
+  number         Int                 @unique @default(autoincrement())
+  orderId        String              @map("order_id") @db.Uuid
+  country        String              @db.Char(2)
+  currency       String              @db.Char(3)
+  title          String
+  description    String
+  photos         String[]            @default([])
+  warehouseId    String              @map("warehouse_id") @db.Uuid
+  startPriceMinor BigInt             @map("start_price_minor")
+  /// The seller's storage owed when listed, and what Udozo spent selling and moving it (never the pickup).
+  owedMinor      BigInt              @map("owed_minor")
+  costsMinor     BigInt              @default(0) @map("costs_minor")
+  startsAt       DateTime            @map("starts_at")
+  endsAt         DateTime            @map("ends_at")
+  /// scheduled, live, awaiting_payment, sold, unsold or cancelled.
+  status         String              @default("scheduled")
+  offeredBidId   String?             @map("offered_bid_id") @db.Uuid
+  payBy          DateTime?           @map("pay_by")
+  buyerId        String?             @map("buyer_id") @db.Uuid
+  saleMinor      BigInt?             @map("sale_minor")
+  paidAt         DateTime?           @map("paid_at")
+  /// What the sale left over after what was owed and the costs: the seller's on a claim.
+  leftOverMinor  BigInt?             @map("left_over_minor")
+  /// Sealed; the buyer shows it at the warehouse to collect the lot.
+  collectionCode String?             @map("collection_code")
+  collectedAt    DateTime?           @map("collected_at")
+  cancelReason   String?             @map("cancel_reason")
+  createdById    String              @map("created_by_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  order          ClassifiedOrder     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  warehouse      ConnectWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  buyer          Customer?           @relation("ConnectAuctionBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  bids           ConnectAuctionBid[]
+
+  @@index([country, status, endsAt])
+  @@map("connect_auctions")
+}
+
+/// A bid on a Udozo auction lot.
+model ConnectAuctionBid {
+  id          String         @id @default(uuid()) @db.Uuid
+  auctionId   String         @map("auction_id") @db.Uuid
+  bidderId    String         @map("bidder_id") @db.Uuid
+  amountMinor BigInt         @map("amount_minor")
+  /// active, offered, lapsed or won.
+  status      String         @default("active")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  auction     ConnectAuction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder      Customer       @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId, amountMinor])
+  @@index([bidderId])
+  @@map("connect_auction_bids")
 }

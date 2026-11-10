@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, PackageSearch, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserCheck, Undo2, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Gavel, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, PackageSearch, Paintbrush, Percent, PlugZap, ReceiptText, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, UserCheck, Undo2, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -72,6 +72,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
       { label: "Missing items", href: "/connect/missing", icon: PackageSearch },
       { label: "Pickups", href: "/connect/pickups", icon: Package },
       { label: "Warehouses", href: "/connect/warehouses", icon: Building2 },
+      { label: "Auctions", href: "/connect/auctions", icon: Gavel },
       { label: "Reports", href: "/connect/reports", icon: ChartNoAxesColumn },
     ],
   },

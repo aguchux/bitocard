@@ -75,6 +75,10 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
   const [abandonDays, setAbandonDays] = useState(String(settings.abandoned_after_days));
   const [auctionDays, setAuctionDays] = useState(String(settings.auction_after_days));
   const [claimDays, setClaimDays] = useState(String(settings.claim_days));
+  const [stepPct, setStepPct] = useState(String(settings.auction_step_bps / 100));
+  const [stepMin, setStepMin] = useState(toMajor(settings.auction_step_min, settings.currency));
+  const [extendMinutes, setExtendMinutes] = useState(String(settings.auction_extend_minutes));
+  const [payHours, setPayHours] = useState(String(settings.auction_pay_hours));
   const [demurrage, setDemurrage] = useState(String(settings.demurrage_bps / 100));
   const [penalty, setPenalty] = useState(String(settings.loc_penalty_bps / 100));
   const [penaltyCap, setPenaltyCap] = useState(toMajor(settings.loc_penalty_cap, settings.currency));
@@ -104,6 +108,13 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
     const auctioned = whole(auctionDays, 1, 730);
     const claims = whole(claimDays, 1, 365);
     if (abandoned === null || auctioned === null || claims === null) return setProblem("Give the days to abandon (1 to 365), to auction (1 to 730) and to claim (1 to 365) as whole numbers.");
+    const stepBps = bpsOf(stepPct);
+    const stepLeast = toMinor(stepMin, settings.currency);
+    const extend = whole(extendMinutes, 0, 60);
+    const pay = whole(payHours, 1, 336);
+    if (stepBps === null || stepBps < 1 || stepBps > 5000) return setProblem("Give the bid step as 0.01 to 50% of the bid.");
+    if (stepLeast === null) return setProblem(`Give the least bid step in ${settings.currency}, for example 500.`);
+    if (extend === null || pay === null) return setProblem("Give the late-bid extension as 0 to 60 minutes and the time to pay as 1 to 336 hours.");
     const change = {
       country: settings.country,
       centre_share_bps: centreShare,
@@ -117,6 +128,10 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
       abandoned_after_days: abandoned,
       auction_after_days: auctioned,
       claim_days: claims,
+      auction_step_bps: stepBps,
+      auction_step_min: stepLeast,
+      auction_extend_minutes: extend,
+      auction_pay_hours: pay,
     };
     let done;
     if (kind === "") done = await save({ ...change, fee_kind: null }).unwrap().catch(() => null);
@@ -190,6 +205,18 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
             </Field>
             <Field label="Days to claim what an auction left over" htmlFor={`${id}-claim`} hint="From the sale; unclaimed money is Udozo's.">
               <Input id={`${id}-claim`} inputMode="numeric" value={claimDays} onChange={event => setClaimDays(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Each bid at least (% above the last)" htmlFor={`${id}-step`}>
+              <Input id={`${id}-step`} inputMode="decimal" value={stepPct} onChange={event => setStepPct(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label={`And at least (${settings.currency} more)`} htmlFor={`${id}-step-min`}>
+              <Input id={`${id}-step-min`} inputMode="decimal" value={stepMin} onChange={event => setStepMin(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="A late bid extends the end by (minutes)" htmlFor={`${id}-extend`} hint="A bid in the last minutes moves the end to this long after it; 0 for never.">
+              <Input id={`${id}-extend`} inputMode="numeric" value={extendMinutes} onChange={event => setExtendMinutes(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Hours the winner has to pay" htmlFor={`${id}-pay`} hint="Then the lot is offered to the next bidder.">
+              <Input id={`${id}-pay`} inputMode="numeric" value={payHours} onChange={event => setPayHours(event.target.value)} className="max-w-xs" />
             </Field>
             <Button type="submit" loading={state.isLoading}>
               Save Connect fee

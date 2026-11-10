@@ -23,6 +23,7 @@ const { default: ReturnsPage } = await import("@/app/(console)/connect/returns/p
 const { default: MissingPage } = await import("@/app/(console)/connect/missing/page");
 const { default: WarehousesPage } = await import("@/app/(console)/connect/warehouses/page");
 const { default: PickupsPage } = await import("@/app/(console)/connect/pickups/page");
+const { default: AuctionsPage } = await import("@/app/(console)/connect/auctions/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -168,7 +169,7 @@ beforeEach(() => {
         const sent = body as { fee_kind: "percent" | "fixed" | null; fee_bps?: number; fee?: number; centre_share_bps: number; buyer_free_hours: number };
         fee = sent.fee_kind === "percent" ? { kind: "percent", bps: sent.fee_bps! } : sent.fee_kind === "fixed" ? { kind: "fixed", amount: sent.fee! } : null;
       }
-      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90 });
+      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48 });
     }
     if (path === "/v1/admin/connect/centres")
       return ok({
@@ -215,6 +216,19 @@ beforeEach(() => {
     if (path === "/v1/admin/connect/pickups") return ok(pickup);
     if (path === "/v1/admin/connect/pickups/pk2/receive") return ok({ ...collected, status: "delivered" });
     if (path === "/v1/admin/connect/warehouse-items") return ok({ object: "list", data: [{ object: "connect_warehouse_item", order_id: "o9", number: "SP-90", title: "Rice cooker", price: 1_500_000, currency: "NGN", warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, centre: { id: "cc1", name: "Ikeja Parcel Hub" }, return_id: "rt9", loss_of_care_at: "2026-09-01T00:00:00.000Z", abandoned_at: "2026-10-01T00:00:00.000Z", received_at: "2026-10-05T00:00:00.000Z" }] });
+    if (path === "/v1/admin/connect/auctions/eligible")
+      return ok({ object: "list", data: [{ order_id: "o9", number: "SP-90", title: "Rice cooker", price: 1_500_000, currency: "NGN", warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, owed: 2_400_000, auction_from: "2026-11-01T00:00:00.000Z", due: true }] });
+    if (path === "/v1/admin/connect/auctions" && input.method === "GET")
+      return ok({
+        object: "list",
+        data: [
+          auction({ id: "au1", number: "AU-000001", status: "scheduled" }),
+          auction({ id: "au2", number: "AU-000002", status: "sold", sale: 3_000_000, left_over: 600_000, paid_at: "2026-11-09T00:00:00.000Z", bids: [{ id: "b1", amount: 3_000_000, status: "won", at: "2026-11-08T00:00:00.000Z", bidder: { id: "c1", name: "Alice Bidder", email: "alice@example.com" } }] }),
+        ],
+      });
+    if (path === "/v1/admin/connect/auctions") return ok(auction({ id: "au3", status: "scheduled" }), 201);
+    if (path === "/v1/admin/connect/auctions/au1/cancel") return ok(auction({ id: "au1", status: "cancelled" }));
+    if (path === "/v1/admin/connect/auctions/au2/hand-over") return ok(auction({ id: "au2", status: "sold", collected_at: "2026-11-10T00:00:00.000Z" }));
     if (path === "/v1/admin/connect/returns/rt9/hand-back") return ok({ object: "connect_return", id: "rt9", status: "collected" });
     const status = /^\/v1\/admin\/connect\/centres\/cc1\/(pause|reinstate|close)$/.exec(path)?.[1];
     if (status && input.method === "POST") {
@@ -241,12 +255,15 @@ const shown = (children: React.ReactNode) =>
   );
 
 const openDialog = () => within(document.querySelector<HTMLElement>("dialog[open]")!);
+function auction(patch: Record<string, unknown>) {
+  return { object: "connect_auction", id: "au1", number: "AU-000001", ref: "1", status: "scheduled", country: "NG", currency: "NGN", title: "Rice cooker", order: { id: "o9", number: "SP-90" }, warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, start_price: 2_400_000, current_price: null, owed: 2_400_000, costs: 0, starts_at: "2026-11-11T10:00:00.000Z", ends_at: "2026-11-14T10:00:00.000Z", pay_by: null, sale: null, left_over: null, paid_at: null, collected_at: null, cancel_reason: null, bids: [], ...patch };
+}
 const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" && item.path.endsWith(suffix)).at(-1);
 
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/reports"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/auctions", "/connect/reports"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -362,7 +379,7 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "percent" } });
     fireEvent.change(screen.getByLabelText("Fee (% of shipping)"), { target: { value: "10" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48 }), slow);
     expect(await screen.findByText(/10% of the shipping charge/, {}, slow)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "fixed" } });
     fireEvent.change(screen.getByLabelText("Fee (NGN)"), { target: { value: "500" } });
@@ -370,7 +387,7 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Hours to answer a return"), { target: { value: "24" } });
     fireEvent.change(screen.getByLabelText("Penalty cap a day (NGN)"), { target: { value: "400" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90, auction_step_bps: 500, auction_step_min: 50000, auction_extend_minutes: 5, auction_pay_hours: 48 }), slow);
   });
 
   test("support cannot change the deposit or states", async () => {
@@ -521,6 +538,42 @@ describe("Connect", () => {
     fireEvent.change(openDialog().getByLabelText("Seller's return code"), { target: { value: "123456" } });
     fireEvent.click(openDialog().getByRole("button", { name: "Hand back" }));
     await waitFor(() => expect(lastSent("/connect/returns/rt9/hand-back")?.body).toEqual({ code: "123456" }), slow);
+  });
+
+  test("auctions: list an abandoned item at what is owed, cancel a lot nobody bid on, hand a sold one over", async () => {
+    shown(<AuctionsPage />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "List at auction" }, slow))[0]!);
+    const listing = openDialog();
+    expect((listing.getByLabelText("Starting price (NGN)") as HTMLInputElement).value).toBe("24000");
+    fireEvent.change(listing.getByLabelText("Costs of selling and moving it (NGN)"), { target: { value: "500" } });
+    fireEvent.change(listing.getByLabelText("Starting price (NGN)"), { target: { value: "24500" } });
+    fireEvent.click(listing.getByRole("button", { name: "List at auction" }));
+    await waitFor(() => expect(lastSent("/connect/auctions")?.body).toMatchObject({ order_id: "o9", start_price: 2_450_000, costs: 50_000 }), slow);
+    const created = lastSent("/connect/auctions")!.body as { starts_at: string; ends_at: string; below_owed?: boolean };
+    expect(new Date(created.starts_at).getTime()).toBeGreaterThan(Date.now() + 24 * 3_600_000);
+    expect(created.below_owed).toBeUndefined();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Cancel" }, slow))[0]!);
+    const cancelling = openDialog();
+    fireEvent.change(cancelling.getByRole("textbox"), { target: { value: "Photos wrong" } });
+    fireEvent.click(cancelling.getByRole("button", { name: "Cancel lot" }));
+    await waitFor(() => expect(lastSent("/connect/auctions/au1/cancel")?.body).toEqual({ reason: "Photos wrong" }), slow);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Hand over" }, slow))[0]!);
+    fireEvent.change(openDialog().getByLabelText("Buyer's collection code"), { target: { value: "654321" } });
+    fireEvent.click(openDialog().getByRole("button", { name: "Hand over" }));
+    await waitFor(() => expect(lastSent("/connect/auctions/au2/hand-over")?.body).toEqual({ code: "654321" }), slow);
+  });
+
+  test("support reads the lots and what a sale paid, without acting", async () => {
+    roles = ["support"];
+    shown(<AuctionsPage />);
+    fireEvent.click((await screen.findAllByRole("button", { name: /AU-000002/ }, slow))[0]!);
+    const lot = openDialog();
+    expect(lot.getByText("Alice Bidder")).toBeTruthy();
+    expect(lot.getByText("Won", { exact: false })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "List at auction" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Hand over" })).toBeNull();
   });
 
   test("a centre's Final Return Address is set by operations", async () => {

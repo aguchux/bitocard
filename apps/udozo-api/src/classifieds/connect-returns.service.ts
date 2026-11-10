@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { ConnectReturnRequest } from '../generated/prisma/client.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ConnectAuctionsService } from './connect-auctions.service.js';
 import { ConnectChargesService } from './connect-charges.service.js';
 import { connectFeeOf, centreShareOf, ConnectCheckoutService } from './connect-checkout.service.js';
 import { cleanMessage } from './conversations.service.js';
@@ -50,6 +51,7 @@ export class ConnectReturnsService {
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
     private readonly charges: ConnectChargesService,
+    private readonly auctions: ConnectAuctionsService,
   ) {}
 
   private async settings(country: string) {
@@ -187,7 +189,9 @@ export class ConnectReturnsService {
     if (!row) throw notFound();
     const place = (await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: row.orderId }, select: { connectPlace: true } })).connectPlace;
     if (place !== 'udozo_warehouse') throw conflict('not_at_warehouse', 'This item is not at Udozo’s warehouse.');
+    await this.auctions.assertCollectable(row.orderId);
     const done = await this.complete(row, input.code, 'warehouse');
+    await this.auctions.cancelForCollection(row.orderId);
     await this.audit.record({ actorId: adminId, action: 'connect_return.handed_back_at_warehouse', targetType: 'connect_return', targetId: id, before: { status: 'accepted' }, after: { status: 'collected' } });
     return done;
   }

@@ -31,6 +31,11 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           <Link href={country ? `/${country.code.toLowerCase()}/connect-centres` : "/connect-centres"} className="hover:underline">
             Connect Centres
           </Link>
+          {country ? (
+            <Link href={`/${country.code.toLowerCase()}/auctions`} className="hover:underline">
+              Udozo auctions
+            </Link>
+          ) : null}
           <a href={connectUrl} className="font-semibold text-navy-900 hover:underline">
             Become a Connect Centre
           </a>
@@ -57,6 +62,9 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           </Link>
           <Link href="/legal/connect-centres" className="hover:underline">
             Connect Centre agreement
+          </Link>
+          <Link href="/legal/auctions" className="hover:underline">
+            Udozo auctions terms
           </Link>
           <Link href="/legal/privacy" className="hover:underline">
             Privacy

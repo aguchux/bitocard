@@ -746,6 +746,15 @@ const privacy: LegalDocument = {
       ],
     },
     {
+      id: "auctions",
+      heading: "4c. Udozo auctions",
+      body: [
+        "If you bid at a Udozo auction we keep each bid (the amount and when you made it), whether you were offered the lot and paid, and when you collected it. Other bidders see your bids beside your first name and the initial of your last name, never your account, email or phone.",
+        "If your item was abandoned at a Connect Centre and auctioned, we keep what the sale raised, what it paid of the storage you owed, what was left over for you and your claim for it.",
+        "We keep auction records for six years, as we keep payment records.",
+      ],
+    },
+    {
       id: "why",
       heading: "5. Why we use it",
       body: [
@@ -1037,5 +1046,67 @@ const connectCentres: LegalDocument = {
   ],
 };
 
-export const legalDocuments: LegalDocument[] = [terms, safePay, sellers, connectCentres, privacy, cookies];
+const auctions: LegalDocument = {
+  slug: "auctions",
+  title: "Udozo auctions terms",
+  summary: "What is sold at Udozo auctions and by whom, bidding and its steps, late bids, winning and paying with UdozoPay, collecting, and the seller's claim to what is left over.",
+  sections: [
+    {
+      id: "about",
+      heading: "1. About Udozo auctions",
+      body: [
+        whoWeAre,
+        "Udozo auctions sell items their sellers abandoned at Udozo Connect Centres: items returned to a seller who did not collect them, a month into Loss of care, that Udozo picked up to its own warehouse. Udozo sells them itself, to recover the storage the seller owed. The seller is told before an item is listed, and can still collect it after paying what is owed until the first bid.",
+        "These terms apply when you bid. They sit alongside the terms of use, the UdozoPay rules and the privacy notice.",
+      ],
+    },
+    {
+      id: "items",
+      heading: "2. What you are buying",
+      body: [
+        "Every lot is sold as seen, from an abandoned shipment. Its photos and description are the best we have: they may come from the original listing. We do not test lots or promise that they work, are complete or match their first listing. Look at what is shown and ask before you bid.",
+        "Each lot says which Udozo warehouse holds it. You collect it there.",
+      ],
+    },
+    {
+      id: "bidding",
+      heading: "3. Bidding",
+      body: [
+        "To bid you need a Udozo account with a confirmed mobile number. The seller of the item may not bid.",
+        "Bidding opens and closes at the times the lot shows. Each bid must be at least the lot's starting price, then at least the step the lot shows above the highest bid (a share of it, with a least amount). A bid is a promise to pay it if you win: you cannot take it back.",
+        "A bid in the last minutes of a lot moves its end to that many minutes after the bid, as the lot shows, so the others can answer it.",
+        "There is no hidden reserve: the starting price is the least we will sell for.",
+      ],
+    },
+    {
+      id: "winning",
+      heading: "4. Winning and paying",
+      body: [
+        "When bidding closes, the highest bidder is offered the lot at their bid and has the hours the lot shows to pay for it with UdozoPay, from their Udozo wallet. If they do not pay in time, the lot is offered to the next highest bidder at their own bid, and so on; if nobody pays, it is not sold and may be listed again.",
+        "Not paying for a lot you won may stop you bidding again.",
+      ],
+    },
+    {
+      id: "collecting",
+      heading: "5. Collecting",
+      body: [
+        "Once you pay, the lot's page shows your collection code. Collect the lot at its warehouse, in its opening hours, and give the code to our team there only when you have it in your hands.",
+      ],
+    },
+    {
+      id: "money",
+      heading: "6. Where the money goes",
+      body: [
+        "What a sale raises pays, first, the storage its seller owed and, then, what Udozo spent selling and moving it (never the pickup, which Udozo pays). What is left over is the seller's, but only if they claim it within the days their order shows, from the sale; unclaimed, it becomes Udozo's.",
+      ],
+    },
+    {
+      id: "changes",
+      heading: "7. Changes",
+      body: ["We may change these terms. A change applies to lots listed after it; we say so on this page and in the account of anyone bidding."],
+    },
+  ],
+};
+
+export const legalDocuments: LegalDocument[] = [terms, safePay, sellers, connectCentres, auctions, privacy, cookies];
 export const legalDocument = (slug: string) => legalDocuments.find(doc => doc.slug === slug) ?? null;

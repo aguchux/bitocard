@@ -119,7 +119,44 @@ export type ConnectSettings = {
   abandoned_after_days: number;
   auction_after_days: number;
   claim_days: number;
+  /** Auctions: each bid's least step (a share of the last bid, and a least amount), minutes a late bid extends, hours the winner has to pay. */
+  auction_step_bps: number;
+  auction_step_min: number;
+  auction_extend_minutes: number;
+  auction_pay_hours: number;
 };
+
+/** An abandoned item at auction (phase 7b), as Udozo's team sees it: every bidder, and what the sale paid off. */
+export type ConnectAuction = {
+  object: 'connect_auction';
+  id: string;
+  number: string;
+  ref: string;
+  status: 'scheduled' | 'live' | 'awaiting_payment' | 'sold' | 'unsold' | 'cancelled';
+  country: string;
+  currency: string;
+  title: string;
+  order: { id: string; number: string };
+  warehouse: { id: string; name: string };
+  start_price: number;
+  current_price: number | null;
+  /** What its seller owed when it was listed, and what Udozo spent selling it: paid from the sale before what is left over. */
+  owed: number;
+  costs: number;
+  starts_at: string;
+  ends_at: string;
+  pay_by: string | null;
+  sale: number | null;
+  left_over: number | null;
+  paid_at: string | null;
+  collected_at: string | null;
+  cancel_reason: string | null;
+  bids: Array<{ id: string; amount: number; status: 'active' | 'offered' | 'lapsed' | 'won'; at: string; bidder: { id: string; name: string; email: string } }>;
+};
+
+/** An abandoned item at a warehouse that can be listed (`due`) or will be once `auction_from` passes. */
+export type ConnectAuctionEligible = { order_id: string; number: string; title: string | null; price: number; currency: string; warehouse: { id: string; name: string } | null; owed: number; auction_from: string; due: boolean };
+export type ConnectAuctionInput = { order_id: string; start_price: number; ends_at: string; starts_at?: string; costs?: number; title?: string; description?: string; below_owed?: boolean };
 
 /** A warehouse Udozo runs: the Final Return Address abandoned items are picked up to. */
 export type ConnectWarehouse = {
@@ -294,6 +331,10 @@ export type ConnectSettingsChange = {
   abandoned_after_days?: number;
   auction_after_days?: number;
   claim_days?: number;
+  auction_step_bps?: number;
+  auction_step_min?: number;
+  auction_extend_minutes?: number;
+  auction_pay_hours?: number;
 };
 
 export type ConnectCentre = {
@@ -500,6 +541,26 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: ({ id }) => ({ url: `/v1/admin/connect/returns/${id}/approve`, method: 'POST', body: {} }),
       invalidatesTags: ['ConnectCentres', 'Activity'],
     }),
+    connectAuctions: build.query<{ object: 'list'; data: ConnectAuction[] }, { status?: ConnectAuction['status']; country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/auctions', params: clean({ status: filter?.status, country: filter?.country }) }),
+      providesTags: ['ConnectAuctions'],
+    }),
+    connectAuctionEligible: build.query<{ object: 'list'; data: ConnectAuctionEligible[] }, { country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/auctions/eligible', params: clean({ country: filter?.country }) }),
+      providesTags: ['ConnectAuctions'],
+    }),
+    createConnectAuction: build.mutation<ConnectAuction, ConnectAuctionInput>({
+      query: body => ({ url: '/v1/admin/connect/auctions', method: 'POST', body }),
+      invalidatesTags: ['ConnectAuctions', 'Activity'],
+    }),
+    cancelConnectAuction: build.mutation<ConnectAuction, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/connect/auctions/${id}/cancel`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['ConnectAuctions', 'Activity'],
+    }),
+    handOverConnectAuction: build.mutation<ConnectAuction, { id: string; code: string }>({
+      query: ({ id, code }) => ({ url: `/v1/admin/connect/auctions/${id}/hand-over`, method: 'POST', body: { code } }),
+      invalidatesTags: ['ConnectAuctions', 'ConnectCentres', 'Activity'],
+    }),
     setConnectCentreStatus: build.mutation<ConnectCentreDetail, { id: string; action: 'pause' | 'reinstate' | 'close'; reason: string }>({
       query: ({ id, action, reason }) => ({ url: `/v1/admin/connect/centres/${id}/${action}`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => ['ConnectCentres', { type: 'ConnectCentres', id }, 'Activity'],
@@ -542,4 +603,9 @@ export const {
   useConnectReportQuery,
   useConnectCentreItemsQuery,
   useApproveConnectReturnMutation,
+  useConnectAuctionsQuery,
+  useConnectAuctionEligibleQuery,
+  useCreateConnectAuctionMutation,
+  useCancelConnectAuctionMutation,
+  useHandOverConnectAuctionMutation,
 } = connectApi;

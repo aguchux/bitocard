@@ -22,6 +22,10 @@ export type ConnectSettingsInput = {
   abandoned_after_days?: number;
   auction_after_days?: number;
   claim_days?: number;
+  auction_step_bps?: number;
+  auction_step_min?: number;
+  auction_extend_minutes?: number;
+  auction_pay_hours?: number;
 };
 
 /** The whole numbers each setting takes, and how it is told when out of range. */
@@ -34,6 +38,9 @@ const limits = {
   abandoned_after_days: { field: 'abandonedAfterDays', min: 1, max: 365, words: 'Give the days in Loss of care before an item is abandoned as 1 to 365.' },
   auction_after_days: { field: 'auctionAfterDays', min: 1, max: 730, words: 'Give the days in Loss of care before an auction as 1 to 730.' },
   claim_days: { field: 'claimDays', min: 1, max: 365, words: 'Give the days to claim what an auction left over as 1 to 365.' },
+  auction_step_bps: { field: 'auctionStepBps', min: 1, max: 5000, words: 'Give the bid step as 0.01% to 50% of the bid.' },
+  auction_extend_minutes: { field: 'auctionExtendMinutes', min: 0, max: 60, words: 'Give the extension for a late bid as 0 to 60 minutes.' },
+  auction_pay_hours: { field: 'auctionPayHours', min: 1, max: 336, words: 'Give the hours to pay for a lot won as 1 to 336.' },
 } as const;
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -181,6 +188,10 @@ export class ConnectAdminService {
       if (!Number.isInteger(value) || value < rule.min || value > rule.max) throw invalid('parameter_invalid', rule.words, key);
       (data as Record<string, number>)[rule.field] = value;
     }
+    if (input.auction_step_min !== undefined) {
+      if (!Number.isSafeInteger(input.auction_step_min) || input.auction_step_min < 0) throw invalid('parameter_invalid', 'Give the least bid step in minor units, 0 or more.', 'auction_step_min');
+      data.auctionStepMinMinor = BigInt(input.auction_step_min);
+    }
     if (input.loc_penalty_cap !== undefined) {
       if (!Number.isSafeInteger(input.loc_penalty_cap) || input.loc_penalty_cap < 0) throw invalid('parameter_invalid', "Give the penalty's daily cap in minor units, 0 or more.", 'loc_penalty_cap');
       data.locPenaltyCapMinor = BigInt(input.loc_penalty_cap);
@@ -212,6 +223,10 @@ export class ConnectAdminService {
       abandonedAfterDays: number;
       auctionAfterDays: number;
       claimDays: number;
+      auctionStepBps: number;
+      auctionStepMinMinor: bigint;
+      auctionExtendMinutes: number;
+      auctionPayHours: number;
     } | null,
   ) {
     return {
@@ -236,6 +251,11 @@ export class ConnectAdminService {
       abandoned_after_days: row?.abandonedAfterDays ?? 30,
       auction_after_days: row?.auctionAfterDays ?? 90,
       claim_days: row?.claimDays ?? 90,
+      /** Auctions: each bid at least this share and this amount above the last; a late bid extends the end by these minutes; the winner pays within these hours. */
+      auction_step_bps: row?.auctionStepBps ?? 500,
+      auction_step_min: Number(row?.auctionStepMinMinor ?? 50000n),
+      auction_extend_minutes: row?.auctionExtendMinutes ?? 5,
+      auction_pay_hours: row?.auctionPayHours ?? 48,
     };
   }
 

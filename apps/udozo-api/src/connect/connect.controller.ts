@@ -217,6 +217,19 @@ class SettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(365)
   claim_days?: number;
+
+  /** Auctions: the bid step (a share and a least amount), the extension for a late bid, and the hours to pay. */
+  @IsOptional() @IsInt() @Min(1) @Max(5000)
+  auction_step_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  auction_step_min?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(60)
+  auction_extend_minutes?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(336)
+  auction_pay_hours?: number;
 }
 
 /**

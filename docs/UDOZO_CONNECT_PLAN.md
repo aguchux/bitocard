@@ -627,8 +627,40 @@ assistants' knowledge, help, terms and privacy.
      - Tests: `apps/udozo-api/test/connect-warehouses.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`,
        `apps/udozo-connect/test/centres.test.ts`, `apps/udozo-connect/test/centre-screens.test.tsx`,
        `apps/udozo/test/connect-orders.test.ts`.
-   - **7b (next):** Udozo auctions on udozo.com.
-   - **7c:** claims, and unclaimed money becoming Udozo's.
+   - **7b, Udozo auctions (built):** migration `20270310700000_connect_auctions` (ledger account kind
+     `connect_auction_held`; the market's `auction_step_bps` 500, `auction_step_min` ₦500, `auction_extend_minutes` 5
+     and `auction_pay_hours` 48, set with the Connect fee; `connect_auctions`, numbered **`AU-000123`**, at most one open
+     lot per order by a partial unique index; `connect_auction_bids`). `ConnectAuctionsService`, the owner's rules:
+     - **Listing** (`GET /v1/admin/connect/auctions/eligible`: items at a warehouse with what their seller owes and from
+       when they can be listed; `POST /v1/admin/connect/auctions { order_id, start_price, ends_at, starts_at?, costs?,
+       title?, description?, below_owed? }`, operations, audited): only an abandoned item at a Udozo warehouse the
+       market's `auction_after_days` into Loss of care (`not_auctionable`, `auction_not_due`, `auction_exists`); **no
+       hidden reserve**: the starting price is at least what is owed plus the costs unless `below_owed`
+       (`start_below_owed`); bidding opens at least a day after listing (`auction_too_soon`), and the seller is told
+       first. Cancelled only before any bid (`auction_has_bids`).
+     - **Bidding** (`POST /v1/classifieds/auctions/:ref/bids { amount }`, a confirmed mobile, `phone_required`; never
+       the item's seller, `own_item`): the lot's row locked, each bid at least the starting price, then the highest
+       plus the larger of 5% (rounded up) and the least step (`bid_too_low`, `nextBid`); a bid in the last 5 minutes
+       moves the end to 5 minutes after it; the outbid bidder told. Bidders are shown by first name and initial.
+     - **Winning** (the `classifieds` job's `connect_auctions`, `runDue`: scheduled lots open, ended lots are offered to
+       the highest bidder, a lapsed offer goes to the next bidder at their own bid, none left is `unsold`): the winner
+       pays within 48 hours from their wallet (`POST …/:ref/pay`, `not_yours_to_pay`, `payment_window_closed`,
+       `wallet_balance_low`), in one entry: the storage the seller owed (paid off, `charges.saleCover`, split as
+       before), Udozo's costs to `connect_revenue`, **what is left over to `connect_auction_held`** for the seller's
+       claim (7c). The lot is `sold`, the item `connect_place: auctioned`, its return cancelled, and the buyer gets a
+       sealed collection code (`GET …/:ref/collection-code`); operations hand it over at the warehouse against it
+       (`POST /v1/admin/connect/auctions/:id/hand-over { code }`, `collection_code_wrong`, audited).
+     - **The seller may still collect** after paying what is owed until the first bid (the hand-back refuses
+       `auction_has_bids` after, and cancels a lot with no bids).
+     - **Not built:** shipping lots through Connect (buyers collect at the warehouse).
+     - **Screens:** udozo.com's **Udozo auctions** (`/<cc>/auctions`, its lots; `/<cc>/auctions/<ref>`: photos, price,
+       bids, rules, Sign in to bid, Place bid, Pay, the collection code; `noindex` lots; footer links), the **Udozo
+       auctions terms** (`/legal/auctions`) and the privacy notice's section 4c; admin Connect > **Auctions**
+       (`/connect/auctions`: what can be auctioned with List at auction, lots with their bids and the sale's split,
+       Cancel, Hand over) and the four auction rules on Connect > Settings.
+     - Tests: `apps/udozo-api/test/connect-auctions.test.mjs`, `apps/udozo/test/auctions.test.ts`,
+       `apps/udozo/test/legal.test.ts`, `apps/udozo-admin/test/connect.test.tsx`.
+   - **7c (next):** claims, and unclaimed money becoming Udozo's.
 
 Each phase is behind the switch `connect_shipping` (Udozo's own, global or per country, **off by default**), with
 tests in the API, the site and the admin, as the other Udozo plans are. Applications can open before shipping does, so
