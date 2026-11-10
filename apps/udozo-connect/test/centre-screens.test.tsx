@@ -26,6 +26,7 @@ const actions = vi.hoisted(() => ({
   askReturn: vi.fn(),
   handBack: vi.fn(),
   recordStockCheck: vi.fn(),
+  handOverPickup: vi.fn(),
   moveEarnings: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
@@ -39,6 +40,7 @@ const { CentreNav } = await import("@/components/centre-nav");
 const { CounterOrderView, FindOrder } = await import("@/components/counter-order");
 const { ReturnsList } = await import("@/components/centre-returns");
 const { StockShelf } = await import("@/components/centre-stock");
+const { PickupCard, FraPanel } = await import("@/components/centre-pickups");
 const { EarningsCard, EarningsLines } = await import("@/components/centre-earnings");
 
 type Centre = import("@/lib/centres").Centre;
@@ -102,7 +104,7 @@ describe("the centre's menu", () => {
   it("marks the page it is on", () => {
     const host = mount(createElement(CentreNav, { id: "c1" }));
     expect(host.querySelector('[aria-current="page"]')!.textContent).toBe("Staff");
-    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/stock", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
+    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/stock", "/centre/c1/pickups", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
     const owner = mount(createElement(CentreNav, { id: "c1", role: "owner" }));
     expect([...owner.querySelectorAll("a")].map(link => link.textContent)).toContain("Earnings");
   });
@@ -398,5 +400,42 @@ describe("earnings", () => {
   it("lists what was earned and moved", () => {
     const host = mount(createElement(EarningsLines, { country: "NG", lines: [{ id: "l1", kind: "earned", description: "UdozoPay SP-41 released", amount: 14000, mode: "live", currency: "NGN", created_at: "2026-11-10T10:00:00.000Z" }] }));
     expect(host.textContent).toContain("+₦140");
+  });
+});
+
+describe("pickups", () => {
+  const warehouse = { id: "wh1", name: "Udozo Lagos warehouse", address: "4 Industrial Avenue", state: { id: "s1", name: "Lagos" }, hours: "9 to 5", phone: "0803" };
+  const pickup = {
+    object: "connect_pickup" as const,
+    id: "pk1",
+    number: "PU-000001",
+    day: "2026-11-12",
+    collector: "Tunde",
+    status: "scheduled" as const,
+    warehouse,
+    collected_at: null,
+    items: [
+      { order_id: "o1", number: "SP-41", title: "Gas cooker", shelf: "A-01", status: "waiting" as const, handed_over_at: null, received_at: null },
+      { order_id: "o2", number: "SP-42", title: "Kettle", shelf: "A-02", status: "waiting" as const, handed_over_at: null, received_at: null },
+    ],
+  };
+
+  it("hands over what is ticked against the collector's code, after confirming what stays", async () => {
+    actions.handOverPickup.mockResolvedValue({ ok: true, data: { ...pickup, status: "collected" } });
+    const host = mount(createElement(PickupCard, { centre: "c1", pickup }));
+    act(() => (host.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement).click());
+    act(() => type(host.querySelector("input[inputmode=numeric]") as HTMLInputElement, "482910"));
+    await act(async () => button(host, "Hand over")!.click());
+    expect(document.querySelector("dialog")!.textContent).toContain("1 item stays here");
+    await act(async () => dialogButton("Hand over").click());
+    expect(actions.handOverPickup).toHaveBeenCalledWith("c1", "pk1", "482910", ["o1"]);
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("says where abandoned items go and when Udozo comes", () => {
+    const host = mount(createElement(FraPanel, { fra: { warehouse, awaiting_pickup: 2, next_pickup: { id: "pk1", number: "PU-000001", day: "2026-11-12", collector: "Tunde" } } }));
+    expect(host.textContent).toContain("Udozo Lagos warehouse");
+    expect(host.textContent).toContain("2 abandoned items wait");
+    expect(host.textContent).toContain("with Tunde");
   });
 });

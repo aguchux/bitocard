@@ -72,6 +72,9 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
   const [dueDays, setDueDays] = useState(String(settings.return_due_days));
   const [answerHours, setAnswerHours] = useState(String(settings.return_answer_hours));
   const [collectDays, setCollectDays] = useState(String(settings.seller_collect_days));
+  const [abandonDays, setAbandonDays] = useState(String(settings.abandoned_after_days));
+  const [auctionDays, setAuctionDays] = useState(String(settings.auction_after_days));
+  const [claimDays, setClaimDays] = useState(String(settings.claim_days));
   const [demurrage, setDemurrage] = useState(String(settings.demurrage_bps / 100));
   const [penalty, setPenalty] = useState(String(settings.loc_penalty_bps / 100));
   const [penaltyCap, setPenaltyCap] = useState(toMajor(settings.loc_penalty_cap, settings.currency));
@@ -97,6 +100,10 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
     const cap = toMinor(penaltyCap, settings.currency);
     if (demurrageBps === null || penaltyBps === null) return setProblem("Give storage and the Loss of care penalty as 0 to 100% of the shipping charge.");
     if (cap === null) return setProblem(`Give the penalty's daily cap in ${settings.currency}, for example 500.`);
+    const abandoned = whole(abandonDays, 1, 365);
+    const auctioned = whole(auctionDays, 1, 730);
+    const claims = whole(claimDays, 1, 365);
+    if (abandoned === null || auctioned === null || claims === null) return setProblem("Give the days to abandon (1 to 365), to auction (1 to 730) and to claim (1 to 365) as whole numbers.");
     const change = {
       country: settings.country,
       centre_share_bps: centreShare,
@@ -107,6 +114,9 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
       demurrage_bps: demurrageBps,
       loc_penalty_bps: penaltyBps,
       loc_penalty_cap: cap,
+      abandoned_after_days: abandoned,
+      auction_after_days: auctioned,
+      claim_days: claims,
     };
     let done;
     if (kind === "") done = await save({ ...change, fee_kind: null }).unwrap().catch(() => null);
@@ -171,6 +181,15 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
             </Field>
             <Field label={`Penalty cap a day (${settings.currency})`} htmlFor={`${id}-cap`}>
               <Input id={`${id}-cap`} inputMode="decimal" value={penaltyCap} onChange={event => setPenaltyCap(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Abandoned after (days in Loss of care)" htmlFor={`${id}-abandon`} hint="Then Udozo picks it up to the centre's Final Return Address.">
+              <Input id={`${id}-abandon`} inputMode="numeric" value={abandonDays} onChange={event => setAbandonDays(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="May be auctioned after (days in Loss of care)" htmlFor={`${id}-auction`}>
+              <Input id={`${id}-auction`} inputMode="numeric" value={auctionDays} onChange={event => setAuctionDays(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Days to claim what an auction left over" htmlFor={`${id}-claim`} hint="From the sale; unclaimed money is Udozo's.">
+              <Input id={`${id}-claim`} inputMode="numeric" value={claimDays} onChange={event => setClaimDays(event.target.value)} className="max-w-xs" />
             </Field>
             <Button type="submit" loading={state.isLoading}>
               Save Connect fee

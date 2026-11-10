@@ -211,3 +211,16 @@ describe("stock checks and earnings", () => {
     expect(sent).toHaveLength(0);
   });
 });
+
+describe("pickups", () => {
+  it("hands over through the centre's own route, the code and items checked here first", async () => {
+    reply = () => Response.json({ object: "connect_pickup", id: other });
+    await actions.handOverPickup(id, other, " 482 910 ", [other]);
+    expect(sent.map(item => [item.url.replace(`https://api.udozo.test/v1/connect/centres/${id}`, ""), item.body])).toEqual([[`/pickups/${other}/hand-over`, { code: "482910", order_ids: [other] }]]);
+    sent.length = 0;
+    expect(await actions.handOverPickup(id, other, "12", [other])).toMatchObject({ ok: false, param: "code" });
+    expect(await actions.handOverPickup(id, other, "482910", [])).toMatchObject({ ok: false, param: "order_ids" });
+    expect(sent).toHaveLength(0);
+    expect(rules.centreNav(id).map(item => item.label)).toContain("Pickups");
+  });
+});

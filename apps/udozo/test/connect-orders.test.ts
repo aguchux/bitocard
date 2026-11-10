@@ -10,6 +10,7 @@ const { orderActions, orderNext, orderSteps } = await import("@/lib/shop");
 const { labelFor } = await import("@/lib/connect-label");
 const { requestSafePay } = await import("@/lib/listing-actions");
 const { acceptReturn, payStorage, orderStep, returnCode } = await import("@/lib/shop-actions");
+const { placeWords } = await import("@/components/account/connect-return");
 
 const id = "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d";
 const centre = { id, number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue", landmark: null, area: "Ikeja", state: "Lagos", hours: "Mon to Sat, 8am to 6pm", phone: "08031234567" };
@@ -120,5 +121,15 @@ describe("asking and sending", () => {
     await orderStep(id, "sent", { dropOff: true, tracking_note: " At the counter by noon " });
     await orderStep(id, "sent", { courier: "GIG Logistics", tracking_number: "GIG123" });
     expect(calls.map(call => call.body)).toEqual([{ tracking_note: "At the counter by noon" }, { courier: "GIG Logistics", tracking_number: "GIG123" }]);
+  });
+});
+
+describe("an abandoned item's place", () => {
+  test("waiting at the centre, with Udozo's pickup, or at the warehouse with its address", () => {
+    expect(placeWords({ place: "awaiting_pickup", warehouse: null }, "Ikeja Parcel Hub")).toContain("waits at Ikeja Parcel Hub");
+    expect(placeWords({ place: "in_transit", warehouse: null }, "Ikeja Parcel Hub")).toContain("taking it to its warehouse");
+    const there = placeWords({ place: "udozo_warehouse", warehouse: { name: "Udozo Lagos warehouse", address: "4 Industrial Avenue", state: "Lagos", hours: "9 to 5", phone: "0803" } }, "Ikeja Parcel Hub");
+    expect(there).toContain("Udozo Lagos warehouse, 4 Industrial Avenue, Lagos");
+    expect(there).toContain("before Udozo auctions it");
   });
 });

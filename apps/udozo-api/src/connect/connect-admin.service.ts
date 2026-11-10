@@ -19,6 +19,9 @@ export type ConnectSettingsInput = {
   demurrage_bps?: number;
   loc_penalty_bps?: number;
   loc_penalty_cap?: number;
+  abandoned_after_days?: number;
+  auction_after_days?: number;
+  claim_days?: number;
 };
 
 /** The whole numbers each setting takes, and how it is told when out of range. */
@@ -28,6 +31,9 @@ const limits = {
   seller_collect_days: { field: 'sellerCollectDays', min: 1, max: 90, words: "Give the seller's days to collect a return as 1 to 90." },
   demurrage_bps: { field: 'demurrageBps', min: 0, max: 10000, words: 'Give the daily demurrage as 0 to 100% of the shipping charge.' },
   loc_penalty_bps: { field: 'locPenaltyBps', min: 0, max: 10000, words: 'Give the daily Loss of care penalty as 0 to 100% of the shipping charge.' },
+  abandoned_after_days: { field: 'abandonedAfterDays', min: 1, max: 365, words: 'Give the days in Loss of care before an item is abandoned as 1 to 365.' },
+  auction_after_days: { field: 'auctionAfterDays', min: 1, max: 730, words: 'Give the days in Loss of care before an auction as 1 to 730.' },
+  claim_days: { field: 'claimDays', min: 1, max: 365, words: 'Give the days to claim what an auction left over as 1 to 365.' },
 } as const;
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -203,6 +209,9 @@ export class ConnectAdminService {
       demurrageBps: number;
       locPenaltyBps: number;
       locPenaltyCapMinor: bigint;
+      abandonedAfterDays: number;
+      auctionAfterDays: number;
+      claimDays: number;
     } | null,
   ) {
     return {
@@ -223,6 +232,10 @@ export class ConnectAdminService {
       demurrage_bps: row?.demurrageBps ?? 210,
       loc_penalty_bps: row?.locPenaltyBps ?? 210,
       loc_penalty_cap: Number(row?.locPenaltyCapMinor ?? 50000n),
+      /** Abandoned, then auctioned, this many days into Loss of care; what an auction left over is claimed within claim_days of the sale. */
+      abandoned_after_days: row?.abandonedAfterDays ?? 30,
+      auction_after_days: row?.auctionAfterDays ?? 90,
+      claim_days: row?.claimDays ?? 90,
     };
   }
 

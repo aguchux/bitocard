@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import type { ConnectReturnRequest } from '../generated/prisma/client.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { ConnectChargesService } from './connect-charges.service.js';
@@ -175,6 +176,25 @@ export class ConnectReturnsService {
     await this.member(customer, centreId);
     const row = await this.prisma.connectReturnRequest.findUnique({ where: { id } });
     if (!row || row.centreId !== centreId) throw notFound();
+    const place = (await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: row.orderId }, select: { connectPlace: true } })).connectPlace;
+    if (place && place !== 'awaiting_pickup') throw conflict('with_udozo', 'This item is with Udozo now: the seller collects it at Udozo’s warehouse.');
+    return this.complete(row, input.code, 'centre');
+  }
+
+  /** Udozo's team hands an abandoned item back to its seller at the warehouse, against the seller's return code. */
+  async handBackAtWarehouse(adminId: string | null, id: string, input: { code: string }) {
+    const row = await this.prisma.connectReturnRequest.findUnique({ where: { id } });
+    if (!row) throw notFound();
+    const place = (await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: row.orderId }, select: { connectPlace: true } })).connectPlace;
+    if (place !== 'udozo_warehouse') throw conflict('not_at_warehouse', 'This item is not at Udozo’s warehouse.');
+    const done = await this.complete(row, input.code, 'warehouse');
+    await this.audit.record({ actorId: adminId, action: 'connect_return.handed_back_at_warehouse', targetType: 'connect_return', targetId: id, before: { status: 'accepted' }, after: { status: 'collected' } });
+    return done;
+  }
+
+  private async complete(row: ConnectReturnRequest, code: string, where: 'centre' | 'warehouse') {
+    const id = row.id;
+    const input = { code };
     if (row.status !== 'accepted' || !row.returnCode) throw conflict('return_not_accepted', 'This return is not ready to hand back.');
     const tried = await this.prisma.connectReturnRequest.updateMany({ where: { id, status: 'accepted', codeAttempts: { lt: codeTries } }, data: { codeAttempts: { increment: 1 } } });
     if (!tried.count) throw conflict('return_locked', 'The code was entered wrongly too many times. Ask Udozo to look into it.');
@@ -190,7 +210,8 @@ export class ConnectReturnsService {
     if ((await this.charges.owed(order.id, 'seller')).total > 0n) throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'return_fee_unpaid', 'The seller must add the storage owed to their Udozo wallet first.');
     const terms = await this.checkout.terms(order.country);
     const fee = connectFeeOf(terms, order.deliveryFeeMinor) ?? 0n;
-    const share = centreShareOf(fee, terms.centreShareBps);
+    // At Udozo's warehouse the return fee is all Udozo's: the centre no longer handles it.
+    const share = where === 'warehouse' ? 0n : centreShareOf(fee, terms.centreShareBps);
     // The return fee: from the seller's Udozo money, else their wallet; without enough in either, it waits.
     const balance = async (kind: 'customer_withdrawable' | 'customer_wallet') =>
       (await this.prisma.ledgerAccount.findFirst({ where: { kind, mode: order.mode, currency: order.currency, customerId: order.sellerId } }))?.balanceMinor ?? 0n;
@@ -214,8 +235,10 @@ export class ConnectReturnsService {
       const done = await tx.connectReturnRequest.updateMany({ where: { id, status: 'accepted' }, data: { status: 'collected', collectedAt: now, returnFeeMinor: fee } });
       if (!done.count) throw conflict('return_changed', 'This return changed: refresh and try again.');
       if (entry) await this.ledger.write(tx, entry);
-      await tx.classifiedOrder.update({ where: { id: order.id }, data: { connectShelfId: null, connectMissingAt: null } });
-      await tx.classifiedShipmentEvent.create({ data: { orderId: order.id, status: 'returned', reportedBy: 'centre', note: 'Collected by the seller.' } });
+      await tx.classifiedOrder.update({ where: { id: order.id }, data: { connectShelfId: null, connectMissingAt: null, connectPlace: null } });
+      // A pickup that was to take it to the warehouse goes without it.
+      await tx.connectPickupItem.updateMany({ where: { orderId: order.id, status: 'waiting' }, data: { status: 'removed' } });
+      await tx.classifiedShipmentEvent.create({ data: { orderId: order.id, status: 'returned', reportedBy: where === 'warehouse' ? 'bitocard' : 'centre', note: where === 'warehouse' ? 'Collected by the seller at Udozo’s warehouse.' : 'Collected by the seller.' } });
     });
     await this.safePay.tellParty(order, 'seller', 'customer.connect.return', `You collected "${order.listing.title}"`, fee ? `The return fee was taken from your ${source === 'customer_wallet' ? 'wallet' : 'Udozo money'}.` : 'Return complete.');
     return this.present(id);

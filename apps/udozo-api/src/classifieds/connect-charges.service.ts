@@ -114,8 +114,10 @@ export class ConnectChargesService {
 
   /** Takes the seller's owed charges, one by one, from their Udozo money, else their wallet; what neither covers stays owed. */
   async collectSeller(orderId: string) {
-    const order = await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, mode: true, country: true, currency: true, sellerId: true, connectCentre: { select: { partnerId: true } } } });
+    const order = await this.prisma.classifiedOrder.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, mode: true, country: true, currency: true, sellerId: true, connectWithUdozoAt: true, connectCentre: { select: { partnerId: true } } } });
     const { rows } = await this.owed(orderId, 'seller');
+    // Days after the centre handed it to Udozo's pickup are Udozo's alone.
+    const udozoFrom = order.connectWithUdozoAt ? new Date(`${order.connectWithUdozoAt.toISOString().slice(0, 10)}T00:00:00.000Z`) : null;
     if (!rows.length || !order.connectCentre) return 0n;
     const rates = await this.rates(order.country);
     let paid = 0n;
@@ -124,7 +126,8 @@ export class ConnectChargesService {
         (await this.prisma.ledgerAccount.findFirst({ where: { kind, mode: order.mode, currency: order.currency, customerId: order.sellerId } }))?.balanceMinor ?? 0n;
       const source = (await balance('customer_withdrawable')) >= row.amountMinor ? 'customer_withdrawable' : (await balance('customer_wallet')) >= row.amountMinor ? 'customer_wallet' : null;
       if (!source) break;
-      const ok = await this.pay(row, order.mode, [{ account: { kind: source, currency: order.currency, customerId: order.sellerId }, debit: row.amountMinor }, ...this.shareLines(row.amountMinor, order.currency, order.connectCentre.partnerId, rates.centreShareBps)]);
+      const shareBps = udozoFrom && row.day >= udozoFrom ? 0 : rates.centreShareBps;
+      const ok = await this.pay(row, order.mode, [{ account: { kind: source, currency: order.currency, customerId: order.sellerId }, debit: row.amountMinor }, ...this.shareLines(row.amountMinor, order.currency, order.connectCentre.partnerId, shareBps)]);
       if (ok) paid += row.amountMinor;
     }
     return paid;

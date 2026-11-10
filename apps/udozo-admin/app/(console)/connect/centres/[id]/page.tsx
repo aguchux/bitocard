@@ -2,9 +2,18 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { ActionDialog, Badge, Button, Card, CardHeader, formatDate, formatDateTime, formatNumber, KeyValue, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, errorMessage, formatDate, formatDateTime, formatNumber, KeyValue, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type ConnectCentreDetail, connectCentreRoleLabels, useConnectCentreItemsQuery, useConnectCentreQuery, useSetConnectCentreStatusMutation } from "@bitocard/api-client/admin";
+import {
+  type ConnectCentreDetail,
+  connectCentreRoleLabels,
+  useConnectCentreItemsQuery,
+  useConnectCentreQuery,
+  useConnectFinalReturnAddressQuery,
+  useConnectWarehousesQuery,
+  useSetConnectCentreStatusMutation,
+  useSetConnectFinalReturnAddressMutation,
+} from "@bitocard/api-client/admin";
 import { centreStatusLabels, centreStatusTones, money, pausedBy } from "@/components/connect";
 import { UdozoShell } from "@/components/shell";
 
@@ -186,6 +195,8 @@ function CentreView({ centre, acts }: { centre: ConnectCentreDetail; acts: boole
             </div>
           </Card>
 
+          <FinalReturnAddress centre={centre.id} country={centre.country} acts={acts} />
+
           <Card className="p-5">
             <CardHeader title="Deposit" className="px-0 pt-0 pb-4" />
             <KeyValue className="sm:grid-cols-1" items={[{ label: "Held", value: money(centre.deposit.amount, centre.deposit.currency) }]} />
@@ -205,6 +216,52 @@ function CentreView({ centre, acts }: { centre: ConnectCentreDetail; acts: boole
         />
       ) : null}
     </>
+  );
+}
+
+/** The centre's Final Return Address (the Udozo warehouse its abandoned items go to), set by operations, and its next pickup. */
+function FinalReturnAddress({ centre, country, acts }: { centre: string; country: string; acts: boolean }) {
+  const fra = useConnectFinalReturnAddressQuery(centre);
+  const warehouses = useConnectWarehousesQuery({ country });
+  const [setFra, state] = useSetConnectFinalReturnAddressMutation();
+  const [problem, setProblem] = useState<string | null>(null);
+  const open = (warehouses.data?.data ?? []).filter(row => row.active);
+  return (
+    <Card className="p-5">
+      <CardHeader title="Final Return Address" description="The Udozo warehouse its abandoned items are picked up to." className="px-0 pt-0 pb-4" />
+      {acts ? (
+        <label className="block text-sm">
+          <span className="sr-only">Final Return Address</span>
+          <select
+            className="block min-h-10 w-full rounded-lg border border-line bg-white px-3"
+            value={fra.data?.warehouse?.id ?? ""}
+            disabled={state.isLoading}
+            onChange={event => {
+              setProblem(null);
+              void setFra({ id: centre, warehouse_id: event.target.value || null })
+                .unwrap()
+                .catch(error => setProblem(errorMessage(error)));
+            }}
+          >
+            <option value="">Not set</option>
+            {open.map(row => (
+              <option key={row.id} value={row.id}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p className="text-sm text-ink">{fra.data?.warehouse?.name ?? "Not set"}</p>
+      )}
+      {fra.data ? (
+        <p className="mt-2 text-xs text-muted">
+          {fra.data.awaiting_pickup} abandoned {fra.data.awaiting_pickup === 1 ? "item" : "items"} waiting
+          {fra.data.next_pickup ? ` · next pickup ${fra.data.next_pickup.number} on ${formatDate(fra.data.next_pickup.day)}` : ""}
+        </p>
+      ) : null}
+      {problem ? <p className="mt-2 text-sm text-red-700">{problem}</p> : null}
+    </Card>
   );
 }
 

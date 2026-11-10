@@ -115,6 +115,76 @@ export type ConnectSettings = {
   demurrage_bps: number;
   loc_penalty_bps: number;
   loc_penalty_cap: number;
+  /** Abandoned, then auctioned, this many days into Loss of care; what an auction left over is claimed within claim_days of the sale. */
+  abandoned_after_days: number;
+  auction_after_days: number;
+  claim_days: number;
+};
+
+/** A warehouse Udozo runs: the Final Return Address abandoned items are picked up to. */
+export type ConnectWarehouse = {
+  object: 'connect_warehouse';
+  id: string;
+  country: string;
+  state: { id: string; name: string };
+  name: string;
+  address: string;
+  hours: string;
+  phone: string;
+  contact_name: string | null;
+  active: boolean;
+  created_at: string;
+  /** In lists: centres sending to it, and items it holds. */
+  centres?: number;
+  holding?: number;
+};
+export type ConnectWarehouseInput = Partial<{ country: string; state_id: string; name: string; address: string; hours: string; phone: string; contact_name: string | null; active: boolean }>;
+
+/** A centre's Final Return Address, abandoned items waiting there and its next pickup. */
+export type ConnectFinalReturnAddress = {
+  object: 'connect_final_return_address';
+  warehouse: ConnectWarehouse | null;
+  awaiting_pickup: number;
+  next_pickup: { id: string; number: string; day: string; collector: string } | null;
+};
+
+/** Udozo's pickup of a centre's abandoned items to its Final Return Address. */
+export type ConnectPickup = {
+  object: 'connect_pickup';
+  id: string;
+  number: string;
+  day: string;
+  collector: string;
+  status: 'scheduled' | 'collected' | 'delivered' | 'cancelled';
+  note: string | null;
+  /** For Udozo's collector to give the centre, while it is scheduled. */
+  code?: string | null;
+  centre: { id: string; number: string; name: string; address: string };
+  warehouse: ConnectWarehouse;
+  items: Array<{ order_id: string; number: string; title: string; shelf: string | null; status: 'waiting' | 'handed_over' | 'received' | 'missing' | 'removed'; handed_over_at: string | null; received_at: string | null }>;
+  collected_at: string | null;
+  delivered_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+};
+
+/** A centre with abandoned items waiting for a pickup. */
+export type ConnectAwaitingPickup = { centre: { id: string; number: string; name: string; country: string }; final_return_address: { id: string; name: string } | null; awaiting: number; scheduled: number };
+
+/** An abandoned item at one of Udozo's warehouses. */
+export type ConnectWarehouseItem = {
+  object: 'connect_warehouse_item';
+  order_id: string;
+  number: string;
+  title: string;
+  price: number;
+  currency: string;
+  warehouse: { id: string; name: string } | null;
+  centre: { id: string; name: string } | null;
+  return_id: string | null;
+  loss_of_care_at: string | null;
+  abandoned_at: string | null;
+  received_at: string | null;
 };
 
 /** What needs attention at a centre, in the report. */
@@ -221,6 +291,9 @@ export type ConnectSettingsChange = {
   demurrage_bps?: number;
   loc_penalty_bps?: number;
   loc_penalty_cap?: number;
+  abandoned_after_days?: number;
+  auction_after_days?: number;
+  claim_days?: number;
 };
 
 export type ConnectCentre = {
@@ -371,6 +444,54 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: id => `/v1/admin/connect/centres/${id}/items`,
       providesTags: (_result, _error, id) => [{ type: 'ConnectCentres', id }],
     }),
+    connectWarehouses: build.query<{ object: 'list'; data: ConnectWarehouse[] }, { country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/warehouses', params: clean({ country: filter?.country }) }),
+      providesTags: ['ConnectCentres'],
+    }),
+    createConnectWarehouse: build.mutation<ConnectWarehouse, ConnectWarehouseInput>({
+      query: body => ({ url: '/v1/admin/connect/warehouses', method: 'POST', body }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
+    updateConnectWarehouse: build.mutation<ConnectWarehouse, ConnectWarehouseInput & { id: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/connect/warehouses/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
+    connectFinalReturnAddress: build.query<ConnectFinalReturnAddress, string>({
+      query: id => `/v1/admin/connect/centres/${id}/final-return-address`,
+      providesTags: (_result, _error, id) => [{ type: 'ConnectCentres', id }],
+    }),
+    setConnectFinalReturnAddress: build.mutation<ConnectFinalReturnAddress, { id: string; warehouse_id: string | null }>({
+      query: ({ id, warehouse_id }) => ({ url: `/v1/admin/connect/centres/${id}/final-return-address`, method: 'PUT', body: { warehouse_id } }),
+      invalidatesTags: (_result, _error, { id }) => ['ConnectCentres', { type: 'ConnectCentres', id }, 'Activity'],
+    }),
+    connectAwaitingPickups: build.query<{ object: 'list'; data: ConnectAwaitingPickup[] }, { country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/pickups/awaiting', params: clean({ country: filter?.country }) }),
+      providesTags: ['ConnectCentres'],
+    }),
+    connectPickups: build.query<{ object: 'list'; data: ConnectPickup[] }, { status?: ConnectPickup['status']; country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/pickups', params: clean({ status: filter?.status, country: filter?.country }) }),
+      providesTags: ['ConnectCentres'],
+    }),
+    scheduleConnectPickup: build.mutation<ConnectPickup, { centre_id: string; day: string; collector: string; note?: string | null }>({
+      query: body => ({ url: '/v1/admin/connect/pickups', method: 'POST', body }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
+    cancelConnectPickup: build.mutation<ConnectPickup, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/connect/pickups/${id}/cancel`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
+    receiveConnectPickup: build.mutation<ConnectPickup, { id: string; order_ids: string[]; missing?: string[] }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/connect/pickups/${id}/receive`, method: 'POST', body }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
+    connectWarehouseItems: build.query<{ object: 'list'; data: ConnectWarehouseItem[] }, { warehouse_id?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/warehouse-items', params: clean({ warehouse_id: filter?.warehouse_id }) }),
+      providesTags: ['ConnectCentres'],
+    }),
+    handBackAtWarehouse: build.mutation<ConnectReturn, { id: string; code: string }>({
+      query: ({ id, code }) => ({ url: `/v1/admin/connect/returns/${id}/hand-back`, method: 'POST', body: { code } }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
     connectMissing: build.query<{ object: 'list'; data: ConnectMissingItem[] }, { country?: string } | void>({
       query: filter => ({ url: '/v1/admin/connect/missing', params: clean({ country: filter?.country }) }),
       providesTags: ['ConnectCentres'],
@@ -406,6 +527,18 @@ export const {
   useSetConnectCentreStatusMutation,
   useConnectReturnsQuery,
   useConnectMissingQuery,
+  useConnectWarehousesQuery,
+  useCreateConnectWarehouseMutation,
+  useUpdateConnectWarehouseMutation,
+  useConnectFinalReturnAddressQuery,
+  useSetConnectFinalReturnAddressMutation,
+  useConnectAwaitingPickupsQuery,
+  useConnectPickupsQuery,
+  useScheduleConnectPickupMutation,
+  useCancelConnectPickupMutation,
+  useReceiveConnectPickupMutation,
+  useConnectWarehouseItemsQuery,
+  useHandBackAtWarehouseMutation,
   useConnectReportQuery,
   useConnectCentreItemsQuery,
   useApproveConnectReturnMutation,

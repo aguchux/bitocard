@@ -104,7 +104,8 @@ export const orderInclude = {
   dispatchPhotos: { orderBy: { createdAt: 'asc' }, select: { id: true, contentType: true, width: true, height: true, createdAt: true } },
   connectCentre: { select: { id: true, number: true, name: true, partnerId: true, address: true, landmark: true, hours: true, phone: true, area: { select: { name: true } }, state: { select: { name: true } } } },
   connectShelf: { select: { id: true, code: true, label: true } },
-  connectReturn: { select: { id: true, number: true, reason: true, status: true, answerBy: true, decidedBy: true, collectBy: true, collectedAt: true, returnFeeMinor: true, lossOfCareAt: true } },
+  connectReturn: { select: { id: true, number: true, reason: true, status: true, answerBy: true, decidedBy: true, collectBy: true, collectedAt: true, returnFeeMinor: true, lossOfCareAt: true, abandonedAt: true } },
+  connectWarehouse: { select: { name: true, address: true, hours: true, phone: true, state: { select: { name: true } } } },
   connectCharges: { select: { payer: true, status: true, amountMinor: true } },
 } satisfies Prisma.ClassifiedOrderInclude;
 export type OrderRow = Prisma.ClassifiedOrderGetPayload<{ include: typeof orderInclude }>;
@@ -1622,6 +1623,9 @@ export class SafePayService {
                     decided_by: order.connectReturn.decidedBy,
                     collect_by: order.connectReturn.collectBy?.toISOString() ?? null,
                     collected_at: order.connectReturn.collectedAt?.toISOString() ?? null,
+                    abandoned_at: order.connectReturn.abandonedAt?.toISOString() ?? null,
+                    place: order.connectPlace ?? 'centre',
+                    warehouse: order.connectPlace === 'udozo_warehouse' && order.connectWarehouse ? { name: order.connectWarehouse.name, address: order.connectWarehouse.address, state: order.connectWarehouse.state.name, hours: order.connectWarehouse.hours, phone: order.connectWarehouse.phone } : null,
                     ...(viewer !== 'buyer' && order.connectReturn.returnFeeMinor !== null ? { return_fee: Number(order.connectReturn.returnFeeMinor) } : {}),
                   }
                 : null,

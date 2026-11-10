@@ -57,6 +57,7 @@ export const centreNav = (id: string, role?: CentreRole) => [
   { label: "Items", href: `/centre/${id}/orders` },
   { label: "Returns", href: `/centre/${id}/returns` },
   { label: "Stock check", href: `/centre/${id}/stock` },
+  { label: "Pickups", href: `/centre/${id}/pickups` },
   ...(role === "owner" ? [{ label: "Earnings", href: `/centre/${id}/earnings` }] : []),
   { label: "Centre", href: `/centre/${id}/settings` },
   { label: "Staff", href: `/centre/${id}/staff` },
@@ -241,3 +242,23 @@ export function checkWords(check: Pick<StockCheck, "expected" | "missing">) {
   if (!check.missing) return `All ${check.expected} there`;
   return `${check.missing} of ${check.expected} missing`;
 }
+
+// ---- Pickups to Udozo's warehouse (phase 7a) ----
+
+export type Warehouse = { id: string; name: string; address: string; state: { id: string; name: string }; hours: string; phone: string };
+export type PickupItem = { order_id: string; number: string; title: string; shelf: string | null; status: "waiting" | "handed_over" | "received" | "missing" | "removed"; handed_over_at: string | null; received_at: string | null };
+export type Pickup = {
+  object: "connect_pickup";
+  id: string;
+  number: string;
+  day: string;
+  collector: string;
+  status: "scheduled" | "collected" | "delivered" | "cancelled";
+  warehouse: Warehouse;
+  items: PickupItem[];
+  collected_at: string | null;
+};
+export type FinalReturnAddress = { warehouse: Warehouse | null; awaiting_pickup: number; next_pickup: { id: string; number: string; day: string; collector: string } | null };
+export type Pickups = { object: "list"; data: Pickup[]; final_return_address: FinalReturnAddress };
+
+export const pickupStatusWords: Record<Pickup["status"], string> = { scheduled: "To hand over", collected: "Collected by Udozo", delivered: "At Udozo's warehouse", cancelled: "Cancelled" };

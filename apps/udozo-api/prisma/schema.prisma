@@ -4658,6 +4658,7 @@ model ClassifiedArea {
   connectApplicationsInArea  ConnectCentreApplication[] @relation("ConnectApplicationArea")
   connectCentresInState      ConnectCentre[]            @relation("ConnectCentreState")
   connectCentresInArea       ConnectCentre[]            @relation("ConnectCentreArea")
+  connectWarehouses          ConnectWarehouse[]
   connectListings            ClassifiedListingConnectState[]
 
   @@index([country, kind])
@@ -5709,6 +5710,13 @@ model ClassifiedOrder {
   collectBy                DateTime?          @map("collect_by")
   /// The centre member who handed it over (no foreign key: kept if they leave).
   releasedById             String?            @map("released_by_id") @db.Uuid
+  /// Connect: where an abandoned item is once it leaves the centre's shelves for Udozo (awaiting_pickup, in_transit,
+  /// udozo_warehouse, auctioned); null while it is at the centre as usual.
+  connectPlace             String?            @map("connect_place")
+  connectWarehouseId       String?            @map("connect_warehouse_id") @db.Uuid
+  /// When the centre handed it to Udozo's pickup: storage from then on is all Udozo's.
+  connectWithUdozoAt       DateTime?          @map("connect_with_udozo_at")
+  warehouseReceivedAt      DateTime?          @map("warehouse_received_at")
   /// Connect: not found on its storage place at a stock check (flagged to Udozo), until found again or handed over.
   connectMissingAt         DateTime?          @map("connect_missing_at")
   /// Connect: when a stock check last found it at the centre.
@@ -5769,6 +5777,8 @@ model ClassifiedOrder {
   connectReturn            ConnectReturnRequest?
   connectCharges           ConnectCharge[]
   connectStockItems        ConnectStockCheckItem[]
+  connectWarehouse         ConnectWarehouse?  @relation(fields: [connectWarehouseId], references: [id], onDelete: SetNull)
+  connectPickupItems       ConnectPickupItem[]
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
@@ -7233,6 +7243,10 @@ model ConnectSettings {
   demurrageBps        Int    @default(210) @map("demurrage_bps")
   locPenaltyBps       Int    @default(210) @map("loc_penalty_bps")
   locPenaltyCapMinor  BigInt @default(50000) @map("loc_penalty_cap_minor")
+  /// Abandoned this many days into Loss of care; Udozo may auction it this many days in; the seller claims what is left over within these days of the sale.
+  abandonedAfterDays Int @default(30) @map("abandoned_after_days")
+  auctionAfterDays   Int @default(90) @map("auction_after_days")
+  claimDays          Int @default(90) @map("claim_days")
   updatedAt    DateTime @updatedAt @map("updated_at")
   /// The admin who last changed them (no foreign key: admins are never deleted).
   updatedById  String?  @map("updated_by_id") @db.Uuid
@@ -7394,8 +7408,12 @@ model ConnectCentre {
   depositMinor BigInt                    @map("deposit_minor")
   currency     String
   photos       String[]                  @default([])
+  /// Its Final Return Address: the Udozo warehouse its abandoned items go to.
+  fraWarehouseId String?                 @map("fra_warehouse_id") @db.Uuid
   createdAt    DateTime                  @default(now()) @map("created_at")
   updatedAt    DateTime                  @updatedAt @map("updated_at")
+  fraWarehouse ConnectWarehouse?         @relation(fields: [fraWarehouseId], references: [id], onDelete: SetNull)
+  pickups      ConnectPickup[]
   partner      Customer                  @relation("ConnectCentrePartner", fields: [partnerId], references: [id], onDelete: Restrict)
   state        ClassifiedArea            @relation("ConnectCentreState", fields: [stateId], references: [id], onDelete: Restrict)
   area         ClassifiedArea            @relation("ConnectCentreArea", fields: [areaId], references: [id], onDelete: Restrict)
@@ -7509,6 +7527,8 @@ model ConnectReturnRequest {
   collectedAt   DateTime?       @map("collected_at")
   /// When the seller's free days to collect it ran out: the item is in Loss of care (the centre no longer liable for it).
   lossOfCareAt  DateTime?       @map("loss_of_care_at")
+  /// Abandoned: a month (the market's days) into Loss of care, then Udozo picks it up to the centre's Final Return Address.
+  abandonedAt   DateTime?       @map("abandoned_at")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
   order         ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -7579,4 +7599,72 @@ model ConnectStockCheckItem {
   @@unique([checkId, orderId])
   @@index([orderId])
   @@map("connect_stock_check_items")
+}
+
+/// A warehouse Udozo runs: the Final Return Address abandoned items are picked up to from centres.
+model ConnectWarehouse {
+  id          String            @id @default(uuid()) @db.Uuid
+  country     String            @db.Char(2)
+  stateId     String            @map("state_id") @db.Uuid
+  name        String
+  address     String
+  hours       String
+  phone       String
+  contactName String?           @map("contact_name")
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  state       ClassifiedArea    @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  centres     ConnectCentre[]
+  orders      ClassifiedOrder[]
+  pickups     ConnectPickup[]
+
+  @@index([country])
+  @@map("connect_warehouses")
+}
+
+/// Udozo's pickup of a centre's abandoned items to its Final Return Address, handed over against the pickup's code.
+model ConnectPickup {
+  id            String              @id @default(uuid()) @db.Uuid
+  number        Int                 @unique @default(autoincrement())
+  centreId      String              @map("centre_id") @db.Uuid
+  warehouseId   String              @map("warehouse_id") @db.Uuid
+  day           DateTime            @db.Date
+  /// Who collects: the name the centre will see.
+  collector     String
+  /// scheduled, collected (handed over by the centre), delivered (checked in at the warehouse) or cancelled.
+  status        String              @default("scheduled")
+  /// Sealed; Udozo's collector gives it to the centre, which enters it to hand the items over.
+  pickupCode    String              @map("pickup_code")
+  codeAttempts  Int                 @default(0) @map("code_attempts")
+  note          String?
+  scheduledById String              @map("scheduled_by_id") @db.Uuid
+  collectedAt   DateTime?           @map("collected_at")
+  deliveredAt   DateTime?           @map("delivered_at")
+  cancelledAt   DateTime?           @map("cancelled_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  centre        ConnectCentre       @relation(fields: [centreId], references: [id], onDelete: Restrict)
+  warehouse     ConnectWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  items         ConnectPickupItem[]
+
+  @@index([centreId, status])
+  @@map("connect_pickups")
+}
+
+/// One item on a pickup, from the centre's shelf to the warehouse.
+model ConnectPickupItem {
+  id           String          @id @default(uuid()) @db.Uuid
+  pickupId     String          @map("pickup_id") @db.Uuid
+  orderId      String          @map("order_id") @db.Uuid
+  /// waiting, handed_over, received, missing or removed.
+  status       String          @default("waiting")
+  handedOverAt DateTime?       @map("handed_over_at")
+  receivedAt   DateTime?       @map("received_at")
+  pickup       ConnectPickup   @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  order        ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([pickupId, orderId])
+  @@index([orderId])
+  @@map("connect_pickup_items")
 }

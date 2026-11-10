@@ -21,6 +21,8 @@ const { default: CentrePage } = await import("@/app/(console)/connect/centres/[i
 const { default: ReportsPage } = await import("@/app/(console)/connect/reports/page");
 const { default: ReturnsPage } = await import("@/app/(console)/connect/returns/page");
 const { default: MissingPage } = await import("@/app/(console)/connect/missing/page");
+const { default: WarehousesPage } = await import("@/app/(console)/connect/warehouses/page");
+const { default: PickupsPage } = await import("@/app/(console)/connect/pickups/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -107,6 +109,11 @@ let centreNow: ReturnType<typeof centre>;
 let deposit: number | null;
 let fee: { kind: "percent"; bps: number } | { kind: "fixed"; amount: number } | null;
 let current: ReturnType<typeof application>;
+const warehouse = { object: "connect_warehouse", id: "wh1", country: "NG", state: { id: "s1", name: "Lagos" }, name: "Udozo Lagos warehouse", address: "4 Industrial Avenue, Ilupeju", hours: "9am to 5pm", phone: "0803", contact_name: null, active: true, created_at: "2026-11-10T00:00:00.000Z", centres: 1, holding: 1 };
+const pickupItem = (over: Record<string, unknown> = {}) => ({ order_id: "o7", number: "SP-70", title: "Gas cooker", shelf: "A-01", status: "waiting", handed_over_at: null, received_at: null, ...over });
+const pickup = { object: "connect_pickup", id: "pk1", number: "PU-000001", day: "2026-11-12", collector: "Tunde", status: "scheduled", note: null, code: "482910", centre: { id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", address: "12 Allen Avenue" }, warehouse, items: [pickupItem()], collected_at: null, delivered_at: null, cancelled_at: null, created_at: "2026-11-10T00:00:00.000Z" };
+const collected = { ...pickup, id: "pk2", number: "PU-000002", status: "collected", code: null, items: [pickupItem({ status: "handed_over" }), pickupItem({ order_id: "o8", number: "SP-80", title: "Kettle", status: "handed_over" })] };
+let sentCollected = false;
 let sent: Array<{ method: string; path: string; search: string; body: unknown }>;
 
 beforeAll(() => {
@@ -161,7 +168,7 @@ beforeEach(() => {
         const sent = body as { fee_kind: "percent" | "fixed" | null; fee_bps?: number; fee?: number; centre_share_bps: number; buyer_free_hours: number };
         fee = sent.fee_kind === "percent" ? { kind: "percent", bps: sent.fee_bps! } : sent.fee_kind === "fixed" ? { kind: "fixed", amount: sent.fee! } : null;
       }
-      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000 });
+      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90 });
     }
     if (path === "/v1/admin/connect/centres")
       return ok({
@@ -200,6 +207,15 @@ beforeEach(() => {
         data: [{ object: "connect_missing_item", order_id: "o2", number: "SP-43", title: "Blender", status: "at_centre", price: 4_500_000, currency: "NGN", centre: { id: "cc1", name: "Ikeja Parcel Hub", number: "CC-000001", country: "NG" }, shelf: "A-01", received_at: "2026-11-08T10:00:00.000Z", missing_since: "2026-11-10T09:00:00.000Z", seen_at: null }],
       });
     if (path === "/v1/admin/connect/returns/rt1/approve") return ok({ object: "connect_return", id: "rt1", status: "accepted" });
+    if (path === "/v1/admin/connect/warehouses" && input.method === "GET") return ok({ object: "list", data: [warehouse] });
+    if (path === "/v1/admin/connect/warehouses") return ok({ ...warehouse, id: "wh2", name: (body as { name: string }).name });
+    if (path === "/v1/admin/connect/centres/cc1/final-return-address") return ok({ object: "connect_final_return_address", warehouse: input.method === "PUT" ? warehouse : null, awaiting_pickup: 1, next_pickup: null });
+    if (path === "/v1/admin/connect/pickups/awaiting") return ok({ object: "list", data: [{ centre: { id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", country: "NG" }, final_return_address: { id: "wh1", name: "Udozo Lagos warehouse" }, awaiting: 2, scheduled: 0 }] });
+    if (path === "/v1/admin/connect/pickups" && input.method === "GET") return ok({ object: "list", data: sentCollected ? [pickup, collected] : [pickup] });
+    if (path === "/v1/admin/connect/pickups") return ok(pickup);
+    if (path === "/v1/admin/connect/pickups/pk2/receive") return ok({ ...collected, status: "delivered" });
+    if (path === "/v1/admin/connect/warehouse-items") return ok({ object: "list", data: [{ object: "connect_warehouse_item", order_id: "o9", number: "SP-90", title: "Rice cooker", price: 1_500_000, currency: "NGN", warehouse: { id: "wh1", name: "Udozo Lagos warehouse" }, centre: { id: "cc1", name: "Ikeja Parcel Hub" }, return_id: "rt9", loss_of_care_at: "2026-09-01T00:00:00.000Z", abandoned_at: "2026-10-01T00:00:00.000Z", received_at: "2026-10-05T00:00:00.000Z" }] });
+    if (path === "/v1/admin/connect/returns/rt9/hand-back") return ok({ object: "connect_return", id: "rt9", status: "collected" });
     const status = /^\/v1\/admin\/connect\/centres\/cc1\/(pause|reinstate|close)$/.exec(path)?.[1];
     if (status && input.method === "POST") {
       const reason = (body as { reason: string }).reason;
@@ -230,7 +246,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/reports"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/pickups", "/connect/warehouses", "/connect/reports"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -346,7 +362,7 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "percent" } });
     fireEvent.change(screen.getByLabelText("Fee (% of shipping)"), { target: { value: "10" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 50000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90 }), slow);
     expect(await screen.findByText(/10% of the shipping charge/, {}, slow)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "fixed" } });
     fireEvent.change(screen.getByLabelText("Fee (NGN)"), { target: { value: "500" } });
@@ -354,7 +370,7 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Hours to answer a return"), { target: { value: "24" } });
     fireEvent.change(screen.getByLabelText("Penalty cap a day (NGN)"), { target: { value: "400" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7, demurrage_bps: 210, loc_penalty_bps: 210, loc_penalty_cap: 40000, abandoned_after_days: 30, auction_after_days: 90, claim_days: 90 }), slow);
   });
 
   test("support cannot change the deposit or states", async () => {
@@ -468,6 +484,52 @@ describe("Connect", () => {
     expect(items[0]!.textContent).toBe("Standing fan");
     expect(screen.getAllByText("Missing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Past free time").length).toBeGreaterThan(0);
+  });
+
+  test("operations add a warehouse in a state of its market", async () => {
+    shown(<WarehousesPage />);
+    expect((await screen.findAllByText("Udozo Lagos warehouse", {}, slow)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Add a warehouse" }));
+    const dialog = openDialog();
+    await dialog.findByRole("option", { name: "Lagos" }, slow);
+    fireEvent.change(dialog.getByLabelText("State"), { target: { value: "s1" } });
+    fireEvent.change(dialog.getByLabelText("Name"), { target: { value: "Udozo Abuja warehouse" } });
+    fireEvent.change(dialog.getByLabelText("Address"), { target: { value: "2 Road" } });
+    fireEvent.change(dialog.getByLabelText("Opening hours"), { target: { value: "9 to 5" } });
+    fireEvent.change(dialog.getByLabelText("Phone"), { target: { value: "0803" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Add warehouse" }));
+    await waitFor(() => expect(lastSent("/connect/warehouses")?.body).toMatchObject({ country: "NG", state_id: "s1", name: "Udozo Abuja warehouse", contact_name: null }), slow);
+  });
+
+  test("pickups: schedule one, show its code, check items in, hand an item back at the warehouse", async () => {
+    sentCollected = true;
+    shown(<PickupsPage />);
+    expect(await screen.findByText("482910", {}, slow)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Schedule a pickup" })[0]!);
+    fireEvent.change(openDialog().getByLabelText("Who collects"), { target: { value: "Tunde (Udozo)" } });
+    fireEvent.click(openDialog().getByRole("button", { name: "Schedule pickup" }));
+    await waitFor(() => expect(lastSent("/connect/pickups")?.body).toMatchObject({ centre_id: "cc1", collector: "Tunde (Udozo)" }), slow);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Check in at the warehouse" }, slow))[0]!);
+    const check = openDialog();
+    fireEvent.click(check.getByRole("checkbox", { name: /Kettle/ }));
+    fireEvent.click(check.getByRole("checkbox", { name: /never arrived/ }));
+    fireEvent.click(check.getByRole("button", { name: "Check in" }));
+    await waitFor(() => expect(lastSent("/connect/pickups/pk2/receive")?.body).toEqual({ order_ids: ["o7"], missing: ["o8"] }), slow);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Hand back to the seller" }, slow))[0]!);
+    fireEvent.change(openDialog().getByLabelText("Seller's return code"), { target: { value: "123456" } });
+    fireEvent.click(openDialog().getByRole("button", { name: "Hand back" }));
+    await waitFor(() => expect(lastSent("/connect/returns/rt9/hand-back")?.body).toEqual({ code: "123456" }), slow);
+  });
+
+  test("a centre's Final Return Address is set by operations", async () => {
+    params.id = "cc1";
+    shown(<CentrePage />);
+    const select = (await screen.findByLabelText("Final Return Address", {}, slow)) as HTMLSelectElement;
+    await waitFor(() => expect([...select.options].map(option => option.text)).toContain("Udozo Lagos warehouse"), slow);
+    fireEvent.change(select, { target: { value: "wh1" } });
+    await waitFor(() => expect(lastSent("/connect/centres/cc1/final-return-address")?.body).toEqual({ warehouse_id: "wh1" }), slow);
   });
 
   test("support reads a centre but cannot pause or close it", async () => {

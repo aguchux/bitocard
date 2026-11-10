@@ -22,9 +22,15 @@ const centreNumber = (number: bigint | number) => `CC-${String(number).padStart(
  */
 export const heldWhere: Prisma.ClassifiedOrderWhereInput = {
   connectCentreId: { not: null },
-  OR: [
-    { status: 'at_centre' },
-    { status: { in: ['disputed', 'refunded', 'partly_refunded'] }, receivedAt: { not: null }, releasedAt: null, NOT: { connectReturn: { is: { status: 'collected' } } } },
+  AND: [
+    {
+      OR: [
+        { status: 'at_centre' },
+        { status: { in: ['disputed', 'refunded', 'partly_refunded'] }, receivedAt: { not: null }, releasedAt: null, NOT: { connectReturn: { is: { status: 'collected' } } } },
+      ],
+    },
+    // Abandoned items stay the centre's until Udozo's pickup collects them.
+    { OR: [{ connectPlace: null }, { connectPlace: 'awaiting_pickup' }] },
   ],
 };
 export const atCentreWhere = (centreId: string): Prisma.ClassifiedOrderWhereInput => ({ ...heldWhere, connectCentreId: centreId });

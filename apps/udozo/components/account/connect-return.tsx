@@ -14,6 +14,13 @@ const reasonWords: Record<ShopConnectReturn["reason"], string> = {
 };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
+/** Where an abandoned item is, and where its seller collects it. */
+export function placeWords(item: Pick<ShopConnectReturn, "place" | "warehouse">, centreName: string) {
+  if (item.place === "udozo_warehouse" && item.warehouse) return `Abandoned: it is at ${item.warehouse.name}, ${item.warehouse.address}, ${item.warehouse.state} (${item.warehouse.hours}, ${item.warehouse.phone}). Collect it there after paying what is owed, before Udozo auctions it.`;
+  if (item.place === "in_transit") return "Abandoned: Udozo has collected it and is taking it to its warehouse.";
+  return `Abandoned: it waits at ${centreName} for Udozo's pickup to its warehouse. You can still collect it there after paying what is owed.`;
+}
+
 /**
  * A Connect item going back to its seller: why, and for the seller Accept the return (or it is accepted by itself when
  * nobody answers) and, once accepted, their return code to show at the centre, which takes its Connect fee as the return
@@ -49,6 +56,7 @@ export function ConnectReturnPanel({ orderId, centreName, seller, item }: { orde
       <p>
         {centreName} is returning it to the seller because {reasonWords[item.reason]}.
       </p>
+      {item.abandoned_at && status !== "collected" ? <p className="text-sm font-semibold">{placeWords(item, centreName)}</p> : null}
       {seller && status === "requested" ? (
         <>
           <p className="text-sm">Accept it, or it is accepted by itself on {when(item.answer_by)}.</p>
@@ -59,7 +67,7 @@ export function ConnectReturnPanel({ orderId, centreName, seller, item }: { orde
       ) : null}
       {seller && status === "accepted" ? (
         <>
-          {item.collect_by ? <p className="text-sm">Collect it by {when(item.collect_by)}: after that, storage is charged daily.</p> : null}
+          {item.collect_by && !item.abandoned_at ? <p className="text-sm">Collect it by {when(item.collect_by)}: after that, storage is charged daily.</p> : null}
           {code ? (
             <p aria-label={`Return code ${code.split("").join(" ")}`} className="text-center font-mono text-3xl font-extrabold tracking-[0.3em]">
               {code}

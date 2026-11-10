@@ -207,6 +207,16 @@ class SettingsDto {
 
   @IsOptional() @IsInt() @Min(0)
   loc_penalty_cap?: number;
+
+  /** Abandoned, then auctioned, this many days into Loss of care; claims within claim_days of the sale. */
+  @IsOptional() @IsInt() @Min(1) @Max(365)
+  abandoned_after_days?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(730)
+  auction_after_days?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(365)
+  claim_days?: number;
 }
 
 /**

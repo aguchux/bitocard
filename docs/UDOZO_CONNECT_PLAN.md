@@ -590,7 +590,45 @@ assistants' knowledge, help, terms and privacy.
      with its flags, sellers and buyers) and **What it holds** on each centre's page.
    - Tests: `apps/udozo-api/test/connect-reports.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo
-   auctions on udozo.com, and auction claims.
+   auctions on udozo.com, and auction claims. Built in slices:
+   - **7a, warehouses, abandonment and pickups (built):** migration `20270310600000_connect_warehouses`
+     (`connect_warehouses`; `connect_centres.fra_warehouse_id`; the market's `abandoned_after_days` 30,
+     `auction_after_days` 90 and `claim_days` 90, set with the Connect fee; `connect_return_requests.abandoned_at`;
+     `classified_orders.connect_place`, `connect_warehouse_id`, `connect_with_udozo_at`, `warehouse_received_at`;
+     `connect_pickups`, numbered **`PU-000123`**, and `connect_pickup_items`). `ConnectWarehousesService`:
+     - **Warehouses** (`GET|POST /v1/admin/connect/warehouses`, `PATCH …/:id`, operations, support reads; audited
+       `connect_warehouse.created|updated`): name, address, state, hours, phone, contact, open or closed. None is seeded:
+       operations add the first, in Lagos, and set each centre's **Final Return Address** (`PUT
+       /v1/admin/connect/centres/:id/final-return-address { warehouse_id }`, an open warehouse of its country, audited
+       `connect_centre.fra_set`).
+     - **Abandoned** (`abandon`, the `classifieds` job's `connect_abandoned`): an accepted return the market's days into
+       Loss of care, claimed once (`abandoned_at`), the item `connect_place: awaiting_pickup`; seller, centre and admins
+       told. **Order statuses are unchanged:** where an abandoned item is lives on `connect_place` (`awaiting_pickup`,
+       `in_transit`, `udozo_warehouse`, `auctioned`) beside the order's own status.
+     - **Pickups** (`POST /v1/admin/connect/pickups { centre_id, day, collector, note? }`, operations; `fra_missing`
+       without a Final Return Address, `nothing_to_pick_up` with nothing abandoned there): every abandoned item at the
+       centre not on another pickup, to its Final Return Address, with **one sealed 6-digit pickup code per pickup**
+       that Udozo's collector gives the centre (admins see it while it is scheduled; the centre never does). The centre
+       ticks what it gives the collector and enters the code (`POST /v1/connect/centres/:centre/pickups/:id/hand-over
+       { code, order_ids }`, 5 tries): those items are `in_transit`, off the centre's shelves and stock, their storage
+       from then on all Udozo's (`connect_with_udozo_at`); unticked ones stay for the next pickup. Operations check them
+       in at the warehouse (`…/pickups/:id/receive { order_ids, missing? }`: `udozo_warehouse`, or flagged missing), the
+       pickup then `delivered`; or cancel a pickup not collected (`…/cancel { reason }`). All audited.
+     - **Still the seller's to collect:** at the centre while it waits for the pickup (a pickup then goes without it),
+       at the warehouse once there (`POST /v1/admin/connect/returns/:id/hand-back { code }`, operations, the seller's
+       return code; the return fee then all Udozo's), never at the centre once Udozo has it (`with_udozo`); storage owed
+       first, as before. The order's `connect.return` carries `abandoned_at`, `place` and the `warehouse` holding it.
+     - **Not built:** check-out photos at the hand-over (a handover record and the code stand in for now).
+     - **Screens:** admin Connect > **Pickups** (`/connect/pickups`: waiting at centres with Schedule a pickup, pickups
+       with their code, Check in at the warehouse, what the warehouses hold with Hand back to the seller), **Warehouses**
+       (`/connect/warehouses`), the Final Return Address on each centre's page and the three day settings;
+       connect.udozo.com's **Pickups** (`/centre/<id>/pickups`: the Final Return Address, the next pickup, Hand over);
+       udozo.com's return panel says where an abandoned item is and where to collect it (`placeWords`).
+     - Tests: `apps/udozo-api/test/connect-warehouses.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`,
+       `apps/udozo-connect/test/centres.test.ts`, `apps/udozo-connect/test/centre-screens.test.tsx`,
+       `apps/udozo/test/connect-orders.test.ts`.
+   - **7b (next):** Udozo auctions on udozo.com.
+   - **7c:** claims, and unclaimed money becoming Udozo's.
 
 Each phase is behind the switch `connect_shipping` (Udozo's own, global or per country, **off by default**), with
 tests in the API, the site and the admin, as the other Udozo plans are. Applications can open before shipping does, so

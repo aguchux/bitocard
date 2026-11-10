@@ -532,6 +532,11 @@ export type ShopConnectReturn = {
   decided_by: 'seller' | 'admin' | 'auto' | null;
   collect_by: string | null;
   collected_at: string | null;
+  /** When it was abandoned (a month into Loss of care), and where it is: still at the centre, waiting for or with Udozo's pickup, or at Udozo's warehouse. */
+  abandoned_at?: string | null;
+  place?: 'centre' | 'awaiting_pickup' | 'in_transit' | 'udozo_warehouse' | 'auctioned';
+  /** Udozo's warehouse holding it, once it is there: where the seller collects it. */
+  warehouse?: { name: string; address: string; state: string; hours: string; phone: string } | null;
   /** The seller's view: the return fee they paid. */
   return_fee?: number;
 };

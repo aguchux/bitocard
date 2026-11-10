@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Centre, CentreReturn, CounterOrder, Earnings, List, Member, Shelf, StockCheck } from "./centres";
+import type { Centre, CentreReturn, CounterOrder, Earnings, List, Member, Pickup, Shelf, StockCheck } from "./centres";
 import { customerApi } from "./session";
 
 /** What an action answers: what it changed as it now is, or Udozo's refusal in words with the field it names. */
@@ -177,4 +177,13 @@ export async function moveEarnings(id: string, mode: "live" | "test", currency: 
   if (!uuid.test(id)) return unknown;
   if (!Number.isSafeInteger(amount) || amount <= 0) return { ok: false, message: "Give an amount to move.", code: "parameter_invalid", param: "amount" };
   return answer(await customerApi<Earnings>("POST", `/v1/connect/centres/${id}/earnings/move`, { mode, currency, amount }));
+}
+
+/** Hands the ticked items to Udozo's collector against their pickup code. Never stored for replay. */
+export async function handOverPickup(id: string, pickup: string, code: string, orders: string[]): Promise<CentreResult<Pickup>> {
+  if (!uuid.test(id) || !uuid.test(pickup) || orders.some(order => !uuid.test(order))) return unknown;
+  const digits = code.replace(/\s/g, "");
+  if (!/^\d{6}$/.test(digits)) return { ok: false, message: "The pickup code is 6 digits.", code: "parameter_invalid", param: "code" };
+  if (!orders.length) return { ok: false, message: "Tick the items you give the collector.", code: "parameter_invalid", param: "order_ids" };
+  return answer(await customerApi<Pickup>("POST", `/v1/connect/centres/${id}/pickups/${pickup}/hand-over`, { code: digits, order_ids: orders }));
 }
