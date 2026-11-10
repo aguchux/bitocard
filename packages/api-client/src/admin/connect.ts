@@ -105,6 +105,8 @@ export type ConnectCentre = {
   number: string;
   name: string;
   status: 'active' | 'paused' | 'closed';
+  /** Why it is paused: by its partner (a holiday, until a day or not) or by Udozo (only Udozo lifts it). */
+  paused: ConnectCentrePause | null;
   country: string;
   state: string;
   area: string;
@@ -119,6 +121,41 @@ export type ConnectCentre = {
 };
 
 const clean = (values: Record<string, string | number | undefined>) => Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined && value !== ''));
+
+export type ConnectCentrePause = { by: 'partner' | 'udozo'; reason: string | null; until: string | null };
+export type ConnectCentreRole = 'owner' | 'manager' | 'staff';
+export const connectCentreRoleLabels: Record<ConnectCentreRole, string> = { owner: 'Owner', manager: 'Manager', staff: 'Staff' };
+
+/** One centre as Udozo's team sees it: its office, its people on connect.udozo.com and its storage places. */
+export type ConnectCentreDetail = {
+  object: 'connect_centre';
+  id: string;
+  number: string;
+  name: string;
+  status: ConnectCentre['status'];
+  paused: ConnectCentrePause | null;
+  closed: { at: string | null; reason: string | null } | null;
+  country: string;
+  state: { id: string; name: string };
+  area: { id: string; name: string };
+  address: string;
+  landmark: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  hours: string;
+  phone: string;
+  capacity: number;
+  photos: string[];
+  deposit: { amount: number; currency: string };
+  /** How many people work there. */
+  people: number;
+  created_at: string;
+  partner: { id: string; name: string; email: string; phone: string | null };
+  application_id: string | null;
+  members: { object: 'connect_centre_member'; id: string; role: ConnectCentreRole; name: string; email: string; phone: string | null; since: string }[];
+  /** Its storage places, those in use first. */
+  shelves: { object: 'connect_shelf'; id: string; code: string; label: string | null; capacity: number | null; active: boolean; position: number }[];
+};
 
 const changed = (id: string) => ['ConnectApplications' as const, { type: 'ConnectApplications' as const, id }, 'Activity' as const];
 
@@ -193,6 +230,14 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: filter => ({ url: '/v1/admin/connect/centres', params: clean({ country: filter?.country, status: filter?.status }) }),
       providesTags: ['ConnectCentres'],
     }),
+    connectCentre: build.query<ConnectCentreDetail, string>({
+      query: id => `/v1/admin/connect/centres/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'ConnectCentres', id }],
+    }),
+    setConnectCentreStatus: build.mutation<ConnectCentreDetail, { id: string; action: 'pause' | 'reinstate' | 'close'; reason: string }>({
+      query: ({ id, action, reason }) => ({ url: `/v1/admin/connect/centres/${id}/${action}`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { id }) => ['ConnectCentres', { type: 'ConnectCentres', id }, 'Activity'],
+    }),
   }),
 });
 
@@ -212,4 +257,6 @@ export const {
   useConnectSettingsQuery,
   useSetConnectSettingsMutation,
   useConnectCentresQuery,
+  useConnectCentreQuery,
+  useSetConnectCentreStatusMutation,
 } = connectApi;

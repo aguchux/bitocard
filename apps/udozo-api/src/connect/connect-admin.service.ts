@@ -127,7 +127,7 @@ export class ConnectAdminService {
     return { object: 'connect_settings' as const, country: country.code, name: country.name, currency: country.currency, deposit: deposit === null ? null : Number(deposit) };
   }
 
-  // ---- Centres (approval makes them; their own dashboard comes with phase 3) ----
+  // ---- Centres (approval makes them; one centre's page is ConnectCentresService.adminGet) ----
 
   async centres(filter: { country?: string; status?: string }) {
     const rows = await this.prisma.connectCentre.findMany({
@@ -144,6 +144,7 @@ export class ConnectAdminService {
         number: centreNumber(row.number),
         name: row.name,
         status: row.status,
+        paused: row.status === 'paused' ? { by: row.pausedBy, reason: row.pausedReason, until: row.pausedUntil?.toISOString() ?? null } : null,
         country: row.country,
         state: row.state.name,
         area: row.area.name,

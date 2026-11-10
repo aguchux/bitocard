@@ -264,7 +264,7 @@ function ApplicationView({ application, acts }: { application: ConnectApplicatio
                         {
                           label: "Centre",
                           value: (
-                            <AppLink href="/connect/centres" className="font-semibold text-brand-600 hover:underline">
+                            <AppLink href={`/connect/centres/${application.centre.id}`} className="font-semibold text-brand-600 hover:underline">
                               {application.centre.number}
                             </AppLink>
                           ),

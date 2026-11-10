@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge, Card, DataTable, errorMessage, FilterSelect, formatDate, formatNumber, PageHeader, type Column } from "@bitocard/admin-ui";
-import { AppLink } from "@bitocard/admin-ui/shell";
+import { usePrefetchQuery } from "@bitocard/api-client";
 import { type ConnectCentre, useConnectCentresQuery } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
-import { money } from "@/components/connect";
+import { centreStatusLabels as statusLabels, centreStatusTones as statusTones, money, pausedBy } from "@/components/connect";
 import { UdozoShell } from "@/components/shell";
 
-const statusLabels: Record<ConnectCentre["status"], string> = { active: "Active", paused: "Paused", closed: "Closed" };
-const statusTones: Record<ConnectCentre["status"], "green" | "amber" | "grey"> = { active: "green", paused: "amber", closed: "grey" };
-
-/** Connect > Centres: the Connect Centres approved applications made, newest first, each with the application it came from. */
+/** Connect > Centres: the Connect Centres approved applications made, newest first; each opens its own page. */
 export default function ConnectCentresPage() {
+  const router = useRouter();
+  const prefetch = usePrefetchQuery("connectCentre");
   const [country, setCountry] = useState("");
   const [status, setStatus] = useState<ConnectCentre["status"] | "">("");
   const centres = useConnectCentresQuery({ country: country || undefined, status: status || undefined });
@@ -23,13 +23,7 @@ export default function ConnectCentresPage() {
       header: "Centre",
       cell: row => (
         <span className="block min-w-0">
-          {row.application_id ? (
-            <AppLink href={`/connect/applications/${row.application_id}`} className="block truncate font-semibold text-brand-600 hover:underline">
-              {row.name}
-            </AppLink>
-          ) : (
-            <span className="block truncate font-semibold text-ink">{row.name}</span>
-          )}
+          <span className="block truncate font-semibold text-brand-600">{row.name}</span>
           <span className="block truncate text-xs text-muted">
             {row.number} · {row.area}, {row.state}
           </span>
@@ -65,7 +59,7 @@ export default function ConnectCentresPage() {
       cell: row => (
         <span className="grid gap-1">
           <Badge tone={statusTones[row.status]}>{statusLabels[row.status]}</Badge>
-          <span className="text-xs text-muted">Since {formatDate(row.created_at)}</span>
+          <span className="text-xs text-muted">{row.paused ? pausedBy(row.paused) : `Since ${formatDate(row.created_at)}`}</span>
         </span>
       ),
     },
@@ -73,7 +67,7 @@ export default function ConnectCentresPage() {
 
   return (
     <UdozoShell section="connect" current="/connect/centres" crumbs={[{ label: "Connect", href: "/connect/applications" }, { label: "Centres" }]}>
-      <PageHeader title="Connect Centres" description="Offices approved to receive, check and hand over items. Running them on connect.udozo.com comes with the next phase." />
+      <PageHeader title="Connect Centres" description="Offices approved to receive, check and hand over items, run by their partners on connect.udozo.com. Open one to see its people and storage places, or to pause or close it." />
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <MarketFilter id="centres-market" value={country} onChange={setCountry} />
         <FilterSelect
@@ -93,6 +87,11 @@ export default function ConnectCentresPage() {
           error={centres.error ? errorMessage(centres.error) : null}
           onRetry={centres.refetch}
           rowKey={row => row.id}
+          onRowClick={row => router.push(`/connect/centres/${row.id}`)}
+          onRowIntent={row => {
+            router.prefetch(`/connect/centres/${row.id}`);
+            prefetch(row.id);
+          }}
           empty="No centres yet. Approving an application makes one."
         />
       </Card>

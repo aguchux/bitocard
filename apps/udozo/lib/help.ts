@@ -14,7 +14,7 @@ export const helpLinks: HelpLink[] = [
   { label: "Track orders", href: null, icon: "package", hint: "Where your order is" },
   { label: "FAQs", href: "/help/faqs", icon: "questions", hint: "Quick answers" },
   { label: "Resell on Udozo", href: "/start-here", icon: "store", hint: "Sell, or open a store" },
-  { label: "Pickup centres", href: null, icon: "pickup", hint: "Collect near you" },
+  { label: "Connect Centres", href: "/connect-centres", icon: "pickup", hint: "Collect near you" },
   { label: "Contact us", href: "/help/contact", icon: "mail", hint: "Write to our team" },
 ];
 

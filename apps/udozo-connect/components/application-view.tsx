@@ -139,7 +139,12 @@ export function ApplicationView({ application }: { application: Application }) {
 
       {app.status === "approved" ? (
         <Panel title="You are a Udozo Connect Centre" tone="good">
-          <p>{app.centre ? <>Your centre number is <strong>{app.centre.number}</strong>.</> : null} Your centre dashboard is coming here soon.</p>
+          <p>{app.centre ? <>Your centre number is <strong>{app.centre.number}</strong>.</> : null} Set up its storage places and staff, and run it from here.</p>
+          {app.centre ? (
+            <a href={`/centre/${app.centre.id}`} className={`${primary} mt-3`}>
+              Open your centre
+            </a>
+          ) : null}
         </Panel>
       ) : null}
 

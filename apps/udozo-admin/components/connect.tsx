@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, currencyDigits, formatMoney } from "@bitocard/admin-ui";
-import { type ConnectApplicationStatus, connectApplicationStatusLabels } from "@bitocard/api-client/admin";
+import { type ConnectApplicationStatus, connectApplicationStatusLabels, type ConnectCentre, type ConnectCentrePause } from "@bitocard/api-client/admin";
 
 const tones: Record<ConnectApplicationStatus, "green" | "amber" | "red" | "blue" | "grey" | "pink"> = {
   draft: "grey",
@@ -18,6 +18,12 @@ const tones: Record<ConnectApplicationStatus, "green" | "amber" | "red" | "blue"
 export function ApplicationStatus({ status }: { status: ConnectApplicationStatus }) {
   return <Badge tone={tones[status]}>{connectApplicationStatusLabels[status]}</Badge>;
 }
+
+export const centreStatusLabels: Record<ConnectCentre["status"], string> = { active: "Active", paused: "Paused", closed: "Closed" };
+export const centreStatusTones: Record<ConnectCentre["status"], "green" | "amber" | "grey"> = { active: "green", paused: "amber", closed: "grey" };
+
+/** Who paused a centre, in words. */
+export const pausedBy = (pause: ConnectCentrePause) => (pause.by === "udozo" ? "Paused by Udozo" : "Paused by the partner");
 
 /** Minor units in the market's currency, or a dash when there is none. */
 export const money = (minor: number | null | undefined, currency: string) => (minor === null || minor === undefined ? "—" : formatMoney(minor, currency));

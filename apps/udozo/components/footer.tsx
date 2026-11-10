@@ -28,6 +28,9 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
               Udozo on WhatsApp
             </a>
           ) : null}
+          <Link href={country ? `/${country.code.toLowerCase()}/connect-centres` : "/connect-centres"} className="hover:underline">
+            Connect Centres
+          </Link>
           <a href={connectUrl} className="font-semibold text-navy-900 hover:underline">
             Become a Connect Centre
           </a>

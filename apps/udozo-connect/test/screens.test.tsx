@@ -102,11 +102,12 @@ describe("the application page", () => {
     expect(host.textContent).toContain("You withdrew this application");
   });
 
-  it("names the centre once approved, with its dashboard to come", () => {
+  it("names the centre once approved and opens it", () => {
     const page = html(application({ status: "approved", decision: { at: "2026-11-13T10:00:00.000Z", reason: null }, centre: { id: "c1", number: "CC-000003", status: "active" } }));
     expect(page).toContain("You are a Udozo Connect Centre");
     expect(page).toContain("CC-000003");
-    expect(page).toContain("Your centre dashboard is coming here soon");
+    expect(page).toContain('href="/centre/c1"');
+    expect(page).toContain("Open your centre");
     expect(page).not.toContain("Withdraw application");
   });
 

@@ -2839,6 +2839,7 @@ model Customer {
   connectApplications       ConnectCentreApplication[]
   connectAgreements         ConnectAgreementAcceptance[]
   connectCentres            ConnectCentre[]           @relation("ConnectCentrePartner")
+  connectMemberships        ConnectCentreMember[]
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
@@ -7329,6 +7330,13 @@ model ConnectCentre {
   phone        String
   capacity     Int
   status       String                    @default("active")
+  /// Why it is paused (a holiday the partner set, or Udozo's reason), until when (the partner's, optional), and by whom
+  /// (partner or udozo: only Udozo lifts its own pause).
+  pausedReason String?                   @map("paused_reason")
+  pausedUntil  DateTime?                 @map("paused_until")
+  pausedBy     String?                   @map("paused_by")
+  closedAt     DateTime?                 @map("closed_at")
+  closedReason String?                   @map("closed_reason")
   /// The deposit it paid, held in its partner's `connect_centre_deposit` account.
   depositMinor BigInt                    @map("deposit_minor")
   currency     String
@@ -7339,8 +7347,48 @@ model ConnectCentre {
   state        ClassifiedArea            @relation("ConnectCentreState", fields: [stateId], references: [id], onDelete: Restrict)
   area         ClassifiedArea            @relation("ConnectCentreArea", fields: [areaId], references: [id], onDelete: Restrict)
   application  ConnectCentreApplication?
+  members      ConnectCentreMember[]
+  shelves      ConnectShelf[]
 
   @@index([country, stateId, status])
   @@index([partnerId])
   @@map("connect_centres")
+}
+
+/// Who works at a centre on connect.udozo.com: its owner (the partner who applied), managers and staff.
+model ConnectCentreMember {
+  id         String        @id @default(uuid()) @db.Uuid
+  centreId   String        @map("centre_id") @db.Uuid
+  customerId String        @map("customer_id") @db.Uuid
+  /// owner, manager or staff.
+  role       String
+  /// The member who added them (null for the owner, made at approval).
+  addedById  String?       @map("added_by_id") @db.Uuid
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  centre     ConnectCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([centreId, customerId])
+  @@index([customerId])
+  @@map("connect_centre_members")
+}
+
+/// A storage place at a centre (A-01, Shelf 3, Back room): items are shelved in one so staff always know where they are.
+model ConnectShelf {
+  id        String        @id @default(uuid()) @db.Uuid
+  centreId  String        @map("centre_id") @db.Uuid
+  code      String
+  label     String?
+  /// How many items it holds, if the centre says.
+  capacity  Int?
+  active    Boolean       @default(true)
+  position  Int           @default(0)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  centre    ConnectCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
+
+  @@unique([centreId, code])
+  @@index([centreId, position])
+  @@map("connect_shelves")
 }

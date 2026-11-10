@@ -544,6 +544,8 @@ export class ConnectApplicationsService {
       });
       const claimed = await tx.connectCentreApplication.updateMany({ where: { id, status: 'visited' }, data: { status: 'approved', decidedAt: now, decidedById: adminId, centreId: made.id } });
       if (!claimed.count) throw changed();
+      // The partner who applied is its owner on connect.udozo.com.
+      await tx.connectCentreMember.create({ data: { centreId: made.id, customerId: row.customerId, role: 'owner' } });
       return made;
     });
     await this.audit.record({ actorId: adminId, action: 'connect_application.approved', targetType: 'connect_application', targetId: id, before: { status: row.status }, after: { status: 'approved', centre_id: centre.id } });

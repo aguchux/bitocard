@@ -17,6 +17,7 @@ const { default: ApplicationPage } = await import("@/app/(console)/connect/appli
 const { default: VisitorsPage } = await import("@/app/(console)/connect/visitors/page");
 const { default: SettingsPage } = await import("@/app/(console)/connect/settings/page");
 const { default: CentresPage } = await import("@/app/(console)/connect/centres/page");
+const { default: CentrePage } = await import("@/app/(console)/connect/centres/[id]/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -63,7 +64,43 @@ const application = (over: Record<string, unknown> = {}) => ({
 
 const visitor = (over: Record<string, unknown> = {}) => ({ object: "connect_visitor", id: "v1", country: "NG", name: "Tunde Bello", phone: "08030000000", email: null, kind: "staff", trained_at: null, can_visit: true, active: true, created_at: "2026-11-01T00:00:00.000Z", ...over });
 
+const centre = (over: Record<string, unknown> = {}) => ({
+  object: "connect_centre",
+  id: "cc1",
+  number: "CC-000001",
+  name: "Ikeja Parcel Hub",
+  status: "active",
+  paused: null,
+  closed: null,
+  country: "NG",
+  state: { id: "s1", name: "Lagos" },
+  area: { id: "a1", name: "Ikeja" },
+  address: "12 Allen Avenue",
+  landmark: "Opposite the bank",
+  latitude: 6.6,
+  longitude: 3.35,
+  hours: "8am to 6pm",
+  phone: "+2348031234567",
+  capacity: 150,
+  photos: ["https://media.udozo.test/front.jpg"],
+  deposit: { amount: 5_000_000, currency: "NGN" },
+  people: 2,
+  created_at: "2026-11-05T00:00:00.000Z",
+  partner: { id: "c1", name: "Ngozi Ade", email: "ngozi@example.com", phone: "+2348031234567" },
+  application_id: "app1",
+  members: [
+    { object: "connect_centre_member", id: "m1", role: "owner", name: "Ngozi Ade", email: "ngozi@example.com", phone: "+2348031234567", since: "2026-11-05T00:00:00.000Z" },
+    { object: "connect_centre_member", id: "m2", role: "staff", name: "Bola Ade", email: "bola@example.com", phone: null, since: "2026-11-06T00:00:00.000Z" },
+  ],
+  shelves: [
+    { object: "connect_shelf", id: "sh1", code: "A-01", label: "Front shelf", capacity: 20, active: true, position: 0 },
+    { object: "connect_shelf", id: "sh2", code: "BACK ROOM", label: null, capacity: null, active: false, position: 1 },
+  ],
+  ...over,
+});
+
 let roles: string[];
+let centreNow: ReturnType<typeof centre>;
 let deposit: number | null;
 let current: ReturnType<typeof application>;
 let sent: Array<{ method: string; path: string; search: string; body: unknown }>;
@@ -83,6 +120,8 @@ beforeEach(() => {
   roles = ["operations"];
   deposit = 5_000_000;
   current = application();
+  centreNow = centre();
+  params.id = "app1";
   process.env.NEXT_PUBLIC_API_URL = "http://api.test";
   vi.stubGlobal("fetch", async (input: Request) => {
     const url = new URL(input.url);
@@ -118,8 +157,17 @@ beforeEach(() => {
     if (path === "/v1/admin/connect/centres")
       return ok({
         object: "list",
-        data: [{ object: "connect_centre", id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", status: "active", country: "NG", state: "Lagos", area: "Ikeja", address: "12 Allen Avenue", hours: "8am to 6pm", phone: "+234", capacity: 150, deposit: { amount: 5_000_000, currency: "NGN" }, partner: { id: "c1", name: "Ngozi Ade", email: "ngozi@example.com" }, application_id: "app1", created_at: "2026-11-05T00:00:00.000Z" }],
+        data: [{ object: "connect_centre", id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", status: "paused", paused: { by: "udozo", reason: "Checks", until: null }, country: "NG", state: "Lagos", area: "Ikeja", address: "12 Allen Avenue", hours: "8am to 6pm", phone: "+234", capacity: 150, deposit: { amount: 5_000_000, currency: "NGN" }, partner: { id: "c1", name: "Ngozi Ade", email: "ngozi@example.com" }, application_id: "app1", created_at: "2026-11-05T00:00:00.000Z" }],
       });
+    if (path === "/v1/admin/connect/centres/cc1") return ok(centreNow);
+    const status = /^\/v1\/admin\/connect\/centres\/cc1\/(pause|reinstate|close)$/.exec(path)?.[1];
+    if (status && input.method === "POST") {
+      const reason = (body as { reason: string }).reason;
+      centreNow = centre(
+        status === "pause" ? { status: "paused", paused: { by: "udozo", reason, until: null } } : status === "close" ? { status: "closed", closed: { at: "2026-11-10T00:00:00.000Z", reason } } : {},
+      );
+      return ok(centreNow);
+    }
     return Response.json({ error: { type: "not_found_error", code: "resource_missing", message: "Not found." } }, { status: 404 });
   });
 });
@@ -275,10 +323,50 @@ describe("Connect", () => {
     expect(await screen.findByText("Kemi Field was added.", {}, slow)).toBeTruthy();
   });
 
-  test("centres link to the application they came from", async () => {
+  test("centres open their own page and say who paused them", async () => {
     shown(<CentresPage />);
-    const link = (await screen.findAllByRole("link", { name: "Ikeja Parcel Hub" }, slow))[0]!;
-    expect(link.getAttribute("href")).toBe("/connect/applications/app1");
-    expect(link.closest("tr")!.textContent).toContain("CC-000001");
+    const row = (await screen.findAllByText("Paused by Udozo", {}, slow)).map(cell => cell.closest("tr")).find(Boolean)!;
+    expect(row.textContent).toContain("CC-000001");
+    fireEvent.click(within(row).getByText("Ikeja Parcel Hub"));
+    expect(pushed).toContain("/connect/centres/cc1");
+  });
+
+  test("a centre's page shows its office, people and storage places, and links its application", async () => {
+    params.id = "cc1";
+    shown(<CentrePage />);
+    expect(await screen.findByRole("heading", { name: "CC-000001: Ikeja Parcel Hub" }, slow)).toBeTruthy();
+    expect(screen.getByText("Opposite the bank")).toBeTruthy();
+    expect(screen.getByText("Bola Ade")).toBeTruthy();
+    expect(screen.getByText("Owner")).toBeTruthy();
+    expect(screen.getByText("A-01")).toBeTruthy();
+    expect(screen.getByText("BACK ROOM (not in use)")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "The application" }).getAttribute("href")).toBe("/connect/applications/app1");
+    expect(screen.getByRole("link", { name: "Open in Google Maps" }).getAttribute("href")).toBe("https://www.google.com/maps?q=6.6,3.35");
+  });
+
+  test("operations pause it with a reason, then close it", async () => {
+    params.id = "cc1";
+    shown(<CentrePage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Pause" }, slow));
+    fireEvent.change(openDialog().getByRole("textbox"), { target: { value: "A buyer reported a missing item." } });
+    fireEvent.click(openDialog().getByRole("button", { name: "Pause centre" }));
+    await waitFor(() => expect(lastSent("/connect/centres/cc1/pause")?.body).toEqual({ reason: "A buyer reported a missing item." }), slow);
+    expect(await screen.findByText(/Paused by Udozo: A buyer reported a missing item\./, {}, slow)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.change(openDialog().getByRole("textbox"), { target: { value: "The office moved away." } });
+    fireEvent.click(openDialog().getByRole("button", { name: "Close centre" }));
+    await waitFor(() => expect(lastSent("/connect/centres/cc1/close")?.body).toEqual({ reason: "The office moved away." }), slow);
+    expect(await screen.findByText(/Closed on .*: The office moved away\./, {}, slow)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+  });
+
+  test("support reads a centre but cannot pause or close it", async () => {
+    params.id = "cc1";
+    roles = ["support"];
+    shown(<CentrePage />);
+    expect(await screen.findByText("Bola Ade", {}, slow)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
   });
 });

@@ -20,11 +20,11 @@ beforeEach(() => api.customerApi.mockReset());
 describe("the Get help menu", () => {
   const html = renderToStaticMarkup(createElement(HelpMenu));
 
-  it("lists every place in order; UdozoPay, FAQs, Resell on Udozo and Contact us open, the rest marked Soon", () => {
-    expect(helpLinks.map(link => link.label)).toEqual(["Help Centre", "UdozoPay", "Track orders", "FAQs", "Resell on Udozo", "Pickup centres", "Contact us"]);
+  it("lists every place in order; UdozoPay, FAQs, Resell on Udozo, Connect Centres and Contact us open, the rest marked Soon", () => {
+    expect(helpLinks.map(link => link.label)).toEqual(["Help Centre", "UdozoPay", "Track orders", "FAQs", "Resell on Udozo", "Connect Centres", "Contact us"]);
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]);
-    expect(links).toEqual(["/safe-trade#udozopay", "/help/faqs", "/start-here", "/help/contact"]);
-    for (const label of ["Help Centre", "Track orders", "Pickup centres"]) {
+    expect(links).toEqual(["/safe-trade#udozopay", "/help/faqs", "/start-here", "/connect-centres", "/help/contact"]);
+    for (const label of ["Help Centre", "Track orders"]) {
       const row = html.slice(html.lastIndexOf("<li", html.indexOf(label)), html.indexOf("</li>", html.indexOf(label)));
       expect(row).toContain('aria-disabled="true"');
       expect(row).toContain("Soon");

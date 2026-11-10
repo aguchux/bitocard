@@ -1,7 +1,7 @@
 # Udozo Connect: UdozoPay, logistics and Connect Centres
 
 Status: **being built** (9 November 2026, the owner's request). The owner has answered every open question
-(recorded at the end). Phases 1 and 2 are built; nothing is pushed until every phase is (the owner's rule).
+(recorded at the end). Phases 1 to 3 are built; nothing is pushed until every phase is (the owner's rule).
 
 ## Udozo's two halves
 
@@ -384,8 +384,41 @@ assistants' knowledge, help, terms and privacy.
    - **udozo.com:** the Connect Centre agreement (`/legal/connect-centres`, version `2026-11-09` in the API), the privacy
      notice's section 4b and the `udz_connect` cookie, footer links, and `/connect/*` redirected to connect.udozo.com.
      Tests: `apps/udozo/test/connect.test.ts`.
-3. **Centres and the dashboard**: the centres table, connect.udozo.com (sign-in, centre roles and staff, Centre,
-   shelves), the admin's Centres page, and udozo.com's Connect Centres page.
+3. **Centres and the dashboard** (**built**): the centres table, connect.udozo.com (sign-in, centre roles and staff,
+   Centre, shelves), the admin's Centres page, and udozo.com's Connect Centres page. As built:
+   - **API** (`ConnectCentresService`, `centres.controller.ts` in `apps/udozo-api/src/connect/`, migration
+     `20270309200000_connect_centres`): `connect_centre_members` (owner, manager, staff; the partner is the owner, made at
+     approval, and every centre approved before was given its owner by the migration) and `connect_shelves` (a code
+     unique per centre in capitals, a description, how many it holds, in use or not; switched off, never deleted), and on
+     `connect_centres` the pause (`paused_by` partner or udozo, its reason and an optional day to reopen) and closing.
+     A centre's people (`/v1/connect/centres/mine`, `/:id`, `PATCH /:id`, `/:id/pause`, `/:id/resume`, `/:id/members`
+     add, change and remove, `/:id/shelves` add and change; customer sessions; anyone else gets `centre_unknown`):
+     owners and managers change the hours, phone, capacity and landmark, pause for a holiday and open again, and set up
+     storage places; only the owner adds people (a Udozo account with a confirmed mobile, `account_not_found`,
+     `mobile_not_confirmed`, `member_exists`, at most 20), changes their role or removes them; anyone but the owner may
+     leave (`owner_fixed`); refusals by role are `centre_role_required` (403). A partner's pause with a day reopens by
+     itself when centres are next read (`reopenDue`); Udozo's pause only Udozo lifts (`centre_not_paused_by_you`).
+     Admins: `GET /v1/admin/connect/centres/:id` (support, operations, finance), `POST …/:id/pause|reinstate|close
+     { reason }` (operations, audited `connect_centre.paused|reinstated|closed`, the owner and managers told, notice
+     `customer.connect.centre` with an email); the list carries `paused`. Public: `GET /v1/connect/centres?country=&state=`
+     (active centres only, a minute in caches, never the deposit). Tests: `apps/udozo-api/test/connect-centres.test.mjs`.
+   - **Admin:** Connect > Centres rows open each centre's page (`/connect/centres/<id>`: the office, photos, its people
+     and storage places, the partner and the application, the deposit; Pause, Reinstate or Open it again, and Close, each
+     with a reason). Hooks `useConnectCentreQuery`, `useSetConnectCentreStatusMutation`. Tests: `apps/udozo-admin/test/connect.test.tsx`.
+   - **connect.udozo.com:** `/centre` (the only centre, a choice of several, or back to the application), and each
+     centre's pages under `/centre/<id>`: Overview (whether it takes orders, what it holds, Get ready: storage places and
+     staff), Centre (`/settings`: the details, Going on holiday? with a day to reopen, Open again), Staff and Storage
+     places (`/shelves`). The header shows **My centre** to people who work at one, and an approved application links
+     **Open your centre**. Actions in `lib/centre-actions.ts`, reads in `lib/centre-data.ts`, rules in `lib/centres.ts`.
+     **Not on `ConsoleShell`** as planned in section 3: the site keeps its server-held session (the browser never calls
+     the API), so its centre layout is its own, mobile first (the menu a row of tabs across the top on phones, a list
+     beside the page from tablets up). Tests: `apps/udozo-connect/test/centres.test.ts`, `centre-screens.test.tsx`.
+   - **udozo.com:** `/<cc>/connect-centres` (`app/[cc]/connect-centres/page.tsx`, `lib/connect-centres.ts`): the
+     market's centres by state (address, landmark, area, hours, a number to call, a map link, the shopfront), a state
+     filter (`?state=<slug>`, `noindex`, as is a list with none yet), and Become a Connect Centre. The help menu's
+     Pickup centres (Soon) is now **Connect Centres** (`/connect-centres`, which opens the chosen market's list, or the
+     only market's, else a choice of markets), and the footer links it. Not in the sitemaps yet: that needs a count of
+     centres on the classifieds sitemap API. Tests: `apps/udozo/test/connect.test.ts`, `help.test.ts`.
 4. **Listings**: shipping states and centres in Post an ad, and the listing page's shipping line.
 5. **Orders**: buying with a centre, labels, and on the dashboard Expected, Receive, Shelve, Release, Updates, Returns
    and Stock check; the order timeline, and centre earnings and payouts.

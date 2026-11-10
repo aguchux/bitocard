@@ -267,6 +267,7 @@ describe('Connect Centre applications', () => {
     assert.match((await person.get(`/v1/connect/applications/${id}`)).json.centre.number, /^CC-\d{6}$/);
     assert.ok((await admin.get('/v1/admin/connect/centres?country=NG')).json.data.some(row => row.id === centre.id));
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'connect_application.approved', targetId: id } }));
+    assert.ok(await prisma.connectCentreMember.findFirst({ where: { centreId: centre.id, customerId: person.id, role: 'owner' } }), 'the applicant owns it on connect.udozo.com');
     assert.equal(await balance('connect_centre_deposit', person.id), 5_000_000n, 'the centre keeps its deposit');
   });
 
