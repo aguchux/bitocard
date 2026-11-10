@@ -117,6 +117,55 @@ export type ConnectSettings = {
   loc_penalty_cap: number;
 };
 
+/** What needs attention at a centre, in the report. */
+export type ConnectFlag = 'over_capacity' | 'overdue_items' | 'missing_items' | 'loss_of_care' | 'late_arrivals' | 'high_uncollected' | 'paused' | 'closed';
+
+/** Udozo Connect's report: what every centre holds now and how it did over the period, the money and the people behind problems. */
+export type ConnectReport = {
+  object: 'connect_report';
+  days: number;
+  country: string | null;
+  now: { centres: number; holding: number; overdue: number; missing: number; loss_of_care: number; late_arrivals: number };
+  period: { orders: number; handed_over: number; not_collected: number; refused_at_check_in: number; refused_at_counter: number; returns_collected: number; uncollected_pct: number | null };
+  money: Array<{ currency: string; connect_fees: number; centres: number; udozo: number; storage_buyers: number; storage_sellers: number }>;
+  centres: Array<{
+    id: string;
+    number: string;
+    name: string;
+    status: ConnectCentre['status'];
+    country: string;
+    state: string;
+    area: string;
+    capacity: number | null;
+    now: { holding: number; overdue: number; missing: number; loss_of_care: number; late_arrivals: number };
+    period: { orders: number; handed_over: number; not_collected: number; refused_at_check_in: number; refused_at_counter: number; uncollected_pct: number | null };
+    flags: ConnectFlag[];
+  }>;
+  sellers: Array<{ id: string; name: string | null; email: string | null; refused: number; damaged: number; storage_owed: { amount: number; currency: string } | null }>;
+  buyers: Array<{ id: string; name: string | null; email: string | null; not_collected: number; refused_at_counter: number }>;
+};
+
+/** An item a centre holds now, as Udozo's team sees it on the centre's page. */
+export type ConnectHeldItem = {
+  object: 'connect_held_item';
+  order_id: string;
+  number: string;
+  title: string;
+  status: string;
+  price: number;
+  currency: string;
+  shelf: string | null;
+  received_at: string | null;
+  ready_at: string | null;
+  collect_by: string | null;
+  overdue: boolean;
+  missing_since: string | null;
+  seen_at: string | null;
+  return: { number: string; status: string; loss_of_care_at: string | null } | null;
+  buyer_owed: number;
+  seller_owed: number;
+};
+
 /** An item a Connect Centre's stock check did not find, until found again or handed over. */
 export type ConnectMissingItem = {
   object: 'connect_missing_item';
@@ -314,6 +363,14 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: filter => ({ url: '/v1/admin/connect/returns', params: clean({ status: filter?.status, country: filter?.country }) }),
       providesTags: ['ConnectCentres'],
     }),
+    connectReport: build.query<ConnectReport, { country?: string; days?: number } | void>({
+      query: filter => ({ url: '/v1/admin/connect/report', params: clean({ country: filter?.country, days: filter?.days }) }),
+      providesTags: ['ConnectCentres'],
+    }),
+    connectCentreItems: build.query<{ object: 'list'; data: ConnectHeldItem[] }, string>({
+      query: id => `/v1/admin/connect/centres/${id}/items`,
+      providesTags: (_result, _error, id) => [{ type: 'ConnectCentres', id }],
+    }),
     connectMissing: build.query<{ object: 'list'; data: ConnectMissingItem[] }, { country?: string } | void>({
       query: filter => ({ url: '/v1/admin/connect/missing', params: clean({ country: filter?.country }) }),
       providesTags: ['ConnectCentres'],
@@ -349,5 +406,7 @@ export const {
   useSetConnectCentreStatusMutation,
   useConnectReturnsQuery,
   useConnectMissingQuery,
+  useConnectReportQuery,
+  useConnectCentreItemsQuery,
   useApproveConnectReturnMutation,
 } = connectApi;

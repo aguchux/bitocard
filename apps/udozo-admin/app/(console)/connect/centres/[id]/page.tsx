@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { ActionDialog, Badge, Button, Card, CardHeader, formatDate, formatDateTime, formatNumber, KeyValue, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type ConnectCentreDetail, connectCentreRoleLabels, useConnectCentreQuery, useSetConnectCentreStatusMutation } from "@bitocard/api-client/admin";
+import { type ConnectCentreDetail, connectCentreRoleLabels, useConnectCentreItemsQuery, useConnectCentreQuery, useSetConnectCentreStatusMutation } from "@bitocard/api-client/admin";
 import { centreStatusLabels, centreStatusTones, money, pausedBy } from "@/components/connect";
 import { UdozoShell } from "@/components/shell";
 
@@ -138,6 +138,8 @@ function CentreView({ centre, acts }: { centre: ConnectCentreDetail; acts: boole
             </ul>
           </Card>
 
+          <HeldItems centre={centre.id} />
+
           <Card className="p-5 sm:p-6">
             <CardHeader title="Storage places" description="Where items are shelved, so staff always know where each one is." className="px-0 pt-0 pb-4" />
             {centre.shelves.length ? (
@@ -203,6 +205,39 @@ function CentreView({ centre, acts }: { centre: ConnectCentreDetail; acts: boole
         />
       ) : null}
     </>
+  );
+}
+
+/** What the centre holds now: each item with its storage place and what is wrong with it, those needing attention first. */
+function HeldItems({ centre }: { centre: string }) {
+  const items = useConnectCentreItemsQuery(centre);
+  const rows = [...(items.data?.data ?? [])].sort((a, b) => Number(Boolean(b.missing_since)) - Number(Boolean(a.missing_since)) || Number(b.overdue) - Number(a.overdue));
+  return (
+    <Card className="p-5 sm:p-6">
+      <CardHeader title="What it holds" description="Every item checked in and not handed over yet, missing and overdue ones first." className="px-0 pt-0 pb-4" />
+      {items.isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : rows.length ? (
+        <ul className="divide-y divide-line text-sm">
+          {rows.map(item => (
+            <li key={item.order_id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+              <AppLink href={`/classifieds/orders/${item.order_id}`} className="min-w-0 truncate hover:underline">
+                <span className="font-semibold text-ink">{item.title}</span> <span className="text-muted">{item.number}</span>
+              </AppLink>
+              <span className="flex flex-wrap items-center gap-1">
+                <span className="text-xs text-muted">{item.shelf ? `On ${item.shelf}` : "On no storage place"}</span>
+                {item.missing_since ? <Badge tone="red">Missing</Badge> : null}
+                {item.overdue ? <Badge tone="amber">Past free time</Badge> : null}
+                {item.return?.loss_of_care_at ? <Badge tone="amber">Loss of care</Badge> : item.return ? <Badge tone="blue">Return {item.return.status}</Badge> : null}
+                {item.buyer_owed || item.seller_owed ? <span className="text-xs text-muted">Storage owed {money(item.buyer_owed + item.seller_owed, item.currency)}</span> : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">{items.error ? "Its items could not be read." : "Nothing at the centre right now."}</p>
+      )}
+    </Card>
   );
 }
 

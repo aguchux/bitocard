@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, currencyDigits, formatMoney } from "@bitocard/admin-ui";
-import { type ConnectApplicationStatus, connectApplicationStatusLabels, type ConnectCentre, type ConnectCentrePause } from "@bitocard/api-client/admin";
+import { type ConnectApplicationStatus, connectApplicationStatusLabels, type ConnectCentre, type ConnectCentrePause, type ConnectFlag } from "@bitocard/api-client/admin";
 
 const tones: Record<ConnectApplicationStatus, "green" | "amber" | "red" | "blue" | "grey" | "pink"> = {
   draft: "grey",
@@ -42,3 +42,28 @@ export function toMinor(value: string, currency: string) {
   if (!match) return null;
   return Number(match[1]) * 10 ** digits + Number((match[2] ?? "").padEnd(digits, "0") || 0);
 }
+
+/** What needs attention at a centre, in words and a badge colour (Connect > Reports). */
+export const flagLabels: Record<ConnectFlag, string> = {
+  missing_items: "Items missing",
+  over_capacity: "Full",
+  high_uncollected: "Often not collected",
+  loss_of_care: "Loss of care",
+  late_arrivals: "Items arriving late",
+  overdue_items: "Past their free time",
+  paused: "Paused",
+  closed: "Closed",
+};
+export const flagTones: Record<ConnectFlag, "red" | "amber" | "grey"> = {
+  missing_items: "red",
+  over_capacity: "red",
+  high_uncollected: "amber",
+  loss_of_care: "amber",
+  late_arrivals: "amber",
+  overdue_items: "amber",
+  paused: "grey",
+  closed: "grey",
+};
+
+/** A share in per cent, or a dash when nothing was tried. */
+export const percent = (value: number | null) => (value === null ? "\u2014" : `${value}%`);

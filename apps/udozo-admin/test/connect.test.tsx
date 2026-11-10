@@ -18,6 +18,7 @@ const { default: VisitorsPage } = await import("@/app/(console)/connect/visitors
 const { default: SettingsPage } = await import("@/app/(console)/connect/settings/page");
 const { default: CentresPage } = await import("@/app/(console)/connect/centres/page");
 const { default: CentrePage } = await import("@/app/(console)/connect/centres/[id]/page");
+const { default: ReportsPage } = await import("@/app/(console)/connect/reports/page");
 const { default: ReturnsPage } = await import("@/app/(console)/connect/returns/page");
 const { default: MissingPage } = await import("@/app/(console)/connect/missing/page");
 const { menus, sections } = await import("@/components/shell");
@@ -168,6 +169,26 @@ beforeEach(() => {
         data: [{ object: "connect_centre", id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", status: "paused", paused: { by: "udozo", reason: "Checks", until: null }, country: "NG", state: "Lagos", area: "Ikeja", address: "12 Allen Avenue", hours: "8am to 6pm", phone: "+234", capacity: 150, deposit: { amount: 5_000_000, currency: "NGN" }, partner: { id: "c1", name: "Ngozi Ade", email: "ngozi@example.com" }, application_id: "app1", created_at: "2026-11-05T00:00:00.000Z" }],
       });
     if (path === "/v1/admin/connect/centres/cc1") return ok(centreNow);
+    if (path === "/v1/admin/connect/centres/cc1/items")
+      return ok({
+        object: "list",
+        data: [
+          { object: "connect_held_item", order_id: "o5", number: "SP-50", title: "Office chair", status: "at_centre", price: 3_000_000, currency: "NGN", shelf: "A-01", received_at: null, ready_at: null, collect_by: "2026-11-09T10:00:00.000Z", overdue: true, missing_since: null, seen_at: null, return: null, buyer_owed: 4200, seller_owed: 0 },
+          { object: "connect_held_item", order_id: "o6", number: "SP-51", title: "Standing fan", status: "at_centre", price: 2_000_000, currency: "NGN", shelf: "A-02", received_at: null, ready_at: null, collect_by: null, overdue: false, missing_since: "2026-11-10T09:00:00.000Z", seen_at: null, return: null, buyer_owed: 0, seller_owed: 0 },
+        ],
+      });
+    if (path === "/v1/admin/connect/report")
+      return ok({
+        object: "connect_report",
+        days: Number(url.searchParams.get("days") ?? 30),
+        country: null,
+        now: { centres: 1, holding: 4, overdue: 1, missing: 1, loss_of_care: 0, late_arrivals: 2 },
+        period: { orders: 6, handed_over: 1, not_collected: 1, refused_at_check_in: 1, refused_at_counter: 0, returns_collected: 0, uncollected_pct: 50 },
+        money: [{ currency: "NGN", connect_fees: 20000, centres: 14000, udozo: 6000, storage_buyers: 8400, storage_sellers: 0 }],
+        centres: [{ id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", status: "active", country: "NG", state: "Lagos", area: "Ikeja", capacity: 4, now: { holding: 4, overdue: 1, missing: 1, loss_of_care: 0, late_arrivals: 2 }, period: { orders: 6, handed_over: 1, not_collected: 1, refused_at_check_in: 1, refused_at_counter: 0, uncollected_pct: 50 }, flags: ["missing_items", "over_capacity", "overdue_items"] }],
+        sellers: [{ id: "s1", name: "Chinedu Okafor", email: "chinedu@example.com", refused: 1, damaged: 0, storage_owed: null }],
+        buyers: [],
+      });
     if (path === "/v1/admin/connect/returns")
       return ok({
         object: "list",
@@ -209,7 +230,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns", "/connect/missing", "/connect/reports"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -422,6 +443,31 @@ describe("Connect", () => {
     shown(<ReturnsPage />);
     expect((await screen.findAllByText("Samsung TV", {}, slow)).length).toBeGreaterThan(0);
     expect(screen.queryAllByRole("button", { name: "Approve" })).toHaveLength(0);
+  });
+
+  test("reports: what centres hold, what needs attention, the money and the sellers, by period", async () => {
+    roles = ["finance"];
+    shown(<ReportsPage />);
+    expect((await screen.findAllByText("Ikeja Parcel Hub", {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Items missing").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Full").length).toBeGreaterThan(0);
+    expect(screen.getByText("50%")).toBeTruthy();
+    expect(screen.getByText(/to centres/).textContent).toContain("140");
+    expect(screen.getByText("Chinedu Okafor")).toBeTruthy();
+    expect(screen.getByText("No buyer problems in the period.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "90 days" }));
+    await waitFor(() => expect(sent.some(call => call.path === "/v1/admin/connect/report" && call.search.includes("days=90"))).toBe(true), slow);
+  });
+
+  test("a centre's page lists what it holds, missing and overdue first", async () => {
+    params.id = "cc1";
+    roles = ["support"];
+    shown(<CentrePage />);
+    expect(await screen.findByText("What it holds", {}, slow)).toBeTruthy();
+    const items = await screen.findAllByText(/Standing fan|Office chair/, {}, slow);
+    expect(items[0]!.textContent).toBe("Standing fan");
+    expect(screen.getAllByText("Missing").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Past free time").length).toBeGreaterThan(0);
   });
 
   test("support reads a centre but cannot pause or close it", async () => {

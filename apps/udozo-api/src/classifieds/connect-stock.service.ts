@@ -20,13 +20,14 @@ const centreNumber = (number: bigint | number) => `CC-${String(number).padStart(
  * The items that should be at a centre: received and not handed over (at the centre, with Udozo after a refusal, or
  * refunded and kept for their seller until the seller collects them).
  */
-export const atCentreWhere = (centreId: string): Prisma.ClassifiedOrderWhereInput => ({
-  connectCentreId: centreId,
+export const heldWhere: Prisma.ClassifiedOrderWhereInput = {
+  connectCentreId: { not: null },
   OR: [
     { status: 'at_centre' },
     { status: { in: ['disputed', 'refunded', 'partly_refunded'] }, receivedAt: { not: null }, releasedAt: null, NOT: { connectReturn: { is: { status: 'collected' } } } },
   ],
-});
+};
+export const atCentreWhere = (centreId: string): Prisma.ClassifiedOrderWhereInput => ({ ...heldWhere, connectCentreId: centreId });
 
 type StockInput = { shelf_id?: string | null; found: string[]; note?: string | null };
 

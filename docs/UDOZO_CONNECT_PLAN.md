@@ -567,8 +567,28 @@ assistants' knowledge, help, terms and privacy.
        in the menu only for the owner); admin Connect > **Missing items** (`/connect/missing`, support and operations).
      - Tests: `apps/udozo-api/test/connect-stock.test.mjs`, `apps/udozo-connect/test/centres.test.ts`,
        `apps/udozo-connect/test/centre-screens.test.tsx`, `apps/udozo-admin/test/connect.test.tsx`.
-6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
-   problems.
+6. **Reports and alerts** (**built**): what each centre holds and its overdue items, uncollected rates, and seller and
+   centre problems. As built (`ConnectReportsService` in `apps/udozo-api/src/classifieds/connect-reports.service.ts`, no
+   migration):
+   - **The report** (`GET /v1/admin/connect/report?country&days=7|30|90|365`, support, operations and finance): now,
+     what every centre holds (`heldWhere`: received and not handed over), past its free time, missing, in Loss of care
+     and arriving late (sent more than `lateArrivalDays`, 7, ago and not checked in); over the period, Connect orders,
+     items handed over, never collected (`not_collected` returns), refused at check-in and at the counter, returns
+     collected and the uncollected share (not collected against handed over plus not collected); per currency the
+     Connect fees on items handed over, the centres' and Udozo's shares and storage paid by buyers and sellers; each
+     centre with the same figures and its **flags** (items missing, full, often not collected from `uncollectedFlagPct`
+     20% of at least `uncollectedFlagFrom` 5 tries, Loss of care, arriving late, past their free time, paused, closed),
+     those needing attention first; and the 20 sellers with most items refused at check-in or damaged (with storage
+     they owe) and the buyers who did not collect or refused at the counter twice or more.
+   - **What one centre holds** (`GET /v1/admin/connect/centres/:id/items`): each item with its storage place, past its
+     free time, missing, its return and Loss of care, and storage owed.
+   - **Alerts** (`alerts`, the `classifieds` job's `connect_alerts`, each keyed by its day, week or item so it is sent
+     once): a centre's owner and managers (`customer.connect.centre`) when it is full, what is due to be collected
+     today and what is past its free time (daily), and each item arriving late; Udozo's team (`admin.connect.alert`)
+     of full centres (daily), late items (once each) and centres whose buyers often never collect (weekly).
+   - **Screens:** admin Connect > **Reports** (`/connect/reports`: the period, four figures, the money, every centre
+     with its flags, sellers and buyers) and **What it holds** on each centre's page.
+   - Tests: `apps/udozo-api/test/connect-reports.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo
    auctions on udozo.com, and auction claims.
 
