@@ -42,7 +42,7 @@ That removes the OAuth app, the webhooks, the 15-minute reconcile and the mock U
 
 - **Switches** (Udozo's, off by default):
   - `pos` (global or country) opens sign-up and the product in a market. Where it is off, the public pages still show, and sign-up says POS is coming to that country.
-  - POS is **paid from the start**: a monthly fee, set by admins. It does not follow `paid_plans`, which keeps Seller HQ free.
+  - POS has **its own three plans** (below): Free, Premium and Multi-shop. They do not follow `paid_plans`, which keeps Seller HQ free.
 - **Who owns a POS account:** a udozo.com customer who sells. One account per customer, holding one or more shops.
 - **Card payments:** recorded only. No terminal.
 - **Sales money never enters Udozo's ledger:** cash, transfer and card belong to the shop. Only the plan charge moves wallet money. Paying with a buyer's Udozo wallet at the till is deferred (it needs UdozoPay-style consent).
@@ -67,7 +67,11 @@ The listing's own `stock` is the shop's inventory. There is no second count and 
 - **Offline replay** (milestone 8) may sell below what is free, because the item was physically there. The sale stands, stock goes no lower than 0, and the listing is flagged `oversold` for the owner or a manager.
 - **`pos_stock_movements`**: an append-only history of every change made from the POS or by sales (listing, delta, reason `sale`, `return`, `restock`, `count`, `damage`, `online_sale`, plus the reference, the staff member and a client id). It feeds the inventory screen's history (S3) and the reports. udozo.com's own edits to stock are logged there too, as `edited_online`.
 - **Restocking and counts** from the POS set the same `stock` (`PATCH` through `ListingsService`, so the rules for live, sold-out and expired ads all apply).
-- **Several shops** sharing one owner's stock is a later choice. Version one is one shop per account with any number of tills.
+- **Several shops (the Multi-shop plan):** the stock is still the listing's one number, but it is split between the owner's shops:
+  - `pos_stock_levels` (listing, shop) holds how many each shop has. The levels always add up to the listing's `stock`; the part not in any shop is the `online` level.
+  - Till sales, counts, damage and transfers between shops move a shop's level and the listing's `stock` in one transaction.
+  - Online sales (`takeStock`) take from `online` first, then from the shop the owner marks **Fulfils online orders**.
+  - On Free and Premium there is one shop, so its level is simply the listing's `stock` and no split is kept.
 
 ## Data (one migration per milestone, in `apps/udozo-api/prisma/migrations/`)
 
@@ -112,7 +116,7 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
     - how it works: list on udozo.com, tick Sell at POS, sell in the shop, and stock follows itself;
     - features: register and barcode, one inventory with udozo.com, staff and roles, receipts by print, WhatsApp and email, reports, offline later;
     - the apps band, pricing, questions and a closing call;
-  - `/pricing`: the plans side by side (monthly, and yearly if admins set it), what each includes (tills, staff), the trial, and that it is paid from the Udozo wallet;
+  - `/pricing`: Free, Premium and Multi-shop side by side (monthly, and yearly if admins set it), what each includes, the trial, and that paid plans are paid from the Udozo wallet;
   - `/download`: Android, iOS and Windows, plus Use it in your browser;
   - `/signup` and `/signin`;
   - legal pages: POS terms and privacy link to udozo.com's `/legal/pos` and `/legal/privacy`.
@@ -123,7 +127,7 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
 - **Sign-up** (`/signup`, the owner only):
   1. **Connect your Udozo account:** sign in, or create an account on udozo.com, through the handoff (`/signin?next=/signup`), returning signed in. An account without a confirmed email or country finishes udozo.com's onboarding first.
   2. **Your shop:** shop name, address, phone and TIN. The shop is in the account's own country (fixed, with its currency), and `pos` must be on there.
-  3. **Choose a plan:** monthly (yearly where set), with the price in the account's currency and what it includes.
+  3. **Choose a plan:** Free, Premium or Multi-shop, with the price in the account's currency and what each includes. Free goes straight to step 5.
   4. **Pay:**
      - the first month comes from the Udozo wallet, shown with the balance;
      - if the balance is short, **Add funds** opens udozo.com's own wallet top-up (card, bank or mobile money, `POST /v1/store/wallet/top-ups`) and returns here;
@@ -137,16 +141,33 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
   - **Plans** (`pos_plans`) are set in admin.udozo.com > POS > Plans: name, monthly price per market currency, an optional yearly price, the limits (tills, staff, shops), trial days (14 by default), and whether the plan is shown. Finance changes them after step-up, and every change is audited.
   - **Charging:** the fee is taken from the owner's `customer_wallet` into `pos_revenue` (a new revenue ledger account). This happens at sign-up, or when the trial ends, then each month. Each period is one entry (`pos:<account>:<period>`), so a retry never charges twice.
   - **Changing plan:** moving up is charged at once, less the unused part of what was paid; moving down takes effect at the end of the month.
-  - **A failed renewal:** 7 days' grace with notices (inbox, push and email) 3 days before renewal, on failure, and the day before the POS stops. After that, staff can no longer sign in or sell, and the owner sees only Billing, to pay. Nothing is deleted.
+  - **A failed renewal:** 7 days' grace with notices (inbox, push and email) 3 days before renewal, on failure, and the day before it drops to Free. After that the account is held to Free's limits (see The three plans) until the owner pays. Nothing is deleted.
   - **Cancelling:** the plan runs to the end of the paid month.
   - **Invoices:** one for every charge, on Billing (PDF).
   - The `pos` cron job runs renewals.
+
+## The three plans (decided, 10 November 2026)
+
+| | **Free** | **Premium** | **Multi-shop** |
+|---|---|---|---|
+| Monthly fee | none | yes | yes, more than Premium |
+| Products at POS (listings ticked Sell at POS) | limited (50 by default) | unlimited | unlimited |
+| Shops | 1 | 1 | several (10 by default) |
+| Tills and staff | admin-set (2 tills, 3 staff by default) | unlimited | unlimited |
+| Stock | the listing's stock | the listing's stock | split between shops (above) |
+
+- **Limits are admin-set** (`pos_plans.limits`, null for unlimited). The defaults above are mine until the owner sets them. Lowering a limit never removes anything: it only stops the next addition (`pos_limit_reached`, naming the plan).
+- **Free needs no payment.** Sign-up on Free skips the Pay step, so a shop can start selling the same day.
+- **Free's product limit counts listings ticked Sell at POS.** Ticking one more is refused on Post an ad, saying why, with Upgrade.
+- **Premium and Multi-shop** are paid monthly (yearly where set) from the wallet, with an optional trial. Moving from Free to a paid plan is charged at once.
+- **A paid plan that lapses** after its grace drops to Free's limits rather than stopping the POS: the till keeps selling the first 50 products, and the rest stay listed but cannot be sold at the till until the owner pays. A Multi-shop account that lapses keeps its main shop selling, and its other shops pause.
 
 ## Milestones (each a commit or a few, tested, deployable)
 
 0. **Plan:** this document saved and linked.
 1. **Foundation, public site and sign-up (S15–S18):**
    - the `pos` switch, and the schema for accounts, shops, tills and plans;
+   - the three plans (Free, Premium, Multi-shop) seeded, with their limits checked by one `posLimit`;
    - `money.ts` (totals, discounts, VAT, rounding; the S9 sample sale totals ₦38,700);
    - `apps/udozo-pos` skeleton on the shared console UI with handoff sign-in;
    - the public site (`/`, `/pricing`, `/download`), with each app's button saying Coming soon until its link is set;
@@ -175,7 +196,7 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
    - totals, an hourly POS-versus-online chart, payment mix, top sellers, restock list;
    - shifts and cash-up, end of day;
    - CSV and PDF exports for the accountant.
-7. **Plan limits and plan changes:** tills, staff and shop limits through one `posLimit` check; upgrading and downgrading; yearly billing.
+7. **Multi-shop:** several shops, the stock split between them with transfers, online orders fulfilled from the chosen shop, and reports per shop. Also upgrading and downgrading between the three plans, and yearly billing. (The plan limits themselves, `posLimit`, come in milestone 1.)
 8. **Offline and apps (S5, S19):**
    - an IndexedDB catalogue and outbox in the web app first;
    - then Expo (camera, Bluetooth ESC/POS) and Tauri (USB printers, cash drawer);
@@ -205,5 +226,5 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
 ## Still needed from the owner
 
 1. **The design canvas** (S1–S19). The doc link reaches only the written brief, so I need the canvas link or an export to match the screens.
-2. **The monthly price per market, trial length and yearly discount.** Needed for milestone 1 now; admins can change them later.
+2. **Premium's and Multi-shop's monthly price per market, the trial length, any yearly discount, and Free's limits** (products, tills, staff) if not my defaults. Needed for milestone 1 now; admins can change them later.
 3. **Store accounts:** Apple, Google Play and a Windows code-signing certificate under Udozo's name (needed by milestone 8 only).
