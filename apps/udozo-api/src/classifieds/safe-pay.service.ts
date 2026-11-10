@@ -104,6 +104,7 @@ export const orderInclude = {
   dispatchPhotos: { orderBy: { createdAt: 'asc' }, select: { id: true, contentType: true, width: true, height: true, createdAt: true } },
   connectCentre: { select: { id: true, number: true, name: true, partnerId: true, address: true, landmark: true, hours: true, phone: true, area: { select: { name: true } }, state: { select: { name: true } } } },
   connectShelf: { select: { id: true, code: true, label: true } },
+  connectReturn: { select: { id: true, number: true, reason: true, status: true, answerBy: true, decidedBy: true, collectBy: true, collectedAt: true, returnFeeMinor: true } },
 } satisfies Prisma.ClassifiedOrderInclude;
 export type OrderRow = Prisma.ClassifiedOrderGetPayload<{ include: typeof orderInclude }>;
 
@@ -480,6 +481,53 @@ export class SafePayService {
     await this.tell(disputed, 'seller', 'customer.classifieds.order_disputed', `SP-${disputed.number} needs Udozo to decide`, body);
     await this.inbox.admins('admin.classifieds.dispute_opened', { subject: disputed.dispute!.id, title: `Connect Centre stopped SP-${disputed.number}`, body: words.slice(0, 160), link: `/classifieds/orders/${disputed.id}` });
     return disputed;
+  }
+
+  /**
+   * A Connect item the buyer did not collect in time, its return to the seller accepted: the buyer gets the item's price
+   * back, the seller keeps the shipping charge (they sent it), UdozoPay keeps the buyer's fee and the Connect fee is shared
+   * as on collection (the centre kept it). Once: the order is claimed from `at_centre` in the same transaction.
+   */
+  async settleNotCollected(order: OrderRow) {
+    const total = totalOf(order);
+    const lines: Line[] = [{ account: { kind: 'classified_escrow', currency: order.currency }, debit: total }];
+    const credit = (account: Line['account'], amount: bigint) => amount > 0n && lines.push({ account, credit: amount });
+    credit({ kind: 'customer_wallet', currency: order.currency, customerId: order.buyerId }, order.priceMinor);
+    credit({ kind: 'customer_withdrawable', currency: order.currency, customerId: order.sellerId }, order.deliveryFeeMinor);
+    credit({ kind: 'classifieds_revenue', currency: order.currency }, order.buyerFeeMinor);
+    if (order.connectFeeMinor > 0n && order.connectCentre) {
+      const centre = order.centreShareMinor ?? 0n;
+      credit({ kind: 'connect_centre_earnings', currency: order.currency, customerId: order.connectCentre.partnerId }, centre);
+      credit({ kind: 'connect_revenue', currency: order.currency }, order.connectFeeMinor - centre);
+    }
+    const entry = await this.ledger.prepare({
+      mode: order.mode,
+      type: 'classified_refund',
+      reference: `classified_order:${order.id}:not_collected`,
+      description: `UdozoPay SP-${order.number} not collected`,
+      metadata: { order: Number(order.number) },
+      lines,
+    });
+    const now = new Date();
+    await this.prisma.$transaction(async tx => {
+      const claimed = await tx.classifiedOrder.updateMany({
+        where: { id: order.id, status: 'at_centre' },
+        data: { status: 'refunded', refundedAt: now, refundMinor: order.priceMinor, sellerPayoutMinor: order.deliveryFeeMinor, sellerFeeMinor: 0n, endedBy: 'bitocard', endReason: 'not_collected', connectShelfId: null },
+      });
+      if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
+      await this.ledger.write(tx, entry);
+    });
+    const done = await this.reload(order.id);
+    await this.tell(done, 'buyer', 'customer.classifieds.order_refunded', `SP-${done.number} was not collected`, `${priceText(order.priceMinor, order.currency)} is back in your wallet: the item's price, less the shipping and fees.`);
+    return done;
+  }
+
+  /** Seals and opens a code kept on an order's records (release and return codes), with the platform's key. */
+  seal(code: string) {
+    return this.encryption().encrypt(code);
+  }
+  unseal(sealed: string) {
+    return this.encryption().decrypt(sealed);
   }
 
   /** Tells the buyer or the seller of an order (the Connect counter's steps). */
@@ -1555,6 +1603,20 @@ export class SafePayService {
               received_at: order.receivedAt?.toISOString() ?? null,
               ready_at: order.readyAt?.toISOString() ?? null,
               collect_by: order.collectBy?.toISOString() ?? null,
+              /** The item's return to the seller, once the centre asked (the seller's return code is read on its own). */
+              return: order.connectReturn
+                ? {
+                    id: order.connectReturn.id,
+                    number: `RT-${String(order.connectReturn.number).padStart(6, '0')}`,
+                    reason: order.connectReturn.reason,
+                    status: order.connectReturn.status,
+                    answer_by: order.connectReturn.answerBy.toISOString(),
+                    decided_by: order.connectReturn.decidedBy,
+                    collect_by: order.connectReturn.collectBy?.toISOString() ?? null,
+                    collected_at: order.connectReturn.collectedAt?.toISOString() ?? null,
+                    ...(viewer !== 'buyer' && order.connectReturn.returnFeeMinor !== null ? { return_fee: Number(order.connectReturn.returnFeeMinor) } : {}),
+                  }
+                : null,
             }
           : null,
       deadlines: { accept_by: order.acceptBy.toISOString(), pay_by: order.payBy?.toISOString() ?? null, handover_by: order.handoverBy?.toISOString() ?? null, confirm_by: order.confirmBy?.toISOString() ?? null },

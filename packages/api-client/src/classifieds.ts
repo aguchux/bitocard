@@ -513,6 +513,23 @@ export type ShopOrderConnect = {
   received_at: string | null;
   ready_at: string | null;
   collect_by: string | null;
+  /** Its return to the seller, once the centre asked. */
+  return?: ShopConnectReturn | null;
+};
+
+/** A Connect item's return to its seller, as the buyer and seller see it. */
+export type ShopConnectReturn = {
+  id: string;
+  /** RT-000123 */
+  number: string;
+  reason: 'not_collected' | 'refused_at_check_in' | 'refused_at_counter' | 'damaged';
+  status: 'requested' | 'accepted' | 'collected' | 'cancelled';
+  answer_by: string;
+  decided_by: 'seller' | 'admin' | 'auto' | null;
+  collect_by: string | null;
+  collected_at: string | null;
+  /** The seller's view: the return fee they paid. */
+  return_fee?: number;
 };
 export type ShopCourier = { name: string; tracking_url: string | null };
 /** A message in a resale order's threads, as one side reads it (the buyer sees the store's side as the store). */

@@ -499,7 +499,34 @@ assistants' knowledge, help, terms and privacy.
        sent Connect order. It carries the order number, its QR code (`SP-000123 CC-000001`, which connect.udozo.com's
        Find reads) and the centre, never the buyer's details.
      - Tests: `apps/udozo/test/connect-orders.test.ts`.
-   - **5c (next):** returns (requests, 48 hours, return codes), demurrage and Loss of care, stock checks, earnings and payouts.
+   - **5c, returns to sellers (built):** migration `20270310200000_connect_returns` (`connect_return_requests`, numbered
+     **`RT-000123`**: `RR-` was already resale store reports; and the market's `return_due_days` 7, `return_answer_hours`
+     48 and `seller_collect_days` 7, set with the Connect fee). `ConnectReturnsService`:
+     - **Asking:** a centre asks for a return (`POST /v1/connect/centres/:centre/orders/:order/return { reason, note }`):
+       `not_collected` from the due days after it was ready, or `refused_at_check_in`, `refused_at_counter` or `damaged`
+       once Udozo decided the dispute for the buyer (`return_not_due` otherwise; one per order, `return_exists`). An item
+       refused at check-in now counts as received, as it is at the centre.
+     - **Answering:** the seller accepts (`POST /v1/classifieds/orders/:id/return/accept`), operations approve
+       (`POST /v1/admin/connect/returns/:id/approve`, audited `connect_return.approved`), or the `classifieds` job accepts
+       it after the hours (`decided_by: auto`, everyone told it was because nobody answered); claimed once
+       (`return_decided`).
+     - **Settling an item not collected:** the buyer gets the price back, the seller keeps the shipping, UdozoPay keeps the
+       buyer's fee, and the Connect fee is shared (`SafePayService.settleNotCollected`, order refunded, `end_reason:
+       not_collected`).
+     - **Collecting:** the seller reads their 6-digit return code (`GET /v1/classifieds/orders/:id/return-code`), and the
+       centre hands it back (`POST /v1/connect/centres/:centre/returns/:id/hand-back { code }`, 5 tries), taking the
+       centre's Connect fee on the shipping as the return fee from the seller's Udozo money, else their wallet
+       (`return_fee_unpaid`, 402, without enough), shared 70:30.
+     - **Screens:** connect.udozo.com's Returns (`/centre/<id>/returns`, hand back against the code) and Return it to the
+       seller on an item; udozo.com's return panel on the order (Accept the return, Show my return code); admin Connect >
+       Returns and the return times on States, deposit and fee.
+     - **Notices:** `customer.connect.return`, `admin.connect.return`.
+     - **Not built yet:** shipping a return to a Connect Centre near the seller (they collect it at this one for now).
+     - Tests: `apps/udozo-api/test/connect-returns.test.mjs`, `apps/udozo-connect/test/`, `apps/udozo/test/connect-orders.test.ts`,
+       `apps/udozo-admin/test/connect.test.tsx`.
+   - **5e (next):** demurrage (the buyer's after the free hours, paid before collection; the seller's after their free
+     days) and Loss of care with its daily penalty.
+   - **5f:** stock checks, and centre earnings and payouts.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo

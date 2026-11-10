@@ -7,6 +7,7 @@ import { WhatsappJobs } from '../whatsapp/jobs.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
+import { ConnectReturnsService } from '../classifieds/connect-returns.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { BuyOrdersService } from '../classifieds/buy-orders/buy-orders.service.js';
 import { ReviewsService } from '../classifieds/reviews/reviews.service.js';
@@ -114,6 +115,7 @@ export class CronController {
     listingMedia: ListingMediaService,
     conversations: ConversationsService,
     safePay: SafePayService,
+    connectReturns: ConnectReturnsService,
     resale: ResaleStoresService,
     resaleOrders: ResaleOrdersService,
     marketing: MarketingService,
@@ -236,6 +238,7 @@ export class CronController {
        */
       classifieds: async () => ({
         safe_pay: await safePay.runDue(),
+        connect_returns: await connectReturns.runDue(),
         buy_orders: await buyOrders.job(),
         reviews: await reviews.remind(),
         listings: await listings.expireDue(),

@@ -69,6 +69,9 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
   const [fee, setFee] = useState(settings.fee?.kind === "percent" ? String(settings.fee.bps / 100) : settings.fee?.kind === "fixed" ? toMajor(settings.fee.amount, settings.currency) : "");
   const [share, setShare] = useState(String(settings.centre_share_bps / 100));
   const [hours, setHours] = useState(String(settings.buyer_free_hours));
+  const [dueDays, setDueDays] = useState(String(settings.return_due_days));
+  const [answerHours, setAnswerHours] = useState(String(settings.return_answer_hours));
+  const [collectDays, setCollectDays] = useState(String(settings.seller_collect_days));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const now = settings.fee === null ? "Not set" : settings.fee.kind === "percent" ? `${percent(settings.fee.bps)} of the shipping charge` : `${money(settings.fee.amount, settings.currency)} an order`;
@@ -81,7 +84,12 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
     if (centreShare === null) return setProblem("Give the centre's share as 0 to 100%.");
     const freeHours = Number(hours);
     if (!Number.isInteger(freeHours) || freeHours < 1 || freeHours > 720) return setProblem("Give the free time to collect as 1 to 720 hours.");
-    const change = { country: settings.country, centre_share_bps: centreShare, buyer_free_hours: freeHours };
+    const whole = (value: string, min: number, max: number) => (/^\d+$/.test(value.trim()) && Number(value) >= min && Number(value) <= max ? Number(value) : null);
+    const returnDue = whole(dueDays, 1, 90);
+    const answer = whole(answerHours, 1, 720);
+    const sellerDays = whole(collectDays, 1, 90);
+    if (returnDue === null || answer === null || sellerDays === null) return setProblem("Give the return times as whole numbers: days 1 to 90, hours 1 to 720.");
+    const change = { country: settings.country, centre_share_bps: centreShare, buyer_free_hours: freeHours, return_due_days: returnDue, return_answer_hours: answer, seller_collect_days: sellerDays };
     let done;
     if (kind === "") done = await save({ ...change, fee_kind: null }).unwrap().catch(() => null);
     else if (kind === "percent") {
@@ -127,6 +135,15 @@ function FeeCard({ settings, changes }: { settings: ConnectSettings; changes: bo
             </Field>
             <Field label="Free time to collect (hours)" htmlFor={`${id}-hours`} hint="From the moment an item is ready at the centre.">
               <Input id={`${id}-hours`} inputMode="numeric" value={hours} onChange={event => setHours(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Return due (days after ready)" htmlFor={`${id}-due`} hint="An item not collected by then goes back to its seller.">
+              <Input id={`${id}-due`} inputMode="numeric" value={dueDays} onChange={event => setDueDays(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Hours to answer a return" htmlFor={`${id}-answer`} hint="Unanswered by the seller or Udozo, it is accepted by itself.">
+              <Input id={`${id}-answer`} inputMode="numeric" value={answerHours} onChange={event => setAnswerHours(event.target.value)} className="max-w-xs" />
+            </Field>
+            <Field label="Seller's days to collect a return" htmlFor={`${id}-collect`}>
+              <Input id={`${id}-collect`} inputMode="numeric" value={collectDays} onChange={event => setCollectDays(event.target.value)} className="max-w-xs" />
             </Field>
             <Button type="submit" loading={state.isLoading}>
               Save Connect fee

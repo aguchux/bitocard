@@ -23,6 +23,8 @@ const actions = vi.hoisted(() => ({
   releaseOrder: vi.fn(),
   refuseCollection: vi.fn(),
   postUpdate: vi.fn(),
+  askReturn: vi.fn(),
+  handBack: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("@/lib/centre-actions", () => actions);
@@ -33,6 +35,7 @@ const { CentreShelves } = await import("@/components/centre-shelves");
 const { CentreSettings } = await import("@/components/centre-settings");
 const { CentreNav } = await import("@/components/centre-nav");
 const { CounterOrderView, FindOrder } = await import("@/components/counter-order");
+const { ReturnsList } = await import("@/components/centre-returns");
 
 type Centre = import("@/lib/centres").Centre;
 type Member = import("@/lib/centres").Member;
@@ -95,7 +98,7 @@ describe("the centre's menu", () => {
   it("marks the page it is on", () => {
     const host = mount(createElement(CentreNav, { id: "c1" }));
     expect(host.querySelector('[aria-current="page"]')!.textContent).toBe("Staff");
-    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
+    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/returns", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
   });
 });
 
@@ -229,6 +232,8 @@ const counterOrder = (over: Partial<import("@/lib/centres").CounterOrder> = {}):
   ready_at: null,
   collect_by: null,
   released_at: null,
+  return: null,
+  held_for_seller: false,
   ...over,
 });
 const shelves = [shelf({}), shelf({ id: "sh2", code: "B-02", label: null })];
@@ -293,5 +298,36 @@ describe("the counter", () => {
     expect(actions.refuseCollection).toHaveBeenCalledWith("c1", "o1", "Not the colour in the photos");
     expect(host.textContent).toContain("With Udozo to decide");
     expect(confirmSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("returns to sellers", () => {
+  it("asks to return an item not collected, after confirming", async () => {
+    actions.askReturn.mockResolvedValue({ ok: true, data: { id: "r1" } });
+    const host = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "at_centre", ready_at: "2026-11-01T10:00:00.000Z", shelf: { id: "sh1", code: "A-01", label: null } }), shelves }));
+    expect(host.textContent).toContain("Return it to the seller");
+    await act(async () => button(host, "Ask for the return")!.click());
+    await act(async () => dialogButton("Ask for the return").click());
+    expect(actions.askReturn).toHaveBeenCalledWith("c1", "o1", "not_collected", "");
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("offers the refused reasons for an item held for its seller, and none once asked", () => {
+    const held = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "refunded", held_for_seller: true }), shelves }));
+    expect([...held.querySelectorAll("option")].map(option => option.textContent)).toEqual(expect.arrayContaining(["Refused at check-in", "Refused by the buyer at the counter", "Damaged"]));
+    const asked = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "refunded", held_for_seller: true, return: { id: "r1", number: "RT-000001", reason: "refused_at_check_in", status: "accepted", collect_by: null } }), shelves }));
+    expect(asked.textContent).toContain("Return RT-000001");
+    expect(asked.textContent).toContain("Hand it back on Returns");
+    expect(asked.textContent).not.toContain("Ask for the return");
+  });
+
+  it("hands an accepted return back against the seller's code", async () => {
+    actions.handBack.mockResolvedValue({ ok: true, data: { id: "r1", status: "collected" } });
+    const row = { object: "connect_return" as const, id: "r1", number: "RT-000001", order: { id: "o1", number: "SP-000042", title: "Samsung TV" }, centre: { id: "c1", name: "Hub" }, seller: { name: "Chinedu Okafor" }, reason: "not_collected" as const, note: null, status: "accepted" as const, answer_by: "2026-11-12T10:00:00.000Z", decided_by: "seller" as const, decided_at: "2026-11-11T10:00:00.000Z", collect_by: "2026-11-18T10:00:00.000Z", collected_at: null, return_fee: null, code_tries_left: 5, created_at: "2026-11-10T10:00:00.000Z" };
+    const host = mount(createElement(ReturnsList, { centre: "c1", country: "NG", returns: [row] }));
+    expect(host.textContent).toContain("Accepted: the seller collects it");
+    act(() => type(host.querySelector<HTMLInputElement>("input")!, "654321"));
+    await act(async () => button(host, "Hand it back")!.click());
+    expect(actions.handBack).toHaveBeenCalledWith("c1", "r1", "654321");
   });
 });

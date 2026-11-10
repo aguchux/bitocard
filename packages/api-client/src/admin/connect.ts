@@ -107,9 +107,47 @@ export type ConnectSettings = {
   /** The centre's part of Connect fees (Udozo has the rest), and the buyer's free time to collect. */
   centre_share_bps: number;
   buyer_free_hours: number;
+  /** Returns to sellers: due days after ready, hours to answer before it is accepted by itself, the seller's days to collect. */
+  return_due_days: number;
+  return_answer_hours: number;
+  seller_collect_days: number;
+};
+
+/** A Connect Centre's return of an item to its seller. */
+export type ConnectReturn = {
+  object: 'connect_return';
+  id: string;
+  /** RT-000123 */
+  number: string;
+  order: { id: string; number: string; title: string };
+  centre: { id: string; name: string };
+  seller: { name: string };
+  reason: 'not_collected' | 'refused_at_check_in' | 'refused_at_counter' | 'damaged';
+  note: string | null;
+  status: 'requested' | 'accepted' | 'collected' | 'cancelled';
+  answer_by: string;
+  decided_by: 'seller' | 'admin' | 'auto' | null;
+  decided_at: string | null;
+  collect_by: string | null;
+  collected_at: string | null;
+  return_fee: number | null;
+  currency: string;
+  code_tries_left: number | null;
+  created_at: string;
 };
 /** What a change sends (anything left out stays). */
-export type ConnectSettingsChange = { country: string; deposit?: number | null; fee_kind?: 'percent' | 'fixed' | null; fee_bps?: number; fee?: number; centre_share_bps?: number; buyer_free_hours?: number };
+export type ConnectSettingsChange = {
+  country: string;
+  deposit?: number | null;
+  fee_kind?: 'percent' | 'fixed' | null;
+  fee_bps?: number;
+  fee?: number;
+  centre_share_bps?: number;
+  buyer_free_hours?: number;
+  return_due_days?: number;
+  return_answer_hours?: number;
+  seller_collect_days?: number;
+};
 
 export type ConnectCentre = {
   object: 'connect_centre';
@@ -247,6 +285,14 @@ export const connectApi = bitocardApi.injectEndpoints({
       query: id => `/v1/admin/connect/centres/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'ConnectCentres', id }],
     }),
+    connectReturns: build.query<{ object: 'list'; data: ConnectReturn[] }, { status?: ConnectReturn['status']; country?: string } | void>({
+      query: filter => ({ url: '/v1/admin/connect/returns', params: clean({ status: filter?.status, country: filter?.country }) }),
+      providesTags: ['ConnectCentres'],
+    }),
+    approveConnectReturn: build.mutation<ConnectReturn, { id: string }>({
+      query: ({ id }) => ({ url: `/v1/admin/connect/returns/${id}/approve`, method: 'POST', body: {} }),
+      invalidatesTags: ['ConnectCentres', 'Activity'],
+    }),
     setConnectCentreStatus: build.mutation<ConnectCentreDetail, { id: string; action: 'pause' | 'reinstate' | 'close'; reason: string }>({
       query: ({ id, action, reason }) => ({ url: `/v1/admin/connect/centres/${id}/${action}`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => ['ConnectCentres', { type: 'ConnectCentres', id }, 'Activity'],
@@ -272,4 +318,6 @@ export const {
   useConnectCentresQuery,
   useConnectCentreQuery,
   useSetConnectCentreStatusMutation,
+  useConnectReturnsQuery,
+  useApproveConnectReturnMutation,
 } = connectApi;

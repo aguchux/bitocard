@@ -55,6 +55,7 @@ export const isOwner = (role: CentreRole) => role === "owner";
 export const centreNav = (id: string) => [
   { label: "Overview", href: `/centre/${id}` },
   { label: "Items", href: `/centre/${id}/orders` },
+  { label: "Returns", href: `/centre/${id}/returns` },
   { label: "Centre", href: `/centre/${id}/settings` },
   { label: "Staff", href: `/centre/${id}/staff` },
   { label: "Storage places", href: `/centre/${id}/shelves` },
@@ -124,6 +125,9 @@ export type CounterOrder = {
   ready_at: string | null;
   collect_by: string | null;
   released_at: string | null;
+  return: { id: string; number: string; reason: ReturnReason; status: ReturnStatus; collect_by: string | null } | null;
+  /** Still at the centre for its seller: refused, or refunded and never collected. */
+  held_for_seller: boolean;
 };
 export type CounterSummary = { object: "connect_counter_summary"; expected: number; to_shelve: number; ready: number; due_today: number; overdue: number };
 
@@ -165,3 +169,49 @@ export const eventWords: Record<string, string> = {
   collection_refused: "Refused by the buyer at the counter",
   note: "Update",
 };
+
+// ---- Returns to sellers ----
+
+export type ReturnReason = "not_collected" | "refused_at_check_in" | "refused_at_counter" | "damaged";
+export type ReturnStatus = "requested" | "accepted" | "collected" | "cancelled";
+export type CentreReturn = {
+  object: "connect_return";
+  id: string;
+  /** RT-000123 */
+  number: string;
+  order: { id: string; number: string; title: string };
+  centre: { id: string; name: string };
+  seller: { name: string };
+  reason: ReturnReason;
+  note: string | null;
+  status: ReturnStatus;
+  answer_by: string;
+  decided_by: "seller" | "admin" | "auto" | null;
+  decided_at: string | null;
+  collect_by: string | null;
+  collected_at: string | null;
+  return_fee: number | null;
+  code_tries_left: number | null;
+  created_at: string;
+};
+
+export const returnReasonWords: Record<ReturnReason, string> = {
+  not_collected: "Not collected in time",
+  refused_at_check_in: "Refused at check-in",
+  refused_at_counter: "Refused by the buyer at the counter",
+  damaged: "Damaged",
+};
+export const returnStatusWords: Record<ReturnStatus, string> = {
+  requested: "Waiting for the seller or Udozo",
+  accepted: "Accepted: the seller collects it",
+  collected: "Collected by the seller",
+  cancelled: "Cancelled",
+};
+
+/** Which return a centre can ask for an item, or null: one not collected once ready, or one held for its seller. */
+export function returnReasonsFor(order: Pick<CounterOrder, "status" | "ready_at" | "return" | "held_for_seller">): ReturnReason[] | null {
+  if (order.return) return null;
+  if (order.status === "at_centre" && order.ready_at) return ["not_collected"];
+  if (order.held_for_seller) return ["refused_at_check_in", "refused_at_counter", "damaged"];
+  return null;
+}

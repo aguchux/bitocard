@@ -5,6 +5,7 @@ import { buyerOrderLabels, sellerOrderLabels, shipmentLabels, shopMoney, type Sh
 import { localPhotoUrl, type OrderAction, orderSteps, orderTone } from "@/lib/shop";
 import { DisputeThread, OrderPanel } from "./order-panel";
 import { OrderThread } from "./order-thread";
+import { ConnectReturnPanel } from "./connect-return";
 import { ReportStore } from "./report-store";
 import { Thumb } from "./thumb";
 
@@ -251,6 +252,7 @@ function ConnectCentreCard({ order, buyer }: { order: ShopOrder; buyer: boolean 
         </p>
       ) : null}
       {buyer && open ? <p className="text-slate-600">Inspect it at the counter first. Give your release code only if you take it; if not, tell the staff why.</p> : null}
+      {connect.return ? <ConnectReturnPanel orderId={order.id} centreName={centre.name} seller={!buyer} item={connect.return} /> : null}
       {!buyer && open && order.status !== "at_centre" ? (
         <Link href={`/account/orders/${order.id}/label`} className="font-semibold text-brand-700 hover:underline">
           Print the parcel label

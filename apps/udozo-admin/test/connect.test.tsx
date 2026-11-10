@@ -18,6 +18,7 @@ const { default: VisitorsPage } = await import("@/app/(console)/connect/visitors
 const { default: SettingsPage } = await import("@/app/(console)/connect/settings/page");
 const { default: CentresPage } = await import("@/app/(console)/connect/centres/page");
 const { default: CentrePage } = await import("@/app/(console)/connect/centres/[id]/page");
+const { default: ReturnsPage } = await import("@/app/(console)/connect/returns/page");
 const { menus, sections } = await import("@/components/shell");
 
 const slow = { timeout: 10000 };
@@ -158,7 +159,7 @@ beforeEach(() => {
         const sent = body as { fee_kind: "percent" | "fixed" | null; fee_bps?: number; fee?: number; centre_share_bps: number; buyer_free_hours: number };
         fee = sent.fee_kind === "percent" ? { kind: "percent", bps: sent.fee_bps! } : sent.fee_kind === "fixed" ? { kind: "fixed", amount: sent.fee! } : null;
       }
-      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72 });
+      return ok({ object: "connect_settings", country: "NG", name: "Nigeria", currency: "NGN", deposit, fee, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7 });
     }
     if (path === "/v1/admin/connect/centres")
       return ok({
@@ -166,6 +167,12 @@ beforeEach(() => {
         data: [{ object: "connect_centre", id: "cc1", number: "CC-000001", name: "Ikeja Parcel Hub", status: "paused", paused: { by: "udozo", reason: "Checks", until: null }, country: "NG", state: "Lagos", area: "Ikeja", address: "12 Allen Avenue", hours: "8am to 6pm", phone: "+234", capacity: 150, deposit: { amount: 5_000_000, currency: "NGN" }, partner: { id: "c1", name: "Ngozi Ade", email: "ngozi@example.com" }, application_id: "app1", created_at: "2026-11-05T00:00:00.000Z" }],
       });
     if (path === "/v1/admin/connect/centres/cc1") return ok(centreNow);
+    if (path === "/v1/admin/connect/returns")
+      return ok({
+        object: "list",
+        data: [{ object: "connect_return", id: "rt1", number: "RT-000003", order: { id: "o1", number: "SP-000042", title: "Samsung TV" }, centre: { id: "cc1", name: "Ikeja Parcel Hub" }, seller: { name: "Chinedu Okafor" }, reason: "not_collected", note: null, status: "requested", answer_by: "2026-11-12T10:00:00.000Z", decided_by: null, decided_at: null, collect_by: null, collected_at: null, return_fee: null, currency: "NGN", code_tries_left: null, created_at: "2026-11-10T10:00:00.000Z" }],
+      });
+    if (path === "/v1/admin/connect/returns/rt1/approve") return ok({ object: "connect_return", id: "rt1", status: "accepted" });
     const status = /^\/v1\/admin\/connect\/centres\/cc1\/(pause|reinstate|close)$/.exec(path)?.[1];
     if (status && input.method === "POST") {
       const reason = (body as { reason: string }).reason;
@@ -196,7 +203,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Connect", () => {
   test("has its own section with applications, visitors, states and deposit, and centres", () => {
     expect(sections.some(item => item.key === "connect" && item.href === "/connect/applications")).toBe(true);
-    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres"]);
+    expect(menus.connect.items.map(item => item.href)).toEqual(["/connect/applications", "/connect/visitors", "/connect/settings", "/connect/centres", "/connect/returns"]);
   });
 
   test("lists submitted applications and opens one", async () => {
@@ -311,13 +318,14 @@ describe("Connect", () => {
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "percent" } });
     fireEvent.change(screen.getByLabelText("Fee (% of shipping)"), { target: { value: "10" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "percent", fee_bps: 1000, centre_share_bps: 7000, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 48, seller_collect_days: 7 }), slow);
     expect(await screen.findByText(/10% of the shipping charge/, {}, slow)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "fixed" } });
     fireEvent.change(screen.getByLabelText("Fee (NGN)"), { target: { value: "500" } });
     fireEvent.change(screen.getByLabelText("Centre's share (%)"), { target: { value: "65" } });
+    fireEvent.change(screen.getByLabelText("Hours to answer a return"), { target: { value: "24" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Connect fee" }));
-    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72 }), slow);
+    await waitFor(() => expect(lastSent("/connect/settings/NG")?.body).toEqual({ fee_kind: "fixed", fee: 50000, centre_share_bps: 6500, buyer_free_hours: 72, return_due_days: 7, return_answer_hours: 24, seller_collect_days: 7 }), slow);
   });
 
   test("support cannot change the deposit or states", async () => {
@@ -381,6 +389,22 @@ describe("Connect", () => {
     await waitFor(() => expect(lastSent("/connect/centres/cc1/close")?.body).toEqual({ reason: "The office moved away." }), slow);
     expect(await screen.findByText(/Closed on .*: The office moved away\./, {}, slow)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+  });
+
+  test("returns: waiting ones listed with when they accept themselves; operations approve", async () => {
+    shown(<ReturnsPage />);
+    expect((await screen.findAllByText("Samsung TV", {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Not collected in time").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Approve" })[0]!);
+    fireEvent.click(openDialog().getByRole("button", { name: "Approve return" }));
+    await waitFor(() => expect(lastSent("/connect/returns/rt1/approve")).toBeTruthy(), slow);
+  });
+
+  test("support reads returns but cannot approve them", async () => {
+    roles = ["support"];
+    shown(<ReturnsPage />);
+    expect((await screen.findAllByText("Samsung TV", {}, slow)).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("button", { name: "Approve" })).toHaveLength(0);
   });
 
   test("support reads a centre but cannot pause or close it", async () => {

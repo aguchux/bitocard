@@ -187,6 +187,16 @@ class SettingsDto {
   /** The buyer's free time to collect once an item is ready. */
   @IsOptional() @IsInt() @Min(1) @Max(720)
   buyer_free_hours?: number;
+
+  /** Returns to sellers: due days after ready, hours to answer, the seller's days to collect. */
+  @IsOptional() @IsInt() @Min(1) @Max(90)
+  return_due_days?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(720)
+  return_answer_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(90)
+  seller_collect_days?: number;
 }
 
 /**

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Centre, CounterOrder, List, Member, Shelf } from "./centres";
+import type { Centre, CentreReturn, CounterOrder, List, Member, Shelf } from "./centres";
 import { customerApi } from "./session";
 
 /** What an action answers: what it changed as it now is, or Udozo's refusal in words with the field it names. */
@@ -145,4 +145,21 @@ export async function refuseCollection(id: string, order: string, reason: string
 export async function postUpdate(id: string, order: string, body: string): Promise<CentreResult<CounterOrder>> {
   if (!uuid.test(id) || !uuid.test(order)) return unknown;
   return answer(await customerApi<CounterOrder>("POST", counter(id, order, "updates"), { body: body.trim() }));
+}
+
+// ---- Returns to sellers ----
+
+/** Asks to return an item to its seller, with why. */
+export async function askReturn(id: string, order: string, reason: string, note: string | null): Promise<CentreResult<CentreReturn>> {
+  if (!uuid.test(id) || !uuid.test(order)) return unknown;
+  if (!["not_collected", "refused_at_check_in", "refused_at_counter", "damaged"].includes(reason)) return { ok: false, message: "Choose why it goes back.", code: "parameter_invalid", param: "reason" };
+  return answer(await customerApi<CentreReturn>("POST", `/v1/connect/centres/${id}/orders/${order}/return`, { reason, note: text(note) }));
+}
+
+/** Hands an item back to its seller against their 6-digit return code. Never stored for replay. */
+export async function handBack(id: string, returnId: string, code: string): Promise<CentreResult<CentreReturn>> {
+  if (!uuid.test(id) || !uuid.test(returnId)) return unknown;
+  const digits = code.replace(/\s/g, "");
+  if (!/^\d{6}$/.test(digits)) return { ok: false, message: "The return code is 6 digits.", code: "parameter_invalid", param: "code" };
+  return answer(await customerApi<CentreReturn>("POST", `/v1/connect/centres/${id}/returns/${returnId}/hand-back`, { code: digits }));
 }

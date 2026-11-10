@@ -5762,6 +5762,7 @@ model ClassifiedOrder {
   shipmentEvents           ClassifiedShipmentEvent[]
   connectCentre            ConnectCentre?     @relation(fields: [connectCentreId], references: [id], onDelete: Restrict)
   connectShelf             ConnectShelf?      @relation(fields: [connectShelfId], references: [id], onDelete: SetNull)
+  connectReturn            ConnectReturnRequest?
   dispatchPhotos           ClassifiedDispatchPhoto[]
   resaleMessages           ResaleOrderMessage[]
   buyerDetailViews         ResaleBuyerDetailView[]
@@ -7216,6 +7217,11 @@ model ConnectSettings {
   centreShareBps Int    @default(7000) @map("centre_share_bps")
   /// The buyer's free time to collect once an item is ready.
   buyerFreeHours Int    @default(72) @map("buyer_free_hours")
+  /// Returns to the seller: due this many days after an item is ready and not collected; accepted by itself when
+  /// neither the seller nor Udozo answers a request within the hours; the seller then has the days to collect it.
+  returnDueDays     Int @default(7) @map("return_due_days")
+  returnAnswerHours Int @default(48) @map("return_answer_hours")
+  sellerCollectDays Int @default(7) @map("seller_collect_days")
   updatedAt    DateTime @updatedAt @map("updated_at")
   /// The admin who last changed them (no foreign key: admins are never deleted).
   updatedById  String?  @map("updated_by_id") @db.Uuid
@@ -7386,6 +7392,7 @@ model ConnectCentre {
   members      ConnectCentreMember[]
   listings     ClassifiedListingConnectCentre[]
   orders       ClassifiedOrder[]
+  returns      ConnectReturnRequest[]
   shelves      ConnectShelf[]
 
   @@index([country, stateId, status])
@@ -7456,4 +7463,43 @@ model ClassifiedListingConnectCentre {
   @@id([listingId, centreId])
   @@index([centreId])
   @@map("classified_listing_connect_centres")
+}
+
+/// A Connect Centre's request to return an item to its seller (docs/UDOZO_CONNECT_PLAN.md, Return requests): not collected
+/// in time, refused at check-in, refused at the counter, or damaged. The seller accepts it or Udozo approves it, and it is
+/// accepted by itself when neither answers in time; the seller then collects it at the centre with their return code.
+model ConnectReturnRequest {
+  id            String          @id @default(uuid()) @db.Uuid
+  /// RT-000123
+  number        Int             @unique @default(autoincrement())
+  orderId       String          @unique @map("order_id") @db.Uuid
+  centreId      String          @map("centre_id") @db.Uuid
+  /// not_collected, refused_at_check_in, refused_at_counter or damaged.
+  reason        String
+  note          String?
+  /// The centre's person who asked (no foreign key: kept if they leave).
+  requestedById String          @map("requested_by_id") @db.Uuid
+  /// requested, accepted (the seller's to collect), collected or cancelled.
+  status        String          @default("requested")
+  /// When it is accepted by itself if nobody answers.
+  answerBy      DateTime        @map("answer_by")
+  /// seller, admin or auto; and who (the seller or the admin).
+  decidedBy     String?         @map("decided_by")
+  decidedById   String?         @map("decided_by_id") @db.Uuid
+  decidedAt     DateTime?       @map("decided_at")
+  /// The seller's 6-digit return code, encrypted; the tries at the counter.
+  returnCode    String?         @map("return_code")
+  codeAttempts  Int             @default(0) @map("code_attempts")
+  /// The seller's free time to collect it, and the return fee they paid (the centre's Connect fee) when they did.
+  collectBy     DateTime?       @map("collect_by")
+  returnFeeMinor BigInt?        @map("return_fee_minor")
+  collectedAt   DateTime?       @map("collected_at")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  order         ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  centre        ConnectCentre   @relation(fields: [centreId], references: [id], onDelete: Restrict)
+
+  @@index([status, answerBy])
+  @@index([centreId, status])
+  @@map("connect_return_requests")
 }

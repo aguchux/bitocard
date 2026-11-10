@@ -23,6 +23,8 @@ const refusalWords: Record<CheckInRefusal, string> = { wrong_item: 'it is not th
 
 /** What each list on the centre's dashboard holds. */
 export const counterViews = { expected: ['paid', 'sent'], at_centre: ['at_centre'], done: ['released', 'disputed', 'refunded', 'partly_refunded'] } as const;
+/** What a centre may ask a return for. */
+export type { ReturnReason } from './connect-returns.service.js';
 export type CounterView = keyof typeof counterViews;
 
 /**
@@ -140,6 +142,8 @@ export class ConnectCounterService implements OnModuleInit {
     if (!['paid', 'sent'].includes(order.status)) throw conflict('order_not_expected', 'This order is not on its way to the centre.');
     const note = input.note ? cleanMessage(input.note).slice(0, 300) : '';
     const centre = order.connectCentre!;
+    // Refused at the counter means it is at the centre: kept there for its seller while Udozo decides.
+    await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, receivedAt: null }, data: { receivedAt: new Date() } });
     await this.prisma.classifiedShipmentEvent.create({ data: { orderId: order.id, status: 'refused', reportedBy: 'centre', note: note || refusalWords[input.reason] } });
     const disputed = await this.safePay.centreDispute(order, ['paid', 'sent'], checkInRefusals[input.reason], `${centre.name} refused it at check-in: ${refusalWords[input.reason]}.${note ? ` ${note}` : ''}`);
     return this.present(disputed);
@@ -262,6 +266,12 @@ export class ConnectCounterService implements OnModuleInit {
       ready_at: order.readyAt?.toISOString() ?? null,
       collect_by: order.collectBy?.toISOString() ?? null,
       released_at: order.releasedAt?.toISOString() ?? null,
+      /** Its return to the seller, once asked (the seller collects it with their own return code). */
+      return: order.connectReturn
+        ? { id: order.connectReturn.id, number: `RT-${String(order.connectReturn.number).padStart(6, '0')}`, reason: order.connectReturn.reason, status: order.connectReturn.status, collect_by: order.connectReturn.collectBy?.toISOString() ?? null }
+        : null,
+      /** Whether it is still here for its seller: refused, or refunded and never collected. */
+      held_for_seller: ['refunded', 'partly_refunded'].includes(order.status) && Boolean(order.receivedAt) && !order.releasedAt && order.connectReturn?.status !== 'collected',
     };
   }
 }

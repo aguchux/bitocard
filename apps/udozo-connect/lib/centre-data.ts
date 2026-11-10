@@ -1,7 +1,7 @@
 import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
-import type { Centre, CounterOrder, CounterSummary, CounterView, List, Member, Shelf } from "./centres";
+import type { Centre, CentreReturn, CounterOrder, CounterSummary, CounterView, List, Member, Shelf } from "./centres";
 import { customerApi } from "./session";
 import { signInPath } from "./site";
 
@@ -35,3 +35,5 @@ export async function readOrder(id: string, order: string) {
   if (!uuid.test(order)) notFound();
   return read<CounterOrder>(`/v1/connect/centres/${id}/orders/${order}`, `/centre/${id}/orders/${order}`);
 }
+
+export const readReturns = (id: string, status?: string) => read<List<CentreReturn>>(`/v1/connect/centres/${id}/returns${status ? `?status=${status}` : ""}`, `/centre/${id}/returns`);

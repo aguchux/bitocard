@@ -6,7 +6,24 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { ConnectApplicationsService, centreNumber } from './applications.service.js';
 
 /** What finance and operations may change on a market's Connect settings (anything left out stays). */
-export type ConnectSettingsInput = { deposit?: number | null; fee_kind?: 'percent' | 'fixed' | null; fee_bps?: number; fee?: number; centre_share_bps?: number; buyer_free_hours?: number };
+export type ConnectSettingsInput = {
+  deposit?: number | null;
+  fee_kind?: 'percent' | 'fixed' | null;
+  fee_bps?: number;
+  fee?: number;
+  centre_share_bps?: number;
+  buyer_free_hours?: number;
+  return_due_days?: number;
+  return_answer_hours?: number;
+  seller_collect_days?: number;
+};
+
+/** The whole numbers each setting takes, and how it is told when out of range. */
+const limits = {
+  return_due_days: { field: 'returnDueDays', min: 1, max: 90, words: 'Give the days until a return is due as 1 to 90.' },
+  return_answer_hours: { field: 'returnAnswerHours', min: 1, max: 720, words: 'Give the hours to answer a return as 1 to 720.' },
+  seller_collect_days: { field: 'sellerCollectDays', min: 1, max: 90, words: "Give the seller's days to collect a return as 1 to 90." },
+} as const;
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
@@ -147,6 +164,12 @@ export class ConnectAdminService {
       if (!Number.isInteger(input.buyer_free_hours) || input.buyer_free_hours < 1 || input.buyer_free_hours > 720) throw invalid('parameter_invalid', 'Give the free time to collect as 1 to 720 hours.', 'buyer_free_hours');
       data.buyerFreeHours = input.buyer_free_hours;
     }
+    for (const [key, rule] of Object.entries(limits) as Array<[keyof typeof limits, (typeof limits)[keyof typeof limits]]>) {
+      const value = input[key];
+      if (value === undefined) continue;
+      if (!Number.isInteger(value) || value < rule.min || value > rule.max) throw invalid('parameter_invalid', rule.words, key);
+      (data as Record<string, number>)[rule.field] = value;
+    }
     const saved = await this.prisma.connectSettings.upsert({
       where: { country: country.code },
       create: { ...(data as Prisma.ConnectSettingsUncheckedCreateInput), country: country.code, updatedById: adminId },
@@ -158,7 +181,7 @@ export class ConnectAdminService {
 
   private presentSettings(
     country: { code: string; currency: string; name: string },
-    row: { depositMinor: bigint | null; feeKind: string | null; feeBps: number | null; feeMinor: bigint | null; centreShareBps: number; buyerFreeHours: number } | null,
+    row: { depositMinor: bigint | null; feeKind: string | null; feeBps: number | null; feeMinor: bigint | null; centreShareBps: number; buyerFreeHours: number; returnDueDays: number; returnAnswerHours: number; sellerCollectDays: number } | null,
   ) {
     return {
       object: 'connect_settings' as const,
@@ -170,6 +193,10 @@ export class ConnectAdminService {
       fee: row?.feeKind === 'percent' ? { kind: 'percent' as const, bps: row.feeBps! } : row?.feeKind === 'fixed' ? { kind: 'fixed' as const, amount: Number(row.feeMinor) } : null,
       centre_share_bps: row?.centreShareBps ?? 7000,
       buyer_free_hours: row?.buyerFreeHours ?? 72,
+      /** Returns to sellers: due days after ready, hours to answer before it is accepted by itself, the seller's days to collect. */
+      return_due_days: row?.returnDueDays ?? 7,
+      return_answer_hours: row?.returnAnswerHours ?? 48,
+      seller_collect_days: row?.sellerCollectDays ?? 7,
     };
   }
 

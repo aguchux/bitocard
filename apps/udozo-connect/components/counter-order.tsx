@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { type CentreResult, findOrder, postUpdate, receiveOrder, refuseCollection, refuseOrder, releaseOrder, shelveOrder } from "@/lib/centre-actions";
-import { type CounterOrder, counterNext, counterStatus, eventWords, refusalReasons, type Shelf } from "@/lib/centres";
+import { type CounterOrder, counterNext, counterStatus, eventWords, refusalReasons, returnReasonsFor, returnStatusWords, type Shelf } from "@/lib/centres";
+import { AskReturn } from "./centre-returns";
 import { money, when } from "@/lib/connect";
 import { useConfirm } from "./confirm-dialog";
 import { danger, input, label, Panel, primary, Problem, secondary } from "./centre-ui";
@@ -235,6 +236,19 @@ export function CounterOrderView({ centre, country, order: initial, shelves }: {
             </form>
           )}
         </Panel>
+      ) : null}
+
+      {order.return ? (
+        <Panel title={`Return ${order.return.number}`}>
+          <p>{returnStatusWords[order.return.status]}.</p>
+          {order.return.status === "accepted" ? (
+            <a href={`/centre/${centre}/returns`} className="mt-2 inline-block font-semibold text-brand-600 hover:underline">
+              Hand it back on Returns
+            </a>
+          ) : null}
+        </Panel>
+      ) : returnReasonsFor(order) ? (
+        <AskReturn centre={centre} order={order.id} reasons={returnReasonsFor(order)!} />
       ) : null}
 
       {order.status === "released" ? (

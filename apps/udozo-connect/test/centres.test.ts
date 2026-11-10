@@ -161,3 +161,27 @@ describe("the counter's rules and actions", () => {
     expect(await actions.findOrder(id, "42")).toMatchObject({ ok: false, message: "No order with that number is coming to this centre." });
   });
 });
+
+describe("returns", () => {
+  it("knows which returns an item can be asked for", () => {
+    const base = { return: null, held_for_seller: false } as const;
+    expect(rules.returnReasonsFor({ ...base, status: "at_centre", ready_at: "x" })).toEqual(["not_collected"]);
+    expect(rules.returnReasonsFor({ ...base, status: "at_centre", ready_at: null })).toBeNull();
+    expect(rules.returnReasonsFor({ ...base, status: "refunded", ready_at: null, held_for_seller: true })).toEqual(["refused_at_check_in", "refused_at_counter", "damaged"]);
+    expect(rules.returnReasonsFor({ status: "at_centre", ready_at: "x", held_for_seller: false, return: { id: "r", number: "RT-1", reason: "not_collected", status: "requested", collect_by: null } })).toBeNull();
+  });
+
+  it("asks and hands back through the centre's own routes, the code checked here first", async () => {
+    reply = () => Response.json({ object: "connect_return", id: other });
+    await actions.askReturn(id, other, "not_collected", " Never came ");
+    await actions.handBack(id, other, "65 43 21");
+    expect(sent.map(item => [item.url.replace(`https://api.udozo.test/v1/connect/centres/${id}`, ""), item.body])).toEqual([
+      [`/orders/${other}/return`, { reason: "not_collected", note: "Never came" }],
+      [`/returns/${other}/hand-back`, { code: "654321" }],
+    ]);
+    sent.length = 0;
+    expect(await actions.askReturn(id, other, "because", null)).toMatchObject({ ok: false, param: "reason" });
+    expect(await actions.handBack(id, other, "123")).toMatchObject({ ok: false, param: "code" });
+    expect(sent).toHaveLength(0);
+  });
+});

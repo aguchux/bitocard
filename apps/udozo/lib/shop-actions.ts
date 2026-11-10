@@ -473,3 +473,18 @@ export async function setResellerStopped(relationshipId: string, stopped: boolea
   revalidatePath("/account/resellers");
   return answer(result);
 }
+// ---- Udozo Connect returns ----
+
+/** The seller accepts a Connect Centre's return of their item. */
+export async function acceptReturn(orderId: string): Promise<ShopResult<{ status: string }>> {
+  if (!id(orderId)) return refused("No such order.");
+  const result = answer(await customerApi<{ status: string }>("POST", `/v1/classifieds/orders/${orderId}/return/accept`, {}));
+  if (result.ok) revalidatePath(`/account/orders/${orderId}`);
+  return result;
+}
+
+/** The seller's return code, shown on their order to collect the item at the centre. */
+export async function returnCode(orderId: string): Promise<ShopResult<{ code: string; tries_left: number }>> {
+  if (!id(orderId)) return refused("No such order.");
+  return answer(await customerApi<{ code: string; tries_left: number }>("GET", `/v1/classifieds/orders/${orderId}/return-code`));
+}
