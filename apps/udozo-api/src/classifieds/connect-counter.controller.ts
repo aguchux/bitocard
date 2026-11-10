@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID, Length, Matches, MaxLength } from 'class-validator';
 import { Public } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { ProductOnly } from '../products/product.js';
+import { sendPhoto } from './chat-files.js';
 import { type CheckInRefusal, checkInRefusals, ConnectCounterService, type CounterView, counterViews } from './connect-counter.service.js';
 
 class ViewDto {
@@ -59,6 +61,16 @@ export class ConnectCounterController {
   @Get()
   list(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string, @Query() query: ViewDto) {
     return this.counter.list(caller.customer, centre, query.view ?? 'expected');
+  }
+
+  @Get('summary')
+  summary(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string) {
+    return this.counter.summary(caller.customer, centre);
+  }
+
+  @Get(':order/dispatch-photos/:photo')
+  async photo(@CurrentCustomer() caller: CustomerCaller, @Param('centre', ParseUUIDPipe) centre: string, @Param('order', ParseUUIDPipe) order: string, @Param('photo', ParseUUIDPipe) photo: string, @Res() res: Response) {
+    sendPhoto(res, await this.counter.dispatchPhoto(caller.customer, centre, order, photo));
   }
 
   @Get('lookup')

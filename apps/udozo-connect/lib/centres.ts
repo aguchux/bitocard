@@ -54,6 +54,7 @@ export const isOwner = (role: CentreRole) => role === "owner";
 /** The centre's places on connect.udozo.com, in the order of its menu. */
 export const centreNav = (id: string) => [
   { label: "Overview", href: `/centre/${id}` },
+  { label: "Items", href: `/centre/${id}/orders` },
   { label: "Centre", href: `/centre/${id}/settings` },
   { label: "Staff", href: `/centre/${id}/staff` },
   { label: "Storage places", href: `/centre/${id}/shelves` },
@@ -86,3 +87,81 @@ export function centreHome(centres: Array<Pick<Centre, "id">>): { redirect: stri
   if (centres.length === 0) return { redirect: "/application" };
   return { choose: true };
 }
+
+// ---- The counter: orders coming to the centre and at it (phase 5) ----
+
+export type CounterView = "expected" | "at_centre" | "done";
+export const counterViews: Array<{ view: CounterView; label: string }> = [
+  { view: "expected", label: "On their way" },
+  { view: "at_centre", label: "At the centre" },
+  { view: "done", label: "Done" },
+];
+
+export type CounterEvent = { status: string; note: string | null; reported_by: string; at: string };
+export type CounterOrder = {
+  object: "connect_order";
+  id: string;
+  /** SP-000123: on the parcel's label. */
+  number: string;
+  status: "paid" | "sent" | "at_centre" | "disputed" | "released" | "refunded" | "partly_refunded";
+  listing: { id: string; ref: number; title: string; cover_url: string | null };
+  quantity: number;
+  seller: { name: string };
+  buyer: { name: string };
+  courier: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  shelf: { id: string; code: string; label: string | null } | null;
+  centre_earns: number;
+  currency: string;
+  dispatch_photos: Array<{ id: string; content_type: string; width: number | null; height: number | null }>;
+  events: CounterEvent[];
+  release_tries_left: number | null;
+  paid_at: string | null;
+  sent_at: string | null;
+  handover_by: string | null;
+  received_at: string | null;
+  ready_at: string | null;
+  collect_by: string | null;
+  released_at: string | null;
+};
+export type CounterSummary = { object: "connect_counter_summary"; expected: number; to_shelve: number; ready: number; due_today: number; overdue: number };
+
+/** Why staff refuse an item at check-in. */
+export const refusalReasons: Array<{ value: "wrong_item" | "damaged" | "missing_parts" | "not_allowed"; label: string }> = [
+  { value: "wrong_item", label: "Not the item listed" },
+  { value: "damaged", label: "Damaged" },
+  { value: "missing_parts", label: "Parts missing" },
+  { value: "not_allowed", label: "Not allowed at Connect Centres" },
+];
+
+/** Where an order stands, as the centre reads it. */
+export function counterStatus(order: Pick<CounterOrder, "status" | "ready_at" | "collect_by">, now = Date.now()) {
+  if (order.status === "paid") return "Paid: the seller is to bring it";
+  if (order.status === "sent") return "On its way";
+  if (order.status === "at_centre") {
+    if (!order.ready_at) return "Received: shelve it";
+    return order.collect_by && new Date(order.collect_by).getTime() < now ? "Ready: free time to collect is over" : "Ready to collect";
+  }
+  if (order.status === "disputed") return "With Udozo to decide";
+  if (order.status === "released") return "Collected";
+  return "Refunded";
+}
+
+/** What staff do next with an order at the counter. */
+export function counterNext(order: Pick<CounterOrder, "status" | "ready_at">): "receive" | "shelve" | "hand_over" | null {
+  if (order.status === "paid" || order.status === "sent") return "receive";
+  if (order.status === "at_centre") return order.ready_at ? "hand_over" : "shelve";
+  return null;
+}
+
+/** A centre step in words, for the order's timeline. */
+export const eventWords: Record<string, string> = {
+  shipped: "Sent by the seller",
+  received: "Received at the centre",
+  refused: "Refused at check-in",
+  ready: "Shelved: ready to collect",
+  collected: "Collected by the buyer",
+  collection_refused: "Refused by the buyer at the counter",
+  note: "Update",
+};

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Centre, List, Member, Shelf } from "./centres";
+import type { Centre, CounterOrder, List, Member, Shelf } from "./centres";
 import { customerApi } from "./session";
 
 /** What an action answers: what it changed as it now is, or Udozo's refusal in words with the field it names. */
@@ -96,4 +96,52 @@ export async function updateShelf(id: string, shelf: string, input: ShelfFields)
   const body = shelfBody(input);
   if ("problem" in body) return { ok: false, message: String(body.problem), code: "parameter_invalid", param: "capacity" };
   return answer(await customerApi<List<Shelf>>("PATCH", `/v1/connect/centres/${id}/shelves/${shelf}`, body));
+}
+
+// ---- The counter ----
+
+const counter = (id: string, order: string, step: string) => `/v1/connect/centres/${id}/orders/${order}/${step}`;
+
+/** Finds an order of this centre by its number (from its label), for its page. */
+export async function findOrder(id: string, number: string): Promise<CentreResult<{ id: string }>> {
+  if (!uuid.test(id)) return unknown;
+  const typed = number.trim();
+  if (!/^(?:sp[-\s]?)?\d{1,12}$/i.test(typed)) return { ok: false, message: "Give the order number on the label, such as SP-000123.", code: "parameter_invalid", param: "number" };
+  const found = await customerApi<CounterOrder>("GET", `/v1/connect/centres/${id}/orders/lookup?number=${encodeURIComponent(typed)}`);
+  if (!found.ok) return { ok: false, message: found.status === 404 ? "No order with that number is coming to this centre." : found.message, code: found.code, param: "number" };
+  return { ok: true, data: { id: found.data.id } };
+}
+
+export async function receiveOrder(id: string, order: string, note: string | null): Promise<CentreResult<CounterOrder>> {
+  if (!uuid.test(id) || !uuid.test(order)) return unknown;
+  return answer(await customerApi<CounterOrder>("POST", counter(id, order, "receive"), { note: text(note) }));
+}
+
+export async function refuseOrder(id: string, order: string, reason: string, note: string | null): Promise<CentreResult<CounterOrder>> {
+  if (!uuid.test(id) || !uuid.test(order)) return unknown;
+  if (!["wrong_item", "damaged", "missing_parts", "not_allowed"].includes(reason)) return { ok: false, message: "Choose why you are refusing it.", code: "parameter_invalid", param: "reason" };
+  return answer(await customerApi<CounterOrder>("POST", counter(id, order, "refuse"), { reason, note: text(note) }));
+}
+
+export async function shelveOrder(id: string, order: string, shelf: string): Promise<CentreResult<CounterOrder>> {
+  if (!uuid.test(id) || !uuid.test(order) || !uuid.test(shelf)) return { ok: false, message: "Choose a storage place.", code: "parameter_invalid", param: "shelf_id" };
+  return answer(await customerApi<CounterOrder>("POST", counter(id, order, "shelve"), { shelf_id: shelf }));
+}
+
+/** Hands it over: the buyer accepted it after inspecting it and gave their 6-digit code. Never stored for replay. */
+export async function releaseOrder(id: string, order: string, code: string): Promise<CentreResult<CounterOrder>> {
+  if (!uuid.test(id) || !uuid.test(order)) return unknown;
+  const digits = code.replace(/\s/g, "");
+  if (!/^\d{6}$/.test(digits)) return { ok: false, message: "The release code is 6 digits.", code: "parameter_invalid", param: "code" };
+  return answer(await customerApi<CounterOrder>("POST", counter(id, order, "release"), { code: digits }));
+}
+
+export async function refuseCollection(id: string, order: string, reason: string): Promise<CentreResult<CounterOrder>> {
+  if (!uuid.test(id) || !uuid.test(order)) return unknown;
+  return answer(await customerApi<CounterOrder>("POST", counter(id, order, "refuse-collection"), { reason: reason.trim() }));
+}
+
+export async function postUpdate(id: string, order: string, body: string): Promise<CentreResult<CounterOrder>> {
+  if (!uuid.test(id) || !uuid.test(order)) return unknown;
+  return answer(await customerApi<CounterOrder>("POST", counter(id, order, "updates"), { body: body.trim() }));
 }

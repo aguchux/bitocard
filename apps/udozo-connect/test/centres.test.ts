@@ -122,3 +122,42 @@ describe("the centre's actions", () => {
     expect(revalidated).toHaveLength(0);
   });
 });
+
+describe("the counter's rules and actions", () => {
+  it("says where an item stands and what comes next", () => {
+    const now = Date.parse("2026-11-12T00:00:00.000Z");
+    expect(rules.counterStatus({ status: "sent", ready_at: null, collect_by: null }, now)).toBe("On its way");
+    expect(rules.counterStatus({ status: "at_centre", ready_at: null, collect_by: null }, now)).toBe("Received: shelve it");
+    expect(rules.counterStatus({ status: "at_centre", ready_at: "x", collect_by: "2026-11-11T00:00:00.000Z" }, now)).toBe("Ready: free time to collect is over");
+    expect(["paid", "at_centre", "released"].map(status => rules.counterNext({ status: status as "paid", ready_at: status === "at_centre" ? "x" : null }))).toEqual(["receive", "hand_over", null]);
+  });
+
+  it("asks the centre's own routes, the code checked here first", async () => {
+    reply = () => Response.json({ object: "connect_order", id: other });
+    await actions.receiveOrder(id, other, " Box fine ");
+    await actions.shelveOrder(id, other, other);
+    await actions.releaseOrder(id, other, "12 34 56");
+    await actions.refuseCollection(id, other, " Wrong colour ");
+    await actions.postUpdate(id, other, "Buyer will come tomorrow");
+    expect(sent.map(item => [item.method, item.url.replace(`https://api.udozo.test/v1/connect/centres/${id}/orders/${other}`, ""), item.body])).toEqual([
+      ["POST", "/receive", { note: "Box fine" }],
+      ["POST", "/shelve", { shelf_id: other }],
+      ["POST", "/release", { code: "123456" }],
+      ["POST", "/refuse-collection", { reason: "Wrong colour" }],
+      ["POST", "/updates", { body: "Buyer will come tomorrow" }],
+    ]);
+    sent.length = 0;
+    expect(await actions.releaseOrder(id, other, "12345")).toMatchObject({ ok: false, param: "code" });
+    expect(await actions.refuseOrder(id, other, "because", null)).toMatchObject({ ok: false, param: "reason" });
+    expect(await actions.findOrder(id, "order 42")).toMatchObject({ ok: false, param: "number" });
+    expect(sent).toHaveLength(0);
+  });
+
+  it("finds an item by its label's number, and says when none is coming here", async () => {
+    reply = () => Response.json({ object: "connect_order", id: other });
+    expect(await actions.findOrder(id, "SP-000042")).toEqual({ ok: true, data: { id: other } });
+    expect(sent[0]!.url).toBe(`https://api.udozo.test/v1/connect/centres/${id}/orders/lookup?number=SP-000042`);
+    reply = () => Response.json({ error: { code: "resource_missing", message: "No such order at this centre." } }, { status: 404 });
+    expect(await actions.findOrder(id, "42")).toMatchObject({ ok: false, message: "No order with that number is coming to this centre." });
+  });
+});

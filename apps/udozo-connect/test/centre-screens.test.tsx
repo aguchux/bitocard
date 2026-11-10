@@ -16,6 +16,13 @@ const actions = vi.hoisted(() => ({
   removeMember: vi.fn(),
   addShelf: vi.fn(),
   updateShelf: vi.fn(),
+  findOrder: vi.fn(),
+  receiveOrder: vi.fn(),
+  refuseOrder: vi.fn(),
+  shelveOrder: vi.fn(),
+  releaseOrder: vi.fn(),
+  refuseCollection: vi.fn(),
+  postUpdate: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("@/lib/centre-actions", () => actions);
@@ -25,6 +32,7 @@ const { CentreStaff } = await import("@/components/centre-staff");
 const { CentreShelves } = await import("@/components/centre-shelves");
 const { CentreSettings } = await import("@/components/centre-settings");
 const { CentreNav } = await import("@/components/centre-nav");
+const { CounterOrderView, FindOrder } = await import("@/components/counter-order");
 
 type Centre = import("@/lib/centres").Centre;
 type Member = import("@/lib/centres").Member;
@@ -87,7 +95,7 @@ describe("the centre's menu", () => {
   it("marks the page it is on", () => {
     const host = mount(createElement(CentreNav, { id: "c1" }));
     expect(host.querySelector('[aria-current="page"]')!.textContent).toBe("Staff");
-    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
+    expect([...host.querySelectorAll("a")].map(link => link.getAttribute("href"))).toEqual(["/centre/c1", "/centre/c1/orders", "/centre/c1/settings", "/centre/c1/staff", "/centre/c1/shelves"]);
   });
 });
 
@@ -193,5 +201,97 @@ describe("the centre's details and its holiday pause", () => {
     const udozo = mount(createElement(CentreSettings, { centre: centre({ status: "paused", paused: { by: "udozo", reason: "Checks.", until: null } }) }));
     expect(udozo.textContent).toContain("Our team will reopen it.");
     expect(button(udozo, "Open again")).toBeUndefined();
+  });
+});
+
+const counterOrder = (over: Partial<import("@/lib/centres").CounterOrder> = {}): import("@/lib/centres").CounterOrder => ({
+  object: "connect_order",
+  id: "o1",
+  number: "SP-000042",
+  status: "sent",
+  listing: { id: "l1", ref: 100001, title: "Samsung 43 inch TV", cover_url: null },
+  quantity: 1,
+  seller: { name: "Chinedu Okafor" },
+  buyer: { name: "Kemi Adeyemi" },
+  courier: null,
+  tracking_number: null,
+  tracking_url: null,
+  shelf: null,
+  centre_earns: 14000,
+  currency: "NGN",
+  dispatch_photos: [{ id: "p1", content_type: "image/jpeg", width: 100, height: 100 }],
+  events: [{ status: "shipped", note: "Dropping it off", reported_by: "seller", at: "2026-11-10T09:00:00.000Z" }],
+  release_tries_left: null,
+  paid_at: "2026-11-10T08:00:00.000Z",
+  sent_at: "2026-11-10T09:00:00.000Z",
+  handover_by: null,
+  received_at: null,
+  ready_at: null,
+  collect_by: null,
+  released_at: null,
+  ...over,
+});
+const shelves = [shelf({}), shelf({ id: "sh2", code: "B-02", label: null })];
+
+describe("the counter", () => {
+  it("finds an item by the number on its label", async () => {
+    actions.findOrder.mockResolvedValue({ ok: true, data: { id: "o1" } });
+    const host = mount(createElement(FindOrder, { centre: "c1" }));
+    act(() => type(host.querySelector<HTMLInputElement>("input")!, "sp-000042"));
+    await act(async () => button(host, "Find")!.click());
+    expect(actions.findOrder).toHaveBeenCalledWith("c1", "sp-000042");
+    expect(router.push).toHaveBeenCalledWith("/centre/c1/orders/o1");
+  });
+
+  it("checks an item in against the seller's photos, or refuses it with a reason after confirming", async () => {
+    actions.receiveOrder.mockResolvedValue({ ok: true, data: counterOrder({ status: "at_centre", received_at: "2026-11-10T10:00:00.000Z" }) });
+    actions.refuseOrder.mockResolvedValue({ ok: true, data: counterOrder({ status: "disputed" }) });
+    const host = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder(), shelves }));
+    expect(host.querySelector("img[alt='Seller’s photo 1'], img[alt^='Seller']")!.getAttribute("src")).toBe("/api/centres/c1/orders/o1/photos/p1");
+    expect(host.textContent).toContain("The seller is dropping it off.");
+    await act(async () => button(host, "Refuse")!.click());
+    act(() => type(host.querySelector<HTMLSelectElement>("select")!, "damaged"));
+    await act(async () => button(host, "Refuse item")!.click());
+    await act(async () => dialogButton("Refuse item").click());
+    expect(actions.refuseOrder).toHaveBeenCalledWith("c1", "o1", "damaged", "");
+
+    const other = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder(), shelves }));
+    act(() => type(other.querySelector<HTMLInputElement>("input")!, "Box in good shape"));
+    await act(async () => button(other, "Received")!.click());
+    expect(actions.receiveOrder).toHaveBeenCalledWith("c1", "o1", "Box in good shape");
+    expect(other.textContent).toContain("Shelve it");
+  });
+
+  it("shelves it, then hands it over only after the buyer accepts it, with their code", async () => {
+    actions.shelveOrder.mockResolvedValue({ ok: true, data: counterOrder({ status: "at_centre", ready_at: "2026-11-10T10:00:00.000Z", collect_by: "2026-11-13T10:00:00.000Z", shelf: { id: "sh2", code: "B-02", label: null }, release_tries_left: 5 }) });
+    actions.releaseOrder.mockResolvedValue({ ok: true, data: counterOrder({ status: "released", released_at: "2026-11-11T10:00:00.000Z" }) });
+    const host = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "at_centre", received_at: "2026-11-10T10:00:00.000Z" }), shelves }));
+    act(() => type(host.querySelector<HTMLSelectElement>("select")!, "sh2"));
+    await act(async () => button(host, "Shelve")!.click());
+    expect(actions.shelveOrder).toHaveBeenCalledWith("c1", "o1", "sh2");
+    expect(host.textContent).toContain("Give the item to the buyer to inspect");
+    expect(host.querySelector("input[autocomplete='one-time-code']")).toBeNull();
+    await act(async () => button(host, "They accept it")!.click());
+    act(() => type(host.querySelector<HTMLInputElement>("input[autocomplete='one-time-code']")!, "123456"));
+    await act(async () => button(host, "Hand it over")!.click());
+    expect(actions.releaseOrder).toHaveBeenCalledWith("c1", "o1", "123456");
+    expect(host.textContent).toContain("Your centre earned ₦140");
+  });
+
+  it("records a buyer's refusal at the counter, after confirming", async () => {
+    actions.refuseCollection.mockResolvedValue({ ok: true, data: counterOrder({ status: "disputed" }) });
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const host = mount(createElement(CounterOrderView, { centre: "c1", country: "NG", order: counterOrder({ status: "at_centre", ready_at: "2026-11-10T10:00:00.000Z", shelf: { id: "sh1", code: "A-01", label: null } }), shelves }));
+    await act(async () => button(host, "They refuse it")!.click());
+    const box = document.querySelector("dialog textarea, dialog input") as HTMLTextAreaElement | HTMLInputElement;
+    act(() => {
+      const proto = box instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(box, "Not the colour in the photos");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => dialogButton("Record the refusal").click());
+    expect(actions.refuseCollection).toHaveBeenCalledWith("c1", "o1", "Not the colour in the photos");
+    expect(host.textContent).toContain("With Udozo to decide");
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });

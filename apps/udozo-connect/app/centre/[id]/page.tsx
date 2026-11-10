@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { Panel, primary, secondary } from "@/components/centre-ui";
 import { ResumeButton } from "@/components/centre-settings";
 import { canManage, day, mapLink, pauseWords } from "@/lib/centres";
-import { readCentre } from "@/lib/centre-data";
+import { readCentre, readSummary } from "@/lib/centre-data";
 
 export const metadata: Metadata = { title: "Your centre" };
 
 /** The centre today: whether it takes orders, what it holds and is set up with, and what to set up next. */
 export default async function CentreOverview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const read = await readCentre(id);
+  const [read, summary] = await Promise.all([readCentre(id), readSummary(id)]);
   if (!read.ok) return null;
   const centre = read.data;
   const stopped = pauseWords(centre, day);
@@ -38,11 +38,27 @@ export default async function CentreOverview({ params }: { params: Promise<{ id:
         ))}
       </dl>
 
-      <Panel title="Items for your centre">
-        <p>
-          Items sellers send to your centre will show here: what is on its way, what to receive and shelve, and what buyers are coming to collect. They
-          start arriving once Udozo Connect shipping opens in your market.
-        </p>
+      <Panel title="Today at your centre">
+        {summary.ok ? (
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {[
+              { label: "On their way", value: summary.data.expected, view: "expected" },
+              { label: "To shelve", value: summary.data.to_shelve, view: "at_centre" },
+              { label: "Ready to collect", value: summary.data.ready, view: "at_centre" },
+              { label: "Due today", value: summary.data.due_today, view: "at_centre" },
+              { label: "Overdue", value: summary.data.overdue, view: "at_centre" },
+            ].map(item => (
+              <li key={item.label}>
+                <a href={`/centre/${centre.id}/orders?view=${item.view}`} className={`block rounded-xl border p-3 hover:border-navy-200 ${item.label === "Overdue" && item.value ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-white"}`}>
+                  <span className="block text-xs font-semibold text-slate-500">{item.label}</span>
+                  <span className="block text-xl font-extrabold text-navy-900">{item.value}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Items sellers send to your centre show under Items: what is on its way, what to receive and shelve, and what buyers are coming to collect.</p>
+        )}
       </Panel>
 
       {centre.shelves === 0 || centre.people === 1 ? (

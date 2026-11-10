@@ -72,6 +72,31 @@ export class ConnectCounterService implements OnModuleInit {
     return { object: 'list' as const, view, data: orders.map(order => this.present(order)) };
   }
 
+  /** Today at the centre: what is on its way, at the centre (waiting to be shelved, ready), due to be collected and late. */
+  async summary(customer: CustomerWithStore, centreId: string) {
+    await this.member(customer, centreId);
+    const now = new Date();
+    const dayEnd = new Date(now);
+    dayEnd.setUTCHours(23, 59, 59, 999);
+    const count = (where: object) => this.prisma.classifiedOrder.count({ where: { connectCentreId: centreId, ...where } });
+    const [expected, toShelve, ready, dueToday, overdue] = await Promise.all([
+      count({ status: { in: ['paid', 'sent'] } }),
+      count({ status: 'at_centre', readyAt: null }),
+      count({ status: 'at_centre', readyAt: { not: null } }),
+      count({ status: 'at_centre', collectBy: { gte: now, lte: dayEnd } }),
+      count({ status: 'at_centre', collectBy: { lt: now } }),
+    ]);
+    return { object: 'connect_counter_summary' as const, expected, to_shelve: toShelve, ready, due_today: dueToday, overdue };
+  }
+
+  /** One of the seller's dispatch photos, to check the item against at check-in. */
+  async dispatchPhoto(customer: CustomerWithStore, centreId: string, orderId: string, photoId: string) {
+    await this.member(customer, centreId);
+    const order = await this.prisma.classifiedOrder.findUnique({ where: { id: orderId }, select: { id: true, connectCentreId: true } });
+    if (!order || order.connectCentreId !== centreId) throw noOrder();
+    return this.safePay.dispatchPhoto(order, photoId);
+  }
+
   async get(customer: CustomerWithStore, centreId: string, orderId: string) {
     await this.member(customer, centreId);
     return this.present(await this.order(centreId, orderId));

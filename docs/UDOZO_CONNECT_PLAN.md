@@ -476,9 +476,19 @@ assistants' knowledge, help, terms and privacy.
        fees). A refund returns everything, the Connect fee too.
      - **Presenter and tests:** orders carry `connect { centre, connect_fee, received_at, ready_at, collect_by }`.
        Tests: `apps/udozo-api/test/connect-orders.test.mjs`, `apps/udozo-admin/test/connect.test.tsx`.
-   - **5b (next):** connect.udozo.com's Expected, Receive, Shelve, Release and Updates screens and the printable label.
+   - **5b, connect.udozo.com's counter (built):** a centre's **Items** (`/centre/<id>/orders`: On their way, At the
+     centre, Done; Find by the number on the label) and each item (`/centre/<id>/orders/<order>`, `CounterOrderView` in
+     `apps/udozo-connect/components/counter-order.tsx`): Check it in (Received with a note, or Refuse with its reason,
+     confirmed), Shelve it in a storage place (or move it), Hand it over (the buyer inspects it first: They accept it,
+     then their 6-digit code; They refuse it, with why, confirmed), Post an update, the seller's dispatch photos (read
+     through the site's own server, `app/api/centres/[id]/orders/[order]/photos/[photo]/route.ts`, from the API's
+     `GET …/orders/:order/dispatch-photos/:photo`) and the item's timeline. The Overview shows today's counts from `GET
+     /v1/connect/centres/:centre/orders/summary` (on their way, to shelve, ready, due today, overdue). Scanning a label's
+     QR code is the phone's own camera app reading the order number into Find. Tests:
+     `apps/udozo-connect/test/centres.test.ts`, `centre-screens.test.tsx`, `counter-photos.test.ts`.
    - **5c:** returns (requests, 48 hours, return codes), demurrage and Loss of care, stock checks, earnings and payouts.
-   - **5d:** udozo.com's Collect at a Connect Centre at checkout and the order's Connect timeline.
+   - **5d:** udozo.com's Collect at a Connect Centre at checkout, the order's Connect timeline, and the printable label
+     (with its QR code: the order number and centre, never the buyer's details) on the seller's order.
 6. **Reports and alerts**: what each centre holds and its overdue items, uncollected rates, and seller and centre
    problems.
 7. **Warehouses, pickups and auctions**: Udozo's warehouses and Final Return Addresses, pickups from centres, Udozo

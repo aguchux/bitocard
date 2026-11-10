@@ -197,6 +197,11 @@ describe('Orders collected at a Connect Centre', () => {
     assert.ok(shelved.ready_at && shelved.collect_by);
     assert.ok(Math.abs(new Date(shelved.collect_by) - new Date(shelved.ready_at) - 72 * 3_600_000) < 5000, '72 free hours');
     assert.ok(await prisma.notification.findFirst({ where: { customerId: buyer.id, title: { contains: 'ready to collect' } } }));
+    const summary = (await hub.owner.get(`/v1/connect/centres/${hub.id}/orders/summary`)).json;
+    assert.deepEqual([summary.expected, summary.to_shelve, summary.ready, summary.overdue], [0, 0, 1, 0]);
+    const photo = await hub.staff.get(`/v1/connect/centres/${hub.id}/orders/${order.id}/dispatch-photos/${shelved.dispatch_photos[0].id}`);
+    assert.equal(photo.json?.error?.code, 'storage_not_configured', "the seller's photo is read through the centre's own route (no private bucket in tests)");
+    assert.equal((await buyer.get(`/v1/connect/centres/${hub.id}/orders/summary`)).json.error.code, 'centre_unknown');
 
     // The buyer inspects it, then gives their code; a wrong one counts a try.
     const code = (await buyer.get(`/v1/classifieds/orders/${order.id}/release-code`)).json.code;
