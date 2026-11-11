@@ -1,0 +1,12 @@
+{
+  "name": "@udozo/pos-windows",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Udozo POS for Windows: a Tauri 2 shell, packed as an MSIX for the Microsoft Store.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/windows.test.mjs",
+    "tauri": "npx --yes @tauri-apps/cli@2",
+    "msix:layout": "node scripts/msix-layout.mjs"
+  }
+}

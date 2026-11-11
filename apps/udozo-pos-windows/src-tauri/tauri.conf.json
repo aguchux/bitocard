@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Udozo POS",
+  "version": "0.1.0",
+  "identifier": "com.udozo.pos",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://pos.udozo.com"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "publisher": "Udozo",
+    "copyright": "Udozo",
+    "category": "Business",
+    "shortDescription": "Udozo POS",
+    "longDescription": "Sell in your shop with Udozo POS: one stock for your shop and udozo.com.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"]
+  }
+}

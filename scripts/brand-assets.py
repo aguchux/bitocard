@@ -38,6 +38,10 @@ BRANDS = [
 # one folder of the app's public/, served at the usual addresses by that deployment (apps/verify/next.config.ts).
 SECOND_BRAND = {"afrippa": [ROOT / "apps" / "verify" / "public" / "afrippa"], "udozo": [ROOT / "apps" / "verify" / "public" / "udozo"]}
 
+# Desktop apps of a brand (Tauri shells): the executable's and window's icons in src-tauri/icons, and the tiles their
+# Microsoft Store package (MSIX) shows in msix/Assets.
+DESKTOP = {"udozo": [ROOT / "apps" / "udozo-pos-windows"]}
+
 WHITE = np.array([255, 255, 255])
 
 
@@ -172,6 +176,36 @@ def write_folder(folder, outputs, dark: Image.Image, white: Image.Image):
     print(f"Wrote the whole set to {folder.relative_to(ROOT)}")
 
 
+def boxed(mark: Image.Image, width: int, height: int, fill: float):
+    """The mark centred in a transparent width by height box, `fill` of the height."""
+    target = max(1, round(height * fill))
+    scaled = mark.resize((max(1, round(mark.width * target / mark.height)), target), Image.LANCZOS)
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    canvas.alpha_composite(scaled, ((width - scaled.width) // 2, (height - scaled.height) // 2))
+    return canvas
+
+
+def write_desktop(folder, dark: Image.Image):
+    """A Tauri shell's icons, its MSIX tiles and its start page's picture."""
+    icons, assets = folder / "src-tauri" / "icons", folder / "msix" / "Assets"
+    icons.mkdir(parents=True, exist_ok=True)
+    assets.mkdir(parents=True, exist_ok=True)
+    for file, size in {"32x32.png": 32, "128x128.png": 128, "128x128@2x.png": 256, "icon.png": 512}.items():
+        fitted(dark, size, 0.9).save(icons / file, optimize=True)
+    fitted(dark, 256, 0.9).save(icons / "icon.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    for file, (width, height, fill) in {
+        "StoreLogo.png": (50, 50, 0.9),
+        "Square44x44Logo.png": (44, 44, 0.9),
+        "Square150x150Logo.png": (150, 150, 0.6),
+        "Wide310x150Logo.png": (310, 150, 0.6),
+    }.items():
+        boxed(dark, width, height, fill).save(assets / file, optimize=True)
+    # The bundled start page's picture.
+    (folder / "dist").mkdir(parents=True, exist_ok=True)
+    fitted(dark, 128, 0.9).save(folder / "dist" / "icon.png", optimize=True)
+    print(f"Wrote the desktop icons and Store tiles to {folder.relative_to(ROOT)}")
+
+
 def main():
     for brand, source, apps in BRANDS:
         write_brand(brand, source, apps)
@@ -200,6 +234,8 @@ def write_brand(brand, source, apps):
     sizes = {file: picture.size for file, picture in outputs.items()}
     print(f"Wrote {', '.join(f'{file} {w}x{h}' for file, (w, h) in sizes.items())} to {len(apps)} apps")
     write_icons(dark, white, apps)
+    for folder in DESKTOP.get(brand, []):
+        write_desktop(folder, dark)
 
 
 if __name__ == "__main__":

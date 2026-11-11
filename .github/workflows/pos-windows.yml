@@ -1,0 +1,72 @@
+# Builds Udozo POS for Windows (apps/udozo-pos-windows): the Tauri 2 app, then its MSIX package for the Microsoft Store,
+# kept as the run's artifact (udozo-pos-msix) to upload in Partner Center. Nothing is published from here, and nothing is
+# signed: the Store signs the package. Partner Center's Product identity goes in the repository variables
+# POS_MSIX_IDENTITY_NAME, POS_MSIX_PUBLISHER and POS_MSIX_PUBLISHER_NAME; without them the package carries a test
+# identity, fine for checking a build but refused by the Store.
+name: Udozo POS for Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/udozo-pos-windows/**
+      - .github/workflows/pos-windows.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pos-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/udozo-pos-windows
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Check the app's settings
+        run: node --test test/windows.test.mjs
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/udozo-pos-windows/src-tauri
+
+      - name: Build the app
+        run: npx --yes @tauri-apps/cli@2 build
+
+      - name: Lay out the package
+        env:
+          POS_MSIX_IDENTITY_NAME: ${{ vars.POS_MSIX_IDENTITY_NAME }}
+          POS_MSIX_PUBLISHER: ${{ vars.POS_MSIX_PUBLISHER }}
+          POS_MSIX_PUBLISHER_NAME: ${{ vars.POS_MSIX_PUBLISHER_NAME }}
+        run: node scripts/msix-layout.mjs --exe src-tauri/target/release/udozo-pos.exe --out msix-layout
+
+      - name: Pack the MSIX
+        shell: pwsh
+        run: |
+          $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+          $makeappx = Get-ChildItem $kits -Directory | Where-Object Name -match '^10\.' | Sort-Object { [version]$_.Name } -Descending |
+            ForEach-Object { Join-Path $_.FullName 'x64\makeappx.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $makeappx) { throw 'makeappx.exe was not found in the Windows SDK.' }
+          & $makeappx pack /d msix-layout /p udozo-pos.msix /o
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: udozo-pos-msix
+          path: |
+            apps/udozo-pos-windows/udozo-pos.msix
+            apps/udozo-pos-windows/src-tauri/Cargo.lock
+          if-no-files-found: error
