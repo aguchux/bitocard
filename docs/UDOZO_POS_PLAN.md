@@ -45,7 +45,7 @@ That removes the OAuth app, the webhooks, the 15-minute reconcile and the mock U
   - POS has **its own three plans** (below): Free, Premium and Multi-shop. They do not follow `paid_plans`, which keeps Seller HQ free.
 - **Who owns a POS account:** a udozo.com customer who sells. One account per customer, holding one or more shops.
 - **Payments at the till:** see How buyers pay at the till.
-- **Offline:** online-first at launch. Every sale still carries a client-made UUID (`client_sale_id`, unique) from the first milestone, so offline replay can come later without changing the API.
+- **Offline:** see Selling with no internet. It comes in milestone 9, online-first until then. Every sale still carries a client-made UUID (`client_sale_id`, unique) from the first milestone, so offline replay can come later without changing the API.
 - **Native apps:** part of the product (Android, iOS, Windows, called Udozo POS), wrapping the same web app's screens, built once the web app works. Before that, the web app installs from the browser.
 
 ## How the owner uses it (the owner's own words, 10 November 2026)
@@ -197,6 +197,65 @@ An owner who wants bank transfers confirmed without checking their bank app asks
 - **Closing:** the owner can close an account (the gateway's account is deactivated where it allows). A transfer still arriving afterwards is credited and settled, never lost.
 - **Admins** (admin.udozo.com > POS > Collections): accounts, collections, unmatched transfers, settlements and failures; hold or release a settlement; set the fee per market.
 
+## Selling with no internet (recommended, 11 November 2026)
+
+**Yes, a till keeps selling with no internet**, within limits that keep stock and money honest. Udozo confirms nothing while the till is offline, so only what the shop handles itself works then. Everything is uploaded in order when the connection returns.
+
+**What works offline and what does not**
+
+| Works offline | Waits for the internet |
+|---|---|
+| Cash (with change) | Udozo wallet payments (the buyer must confirm online) |
+| Card, recorded with the terminal's reference | Udozo collection accounts: the till cannot see the transfer arrive (but see below) |
+| Transfer to the shop's own account, recorded | Sending receipts by WhatsApp or email (queued, sent on reconnect) |
+| Other methods, recorded | Inviting staff, changing roles, plans or settings |
+| Split payments of the above | Stock changes made by another till or online (seen on reconnect) |
+| Printing receipts | |
+| Refunds and voids of this till's own sales, with a manager's PIN | |
+| Opening and closing a shift, cash-up | |
+
+A transfer to the till's **static** collection account can still be accepted offline as **Transfer: to confirm**, with a manager's PIN. The sale completes, its receipt says payment is being confirmed, and on reconnect it is matched to the transfer that arrived (amount, account, time). If none arrived within an hour, it is flagged to the manager as unpaid. This is off by default, a shop setting.
+
+**Before a till can work offline**
+
+- **The device is linked to the shop** (device linking, milestone 5) and has synced while online. A browser that has never been online with the shop cannot sell offline.
+- **It keeps a copy of what it needs**, refreshed every few minutes while online and on every sale:
+  - the listings ticked Sell at POS, with their price, barcode, category and photo;
+  - **how many are free to sell** (stock less what online orders hold);
+  - the shop's details, VAT, receipt layout and bank details;
+  - the roles and permissions;
+  - the staff allowed on this till.
+- **Staff sign in offline with their PIN.** The device keeps a PIN check for each staff member who has signed in on it online (an Argon2 hash, sealed with the device's key, never the PIN). Five wrong tries lock that person on that device. A staff member suspended while the till was offline can still sign in there until it reconnects; their sales are flagged for the owner then.
+- **Where it is kept:** in the apps, SQLite (Expo and Tauri), encrypted. In the web app, IndexedDB with the browser asked for persistent storage, so it is not cleared. The web app warns when the browser refuses, and recommends the app for shops that go offline often.
+
+**Selling offline**
+
+1. The till shows a clear **Offline** banner, with how many sales are waiting to upload. It turns to **Syncing**, then disappears.
+2. The cashier sells as usual. Prices are the copy's prices; stock counts down from the copy's free stock.
+3. **Stock:** the till will not sell more than its copy says is free. A manager's PIN can override this for an item physically in hand, and the sale is then marked oversold. The till cannot see other tills' or online sales meanwhile, so two tills could both sell the last unit; that is caught on upload (below).
+4. **Each sale gets** its client id (`client_sale_id`, made on the device) and a provisional number naming the till (`T2-0042`), printed on the receipt with a QR to the receipt online. Its final `POS-000123` number comes on upload and is shown in the sales history beside the provisional one.
+5. **Receipts:** printing works offline (Bluetooth or USB printers in the apps, the browser's print in the web app). WhatsApp and email receipts are queued and sent on reconnect.
+
+**Limits that keep it safe**
+
+- **72 hours or 500 sales offline** (admin-set per plan), whichever comes first. After that the till stops selling until it syncs, so a lost or stolen till cannot keep trading for weeks. Warnings start at 48 hours.
+- **Discounts** are held to the staff member's role limit offline as online. Anything needing a manager needs a manager's PIN on the till.
+- **An unlinked device** (lost or stolen) can upload what it sold while it was linked; those sales are held for the owner to accept or reject, never applied automatically. It can sell nothing more.
+
+**Uploading on reconnect**
+
+- **The outbox:** everything done offline (sales, refunds, voids, shift and cash-up events, stock counts) is uploaded **in the order it happened**, in batches, each with its own id, so a retry never doubles anything (the API answers the earlier result for an id it has seen).
+- **Each sale is applied as it was made:** the prices it was sold at, the staff member, the time it happened (`client_created_at`, beside when it arrived).
+- **Stock** is taken in one transaction per sale, as online (`takeStockAtTill`):
+  - if what is free has run out, the sale still stands (the goods have left the shop), stock goes no lower than 0, and the listing is flagged **oversold** for the owner or a manager to resolve (restock, cancel an online order, or correct a count);
+  - units held for online orders are never taken. A sale that would need them is flagged instead, so the owner decides.
+- **Things that changed meanwhile** never undo a sale: a new price applies only to new sales, an unticked product's sale stands, and a staff member suspended meanwhile has their offline sales flagged.
+- **After upload** the till refreshes its copy, shows anything flagged, and the banner clears. The owner's dashboard lists each device's last sync and anything still waiting, and the owner is told when a till has not synced for a day.
+
+**Rollout:** offline comes in milestone 9, but every sale carries its client id from milestone 3, so nothing in the API changes for it.
+1. The web app first (IndexedDB, service worker, cash and recorded methods), so shops can use it on any device.
+2. The Android, iOS and Windows apps, where storage is reliable and printers and cash drawers connect.
+
 ## The three plans (decided, 10 November 2026)
 
 | | **Free** | **Premium** | **Multi-shop** |
@@ -255,7 +314,7 @@ An owner who wants bank transfers confirmed without checking their bank app asks
    - CSV and PDF exports for the accountant.
 8. **Multi-shop:** several shops, the stock split between them with transfers, online orders fulfilled from the chosen shop, and reports per shop. Also upgrading and downgrading between the three plans, and yearly billing. (The plan limits themselves, `posLimit`, come in milestone 1.)
 9. **Offline and apps (S5, S19):**
-   - an IndexedDB catalogue and outbox in the web app first;
+   - selling with no internet, as above: the device's copy, offline PIN sign-in, the outbox and in-order upload, oversold and flagged sales, the 72-hour or 500-sale limit, in the web app first (IndexedDB, service worker);
    - then Expo (camera, Bluetooth ESC/POS) and Tauri (USB printers, cash drawer);
    - setting each app's store link in admin turns its Coming soon button on pos.udozo.com into a download.
 
