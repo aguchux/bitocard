@@ -129,6 +129,9 @@ describe("words", () => {
   it("say what a flag means and where a transfer stands", () => {
     expect(flagText({ code: "oversold", listing_id: "a", title: "Radio", short: 2 }, "NGN")).toBe("2 more “Radio” sold than there was: restock or count the shelf.");
     expect(flagText({ code: "price_changed", listing_id: "a", title: "Radio", sold_at: 10_000, price: 12_000 }, "NGN")).toBe("“Radio” sold at ₦100; it is now ₦120.");
+    expect(flagText({ code: "staff_not_on_till", staff: "Bola Ade" }, "NGN")).toBe("Sold by Bola Ade, who does not work at this till.");
+    expect(flagText({ code: "discount_over_limit", staff: "Bola Ade", bps: 2500 }, "NGN")).toContain("25% discount");
+    expect(flagText({ code: "refund_unapproved", staff: "Bola Ade" }, "NGN")).toContain("without a manager's PIN");
     expect(transferStatusText({ status: "in_transit" })).toBe("On its way");
     expect(transferStatusText({ status: "received", received_lines: [{ listing_id: "a", sent: 4, received: 3, lost: 1 }] })).toBe("Received, 1 lost on the way");
     expect(transferStatusText({ status: "cancelled", received_by: "Ada" })).toBe("Taken back by Ada");

@@ -29,6 +29,12 @@ export const limitsFor = (plan: { offlineHours: number; offlineSales: number }) 
 export const unsyncedAfterMs = 24 * 3_600_000;
 /** Entries a till uploads at once. */
 export const maxUploadEntries = 50;
+/** Entries in one file of unsent sales. */
+export const maxImportEntries = 2000;
+/** An unlinked device may upload what it sold for this long after it was unlinked, its sales held for the owner. */
+export const unlinkedUploadDays = 30;
+/** Sales an unlinked device may leave waiting for the owner. */
+export const maxHeldPerDevice = 500;
 /** An offline sale's time is kept as the till gave it, within this many days before it arrived. */
 const backdateDays = 7;
 
@@ -80,11 +86,11 @@ export type OfflineFlag =
   | { code: 'unticked'; listing_id: string; title: string }
   | { code: 'price_changed'; listing_id: string; title: string; sold_at: number; price: number | null }
   | { code: 'staff_suspended'; staff: string }
+  | { code: 'staff_not_on_till'; staff: string }
   | { code: 'device_unlinked' }
   | { code: 'beyond_offline_limit'; hours: number }
   | { code: 'discount_over_limit'; staff: string; bps: number }
-  | { code: 'refund_unapproved'; staff: string }
-  | { code: 'imported_from_file' };
+  | { code: 'refund_unapproved'; staff: string };
 
 type Result = {
   client_id: string;
@@ -109,6 +115,62 @@ const minorOf = (value: unknown, param: string) => {
   return BigInt(value);
 };
 const fullName = (staff: { firstName: string; lastName: string }) => `${staff.firstName} ${staff.lastName}`.trim();
+/** An optional piece of text from the till: a string of at most `max` characters, or nothing. */
+const optionalText = (value: unknown, max: number, param: string) => {
+  if (value === undefined || value === null) return;
+  if (typeof value !== 'string' || value.length > max) throw invalid('parameter_invalid', `Text of up to ${max} characters.`, param);
+};
+const requiredId = (value: unknown, param: string) => {
+  if (typeof value !== 'string' || !uuid.test(value)) throw invalid('parameter_invalid', 'Give its id.', param);
+};
+
+/**
+ * What every entry must look like before anything is read: ids are ids and text is text of bounded length. A malformed
+ * entry is refused on its own (never left to fail in the database, which would stop the till's whole queue).
+ */
+function checkShape(entry: OfflineEntry) {
+  switch (entry.kind) {
+    case 'sale':
+      optionalText(entry.client_number, 40, 'client_number');
+      optionalText(entry.note, 300, 'note');
+      optionalText(entry.client_created_at, 40, 'client_created_at');
+      if (entry.customer_id !== undefined && entry.customer_id !== null) requiredId(entry.customer_id, 'customer_id');
+      if (entry.approved_by_staff_id !== undefined && entry.approved_by_staff_id !== null) requiredId(entry.approved_by_staff_id, 'approved_by_staff_id');
+      if (entry.receipt !== undefined && entry.receipt !== null) {
+        if (typeof entry.receipt !== 'object') throw invalid('parameter_invalid', 'A receipt is a WhatsApp number or an email.', 'receipt');
+        optionalText(entry.receipt.whatsapp, 32, 'receipt.whatsapp');
+        optionalText(entry.receipt.email, 254, 'receipt.email');
+      }
+      if (Array.isArray(entry.payments)) entry.payments.forEach((payment, index) => optionalText(payment?.reference, 80, `payments[${index}].reference`));
+      return;
+    case 'refund':
+      requiredId(entry.sale_client_id, 'sale_client_id');
+      requiredId(entry.staff_id, 'staff_id');
+      optionalText(entry.reason, 300, 'reason');
+      if (entry.restock !== undefined && typeof entry.restock !== 'boolean') throw invalid('parameter_invalid', 'Say whether it goes back on the shelf.', 'restock');
+      if (entry.approved_by_staff_id !== undefined && entry.approved_by_staff_id !== null) requiredId(entry.approved_by_staff_id, 'approved_by_staff_id');
+      return;
+    case 'shift_open':
+    case 'shift_cash':
+    case 'shift_close':
+      requiredId(entry.staff_id, 'staff_id');
+      optionalText(entry.at, 40, 'at');
+      if (typeof entry.at !== 'string') throw invalid('parameter_invalid', 'Give the time as an ISO date.', 'at');
+      if ('note' in entry) optionalText(entry.note, 300, 'note');
+      if ('reason' in entry) optionalText(entry.reason, 200, 'reason');
+      if ('shift_client_id' in entry && entry.shift_client_id !== undefined && entry.shift_client_id !== null) requiredId(entry.shift_client_id, 'shift_client_id');
+      if ('shift_id' in entry && entry.shift_id !== undefined && entry.shift_id !== null) requiredId(entry.shift_id, 'shift_id');
+      return;
+    case 'stock':
+      requiredId(entry.staff_id, 'staff_id');
+      requiredId(entry.listing_id, 'listing_id');
+      optionalText(entry.at, 40, 'at');
+      if (typeof entry.at !== 'string') throw invalid('parameter_invalid', 'Give the time as an ISO date.', 'at');
+      optionalText(entry.note, 200, 'note');
+      if (entry.approved_by_staff_id !== undefined && entry.approved_by_staff_id !== null) requiredId(entry.approved_by_staff_id, 'approved_by_staff_id');
+      return;
+  }
+}
 
 /**
  * Selling with no internet (docs/UDOZO_POS_PLAN.md, Selling with no internet; milestone 9). A linked till keeps a copy
@@ -136,13 +198,18 @@ export class PosOfflineService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** A member of staff of the account with their role (null when not one of theirs). */
-  private async member(accountId: string, staffId: string | null | undefined) {
+  /**
+   * A member of staff of the account with their role (null when not one of theirs), whether they are active and whether
+   * they may work at the till (`tillId`): only those are offered on its device, so anyone else named by an upload is
+   * either stale or forged.
+   */
+  private async member(accountId: string, staffId: string | null | undefined, tillId?: string | null) {
     if (typeof staffId !== 'string' || !uuid.test(staffId)) return null;
-    const row = await this.prisma.posStaff.findFirst({ where: { id: staffId, accountId }, include: { role: true } });
+    const row = await this.prisma.posStaff.findFirst({ where: { id: staffId, accountId }, include: { role: true, tills: { select: { tillId: true } } } });
     if (!row) return null;
     const role: ResolvedRole = this.staff.resolveRole(row);
-    return { row, role, by: { customerId: null, staffId: row.id, name: fullName(row) } satisfies PosBy, active: row.status === 'active' };
+    const onTill = !tillId || row.allTills || row.tills.some(till => till.tillId === tillId);
+    return { row, role, by: { customerId: null, staffId: row.id, name: fullName(row) } satisfies PosBy, active: row.status === 'active', onTill, trusted: row.status === 'active' && onTill };
   }
 
   /** The owner's Udozo account (still active), as the till's services take it. */
@@ -240,6 +307,8 @@ export class PosOfflineService {
   /** A till's offline entries, in the order they happened: each applied once, its result answered. */
   async upload(device: DeviceRow, entries: OfflineEntry[]) {
     if (!Array.isArray(entries) || !entries.length || entries.length > maxUploadEntries) throw invalid('parameter_invalid', `Upload 1 to ${maxUploadEntries} entries at once.`, 'entries');
+    // A device unlinked long ago (lost, stolen) uploads nothing more.
+    if (device.revokedAt && Date.now() - device.revokedAt.getTime() > unlinkedUploadDays * 86_400_000) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'device_not_linked', 'This device is not linked to a till.');
     const owner = await this.owner(device.accountId);
     const results: Result[] = [];
     const plan = (await this.prisma.posAccount.findUniqueOrThrow({ where: { id: device.accountId }, include: { plan: true } })).plan;
@@ -249,6 +318,7 @@ export class PosOfflineService {
       try {
         if (!(offlineEntryKinds as readonly string[]).includes(entry?.kind)) throw invalid('parameter_invalid', 'Each entry is a sale, a refund, a shift step or a stock change.', `entries[${index}].kind`);
         if (typeof clientId !== 'string' || !uuid.test(clientId)) throw invalid('parameter_invalid', 'Each entry has its own id.', `entries[${index}]`);
+        checkShape(entry);
         if (device.revokedAt) {
           results.push(entry.kind === 'sale' ? await this.hold(device, entry) : { client_id: clientId, kind, status: 'rejected', error: { code: 'device_unlinked', message: 'This device was unlinked: only its sales are kept, for the owner to decide.' } });
           continue;
@@ -274,7 +344,18 @@ export class PosOfflineService {
             break;
         }
       } catch (error) {
-        // A refusal is that entry's answer and the till moves on; anything else stops the upload, to be sent again.
+        // A refusal is that entry's answer and the till moves on. The same step sent twice at once: the first made it.
+        // Data the database could not take is that entry's refusal too (never retried for ever, holding the queue).
+        // Anything else (the database unreachable) stops the upload, to be sent again.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002' && kind !== 'sale') {
+          results.push({ client_id: String(clientId), kind, status: 'duplicate' });
+          continue;
+        }
+        if (error instanceof Prisma.PrismaClientValidationError || error instanceof TypeError || (error instanceof Prisma.PrismaClientKnownRequestError && ['P2000', 'P2006', 'P2007', 'P2023'].includes(error.code))) {
+          this.logger.warn(`Offline ${kind} ${String(clientId)} refused: ${error instanceof Error ? error.message.split('\n')[0] : 'bad data'}`);
+          results.push({ client_id: String(clientId), kind, status: 'rejected', error: { code: 'entry_invalid', message: 'Udozo could not read this entry. Export it and send it to Udozo.' } });
+          continue;
+        }
         if (!(error instanceof ApiError)) throw error;
         results.push({ client_id: String(clientId), kind, status: 'rejected', error: { code: error.code, message: error.message, ...(error.param ? { param: error.param } : {}) } });
       }
@@ -287,6 +368,10 @@ export class PosOfflineService {
   private async hold(device: DeviceRow, entry: OfflineSaleEntry): Promise<Result> {
     const done = await this.prisma.posSale.findUnique({ where: { accountId_clientSaleId: { accountId: device.accountId, clientSaleId: entry.client_sale_id } }, select: { id: true, number: true, clientNumber: true, flags: true } });
     if (done) return { client_id: entry.client_sale_id, kind: 'sale', status: 'duplicate', sale: { id: done.id, number: done.number, client_number: done.clientNumber, flags: done.flags as OfflineFlag[] } };
+    // Only what could be a sale is kept, and only so much from one device.
+    this.checkSale(entry);
+    const waiting = await this.prisma.posOfflineHeld.count({ where: { deviceId: device.id, status: 'held' } });
+    if (waiting >= maxHeldPerDevice) throw conflict('held_limit', `This device has ${maxHeldPerDevice} sales waiting for the owner. They must accept or reject them first.`);
     await this.prisma.posOfflineHeld.upsert({
       where: { accountId_clientSaleId: { accountId: device.accountId, clientSaleId: entry.client_sale_id } },
       create: { accountId: device.accountId, deviceId: device.id, tillId: device.tillId, clientSaleId: entry.client_sale_id, entry: entry as unknown as Prisma.InputJsonValue },
@@ -339,13 +424,15 @@ export class PosOfflineService {
     if (device.lastSyncedAt && soldAt.getTime() - device.lastSyncedAt.getTime() > (device.limitHours ?? offlineLimits.hours) * 3_600_000) flags.push({ code: 'beyond_offline_limit', hours: Math.floor((soldAt.getTime() - device.lastSyncedAt.getTime()) / 3_600_000) });
 
     // Who sold it: kept as they were, flagged if suspended or removed meanwhile.
-    const member = await this.member(account.id, entry.staff_id);
+    const member = await this.member(account.id, entry.staff_id, device.tillId);
     if (!member) throw invalid('parameter_invalid', 'That member of staff is not on this account.', 'staff_id');
     const seller = member.row;
     const by: PosBy = member.by;
     if (seller.status !== 'active') flags.push({ code: 'staff_suspended', staff: by.name });
-    const approval = await this.member(account.id, entry.approved_by_staff_id);
-    const approver = approval && approval.row.id !== seller.id ? approval.row : null;
+    if (!member.onTill) flags.push({ code: 'staff_not_on_till', staff: by.name });
+    // A colleague's PIN counts only from someone active who works at this till.
+    const approval = await this.member(account.id, entry.approved_by_staff_id, device.tillId);
+    const approver = approval && approval.trusted && approval.row.id !== seller.id ? approval.row : null;
 
     const lines = entry.lines.map((line, index) => ({ ...line, unit: minorOf(line.unit_price, `lines[${index}].unit_price`), off: minorOf(line.discount, `lines[${index}].discount`) }));
     const totals = saleTotals(
@@ -446,7 +533,8 @@ export class PosOfflineService {
           if (levels) await changeLevel(tx, row.id, till.shopId, -take, now);
           await this.sales.setStock(tx, row, stock, now);
           row.stock = stock;
-          await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId: till.shopId, reason: 'sale', delta: -take, stockAfter: stock, saleId: sale.id, note: 'Sold offline', byStaffId: by.staffId, byName: by.name } });
+          // Dated when it was sold, so a shelf count made offline later is worked out against it.
+          await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId: till.shopId, reason: 'sale', delta: -take, stockAfter: stock, saleId: sale.id, note: 'Sold offline', byStaffId: by.staffId, byName: by.name, createdAt: soldAt } });
         }
         if (approver) await tx.posApproval.create({ data: { accountId: account.id, action: 'offline_sale', subjectId: sale.id, requestedByStaffId: seller.id, requestedByName: by.name, approvedByStaffId: approver.id, approvedByName: fullName(approver), tillId: till.id } });
         return sale.id;
@@ -468,28 +556,28 @@ export class PosOfflineService {
   private async applyRefund(owner: CustomerWithStore, device: DeviceRow, entry: OfflineRefundEntry): Promise<Result> {
     if (typeof entry.sale_client_id !== 'string' || !uuid.test(entry.sale_client_id)) throw invalid('parameter_invalid', 'Say which sale it refunds.', 'sale_client_id');
     if (typeof entry.staff_id !== 'string' || !uuid.test(entry.staff_id)) throw invalid('parameter_invalid', 'Say who refunded it.', 'staff_id');
-    const sale = await this.prisma.posSale.findUnique({ where: { accountId_clientSaleId: { accountId: device.accountId, clientSaleId: entry.sale_client_id } }, select: { id: true, number: true, clientNumber: true, flags: true, status: true, tillId: true } });
+    const sale = await this.prisma.posSale.findUnique({ where: { accountId_clientSaleId: { accountId: device.accountId, clientSaleId: entry.sale_client_id } }, select: { id: true, number: true, clientNumber: true, flags: true, status: true, tillId: true, payments: { select: { method: true } } } });
     if (!sale || sale.tillId !== device.tillId) throw notFound('sale at this till');
     const present = { id: sale.id, number: sale.number, client_number: sale.clientNumber, flags: sale.flags as OfflineFlag[] };
     if (sale.status === 'refunded') return { client_id: entry.client_id, kind: 'refund', status: 'duplicate', sale: present };
-    const member = await this.member(device.accountId, entry.staff_id);
+    // Money Udozo moved (the Udozo wallet, a Udozo account) or pay later is refunded online only, with the role's own
+    // checks: an offline refund is taken on trust and only flagged, so it never moves money through Udozo.
+    if (!sale.payments.every(payment => (recordedPaymentMethods as readonly string[]).includes(payment.method))) throw conflict('refund_online_only', `${sale.number} was paid through Udozo or on credit. Refund it at the till once it is online.`);
+    const member = await this.member(device.accountId, entry.staff_id, device.tillId);
     if (!member) throw invalid('parameter_invalid', 'That member of staff is not on this account.', 'staff_id');
     const refunder = member.row;
     await this.sales.refund(owner, sale.id, { reason: entry.reason, restock: entry.restock }, { by: member.by, tills: [device.tillId] });
     // The refund stands (the money went back at the counter) but is flagged unless the role refunds, or a colleague who
     // refunds gave their PIN.
-    const approval = await this.member(device.accountId, entry.approved_by_staff_id);
+    const approval = await this.member(device.accountId, entry.approved_by_staff_id, device.tillId);
     const level = levelOf(member.role, 'refund');
-    const approved = approval && approval.row.id !== refunder.id && levelOf(approval.role, 'refund') === 'yes';
-    if ((level !== 'yes' && !(level === 'approval' && approved)) || !member.active) {
+    const approved = Boolean(approval && approval.trusted && approval.row.id !== refunder.id && levelOf(approval.role, 'refund') === 'yes');
+    if ((level !== 'yes' && !(level === 'approval' && approved)) || !member.trusted) {
       const flagged = [...(sale.flags as OfflineFlag[]), { code: 'refund_unapproved' as const, staff: member.by.name }];
       await this.prisma.posSale.update({ where: { id: sale.id }, data: { flags: flagged as unknown as Prisma.InputJsonValue, flagsResolvedAt: null, flagsResolvedBy: null } });
       present.flags = flagged;
     }
-    if (entry.approved_by_staff_id && uuid.test(entry.approved_by_staff_id)) {
-      const approver = await this.prisma.posStaff.findFirst({ where: { id: entry.approved_by_staff_id, accountId: device.accountId }, select: { id: true, firstName: true, lastName: true } });
-      if (approver) await this.prisma.posApproval.create({ data: { accountId: device.accountId, action: 'refund', subjectId: sale.id, requestedByStaffId: refunder.id, requestedByName: fullName(refunder), approvedByStaffId: approver.id, approvedByName: fullName(approver), tillId: device.tillId } });
-    }
+    if (approved && approval) await this.prisma.posApproval.create({ data: { accountId: device.accountId, action: 'refund', subjectId: sale.id, requestedByStaffId: refunder.id, requestedByName: fullName(refunder), approvedByStaffId: approval.row.id, approvedByName: approval.by.name, tillId: device.tillId } });
     return { client_id: entry.client_id, kind: 'refund', status: 'applied', sale: present };
   }
 
@@ -498,10 +586,17 @@ export class PosOfflineService {
     return this.soldAt(value, now);
   }
 
+  /** A shift step's time, never before the shift opened. */
+  private atOrAfter(value: string, from: Date) {
+    const at = this.at(value);
+    return at < from ? from : at;
+  }
+
   /** A member of staff who may open, count and close shifts (`till` or `cash_up`), else refused. */
-  private async shiftWorker(accountId: string, staffId: string) {
-    const member = await this.member(accountId, staffId);
+  private async shiftWorker(accountId: string, staffId: string, tillId: string) {
+    const member = await this.member(accountId, staffId, tillId);
     if (!member) throw invalid('parameter_invalid', 'That member of staff is not on this account.', 'staff_id');
+    if (!member.trusted) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'pos_permission_required', `${member.by.name} cannot work at this till.`, 'staff_id');
     if (levelOf(member.role, 'till') !== 'yes' && levelOf(member.role, 'cash_up') !== 'yes') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'pos_permission_required', `${member.by.name}'s role does not open or close tills.`, 'staff_id');
     return member;
   }
@@ -517,7 +612,7 @@ export class PosOfflineService {
   private async applyShiftOpen(owner: CustomerWithStore, device: DeviceRow, entry: OfflineShiftOpenEntry): Promise<Result> {
     const done = await this.prisma.posShift.findFirst({ where: { accountId: device.accountId, clientId: entry.client_id } });
     if (done) return { client_id: entry.client_id, kind: 'shift_open', status: 'duplicate', shift: { id: done.id, status: done.status } };
-    const member = await this.shiftWorker(device.accountId, entry.staff_id);
+    const member = await this.shiftWorker(device.accountId, entry.staff_id, device.tillId);
     const made = await this.shifts.open(owner, { till_id: device.tillId, opening_float: entry.opening_float, note: entry.note ?? null }, { by: member.by, at: this.at(entry.at), clientId: entry.client_id });
     return { client_id: entry.client_id, kind: 'shift_open', status: 'applied', shift: { id: made.id, status: made.status } };
   }
@@ -525,17 +620,17 @@ export class PosOfflineService {
   private async applyShiftCash(owner: CustomerWithStore, device: DeviceRow, entry: OfflineShiftCashEntry): Promise<Result> {
     const done = await this.prisma.posShiftCash.findFirst({ where: { clientId: entry.client_id }, include: { shift: { select: { id: true, status: true, accountId: true } } } });
     if (done && done.shift.accountId === device.accountId) return { client_id: entry.client_id, kind: 'shift_cash', status: 'duplicate', shift: { id: done.shift.id, status: done.shift.status } };
-    const member = await this.shiftWorker(device.accountId, entry.staff_id);
+    const member = await this.shiftWorker(device.accountId, entry.staff_id, device.tillId);
     const shift = await this.shiftFor(device, entry);
-    const after = await this.shifts.cash(owner, shift.id, { kind: entry.cash_kind, amount: entry.amount, reason: entry.reason }, { by: member.by, at: this.at(entry.at), clientId: entry.client_id });
+    const after = await this.shifts.cash(owner, shift.id, { kind: entry.cash_kind, amount: entry.amount, reason: entry.reason }, { by: member.by, at: this.atOrAfter(entry.at, shift.openedAt), clientId: entry.client_id });
     return { client_id: entry.client_id, kind: 'shift_cash', status: 'applied', shift: { id: after.id, status: after.status } };
   }
 
   private async applyShiftClose(owner: CustomerWithStore, device: DeviceRow, entry: OfflineShiftCloseEntry): Promise<Result> {
     const shift = await this.shiftFor(device, entry);
     if (shift.status === 'closed') return { client_id: entry.client_id, kind: 'shift_close', status: 'duplicate', shift: { id: shift.id, status: shift.status } };
-    const member = await this.shiftWorker(device.accountId, entry.staff_id);
-    const after = await this.shifts.close(owner, shift.id, { counted: entry.counted, note: entry.note ?? null }, { by: member.by, at: this.at(entry.at) });
+    const member = await this.shiftWorker(device.accountId, entry.staff_id, device.tillId);
+    const after = await this.shifts.close(owner, shift.id, { counted: entry.counted, note: entry.note ?? null }, { by: member.by, at: this.atOrAfter(entry.at, shift.openedAt) });
     return { client_id: entry.client_id, kind: 'shift_close', status: 'applied', shift: { id: after.id, status: after.status } };
   }
 
@@ -543,15 +638,25 @@ export class PosOfflineService {
   private async applyStock(owner: CustomerWithStore, device: DeviceRow, entry: OfflineStockEntry): Promise<Result> {
     const done = await this.prisma.posStockMovement.findFirst({ where: { accountId: device.accountId, clientId: entry.client_id }, select: { id: true } });
     if (done) return { client_id: entry.client_id, kind: 'stock', status: 'duplicate' };
-    const member = await this.member(device.accountId, entry.staff_id);
+    const member = await this.member(device.accountId, entry.staff_id, device.tillId);
     if (!member) throw invalid('parameter_invalid', 'That member of staff is not on this account.', 'staff_id');
+    if (!member.trusted) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'pos_permission_required', `${member.by.name} cannot work at this till.`, 'staff_id');
     const level = levelOf(member.role, 'stock_adjust');
-    const approval = await this.member(device.accountId, entry.approved_by_staff_id);
-    const approved = approval && approval.row.id !== member.row.id && levelOf(approval.role, 'stock_adjust') === 'yes';
+    const approval = await this.member(device.accountId, entry.approved_by_staff_id, device.tillId);
+    const approved = Boolean(approval && approval.trusted && approval.row.id !== member.row.id && levelOf(approval.role, 'stock_adjust') === 'yes');
     if (level !== 'yes' && !(level === 'approval' && approved)) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', level === 'approval' ? 'approval_required' : 'pos_permission_required', level === 'approval' ? "This stock change needed a manager's PIN." : `${member.by.name}'s role does not change stock.`, 'staff_id');
     if (!['restock', 'count', 'damage'].includes(entry.adjustment)) throw invalid('parameter_invalid', 'A stock change is new stock, a count or damage.', 'adjustment');
     const till = await this.prisma.posTill.findUniqueOrThrow({ where: { id: device.tillId }, select: { shopId: true } });
-    await this.sales.adjustStock(owner, entry.listing_id, { kind: entry.adjustment, quantity: entry.quantity, note: entry.note ?? 'Changed offline', shop_id: till.shopId, client_id: entry.client_id, at: this.at(entry.at) }, member.by);
+    const at = this.at(entry.at);
+    let quantity = entry.quantity;
+    if (entry.adjustment === 'count' && Number.isInteger(quantity) && quantity >= 0) {
+      // A count is what was on the shelf when it was made: what moved since (sales online and at other tills, deliveries)
+      // is added to it, so counting offline never undoes them.
+      const { split } = await shopsOf(this.prisma, device.accountId);
+      const since = await this.prisma.posStockMovement.aggregate({ _sum: { delta: true }, where: { accountId: device.accountId, listingId: entry.listing_id, createdAt: { gt: at }, ...(split ? { shopId: till.shopId } : {}) } });
+      quantity = Math.max(0, quantity + (since._sum.delta ?? 0));
+    }
+    await this.sales.adjustStock(owner, entry.listing_id, { kind: entry.adjustment, quantity, note: entry.note ?? 'Changed offline', shop_id: till.shopId, client_id: entry.client_id, at }, member.by);
     if (approved && approval) await this.prisma.posApproval.create({ data: { accountId: device.accountId, action: 'offline_stock', subjectId: entry.listing_id, requestedByStaffId: member.row.id, requestedByName: member.by.name, approvedByStaffId: approval.row.id, approvedByName: approval.by.name, tillId: device.tillId } });
     return { client_id: entry.client_id, kind: 'stock', status: 'applied' };
   }
@@ -603,7 +708,8 @@ export class PosOfflineService {
     } catch {
       throw invalid('parameter_invalid', 'This is not a file of unsent sales from Udozo POS.', 'payload');
     }
-    if (body.object !== 'pos_offline_export' || typeof body.device_id !== 'string' || !uuid.test(body.device_id) || !Array.isArray(body.entries)) throw invalid('parameter_invalid', 'This is not a file of unsent sales from Udozo POS.', 'payload');
+    if (body.object !== 'pos_offline_export' || typeof body.device_id !== 'string' || !uuid.test(body.device_id) || !Array.isArray(body.entries) || !body.entries.length) throw invalid('parameter_invalid', 'This is not a file of unsent sales from Udozo POS.', 'payload');
+    if (body.entries.length > maxImportEntries) throw invalid('parameter_invalid', `A file holds at most ${maxImportEntries} entries. Save the rest to another file.`, 'payload');
     const device = await this.prisma.posDevice.findFirst({ where: { id: body.device_id, accountId: account.id, linkedAt: { not: null } } });
     if (!device) throw notFound('till device');
     if (!device.publicKey) throw conflict('device_key_missing', 'This till never registered its key, so its file cannot be checked. Upload its sales from the till itself.');

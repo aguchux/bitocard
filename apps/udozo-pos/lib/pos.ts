@@ -1068,8 +1068,11 @@ export type PosOfflineFlag =
   | { code: "unticked"; listing_id: string; title: string }
   | { code: "price_changed"; listing_id: string; title: string; sold_at: number; price: number | null }
   | { code: "staff_suspended"; staff: string }
+  | { code: "staff_not_on_till"; staff: string }
   | { code: "device_unlinked" }
-  | { code: "beyond_offline_limit"; hours: number };
+  | { code: "beyond_offline_limit"; hours: number }
+  | { code: "discount_over_limit"; staff: string; bps: number }
+  | { code: "refund_unapproved"; staff: string };
 
 export type PosFlaggedSale = {
   object: "pos_flagged_sale";
@@ -1116,6 +1119,12 @@ export function flagText(flag: PosOfflineFlag, currency: string) {
       return `“${flag.title}” sold at ${money(flag.sold_at, currency)}; it is now ${flag.price === null ? "without a price" : money(flag.price, currency)}.`;
     case "staff_suspended":
       return `Sold by ${flag.staff}, suspended or removed while the till was offline.`;
+    case "staff_not_on_till":
+      return `Sold by ${flag.staff}, who does not work at this till.`;
+    case "discount_over_limit":
+      return `${flag.staff} gave a ${(flag.bps / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}% discount, more than their role allows, without a manager's PIN.`;
+    case "refund_unapproved":
+      return `Refunded offline by ${flag.staff} without a manager's PIN their role needs.`;
     case "device_unlinked":
       return "Uploaded by a device you unlinked: you accepted it.";
     case "beyond_offline_limit":

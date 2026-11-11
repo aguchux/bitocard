@@ -39,6 +39,10 @@ export const isMediaContent = (url: string | undefined) =>
   /^\/v1\/(?:(?:afrippa\/)?admin\/)?(?:media\/[^/?#]+|auth\/avatar\/uploads\/[^/?#]+)\/content(?:[?#]|$)/.test(url ?? '');
 const mediaContent = raw({ type: () => true, limit: '6mb' });
 
+/** A file of a till's unsent sales (Udozo POS), uploaded by its owner: up to 4 MB of JSON, Vercel's limit being 4.5 MB. */
+export const isOfflineImport = (url: string | undefined) => /^\/v1\/pos\/owner\/offline\/import(?:[?#]|$)/.test(url ?? '');
+const offlineImportJson = json({ limit: '4mb' });
+
 /** BitoCard Shop's listing video uploads, sent by the seller's browser with a signed link (no cookies). */
 export const isVideoUpload = (url: string | undefined) => /^\/v1\/classifieds\/video-uploads\/[^/?#]+(?:[?#]|$)/.test(url ?? '');
 
@@ -56,6 +60,7 @@ export async function createApp(options: AppOptions = {}) {
   app.use(cookieParser());
   app.use((req: Request, res: Response, next: NextFunction) => (isOrderRoomUpload(req.originalUrl) ? orderRoomJson(req, res, next) : next()));
   app.use((req: Request, res: Response, next: NextFunction) => (req.method === 'POST' && isMediaContent(req.originalUrl) ? mediaContent(req, res, next) : next()));
+  app.use((req: Request, res: Response, next: NextFunction) => (req.method === 'POST' && isOfflineImport(req.originalUrl) ? offlineImportJson(req, res, next) : next()));
   const config = app.get<AppConfig>(APP_CONFIG);
   // Browsers on BitoCard apps, and Afrippa's admin app, may call the API with cookies; anything else uses API keys and
   // needs no CORS.

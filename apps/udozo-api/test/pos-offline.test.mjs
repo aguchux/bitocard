@@ -415,4 +415,80 @@ describe('selling with no internet', () => {
     await device.get('/v1/pos/device/sync');
     assert.equal((await prisma.posDevice.findUnique({ where: { id: device.id } })).unsyncedNotifiedAt, null);
   });
+
+  test('guards: malformed entries never hold the queue, refunds through Udozo stay online, staff must work at the till', async () => {
+    const ada = await owner();
+    const tv = await product(ada, 'Samsung 32 inch TV', { stock: 6 });
+    const [ikeja, lekki] = await addShops(ada, 1);
+    const till = ikeja.tills[0];
+    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const elsewhere = await hire(ada, 'cashier', '4826', [lekki.tills[0].id]);
+    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    const device = await linkDevice(ada, till.id);
+
+    // A bad listing id, a wrong type and an over-long note are each refused on their own; the sale after them applies.
+    const good = offlineSale(cashier.id, tv);
+    const upload = await device.post('/v1/pos/device/upload', {
+      entries: [
+        { kind: 'stock', client_id: randomUUID(), staff_id: manager.id, at: new Date().toISOString(), listing_id: 'not-an-id', adjustment: 'restock', quantity: 1 },
+        { kind: 'shift_cash', client_id: randomUUID(), staff_id: manager.id, at: 12, cash_kind: 'in', amount: 100, reason: 'x' },
+        { ...offlineSale(cashier.id, tv), note: 'x'.repeat(301) },
+        good,
+      ],
+    });
+    assert.equal(upload.status, 200, JSON.stringify(upload.json));
+    assert.deepEqual(upload.json.results.map(row => row.status), ['rejected', 'rejected', 'rejected', 'applied']);
+    assert.deepEqual(upload.json.results.slice(0, 3).map(row => row.error.param), ['listing_id', 'at', 'note']);
+
+    // Someone who does not work at this till is flagged; their PIN approves nothing here.
+    const stranger = await device.post('/v1/pos/device/upload', { entries: [{ ...offlineSale(cashier.id, tv, { unit: 100_000 }), staff_id: elsewhere.id }] });
+    assert.deepEqual(stranger.json.results[0].sale.flags, [{ code: 'staff_not_on_till', staff: 'cashier Test' }]);
+    const discounted = { ...offlineSale(cashier.id, tv, { unit: 50_000 }), lines: [{ listing_id: tv.id, quantity: 1, unit_price: 100_000 }], discount: 50_000, approved_by_staff_id: elsewhere.id };
+    assert.equal((await device.post('/v1/pos/device/upload', { entries: [discounted] })).json.results[0].sale.flags[0].code, 'discount_over_limit');
+    // A suspended manager's PIN counts for nothing either.
+    await prisma.posStaff.update({ where: { id: manager.id }, data: { status: 'suspended' } });
+    const stock = { kind: 'stock', client_id: randomUUID(), staff_id: manager.id, at: new Date().toISOString(), listing_id: tv.id, adjustment: 'restock', quantity: 1 };
+    assert.equal((await device.post('/v1/pos/device/upload', { entries: [stock] })).json.results[0].error.code, 'pos_permission_required');
+    await prisma.posStaff.update({ where: { id: manager.id }, data: { status: 'active' } });
+
+    // A sale paid through Udozo or on credit is refunded online only.
+    const sold = await prisma.posSale.findFirst({ where: { clientSaleId: good.client_sale_id } });
+    await prisma.posPayment.updateMany({ where: { saleId: sold.id }, data: { method: 'credit' } });
+    const refund = await device.post('/v1/pos/device/upload', { entries: [{ kind: 'refund', client_id: randomUUID(), sale_client_id: good.client_sale_id, reason: 'Faulty', staff_id: manager.id }] });
+    assert.equal(refund.json.results[0].error.code, 'refund_online_only');
+    assert.equal((await prisma.posSale.findUnique({ where: { id: sold.id } })).status, 'completed');
+  });
+
+  test('a shelf count made offline keeps what moved since; an unlinked device stops uploading after 30 days', async () => {
+    const ada = await owner();
+    const till = ada.account.shops[0].tills[0];
+    const tv = await product(ada, 'Panasonic 43 inch TV', { stock: 10 });
+    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    const device = await linkDevice(ada, till.id);
+    const countedAt = new Date(Date.now() - 2 * 3_600_000);
+    // Counted 7 two hours ago; 2 sold online since.
+    assert.equal((await sell(ada, till.id, tv, { quantity: 2 })).status, 201);
+    const count = await device.post('/v1/pos/device/upload', { entries: [{ kind: 'stock', client_id: randomUUID(), staff_id: manager.id, at: countedAt.toISOString(), listing_id: tv.id, adjustment: 'count', quantity: 7 }] });
+    assert.equal(count.json.results[0].status, 'applied', JSON.stringify(count.json));
+    assert.equal(await stockOf(tv), 5);
+
+    await ada.post(`/v1/pos/owner/devices/${device.id}/unlink`);
+    await prisma.posDevice.update({ where: { id: device.id }, data: { revokedAt: new Date(Date.now() - 31 * 86_400_000) } });
+    assert.equal((await device.post('/v1/pos/device/upload', { entries: [offlineSale(manager.id, tv)] })).status, 401);
+  });
+
+  test('a large file of unsent sales is read whole', async () => {
+    const ada = await owner();
+    const till = ada.account.shops[0].tills[0];
+    const tv = await product(ada, 'Hisense 24 inch TV', { stock: 3 });
+    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const device = await linkDevice(ada, till.id);
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    await device.put('/v1/pos/device/key', { public_key: publicKey.export({ format: 'jwk' }) });
+    const payload = JSON.stringify({ object: 'pos_offline_export', device_id: device.id, padding: 'x'.repeat(300_000), entries: [offlineSale(cashier.id, tv)] });
+    const signature = sign('sha256', Buffer.from(payload), { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64');
+    const imported = await ada.post('/v1/pos/owner/offline/import', { payload, signature });
+    assert.equal(imported.status, 200, JSON.stringify(imported.json).slice(0, 300));
+    assert.equal(imported.json.results[0].status, 'applied');
+  });
 });

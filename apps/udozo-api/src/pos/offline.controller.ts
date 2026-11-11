@@ -26,7 +26,7 @@ class DeviceKeyDto {
 
 class ImportDto {
   /** The file's payload exactly as the till wrote it (JSON text). */
-  @IsString() @MaxLength(5_000_000)
+  @IsString() @MaxLength(4_000_000)
   payload: string;
 
   /** The till's ECDSA P-256 signature of the payload (base64, 64 bytes). */
