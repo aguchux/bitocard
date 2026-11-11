@@ -252,6 +252,24 @@ A transfer to the till's **static** collection account can still be accepted off
 - **Things that changed meanwhile** never undo a sale: a new price applies only to new sales, an unticked product's sale stands, and a staff member suspended meanwhile has their offline sales flagged.
 - **After upload** the till refreshes its copy, shows anything flagged, and the banner clears. The owner's dashboard lists each device's last sync and anything still waiting, and the owner is told when a till has not synced for a day.
 
+**Where the web app lives on the device**
+
+Nothing is installed into a folder the shop chooses. Everything belongs to the browser, kept for the address `https://pos.udozo.com` only, so no other site can read it.
+
+- **Installing** (Install Udozo POS, or the browser's Add to Home screen) adds an icon (Windows Start menu and desktop, an Android home-screen app, an iPhone or iPad Home Screen icon) that opens the POS in its own window without the address bar. It is a shortcut to the same site, with no files of its own.
+- **The app itself** (pages, scripts, icons): kept by its **service worker** in the browser's Cache Storage, so it opens with no internet.
+  - This is POS's own worker: udozo.com's offline worker caches nothing.
+  - A new version downloads in the background, and the till shows **Update ready** and switches between sales, never in the middle of one.
+- **The data** (the product copy, staff PIN checks, the outbox of unsent sales): in the browser's **IndexedDB** for pos.udozo.com, sealed with a device key made by the browser (WebCrypto, not extractable) and kept beside it.
+- **On disk** it is inside the browser's profile, for example on Windows with Chrome `%LOCALAPPDATA%\Google\Chrome\User Data\Default\IndexedDB\https_pos.udozo.com_0.indexeddb.leveldb`. On Android and iPhone it sits in the browser's private storage, which nobody can open.
+- **Each browser keeps its own copy:** Chrome and Edge on the same computer are two devices to link. A private or incognito window keeps nothing, and the POS refuses offline mode there.
+- **Clearing it is the risk:** clearing the browser's site data, uninstalling the browser, or (iPhone and iPad) Safari removing data of a site not opened for 7 days unless it is on the Home Screen, deletes the copy and **any sales not yet uploaded**. The plan guards against this:
+  - **Persistent storage:** the POS asks the browser for it at linking (`navigator.storage.persist()`), and refuses offline mode if refused, saying why.
+  - **Upload at once:** sales go up immediately whenever there is a connection, so the outbox is normally empty, and the count of waiting sales is always on screen.
+  - **Export unsent sales:** a file of sales not yet uploaded, sealed and signed by the device, that a manager can save to the computer or a USB stick and upload later from any signed-in device (applied like the outbox, never twice).
+  - **Printed receipts** remain the shop's paper record.
+  - **Shops that go offline often are steered to the apps,** whose SQLite database sits in the app's own storage and is not cleared with the browser.
+
 **Rollout:** offline comes in milestone 9, but every sale carries its client id from milestone 3, so nothing in the API changes for it.
 1. The web app first (IndexedDB, service worker, cash and recorded methods), so shops can use it on any device.
 2. The Android, iOS and Windows apps, where storage is reliable and printers and cash drawers connect.
