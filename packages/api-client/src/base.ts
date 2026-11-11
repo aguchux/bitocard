@@ -167,6 +167,8 @@ export const tagTypes = [
   'ConnectCentres',
   'ConnectAuctions',
   'ConnectTransfers',
+  'PosAccounts',
+  'PosPlans',
   'Overview',
   'Invoice',
   'Reseller',

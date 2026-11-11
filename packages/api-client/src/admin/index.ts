@@ -538,3 +538,4 @@ export * from './udozo-watermark';
 export * from './udozo-buy-orders';
 export * from './udozo-reviews';
 export * from './udozo-scores';
+export * from './udozo-pos';
