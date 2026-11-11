@@ -14,7 +14,7 @@ import { type DiscountRule, ownerBy, type PosBy, type PosSellOptions } from './a
 import { discountBps } from './permissions.js';
 import { limitsOf } from './plans.js';
 import { customerUnknown } from './customers.service.js';
-import { changeLevel, freeAtShop, levelsOf, pausedShops, shopsOf } from './stock-levels.js';
+import { changeLevel, freeAtShop, levelsOf, pausedShops, shopPricesOf, shopsOf } from './stock-levels.js';
 import { adjustedStock, checkPayments, maxLineQuantity, maxSaleLines, type PaymentInput, saleNumber, type StockAdjustment, tillPaymentMethods, type TillPaymentMethod } from './sale-rules.js';
 
 export type SaleInput = {
@@ -114,6 +114,7 @@ export class PosSalesService {
   async till(accountId: string, tillId: string) {
     const till = await this.prisma.posTill.findFirst({ where: { id: tillId, shop: { accountId } }, include: { shop: true } });
     if (!till) throw notFound('till');
+    if (till.shop.closedAt) throw conflict('shop_closed', `${till.shop.name} is closed: it sells nothing more.`, 'till_id');
     return till;
   }
 
@@ -148,6 +149,8 @@ export class PosSalesService {
     if (pausedShops(shops, account.plan).has(till.shopId)) throw conflict('shop_paused', `${till.shop.name} is paused: ${account.plan.name} keeps ${shops.length > 1 ? 'only your first shops' : 'one shop'} selling. Change plan to sell here again.`, 'till_id');
     const shopRow = shops.find(shop => shop.id === till.shopId);
     const levels = split ? await levelsOf(tx, ids) : null;
+    // The shop's own prices, where it set any; the listing's elsewhere.
+    const shopPrices = await shopPricesOf(tx, ids, till.shopId);
     // The plan's product limit keeps the first ticked selling (as the catalogue shows).
     const limit = limitsOf(account.plan).products;
     const within = limit === null ? null : new Set((await tx.classifiedListing.findMany({ where: { customerId: ownerId, posEnabledAt: { not: null }, status: { in: posCountedStatuses } }, select: { id: true }, orderBy: [{ posEnabledAt: 'asc' }, { id: 'asc' }], take: limit })).map(row => row.id));
@@ -167,7 +170,7 @@ export class PosSalesService {
         const where = levels ? ' at this shop' : ' left to sell';
         throw conflict('stock_short', free > 0 ? `Only ${free} of “${row.title}”${where}.` : `“${row.title}” is out of stock${levels ? ' at this shop' : ''}.`, param);
       }
-      lines.push({ row, quantity: line.quantity, unit: row.priceMinor!, discount: minor(line.discount, `${param}.discount`) });
+      lines.push({ row, quantity: line.quantity, unit: shopPrices.get(row.id) ?? row.priceMinor!, discount: minor(line.discount, `${param}.discount`) });
     }
 
     const totals = saleTotals(lines, { discount: minor(input.discount, 'discount'), vatBps: till.shop.vatBps });
@@ -310,7 +313,7 @@ export class PosSalesService {
   }
 
   /** A listing's new stock, with udozo.com's out-of-stock clock kept for a public listing (a shop-only one has none). */
-  private async setStock(tx: Prisma.TransactionClient, row: { id: string; status: string; stock: number; outOfStockAt: Date | null; expiresAt: Date | null; onShop: boolean; resale: boolean; posEnabledAt: Date | null; country: string }, stock: number, now: Date) {
+  async setStock(tx: Prisma.TransactionClient, row: { id: string; status: string; stock: number; outOfStockAt: Date | null; expiresAt: Date | null; onShop: boolean; resale: boolean; posEnabledAt: Date | null; country: string }, stock: number, now: Date) {
     const clock = isShopOnly(row) || row.status === 'draft' ? {} : stockChange(row, stock, await this.listingDays(tx, row.country), now);
     await tx.classifiedListing.update({ where: { id: row.id }, data: { stock, ...clock } });
   }

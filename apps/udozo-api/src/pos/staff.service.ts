@@ -218,7 +218,7 @@ export class PosStaffService {
   // ---- Staff ----
 
   private async account(accountId: string) {
-    return this.prisma.posAccount.findUniqueOrThrow({ where: { id: accountId }, include: { plan: true, shops: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { tills: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } } } } });
+    return this.prisma.posAccount.findUniqueOrThrow({ where: { id: accountId }, include: { plan: true, shops: { where: { closedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { tills: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } } } } });
   }
 
   async list(accountId: string) {
@@ -500,7 +500,9 @@ export class PosStaffService {
 
   /** Staff on the web: the shop code, their phone and PIN, and optionally the till they sell at. */
   async signIn(input: { shop_code: string; phone: string; pin: string; till_id?: string | null }) {
-    const shop = typeof input.shop_code === 'string' ? await this.prisma.posShop.findUnique({ where: { shopCode: input.shop_code.trim().toUpperCase() }, include: { account: true } }) : null;
+    const found = typeof input.shop_code === 'string' ? await this.prisma.posShop.findUnique({ where: { shopCode: input.shop_code.trim().toUpperCase() }, include: { account: true } }) : null;
+    // A closed shop's code signs nobody in.
+    const shop = found && !found.closedAt ? found : null;
     let phone: string | null = null;
     try {
       phone = shop ? normalisePhone(input.phone ?? '', shop.account.country) : null;
@@ -602,11 +604,11 @@ export class PosStaffService {
     return { object: 'pos_device_link' as const, token, device: await this.deviceInfo(device.id) };
   }
 
-  /** A linked device by its token, else null. */
-  async device(token: string | undefined) {
+  /** A linked device by its token, else null; `unlinked` also finds one unlinked since (for its offline uploads only). */
+  async device(token: string | undefined, options: { unlinked?: boolean } = {}) {
     if (typeof token !== 'string' || !token.startsWith('upd_')) return null;
     const device = await this.prisma.posDevice.findUnique({ where: { tokenHash: sha256(token) } });
-    if (!device || device.revokedAt || !device.linkedAt) return null;
+    if (!device || !device.linkedAt || (device.revokedAt && !options.unlinked)) return null;
     if (!device.lastSeenAt || Date.now() - device.lastSeenAt.getTime() > touchEveryMs) await this.prisma.posDevice.update({ where: { id: device.id }, data: { lastSeenAt: new Date() } });
     return device;
   }
@@ -628,6 +630,26 @@ export class PosStaffService {
     };
   }
 
+  /**
+   * Who a till may sign in offline, with what their role lets them do there: the till keeps its own PIN check for each
+   * one who signed in on it online (never sent from here), and their limits come from this copy.
+   */
+  async offlineStaff(deviceId: string) {
+    const device = await this.prisma.posDevice.findUniqueOrThrow({ where: { id: deviceId } });
+    const rows = await this.prisma.posStaff.findMany({ where: { accountId: device.accountId, status: 'active', OR: [{ allTills: true }, { tills: { some: { tillId: device.tillId } } }] }, include: staffInclude, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] });
+    return rows.map(row => {
+      const role = this.resolveRole(row);
+      return {
+        id: row.id,
+        name: fullName(row),
+        first_name: row.firstName,
+        initials: initials(fullName(row)),
+        role: { id: role.id ?? role.key, name: role.name, discount_limit_bps: role.discountLimitBps },
+        permissions: Object.fromEntries(posPermissions.map(key => [key, role.permissions[key as PosPermission]])),
+      };
+    });
+  }
+
   /** A name tile and PIN on a linked till: a session at that till. */
   async deviceSignIn(deviceId: string, input: { staff_id: string; pin: string }) {
     const device = await this.prisma.posDevice.findUniqueOrThrow({ where: { id: deviceId } });
@@ -645,7 +667,7 @@ export class PosStaffService {
     const rows = await this.prisma.posDevice.findMany({ where: { accountId, linkedAt: { not: null } }, include: { till: { select: { id: true, name: true } } }, orderBy: [{ revokedAt: { sort: 'desc', nulls: 'first' } }, { linkedAt: 'desc' }] });
     return {
       object: 'list' as const,
-      data: rows.map(row => ({ object: 'pos_device' as const, id: row.id, name: row.name, platform: row.platform, till: row.till, linked_at: iso(row.linkedAt), last_seen_at: iso(row.lastSeenAt), revoked_at: iso(row.revokedAt), linked_by: row.createdByName })),
+      data: rows.map(row => ({ object: 'pos_device' as const, id: row.id, name: row.name, platform: row.platform, till: row.till, linked_at: iso(row.linkedAt), last_seen_at: iso(row.lastSeenAt), last_synced_at: iso(row.lastSyncedAt), last_upload_at: iso(row.lastUploadAt), revoked_at: iso(row.revokedAt), linked_by: row.createdByName })),
     };
   }
 

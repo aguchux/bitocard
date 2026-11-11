@@ -4930,6 +4930,7 @@ model ClassifiedListing {
   auctions     ConnectAuction[]
   posSaleLines      PosSaleLine[]
   posStockLevels    PosStockLevel[]
+  posShopPrices     PosShopPrice[] 
   posStockMovements PosStockMovement[]
 }
 
@@ -7982,6 +7983,7 @@ model PosAccount {
   receiptSends       PosReceiptSend[]
   shifts             PosShift[]
   stockTransfers     PosStockTransfer[]
+  offlineHeld        PosOfflineHeld[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -8014,6 +8016,10 @@ model PosShop {
   /// Online orders take from this shop once the online level is used up (one an account).
   fulfilsOnline Boolean    @default(false) @map("fulfils_online")
   stockLevels   PosStockLevel[]
+  prices        PosShopPrice[]
+  /// Closed: kept for its history, out of every list, its stock moved elsewhere first.
+  closedAt      DateTime?  @map("closed_at")
+  closedBy      String?    @map("closed_by") @db.VarChar(120)
   /// The next sale's number (POS-000001…), claimed with one UPDATE … RETURNING.
   saleNext      Int        @default(1) @map("sale_next")
   position      Int        @default(0)
@@ -8112,6 +8118,15 @@ model PosSale {
   customerId      String?    @map("customer_id") @db.Uuid
   customer        PosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerEntries PosCustomerEntry[]
+  /// Rung up with no internet on a linked till, uploaded later: its number on the paper receipt (T2-0042), the device,
+  /// when it arrived, and what to look at (`oversold`, `held`, `staff_suspended`, `unticked`, `price_changed`).
+  offline         Boolean    @default(false)
+  clientNumber    String?    @map("client_number") @db.VarChar(20)
+  deviceId        String?    @map("device_id") @db.Uuid
+  uploadedAt      DateTime?  @map("uploaded_at")
+  flags           Json       @default("[]")
+  flagsResolvedAt DateTime?  @map("flags_resolved_at")
+  flagsResolvedBy String?    @map("flags_resolved_by") @db.VarChar(120)
 
   @@unique([shopId, number], map: "pos_sales_shop_number_key")
   @@unique([shopId, invoiceNumber], map: "pos_sales_shop_invoice_key")
@@ -8562,6 +8577,9 @@ model PosDevice {
   linkedAt      DateTime?  @map("linked_at")
   lastSeenAt    DateTime?  @map("last_seen_at")
   revokedAt     DateTime?  @map("revoked_at")
+  /// When it last read its offline copy, and last uploaded sales made offline.
+  lastSyncedAt  DateTime?  @map("last_synced_at")
+  lastUploadAt  DateTime?  @map("last_upload_at")
   createdByName String     @map("created_by_name") @db.VarChar(120)
   createdAt     DateTime   @default(now()) @map("created_at")
   account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
@@ -8712,6 +8730,8 @@ model PosStockLevel {
   listingId String            @map("listing_id") @db.Uuid
   shopId    String            @map("shop_id") @db.Uuid
   quantity  Int               @default(0)
+  /// On its way here from another shop: never sold or online until received.
+  incoming  Int               @default(0)
   updatedAt DateTime          @default(now()) @map("updated_at")
   listing   ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
   shop      PosShop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
@@ -8732,9 +8752,50 @@ model PosStockTransfer {
   note       String?    @db.VarChar(300)
   byName     String     @map("by_name") @db.VarChar(120)
   byStaffId  String?    @map("by_staff_id") @db.Uuid
+  /// `in_transit` (sent, the receiving shop to check it in), `received` or `cancelled`.
+  status        String    @default("received") @db.VarChar(16)
+  receivedAt    DateTime? @map("received_at")
+  receivedBy    String?   @map("received_by") @db.VarChar(120)
+  /// What arrived of each line, where it was not all of it.
+  receivedLines Json?     @map("received_lines")
   createdAt  DateTime   @default(now()) @map("created_at")
   account    PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId, createdAt(sort: Desc)], map: "pos_stock_transfers_account_idx")
   @@map("pos_stock_transfers")
+}
+
+/// A shop's own price for a listing; the listing's price everywhere else.
+model PosShopPrice {
+  listingId  String            @map("listing_id") @db.Uuid
+  shopId     String            @map("shop_id") @db.Uuid
+  priceMinor BigInt            @map("price_minor")
+  byName     String            @map("by_name") @db.VarChar(120)
+  updatedAt  DateTime          @default(now()) @map("updated_at")
+  listing    ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  shop       PosShop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, shopId])
+  @@map("pos_shop_prices")
+}
+
+/// A sale an unlinked device uploaded of what it sold offline while linked: the owner accepts it (it becomes a sale) or
+/// rejects it.
+model PosOfflineHeld {
+  id           String     @id @default(uuid()) @db.Uuid
+  accountId    String     @map("account_id") @db.Uuid
+  deviceId     String     @map("device_id") @db.Uuid
+  tillId       String?    @map("till_id") @db.Uuid
+  entry        Json
+  clientSaleId String     @map("client_sale_id") @db.Uuid
+  /// `held`, `accepted` or `rejected`.
+  status       String     @default("held") @db.VarChar(16)
+  decidedBy    String?    @map("decided_by") @db.VarChar(120)
+  decidedAt    DateTime?  @map("decided_at")
+  saleId       String?    @map("sale_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at")
+  account      PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, clientSaleId], map: "pos_offline_held_client_key")
+  @@map("pos_offline_held")
 }

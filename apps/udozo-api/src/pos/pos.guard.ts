@@ -16,7 +16,7 @@ const ROUTE_POS_ALLOWS = 'pos:allows';
 export const PosAllows = (permissions: PosPermission | PosPermission[], options: { approval?: boolean } = {}) =>
   SetMetadata(ROUTE_POS_ALLOWS, { permissions: [permissions].flat(), approval: Boolean(options.approval) });
 
-export type PosStaffRequest = Request & { posStaff?: PosStaffContext; posSessionId?: string; posDeviceId?: string; posDevice?: { id: string; accountId: string; tillId: string } };
+export type PosStaffRequest = Request & { posStaff?: PosStaffContext; posSessionId?: string; posDeviceId?: string; posDevice?: { id: string; accountId: string; tillId: string; revokedAt?: Date | null; lastSyncedAt?: Date | null; name?: string | null } };
 
 export const staffSignInRequired = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'pos_sign_in_required', 'Sign in at the till with your PIN.');
 export const permissionRequired = () => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'pos_permission_required', 'Your role does not allow this. Ask a manager or the shop owner.');
@@ -70,6 +70,24 @@ export class PosDeviceGuard implements CanActivate {
     const device = await this.staff.device(req.get(deviceHeader));
     if (!device) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'device_not_linked', 'This device is not linked to a till. Link it with a code from Settings > Shops & tills.');
     req.posDevice = { id: device.id, accountId: device.accountId, tillId: device.tillId };
+    req.posDeviceId = device.id;
+    return true;
+  }
+}
+
+/**
+ * A till's device uploading what it sold offline: a linked device, or one unlinked since (lost or stolen), whose sales
+ * are then held for the owner rather than applied.
+ */
+@Injectable()
+export class PosDeviceUploadGuard implements CanActivate {
+  constructor(private readonly staff: PosStaffService) {}
+
+  async canActivate(context: ExecutionContext) {
+    const req = context.switchToHttp().getRequest<PosStaffRequest>();
+    const device = await this.staff.device(req.get(deviceHeader), { unlinked: true });
+    if (!device) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'device_not_linked', 'This device is not linked to a till.');
+    req.posDevice = device;
     req.posDeviceId = device.id;
     return true;
   }

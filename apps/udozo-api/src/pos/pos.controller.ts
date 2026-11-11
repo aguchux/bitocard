@@ -21,6 +21,12 @@ import { posShopKindCodes, presentShopKind } from './shop-kinds.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
+class CloseShopDto {
+  /** Where its stock goes: another shop, or null for online. */
+  @IsOptional() @IsUUID()
+  move_to_shop_id?: string | null;
+}
+
 export class ShopDto {
   @IsOptional() @IsString() @MaxLength(80)
   name?: string;
@@ -672,6 +678,13 @@ export class PosOwnerController {
   @Patch('shops/:id')
   updateShop(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ShopDto) {
     return this.pos.updateShop(caller.customer, id, body);
+  }
+
+  /** Closes a shop, its stock moved to another shop or online. */
+  @Post('shops/:id/close')
+  @HttpCode(HttpStatus.OK)
+  closeShop(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CloseShopDto) {
+    return this.pos.closeShop(caller.customer, id, body);
   }
 
   @Post('shops/:id/tills')

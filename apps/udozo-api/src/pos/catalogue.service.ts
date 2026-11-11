@@ -8,7 +8,7 @@ import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { posCountedStatuses, tillBlock } from './catalogue-rules.js';
 import { limitsOf } from './plans.js';
 import { presentShopKind } from './shop-kinds.js';
-import { freeAtShop, levelsOf, onlineLevel, shopsOf } from './stock-levels.js';
+import { freeAtShop, levelsOf, onlineLevel, shopPricesOf, shopsOf } from './stock-levels.js';
 
 export type CatalogueFilter = { q?: string; category?: string; barcode?: string; show?: 'all' | 'sellable' | 'low_stock' | 'out_of_stock' | 'blocked'; limit?: number; offset?: number; /** With several shops: what this shop can sell. */ shop?: string };
 export type ProductBlock = 'plan_limit' | 'incomplete' | 'no_price' | 'out_of_stock';
@@ -29,7 +29,7 @@ export class PosCatalogueService {
   ) {}
 
   async catalogue(customer: CustomerWithStore, filter: CatalogueFilter) {
-    const account = await this.prisma.posAccount.findUnique({ where: { customerId: customer.id }, include: { plan: true, shops: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], take: 1, select: { kind: true } } } });
+    const account = await this.prisma.posAccount.findUnique({ where: { customerId: customer.id }, include: { plan: true, shops: { where: { closedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], take: 1, select: { kind: true } } } });
     if (!account) throw noAccount();
     const limit = limitsOf(account.plan).products;
     const kind = presentShopKind(account.shops[0]?.kind ?? 'general');
@@ -45,6 +45,9 @@ export class PosCatalogueService {
     const { shops, split } = await shopsOf(this.prisma, account.id);
     const levels = split ? await levelsOf(this.prisma, rows.map(row => row.id)) : null;
     const shop = filter.shop ? (shops.find(item => item.id === filter.shop) ?? null) : null;
+    // A shop's own prices: the asked shop's, or the only shop's.
+    const priceShop = shop?.id ?? (shops.length === 1 ? shops[0]!.id : null);
+    const shopPrices = await shopPricesOf(this.prisma, rows.map(row => row.id), priceShop);
     const products = rows.map((row, index) => {
       const units = held.get(row.id) ?? 0;
       const available = levels && shop ? freeAtShop({ stock: row.stock, held: units, levels: levels.get(row.id), shopId: shop.id, fulfilsOnline: shop.fulfilsOnline }) : Math.max(0, row.stock - units);
@@ -113,7 +116,8 @@ export class PosCatalogueService {
           ref: Number(row.ref),
           sku: row.sku,
           title: row.title,
-          price: { kind: row.priceKind, amount: row.priceMinor === null ? null : Number(row.priceMinor), currency: row.currency },
+          /** What the till charges: the shop's own price where it set one (`shop_price`), else the listing's (`udozo_amount`). */
+          price: { kind: row.priceKind, amount: (shopPrices.get(row.id) ?? row.priceMinor) === null ? null : Number(shopPrices.get(row.id) ?? row.priceMinor), currency: row.currency, udozo_amount: row.priceMinor === null ? null : Number(row.priceMinor), shop_price: shopPrices.has(row.id) },
           barcode: row.barcode,
           category: detail?.category ? { id: detail.category.id, name: detail.category.name, parent: detail.category.parent ? { id: detail.category.parent.id, name: detail.category.parent.name } : null } : null,
           photo_url: photo ? this.watermarks.url(photo, 480) : null,

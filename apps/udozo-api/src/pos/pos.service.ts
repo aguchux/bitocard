@@ -12,7 +12,7 @@ import { AccountNotices } from '../notifications/account-notices.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { addMonth, addYear, unusedCredit } from './money.js';
-import { pausedShops, startSplit } from './stock-levels.js';
+import { changeLevel, pausedShops, startSplit } from './stock-levels.js';
 import { isPosShopKind, presentShopKind } from './shop-kinds.js';
 import { type BillingInterval, chargeNumber, freePlan, graceDays, isPosPlanCode, limitsOf, offered, type PosLimitKey, presentPlan, priceIn, shopCodeFor } from './plans.js';
 
@@ -54,7 +54,8 @@ export type TillInput = { name?: string; printer_width?: 58 | 80; auto_print?: b
 type AccountRow = PosAccount & { plan: PosPlan; shops: Array<PosShop & { tills: PosTill[] }> };
 const withShops = {
   plan: true,
-  shops: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { tills: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } } },
+  // Closed shops are kept for their history, out of every list and limit.
+  shops: { where: { closedAt: null }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { tills: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } } },
 } satisfies Prisma.PosAccountInclude;
 
 const iso = (date: Date | null | undefined) => (date ? date.toISOString() : null);
@@ -316,6 +317,52 @@ export class PosService {
         await tx.posShop.updateMany({ where: { accountId: row.id, fulfilsOnline: true, id: { not: shopId } }, data: { fulfilsOnline: false } });
         await tx.posShop.update({ where: { id: shopId }, data: { fulfilsOnline: true } });
       }
+    });
+    return this.present((await this.row(customer.id))!);
+  }
+
+  /**
+   * Closes a shop (docs/UDOZO_POS_PLAN.md, milestone 9): its stock moves to another shop (`move_to_shop_id`) or online
+   * (null), recorded as a transfer; it is kept for its history (sales, shifts, reports) but out of every list and limit;
+   * its tills' devices are unlinked and everyone signed in at them signed out. Never the last shop (`last_shop`), nor with
+   * a shift open at its tills (`shift_open`) or stock on its way to or from it (`transfers_in_transit`). With one shop
+   * left the split ends: its stock is the listing's again.
+   */
+  async closeShop(customer: CustomerWithStore, shopId: string, input: { move_to_shop_id?: string | null }) {
+    const row = await this.own(customer);
+    const shop = row.shops.find(item => item.id === shopId);
+    if (!shop) throw missing();
+    if (row.shops.length <= 1) throw conflict('last_shop', 'Your only shop cannot close. Change plan or stop using Udozo POS instead.');
+    const target = input.move_to_shop_id ?? null;
+    if (target === shopId) throw invalid('parameter_invalid', 'Move its stock to another shop, or online.', 'move_to_shop_id');
+    if (target && !row.shops.some(item => item.id === target)) throw missing();
+    const tillIds = shop.tills.map(till => till.id);
+    if (await this.prisma.posShift.count({ where: { tillId: { in: tillIds }, status: 'open' } })) throw conflict('shift_open', `Close the shifts open at ${shop.name}'s tills first.`);
+    if (await this.prisma.posStockTransfer.count({ where: { accountId: row.id, status: 'in_transit', OR: [{ fromShopId: shopId }, { toShopId: shopId }] } })) throw conflict('transfers_in_transit', `Receive or cancel the stock on its way to or from ${shop.name} first.`);
+    const now = new Date();
+    const by = customer.name.slice(0, 120);
+    const remaining = row.shops.filter(item => item.id !== shopId);
+    await this.prisma.$transaction(async tx => {
+      const levels = await tx.posStockLevel.findMany({ where: { shopId, quantity: { gt: 0 } }, include: { listing: { select: { title: true, stock: true } } } });
+      const ids = levels.map(level => level.listingId).sort();
+      if (ids.length) await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ANY(${ids}::uuid[]) ORDER BY "id" FOR UPDATE`;
+      if (target) for (const level of levels) await changeLevel(tx, level.listingId, target, level.quantity, now);
+      await tx.posStockLevel.deleteMany({ where: { shopId } });
+      if (levels.length) {
+        const lines = levels.map(level => ({ listing_id: level.listingId, title: level.listing.title ?? 'Untitled listing', quantity: level.quantity }));
+        const made = await tx.posStockTransfer.create({ data: { accountId: row.id, fromShopId: shopId, toShopId: target, lines, note: `${shop.name} closed`, byName: by, status: 'received', receivedAt: now, receivedBy: by } });
+        for (const level of levels) {
+          const base = { accountId: row.id, listingId: level.listingId, transferId: made.id, stockAfter: level.listing.stock, note: `${shop.name} closed`, byCustomerId: customer.id, byName: customer.name };
+          await tx.posStockMovement.createMany({ data: [{ ...base, shopId, reason: 'transfer_out', delta: -level.quantity }, { ...base, shopId: target, reason: 'transfer_in', delta: level.quantity }] });
+        }
+      }
+      await tx.posShop.update({ where: { id: shopId }, data: { closedAt: now, closedBy: by, fulfilsOnline: false } });
+      if (shop.fulfilsOnline) await tx.posShop.update({ where: { id: remaining[0]!.id }, data: { fulfilsOnline: true } });
+      // One shop left: no split, its stock is the listing's.
+      if (remaining.length === 1) await tx.posStockLevel.deleteMany({ where: { shop: { accountId: row.id } } });
+      await tx.posDevice.updateMany({ where: { tillId: { in: tillIds }, revokedAt: null }, data: { revokedAt: now } });
+      await tx.posStaffSession.updateMany({ where: { endedAt: null, OR: [{ tillId: { in: tillIds } }, { device: { tillId: { in: tillIds } } }] }, data: { endedAt: now, endedReason: 'shop_closed' } });
+      await tx.posShopPrice.deleteMany({ where: { shopId } });
     });
     return this.present((await this.row(customer.id))!);
   }
