@@ -63,7 +63,7 @@ The listing's own `stock` is the shop's inventory. There is no second count and 
 
 - **A till sale** takes its units through the same rules as an online sale. A new `takeStockAtTill` beside `takeStock` in `stock.ts` locks the listing's row and lowers `stock`, then runs `stockChange` (out of stock at 0, the 90 days, the seller told), all in the sale's transaction.
 - **Online holds still count.** A till may not sell units held for UdozoPay, buy orders or resale (`heldUnits`). Selling into them is refused with `stock_held`, and the cashier sees how many are free.
-- **Offline replay** (milestone 8) may sell below what is free, because the item was physically there. The sale stands, stock goes no lower than 0, and the listing is flagged `oversold` for the owner or a manager.
+- **Offline replay** (milestone 9) may sell below what is free, because the item was physically there. The sale stands, stock goes no lower than 0, and the listing is flagged `oversold` for the owner or a manager.
 - **`pos_stock_movements`**: an append-only history of every change made from the POS or by sales (listing, delta, reason `sale`, `return`, `restock`, `count`, `damage`, `online_sale`, plus the reference, the staff member and a client id). It feeds the inventory screen's history (S3) and the reports. udozo.com's own edits to stock are logged there too, as `edited_online`.
 - **Restocking and counts** from the POS set the same `stock` (`PATCH` through `ListingsService`, so the rules for live, sold-out and expired ads all apply).
 - **Several shops (the Multi-shop plan):** the stock is still the listing's one number, but it is split between the owner's shops:
@@ -92,7 +92,10 @@ The listing's own `stock` is the shop's inventory. There is no second count and 
   - `pos_sale_lines` (listing, quantity, unit price and discount copied at sale);
   - `pos_payments` (method `cash`, `transfer`, `card`, `wallet` or `other`, amount, cash handed and change, reference, the buyer's customer for `wallet`);
   - `pos_wallet_requests` (sale, amount, code hash, buyer, status `waiting`, `paid`, `declined` or `expired`, expires in 5 minutes);
-  - `pos_shops` also keeps the shop's bank details for transfers (shown, never used to move money);
+  - `pos_shops` also keeps the shop's own bank details for transfers (shown, never used to move money);
+  - `pos_collection_accounts` (shop, till or one sale, provider, reference, account number, bank, name, kind `static` or `sale`, amount and expiry for `sale`, status);
+  - `pos_collections` (account, provider transaction, amount, sender's name, sale, status `matched`, `unmatched`, `refunded`, fee);
+  - `pos_settlements` (account, day, amount, fees, bank account, transfer reference, status `pending`, `paid`, `failed` or `held`);
   - `pos_customers` (optional, the shop's own).
 - **Receipts and shifts**:
   - `pos_receipts` (sale, kind `receipt` or `invoice`, storage key, QR token hash expiring in 10 minutes, delivered via and to);
@@ -152,7 +155,9 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
 A sale can be paid by **cash**, **bank transfer**, **card**, **Udozo wallet** or **other** (the shop names it, such as a cheque or a POS terminal's own slip). It can also be **split** across methods, the payments adding up to the total, with change worked out for cash.
 
 - **Cash:** the amount handed over, with the change shown. It counts towards the shift's expected cash at cash-up.
-- **Bank transfer:** to the shop's own account, shown on the till and the receipt (the shop's bank details, set on the shop). The cashier records the sender's name or reference once the money shows in the shop's bank.
+- **Bank transfer**, in one of two ways, which the owner chooses per shop (both may be on):
+  - **To a Udozo collection account** (below): Udozo confirms the money itself, the sale completes on its own, and the money is in the owner's bank the next working day.
+  - **To the shop's own bank account**, set on the shop in the POS admin dashboard and shown on the till and the receipt. Udozo cannot see this account, so the cashier records the sender's name or reference once the money shows in the shop's bank.
 - **Card:** recorded only, with the terminal's reference. Udozo integrates no card terminal in version one.
 - **Other:** recorded with its name and reference.
 - **Udozo wallet:** the only method where money moves through Udozo.
@@ -163,7 +168,34 @@ A sale can be paid by **cash**, **bank transfer**, **card**, **Udozo wallet** or
   - **The payout hold:** the money is paid out only after the market's payout hold, and after the check of reversible card top-ups, as UdozoPay's money is.
   - **Refunds:** a refunded or voided wallet sale returns the money from the owner's withdrawable to the buyer's wallet (`pos_wallet_refund:<payment>`). Where the owner has already withdrawn it, the refund waits until enough has come in, and the owner is told.
   - **Limits:** the buyer needs a confirmed mobile, and never pays their own shop (`same_person`). It is off unless the market's `pos_wallet_payments` switch is on (global or country, off by default), pending the licensing advice below.
-- **Every other method's money is the shop's own and never enters Udozo's ledger.** The POS only records it, for receipts, cash-up and reports.
+- **Every other method's money** (cash, the shop's own account, card, other) **is the shop's own and never enters Udozo's ledger.** The POS only records it, for receipts, cash-up and reports.
+
+## Udozo collection accounts and next-day settlement (decided, 11 November 2026)
+
+An owner who wants bank transfers confirmed without checking their bank app asks Udozo for **collection accounts** in the POS admin dashboard (Settings > Payments > Collection accounts).
+
+- **What they are:** bank account numbers issued by Udozo's payment gateways in Udozo's name for that shop, the same kind of accounts as udozo.com's reserved accounts (`PaymentsService.openReservedAccounts`, `reserved_account_requests`).
+  - Flutterwave first; Monnify as a second in Nigeria; Paystack's dedicated accounts where it has them.
+  - Each is opened with its own reference (`udz_pos_<shop>_<till>`) and request row, claimed so that a double click opens one.
+- **Two kinds**, the owner choosing which:
+  - **A static account per till**, which customers can pay at any time. A transfer is matched to the sale waiting on that till for that exact amount. With no sale waiting, or a different amount, it goes to **Unmatched** for a manager to attach to a sale or refund.
+  - **An account for one sale** (dynamic), where the gateway offers them: made for the exact amount when the cashier chooses Bank transfer, expiring in 30 minutes. This matches exactly, even with several tills waiting for the same amount.
+- **At the till:** the cashier chooses Bank transfer > Udozo account. The till shows the bank, the account number, the name and the amount (also as a QR for banking apps that read one) and waits.
+  - The gateway's notification is re-read from the gateway, never trusted from its body, then credited once (`pos_collection:<provider>:<transaction>`). The sale completes on its own, and the receipt says Paid by transfer with the sender's name.
+  - A transfer for less is shown as part payment, and the rest can be paid by any method. A transfer for more completes the sale, and the difference is refunded or attached to the next sale.
+- **Who can request them:**
+  - the owner, on a paid plan (Premium or Multi-shop; Free shows the shop's own account only), with `pos_collections` on in the market (global or country, off by default);
+  - live, the owner's passed identity check (and in Nigeria the BVN check the gateways need), and a settlement bank account in the owner's verified name (`accountNameMatches`);
+  - at most one static account per till.
+- **The money:**
+  - **Collected:** the gateway's money is booked from `provider_balance` to the owner's `pos_collected` (a new customer account, never below zero), less Udozo's collection fee: the gateway's fee plus an admin-set margin per market (`pos_collection_fee_bps`, a minimum and a cap), into `pos_revenue`.
+  - **Next-day settlement:** the `pos` job pays each owner's previous day's collections (Lagos time, or the market's zone) to their settlement bank account on the next working day, through Udozo's transfer provider (`PaymentProviders.transfers`).
+    - It runs as Safe pay payouts do: moved to `customer_payouts_pending` first (reference `pos_settlement:<account>:<day>`, so it is never paid twice). Paid, the provider's fee is Udozo's. A definite failure returns the money to `pos_collected` and tells the owner; an unclear transfer stays pending and tells finance.
+    - Bank transfers are not reversible like cards, so no payout hold applies. Admins can hold an owner's settlement (fraud, a dispute) with a reason, audited.
+  - **Statement:** each day's settlement on the POS admin dashboard lists every transfer, its sale, the fee and what was paid, with a PDF.
+  - **Refunds** of a sale paid this way are taken from the day's collections before settlement, else they wait for the next collections, and the owner is told.
+- **Closing:** the owner can close an account (the gateway's account is deactivated where it allows). A transfer still arriving afterwards is credited and settled, never lost.
+- **Admins** (admin.udozo.com > POS > Collections): accounts, collections, unmatched transfers, settlements and failures; hold or release a settlement; set the fee per market.
 
 ## The three plans (decided, 10 November 2026)
 
@@ -203,21 +235,26 @@ A sale can be paid by **cash**, **bank transfer**, **card**, **Udozo wallet** or
    - payments: cash with change, bank transfer, card and other (recorded), split payments, and Udozo wallet by QR or phone with the buyer confirming on udozo.com, refunds included;
    - till sales taking the listing's stock (`takeStockAtTill`), never what online orders hold;
    - inventory with adjust, count, history and low stock, all on the listing's own stock.
-4. **Staff, roles, tills (S6–S8):**
+4. **Udozo collection accounts and next-day settlement:**
+   - the POS admin dashboard's Collection accounts page: request, see and close each till's account, and choose the settlement bank account;
+   - per-sale accounts where the gateway offers them, and per-till static accounts otherwise, opened through `PaymentsService` as reserved accounts are;
+   - the gateway's notifications, re-read and credited once, paying the waiting sale at the till automatically; Unmatched transfers to attach or refund;
+   - the daily settlement job and its statement, the collection fee, and Collections in admin.udozo.com.
+5. **Staff, roles, tills (S6–S8):**
    - matrix and custom roles, invites by WhatsApp or SMS, PIN set-up;
    - till sign-in, lockout, manager approval, device linking (S19);
    - a role test for every cell of the matrix.
-5. **Receipts (S9–S13):**
+6. **Receipts (S9–S13):**
    - 80 mm and 58 mm receipts and A4 invoice (pdfkit, plus print CSS for browser printing);
    - share screen with a QR (`wa.me/<Udozo number>?text=RECEIPT POS-…-<token>`), the bot replying with the PDF;
    - email with the PDF attached;
    - resend from history.
-6. **Overview and reports (S2):**
+7. **Overview and reports (S2):**
    - totals, an hourly POS-versus-online chart, payment mix, top sellers, restock list;
    - shifts and cash-up, end of day;
    - CSV and PDF exports for the accountant.
-7. **Multi-shop:** several shops, the stock split between them with transfers, online orders fulfilled from the chosen shop, and reports per shop. Also upgrading and downgrading between the three plans, and yearly billing. (The plan limits themselves, `posLimit`, come in milestone 1.)
-8. **Offline and apps (S5, S19):**
+8. **Multi-shop:** several shops, the stock split between them with transfers, online orders fulfilled from the chosen shop, and reports per shop. Also upgrading and downgrading between the three plans, and yearly billing. (The plan limits themselves, `posLimit`, come in milestone 1.)
+9. **Offline and apps (S5, S19):**
    - an IndexedDB catalogue and outbox in the web app first;
    - then Expo (camera, Bluetooth ESC/POS) and Tauri (USB printers, cash drawer);
    - setting each app's store link in admin turns its Coming soon button on pos.udozo.com into a download.
@@ -225,6 +262,7 @@ A sale can be paid by **cash**, **bank transfer**, **card**, **Udozo wallet** or
 ## Legal owed before `pos` goes on anywhere
 
 - POS terms: the shop is the seller at its till, Udozo provides the software, and the shop handles its own tax and VAT on receipts.
+- **Udozo collection accounts:** lawyers' advice per market before `pos_collections` goes on. Udozo collects money in its gateway accounts on a shop's behalf and pays it out the next day, which may be payment facilitation or collection needing a licence or the gateway's sub-merchant approval. The gateways' written approval of the model is also needed, and the shop terms must cover collection, the fee, next-day settlement, holds and refunds.
 - **Udozo wallet payments at the till:** lawyers' advice per market before `pos_wallet_payments` goes on. Money moves from one customer's wallet to another's withdrawable balance, held through Udozo's licensed payment partners as for UdozoPay. The buyer and shop terms must cover it (confirming, refunds, the payout hold), and the privacy notice must say the shop sees the buyer's name.
 - Privacy notice: staff names and phones, the shop's customers on receipts, WhatsApp delivery of receipts, retention.
 - Plan and fee terms, before sign-up opens: the monthly fee from the wallet, the trial, renewal, grace, cancelling, and what happens to the shop's data after the POS stops.
@@ -248,4 +286,4 @@ A sale can be paid by **cash**, **bank transfer**, **card**, **Udozo wallet** or
 
 1. **The design canvas** (S1–S19). The doc link reaches only the written brief, so I need the canvas link or an export to match the screens.
 2. **Premium's and Multi-shop's monthly price per market, the trial length, any yearly discount, and Free's limits** (products, tills, staff) if not my defaults. Needed for milestone 1 now; admins can change them later.
-3. **Store accounts:** Apple, Google Play and a Windows code-signing certificate under Udozo's name (needed by milestone 8 only).
+3. **Store accounts:** Apple, Google Play and a Windows code-signing certificate under Udozo's name (needed by milestone 9 only).
