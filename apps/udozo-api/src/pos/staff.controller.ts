@@ -636,7 +636,8 @@ export class PosStaffController {
   @Patch('shops/:id')
   @PosAllows('settings')
   async updateShop(@CurrentStaff() context: PosStaffContext, @Param('id', ParseUUIDPipe) id: string, @Body() body: ShopDto) {
-    await this.pos.updateShop(context.owner, id, body);
+    // The main shop and the one that fulfils online orders stay the owner's to choose.
+    await this.pos.updateShop(context.owner, id, { ...body, main: undefined, fulfils_online: undefined });
     return this.me(context);
   }
 

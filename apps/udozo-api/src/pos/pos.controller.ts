@@ -14,7 +14,7 @@ import { PosCustomersService } from './customers.service.js';
 import { maxSaleLines, maxSalePayments, recordedPaymentMethods, stockAdjustments, tillPaymentMethods } from './sale-rules.js';
 import { PosSalesService } from './sales.service.js';
 import { PosWalletService, walletTokenPattern } from './wallet.service.js';
-import { posPlanCodes } from './plans.js';
+import { type BillingInterval, billingIntervals, posPlanCodes } from './plans.js';
 import { PosService } from './pos.service.js';
 import { PosStaffService } from './staff.service.js';
 import { posShopKindCodes, presentShopKind } from './shop-kinds.js';
@@ -59,6 +59,14 @@ export class ShopDto {
   @IsOptional() @IsBoolean()
   receipt_qr?: boolean;
 
+  /** The owner's: this shop first, the main shop a plan of one shop keeps selling. */
+  @IsOptional() @IsBoolean()
+  main?: boolean;
+
+  /** The owner's: online orders take from this shop once the online level is used up. */
+  @IsOptional() @IsBoolean()
+  fulfils_online?: boolean;
+
   /** What kind of shop it is (`GET /v1/pos/shop-kinds`): the till leads with its categories. */
   @IsOptional() @IsIn(posShopKindCodes)
   kind?: string;
@@ -74,11 +82,19 @@ class SignupDto {
   /** What the owner saw due today, in minor units: a different amount is refused (`price_changed`). */
   @IsOptional() @IsInt() @Min(0)
   expected_amount?: number;
+
+  /** Monthly (the default) or yearly where the plan has a yearly price. */
+  @IsOptional() @IsIn(billingIntervals)
+  interval?: BillingInterval;
 }
 
 class PlanDto {
   @IsIn(posPlanCodes)
   plan: string;
+
+  /** Monthly (the default) or yearly where the plan has a yearly price. */
+  @IsOptional() @IsIn(billingIntervals)
+  interval?: BillingInterval;
 
   @IsOptional() @IsInt() @Min(0)
   expected_amount?: number;
@@ -96,6 +112,10 @@ export class TillDto {
 }
 
 export class CatalogueDto {
+  /** With several shops: what this shop can sell. */
+  @IsOptional() @IsUUID()
+  shop?: string;
+
   @IsOptional() @IsString() @MaxLength(80)
   q?: string;
 
@@ -392,6 +412,10 @@ class PlanChangeDto {
   @IsOptional() @IsObject()
   prices?: Record<string, number | null>;
 
+  /** The yearly prices, as `prices`; a currency needs its monthly price first. */
+  @IsOptional() @IsObject()
+  yearly_prices?: Record<string, number | null>;
+
   /** { "tills": 3 }; null is unlimited. */
   @IsOptional() @IsObject()
   limits?: Record<string, number | null>;
@@ -575,7 +599,7 @@ export class PosOwnerController {
   @Post('plan')
   @HttpCode(HttpStatus.OK)
   plan(@CurrentCustomer() caller: CustomerCaller, @Body() body: PlanDto) {
-    return this.pos.changePlan(caller.customer, body.plan, body.expected_amount);
+    return this.pos.changePlan(caller.customer, body.plan, body.expected_amount, body.interval);
   }
 
   /** The listings ticked Sell at POS, read live, with the stock free to sell and why one cannot be sold. */

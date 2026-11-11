@@ -11,14 +11,19 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { AccountNotices } from '../notifications/account-notices.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { addMonth, unusedCredit } from './money.js';
+import { addMonth, addYear, unusedCredit } from './money.js';
+import { pausedShops, startSplit } from './stock-levels.js';
 import { isPosShopKind, presentShopKind } from './shop-kinds.js';
-import { chargeNumber, freePlan, graceDays, isPosPlanCode, limitsOf, offered, type PosLimitKey, presentPlan, priceIn, shopCodeFor } from './plans.js';
+import { type BillingInterval, chargeNumber, freePlan, graceDays, isPosPlanCode, limitsOf, offered, type PosLimitKey, presentPlan, priceIn, shopCodeFor } from './plans.js';
+
+/** The end of a period paid from `start`: a month or a year on. */
+export const periodEnd = (start: Date, interval: BillingInterval) => (interval === 'year' ? addYear(start) : addMonth(start));
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 const conflict = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
 const missing = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'There is no such shop or till on your Udozo POS account.');
 const noAccount = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'pos_account_missing', 'You have not signed up for Udozo POS yet.');
+const noYearly = (plan: string) => conflict('interval_unavailable', `${plan} is not offered yearly in your country: choose monthly.`, 'interval');
 const changed = () => conflict('pos_account_changed', 'Your Udozo POS account changed while you were doing this. Look again, then try again.');
 const walletLow = (amount: bigint, currency: string) =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'wallet_balance_low', `Your Udozo wallet needs ${currency} ${(Number(amount) / 100).toFixed(2)} for this. Add funds on udozo.com, then try again.`);
@@ -39,6 +44,10 @@ export type ShopInput = {
   bank_account_number?: string | null;
   /** Printed receipts carry the WhatsApp QR code. */
   receipt_qr?: boolean;
+  /** The owner's: this shop first (the main shop, which a plan of one shop keeps selling). */
+  main?: boolean;
+  /** The owner's: online orders take from this shop once the online level is used up. */
+  fulfils_online?: boolean;
 };
 export type TillInput = { name?: string; printer_width?: 58 | 80; auto_print?: boolean };
 
@@ -152,7 +161,7 @@ export class PosService {
   }
 
   /** Signing up: the shop, its first till and the plan, paid now unless it starts with a free trial (or is Free). */
-  async signup(customer: CustomerWithStore, input: { plan: string; shop: ShopInput; expected_amount?: number }) {
+  async signup(customer: CustomerWithStore, input: { plan: string; shop: ShopInput; expected_amount?: number; interval?: BillingInterval }) {
     const market = await this.market(customer);
     if (!(await this.settings.isOnForCountry('pos', market.code))) throw conflict('pos_unavailable', `Udozo POS is not open in your country yet.`);
     if (await this.prisma.posAccount.findUnique({ where: { customerId: customer.id }, select: { id: true } })) throw conflict('pos_account_exists', 'You already have a Udozo POS account. Sign in to it instead.');
@@ -161,10 +170,12 @@ export class PosService {
     const shop = this.shopFields(input.shop, true);
     const mode = this.mode(customer);
     const now = new Date();
-    const price = priceIn(plan, market.currency) ?? 0n;
     const paid = plan.code !== freePlan;
+    const interval: BillingInterval = paid ? (input.interval ?? 'month') : 'month';
+    if (interval === 'year' && priceIn(plan, market.currency, 'year') === null) throw noYearly(plan.name);
+    const price = priceIn(plan, market.currency, interval) ?? 0n;
     const trial = paid && plan.trialDays > 0;
-    const end = !paid ? null : trial ? new Date(now.getTime() + days(plan.trialDays)) : addMonth(now);
+    const end = !paid ? null : trial ? new Date(now.getTime() + days(plan.trialDays)) : periodEnd(now, interval);
     const due = paid && !trial ? price : 0n;
     if (input.expected_amount !== undefined && BigInt(input.expected_amount) !== due) throw conflict('price_changed', 'The price has changed: check it, then sign up again.', 'expected_amount');
     const accountId = randomUUID();
@@ -179,6 +190,7 @@ export class PosService {
             country: market.code,
             currency: market.currency,
             planCode: plan.code,
+            billingInterval: interval,
             periodStart: paid ? now : null,
             periodEnd: end,
             trialEndsAt: trial ? end : null,
@@ -187,7 +199,7 @@ export class PosService {
         });
         await this.createShop(tx, accountId, shop, 0);
         if (entry) {
-          await tx.posCharge.create({ data: { accountId, planCode: plan.code, kind: 'signup', periodStart: now, periodEnd: end!, priceMinor: price, amountMinor: due, currency: market.currency, mode, reference: entry.reference } });
+          await tx.posCharge.create({ data: { accountId, planCode: plan.code, kind: 'signup', interval, periodStart: now, periodEnd: end!, priceMinor: price, amountMinor: due, currency: market.currency, mode, reference: entry.reference } });
           await this.ledger.write(tx, entry);
         }
       });
@@ -200,51 +212,73 @@ export class PosService {
   }
 
   /**
-   * Changing plan. The same plan again takes back a waiting change. During a trial the plan is swapped and the trial
-   * runs on (Free ends it). A dearer plan is charged now, less the unused part of what was paid, for a new month; a
-   * cheaper one (Free included, which is cancelling) takes over when the paid month ends.
+   * Changing plan or how it is paid. The same plan and interval again takes back a waiting change. During a trial the
+   * plan and interval are swapped and the trial runs on (Free ends it). A dearer plan (by a month's worth), or moving
+   * from monthly to yearly, is charged now, less the unused part of what was paid, for a new period; a cheaper one (Free
+   * included, which is cancelling) or yearly to monthly takes over when the paid period ends.
    */
-  async changePlan(customer: CustomerWithStore, code: string, expectedAmount?: number) {
+  async changePlan(customer: CustomerWithStore, code: string, expectedAmount?: number, asked?: BillingInterval) {
     const row = await this.own(customer);
     const target = await this.plan(code);
     const now = new Date();
+    const current = row.billingInterval as BillingInterval;
+    const interval: BillingInterval = target.code === freePlan ? 'month' : (asked ?? current);
     if (target.code !== row.planCode && target.code !== freePlan && !offered(target, row.currency)) throw conflict('plan_unavailable', `${target.name} is not offered in your country yet.`, 'plan');
-    if (target.code === row.planCode) {
-      await this.update(row, { nextPlanCode: null });
+    if (interval === 'year' && priceIn(target, row.currency, 'year') === null) throw noYearly(target.name);
+    if (target.code === row.planCode && interval === current) {
+      await this.update(row, { nextPlanCode: null, nextInterval: null });
       return this.present((await this.row(customer.id))!);
     }
     const trialling = row.trialEndsAt !== null && row.trialEndsAt > now;
     if (trialling) {
       await this.update(
         row,
-        target.code === freePlan ? { planCode: freePlan, periodStart: null, periodEnd: null, trialEndsAt: null, nextPlanCode: null } : { planCode: target.code, nextPlanCode: null },
+        target.code === freePlan
+          ? { planCode: freePlan, billingInterval: 'month', periodStart: null, periodEnd: null, trialEndsAt: null, nextPlanCode: null, nextInterval: null }
+          : { planCode: target.code, billingInterval: interval, nextPlanCode: null, nextInterval: null },
       );
       return this.present((await this.row(customer.id))!);
     }
     const paidUp = row.planCode !== freePlan && row.periodEnd !== null && row.periodEnd > now && row.pastDueSince === null;
     if (target.code === freePlan) {
-      // Cancelling: a paid month runs out first; with nothing paid up it is Free at once.
-      await this.update(row, paidUp ? { nextPlanCode: freePlan } : { planCode: freePlan, periodStart: null, periodEnd: null, pastDueSince: null, nextPlanCode: null, trialEndsAt: null });
+      // Cancelling: a paid period runs out first; with nothing paid up it is Free at once.
+      await this.update(
+        row,
+        paidUp ? { nextPlanCode: freePlan, nextInterval: null } : { planCode: freePlan, billingInterval: 'month', periodStart: null, periodEnd: null, pastDueSince: null, nextPlanCode: null, nextInterval: null, trialEndsAt: null },
+      );
       return this.present((await this.row(customer.id))!);
     }
     const currentPrice = paidUp ? await this.paidPrice(row) : 0n;
-    const targetPrice = priceIn(target, row.currency) ?? 0n;
-    if (paidUp && targetPrice <= currentPrice) {
-      await this.update(row, { nextPlanCode: target.code });
+    const targetPrice = priceIn(target, row.currency, interval) ?? 0n;
+    // A dearer plan (by its monthly price, so monthly and yearly compare fairly) or monthly to yearly is charged now.
+    const dearer = (priceIn(target, row.currency, 'month') ?? 0n) > (priceIn(row.plan, row.currency, 'month') ?? 0n);
+    const immediate = dearer || (interval === 'year' && current === 'month');
+    if (paidUp && !immediate) {
+      await this.update(row, { nextPlanCode: target.code === row.planCode ? null : target.code, nextInterval: interval === current ? null : interval });
       return this.present((await this.row(customer.id))!);
     }
     const credit = paidUp && row.periodStart && row.periodEnd ? unusedCredit(currentPrice, row.periodStart, row.periodEnd, now) : 0n;
     const due = targetPrice > credit ? targetPrice - credit : 0n;
     if (expectedAmount !== undefined && BigInt(expectedAmount) !== due) throw conflict('price_changed', 'The amount has changed: check it, then try again.', 'expected_amount');
-    const end = addMonth(now);
-    await this.charge(row, { kind: 'upgrade', plan: target, price: targetPrice, credit, amount: due, start: now, end, data: { planCode: target.code, periodStart: now, periodEnd: end, nextPlanCode: null, pastDueSince: null, lapsedPlanCode: null, trialEndsAt: null } });
+    const end = periodEnd(now, interval);
+    await this.charge(row, {
+      kind: 'upgrade',
+      plan: target,
+      interval,
+      price: targetPrice,
+      credit,
+      amount: due,
+      start: now,
+      end,
+      data: { planCode: target.code, billingInterval: interval, periodStart: now, periodEnd: end, nextPlanCode: null, nextInterval: null, pastDueSince: null, lapsedPlanCode: null, trialEndsAt: null },
+    });
     return this.present((await this.row(customer.id))!);
   }
 
   /** What was paid for the current period (its latest charge), else the plan's price now. */
   private async paidPrice(row: AccountRow) {
     const last = row.periodEnd ? await this.prisma.posCharge.findFirst({ where: { accountId: row.id, periodEnd: row.periodEnd }, orderBy: { createdAt: 'desc' } }) : null;
-    return last ? last.priceMinor : (priceIn(row.plan, row.currency) ?? 0n);
+    return last ? last.priceMinor : (priceIn(row.plan, row.currency, row.billingInterval as BillingInterval) ?? 0n);
   }
 
   async charges(customer: CustomerWithStore) {
@@ -259,14 +293,30 @@ export class PosService {
   async addShop(customer: CustomerWithStore, input: ShopInput) {
     const row = await this.own(customer);
     this.requireRoom(row, 'shops', row.shops.length);
-    await this.prisma.$transaction(tx => this.createShop(tx, row.id, this.shopFields(input, true), row.shops.length));
+    await this.prisma.$transaction(async tx => {
+      // A second shop starts the split: everything at the till so far is the first shop's.
+      if (row.shops.length === 1) await startSplit(tx, row.customerId, row.shops[0]!.id);
+      await this.createShop(tx, row.id, this.shopFields(input, true), row.shops.length);
+    });
     return this.present((await this.row(customer.id))!);
   }
 
   async updateShop(customer: CustomerWithStore, shopId: string, input: Partial<ShopInput>) {
     const row = await this.own(customer);
     if (!row.shops.some(shop => shop.id === shopId)) throw missing();
-    await this.prisma.posShop.update({ where: { id: shopId }, data: this.shopFields(input, false) });
+    await this.prisma.$transaction(async tx => {
+      await tx.posShop.update({ where: { id: shopId }, data: this.shopFields(input, false) });
+      if (input.main === true) {
+        // First in the list: every other shop moves one along.
+        const others = row.shops.filter(shop => shop.id !== shopId);
+        await tx.posShop.update({ where: { id: shopId }, data: { position: 0 } });
+        for (const [index, shop] of others.entries()) await tx.posShop.update({ where: { id: shop.id }, data: { position: index + 1 } });
+      }
+      if (input.fulfils_online === true) {
+        await tx.posShop.updateMany({ where: { accountId: row.id, fulfilsOnline: true, id: { not: shopId } }, data: { fulfilsOnline: false } });
+        await tx.posShop.update({ where: { id: shopId }, data: { fulfilsOnline: true } });
+      }
+    });
     return this.present((await this.row(customer.id))!);
   }
 
@@ -343,7 +393,8 @@ export class PosService {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const shopCode = shopCodeFor(fields.name ?? 'Shop');
       if (await tx.posShop.findUnique({ where: { shopCode }, select: { id: true } })) continue;
-      const shop = await tx.posShop.create({ data: { accountId, name: fields.name ?? 'My shop', ...fields, shopCode, position } });
+      // The first shop fulfils online orders until the owner chooses another.
+      const shop = await tx.posShop.create({ data: { accountId, name: fields.name ?? 'My shop', ...fields, shopCode, position, fulfilsOnline: position === 0 } });
       await tx.posTill.create({ data: { shopId: shop.id, name: 'Till 1' } });
       return shop;
     }
@@ -369,14 +420,14 @@ export class PosService {
    * Takes a charge and changes the account in one transaction, claimed on the account's `updated_at` so two changes never
    * both win; a wallet that cannot pay leaves everything as it was (`wallet_balance_low`).
    */
-  async charge(row: AccountRow, input: { kind: 'signup' | 'renewal' | 'upgrade'; plan: PosPlan; price: bigint; credit: bigint; amount: bigint; start: Date; end: Date; data: Prisma.PosAccountUncheckedUpdateManyInput }) {
+  async charge(row: AccountRow, input: { kind: 'signup' | 'renewal' | 'upgrade'; plan: PosPlan; interval: BillingInterval; price: bigint; credit: bigint; amount: bigint; start: Date; end: Date; data: Prisma.PosAccountUncheckedUpdateManyInput }) {
     const entry = input.amount > 0n ? await this.chargeEntry({ accountId: row.id, customerId: row.customerId, mode: row.mode, currency: row.currency, amount: input.amount, kind: input.kind, start: input.start, planName: input.plan.name }) : null;
     const reference = entry?.reference ?? `pos:${row.id}:${input.kind}:${input.start.toISOString()}`;
     try {
       await this.prisma.$transaction(async tx => {
         const claimed = await tx.posAccount.updateMany({ where: { id: row.id, updatedAt: row.updatedAt }, data: input.data });
         if (!claimed.count) throw changed();
-        await tx.posCharge.create({ data: { accountId: row.id, planCode: input.plan.code, kind: input.kind, periodStart: input.start, periodEnd: input.end, priceMinor: input.price, creditMinor: input.credit, amountMinor: input.amount, currency: row.currency, mode: row.mode, reference } });
+        await tx.posCharge.create({ data: { accountId: row.id, planCode: input.plan.code, kind: input.kind, interval: input.interval, periodStart: input.start, periodEnd: input.end, priceMinor: input.price, creditMinor: input.credit, amountMinor: input.amount, currency: row.currency, mode: row.mode, reference } });
         if (entry) await this.ledger.write(tx, entry);
       });
     } catch (error) {
@@ -417,6 +468,9 @@ export class PosService {
       status: this.status(row),
       plan: presentPlan(row.plan, row.currency),
       next_plan: row.nextPlanCode,
+      /** `month` or `year`, and the interval taking over when the paid period ends. */
+      billing_interval: row.billingInterval,
+      next_interval: row.nextInterval,
       trial_ends_at: iso(row.trialEndsAt),
       period_start: iso(row.periodStart),
       period_end: iso(row.periodEnd),
@@ -424,7 +478,7 @@ export class PosService {
       drops_to_free_at: row.pastDueSince ? new Date(row.pastDueSince.getTime() + days(graceDays)).toISOString() : null,
       lapsed_plan: row.lapsedPlanCode,
       limits: limitsOf(row.plan),
-      shops: row.shops.map(shop => ({
+      shops: row.shops.map((shop, index, all) => ({
         object: 'pos_shop' as const,
         id: shop.id,
         name: shop.name,
@@ -437,6 +491,10 @@ export class PosService {
         email: shop.email,
         bank: shop.bankName || shop.bankAccountName || shop.bankAccountNumber ? { name: shop.bankName, account_name: shop.bankAccountName, account_number: shop.bankAccountNumber } : null,
         receipt_qr: shop.receiptQr,
+        /** The main shop (first), the one online orders take from, and paused: past the plan's shop limit, it sells nothing. */
+        main: index === 0,
+        fulfils_online: shop.fulfilsOnline,
+        paused: pausedShops(all, row.plan).has(shop.id),
         /** What kind of shop it is, and its categories that come first at the till. */
         kind: presentShopKind(shop.kind),
         tills: shop.tills.map(till => ({ object: 'pos_till' as const, id: till.id, name: till.name, printer_width: till.printerWidth, auto_print: till.autoPrint })),
@@ -452,6 +510,7 @@ export class PosService {
       number: chargeNumber(charge.number),
       plan: { code: charge.planCode, name: planName },
       kind: charge.kind,
+      interval: charge.interval,
       period_start: charge.periodStart.toISOString(),
       period_end: charge.periodEnd.toISOString(),
       price: Number(charge.priceMinor),

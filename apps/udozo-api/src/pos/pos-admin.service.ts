@@ -20,7 +20,7 @@ const storeAddress: Record<PosAppPlatform, RegExp> = {
 
 export const appLinkValid = (platform: PosAppPlatform, url: string) => storeAddress[platform].test(url);
 
-export type PlanChange = { name?: string; description?: string; prices?: Record<string, number | null>; limits?: Partial<PosLimits>; trial_days?: number; shown?: boolean };
+export type PlanChange = { name?: string; description?: string; prices?: Record<string, number | null>; yearly_prices?: Record<string, number | null>; limits?: Partial<PosLimits>; trial_days?: number; shown?: boolean };
 
 /**
  * Udozo's team on Udozo POS (admin.udozo.com > POS): every owner's account, the three plans (finance sets their prices per
@@ -76,6 +76,7 @@ export class PosAdminService {
         ...presentPlan(plan, null),
         shown: plan.shown,
         prices: plan.prices as Record<string, number>,
+        yearly_prices: plan.yearlyPrices as Record<string, number>,
         accounts: counts.find(item => item.planCode === plan.code)?._count._all ?? 0,
       })),
     };
@@ -91,18 +92,26 @@ export class PosAdminService {
       data.name = name;
     }
     if (change.description !== undefined) data.description = change.description.trim().slice(0, 300);
-    if (change.prices !== undefined) {
-      if (code === 'free') throw invalid('parameter_invalid', 'Free has no price.', 'prices');
+    // Monthly prices and yearly ones (a yearly price needs the monthly one in that currency, as plans are offered monthly first).
+    for (const field of ['prices', 'yearly_prices'] as const) {
+      const asked = change[field];
+      if (asked === undefined) continue;
+      if (code === 'free') throw invalid('parameter_invalid', 'Free has no price.', field);
       const markets = new Set((await this.prisma.country.findMany({ select: { currency: true } })).map(item => item.currency));
-      const prices = { ...(before.prices as Record<string, number>) };
-      for (const [currency, amount] of Object.entries(change.prices)) {
-        if (!markets.has(currency)) throw invalid('parameter_invalid', `${currency} is not a market's currency.`, `prices.${currency}`);
+      const prices = { ...((field === 'prices' ? before.prices : before.yearlyPrices) as Record<string, number>) };
+      for (const [currency, amount] of Object.entries(asked)) {
+        if (!markets.has(currency)) throw invalid('parameter_invalid', `${currency} is not a market's currency.`, `${field}.${currency}`);
         if (amount === null) delete prices[currency];
-        else if (!Number.isSafeInteger(amount) || amount <= 0) throw invalid('parameter_invalid', 'A price is a whole number of minor units above zero.', `prices.${currency}`);
+        else if (!Number.isSafeInteger(amount) || amount <= 0) throw invalid('parameter_invalid', 'A price is a whole number of minor units above zero.', `${field}.${currency}`);
         else prices[currency] = amount;
       }
-      data.prices = prices;
+      if (field === 'prices') data.prices = prices;
+      else data.yearlyPrices = prices;
     }
+    const monthly = (data.prices ?? before.prices) as Record<string, number>;
+    const yearly = (data.yearlyPrices ?? before.yearlyPrices) as Record<string, number>;
+    const orphan = Object.keys(yearly).find(currency => monthly[currency] === undefined);
+    if (orphan) throw invalid('parameter_invalid', `Set ${orphan}'s monthly price before its yearly one.`, `yearly_prices.${orphan}`);
     if (change.limits !== undefined) {
       const limits = { ...(before.limits as Record<string, number | null>) };
       for (const [key, value] of Object.entries(change.limits)) {

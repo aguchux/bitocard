@@ -66,6 +66,13 @@ export function addMonth(from: Date) {
   return next;
 }
 
+/** One year on, in UTC (29 February is followed by 28 February). */
+export function addYear(from: Date) {
+  const year = from.getUTCFullYear() + 1;
+  const lastDay = new Date(Date.UTC(year, from.getUTCMonth() + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, from.getUTCMonth(), Math.min(from.getUTCDate(), lastDay), from.getUTCHours(), from.getUTCMinutes(), from.getUTCSeconds(), from.getUTCMilliseconds()));
+}
+
 /**
  * What is left of a paid period, as credit towards a dearer plan: the price times the share of the period not used yet,
  * rounded down (Udozo never credits more than was paid).

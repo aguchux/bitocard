@@ -8,8 +8,9 @@ import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { posCountedStatuses, tillBlock } from './catalogue-rules.js';
 import { limitsOf } from './plans.js';
 import { presentShopKind } from './shop-kinds.js';
+import { freeAtShop, levelsOf, onlineLevel, shopsOf } from './stock-levels.js';
 
-export type CatalogueFilter = { q?: string; category?: string; barcode?: string; show?: 'all' | 'sellable' | 'low_stock' | 'out_of_stock' | 'blocked'; limit?: number; offset?: number };
+export type CatalogueFilter = { q?: string; category?: string; barcode?: string; show?: 'all' | 'sellable' | 'low_stock' | 'out_of_stock' | 'blocked'; limit?: number; offset?: number; /** With several shops: what this shop can sell. */ shop?: string };
 export type ProductBlock = 'plan_limit' | 'incomplete' | 'no_price' | 'out_of_stock';
 
 const noAccount = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'pos_account_missing', 'You have not signed up for Udozo POS yet.');
@@ -40,9 +41,13 @@ export class PosCatalogueService {
       orderBy: [{ posEnabledAt: 'asc' }, { id: 'asc' }],
     });
     const held = await this.held(rows.map(row => row.id));
+    // Several shops: each product's level per shop, and what the asked shop can sell.
+    const { shops, split } = await shopsOf(this.prisma, account.id);
+    const levels = split ? await levelsOf(this.prisma, rows.map(row => row.id)) : null;
+    const shop = filter.shop ? (shops.find(item => item.id === filter.shop) ?? null) : null;
     const products = rows.map((row, index) => {
       const units = held.get(row.id) ?? 0;
-      const available = Math.max(0, row.stock - units);
+      const available = levels && shop ? freeAtShop({ stock: row.stock, held: units, levels: levels.get(row.id), shopId: shop.id, fulfilsOnline: shop.fulfilsOnline }) : Math.max(0, row.stock - units);
       const block: ProductBlock | null = tillBlock(row, limit === null || index < limit) ?? (available === 0 ? 'out_of_stock' : null);
       const lowStock = row.reorderLevel !== null && row.stock <= row.reorderLevel;
       return { row, held: units, available, block, lowStock };
@@ -84,6 +89,10 @@ export class PosCatalogueService {
       plan: { code: account.plan.code, name: account.plan.name },
       /** The shop's kind: its categories come first. */
       shop_kind: { code: kind.code, name: kind.name },
+      /** Several shops: stock is split between them, and `available` is the asked shop's. */
+      split,
+      shop: shop ? { id: shop.id, name: shop.name } : null,
+      shops: split ? shops.map(item => ({ id: item.id, name: item.name, fulfils_online: item.fulfilsOnline })) : [],
       summary: {
         products: products.length,
         limit,
@@ -113,6 +122,8 @@ export class PosCatalogueService {
           /** Units held for online buyers (UdozoPay orders and accepted buy orders): never sold at the till. */
           held: units,
           available,
+          /** Several shops: each shop's level, and what is in no shop (online). */
+          levels: levels ? { online: onlineLevel(row.stock, levels.get(row.id)), shops: shops.map(item => ({ shop_id: item.id, quantity: levels.get(row.id)?.get(item.id) ?? 0 })) } : null,
           reorder_level: row.reorderLevel,
           low_stock: lowStock,
           /** Also on udozo.com; false for a shop-only listing. */

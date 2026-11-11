@@ -33,10 +33,19 @@ export function limitsOf(plan: Pick<PosPlan, 'limits'>): PosLimits {
   return out;
 }
 
-/** The plan's monthly price in a currency, in minor units: 0 for Free, null where a paid plan has none. */
-export function priceIn(plan: Pick<PosPlan, 'code' | 'prices'>, currency: string): bigint | null {
+/** How a paid plan is paid: each month, or each year where the plan has a yearly price. */
+export const billingIntervals = ['month', 'year'] as const;
+export type BillingInterval = (typeof billingIntervals)[number];
+export const isBillingInterval = (value: unknown): value is BillingInterval => value === 'month' || value === 'year';
+
+/**
+ * The plan's price in a currency for a month or a year, in minor units: 0 for Free, null where a paid plan has none
+ * (yearly: where finance set no yearly price there).
+ */
+export function priceIn(plan: Pick<PosPlan, 'code' | 'prices'> & { yearlyPrices?: PosPlan['yearlyPrices'] }, currency: string, interval: BillingInterval = 'month'): bigint | null {
   if (plan.code === freePlan) return 0n;
-  const value = ((plan.prices ?? {}) as Record<string, unknown>)[currency];
+  const table = interval === 'year' ? plan.yearlyPrices : plan.prices;
+  const value = ((table ?? {}) as Record<string, unknown>)[currency];
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? BigInt(value) : null;
 }
 
@@ -51,6 +60,8 @@ export function presentPlan(plan: PosPlan, currency: string | null) {
     name: plan.name,
     description: plan.description,
     price: currency ? (price === null ? null : { amount: Number(price), currency }) : null,
+    /** The yearly price where finance set one (null: monthly only). */
+    yearly_price: currency && plan.code !== freePlan ? ((yearly: bigint | null) => (yearly === null ? null : { amount: Number(yearly), currency }))(priceIn(plan, currency, 'year')) : null,
     available: currency ? offered(plan, currency) : plan.code === freePlan || plan.shown,
     paid: plan.code !== freePlan,
     limits: limitsOf(plan),

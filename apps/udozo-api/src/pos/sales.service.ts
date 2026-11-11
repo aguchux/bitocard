@@ -14,6 +14,7 @@ import { type DiscountRule, ownerBy, type PosBy, type PosSellOptions } from './a
 import { discountBps } from './permissions.js';
 import { limitsOf } from './plans.js';
 import { customerUnknown } from './customers.service.js';
+import { changeLevel, freeAtShop, levelsOf, pausedShops, shopsOf } from './stock-levels.js';
 import { adjustedStock, checkPayments, maxLineQuantity, maxSaleLines, type PaymentInput, saleNumber, type StockAdjustment, tillPaymentMethods, type TillPaymentMethod } from './sale-rules.js';
 
 export type SaleInput = {
@@ -142,6 +143,11 @@ export class PosSalesService {
       select: { id: true, customerId: true, title: true, sku: true, barcode: true, status: true, priceKind: true, priceMinor: true, currency: true, stock: true, posEnabledAt: true, onShop: true, resale: true, outOfStockAt: true, expiresAt: true, country: true },
     });
     const byId = new Map(rows.map(row => [row.id, row]));
+    // Several shops: a shop past the plan's shop limit sells nothing, and each sells only its own level.
+    const { shops, split } = await shopsOf(tx, account.id);
+    if (pausedShops(shops, account.plan).has(till.shopId)) throw conflict('shop_paused', `${till.shop.name} is paused: ${account.plan.name} keeps ${shops.length > 1 ? 'only your first shops' : 'one shop'} selling. Change plan to sell here again.`, 'till_id');
+    const shopRow = shops.find(shop => shop.id === till.shopId);
+    const levels = split ? await levelsOf(tx, ids) : null;
     // The plan's product limit keeps the first ticked selling (as the catalogue shows).
     const limit = limitsOf(account.plan).products;
     const within = limit === null ? null : new Set((await tx.classifiedListing.findMany({ where: { customerId: ownerId, posEnabledAt: { not: null }, status: { in: posCountedStatuses } }, select: { id: true }, orderBy: [{ posEnabledAt: 'asc' }, { id: 'asc' }], take: limit })).map(row => row.id));
@@ -155,8 +161,12 @@ export class PosSalesService {
       if (block === 'plan_limit') throw conflict('plan_limit', `Over ${account.plan.name}'s product limit: change plan to sell it.`, param);
       if (block) throw conflict('product_unavailable', `“${row.title ?? 'This product'}” has no title or price yet: finish it on udozo.com.`, param);
       if (row.currency !== account.currency) throw conflict('product_unavailable', `“${row.title}” is priced in ${row.currency}, not your shop's ${account.currency}.`, param);
-      const free = row.stock - (await heldUnits(tx, row.id));
-      if (line.quantity > free) throw conflict('stock_short', free > 0 ? `Only ${free} of “${row.title}” left to sell.` : `“${row.title}” is out of stock.`, param);
+      const held = await heldUnits(tx, row.id);
+      const free = levels ? freeAtShop({ stock: row.stock, held, levels: levels.get(row.id), shopId: till.shopId, fulfilsOnline: shopRow?.fulfilsOnline ?? false }) : row.stock - held;
+      if (line.quantity > free) {
+        const where = levels ? ' at this shop' : ' left to sell';
+        throw conflict('stock_short', free > 0 ? `Only ${free} of “${row.title}”${where}.` : `“${row.title}” is out of stock${levels ? ' at this shop' : ''}.`, param);
+      }
       lines.push({ row, quantity: line.quantity, unit: row.priceMinor!, discount: minor(line.discount, `${param}.discount`) });
     }
 
@@ -179,7 +189,7 @@ export class PosSalesService {
     if (credit > 0n && customer!.creditLimitMinor !== null && customer!.owedMinor + credit > customer!.creditLimitMinor) {
       throw conflict('credit_limit_reached', `${customer!.name} may owe at most ${formatMoney(customer!.creditLimitMinor, account.currency)} and owes ${formatMoney(customer!.owedMinor, account.currency)} already.`, 'customer_id');
     }
-    return { lines, totals, paid, customer, credit };
+    return { lines, totals, paid, customer, credit, split };
   }
 
   /**
@@ -286,6 +296,8 @@ export class PosSalesService {
 
     for (const line of lines) {
       const stock = line.row.stock - line.quantity;
+      // The shop's level first, so the stock's trigger finds the levels within it and takes nothing more.
+      if (built.split) await changeLevel(tx, line.row.id, till.shopId, -line.quantity, now);
       await this.setStock(tx, line.row, stock, now);
       await tx.posStockMovement.create({ data: { accountId: account.id, listingId: line.row.id, shopId: till.shopId, reason: 'sale', delta: -line.quantity, stockAfter: stock, saleId: sale.id, byCustomerId: soldBy.customerId, byStaffId: soldBy.staffId, byName: soldBy.name } });
     }
@@ -412,6 +424,7 @@ export class PosSalesService {
         }
       }
       if (!restock) return;
+      const { split } = await shopsOf(tx, account.id);
       const listingIds = [...new Set(sale.lines.map(line => line.listingId))].sort();
       await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ANY(${listingIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
       const rows = await tx.classifiedListing.findMany({ where: { id: { in: listingIds } }, select: { id: true, status: true, stock: true, outOfStockAt: true, expiresAt: true, onShop: true, resale: true, posEnabledAt: true, country: true } });
@@ -422,13 +435,17 @@ export class PosSalesService {
         if (!row || !posCountedStatuses.includes(row.status)) continue;
         const stock = Math.min(maxStock, row.stock + line.quantity);
         await this.setStock(tx, row, stock, now);
+        if (split) await changeLevel(tx, row.id, sale.shopId, stock - row.stock, now);
         row.stock = stock;
         await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId: sale.shopId, reason: 'refund', delta: line.quantity, stockAfter: stock, saleId: sale.id, note: reason.slice(0, 200), byCustomerId: by.customerId, byStaffId: by.staffId, byName: by.name } });
       }
     });
   }
 
-  /** Restocks, counts or writes off damaged units of one of the owner's products at the till. */
+  /**
+   * Restocks, counts or writes off damaged units of one of the owner's products at the till. With several shops it is
+   * one shop's (`shop_id`, `shop_required`): a count is of that shop's shelf, and its level moves with the stock.
+   */
   async adjustStock(customer: CustomerWithStore, listingId: string, input: { kind: StockAdjustment; quantity: number; note?: string | null; shop_id?: string | null }, by: PosBy = ownerBy(customer)) {
     const account = await this.account(customer);
     if (!Number.isInteger(input.quantity) || input.quantity < (input.kind === 'count' ? 0 : 1) || input.quantity > maxStock) throw invalid('parameter_invalid', input.kind === 'count' ? 'Count what is on the shelf: 0 or more.' : 'Give how many, from 1.', 'quantity');
@@ -440,8 +457,23 @@ export class PosSalesService {
       const row = await tx.classifiedListing.findUnique({ where: { id: listingId }, select: { id: true, customerId: true, status: true, stock: true, outOfStockAt: true, expiresAt: true, onShop: true, resale: true, posEnabledAt: true, country: true } });
       if (!row || row.customerId !== customer.id || !row.posEnabledAt || !posCountedStatuses.includes(row.status)) throw notFound('product');
       const held = await heldUnits(tx, row.id);
-      const stock = adjustedStock(row.stock, input.kind, input.quantity, held, maxStock);
-      await this.setStock(tx, row, stock, now);
+      const { split } = await shopsOf(tx, account.id);
+      let stock: number;
+      if (!split) {
+        stock = adjustedStock(row.stock, input.kind, input.quantity, held, maxStock);
+        await this.setStock(tx, row, stock, now);
+      } else {
+        if (!shopId) throw invalid('shop_required', 'Choose which shop this is for.', 'shop_id');
+        const level = (await levelsOf(tx, [row.id])).get(row.id)?.get(shopId) ?? 0;
+        const target = input.kind === 'restock' ? level + input.quantity : input.kind === 'damage' ? level - input.quantity : input.quantity;
+        if (target < 0) throw conflict('stock_short', `This shop has only ${level}.`, 'quantity');
+        const delta = target - level;
+        stock = adjustedStock(row.stock, 'count', row.stock + delta, held, maxStock);
+        // Down: the shop's level first (so the trigger takes nothing more); up: the stock first.
+        if (delta < 0) await changeLevel(tx, row.id, shopId, delta, now);
+        await this.setStock(tx, row, stock, now);
+        if (delta > 0) await changeLevel(tx, row.id, shopId, delta, now);
+      }
       const movement = await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId, reason: input.kind, delta: stock - row.stock, stockAfter: stock, note: text(input.note, 200), byCustomerId: by.customerId, byStaffId: by.staffId, byName: by.name } });
       return { object: 'pos_stock' as const, listing_id: row.id, stock, held, available: Math.max(0, stock - held), movement: this.presentMovement(movement) };
     });

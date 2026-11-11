@@ -4929,6 +4929,7 @@ model ClassifiedListing {
   @@map("classified_listings")
   auctions     ConnectAuction[]
   posSaleLines      PosSaleLine[]
+  posStockLevels    PosStockLevel[]
   posStockMovements PosStockMovement[]
 }
 
@@ -7910,6 +7911,8 @@ model PosPlan {
   description String
   /// { "NGN": 1500000 }: the monthly price per currency, in minor units. Free has none.
   prices      Json     @default("{}")
+  /// { "NGN": 15000000 }: the yearly price per currency (none: not offered yearly there).
+  yearlyPrices Json    @default("{}") @map("yearly_prices")
   /// { "products": 50, "shops": 1, "tills": 2, "staff": 3 }: null or missing is unlimited.
   limits      Json     @default("{}")
   trialDays   Int      @default(0) @map("trial_days")
@@ -7930,6 +7933,9 @@ model PosAccount {
   country            String       @db.VarChar(2)
   currency           String       @db.VarChar(10)
   planCode           String       @map("plan_code")
+  /// `month` or `year`; `nextInterval` takes over when the paid period ends.
+  billingInterval    String       @default("month") @map("billing_interval") @db.VarChar(8)
+  nextInterval       String?      @map("next_interval") @db.VarChar(8)
   /// While trialling a paid plan: nothing is charged until it ends.
   trialEndsAt        DateTime?    @map("trial_ends_at")
   /// The paid plan was trialled once; never again.
@@ -7975,6 +7981,7 @@ model PosAccount {
   receiptCodes       PosReceiptCode[]
   receiptSends       PosReceiptSend[]
   shifts             PosShift[]
+  stockTransfers     PosStockTransfer[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -8004,6 +8011,9 @@ model PosShop {
   receiptQr     Boolean    @default(true) @map("receipt_qr")
   /// The next invoice's number, claimed with one UPDATE … RETURNING.
   invoiceNext   Int        @default(1) @map("invoice_next")
+  /// Online orders take from this shop once the online level is used up (one an account).
+  fulfilsOnline Boolean    @default(false) @map("fulfils_online")
+  stockLevels   PosStockLevel[]
   /// The next sale's number (POS-000001…), claimed with one UPDATE … RETURNING.
   saleNext      Int        @default(1) @map("sale_next")
   position      Int        @default(0)
@@ -8257,6 +8267,8 @@ model PosStockMovement {
   delta        Int
   stockAfter   Int               @map("stock_after")
   saleId       String?           @map("sale_id") @db.Uuid
+  /// The stock transfer it was part of.
+  transferId   String?           @map("transfer_id") @db.Uuid
   note         String?           @db.VarChar(200)
   byCustomerId String?           @map("by_customer_id") @db.Uuid
   byName       String?           @map("by_name")
@@ -8283,6 +8295,8 @@ model PosCharge {
   periodEnd   DateTime   @map("period_end")
   /// The plan's price, the credit for the unused part of the plan before (upgrades), and what was taken.
   priceMinor  BigInt     @map("price_minor")
+  /// `month` or `year`: the period paid for.
+  interval    String     @default("month") @db.VarChar(8)
   creditMinor BigInt     @default(0) @map("credit_minor")
   amountMinor BigInt     @map("amount_minor")
   currency    String     @db.VarChar(10)
@@ -8690,4 +8704,37 @@ model PosShiftCash {
 
   @@index([shiftId, createdAt], map: "pos_shift_cash_shift_idx")
   @@map("pos_shift_cash")
+}
+
+/// What one shop holds of a listing's stock (several shops only). Every shop's together never pass the listing's
+/// stock; the rest is the online level. A trigger takes from them when stock goes down outside the till.
+model PosStockLevel {
+  listingId String            @map("listing_id") @db.Uuid
+  shopId    String            @map("shop_id") @db.Uuid
+  quantity  Int               @default(0)
+  updatedAt DateTime          @default(now()) @map("updated_at")
+  listing   ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  shop      PosShop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, shopId])
+  @@index([shopId], map: "pos_stock_levels_shop_idx")
+  @@map("pos_stock_levels")
+}
+
+/// Stock moved between shops, or between a shop and online (null), `ST-000123`, its lines as moved.
+model PosStockTransfer {
+  id         String     @id @default(uuid()) @db.Uuid
+  number     Int        @unique(map: "pos_stock_transfers_number_key") @default(autoincrement())
+  accountId  String     @map("account_id") @db.Uuid
+  fromShopId String?    @map("from_shop_id") @db.Uuid
+  toShopId   String?    @map("to_shop_id") @db.Uuid
+  lines      Json
+  note       String?    @db.VarChar(300)
+  byName     String     @map("by_name") @db.VarChar(120)
+  byStaffId  String?    @map("by_staff_id") @db.Uuid
+  createdAt  DateTime   @default(now()) @map("created_at")
+  account    PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_stock_transfers_account_idx")
+  @@map("pos_stock_transfers")
 }

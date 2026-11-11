@@ -219,6 +219,9 @@ export class PosReportsService {
       .map(row => ({ ...row, at: row.at.toISOString() }));
 
     const restock = await this.restock(account);
+    // Several shops: each one's takings (the shop filter shows one).
+    const shops = await this.prisma.posShop.findMany({ where: { accountId: account.id }, select: { id: true, name: true }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] });
+    const byShop = shops.length > 1 ? shops.map(item => { const mine = completed.filter(sale => sale.shopId === item.id); return { shop_id: item.id, name: item.name, sales: mine.length, total: sum(mine.map(sale => Number(sale.totalMinor))) }; }) : [];
     return {
       object: 'pos_overview' as const,
       currency: account.currency,
@@ -242,6 +245,8 @@ export class PosReportsService {
       series: points,
       busiest: busiest && busiest.pos + busiest.online > 0 ? { label: busiest.label, amount: busiest.pos + busiest.online } : null,
       payment_methods: [...methods.entries()].sort((a, b) => b[1] - a[1]).map(([method, amount]) => ({ method, amount, share_pct: paid ? Math.round((amount * 100) / paid) : 0 })),
+      /** Several shops: each one's sales and takings in the period. */
+      by_shop: byShop,
       top_sellers: top,
       recent,
       restock,

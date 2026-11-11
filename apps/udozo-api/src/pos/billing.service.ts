@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { addMonth } from './money.js';
-import { freePlan, graceDays, priceIn, remindDays } from './plans.js';
+import { type BillingInterval, freePlan, graceDays, priceIn, remindDays } from './plans.js';
+import { periodEnd } from './pos.service.js';
 import { type AccountRow, PosService, withShops } from './pos.service.js';
 
 const day = 24 * 60 * 60 * 1000;
@@ -100,21 +100,25 @@ export class PosBillingService {
       return 'ended';
     }
     const plan = code === row.planCode ? row.plan : await this.prisma.posPlan.findUnique({ where: { code } });
-    const price = plan ? priceIn(plan, row.currency) : null;
-    // A month on from the paid-up date, or from now when it is days behind (a renewal that waited), so no time is lost.
+    // Yearly while the plan is priced yearly there, else monthly.
+    const asked = (row.nextInterval ?? row.billingInterval) as BillingInterval;
+    const interval: BillingInterval = plan && asked === 'year' && priceIn(plan, row.currency, 'year') === null ? 'month' : asked;
+    const price = plan ? priceIn(plan, row.currency, interval) : null;
+    // A period on from the paid-up date, or from now when it is days behind (a renewal that waited), so no time is lost.
     const start = row.pastDueSince ? now : row.periodEnd;
-    const end = addMonth(start);
+    const end = periodEnd(start, interval);
     if (plan && price !== null) {
       try {
         await this.pos.charge(row, {
           kind: 'renewal',
           plan,
+          interval,
           price,
           credit: 0n,
           amount: price,
           start,
           end,
-          data: { planCode: plan.code, periodStart: start, periodEnd: end, nextPlanCode: null, pastDueSince: null, trialEndsAt: null, claimedAt: now },
+          data: { planCode: plan.code, billingInterval: interval, periodStart: start, periodEnd: end, nextPlanCode: null, nextInterval: null, pastDueSince: null, trialEndsAt: null, claimedAt: now },
         });
         this.pos.tell(row, `renewed:${start.toISOString()}`, 'Your Udozo POS plan is renewed', `${plan.name} is paid until ${date(end)}: ${money(price, row.currency)} from your Udozo wallet.`);
         return 'renewed';
@@ -145,7 +149,7 @@ export class PosBillingService {
   private async toFree(row: AccountRow, lapsed: string | null) {
     await this.prisma.posAccount.updateMany({
       where: { id: row.id, updatedAt: row.updatedAt },
-      data: { planCode: freePlan, periodStart: null, periodEnd: null, trialEndsAt: null, nextPlanCode: null, pastDueSince: null, ...(lapsed ? { lapsedPlanCode: lapsed } : {}) },
+      data: { planCode: freePlan, billingInterval: 'month', periodStart: null, periodEnd: null, trialEndsAt: null, nextPlanCode: null, nextInterval: null, pastDueSince: null, ...(lapsed ? { lapsedPlanCode: lapsed } : {}) },
     });
   }
 }
