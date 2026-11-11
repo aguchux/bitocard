@@ -147,7 +147,7 @@ describe("admin.udozo.com", () => {
   test("the rail and menus are Udozo's, with none of BitoCard's own areas", () => {
     const hrefs = [...sections.map(item => item.href), ...Object.values(menus).flatMap(menu => menu.items.map(item => item.href))];
     for (const href of bitocardOnly) expect(hrefs.some(item => item === href || item.startsWith(`${href}/`)), href).toBe(false);
-    expect(sections.map(item => item.label)).toEqual(["Home", "Marketplace", "Connect", "Shop assistants", "Resellers", "Money", "Plans & fees", "Site", "Identity", "Support", "Reports", "Settings"]);
+    expect(sections.map(item => item.label)).toEqual(["Home", "Marketplace", "Connect", "POS", "Shop assistants", "Resellers", "Money", "Plans & fees", "Site", "Identity", "Support", "Reports", "Settings"]);
     expect(menus.marketplace.items.map(item => item.href)).toContain("/classifieds/resale-reports");
     expect(menus.plans.items.map(item => item.href)).toEqual(["/plans", "/plans/setup-fees"]);
     expect(JSON.stringify(menus)).not.toMatch(/BitoCard|Bitocard/);

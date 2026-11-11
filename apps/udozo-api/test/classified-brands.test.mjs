@@ -79,7 +79,8 @@ describe('the seeded registry', () => {
     const brandFeature = await prisma.classifiedFeature.findUniqueOrThrow({ where: { key: 'brand' } });
     const asking = await prisma.classifiedCategoryFeature.findMany({ where: { featureId: brandFeature.id }, include: { category: true } });
     assert.ok(asking.length >= 60);
-    for (const link of asking) {
+    // Shop-only categories (a chemist's medicines) are never public: they ask a brand as typed, with no registry or filter.
+    for (const link of asking.filter(item => !item.category.shopOnly)) {
       assert.ok((await prisma.classifiedBrandCategory.count({ where: { categoryId: link.categoryId } })) >= 10, `${link.category.slug} has its brands`);
       // Buyers filter on brand wherever it is asked.
       assert.equal(link.filter, true, link.category.slug);

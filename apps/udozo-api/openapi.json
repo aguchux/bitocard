@@ -10524,7 +10524,7 @@
         },
         "responses": {
           "202": {
-            "description": "A code is on its way by SMS.",
+            "description": "A code is on its way by SMS, or on WhatsApp where asked or where the country cannot text.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10532,7 +10532,8 @@
                   "required": [
                     "object",
                     "message",
-                    "phone"
+                    "phone",
+                    "channel"
                   ],
                   "additionalProperties": false,
                   "properties": {
@@ -10548,13 +10549,22 @@
                     "phone": {
                       "type": "string",
                       "description": "The number the code was sent to, in E.164 form."
+                    },
+                    "channel": {
+                      "type": "string",
+                      "description": "How the code was sent: `sms` or `whatsapp`.",
+                      "enum": [
+                        "sms",
+                        "whatsapp"
+                      ]
                     }
                   }
                 },
                 "example": {
                   "object": "notice",
                   "message": "A code is on its way to +2348031234567.",
-                  "phone": "+2348031234567"
+                  "phone": "+2348031234567",
+                  "channel": "sms"
                 }
               }
             }
@@ -10944,7 +10954,7 @@
         },
         "responses": {
           "202": {
-            "description": "A code is on its way by SMS to the number (one from your business country).",
+            "description": "A code is on its way to the number (one from your business country), by SMS or on WhatsApp.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10952,7 +10962,8 @@
                   "required": [
                     "object",
                     "message",
-                    "phone"
+                    "phone",
+                    "channel"
                   ],
                   "additionalProperties": false,
                   "properties": {
@@ -10968,13 +10979,22 @@
                     "phone": {
                       "type": "string",
                       "description": "The number the code was sent to, in E.164 form."
+                    },
+                    "channel": {
+                      "type": "string",
+                      "description": "How the code was sent: `sms` or `whatsapp`.",
+                      "enum": [
+                        "sms",
+                        "whatsapp"
+                      ]
                     }
                   }
                 },
                 "example": {
                   "object": "notice",
                   "message": "A code is on its way to +2348031234568.",
-                  "phone": "+2348031234568"
+                  "phone": "+2348031234568",
+                  "channel": "sms"
                 }
               }
             }

@@ -153,7 +153,7 @@ describe("search engines", () => {
   it("index the public pages only", () => {
     const rules = robots().rules as { allow: string[]; disallow: string[] };
     expect(rules.allow).toEqual(["/", "/pricing", "/download"]);
-    expect(rules.disallow).toEqual(["/app", "/signin", "/signup", "/handoff"]);
+    expect(rules.disallow).toEqual(["/app", "/signin", "/signup", "/handoff", "/offline"]);
     expect(sitemap().map(entry => entry.url)).toEqual(["https://pos.udozo.test/", "https://pos.udozo.test/pricing", "https://pos.udozo.test/download"]);
   });
 });
