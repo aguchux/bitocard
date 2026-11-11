@@ -854,3 +854,125 @@ export function shortName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]![0]!.toUpperCase()}.` : (parts[0] ?? "");
 }
+
+// ---- Shifts, the overview and reports (milestone 7) ----
+
+/** What a shift took (amounts in minor units); cash figures are null for staff who count blind. */
+export type PosShiftTotals = {
+  sales: number;
+  sales_total: number;
+  refunds: number;
+  refunds_total: number;
+  items: number;
+  by_method: Record<string, number>;
+  cash_sales: number | null;
+  cash_refunds: number | null;
+  paid_in: number;
+  paid_out: number;
+};
+
+export type PosShift = {
+  object: "pos_shift";
+  id: string;
+  status: "open" | "closed";
+  shop_id: string;
+  till: { id: string | null; name: string };
+  currency: string;
+  opened_at: string;
+  opened_by: string;
+  opening_float: number;
+  closed_at: string | null;
+  closed_by: string | null;
+  counted_cash: number | null;
+  /** The cash the drawer should hold, and counted less expected: null for staff who count blind. */
+  expected_cash: number | null;
+  difference: number | null;
+  blind: boolean;
+  totals: PosShiftTotals;
+  cash: Array<{ id: string; kind: "in" | "out"; amount: number; reason: string; by: string; created_at: string }>;
+  note: string | null;
+};
+
+export type PosCurrentShift = { object: "pos_current_shift"; till: { id: string; name: string }; shift: PosShift | null };
+export type PosShifts = { object: "list"; currency: string; total: number; has_more: boolean; data: PosShift[] };
+
+export type ReportPeriod = "today" | "7d" | "30d" | "custom";
+type Compared = { value: number; previous: number; change_pct: number | null };
+
+export type PosOverview = {
+  object: "pos_overview";
+  currency: string;
+  period: ReportPeriod;
+  from: string;
+  to: string;
+  by: "hour" | "day";
+  shop: { id: string; name: string } | null;
+  totals: {
+    sales: Compared;
+    transactions: Compared & { pos: number; online: number };
+    average_basket: Compared;
+    items: Compared;
+    refunds: { count: number; amount: number };
+    low_stock: number;
+  };
+  channels: { pos: { amount: number; share_pct: number }; online: { amount: number; share_pct: number } };
+  series: Array<{ key: string; label: string; pos: number; online: number }>;
+  busiest: { label: string; amount: number } | null;
+  payment_methods: Array<{ method: string; amount: number; share_pct: number }>;
+  top_sellers: Array<{ listing_id: string; title: string; quantity: number; revenue: number; pos_quantity: number; online_quantity: number }>;
+  recent: Array<{ channel: "pos" | "online"; id: string; number: string | null; title: string; meta: string; methods: string[]; amount: number; status: string; at: string }>;
+  restock: Array<{ listing_id: string; title: string; stock: number; available: number; reorder_level: number | null; per_day: number; days_left: number | null }>;
+};
+
+export type PosDay = {
+  object: "pos_day";
+  date: string;
+  currency: string;
+  shop: { id: string; name: string } | null;
+  sales: { count: number; gross: number; discounts: number; vat: number; total: number; items: number };
+  refunds: { count: number; total: number; by_method: Record<string, number> };
+  net: number;
+  by_method: Array<{ method: string; amount: number }>;
+  by_till: Array<{ name: string; sales: number; total: number }>;
+  by_staff: Array<{ name: string; sales: number; total: number }>;
+  top_products: Array<{ title: string; quantity: number; revenue: number }>;
+  shifts: PosShift[];
+  online: { count: number; total: number };
+};
+
+export const reportPeriods: Array<{ value: ReportPeriod; label: string }> = [
+  { value: "today", label: "Today" },
+  { value: "7d", label: "7 days" },
+  { value: "30d", label: "30 days" },
+  { value: "custom", label: "Custom" },
+];
+
+/** How a figure moved against the period before, in words (never colour alone): "▲ 12% vs last Tuesday". */
+export function changeText(pct: number | null, against: string) {
+  if (pct === null) return `Nothing to compare with ${against}`;
+  if (pct === 0) return `Same as ${against}`;
+  return `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}% ${pct > 0 ? "up on" : "down on"} ${against}`;
+}
+
+/** What a period is compared with: the same weekday a week before (today), else the days just before. */
+export function comparedWith(period: ReportPeriod, weekday: string) {
+  if (period === "today") return `last ${weekday}, same time`;
+  if (period === "7d") return "the 7 days before";
+  if (period === "30d") return "the 30 days before";
+  return "the days before";
+}
+
+/** A cash count against what was expected, in words: balanced, over or short. */
+export function differenceText(difference: number | null, currency: string) {
+  if (difference === null) return null;
+  if (difference === 0) return "Balanced";
+  return `${difference > 0 ? "Over" : "Short"} by ${money(Math.abs(difference), currency)}`;
+}
+
+/** Whole units typed at the till (a float, a count) as minor units, or null when it is not an amount. */
+export function readCash(text: string) {
+  const clean = text.replace(/[,\s₦₵]/g, "");
+  if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
+  const minor = Math.round(Number(clean) * 100);
+  return Number.isSafeInteger(minor) && minor <= 10_000_000_000 ? minor : null;
+}

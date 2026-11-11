@@ -169,9 +169,9 @@ describe("a staff browser's till", () => {
 
 describe("words and places", () => {
   it("shows a member of staff only what their role opens", () => {
-    expect(staffLinks(cashier).map(link => link.label)).toEqual(["Home", "Till", "Sales", "Customers", "Products"]);
+    expect(staffLinks(cashier).map(link => link.label)).toEqual(["Home", "Till", "Shifts", "Sales", "Customers", "Products"]);
     const accountant = { ...cashier, sell: "no", refund: "no", till: "no", own_sales: "no", all_sales: "yes", customers: "no", cash_up: "yes", export: "yes" } as const;
-    expect(staffLinks(accountant).map(link => link.label)).toEqual(["Home", "Sales", "Products"]);
+    expect(staffLinks(accountant).map(link => link.label)).toEqual(["Home", "Overview", "Shifts", "Sales", "Reports", "Products"]);
     expect(staffLinks({ ...cashier, staff: "cashiers" }).map(link => link.label)).toContain("Cashiers");
     expect(Object.values(ownerPermissions).every(level => level === "yes")).toBe(true);
   });

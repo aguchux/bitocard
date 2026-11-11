@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Register } from "@/components/register";
 import { needs } from "@/lib/gates";
-import { ownerCollections, tillCatalogue } from "@/lib/pos-data";
+import { allows, saleTime } from "@/lib/pos";
+import { currentShift, ownerCollections, tillCatalogue } from "@/lib/pos-data";
 
 export const metadata: Metadata = { title: "Till", robots: { index: false, follow: false } };
 
@@ -39,6 +40,8 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
       </section>
     );
   }
+  const shift = await currentShift(till.id);
+  const canShift = allows(view.permissions, "till") || allows(view.permissions, "cash_up");
   if (!catalogue.ok) {
     return (
       <p role="alert" className="rounded-[20px] bg-white p-6 text-pos-error">
@@ -68,6 +71,16 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
           <span className="text-sm font-semibold text-pos-muted">{till.name}</span>
         )}
       </div>
+      {shift.ok && canShift ? (
+        <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 text-sm">
+          <span className={shift.data.shift ? "text-pos-ink-2" : "font-semibold text-pos-warn"}>
+            {shift.data.shift ? `Shift open since ${saleTime(shift.data.shift.opened_at)} · ${shift.data.shift.opened_by}` : `No shift is open at ${till.name}: sales still go through, but count towards no shift.`}
+          </span>
+          <Link href="/app/shifts" className="font-semibold">
+            {shift.data.shift ? "Close or count" : "Open a shift"}
+          </Link>
+        </p>
+      ) : null}
       {catalogue.data.summary.products === 0 ? (
         <section className="rounded-[20px] bg-white p-6">
           <h2 className="font-display text-xl font-bold text-pos-ink">Nothing to sell yet</h2>

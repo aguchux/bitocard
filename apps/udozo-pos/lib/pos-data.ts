@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { ownerPermissions, type PermissionSet, type PosApprover, type PosDeviceInfo, type PosDeviceRow, type PosRoles, type PosShop, type PosStaffList, type PosStaffMe } from "./pos";
-import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosPlans, PosReceipts, PosSale, PosSales, PosSettlement, PosSettlements, PosShopKind } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosCurrentShift, PosDay, PosOverview, PosPlans, PosReceipts, PosSale, PosSales, PosShift, PosShifts, PosSettlement, PosSettlements, PosShopKind } from "./pos";
 import { actorKind } from "./pos-api";
 import { type ApiResult, currentCustomer, customerApi, deviceApi, staffApi } from "./session";
 import { posApi } from "./pos-api";
@@ -173,3 +173,19 @@ export const ownerRoles = () => customerApi<PosRoles>("GET", "/v1/pos/owner/role
 export const ownerDevices = () => customerApi<{ object: "list"; data: PosDeviceRow[] }>("GET", "/v1/pos/owner/devices");
 /** This browser as a linked till: its shop, till and the name tiles. */
 export const linkedDevice = () => deviceApi<PosDeviceInfo>("GET", "/v1/pos/device");
+
+// ---- Shifts, the overview and reports (milestone 7), as the owner or the member of staff at the till ----
+
+const query = (params: Record<string, string | undefined>) => {
+  const search = new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return search.size ? `?${search}` : "";
+};
+
+/** The overview: a period's takings in the shop and online, by the hour or the day, and what needs restocking. */
+export const posOverview = (params: { period?: string; from?: string; to?: string; shop?: string }) => posApi<PosOverview>("GET", `/reports/overview${query(params)}`);
+/** End of day for a date (the shop's today without one). */
+export const posDay = (params: { date?: string; shop?: string }) => posApi<PosDay>("GET", `/reports/day${query(params)}`);
+/** A till's open shift, if any. */
+export const currentShift = (tillId: string) => posApi<PosCurrentShift>("GET", `/shifts/current?till_id=${encodeURIComponent(tillId)}`);
+export const posShifts = (params: { status?: string; till?: string; limit?: string; offset?: string } = {}) => posApi<PosShifts>("GET", `/shifts${query(params)}`);
+export const posShift = (id: string) => posApi<PosShift>("GET", `/shifts/${id}`);
