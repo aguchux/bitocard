@@ -1,0 +1,80 @@
+@import "tailwindcss";
+@import "@bitocard/ui/styles/tokens.css";
+@import "@bitocard/ui/styles/interactive.css";
+/* Shared components styled with Tailwind utilities. */
+@source "../../../packages/ui/src/handoff-ui.tsx";
+
+/* Udozo POS's own colours and type (docs/UDOZO_POS_PLAN.md, The theme), not udozo.com's blue. */
+@theme {
+  --color-pos-50: #e6f3ee;
+  --color-pos-500: #19a47a;
+  --color-pos-600: #0b7a5a;
+  --color-pos-700: #075c43;
+  --color-pos-ink: #14201b;
+  --color-pos-ink-2: #33413a;
+  --color-pos-muted: #56635c;
+  --color-pos-line: #dce2de;
+  --color-pos-page: #f4f6f4;
+  --color-pos-night: #10231c;
+  --color-pos-night-2: #1a3329;
+  --color-pos-night-line: #2a4a3d;
+  --color-pos-night-text: #d6e3dd;
+  --color-pos-night-muted: #b9ccc3;
+  --color-pos-warn: #8a4b08;
+  --color-pos-warn-bg: #fdefd9;
+  --color-pos-error: #a2251a;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The shared screens (the handoff landing) use navy and brand: here they are the POS's greens. Unlayered, so they
+   win over the tokens' theme layer. */
+:root {
+  --color-navy-950: #10231c;
+  --color-navy-900: #0b7a5a;
+  --color-navy-800: #075c43;
+  --color-navy-700: color-mix(in srgb, #0b7a5a 76%, white);
+  --color-navy-600: color-mix(in srgb, #0b7a5a 70%, white);
+  --color-navy-500: color-mix(in srgb, #0b7a5a 58%, white);
+  --color-navy-400: color-mix(in srgb, #0b7a5a 46%, white);
+  --color-navy-200: color-mix(in srgb, #0b7a5a 18%, white);
+  --color-navy-100: #e6f3ee;
+  --color-navy-50: color-mix(in srgb, #0b7a5a 4%, white);
+  --color-brand-50: #e6f3ee;
+  --color-brand-100: color-mix(in srgb, #19a47a 14%, white);
+  --color-brand-200: color-mix(in srgb, #19a47a 28%, white);
+  --color-brand-500: #19a47a;
+  --color-brand-600: #0b7a5a;
+  --color-brand-700: #075c43;
+  --color-ink: #14201b;
+  --color-page: #ffffff;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  /* Mobile first, never sideways. */
+  html { overflow-x: clip; }
+  body { margin: 0; background: var(--color-page); color: var(--color-ink); overflow-wrap: break-word; }
+  .grid > * { min-width: 0; }
+  :where(input, select, textarea) { min-width: 0; max-width: 100%; }
+  :focus-visible { outline: 2px solid #0b7a5a; outline-offset: 2px; }
+  :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
+}
+
+/* Confirmations: a sheet pulled up from the bottom on phones, centred above. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+dialog.sheet[open] {
+  animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.sheet::backdrop {
+  background: rgb(16 35 28 / 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.sheet[open] {
+    animation: none;
+  }
+}

@@ -350,18 +350,18 @@ The design names its plans Starter, Business and Multi-shop with placeholder pri
 - **Settings:** the switch `pos` (Udozo's, global or country, off), the notice type `customer.pos.plan`, `POS_URL` (default `https://pos.udozo.com`) as a handoff target, `AccountNotices.customerAt`, and the `pos` cron job (`jobs.ts`, `vercel.json` at `25 * * * *`).
 - **Tests:** `apps/udozo-api/test/pos.test.mjs`; `udozo-scope`, `vercel-crons` and `admin-step-up` updated.
 
+**Milestone 1: the web app is built (11 November 2026)**, `apps/udozo-pos` (`@udozo/pos`, port 3014), copied in structure from `apps/udozo-connect`:
+- `lib/site.ts` (`POS_URL`, else pos.udozo.com on Vercel, else localhost:3014; `signInUrl` through udozo.com's `/handoff/go`), `lib/session.ts` (its own `udz_pos` cookie, host-only and httpOnly; the browser never calls the API), `lib/handoff-actions.ts`, `lib/pos.ts` (the API's shapes, money in the market's currency, plan and limit words, `dueToday`, `statusText`, `readVat`), `lib/pos-data.ts` (public plans and app links kept a minute and never throwing, the owner, the charges, `marketFor`), `lib/pos-actions.ts` (sign-up with what was shown due today, plan changes, shop details, tills, sign out);
+- the public site in `app/(site)`, on the POS's own header and footer: `/` (`PosLanding`: hero with the till as a labelled illustration, three steps, features with those not built yet marked Coming soon, the apps band, plans, questions), `/pricing`, `/download` (each app's button Coming soon until its store link is set; Windows only ever the Microsoft Store), `/signin` (two doors: Continue with Udozo, `/signin/udozo`; staff marked Coming soon until milestone 5), `/signup` (connect, then the shop with its VAT, the plan, and what is due today from the wallet, Pay blocked with Add funds on udozo.com when short; Free and trials take nothing); robots and the sitemap keep only `/`, `/pricing` and `/download` indexed;
+- the owner's `/app`, behind Continue with Udozo and sign-up: home (where the plan stands, limits, what to do next), `/app/setup` (shop details and tills within the plan's limit, counted across shops), `/app/billing` (the wallet, changing plan confirmed in Udozo POS's own dialog with what it does, the charges);
+- Udozo's icons (`scripts/brand-assets.py` lists `udozo-pos`), the theme above as `pos-*` colours;
+- tests: `apps/udozo-pos/test` (31: the words and figures, signing in and the handoff, every action's route and body, the public reads, robots, the sign-up wizard, plan changes, tills and the public pieces); every public page checked at 320, 360, 390 and 1280 px with no sideways scrolling.
+
 **Milestone 1: still to do, in order:**
-1. **`apps/udozo-pos` (`@udozo/pos`, port 3014)**, a Next.js app copied in structure from `apps/udozo-connect` (`lib/session.ts`, `lib/site.ts` with `POS_URL`, `lib/handoff-actions.ts`, `app/signin/route.ts`, `app/handoff/page.tsx`; its own cookie `udz_pos`), indexable for the public pages only:
-   - `/`: the landing page (`PosLanding`), with app buttons from `GET /v1/pos/apps`, Coming soon while null;
-   - `/pricing`, from `GET /v1/pos/plans?country=`;
-   - `/download` (`Downloads`): Windows goes to the Microsoft Store listing;
-   - `/signin` (`PosLogin`), with two doors: Continue with Udozo; staff sign-in arrives in milestone 5, so say so;
-   - `/signup` (`Signup`): connect, shop, plan, then pay from the wallet with Add funds on udozo.com (`/account/wallet`), then done;
-   - `/app` (after sign-in: the owner's home), `/app/setup` (`Setup`: shop details, VAT, tills), `/app/billing` (plan, change or cancel, invoices).
-   - Tests in `apps/udozo-pos/test` (Vitest), as Connect's.
+1. **Deploy pos.udozo.com:** Vercel project `udozo-pos` in the De-Golojan Team (root `apps/udozo-pos`, skip-unchanged, `VERCEL_DEEP_CLONE`, `STORE_SERVER_SECRET`), DNS `pos.udozo.com` as a DNS-only CNAME in udozo.com's Cloudflare zone, as `udozo-connect` was.
 2. **Windows:** `apps/udozo-pos-windows`, a Tauri 2 shell with `src-tauri` (`tauri.conf.json`, `Cargo.toml`, `main.rs`): it opens pos.udozo.com in its own window for now (bundled screens and offline come in milestone 9), allows one copy at a time, builds an MSIX for the Microsoft Store, and works on Windows 10 or later. Rust is not installed on the owner's machine, so build it in CI (`windows-latest`, `tauri-apps/tauri-action`). Test the config with a Node test.
 3. **admin.udozo.com > POS:** accounts, plans and prices (finance, step-up), app links (operations), with hooks in `@bitocard/api-client/admin`.
-4. **AGENTS.md:** a Udozo POS entry, built, replacing "nothing built yet". Vercel project `udozo-pos` (root `apps/udozo-pos`, skip-unchanged, `VERCEL_DEEP_CLONE`), and DNS `pos.udozo.com` as a DNS-only CNAME in udozo.com's Cloudflare zone.
+4. **AGENTS.md:** the Udozo POS entry says what is built (done for the API and the web app); add the deployment once it is live.
 5. **Legal:** POS terms (`/legal/pos` on udozo.com) before the switch goes on.
 
 ## Milestones (each a commit or a few, tested, deployable)

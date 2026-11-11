@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 const root = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify', 'afrippa', 'afrippa-admin', 'udozo', 'udozo-shq', 'udozo-admin', 'udozo-connect'];
+const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify', 'afrippa', 'afrippa-admin', 'udozo', 'udozo-shq', 'udozo-admin', 'udozo-connect', 'udozo-pos'];
 /** Afrippa wears its own mark; every other app BitoCard's. */
 const brandOf = app => (app.startsWith('afrippa') ? 'afrippa' : app.startsWith('udozo') ? 'udozo' : 'bitocard');
 
