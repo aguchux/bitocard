@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -noiE \".{0,200}\\\\b\\(crypto|usdt|stablecoin|p2p|trade|trading\\)\\\\b.{0,200}\" PLANS.md AGENTS.md CLAUDE.md docs -r)"
+      "Bash(grep -noiE \".{0,200}\\\\b\\(crypto|usdt|stablecoin|p2p|trade|trading\\)\\\\b.{0,200}\" PLANS.md AGENTS.md CLAUDE.md docs -r)",
+      "WebSearch"
     ]
   }
 }
