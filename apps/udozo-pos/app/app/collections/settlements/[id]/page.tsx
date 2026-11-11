@@ -1,3 +1,4 @@
+import { ownerOnly } from "@/lib/gates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,6 +10,7 @@ export const metadata: Metadata = { title: "Settlement", robots: { index: false,
 
 /** One day's settlement, the statement: every transfer in it, Udozo's fee on each, and what was paid to the bank. */
 export default async function SettlementPage({ params }: { params: Promise<{ id: string }> }) {
+  await ownerOnly();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const result = await ownerSettlement(id);

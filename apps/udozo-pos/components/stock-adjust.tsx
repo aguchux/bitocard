@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { movementText, type PosStockMovement, saleTime } from "@/lib/pos";
-import { adjustStock, type StockKind, stockHistory } from "@/lib/pos-actions";
+import { ApprovalBox } from "@/components/approval-box";
+import { movementText, type PosApprover, type PosStockMovement, saleTime } from "@/lib/pos";
+import { type Approval, adjustStock, type StockKind, stockHistory } from "@/lib/pos-actions";
 
 const kinds: Array<{ value: StockKind; label: string; quantity: string }> = [
   { value: "restock", label: "New stock arrived", quantity: "How many arrived" },
@@ -15,7 +16,7 @@ const kinds: Array<{ value: StockKind; label: string; quantity: string }> = [
  * Changing a product's stock from the POS: new stock in, a shelf count, or units damaged or lost, each kept with its
  * history. The stock is the listing's own, so udozo.com shows it at once.
  */
-export function StockAdjust({ id, title, stock }: { id: string; title: string; stock: number }) {
+export function StockAdjust({ id, title, stock, approvers = [] }: { id: string; title: string; stock: number; approvers?: PosApprover[] }) {
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
   const [kind, setKind] = useState<StockKind>("restock");
@@ -24,6 +25,7 @@ export function StockAdjust({ id, title, stock }: { id: string; title: string; s
   const [message, setMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<PosStockMovement[] | null>(null);
   const [pending, start] = useTransition();
+  const [approving, setApproving] = useState<string | null>(null);
 
   const open = () => {
     setMessage(null);
@@ -36,22 +38,31 @@ export function StockAdjust({ id, title, stock }: { id: string; title: string; s
     });
   };
 
-  const save = (event: React.FormEvent) => {
-    event.preventDefault();
+  const submit = (approval: Approval | null) => {
     const count = Number(quantity);
     if (quantity.trim() === "" || !Number.isInteger(count)) {
       setMessage("Give a whole number.");
       return;
     }
     start(async () => {
-      const result = await adjustStock(id, kind, count, note);
+      const result = await adjustStock(id, kind, count, note, approval);
       if (!result.ok) {
+        if (result.code === "approval_required" || result.code === "approval_invalid") {
+          setApproving(result.message);
+          setMessage(null);
+          return;
+        }
         setMessage(result.message);
         return;
       }
+      setApproving(null);
       dialog.current?.close();
       router.refresh();
     });
+  };
+  const save = (event: React.FormEvent) => {
+    event.preventDefault();
+    submit(null);
   };
 
   const field = "mt-1 h-12 w-full rounded-xl border border-pos-line bg-white px-4 text-base";
@@ -62,7 +73,12 @@ export function StockAdjust({ id, title, stock }: { id: string; title: string; s
         <span className="sr-only"> of {title}</span>
       </button>
       <dialog ref={dialog} aria-labelledby={`stock-${id}`} className="m-auto w-[min(100%-2rem,28rem)] rounded-[20px] p-0 backdrop:bg-black/50">
-        <form onSubmit={save} className="grid gap-3 p-5">
+        {approving ? (
+          <div className="p-5">
+            <ApprovalBox approvers={approvers} what="stock_adjust" reason={approving} pending={pending} onApprove={approval => submit(approval)} onCancel={() => setApproving(null)} />
+          </div>
+        ) : null}
+        <form onSubmit={save} hidden={approving !== null} className="grid gap-3 p-5">
           <h2 id={`stock-${id}`} className="font-display text-xl font-bold text-pos-ink">
             {title}
           </h2>

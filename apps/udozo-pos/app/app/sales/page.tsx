@@ -1,3 +1,4 @@
+import { needs } from "@/lib/gates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { methodLabel, money, salesPage, salesQuery, saleTime, shopToday } from "@/lib/pos";
@@ -22,6 +23,7 @@ const chip = (on: boolean) => `flex h-10 items-center rounded-full px-4 text-sm 
 
 /** Every sale rung up at the shop's tills, newest first, with what was taken and refunded for the filter shown. */
 export default async function SalesPage({ searchParams }: { searchParams: Promise<Params> }) {
+  await needs("own_sales", "all_sales");
   const query = salesQuery(await searchParams);
   const result = await ownerSales(query.api);
   if (!result.ok) {

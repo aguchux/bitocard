@@ -129,7 +129,7 @@ describe("Products", () => {
   it("pages through, keeping the filters", async () => {
     reply = catalogue([product()], { total: 60, has_more: true, summary: { products: 60, limit: null, over_limit: 0, sellable: 60, low_stock: 0, out_of_stock: 0 } });
     const html = await page({ q: "tv", page: "2" });
-    expect(sent[0]).toContain("offset=24&q=tv");
+    expect(sent.some(item => item.includes("offset=24&q=tv"))).toBe(true);
     expect(html).toContain("Page 2 of 3");
     expect(html).toContain('href="/app/products?q=tv"');
     expect(html).toContain('href="/app/products?q=tv&amp;page=3"');

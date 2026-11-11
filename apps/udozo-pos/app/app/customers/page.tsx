@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { customersPage, customersQuery, money, saleTime } from "@/lib/pos";
-import { currentOwner, ownerCustomers } from "@/lib/pos-data";
+import { ownerCustomers } from "@/lib/pos-data";
+import { needs } from "@/lib/gates";
 
 export const metadata: Metadata = {
   title: "Customers",
@@ -37,7 +38,7 @@ export default async function CustomersPage({
 }) {
   const query = customersQuery(await searchParams);
   const [owner, result] = await Promise.all([
-    currentOwner(),
+    needs("customers"),
     ownerCustomers(query.api),
   ]);
   if (!result.ok) {

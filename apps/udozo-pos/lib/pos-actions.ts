@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { type PosAccount, type PosCollection, type PosCollectionAccount, type PosCollectionsOverview, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosTransferRequest, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
-import { type ApiResult, customerApi, dropSession } from "./session";
+import { type ApiResult, customerApi, dropSession, dropStaffSession } from "./session";
+import { posApi } from "./pos-api";
 
 /** What an action answers: the account as it now is, or Udozo's refusal in words with the field it names. */
 export type PosResult<T> = { ok: true; data: T } | { ok: false; message: string; code: string | null; param: string | null };
@@ -93,7 +94,15 @@ export type RingUp = {
   note?: string | null;
   /** The shop's customer the sale is made to (needed to sell on credit). */
   customer_id?: string | null;
+  /** A manager's PIN given at the till, for a discount past the member of staff's own limit. */
+  approval?: Approval | null;
 };
+
+/** A manager's PIN given at the till for what a member of staff may only do with approval. */
+export type Approval = { staff_id: string; pin: string };
+
+/** The approval to send, if it is one: a colleague's id and a 4-digit PIN. */
+const approvalOf = (approval: Approval | null | undefined) => (approval && uuid.test(approval.staff_id) && /^\d{4}$/.test(approval.pin) ? { approval: { staff_id: approval.staff_id, pin: approval.pin } } : {});
 
 const tillMethods = [...paymentMethods.map(item => item.value), "credit"];
 
@@ -117,16 +126,17 @@ export async function ringUp(sale: RingUp): Promise<PosResult<PosSale>> {
     expected_total: sale.expected_total,
     ...(sale.note?.trim() ? { note: sale.note.trim().slice(0, 300) } : {}),
     ...(sale.customer_id ? { customer_id: sale.customer_id } : {}),
+    ...approvalOf(sale.approval),
   };
   // The basket's own id is the idempotency key too, so a send that lost its reply is never a second sale.
-  return answer(await customerApi<PosSale>("POST", "/v1/pos/owner/sales", body, { idempotencyKey: `sale-${sale.client_sale_id}` }));
+  return answer(await posApi<PosSale>("POST", "/sales", body, { idempotencyKey: `sale-${sale.client_sale_id}` }));
 }
 
 /** Refunds a whole sale (the shop pays it back as it was paid), putting its units back unless `restock` is false. */
-export async function refundSale(id: string, reason: string, restock = true): Promise<PosResult<PosSale>> {
+export async function refundSale(id: string, reason: string, restock = true, approval: Approval | null = null): Promise<PosResult<PosSale>> {
   if (!uuid.test(id)) return refused("No such sale.", null, "resource_missing");
   if (!reason.trim()) return refused("Say why it is refunded.", "reason", "parameter_missing");
-  return answer(await customerApi<PosSale>("POST", `/v1/pos/owner/sales/${id}/refund`, { reason: reason.trim().slice(0, 300), restock }));
+  return answer(await posApi<PosSale>("POST", `/sales/${id}/refund`, { reason: reason.trim().slice(0, 300), restock, ...approvalOf(approval) }));
 }
 
 /**
@@ -149,15 +159,16 @@ export async function askWallet(sale: RingUp & { wallet_amount: number; phone?: 
     expected_total: sale.expected_total,
     ...(phone ? { phone } : {}),
     ...(sale.customer_id && uuid.test(sale.customer_id) ? { customer_id: sale.customer_id } : {}),
+    ...approvalOf(sale.approval),
   };
-  const result = await customerApi<PosWalletRequest & { token: string; pay_url: string }>("POST", "/v1/pos/owner/wallet-requests", body);
+  const result = await posApi<PosWalletRequest & { token: string; pay_url: string }>("POST", "/wallet-requests", body);
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.status === 401 ? "Your session ended. Sign in again to carry on." : result.message, code: result.code, param: result.param };
 }
 
 /** Where a wallet request stands; once paid, it carries the sale. */
 export async function walletStatus(id: string): Promise<PosResult<PosWalletRequest>> {
   if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
-  const result = await customerApi<PosWalletRequest>("GET", `/v1/pos/owner/wallet-requests/${id}`);
+  const result = await posApi<PosWalletRequest>("GET", `/wallet-requests/${id}`);
   if (!result.ok) return { ok: false, message: result.message, code: result.code, param: result.param };
   if (result.data.status === "paid") revalidatePath("/app", "layout");
   return { ok: true, data: result.data };
@@ -165,7 +176,7 @@ export async function walletStatus(id: string): Promise<PosResult<PosWalletReque
 
 export async function cancelWallet(id: string): Promise<PosResult<PosWalletRequest>> {
   if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
-  const result = await customerApi<PosWalletRequest>("POST", `/v1/pos/owner/wallet-requests/${id}/cancel`);
+  const result = await posApi<PosWalletRequest>("POST", `/wallet-requests/${id}/cancel`);
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.message, code: result.code, param: result.param };
 }
 
@@ -188,7 +199,7 @@ export async function saveCustomer(id: string | null, fields: CustomerFields): P
   if (id !== null && !uuid.test(id)) return refused("No such customer.", null, "resource_missing");
   if ((id === null || fields.name !== undefined) && !fields.name?.trim()) return refused("Give the customer's name.", "name", "parameter_missing");
   if (fields.credit_limit != null && !whole(fields.credit_limit)) return refused("A credit limit is an amount from nothing up.", "credit_limit");
-  const result = id === null ? await customerApi<PosCustomer>("POST", "/v1/pos/owner/customers", customerBody(fields)) : await customerApi<PosCustomer>("PATCH", `/v1/pos/owner/customers/${id}`, customerBody(fields));
+  const result = id === null ? await posApi<PosCustomer>("POST", "/customers", customerBody(fields)) : await posApi<PosCustomer>("PATCH", `/customers/${id}`, customerBody(fields));
   return answer(result);
 }
 
@@ -203,13 +214,13 @@ export async function repayCustomer(id: string, amount: number, method: PosPayme
   if (!uuid.test(id)) return refused("No such customer.", null, "resource_missing");
   if (!whole(amount, 1)) return refused("Give how much they paid.", "amount");
   if (!paymentMethods.some(item => item.value === method)) return refused("Choose how they paid.", "method");
-  return answer(await customerApi<PosCustomer>("POST", `/v1/pos/owner/customers/${id}/repayments`, { amount, method, ...(reference.trim() ? { reference: reference.trim().slice(0, 80) } : {}) }));
+  return answer(await posApi<PosCustomer>("POST", `/customers/${id}/repayments`, { amount, method, ...(reference.trim() ? { reference: reference.trim().slice(0, 80) } : {}) }));
 }
 
 /** Customers matching what the cashier typed, for the till. */
 export async function findCustomers(words: string): Promise<PosResult<PosCustomerBrief[]>> {
   const q = words.trim().slice(0, 80);
-  const result = await customerApi<PosCustomers>("GET", `/v1/pos/owner/customers?limit=8${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+  const result = await posApi<PosCustomers>("GET", `/customers?limit=8${q ? `&q=${encodeURIComponent(q)}` : ""}`);
   return result.ok ? { ok: true, data: result.data.data } : { ok: false, message: result.message, code: result.code, param: result.param };
 }
 
@@ -217,17 +228,17 @@ export type StockKind = "restock" | "count" | "damage";
 export type StockAnswer = { object: "pos_stock"; listing_id: string; stock: number; held: number; available: number; movement: PosStockMovement };
 
 /** Restocks, counts or writes off a product's units. */
-export async function adjustStock(listingId: string, kind: StockKind, quantity: number, note = ""): Promise<PosResult<StockAnswer>> {
+export async function adjustStock(listingId: string, kind: StockKind, quantity: number, note = "", approval: Approval | null = null): Promise<PosResult<StockAnswer>> {
   if (!uuid.test(listingId)) return refused("No such product.", null, "resource_missing");
   if (!["restock", "count", "damage"].includes(kind)) return refused("Choose what happened.", "kind");
   if (!whole(quantity, kind === "count" ? 0 : 1) || quantity > 100_000) return refused(kind === "count" ? "Count what is on the shelf: 0 or more." : "Give how many, from 1.", "quantity");
-  return answer(await customerApi<StockAnswer>("POST", `/v1/pos/owner/stock/${listingId}`, { kind, quantity, ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}) }));
+  return answer(await posApi<StockAnswer>("POST", `/stock/${listingId}`, { kind, quantity, ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}), ...approvalOf(approval) }));
 }
 
 /** A product's latest stock movements, newest first. */
 export async function stockHistory(listingId: string): Promise<PosResult<PosStockMovement[]>> {
   if (!uuid.test(listingId)) return refused("No such product.", null, "resource_missing");
-  const result = await customerApi<{ data: PosStockMovement[] }>("GET", `/v1/pos/owner/stock/${listingId}/movements`);
+  const result = await posApi<{ data: PosStockMovement[] }>("GET", `/stock/${listingId}/movements`);
   return result.ok ? { ok: true, data: result.data.data } : { ok: false, message: result.status === 401 ? "Your session ended. Sign in again to carry on." : result.message, code: result.code, param: result.param };
 }
 
@@ -235,6 +246,7 @@ export async function stockHistory(listingId: string): Promise<PosResult<PosStoc
 export async function signOut() {
   await customerApi("POST", "/v1/store/account/signout");
   await dropSession();
+  await dropStaffSession();
   redirect("/");
 }
 
@@ -269,13 +281,13 @@ export async function simulateCollection(id: string, amount: number, payerName =
 /** Attaches an unmatched transfer to the sale it was for, which makes the sale. */
 export async function attachCollection(id: string, requestId: string): Promise<PosResult<PosCollection>> {
   if (!uuid.test(id) || !uuid.test(requestId)) return refused("Choose the sale it was for.", "transfer_request_id");
-  return answer(await customerApi<PosCollection>("POST", `/v1/pos/owner/collections/transfers/${id}/attach`, { transfer_request_id: requestId }));
+  return answer(await posApi<PosCollection>("POST", `/collections/transfers/${id}/attach`, { transfer_request_id: requestId }));
 }
 
 /** Keeps an unmatched transfer for no sale: it is paid to the bank with the day's collections all the same. */
 export async function keepCollection(id: string, note = ""): Promise<PosResult<PosCollection>> {
   if (!uuid.test(id)) return refused("No such transfer.", null, "resource_missing");
-  return answer(await customerApi<PosCollection>("POST", `/v1/pos/owner/collections/transfers/${id}/keep`, note.trim() ? { note: note.trim().slice(0, 300) } : {}));
+  return answer(await posApi<PosCollection>("POST", `/collections/transfers/${id}/keep`, note.trim() ? { note: note.trim().slice(0, 300) } : {}));
 }
 
 /** The till asks for the rest of the basket by transfer into its Udozo account: the transfer makes the sale. */
@@ -292,24 +304,25 @@ export async function askTransfer(sale: RingUp & { transfer_amount: number }): P
     transfer_amount: sale.transfer_amount,
     expected_total: sale.expected_total,
     ...(sale.customer_id && uuid.test(sale.customer_id) ? { customer_id: sale.customer_id } : {}),
+    ...approvalOf(sale.approval),
   };
-  const result = await customerApi<PosTransferRequest>("POST", "/v1/pos/owner/transfer-requests", body);
+  const result = await posApi<PosTransferRequest>("POST", "/transfer-requests", body);
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.status === 401 ? "Your session ended. Sign in again to carry on." : result.message, code: result.code, param: result.param };
 }
 
 /** Where a transfer request stands; once paid, with the sale it made. */
 export async function transferStatus(id: string): Promise<PosResult<PosTransferRequest & { sale: PosSale | null }>> {
   if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
-  const result = await customerApi<PosTransferRequest>("GET", `/v1/pos/owner/transfer-requests/${id}`);
+  const result = await posApi<PosTransferRequest>("GET", `/transfer-requests/${id}`);
   if (!result.ok) return { ok: false, message: result.message, code: result.code, param: result.param };
   if (result.data.status !== "paid" || !result.data.sale_id) return { ok: true, data: { ...result.data, sale: null } };
-  const sale = await customerApi<PosSale>("GET", `/v1/pos/owner/sales/${result.data.sale_id}`);
+  const sale = await posApi<PosSale>("GET", `/sales/${result.data.sale_id}`);
   revalidatePath("/app", "layout");
   return { ok: true, data: { ...result.data, sale: sale.ok ? sale.data : null } };
 }
 
 export async function cancelTransfer(id: string): Promise<PosResult<PosTransferRequest>> {
   if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
-  const result = await customerApi<PosTransferRequest>("POST", `/v1/pos/owner/transfer-requests/${id}/cancel`);
+  const result = await posApi<PosTransferRequest>("POST", `/transfer-requests/${id}/cancel`);
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.message, code: result.code, param: result.param };
 }

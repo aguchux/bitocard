@@ -1,13 +1,16 @@
+import { ownerOnly } from "@/lib/gates";
 import { ShopForm } from "@/components/shop-form";
 import { Tills } from "@/components/tills";
 import Link from "next/link";
-import { currentOwner, ownerCatalogue, shopKinds } from "@/lib/pos-data";
+import { DeviceList, LinkDevice } from "@/components/devices";
+import { currentOwner, ownerCatalogue, ownerDevices, shopKinds } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
 
 /** First-run setup and later changes: each shop's details for receipts, its VAT, and its tills. */
 export default async function SetupPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+  await ownerOnly();
   const welcome = (await searchParams).welcome === "1";
-  const [owner, catalogue, kinds] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1"), shopKinds()]);
+  const [owner, catalogue, kinds, devices] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1"), shopKinds(), ownerDevices()]);
   if (!owner.ok || !owner.data.account) return null;
   const products = catalogue.ok ? catalogue.data.summary.products : 0;
   const { account } = owner.data;
@@ -38,6 +41,34 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
           </section>
         </div>
       ))}
+      <section id="devices" aria-labelledby="devices-title" className="grid gap-4 rounded-[20px] bg-white p-6">
+        <div>
+          <h2 id="devices-title" className="font-display text-xl font-bold text-pos-ink">
+            Devices at your tills
+          </h2>
+          <p className="mt-1 text-pos-ink-2">Link the computer, tablet or phone at a counter to its till. Staff then sign in on it by tapping their name and entering their PIN.</p>
+        </div>
+        <ul className="grid gap-3">
+          {account.shops.flatMap(shop =>
+            shop.tills.map(till => (
+              <li key={till.id} className="grid gap-2 rounded-xl border border-pos-line p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <span className="font-semibold text-pos-ink">
+                  {account.shops.length > 1 ? `${shop.name}: ` : ""}
+                  {till.name}
+                </span>
+                <LinkDevice tillId={till.id} tillName={till.name} />
+              </li>
+            )),
+          )}
+        </ul>
+        {devices.ok ? (
+          <DeviceList devices={devices.data.data} />
+        ) : (
+          <p role="alert" className="text-pos-error">
+            {devices.message}
+          </p>
+        )}
+      </section>
       <section aria-labelledby="products" className="rounded-[20px] bg-white p-6">
         <h2 id="products" className="font-display text-xl font-bold text-pos-ink">
           Products at the till

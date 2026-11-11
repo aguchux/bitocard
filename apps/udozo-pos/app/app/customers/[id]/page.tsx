@@ -7,7 +7,8 @@ import {
   Repayment,
 } from "@/components/customer-forms";
 import { entryText, money, ratingText, saleTime } from "@/lib/pos";
-import { currentOwner, ownerCustomer } from "@/lib/pos-data";
+import { ownerCustomer } from "@/lib/pos-data";
+import { needs } from "@/lib/gates";
 
 export const metadata: Metadata = {
   title: "Customer",
@@ -23,7 +24,7 @@ export default async function CustomerPage({
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const [owner, result] = await Promise.all([
-    currentOwner(),
+    needs("customers"),
     ownerCustomer(id),
   ]);
   if (!result.ok) {
@@ -151,7 +152,7 @@ export default async function CustomerPage({
           Details
         </h2>
         <CustomerForm customer={customer} currency={currency} />
-        <RemoveCustomer customer={customer} />
+        {owner.ok && owner.data.actor === "owner" ? <RemoveCustomer customer={customer} /> : null}
       </section>
     </div>
   );

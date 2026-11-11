@@ -1,7 +1,10 @@
 import "server-only";
 import { cache } from "react";
+import { ownerPermissions, type PermissionSet, type PosApprover, type PosDeviceInfo, type PosDeviceRow, type PosRoles, type PosShop, type PosStaffList, type PosStaffMe } from "./pos";
 import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosPlans, PosSale, PosSales, PosSettlement, PosSettlements, PosShopKind } from "./pos";
-import { type ApiResult, customerApi } from "./session";
+import { actorKind } from "./pos-api";
+import { type ApiResult, currentCustomer, customerApi, deviceApi, staffApi } from "./session";
+import { posApi } from "./pos-api";
 import { apiUrl } from "./site";
 
 /** A public read, kept a minute; never throws (null when the API cannot answer). */
@@ -40,7 +43,7 @@ export async function shopKinds(): Promise<PosShopKind[]> {
 export const currentOwner = cache((): Promise<ApiResult<PosOwner>> => customerApi<PosOwner>("GET", "/v1/pos/owner"));
 
 /** The listings ticked Sell at POS, read live from udozo.com (`query` from `catalogueQuery`). */
-export const ownerCatalogue = (query = "") => customerApi<PosCatalogue>("GET", `/v1/pos/owner/catalogue${query}`);
+export const ownerCatalogue = (query = "") => posApi<PosCatalogue>("GET", `/catalogue${query}`);
 
 /** How many products the till reads a call, and the most calls (20,000 products). */
 export const tillPage = 1000;
@@ -68,18 +71,103 @@ export async function tillCatalogue(): Promise<ApiResult<PosCatalogue>> {
 export const ownerCharges = () => customerApi<{ object: "list"; data: PosCharge[] }>("GET", "/v1/pos/owner/charges");
 
 /** The owner's sales, newest first, with the filter's takings (`query` from `salesQuery`). */
-export const ownerSales = (query = "") => customerApi<PosSales>("GET", `/v1/pos/owner/sales${query}`);
+export const ownerSales = (query = "") => posApi<PosSales>("GET", `/sales${query}`);
 
 /** One sale with its lines and payments. */
-export const ownerSale = (id: string) => customerApi<PosSale>("GET", `/v1/pos/owner/sales/${id}`);
+export const ownerSale = (id: string) => posApi<PosSale>("GET", `/sales/${id}`);
 
 /** The shop's customers (`query` from `customersQuery`), and one with its sales and what it owes. */
-export const ownerCustomers = (query = "") => customerApi<PosCustomers>("GET", `/v1/pos/owner/customers${query}`);
-export const ownerCustomer = (id: string) => customerApi<PosCustomer>("GET", `/v1/pos/owner/customers/${id}`);
+export const ownerCustomers = (query = "") => posApi<PosCustomers>("GET", `/customers${query}`);
+export const ownerCustomer = (id: string) => posApi<PosCustomer>("GET", `/customers/${id}`);
 
 /** The owner's collection accounts: whether they may open one, where collections are paid, each till's account. */
 export const ownerCollections = cache(() => customerApi<PosCollectionsOverview>("GET", "/v1/pos/owner/collections"));
 /** Transfers into them, newest first (`status`: matched, unmatched or kept). */
-export const ownerCollectionTransfers = (status?: string) => customerApi<PosCollections>("GET", `/v1/pos/owner/collections/transfers?limit=50${status && /^[a-z]+$/.test(status) ? `&status=${status}` : ""}`);
+export const ownerCollectionTransfers = (status?: string) => posApi<PosCollections>("GET", `/collections/transfers?limit=50${status && /^[a-z]+$/.test(status) ? `&status=${status}` : ""}`);
 export const ownerSettlements = () => customerApi<PosSettlements>("GET", "/v1/pos/owner/collections/settlements?limit=30");
 export const ownerSettlement = (id: string) => customerApi<PosSettlement>("GET", `/v1/pos/owner/collections/settlements/${id}`);
+
+// ---- Who is at the till (milestone 5) ----
+
+/** The signed-in member of staff's role, permissions and the tills they may use. */
+export const staffMe = cache(() => staffApi<PosStaffMe>("GET", "/v1/pos/staff"));
+
+/**
+ * Whoever is signed in, as the till's pages need them: the owner (every permission) or a member of staff (their
+ * role's, at their tills), the shops they may sell in, and who may approve what they may not do alone.
+ */
+export type PosView = {
+  actor: "owner" | "staff";
+  name: string;
+  role: string;
+  permissions: PermissionSet;
+  /** The most discount without a manager, in basis points (null: any amount). */
+  discountLimit: number | null;
+  currency: string;
+  country: string;
+  walletPayments: boolean;
+  collections: boolean;
+  shops: PosShop[];
+  /** A linked till's own till (staff signed in on it). */
+  tillId: string | null;
+  /** Staff: the tills with an open Udozo collection account. */
+  transferTills: string[];
+  approvers: PosApprover[];
+  planName: string;
+};
+
+export const currentPos = cache(async (): Promise<ApiResult<PosView>> => {
+  if ((await actorKind()) === "staff") {
+    const me = await staffMe();
+    if (!me.ok) return me;
+    return {
+      ok: true,
+      data: {
+        actor: "staff",
+        name: me.data.staff.name,
+        role: me.data.role.name,
+        permissions: me.data.permissions,
+        discountLimit: me.data.role.discount_limit_bps,
+        currency: me.data.currency,
+        country: me.data.country,
+        walletPayments: me.data.wallet_payments,
+        collections: me.data.collections,
+        shops: me.data.account.shops,
+        tillId: me.data.till_id,
+        transferTills: me.data.transfer_accounts.map(item => item.till_id),
+        approvers: me.data.approvers,
+        planName: me.data.account.plan.name,
+      },
+    };
+  }
+  const [owner, customer] = await Promise.all([currentOwner(), currentCustomer()]);
+  if (!owner.ok) return owner;
+  return {
+    ok: true,
+    data: {
+      actor: "owner",
+      name: customer?.name ?? "Owner",
+      role: "Owner",
+      permissions: ownerPermissions,
+      discountLimit: null,
+      currency: owner.data.currency,
+      country: owner.data.country,
+      walletPayments: owner.data.wallet_payments === true,
+      collections: owner.data.collections === true,
+      shops: owner.data.account?.shops ?? [],
+      tillId: null,
+      transferTills: [],
+      approvers: [],
+      planName: owner.data.account?.plan.name ?? "Free",
+    },
+  };
+});
+
+/** The owner's staff, or (a manager) the cashiers they manage. */
+export const posStaff = async () => ((await actorKind()) === "staff" ? staffApi<PosStaffList>("GET", "/v1/pos/staff/staff") : customerApi<PosStaffList>("GET", "/v1/pos/owner/staff"));
+/** The fixed roles and the owner's own, with the matrix's words. */
+export const ownerRoles = () => customerApi<PosRoles>("GET", "/v1/pos/owner/roles");
+/** The tills' linked devices. */
+export const ownerDevices = () => customerApi<{ object: "list"; data: PosDeviceRow[] }>("GET", "/v1/pos/owner/devices");
+/** This browser as a linked till: its shop, till and the name tiles. */
+export const linkedDevice = () => deviceApi<PosDeviceInfo>("GET", "/v1/pos/device");

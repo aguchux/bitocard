@@ -299,6 +299,9 @@ export type PosSale = {
   /** The shop's customer it was sold to, if one was chosen. */
   customer?: { id: string; name: string; number: string } | null;
   sold_by: string;
+  /** The member of staff who sold it (null: the owner), and who refunded it. */
+  sold_by_staff_id?: string | null;
+  refunded_by?: string | null;
   note: string | null;
   refunded_at: string | null;
   refund_reason: string | null;
@@ -658,4 +661,129 @@ export function transferOutcome(request: Pick<PosTransferRequest, "status" | "fa
 /** A market's date, written out: Wed 25 Mar. */
 export function dayText(day: string) {
   return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+// ---- Staff, roles and tills (milestone 5) ----
+
+/** What a role may do: the API's matrix, mirrored only to hide controls (the API decides). */
+export const posPermissions = ["sell", "refund", "till", "stock_view", "stock_adjust", "prices", "own_sales", "all_sales", "cash_up", "export", "customers", "transfers", "staff", "settings"] as const;
+export type PosPermission = (typeof posPermissions)[number];
+export type PermissionLevel = "yes" | "approval" | "no" | "cashiers";
+export type PermissionSet = Record<PosPermission, PermissionLevel>;
+
+/** The owner may do everything; managing staff in full included. */
+export const ownerPermissions = Object.fromEntries(posPermissions.map(key => [key, "yes"])) as PermissionSet;
+
+/** Whether a set of permissions allows one at all (`approval` asks a manager; `cashiers` is staff for a manager). */
+export const allows = (permissions: PermissionSet, key: PosPermission) => permissions[key] !== "no";
+
+/** A colleague who may give a manager's PIN at this till. */
+export type PosApprover = { id: string; name: string; role: string; discount_limit_bps: number | null; refund: boolean; stock_adjust: boolean };
+
+export type PosStaffMe = {
+  object: "pos_staff_me";
+  staff: { id: string; name: string; first_name: string };
+  role: { id: string; key: string | null; name: string; discount_limit_bps: number | null };
+  permissions: PermissionSet;
+  till_id: string | null;
+  tills: "all" | string[];
+  device: string | null;
+  open: boolean;
+  wallet_payments: boolean;
+  collections: boolean;
+  country: string;
+  currency: string;
+  account: { id: string; mode: "live" | "test"; plan: { code: string; name: string }; shops: PosShop[] };
+  transfer_accounts: Array<{ till_id: string; bank_name: string; account_number: string; account_name: string }>;
+  approvers: PosApprover[];
+};
+
+export type PosRoleView = {
+  object: "pos_role";
+  id: string;
+  key: string | null;
+  name: string;
+  description: string | null;
+  system: boolean;
+  permissions: PermissionSet;
+  discount_limit_bps: number | null;
+  staff: number;
+};
+export type PosRoles = { object: "list"; permissions: Array<{ group: string; items: Array<{ key: PosPermission; label: string }> }>; data: PosRoleView[] };
+
+export type PosStaffStatus = "invited" | "active" | "suspended" | "removed";
+export type PosStaffMember = {
+  object: "pos_staff";
+  id: string;
+  first_name: string;
+  last_name: string;
+  name: string;
+  initials: string;
+  phone: string;
+  phone_hint: string;
+  email: string | null;
+  role: { id: string; key: string | null; name: string };
+  all_tills: boolean;
+  tills: Array<{ id: string; name: string; shop_id: string }>;
+  mobile: boolean;
+  status: PosStaffStatus;
+  pin_set: boolean;
+  locked_until: string | null;
+  last_active_at: string | null;
+  invited_by: string;
+  created_at: string;
+};
+export type PosStaffList = { object: "list"; limit: number | null; used: number; data: PosStaffMember[] };
+export type PosInviteSent = { url: string; expires_at: string; sent_via: "sms" | "whatsapp" | "link"; sent: boolean; message: string; whatsapp_url: string; shop_code: string | null };
+
+export type PosInviteInfo = {
+  object: "pos_invite";
+  first_name: string;
+  shop: { name: string | null; shop_code: string | null };
+  role: { name: string; allows: string[] };
+  tills: "all" | string[];
+  invited_by: string;
+  reset: boolean;
+  expires_at: string;
+};
+
+export type PosDeviceRow = { object: "pos_device"; id: string; name: string | null; platform: string | null; till: { id: string; name: string }; linked_at: string | null; last_seen_at: string | null; revoked_at: string | null; linked_by: string };
+export type PosLinkCode = { object: "pos_link_code"; device_id: string; code: string; expires_at: string; till: { id: string; name: string }; shop: string; link_url: string };
+export type PosDeviceInfo = {
+  object: "pos_device";
+  id: string;
+  name: string | null;
+  shop: { id: string; name: string; shop_code: string };
+  till: { id: string; name: string };
+  staff: Array<{ id: string; name: string; first_name: string; initials: string; role: string; locked: boolean }>;
+};
+
+/** How a member of staff's status reads. */
+export const staffStatusText: Record<PosStaffStatus, string> = { invited: "Invite pending", active: "Active", suspended: "Suspended", removed: "Removed" };
+
+/** Where a member of staff may work, in words. */
+export const accessText = (member: Pick<PosStaffMember, "all_tills" | "tills" | "mobile">) => {
+  const tills = member.all_tills ? "All tills" : member.tills.map(till => till.name).join(", ") || "No till";
+  return member.mobile ? `${tills}, mobile` : tills;
+};
+
+/** A permission level in the matrix's words. */
+export function levelText(level: PermissionLevel) {
+  if (level === "yes") return "Allowed";
+  if (level === "approval") return "With approval";
+  if (level === "cashiers") return "Cashiers only";
+  return "Not allowed";
+}
+
+/** A discount limit in words: none, up to a share, or any amount. */
+export const discountText = (bps: number | null) => (bps === null ? "Any amount" : bps === 0 ? "No discounts" : `Up to ${(bps / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}%`);
+
+/** Easy PINs the API refuses: all one digit, a run up or down, or a year from 1900 to 2099. */
+export function weakPin(pin: string) {
+  if (!/^\d{4}$/.test(pin)) return true;
+  if (new Set(pin).size === 1) return true;
+  const digits = [...pin].map(Number);
+  const up = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 1) % 10);
+  const down = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 9) % 10);
+  return up || down || /^(19|20)\d\d$/.test(pin);
 }

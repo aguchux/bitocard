@@ -2,12 +2,15 @@ import Link from "next/link";
 import { limitText, money, salesQuery, shopToday, statusText } from "@/lib/pos";
 import { currentOwner, ownerCatalogue, ownerSales } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
+import { actorKind } from "@/lib/pos-api";
+import { StaffHome } from "@/components/staff-home";
 
 /**
  * The owner's home: today's takings with the till a tap away, their shop, where the plan stands, and what to do next.
- * Staff come in a later milestone, and say so.
+ * Staff have their own home, with what their role lets them do.
  */
 export default async function OwnerHome() {
+  if ((await actorKind()) === "staff") return <StaffHome />;
   const today = shopToday();
   const [owner, catalogue, sales] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1"), ownerSales(salesQuery({ day: today }).api.replace(/limit=\d+/, "limit=1"))]);
   if (!owner.ok || !owner.data.account) return null;
@@ -22,7 +25,7 @@ export default async function OwnerHome() {
     products > 0
       ? { done: true, title: "Tick Sell at POS on your listings", body: `${products} ${products === 1 ? "product is" : "products are"} at the till, with their stock from udozo.com.`, href: "/app/products", action: "Products" }
       : { done: false, title: "Tick Sell at POS on your listings", body: "On udozo.com, tick Sell at your shop with Udozo POS on what you sell in the shop. It comes to the till with its stock.", href: udozoUrl("/account/listings"), action: "My listings on udozo.com" },
-    { done: false, title: "Invite your team", body: "Cashiers and managers sign in with a PIN. Coming soon.", href: null, action: null },
+    { done: false, title: "Invite your team", body: "Cashiers, managers, stock keepers and accountants sign in with your shop code and their own PIN, never your Udozo account.", href: "/app/staff", action: "Staff" },
   ];
   return (
     <div className="grid gap-6">

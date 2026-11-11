@@ -147,6 +147,30 @@ export type AdminPosAccountCollections = {
 };
 export type AdminPosMarketSetting = { country: string; name: string; currency: string; collection_fee_bps: number; collection_fee_min: number; collection_fee_cap: number | null };
 
+/** A POS account's staff, roles, tills' devices and managers' approvals, as Udozo's admins read them (never PINs). */
+export type AdminPosPermissionLevel = 'yes' | 'approval' | 'no' | 'cashiers';
+export type AdminPosStaffMember = {
+  id: string;
+  name: string;
+  initials: string;
+  phone_hint: string;
+  role: { id: string; key: string | null; name: string };
+  all_tills: boolean;
+  tills: Array<{ id: string; name: string; shop_id: string }>;
+  status: 'invited' | 'active' | 'suspended' | 'removed';
+  locked_until: string | null;
+  last_active_at: string | null;
+  invited_by: string;
+  created_at: string;
+};
+export type AdminPosAccountStaff = {
+  object: 'pos_account_staff';
+  staff: { object: 'list'; limit: number | null; used: number; data: AdminPosStaffMember[] };
+  roles: { object: 'list'; data: Array<{ id: string; key: string | null; name: string; system: boolean; permissions: Record<string, AdminPosPermissionLevel>; discount_limit_bps: number | null; staff: number }> };
+  devices: Array<{ id: string; name: string | null; platform: string | null; till: { id: string; name: string }; linked_at: string | null; last_seen_at: string | null; revoked_at: string | null; linked_by: string }>;
+  approvals: Array<{ id: string; action: string; subject_id: string | null; requested_by: string; approved_by: string; till_id: string | null; created_at: string }>;
+};
+
 export const posAppPlatforms = ['android', 'ios', 'windows'] as const;
 export type PosAppPlatform = (typeof posAppPlatforms)[number];
 export type PosApps = { object: 'pos_apps' } & Record<PosAppPlatform, string | null>;
@@ -176,6 +200,11 @@ export const adminUdozoPosApi = bitocardApi.injectEndpoints({
     posCollections: build.query<AdminPosCollections, { account?: string; status?: AdminPosCollection['status']; limit?: number; offset?: number } | void>({
       query: filter => ({ url: '/v1/admin/pos/collections', params: clean(filter ?? {}) }),
       providesTags: [{ type: 'PosAccounts', id: 'COLLECTIONS' }],
+    }),
+    /** An account's staff, roles, devices and approvals (support, operations and finance read). */
+    posAccountStaff: build.query<AdminPosAccountStaff, string>({
+      query: id => `/v1/admin/pos/accounts/${id}/staff`,
+      providesTags: (_result, _error, id) => [{ type: 'PosAccounts', id }],
     }),
     posAccountCollections: build.query<AdminPosAccountCollections, string>({
       query: id => `/v1/admin/pos/accounts/${id}/collections`,
@@ -228,6 +257,7 @@ export const {
   usePosCustomerQuery,
   usePosCollectionsQuery,
   usePosAccountCollectionsQuery,
+  usePosAccountStaffQuery,
   useHoldPosSettlementsMutation,
   useReleasePosSettlementsMutation,
   usePosMarketSettingsQuery,

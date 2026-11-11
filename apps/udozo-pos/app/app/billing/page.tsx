@@ -1,3 +1,4 @@
+import { ownerOnly } from "@/lib/gates";
 import { PlanChanger } from "@/components/plan-changer";
 import { money, statusText } from "@/lib/pos";
 import { currentOwner, ownerCharges } from "@/lib/pos-data";
@@ -8,6 +9,7 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "n
 
 /** The plan, where it stands, changing it, the Udozo wallet it is paid from, and every charge so far. */
 export default async function BillingPage() {
+  await ownerOnly();
   const [owner, charges] = await Promise.all([currentOwner(), ownerCharges()]);
   if (!owner.ok || !owner.data.account) return null;
   const { account, plans, wallet } = owner.data;

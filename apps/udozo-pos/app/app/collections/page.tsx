@@ -1,3 +1,4 @@
+import { ownerOnly } from "@/lib/gates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SettlementAccountForm, TillAccount, UnmatchedActions } from "@/components/collection-forms";
@@ -15,6 +16,7 @@ const card = "rounded-[20px] bg-white p-5 sm:p-6";
  * account the next working day, less Udozo's fee. Transfers that matched no sale wait here to attach or keep.
  */
 export default async function CollectionsPage() {
+  await ownerOnly();
   const [overview, unmatched, recent, settlements] = await Promise.all([ownerCollections(), ownerCollectionTransfers("unmatched"), ownerCollectionTransfers(), ownerSettlements()]);
   if (!overview.ok) {
     return (

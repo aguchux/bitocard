@@ -43,12 +43,46 @@ export async function clientHeaders(now = Date.now()): Promise<Record<string, st
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /**
+ * A shop's member of staff signed in at the till (milestone 5): their API session, in this site's own host-only,
+ * httpOnly cookie (12 hours, as the API ends an idle session), sent as `Udozo-Pos-Session`. Never a Udozo account.
+ */
+export const staffCookie = "udz_pos_staff";
+const staffHeader = "udozo-pos-session";
+/** A till's linked device: its token (a year), sent as `Udozo-Pos-Device` for the name tiles and PIN sign-in. */
+export const deviceCookie = "udz_pos_device";
+const deviceHeader = "udozo-pos-device";
+const twelveHours = 60 * 60 * 12;
+const oneYear = 60 * 60 * 24 * 365;
+
+/** Whose credentials a call carries: the owner's Udozo session, a member of staff's, the till's device, or none. */
+export type Auth = "customer" | "staff" | "device" | "none";
+
+/**
  * Calls a customer endpoint with this site's session and reads its JSON. Server only; never cached, never throws
  * (status 0 when the API cannot be reached). Every POST carries a fresh Idempotency-Key unless one is named.
  */
 export async function customerApi<T>(method: Method, path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<ApiResult<T>> {
-  if (typeof window !== "undefined") throw new Error("customerApi runs on the server only.");
-  const token = (await cookies()).get(sessionCookie)?.value;
+  return callApi<T>("customer", method, path, body, options);
+}
+
+/** As `customerApi`, with a member of staff's session. */
+export async function staffApi<T>(method: Method, path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<ApiResult<T>> {
+  return callApi<T>("staff", method, path, body, options);
+}
+
+/** As `customerApi`, with the till's device token (or none, for public calls such as signing in). */
+export async function deviceApi<T>(method: Method, path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<ApiResult<T>> {
+  return callApi<T>("device", method, path, body, options);
+}
+export async function publicApi<T>(method: Method, path: string, body?: unknown): Promise<ApiResult<T>> {
+  return callApi<T>("none", method, path, body);
+}
+
+async function callApi<T>(auth: Auth, method: Method, path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<ApiResult<T>> {
+  if (typeof window !== "undefined") throw new Error("The API is called from the server only.");
+  const jar = await cookies();
+  const credential =
+    auth === "customer" ? [sessionHeader, jar.get(sessionCookie)?.value] : auth === "staff" ? [staffHeader, jar.get(staffCookie)?.value] : auth === "device" ? [deviceHeader, jar.get(deviceCookie)?.value] : [null, undefined];
   let res: Response;
   try {
     res = await fetch(apiUrl(path), {
@@ -57,7 +91,7 @@ export async function customerApi<T>(method: Method, path: string, body?: unknow
       headers: {
         accept: "application/json",
         ...(body !== undefined ? { "content-type": "application/json" } : {}),
-        ...(token ? { [sessionHeader]: token } : {}),
+        ...(credential[0] && credential[1] ? { [credential[0]]: credential[1] } : {}),
         ...(await clientHeaders()),
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && /^[A-Za-z0-9_-]{8,128}$/.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
       },
@@ -85,4 +119,27 @@ export async function keepSession(session: { token: string }) {
 
 export async function dropSession() {
   (await cookies()).delete(sessionCookie);
+}
+
+/** Keeps a member of staff's session (server actions only). */
+export async function keepStaffSession(token: string) {
+  (await cookies()).set(staffCookie, token, { maxAge: twelveHours, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+}
+
+export async function dropStaffSession() {
+  (await cookies()).delete(staffCookie);
+}
+
+/** Keeps the till's device token once it is linked (server actions only). */
+export async function keepDevice(token: string) {
+  (await cookies()).set(deviceCookie, token, { maxAge: oneYear, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+}
+
+export async function dropDevice() {
+  (await cookies()).delete(deviceCookie);
+}
+
+/** Whether this browser is a linked till (it has a device token; the API decides whether it still counts). */
+export async function hasDevice() {
+  return Boolean((await cookies()).get(deviceCookie)?.value);
 }

@@ -2,16 +2,37 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ApprovalBox } from "@/components/approval-box";
 import { useConfirm } from "@/components/confirm-dialog";
-import { refundSale } from "@/lib/pos-actions";
+import type { PosApprover } from "@/lib/pos";
+import { type Approval, refundSale } from "@/lib/pos-actions";
 
 /** Refunding a whole sale: the shop pays it back as it was paid; its items go back into stock unless the box is cleared. */
-export function RefundSale({ id, number, total }: { id: string; number: string; total: string }) {
+export function RefundSale({ id, number, total, approvers = [] }: { id: string; number: string; total: string; approvers?: PosApprover[] }) {
   const router = useRouter();
   const [confirm, dialog] = useConfirm();
   const [restock, setRestock] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // A refund this member of staff may only make with a manager's PIN: asked here, then sent again.
+  const [approving, setApproving] = useState<{ reason: string; refundReason: string } | null>(null);
+
+  const send = (reason: string, approval: Approval | null = null) =>
+    start(async () => {
+      const result = await refundSale(id, reason, restock, approval);
+      if (!result.ok) {
+        if (result.code === "approval_required" || result.code === "approval_invalid") {
+          setApproving({ reason: result.message, refundReason: reason });
+          setMessage(null);
+          return;
+        }
+        setMessage(result.message);
+        return;
+      }
+      setApproving(null);
+      setMessage(null);
+      router.refresh();
+    });
 
   const refund = async () => {
     const answer = await confirm({
@@ -26,15 +47,7 @@ export function RefundSale({ id, number, total }: { id: string; number: string; 
       reason: { label: "Why is it refunded?", required: true, placeholder: "Returned unopened" },
     });
     if (!answer) return;
-    start(async () => {
-      const result = await refundSale(id, answer.reason, restock);
-      if (!result.ok) {
-        setMessage(result.message);
-        return;
-      }
-      setMessage(null);
-      router.refresh();
-    });
+    send(answer.reason);
   };
 
   return (
@@ -46,6 +59,7 @@ export function RefundSale({ id, number, total }: { id: string; number: string; 
         <input type="checkbox" checked={restock} onChange={event => setRestock(event.target.checked)} className="size-5" />
         Put its items back into stock
       </label>
+      {approving ? <ApprovalBox approvers={approvers} what="refund" reason={approving.reason} pending={pending} onApprove={approval => send(approving.refundReason, approval)} onCancel={() => setApproving(null)} /> : null}
       {message ? (
         <p role="alert" className="text-pos-error">
           {message}

@@ -1,3 +1,4 @@
+import { needs } from "@/lib/gates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,6 +10,8 @@ export const metadata: Metadata = { title: "Sale", robots: { index: false, follo
 
 /** One sale as it was rung up: its lines, totals and how it was paid, and refunding it. */
 export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
+  const pos = await needs("own_sales", "all_sales");
+  const view = pos.ok ? pos.data : null;
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const result = await ownerSale(id);
@@ -103,13 +106,14 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       {sale.status === "refunded" ? (
         <section className="rounded-[20px] bg-pos-warn-bg p-5 text-pos-warn">
           <p className="font-semibold">
-            Refunded {sale.refunded_at ? saleTime(sale.refunded_at) : ""}: {sale.refund_reason}
+            Refunded {sale.refunded_at ? saleTime(sale.refunded_at) : ""}
+            {sale.refunded_by ? ` by ${sale.refunded_by}` : ""}: {sale.refund_reason}
           </p>
           <p className="mt-1 text-sm">{sale.restocked ? "Its items went back into stock." : "Its items were not put back into stock."}</p>
         </section>
-      ) : (
-        <RefundSale id={sale.id} number={sale.number} total={at(sale.total)} />
-      )}
+      ) : view && view.permissions.refund !== "no" ? (
+        <RefundSale id={sale.id} number={sale.number} total={at(sale.total)} approvers={view.approvers} />
+      ) : null}
     </div>
   );
 }

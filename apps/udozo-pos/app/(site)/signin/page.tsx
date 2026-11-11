@@ -4,15 +4,18 @@ import { redirect } from "next/navigation";
 import { currentCustomer } from "@/lib/session";
 import { safeNext, signInPath, udozoUrl } from "@/lib/site";
 import { UdozoMark } from "@/components/site-chrome";
+import { StaffSignInForm } from "@/components/staff-auth";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: true }, alternates: { canonical: "/signin" } };
 
 /**
  * Two doors on one page. Shop owners Continue with Udozo (udozo.com's handoff: pos.udozo.com never asks for a Udozo
- * password). Staff sign in with the shop code, phone and PIN once staff accounts come (milestone 5).
+ * password). Staff sign in with the shop code, their phone and their PIN, never a Udozo account.
  */
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const next = safeNext((await searchParams).next);
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string; ended?: string }> }) {
+  const query = await searchParams;
+  const next = safeNext(query.next);
+  const ended = query.ended === "1";
   if (await currentCustomer()) redirect(next);
   return (
     <div className="mx-auto grid max-w-[1100px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 md:py-16">
@@ -49,12 +52,16 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
             No Udozo account? <a href={udozoUrl("/signup")}>Create one free on udozo.com</a>, then come back here. New to Udozo POS? <Link href="/signup">Start free</Link>.
           </p>
         </section>
-        <section aria-labelledby="staff" className="rounded-[20px] border border-dashed border-pos-line bg-pos-page p-6">
+        <section aria-labelledby="staff" className="rounded-[20px] border border-pos-line bg-white p-6">
           <h2 id="staff" className="font-display text-2xl font-bold text-pos-ink">
             Staff
           </h2>
-          <p className="mt-2 text-pos-ink-2">Staff will sign in here with the shop code, their phone number and a 4-digit PIN from their invite, without a Udozo account.</p>
-          <p className="mt-3 inline-block rounded-md bg-pos-warn-bg px-2 py-1 text-sm font-semibold text-pos-warn">Coming soon</p>
+          <p className="mt-2 text-pos-ink-2">Sign in with your shop’s code, your phone number and the 4-digit PIN you set from your invite. No Udozo account needed.</p>
+          {ended ? <p className="mt-3 rounded-xl bg-pos-warn-bg p-3 text-sm font-semibold text-pos-warn">You were signed out. Sign in again to carry on.</p> : null}
+          <StaffSignInForm />
+          <p className="mt-3 text-sm text-pos-muted">
+            Setting up a shop’s till? <Link href="/link">Link this device</Link> with the code from the shop owner.
+          </p>
         </section>
       </div>
     </div>

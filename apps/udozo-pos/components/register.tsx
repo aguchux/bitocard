@@ -29,9 +29,10 @@ import {
   tillTotals,
   vatText,
 } from "@/lib/pos";
-import { askTransfer, askWallet, ringUp } from "@/lib/pos-actions";
+import { type Approval, askTransfer, askWallet, ringUp } from "@/lib/pos-actions";
+import { ApprovalBox } from "@/components/approval-box";
 import { TillCustomer } from "@/components/till-customer";
-import type { PosCustomerBrief } from "@/lib/pos";
+import type { PosApprover, PosCustomerBrief } from "@/lib/pos";
 
 type Payment = {
   method: PosPaymentMethod | "credit";
@@ -86,6 +87,7 @@ export function Register({
   planName,
   walletPayments = false,
   transferAccount = false,
+  approvers = [],
 }: {
   tillId: string;
   vatBps: number;
@@ -96,6 +98,8 @@ export function Register({
   walletPayments?: boolean;
   /** This till has an open Udozo collection account, so buyers can pay by transfer to it. */
   transferAccount?: boolean;
+  /** Staff: who may give a manager's PIN here, for a discount past their own limit (none for the owner). */
+  approvers?: PosApprover[];
 }) {
   const router = useRouter();
   const search = useRef<HTMLInputElement>(null);
@@ -117,7 +121,10 @@ export function Register({
   const [done, setDone] = useState<PosSale | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [customer, setCustomer] = useState<PosCustomerBrief | null>(null);
+  // A discount past a member of staff's limit: a manager approves it with their PIN, then the same step runs again.
+  const [approving, setApproving] = useState<{ reason: string; retry: (approval: Approval) => void } | null>(null);
   const [pending, start] = useTransition();
+  const needsApproval = (code: string | null) => code === "approval_required" || code === "approval_invalid";
 
   const byId = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
@@ -235,10 +242,11 @@ export function Register({
     setTimeout(() => search.current?.focus(), 0);
   };
 
-  const complete = () =>
+  const complete = (approval?: Approval) =>
     start(async () => {
       setMessage(null);
       const result = await ringUp({
+        ...(approval ? { approval } : {}),
         till_id: tillId,
         client_sale_id: saleId,
         lines: lines.map((line) => ({
@@ -256,9 +264,14 @@ export function Register({
         ...(customer ? { customer_id: customer.id } : {}),
       });
       if (result.ok) {
+        setApproving(null);
         setDone(result.data);
         setStage("done");
         router.refresh();
+        return;
+      }
+      if (needsApproval(result.code)) {
+        setApproving({ reason: result.message, retry: (next) => complete(next) });
         return;
       }
       setMessage(result.message);
@@ -276,10 +289,11 @@ export function Register({
     });
 
   /** Asks the buyer to pay the rest from their Udozo wallet; the till then waits for them. */
-  const askForWallet = (phone: string) =>
+  const askForWallet = (phone: string, approval?: Approval) =>
     start(async () => {
       setMessage(null);
       const result = await askWallet({
+        ...(approval ? { approval } : {}),
         till_id: tillId,
         client_sale_id: saleId,
         lines: lines.map((line) => ({
@@ -299,6 +313,10 @@ export function Register({
         ...(customer ? { customer_id: customer.id } : {}),
       });
       if (!result.ok) {
+        if (needsApproval(result.code)) {
+          setApproving({ reason: result.message, retry: (next) => askForWallet(phone, next) });
+          return;
+        }
         setMessage(result.message);
         if (
           result.code === "stock_short" ||
@@ -312,15 +330,17 @@ export function Register({
         }
         return;
       }
+      setApproving(null);
       setWalletRequest(result.data);
       setStage("wallet");
     });
 
   /** Asks for the rest of the basket by transfer into this till's Udozo account; the till then waits for the bank. */
-  const askForTransfer = () =>
+  const askForTransfer = (approval?: Approval) =>
     start(async () => {
       setMessage(null);
       const result = await askTransfer({
+        ...(approval ? { approval } : {}),
         till_id: tillId,
         client_sale_id: saleId,
         lines: lines.map((line) => ({
@@ -339,6 +359,10 @@ export function Register({
         ...(customer ? { customer_id: customer.id } : {}),
       });
       if (!result.ok) {
+        if (needsApproval(result.code)) {
+          setApproving({ reason: result.message, retry: (next) => askForTransfer(next) });
+          return;
+        }
         setMessage(result.message);
         if (
           result.code === "stock_short" ||
@@ -352,6 +376,7 @@ export function Register({
         }
         return;
       }
+      setApproving(null);
       setTransferRequest(result.data);
       setStage("transfer");
     });
@@ -508,6 +533,17 @@ export function Register({
           >
             {message}
           </p>
+        ) : null}
+
+        {approving ? (
+          <ApprovalBox
+            approvers={approvers}
+            what="discount"
+            reason={approving.reason}
+            pending={pending}
+            onApprove={approving.retry}
+            onCancel={() => setApproving(null)}
+          />
         ) : null}
 
         {stage === "done" && done ? (
@@ -717,9 +753,9 @@ export function Register({
                 transferAccount={transferAccount}
                 credit={customer !== null}
                 onAskWallet={askForWallet}
-                onAskTransfer={askForTransfer}
+                onAskTransfer={() => askForTransfer()}
                 onBack={() => setStage("basket")}
-                onComplete={complete}
+                onComplete={() => complete()}
               />
             )}
           </>

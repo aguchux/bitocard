@@ -1,7 +1,8 @@
+import { needs } from "@/lib/gates";
 /* eslint-disable @next/next/no-img-element -- listing photos come from udozo.com's own image addresses. */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, money, type PosProduct, stockLine } from "@/lib/pos";
+import { blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, money, type PosApprover, type PosProduct, stockLine } from "@/lib/pos";
 import { StockAdjust } from "@/components/stock-adjust";
 import { ownerCatalogue } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
@@ -29,6 +30,8 @@ const chip = (on: boolean) => `flex h-10 items-center rounded-full px-4 text-sm 
  * what is low or out of stock, and why the rest cannot sell. Everything is changed on udozo.com, where the listing is.
  */
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const pos = await needs("stock_view", "sell");
+  const view = pos.ok ? pos.data : null;
   const query = catalogueQuery(await searchParams);
   const result = await ownerCatalogue(query.api);
   if (!result.ok) {
@@ -129,7 +132,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           {catalogue.data.length ? (
             <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {catalogue.data.map(product => (
-                <ProductCard key={product.id} product={product} planName={catalogue.plan.name} />
+                <ProductCard key={product.id} product={product} planName={catalogue.plan.name} stock={view && view.permissions.stock_adjust !== "no" ? view.approvers : null} />
               ))}
             </ul>
           ) : (
@@ -172,7 +175,8 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: "
   );
 }
 
-function ProductCard({ product, planName }: { product: PosProduct; planName: string }) {
+/** `stock`: who may approve a stock change (staff), or null where their role may not change stock at all. */
+function ProductCard({ product, planName, stock }: { product: PosProduct; planName: string; stock: PosApprover[] | null }) {
   const why = blockText(product, planName);
   const price = product.price.amount === null ? "No price" : `${money(product.price.amount, product.price.currency)}${product.price.kind === "negotiable" ? ", negotiable" : ""}`;
   return (
@@ -191,7 +195,7 @@ function ProductCard({ product, planName }: { product: PosProduct; planName: str
           {[product.sku, product.barcode ? `Barcode ${product.barcode}` : "No barcode", product.category?.name].filter(Boolean).join(" · ")}
         </span>
         {why ? <span className="text-sm text-pos-warn">{why}</span> : null}
-        <StockAdjust id={product.id} title={product.title ?? "Untitled draft"} stock={product.stock} />
+        {stock ? <StockAdjust id={product.id} title={product.title ?? "Untitled draft"} stock={product.stock} approvers={stock} /> : null}
         <a href={product.edit_url} target="_blank" rel="noopener" className="text-sm font-semibold">
           Edit on udozo.com
           <span className="sr-only"> ({product.title ?? "draft"})</span>

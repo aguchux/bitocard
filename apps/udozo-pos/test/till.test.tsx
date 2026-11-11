@@ -168,7 +168,7 @@ describe("the screens", () => {
   it("lists sales with what was taken, and opens one with its refund", async () => {
     reply = { object: "list", currency: "NGN", summary: { sales: 1, takings: 53_750_000, refunds: 1, refunded: 1_000_000 }, total: 2, has_more: false, data: [sale(), sale({ id: "r1", number: "POS-000006", status: "refunded", total: 1_000_000 })] } satisfies PosSales;
     const list = renderToStaticMarkup(await SalesPage({ searchParams: Promise.resolve({ status: "" }) }));
-    expect(sent[0]!.url).toBe("/v1/pos/owner/sales?limit=25&offset=0");
+    expect(sent.some(item => item.url === "/v1/pos/owner/sales?limit=25&offset=0")).toBe(true);
     expect(list).toContain("₦537,500");
     expect(list).toContain("POS-000007");
     expect(list).toContain("Refunded");
