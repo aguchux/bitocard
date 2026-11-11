@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MoveStock } from "@/components/move-stock";
+import { MoveStock, TransferRow } from "@/components/move-stock";
 import { needs } from "@/lib/gates";
-import { type PosStockTransfers, saleTime } from "@/lib/pos";
+import type { PosStockTransfers } from "@/lib/pos";
 import { posApi } from "@/lib/pos-api";
 import { tillCatalogue } from "@/lib/pos-data";
 
@@ -49,15 +49,7 @@ export default async function MoveStockPage() {
         {transfers.ok && transfers.data.data.length ? (
           <ul className="mt-2 grid gap-2">
             {transfers.data.data.map(transfer => (
-              <li key={transfer.id} className="border-t border-pos-line pt-2 text-sm">
-                <span className="font-semibold text-pos-ink">
-                  {transfer.number} · {transfer.from.name} to {transfer.to.name} · {transfer.units} {transfer.units === 1 ? "unit" : "units"}
-                </span>
-                <span className="block text-pos-muted">
-                  {transfer.lines.map(line => `${line.title} × ${line.quantity}`).join(", ")} · {transfer.by}, {saleTime(transfer.created_at)}
-                  {transfer.note ? ` · ${transfer.note}` : ""}
-                </span>
-              </li>
+              <TransferRow key={transfer.id} transfer={transfer} canAct />
             ))}
           </ul>
         ) : (

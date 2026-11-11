@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type BillingInterval, type PosAccount, type PosCollection, type PosCollectionAccount, type PosCollectionsOverview, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosStockTransfer, type PosTransferRequest, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
+import { type BillingInterval, type PosAccount, type PosCollection, type PosCollectionAccount, type PosCollectionsOverview, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosStockTransfer, type PosTransferRequest, type PosShopPrices, type PosFlaggedSale, type PosOfflineHeld, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
 import { type ApiResult, customerApi, dropSession, dropStaffSession } from "./session";
 import { posApi } from "./pos-api";
 
@@ -88,11 +88,55 @@ export async function chooseShop(id: string, choice: "main" | "fulfils_online"):
 }
 
 /** Moves stock between shops, or between a shop and online (null). */
-export async function moveStock(input: { from: string | null; to: string | null; lines: Array<{ listing_id: string; quantity: number }>; note?: string }): Promise<PosResult<PosStockTransfer>> {
+export async function moveStock(input: { from: string | null; to: string | null; lines: Array<{ listing_id: string; quantity: number }>; note?: string; inTransit?: boolean }): Promise<PosResult<PosStockTransfer>> {
   if ((input.from !== null && !uuid.test(input.from)) || (input.to !== null && !uuid.test(input.to))) return refused("Choose where it leaves and where it goes.", "to_shop_id");
   if (input.from === input.to) return refused("Choose two different places.", "to_shop_id");
   if (!input.lines.length || input.lines.some(line => !uuid.test(line.listing_id) || !Number.isSafeInteger(line.quantity) || line.quantity < 1)) return refused("Choose the products and how many of each.", "lines");
-  return answer(await posApi<PosStockTransfer>("POST", "/stock-transfers", { from_shop_id: input.from, to_shop_id: input.to, lines: input.lines, ...(input.note?.trim() ? { note: input.note.trim().slice(0, 300) } : {}) }));
+  return answer(await posApi<PosStockTransfer>("POST", "/stock-transfers", { from_shop_id: input.from, to_shop_id: input.to, lines: input.lines, ...(input.note?.trim() ? { note: input.note.trim().slice(0, 300) } : {}), ...(input.inTransit && input.from && input.to ? { in_transit: true } : {}) }));
+}
+
+/** The receiving shop checks a transfer in: what arrived of each line (a line left out arrived in full). */
+export async function receiveStock(id: string, lines: Array<{ listing_id: string; quantity: number }> = [], note = ""): Promise<PosResult<PosStockTransfer>> {
+  if (!uuid.test(id)) return refused("No such transfer.", null, "resource_missing");
+  if (lines.some(line => !uuid.test(line.listing_id) || !Number.isSafeInteger(line.quantity) || line.quantity < 0)) return refused("Say how many of each arrived.", "lines");
+  return answer(await posApi<PosStockTransfer>("POST", `/stock-transfers/${id}/receive`, { ...(lines.length ? { lines } : {}), ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}) }));
+}
+
+/** The sender takes stock still on its way back. */
+export async function takeBackStock(id: string): Promise<PosResult<PosStockTransfer>> {
+  if (!uuid.test(id)) return refused("No such transfer.", null, "resource_missing");
+  return answer(await posApi<PosStockTransfer>("POST", `/stock-transfers/${id}/cancel`));
+}
+
+/** Closes a shop, its stock moved to another shop or online (`null`). The owner's alone. */
+export async function closeShop(id: string, moveTo: string | null): Promise<PosResult<PosAccount>> {
+  if (!uuid.test(id) || (moveTo !== null && !uuid.test(moveTo))) return refused("Choose where its stock goes.", "move_to_shop_id");
+  return answer(await customerApi<PosAccount>("POST", `/v1/pos/owner/shops/${id}/close`, { move_to_shop_id: moveTo }));
+}
+
+/** A shop's own price for a product (minor units), or `null` to go back to the listing's. */
+export async function setShopPrice(listingId: string, shopId: string, price: number | null): Promise<PosResult<PosShopPrices>> {
+  if (!uuid.test(listingId) || !uuid.test(shopId)) return refused("Choose the shop.", "shop_id");
+  if (price !== null && (!Number.isSafeInteger(price) || price < 1)) return refused("Give a price above nothing.", "price");
+  return answer(await posApi<PosShopPrices>("PUT", `/products/${listingId}/prices`, { shop_id: shopId, price }));
+}
+
+export async function shopPrices(listingId: string): Promise<PosResult<PosShopPrices>> {
+  if (!uuid.test(listingId)) return refused("No such product.", null, "resource_missing");
+  const result = await posApi<PosShopPrices>("GET", `/products/${listingId}/prices`);
+  return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.message, code: result.code, param: result.param };
+}
+
+/** Marks an offline sale's flags looked at. */
+export async function resolveFlags(saleId: string): Promise<PosResult<PosFlaggedSale>> {
+  if (!uuid.test(saleId)) return refused("No such sale.", null, "resource_missing");
+  return answer(await posApi<PosFlaggedSale>("POST", `/sales/${saleId}/flags/resolve`));
+}
+
+/** Accepts or rejects a sale an unlinked device uploaded. The owner's alone. */
+export async function decideHeld(id: string, decision: "accept" | "reject"): Promise<PosResult<PosOfflineHeld>> {
+  if (!uuid.test(id)) return refused("No such sale.", null, "resource_missing");
+  return answer(await customerApi<PosOfflineHeld>("POST", `/v1/pos/owner/offline/held/${id}/${decision}`));
 }
 
 export async function updateShop(id: string, fields: ShopFields): Promise<PosResult<PosAccount>> {

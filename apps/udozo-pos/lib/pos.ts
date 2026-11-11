@@ -212,7 +212,8 @@ export type PosProduct = {
   ref: number;
   sku: string | null;
   title: string | null;
-  price: { kind: "fixed" | "negotiable" | "on_request"; amount: number | null; currency: string };
+  /** What the till charges: the shop's own price where it set one (`shop_price`), else the listing's (`udozo_amount`). */
+  price: { kind: "fixed" | "negotiable" | "on_request"; amount: number | null; currency: string; udozo_amount?: number | null; shop_price?: boolean };
   barcode: string | null;
   category: { id: string; name: string; parent: { id: string; name: string } | null } | null;
   photo_url: string | null;
@@ -364,7 +365,7 @@ export type PosSales = {
   data: PosSale[];
 };
 
-export type PosStockMovement = { object: "pos_stock_movement"; id: string; reason: "sale" | "refund" | "restock" | "count" | "damage"; delta: number; stock_after: number; sale: { id: string; number: string | null } | null; note: string | null; by: string | null; created_at: string };
+export type PosStockMovement = { object: "pos_stock_movement"; id: string; reason: "sale" | "refund" | "restock" | "count" | "damage" | "transfer_in" | "transfer_out" | "transfer_lost"; delta: number; stock_after: number; sale: { id: string; number: string | null } | null; note: string | null; by: string | null; created_at: string };
 
 /** A line in the till's basket. */
 export type CartLine = { id: string; unit: number; quantity: number; discount?: number };
@@ -450,7 +451,7 @@ export function salesQuery(params: { q?: string; status?: string; day?: string; 
   return { status, page, q, day, api: `?${search.toString()}` };
 }
 
-const movementWords: Record<PosStockMovement["reason"], string> = { sale: "Sold", refund: "Refunded", restock: "Restocked", count: "Counted", damage: "Damaged or lost" };
+const movementWords: Record<PosStockMovement["reason"], string> = { sale: "Sold", refund: "Refunded", restock: "Restocked", count: "Counted", damage: "Damaged or lost", transfer_in: "Moved in", transfer_out: "Moved out", transfer_lost: "Lost on the way" };
 export const movementText = (movement: Pick<PosStockMovement, "reason" | "delta">) => `${movementWords[movement.reason]} ${movement.delta > 0 ? "+" : ""}${movement.delta.toLocaleString("en-GB")}`;
 
 // ---- The Udozo wallet at the till ----
@@ -792,7 +793,7 @@ export type PosInviteInfo = {
   expires_at: string;
 };
 
-export type PosDeviceRow = { object: "pos_device"; id: string; name: string | null; platform: string | null; till: { id: string; name: string }; linked_at: string | null; last_seen_at: string | null; revoked_at: string | null; linked_by: string };
+export type PosDeviceRow = { object: "pos_device"; id: string; name: string | null; platform: string | null; till: { id: string; name: string }; linked_at: string | null; last_seen_at: string | null; last_synced_at?: string | null; last_upload_at?: string | null; revoked_at: string | null; linked_by: string };
 export type PosLinkCode = { object: "pos_link_code"; device_id: string; code: string; expires_at: string; till: { id: string; name: string }; shop: string; link_url: string };
 export type PosDeviceInfo = {
   object: "pos_device";
@@ -1031,6 +1032,93 @@ export type PosStockTransfer = {
   units: number;
   note: string | null;
   by: string;
+  /** `in_transit`: on its way, the shop it goes to checks it in; `received`; `cancelled` (taken back). */
+  status?: "in_transit" | "received" | "cancelled";
+  received_at?: string | null;
+  received_by?: string | null;
+  /** What arrived of each line, and what was lost on the way. */
+  received_lines?: Array<{ listing_id: string; sent: number; received: number; lost: number }> | null;
   created_at: string;
 };
 export type PosStockTransfers = { object: "list"; total: number; has_more: boolean; data: PosStockTransfer[] };
+
+/** A transfer's place in words: on its way, received (with what was lost) or taken back. */
+export function transferStatusText(transfer: Pick<PosStockTransfer, "status" | "received_lines" | "received_by">) {
+  if (transfer.status === "in_transit") return "On its way";
+  if (transfer.status === "cancelled") return `Taken back${transfer.received_by ? ` by ${transfer.received_by}` : ""}`;
+  const lost = (transfer.received_lines ?? []).reduce((sum, line) => sum + line.lost, 0);
+  return lost ? `Received, ${lost} lost on the way` : "Received";
+}
+
+// ---- Prices per shop and selling offline (milestone 9) ----
+
+/** A product's price in each shop: its own, or the listing's. */
+export type PosShopPrices = {
+  object: "pos_shop_prices";
+  listing_id: string;
+  title: string | null;
+  currency: string;
+  udozo_price: number | null;
+  shops: Array<{ shop_id: string; name: string; own: boolean; price: number | null; by: string | null; updated_at: string | null }>;
+};
+
+/** What to look at in a sale made offline. */
+export type PosOfflineFlag =
+  | { code: "oversold" | "held"; listing_id: string; title: string; short: number }
+  | { code: "unticked"; listing_id: string; title: string }
+  | { code: "price_changed"; listing_id: string; title: string; sold_at: number; price: number | null }
+  | { code: "staff_suspended"; staff: string }
+  | { code: "device_unlinked" }
+  | { code: "beyond_offline_limit"; hours: number };
+
+export type PosFlaggedSale = {
+  object: "pos_flagged_sale";
+  id: string;
+  number: string;
+  client_number: string | null;
+  till: string;
+  sold_by: string;
+  total: number;
+  currency: string;
+  flags: PosOfflineFlag[];
+  sold_at: string;
+  uploaded_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+};
+
+export type PosOfflineHeld = {
+  object: "pos_offline_held";
+  id: string;
+  device: { id: string; name: string | null; till: string | null };
+  client_number: string | null;
+  sold_at: string;
+  items: number;
+  total: number;
+  payments: Array<{ method: string; amount: number }>;
+  status: "held" | "accepted" | "rejected";
+  decided_by: string | null;
+  decided_at: string | null;
+  sale_id: string | null;
+  uploaded_at: string;
+};
+
+/** A flag in words, with what to do about it. */
+export function flagText(flag: PosOfflineFlag, currency: string) {
+  switch (flag.code) {
+    case "oversold":
+      return `${flag.short} more “${flag.title}” sold than there was: restock or count the shelf.`;
+    case "held":
+      return `${flag.short} of “${flag.title}” were held for online orders, so none were taken: decide which order goes without.`;
+    case "unticked":
+      return `“${flag.title}” was no longer at the till: no stock was taken.`;
+    case "price_changed":
+      return `“${flag.title}” sold at ${money(flag.sold_at, currency)}; it is now ${flag.price === null ? "without a price" : money(flag.price, currency)}.`;
+    case "staff_suspended":
+      return `Sold by ${flag.staff}, suspended or removed while the till was offline.`;
+    case "device_unlinked":
+      return "Uploaded by a device you unlinked: you accepted it.";
+    case "beyond_offline_limit":
+      return `Sold ${flag.hours} hours after the till last synced, past the offline limit.`;
+  }
+}

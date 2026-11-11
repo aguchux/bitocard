@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { OfflineSync } from "@/components/offline-sync";
 import { OwnerNav, staffLinks } from "@/components/owner-nav";
 import { PosMark } from "@/components/site-chrome";
 import { signOut } from "@/lib/pos-actions";
@@ -27,7 +28,8 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   const pos = await currentPos();
   // A staff session that ended (12 hours idle, signed out elsewhere, suspended or the device unlinked): sign in again.
   if (staff && !pos.ok && (pos.status === 401 || pos.status === 403)) redirect("/signin/staff/end");
-  const onDevice = staff && (await hasDevice());
+  const linked = await hasDevice();
+  const onDevice = staff && linked;
   return (
     <>
       <header className="bg-pos-night text-white">
@@ -50,6 +52,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
           </div>
         </div>
       </header>
+      {linked ? <OfflineSync /> : null}
       <main className="flex-1 bg-pos-page">
         <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6">
           {pos.ok ? (

@@ -53,7 +53,7 @@ const choose = (field: HTMLSelectElement, value: string) =>
   });
 const submit = (form: HTMLFormElement) => act(async () => void form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 const button = (host: ParentNode, text: string) => [...host.querySelectorAll("button")].find(item => item.textContent?.trim().startsWith(text))!;
-const confirmDialog = (text: string) => act(async () => [...document.querySelector("dialog")!.querySelectorAll("button")].find(item => item.textContent === text)!.click());
+const confirmDialog = (text: string) => act(async () => [...[...document.querySelectorAll("dialog")].find(item => item.open)!.querySelectorAll("button")].find(item => item.textContent === text)!.click());
 
 const ikeja = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const lekki = "2a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
@@ -79,7 +79,8 @@ describe("the shops panel", () => {
     const host = mount(createElement(ShopsPanel, { shops: [shop(ikeja, "Ikeja shop", { main: true, fulfils_online: true }), shop(lekki, "Lekki shop", { paused: true })], limit: 1, planName: "Premium" }));
     expect(host.textContent).toContain("Fulfils online orders");
     expect(host.textContent).toContain("Paused on Premium");
-    expect(host.querySelector("form")).toBeNull();
+    // No form to open another shop (each shop's Close shop dialog has its own).
+    expect([...host.querySelectorAll("form")].filter(form => !form.closest("dialog"))).toEqual([]);
     expect(host.textContent).toContain("Premium has one shop.");
     await act(async () => button(host, "Make main").click());
     await confirmDialog("Make it main");

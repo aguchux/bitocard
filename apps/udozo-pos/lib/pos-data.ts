@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { ownerPermissions, type PermissionSet, type PosApprover, type PosDeviceInfo, type PosDeviceRow, type PosRoles, type PosShop, type PosStaffList, type PosStaffMe } from "./pos";
-import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosCurrentShift, PosDay, PosOverview, PosPlans, PosReceipts, PosSale, PosSales, PosShift, PosShifts, PosSettlement, PosSettlements, PosShopKind } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosFlaggedSale, PosOfflineHeld, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosCurrentShift, PosDay, PosOverview, PosPlans, PosReceipts, PosSale, PosSales, PosShift, PosShifts, PosSettlement, PosSettlements, PosShopKind } from "./pos";
 import { actorKind } from "./pos-api";
 import { type ApiResult, currentCustomer, customerApi, deviceApi, staffApi } from "./session";
 import { posApi } from "./pos-api";
@@ -175,6 +175,10 @@ export const ownerRoles = () => customerApi<PosRoles>("GET", "/v1/pos/owner/role
 export const ownerDevices = () => customerApi<{ object: "list"; data: PosDeviceRow[] }>("GET", "/v1/pos/owner/devices");
 /** This browser as a linked till: its shop, till and the name tiles. */
 export const linkedDevice = () => deviceApi<PosDeviceInfo>("GET", "/v1/pos/device");
+
+/** Offline sales with something to look at (milestone 9), and an unlinked device's sales waiting for the owner. */
+export const offlineFlagged = (resolved = false) => posApi<{ object: "list"; total: number; has_more: boolean; data: PosFlaggedSale[] }>("GET", `/offline/flagged?limit=50${resolved ? "&resolved=true" : ""}`);
+export const offlineHeld = () => customerApi<{ object: "list"; currency: string; data: PosOfflineHeld[] }>("GET", "/v1/pos/owner/offline/held");
 
 // ---- Shifts, the overview and reports (milestone 7), as the owner or the member of staff at the till ----
 

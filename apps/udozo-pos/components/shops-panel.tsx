@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { PosShop } from "@/lib/pos";
-import { addShop, chooseShop } from "@/lib/pos-actions";
+import { addShop, chooseShop, closeShop } from "@/lib/pos-actions";
 
 const quiet = "inline-flex h-10 items-center justify-center rounded-xl border border-pos-line bg-white px-3 text-sm font-semibold text-pos-ink hover:bg-pos-50 disabled:opacity-50";
 const badge = "rounded-full px-2.5 py-0.5 text-xs font-semibold";
@@ -69,6 +69,7 @@ export function ShopsPanel({ shops, limit, planName }: { shops: PosShop[]; limit
                     Fulfil online orders<span className="sr-only"> from {shop.name}</span>
                   </button>
                 ) : null}
+                <CloseShop shop={shop} others={shops.filter(item => item.id !== shop.id)} />
               </span>
             ) : null}
           </li>
@@ -114,5 +115,70 @@ export function ShopsPanel({ shops, limit, planName }: { shops: PosShop[]; limit
       ) : null}
       {dialog}
     </div>
+  );
+}
+
+/**
+ * Closing a shop (milestone 9): where its stock goes (another shop, or online), then it sells nothing more, its tills'
+ * devices unlinked. Its sales, shifts and reports stay.
+ */
+function CloseShop({ shop, others }: { shop: PosShop; others: PosShop[] }) {
+  const router = useRouter();
+  const ids = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [target, setTarget] = useState(others[0]?.id ?? "online");
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <>
+      <button type="button" className={quiet} onClick={() => (setMessage(null), dialog.current?.showModal())}>
+        Close shop<span className="sr-only">: {shop.name}</span>
+      </button>
+      <dialog ref={dialog} aria-labelledby={`${ids}-title`} className="sheet m-0 mt-auto w-full max-w-none rounded-t-3xl bg-white p-0 shadow-xl sm:m-auto sm:max-w-md sm:rounded-3xl">
+        <form
+          className="grid gap-4 p-5 sm:p-6"
+          onSubmit={event => {
+            event.preventDefault();
+            start(async () => {
+              const result = await closeShop(shop.id, target === "online" ? null : target);
+              if (!result.ok) return setMessage(result.message);
+              dialog.current?.close();
+              router.refresh();
+            });
+          }}
+        >
+          <h2 id={`${ids}-title`} className="font-display text-xl font-bold text-pos-ink">
+            Close {shop.name}?
+          </h2>
+          <p className="text-pos-ink-2">It sells nothing more: its tills&apos; devices are unlinked and everyone signed in there is signed out. Its sales, shifts and reports stay.</p>
+          <div>
+            <label htmlFor={`${ids}-target`} className="block text-sm font-semibold text-pos-ink-2">
+              Its stock goes to
+            </label>
+            <select id={`${ids}-target`} value={target} onChange={event => setTarget(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-pos-line bg-white px-3">
+              {others.map(item => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+              <option value="online">Online (in no shop)</option>
+            </select>
+          </div>
+          {message ? (
+            <p role="alert" className="font-semibold text-pos-error">
+              {message}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" autoFocus onClick={() => dialog.current?.close()} className="h-12 rounded-xl border border-pos-line px-5 font-semibold">
+              Cancel
+            </button>
+            <button type="submit" disabled={pending} className="h-12 rounded-xl bg-pos-error px-5 font-bold text-white disabled:opacity-60">
+              Close the shop
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }

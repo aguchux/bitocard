@@ -2,8 +2,9 @@ import { needs } from "@/lib/gates";
 /* eslint-disable @next/next/no-img-element -- listing photos come from udozo.com's own image addresses. */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, levelsText, money, type PosApprover, type PosProduct, stockLine } from "@/lib/pos";
+import { allows, blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, levelsText, money, type PosApprover, type PosProduct, stockLine } from "@/lib/pos";
 import { StockAdjust } from "@/components/stock-adjust";
+import { ShopPrices } from "@/components/shop-prices";
 import { ownerCatalogue } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
 
@@ -139,7 +140,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           {catalogue.data.length ? (
             <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {catalogue.data.map(product => (
-                <ProductCard key={product.id} product={product} planName={catalogue.plan.name} stock={view && view.permissions.stock_adjust !== "no" ? view.approvers : null} shops={catalogue.shops ?? []} />
+                <ProductCard key={product.id} product={product} planName={catalogue.plan.name} stock={view && view.permissions.stock_adjust !== "no" ? view.approvers : null} shops={catalogue.shops ?? []} prices={Boolean(view && (view.actor === "owner" || allows(view.permissions, "prices")))} />
               ))}
             </ul>
           ) : (
@@ -183,16 +184,19 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: "
 }
 
 /** `stock`: who may approve a stock change (staff), or null where their role may not change stock at all. */
-function ProductCard({ product, planName, stock, shops }: { product: PosProduct; planName: string; stock: PosApprover[] | null; shops: Array<{ id: string; name: string }> }) {
+/** `prices`: may set each shop's own price for it. */
+function ProductCard({ product, planName, stock, shops, prices }: { product: PosProduct; planName: string; stock: PosApprover[] | null; shops: Array<{ id: string; name: string }>; prices: boolean }) {
   const where = levelsText(product, shops);
   const why = blockText(product, planName);
   const price = product.price.amount === null ? "No price" : `${money(product.price.amount, product.price.currency)}${product.price.kind === "negotiable" ? ", negotiable" : ""}`;
+  const udozo = product.price.shop_price && product.price.udozo_amount != null ? `This shop's price; ${money(product.price.udozo_amount, product.price.currency)} on udozo.com` : null;
   return (
     <li className="flex min-w-0 gap-3 rounded-[18px] bg-white p-3">
       <span className="size-20 shrink-0 overflow-hidden rounded-xl bg-pos-page">{product.photo_url ? <img src={product.photo_url} alt="" width={80} height={80} loading="lazy" className="size-20 object-cover" /> : null}</span>
       <span className="grid min-w-0 flex-1 content-start gap-1">
         <span className="truncate font-semibold text-pos-ink">{product.title ?? "Untitled draft"}</span>
         <span className="font-display text-lg font-bold text-pos-ink">{price}</span>
+        {udozo ? <span className="text-sm text-pos-ink-2">{udozo}</span> : null}
         <span className="text-sm text-pos-ink-2">{stockLine(product)}</span>
         {where ? <span className="text-sm text-pos-ink-2">{where}</span> : null}
         <span className="flex flex-wrap gap-1.5 text-xs font-semibold">
@@ -204,6 +208,7 @@ function ProductCard({ product, planName, stock, shops }: { product: PosProduct;
           {[product.sku, product.barcode ? `Barcode ${product.barcode}` : "No barcode", product.category?.name].filter(Boolean).join(" · ")}
         </span>
         {why ? <span className="text-sm text-pos-warn">{why}</span> : null}
+        {prices && product.price.kind === "fixed" ? <ShopPrices id={product.id} title={product.title ?? "Untitled draft"} /> : null}
         {stock ? <StockAdjust id={product.id} title={product.title ?? "Untitled draft"} stock={product.stock} approvers={stock} shops={shops} levels={product.levels} /> : null}
         <a href={product.edit_url} target="_blank" rel="noopener" className="text-sm font-semibold">
           Edit on udozo.com

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { PinPad } from "@/components/pin-pad";
 import { type PosDeviceInfo, type PosInviteInfo, weakPin } from "@/lib/pos";
 import { acceptInvite, deviceGone, deviceSignIn, linkDevice, lookupInvite, staffSignIn } from "@/lib/staff-actions";
+import { rememberPin } from "@/lib/offline-store";
 
 const field = "mt-1 h-12 w-full rounded-xl border border-pos-line bg-white px-4 text-base";
 const primary = "inline-flex h-12 w-full items-center justify-center rounded-xl bg-pos-600 px-5 font-bold text-white hover:bg-pos-700 disabled:cursor-not-allowed disabled:opacity-50";
@@ -78,6 +79,8 @@ export function TillTiles({ device }: { device: PosDeviceInfo }) {
         setPin("");
         return;
       }
+      // The till keeps a check of this PIN (never the PIN), so they can sign in here offline.
+      void rememberPin(chosen.id, next).catch(() => undefined);
       router.push("/app/till");
       router.refresh();
     });
