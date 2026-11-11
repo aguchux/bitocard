@@ -124,7 +124,7 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
   - `/download`: Android, iOS and Windows, plus Use it in your browser;
   - `/signup` and `/signin`;
   - legal pages: POS terms and privacy link to udozo.com's `/legal/pos` and `/legal/privacy`.
-- **App buttons** (Google Play, App Store, Microsoft Store or the Windows installer):
+- **App buttons** (Google Play, App Store and Microsoft Store):
   - each points at its store once that app is live, with the links set in admin (`pos_app_links`);
   - until then the button says **Coming soon** and is not a link, so the site never claims an app that does not exist;
   - Use in browser always works, and offers to install the web app (`@bitocard/ui/install`).
@@ -359,6 +359,11 @@ One local database per linked till (`udozo-pos-<shop>-<till>`), the same layout 
 9. **Offline and apps (S5, S19):**
    - selling with no internet, as above: the device's copy, offline PIN sign-in, the outbox and in-order upload, oversold and flagged sales, the 72-hour or 500-sale limit, in the web app first (IndexedDB, service worker);
    - then Expo (camera, Bluetooth ESC/POS) and Tauri (USB printers, cash drawer);
+   - **Windows (decided 11 November 2026): Tauri 2, published only through the Microsoft Store, at no cost.**
+     - The app carries the till's screens inside it (a client-only build), so it starts with no internet; it runs on WebView2, built into Windows 10 and 11 (Windows 10 is the minimum).
+     - Its Rust side keeps the encrypted SQLite store, prints raw ESC/POS through the Windows print spooler (USB thermal printers installed as Windows printers, COM ports, network printers on port 9100) with no print dialog, opens the cash drawer with the printer's kick command, and runs one copy at a time, full screen and starting with Windows. USB barcode scanners type like a keyboard and need nothing.
+     - **Distribution is the Microsoft Store only, as an MSIX package.** Registering Udozo's company developer account is free (since May 2026; individuals since September 2025), and the Store signs the package, so no code-signing certificate is bought and there is no SmartScreen warning. There is no direct installer download from pos.udozo.com: an unsigned one would be warned off by Windows.
+     - The app is free in the Store with no in-app purchase through Microsoft. The POS plan is paid from the Udozo wallet on pos.udozo.com, which the Store allows for non-game apps, so Microsoft takes no commission. Updates come through the Store and are applied between sales.
    - setting each app's store link in admin turns its Coming soon button on pos.udozo.com into a download.
 
 ## Legal owed before `pos` goes on anywhere
@@ -388,4 +393,4 @@ One local database per linked till (`udozo-pos-<shop>-<till>`), the same layout 
 
 1. **The design canvas** (S1–S19). The doc link reaches only the written brief, so I need the canvas link or an export to match the screens.
 2. **Premium's and Multi-shop's monthly price per market, the trial length, any yearly discount, and Free's limits** (products, tills, staff) if not my defaults. Needed for milestone 1 now; admins can change them later.
-3. **Store accounts:** Apple, Google Play and a Windows code-signing certificate under Udozo's name (needed by milestone 9 only).
+3. **Store accounts:** Apple, Google Play and a free Microsoft Store company developer account under Udozo's name (verified with its business documents; no code-signing certificate needed), all by milestone 9 only.
