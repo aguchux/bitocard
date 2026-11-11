@@ -52,6 +52,7 @@ import { PostingsModule } from './postings/postings.module.js';
 import { ResaleModule } from './resale/resale.module.js';
 import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
 import { SellerScoresModule } from './classifieds/scores/scores.module.js';
+import { PosModule } from './pos/pos.module.js';
 import { DisputesModule } from './disputes/disputes.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { AfrippaModule } from './afrippa/afrippa.module.js';
@@ -134,6 +135,7 @@ export class AppModule {
         ResaleModule,
         ShopAssistantModule,
         SellerScoresModule,
+        PosModule,
         CryptoModule,
         AfrippaModule,
         SpinsModule,

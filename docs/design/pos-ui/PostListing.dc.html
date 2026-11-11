@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo — Post an item with POS</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input,select,textarea{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 1000px; background: #F4F6F4; display: flex; flex-direction: column">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCE2DE; padding: 0 28px; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+<div style="display: flex; align-items: center; gap: 10px; margin-right: auto">
+<div style="width: 32px; height: 32px; border-radius: 9px; background: #19A47A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700">U</div>
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">Udozo</span>
+<span style="font-size: 14px; color: #56635C">/ Seller centre / Post an item</span>
+</div>
+<a href="Main.dc.html" style="font-size: 14px; font-weight: 600">Open POS</a>
+</header>
+
+<div style="width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<form style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 28px">Post an item</h1>
+
+<section style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-size: 16px">Item details</h2>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+<div style="aspect-ratio: 1; border-radius: 12px; background: #E3EEFB; color: #1D4F91; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600">Photo 1</div>
+<div style="aspect-ratio: 1; border-radius: 12px; background: #E3EEFB; color: #1D4F91; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600">Photo 2</div>
+<button type="button" style="aspect-ratio: 1; border-radius: 12px; border: 1px dashed #B7C2BC; background: #F8FAF9; color: #33413A; font-size: 13px; font-weight: 600">+ Add photo</button>
+<div style="aspect-ratio: 1; border-radius: 12px; border: 1px dashed #DCE2DE"></div>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Title
+<input type="text" value="Wireless Earbuds Pro" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<label style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Price (₦)
+<input type="text" value="18,500" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<label style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Category
+<sc-raw-select style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; background: #FFFFFF; color: #14201B"><option>Phones &amp; Accessories › Audio</option></sc-raw-select></label>
+<label style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Condition
+<sc-raw-select style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; background: #FFFFFF; color: #14201B"><option>Brand new</option></sc-raw-select></label>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Description
+<textarea rows="3" style="border-radius: 10px; border: 1px solid #DCE2DE; padding: 10px 12px; font-size: 14px; resize: vertical; color: #14201B">Bluetooth 5.3 earbuds with charging case. 1-month shop warranty.</textarea></label>
+</section>
+
+<section style="{{posCardStyle}}">
+<div style="display: flex; align-items: flex-start; gap: 14px">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: #E6F3EE; display: flex; align-items: center; justify-content: center; flex: none"><svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M7 20h10M12 16v4"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0">
+<h2 style="margin: 0; font-size: 16px">Sell in my shop too (POS)</h2>
+<p style="margin: 0; font-size: 13px; color: #56635C; line-height: 1.5">Puts this item on your POS register. Shop sales and Udozo orders share one stock count, so you never sell what you don't have.</p>
+</div>
+<button type="button" role="switch" aria-checked="{{pos}}" aria-label="Enable POS for this item" sc-camel-on-click="{{toggle}}" style="{{switchStyle}}"><span style="{{knobStyle}}"></span></button>
+</div>
+
+<sc-if value="{{pos}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #EDF0EE; padding-top: 16px">
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<label style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Quantity in shop
+<input type="number" value="24" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<label style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Alert me when stock falls to
+<input type="number" value="8" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+<label style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">SKU / barcode
+<input type="text" value="AUD-014" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<button type="button" style="height: 46px; padding: 0 14px; border-radius: 10px; border: 1px solid #0B7A5A; background: #E6F3EE; color: #075C43; font-weight: 600; font-size: 14px">Scan barcode</button>
+<button type="button" style="height: 46px; padding: 0 14px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; color: #14201B; font-weight: 600; font-size: 14px">Print labels</button>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Shop
+<sc-raw-select style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; background: #FFFFFF; color: #14201B"><option>Ada's Gadget Hub — main shop</option><option>Add another shop…</option></sc-raw-select></label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Use the same price in shop and online</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Pause the Udozo listing when shop stock hits 0</label>
+</div>
+</sc-if>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end">
+<button type="button" style="height: 50px; padding: 0 22px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 15px; color: #14201B">Save draft</button>
+<button type="button" style="height: 50px; padding: 0 26px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 15px">{{postLabel}}</button>
+</div>
+</form>
+
+<aside aria-label="Preview" style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding-top: 52px">
+<span style="font-size: 12px; font-weight: 600; color: #56635C; text-transform: uppercase; letter-spacing: 0.06em">Where it will appear</span>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 13px; font-weight: 600">On Udozo</span>
+<div style="height: 140px; border-radius: 12px; background: #E3EEFB; color: #1D4F91; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px">Listing photo</div>
+<span style="font-weight: 600">Wireless Earbuds Pro</span>
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-family: 'Space Grotesk',sans-serif; font-size: 18px; font-weight: 700">₦18,500</span><span style="font-size: 12px; color: #56635C">{{onlineStock}}</span></div>
+</div>
+<sc-if value="{{pos}}" hint-placeholder-val="{{true}}">
+<div style="background: #10231C; color: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 13px; font-weight: 600; color: #B9CCC3">On your POS register</span>
+<div style="background: #FFFFFF; color: #14201B; border-radius: 12px; padding: 10px; display: flex; gap: 12px; align-items: center">
+<div style="width: 56px; height: 56px; border-radius: 10px; background: #E3EEFB; color: #1D4F91; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px; flex: none">WE</div>
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0"><span style="font-weight: 600; font-size: 14px">Wireless Earbuds Pro</span><span style="font-size: 12px; color: #56635C">AUD-014 · 24 in stock</span></div>
+<span style="font-weight: 700">₦18,500</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{posOff}}" hint-placeholder-val="{{false}}">
+<div style="border: 1px dashed #B7C2BC; border-radius: 16px; padding: 16px; font-size: 13px; color: #56635C; line-height: 1.5">Turn on POS to sell this item over the counter and track its stock in Inventory.</div>
+</sc-if>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pos: true };
+  }
+  renderVals() {
+    var self = this; var on = this.state.pos;
+    return {
+      pos: on, posOff: !on,
+      toggle: function () { self.setState({ pos: !self.state.pos }); },
+      postLabel: on ? 'Post and add to POS' : 'Post item',
+      onlineStock: on ? '24 available' : 'Stock not tracked',
+      posCardStyle: 'background: #FFFFFF; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE') + '; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 16px',
+      switchStyle: 'flex: none; width: 56px; height: 32px; border-radius: 16px; border: 0; padding: 3px; display: flex; align-items: center; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? '#0B7A5A' : '#9AA6A0'),
+      knobStyle: 'width: 26px; height: 26px; border-radius: 13px; background: #FFFFFF; display: block'
+    };
+  }
+}
+</script>
+
+
+</body></html>

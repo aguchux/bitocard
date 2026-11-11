@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — First-time shop setup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 980px; background: #F4F6F4; display: flex; flex-direction: column">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCE2DE; padding: 0 28px; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+<div style="width: 34px; height: 34px; border-radius: 10px; background: #19A47A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</div>
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px; margin-right: auto">Udozo POS · Shop setup</span>
+<span style="font-size: 13px; color: #56635C">Signed in as Ada Okafor (Owner)</span>
+<a href="Main.dc.html" style="font-size: 14px; font-weight: 600">Skip for now</a>
+</header>
+
+<div style="width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px 24px 48px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+<nav aria-label="Setup steps" style="flex: 1 1 250px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0 0 10px; font-family: 'Space Grotesk',sans-serif; font-size: 26px; line-height: 1.2">Welcome, Ada. Let's open your till.</h1>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: #FFFFFF; border: 1px solid #DCE2DE"><span style="width: 28px; height: 28px; border-radius: 14px; background: #0B7A5A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex: none">✓</span><span style="display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 14px">Signed in with Udozo</span><span style="font-size: 12px; color: #56635C">Admin rights for this shop</span></span></div>
+<div aria-current="step" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: #E6F3EE; border: 2px solid #0B7A5A"><span style="width: 28px; height: 28px; border-radius: 14px; background: #FFFFFF; border: 2px solid #0B7A5A; box-sizing: border-box; color: #075C43; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex: none">2</span><span style="display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">Check products and stock</span><span style="font-size: 12px; color: #33413A">From your udozo.com listings</span></span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px"><span style="width: 28px; height: 28px; border-radius: 14px; border: 2px solid #8A968F; box-sizing: border-box; color: #44524B; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex: none">3</span><span style="display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 14px">Shop, tills and printer</span><span style="font-size: 12px; color: #56635C">Address for receipts, VAT</span></span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px"><span style="width: 28px; height: 28px; border-radius: 14px; border: 2px solid #8A968F; box-sizing: border-box; color: #44524B; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex: none">4</span><span style="display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 14px">Invite your team</span><span style="font-size: 12px; color: #56635C">Managers, cashiers, accountants</span></span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px"><span style="width: 28px; height: 28px; border-radius: 14px; border: 2px solid #8A968F; box-sizing: border-box; color: #44524B; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex: none">5</span><span style="display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 14px">Get the apps</span><span style="font-size: 12px; color: #56635C">Android, iOS, Windows</span></span></div>
+</nav>
+
+<section aria-label="Products from Udozo" style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 22px">Products from udozo.com</h2>
+<p style="margin: 0; font-size: 14px; color: #33413A; line-height: 1.5">These are your Udozo listings. The ones ticked "Sell at POS" go on your till with the same category, price and stock count. Tick any others you also sell in the shop.</p>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; color: #56635C">Udozo listings</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 24px; font-weight: 700">15</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; color: #56635C">Selling at POS</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 24px; font-weight: 700; color: #075C43">{{onCount}}</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; color: #56635C">Units in stock</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 24px; font-weight: 700">{{units}}</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; color: #56635C">Categories</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 24px; font-weight: 700">{{catCount}}</span></div>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; overflow-x: auto">
+<sc-raw-table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px">
+<sc-raw-thead>
+<sc-raw-tr style="text-align: left; color: #56635C; font-size: 12px; background: #F8FAF9">
+<sc-raw-th style="padding: 12px 16px; font-weight: 600; width: 64px">Sell at POS</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600">Listing</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600">Udozo category</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600; text-align: right">In stock</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600; text-align: right">Price</sc-raw-th>
+<sc-raw-th style="padding: 12px 16px; font-weight: 600">Shown on udozo.com</sc-raw-th>
+</sc-raw-tr>
+</sc-raw-thead>
+<sc-raw-tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="15">
+<sc-raw-tr style="{{r.rowStyle}}">
+<sc-raw-td style="padding: 6px 16px"><button type="button" role="checkbox" aria-checked="{{r.on}}" aria-label="{{r.aria}}" sc-camel-on-click="{{r.toggle}}" style="{{r.boxStyle}}">{{r.tick}}</button></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px"><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">{{r.name}}</span><span style="font-size: 12px; color: #56635C">{{r.sku}}</span></div></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; color: #33413A">{{r.cat}}</sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: right"><span style="{{r.stockStyle}}">{{r.stock}}</span></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: right; font-weight: 600">{{r.price}}</sc-raw-td>
+<sc-raw-td style="padding: 10px 16px; color: #33413A">{{r.vis}}</sc-raw-td>
+</sc-raw-tr>
+</sc-for>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; background: #E6F3EE; border-radius: 14px; padding: 14px 16px">
+<svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="#075C43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 12a8 8 0 0114-5.3L20 9M20 4v5h-5M20 12a8 8 0 01-14 5.3L4 15M4 20v-5h5"></path></svg>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #0E3B2D">Udozo is the master list. Add or edit products and categories on udozo.com and they update here within seconds. Every shop sale and online order takes from the same stock count.</p>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end">
+<a href="PostListing.dc.html" style="height: 50px; display: flex; align-items: center; padding: 0 20px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; color: #14201B; text-decoration: none; font-weight: 600; font-size: 15px">Add a new listing on Udozo</a>
+<a href="Staff.dc.html" style="height: 50px; display: flex; align-items: center; padding: 0 24px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 15px">Continue: invite your team</a>
+</div>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:980}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { off: { 13: true, 14: true, 15: true } };
+  }
+  renderVals() {
+    var self = this;
+    var fmt = function (n) { return '₦' + n.toLocaleString('en-NG'); };
+    var items = [
+      [1, 'Wireless Earbuds Pro', 'AUD-014', 'Phones & Accessories › Audio', 24, 18500, true],
+      [2, 'USB-C Fast Charger 25W', 'CHG-031', 'Phones & Accessories › Chargers', 41, 7500, true],
+      [3, 'Power Bank 20,000mAh', 'PWR-008', 'Phones & Accessories › Power', 6, 21000, true],
+      [4, 'USB-C to Lightning Cable 1m', 'CBL-102', 'Phones & Accessories › Cables', 88, 3500, true],
+      [5, 'Silicone Phone Case', 'CSE-210', 'Phones & Accessories › Cases', 0, 4000, true],
+      [6, 'Tempered Glass Protector', 'SCR-055', 'Phones & Accessories › Cases', 120, 2500, false],
+      [7, 'Bluetooth Speaker Mini', 'AUD-022', 'Phones & Accessories › Audio', 9, 15000, true],
+      [8, 'Smart Watch Band', 'WRB-017', 'Wearables › Bands', 3, 3000, false],
+      [9, 'Car Charger Dual USB', 'CHG-044', 'Phones & Accessories › Chargers', 17, 5500, true],
+      [10, 'Ring Light 10 inch', 'ACC-090', 'Photo & Video › Lighting', 12, 12000, true],
+      [11, 'Memory Card 64GB', 'STO-012', 'Computing › Storage', 33, 6500, true],
+      [12, 'Laptop Sleeve 15 inch', 'ACC-071', 'Computing › Bags', 14, 9000, false],
+      [13, 'Phone Tripod Stand', 'ACC-104', 'Photo & Video › Tripods', 7, 6000, true],
+      [14, 'HDMI Cable 2m', 'CBL-130', 'Computing › Cables', 15, 4500, true],
+      [15, 'Gaming Mouse RGB', 'CMP-020', 'Computing › Accessories', 0, 11000, true]
+    ];
+    var off = this.state.off;
+    var onCount = 0, units = 0, cats = {};
+    var rows = items.map(function (it) {
+      var on = !off[it[0]];
+      if (on) { onCount++; units += it[4]; cats[it[3]] = 1; }
+      return {
+        name: it[1], sku: it[2], cat: it[3], stock: it[4], price: fmt(it[5]), on: on,
+        vis: it[6] ? 'Yes' : 'Hidden (shop only)',
+        aria: 'Sell ' + it[1] + ' at POS', tick: on ? '✓' : '',
+        toggle: function () { var o = Object.assign({}, self.state.off); if (o[it[0]]) { delete o[it[0]]; } else { o[it[0]] = true; } self.setState({ off: o }); },
+        rowStyle: 'border-top: 1px solid #EDF0EE; background: ' + (on ? '#FFFFFF' : '#F8FAF9'),
+        boxStyle: 'width: 44px; height: 44px; border-radius: 10px; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0; ' + (on ? 'background: #0B7A5A; color: #FFFFFF; border: 0' : 'background: #FFFFFF; color: #FFFFFF; border: 2px solid #8A968F'),
+        stockStyle: 'font-weight: 700; ' + (it[4] === 0 ? 'color: #A2251A' : (it[4] <= 6 ? 'color: #8A4B08' : 'color: #14201B'))
+      };
+    });
+    return { rows: rows, onCount: onCount, units: units, catCount: Object.keys(cats).length };
+  }
+}
+</script>
+
+
+</body></html>

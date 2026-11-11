@@ -146,6 +146,8 @@ export const configSchema = z.object({
   SHOP_URL: z.string().url().default('https://shop.bitocard.com'),
   /** Udozo Connect's dashboard (connect.udozo.com): customers are handed to it signed in. Environment only. */
   CONNECT_URL: z.string().url().default('https://connect.udozo.com'),
+  /** Udozo POS (pos.udozo.com, docs/UDOZO_POS_PLAN.md): shop owners are handed to it signed in, and its notices link there. Environment only. */
+  POS_URL: z.string().url().default('https://pos.udozo.com'),
   /** Afrippa's site (docs/CRYPTO_SPINOFF_PLAN.md): where its emails and links point. */
   AFRIPPA_URL: z.string().url().default('https://afrippa.com'),
   /** Verify in Afrippa's name, where its traders complete identity checks. */

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>pos.udozo.com — Sign in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#10231C}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 800px; display: flex; flex-wrap: wrap; background: #F4F6F4">
+
+<section aria-label="About Udozo POS" style="flex: 1 1 420px; min-width: 0; background: #10231C; color: #FFFFFF; padding: 48px 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; align-items: center; gap: 12px">
+<div style="width: 40px; height: 40px; border-radius: 11px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 20px">U</div>
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 20px">Udozo POS</span>
+<span style="font-size: 13px; color: #B9CCC3">pos.udozo.com</span>
+</div>
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 40px; line-height: 1.15; max-width: 460px; text-wrap: balance">Sell in your shop with the stock you list on Udozo</h1>
+<div style="display: flex; flex-direction: column; gap: 14px; font-size: 15px; color: #D6E3DD; max-width: 440px">
+<span style="display: flex; gap: 12px"><span style="color: #3DDC97; font-weight: 700">✓</span>Products ticked "Sell at POS" on udozo.com show up on your till</span>
+<span style="display: flex; gap: 12px"><span style="color: #3DDC97; font-weight: 700">✓</span>One stock count for your shop and your Udozo listings</span>
+<span style="display: flex; gap: 12px"><span style="color: #3DDC97; font-weight: 700">✓</span>Your team signs in with a PIN, without seeing your Udozo account</span>
+</div>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 13px; color: #B9CCC3">Also on your devices</span>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<a href="Downloads.dc.html" style="height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-radius: 12px; border: 1px solid #2A4A3D; background: #1A3329; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>Android</a>
+<a href="Downloads.dc.html" style="height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-radius: 12px; border: 1px solid #2A4A3D; background: #1A3329; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="3"></rect><path d="M11 18h2"></path></svg>iPhone &amp; iPad</a>
+<a href="Downloads.dc.html" style="height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-radius: 12px; border: 1px solid #2A4A3D; background: #1A3329; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>Windows</a>
+</div>
+</div>
+</section>
+
+<section aria-label="Sign in" style="flex: 1 1 460px; min-width: 0; padding: 48px 24px; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+<div style="width: 100%; max-width: 440px; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 22px; padding: 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 26px">Sign in to your shop</h2>
+<span style="font-size: 14px; color: #33413A; margin-top: -8px">New to Udozo POS? <a href="Signup.dc.html" style="font-weight: 700">Start a free trial</a> · <a href="PosLanding.dc.html" style="font-weight: 600">See plans</a></span>
+<div role="tablist" aria-label="Who is signing in" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; background: #F4F6F4; border-radius: 12px; padding: 4px">
+<button type="button" role="tab" aria-selected="{{isOwner}}" sc-camel-on-click="{{pickOwner}}" style="{{ownerTab}}">Shop owner</button>
+<button type="button" role="tab" aria-selected="{{isStaff}}" sc-camel-on-click="{{pickStaff}}" style="{{staffTab}}">Staff</button>
+</div>
+
+<sc-if value="{{isOwner}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<p style="margin: 0; font-size: 14px; color: #33413A; line-height: 1.5">Use the same account you sell with on udozo.com. You'll get full admin rights for your shop.</p>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Email or phone number
+<input type="text" value="ada@example.com" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Udozo password
+<input type="password" value="password" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<a href="Setup.dc.html" style="height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Sign in with Udozo</a>
+<div style="display: flex; justify-content: space-between; font-size: 13px"><a href="#" style="font-weight: 600">Forgot password?</a><a href="#" style="font-weight: 600">No Udozo account? Sign up</a></div>
+<span style="font-size: 12px; color: #56635C; line-height: 1.5">Signing in from a new device sends a code to your phone first.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{isStaff}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<p style="margin: 0; font-size: 14px; color: #33413A; line-height: 1.5">Use the shop code and PIN from your invite. You don't need a Udozo account.</p>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Shop code
+<input type="text" value="ADA-4821" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 16px; letter-spacing: 0.08em; color: #14201B"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Your phone number
+<input type="tel" value="0816 000 0902" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">4-digit PIN
+<input type="password" inputmode="numeric" maxlength="4" value="1111" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 18px; letter-spacing: 0.4em; color: #14201B"></label>
+<a href="StaffLogin.dc.html" style="height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Sign in to the till</a>
+<span style="font-size: 12px; color: #56635C; line-height: 1.5">Forgot your PIN? Ask your manager to reset it. On a shared till, the device stays linked and staff just tap their name and PIN.</span>
+</div>
+</sc-if>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:800}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { who: 'owner' };
+  }
+  renderVals() {
+    var self = this; var owner = this.state.who === 'owner';
+    var tab = function (on) { return 'height: 44px; border-radius: 9px; border: 0; font-weight: 700; font-size: 14px; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#14201B' : '#56635C') + '; box-shadow: ' + (on ? '0 1px 2px rgba(20,32,27,0.12)' : 'none'); };
+    return {
+      isOwner: owner, isStaff: !owner, ownerTab: tab(owner), staffTab: tab(!owner),
+      pickOwner: function () { self.setState({ who: 'owner' }); },
+      pickStaff: function () { self.setState({ who: 'staff' }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

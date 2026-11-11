@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Staff sign-in at the till</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#FFFFFF;background:#10231C}
+button{font-family:inherit;cursor:pointer}
+a{color:#8FE0C2}a:hover{color:#BDF0DC}
+:focus-visible{outline:2px solid #8FE0C2;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 800px; background: #10231C; display: flex; flex-direction: column">
+
+<header style="padding: 20px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; border-bottom: 1px solid #1F3A2F">
+<div style="width: 36px; height: 36px; border-radius: 10px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</div>
+<div style="display: flex; flex-direction: column; margin-right: auto">
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">Ada's Gadget Hub</span>
+<span style="font-size: 13px; color: #B9CCC3">Main shop · Till 1 · Shop code ADA-4821</span>
+</div>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 22px; font-weight: 600">16:05</span>
+</header>
+
+<div style="flex: 1; width: 100%; max-width: 1120px; margin: 0 auto; padding: 36px 24px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start">
+
+<section aria-label="Choose your name" style="flex: 999 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 32px">Who's selling?</h1>
+<p style="margin: 0; font-size: 15px; color: #B9CCC3">Tap your name, then enter your 4-digit PIN.</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px">
+<sc-for list="{{people}}" as="p" hint-placeholder-count="3">
+<button type="button" sc-camel-on-click="{{p.pick}}" aria-pressed="{{p.on}}" style="{{p.style}}">
+<span style="{{p.avatarStyle}}">{{p.initials}}</span>
+<span style="font-weight: 700; font-size: 15px">{{p.name}}</span>
+<span style="font-size: 12px; opacity: 0.85">{{p.role}}</span>
+</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #B9CCC3; padding-top: 8px">
+<span>Not on the list? Ask the shop owner to invite you from Settings › Staff &amp; roles.</span>
+<span>Shop owner? <a href="PosLogin.dc.html" style="font-weight: 700">Sign in with your Udozo account</a></span>
+</div>
+</section>
+
+<section aria-label="Enter PIN" style="flex: 1 1 340px; max-width: 100%; background: #FFFFFF; color: #14201B; border-radius: 24px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 20px">
+<sc-if value="{{locked}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+<span style="font-size: 14px; color: #56635C">Signing in as</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 22px; font-weight: 700">{{selName}}</span>
+</div>
+<div aria-label="{{pinAria}}" role="img" style="display: flex; gap: 16px">
+<sc-for list="{{dots}}" as="d" hint-placeholder-count="4"><span style="{{d.style}}"></span></sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 300px">
+<sc-for list="{{keys}}" as="k" hint-placeholder-count="12">
+<button type="button" sc-camel-on-click="{{k.press}}" aria-label="{{k.aria}}" style="{{k.style}}">{{k.label}}</button>
+</sc-for>
+</div>
+<span style="font-size: 13px; color: #56635C">Forgot your PIN? A manager can reset it.</span>
+</div>
+</sc-if>
+<sc-if value="{{unlocked}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; padding: 30px 0; width: 100%">
+<div style="width: 72px; height: 72px; border-radius: 36px; background: #E6F3EE; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="34" height="34" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></div>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 24px; font-weight: 700">Welcome, {{selFirst}}</span>
+<span style="font-size: 14px; color: #33413A">Signed in as {{selRole}} on Till 1. Sales you make are recorded under your name.</span>
+<a href="Main.dc.html" style="width: 100%; height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Start selling</a>
+<button type="button" sc-camel-on-click="{{signOut}}" style="height: 44px; border: 0; background: none; color: #075C43; font-weight: 600; font-size: 14px">Not you? Switch user</button>
+</div>
+</sc-if>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:800}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 1, pin: '' };
+  }
+  renderVals() {
+    var self = this;
+    var list = [['Chinedu Eze', 'Manager'], ['Blessing Musa', 'Cashier'], ['Ngozi Obi', 'Stock keeper']];
+    var people = list.map(function (p, i) {
+      var on = self.state.sel === i;
+      return { name: p[0], role: p[1], on: on,
+        initials: p[0].split(' ').map(function (w) { return w[0]; }).join(''),
+        pick: function () { self.setState({ sel: i, pin: '' }); },
+        style: 'display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 12px; border-radius: 18px; color: ' + (on ? '#14201B' : '#FFFFFF') + '; background: ' + (on ? '#FFFFFF' : '#1A3329') + '; border: ' + (on ? '3px solid #3DDC97' : '1px solid #2A4A3D'),
+        avatarStyle: 'width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; font-family: Space Grotesk, sans-serif; font-weight: 700; font-size: 20px; background: ' + (on ? '#0B7A5A' : '#2A4A3D') + '; color: #FFFFFF' };
+    });
+    var pin = this.state.pin;
+    var dots = [0, 1, 2, 3].map(function (i) {
+      var f = i < pin.length;
+      return { style: 'width: 18px; height: 18px; border-radius: 9px; box-sizing: border-box; border: 2px solid #14201B; background: ' + (f ? '#14201B' : 'transparent') };
+    });
+    var press = function (d) { return function () { var p = self.state.pin; if (p.length < 4) { self.setState({ pin: p + d }); } }; };
+    var base = 'height: 64px; border-radius: 16px; font-size: 24px; font-weight: 600; color: #14201B; ';
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(function (d) {
+      return { label: d, aria: d, press: press(d), style: base + 'border: 1px solid #DCE2DE; background: #F4F6F4' };
+    });
+    keys.push({ label: 'Clear', aria: 'Clear PIN', press: function () { self.setState({ pin: '' }); }, style: base + 'font-size: 14px; border: 0; background: #FFFFFF' });
+    keys.push({ label: '0', aria: '0', press: press('0'), style: base + 'border: 1px solid #DCE2DE; background: #F4F6F4' });
+    keys.push({ label: '⌫', aria: 'Delete last digit', press: function () { self.setState({ pin: self.state.pin.slice(0, -1) }); }, style: base + 'border: 0; background: #FFFFFF' });
+    var sel = list[this.state.sel];
+    var done = pin.length === 4;
+    return {
+      people: people, dots: dots, keys: keys,
+      selName: sel[0], selFirst: sel[0].split(' ')[0], selRole: sel[1].toLowerCase(),
+      pinAria: pin.length + ' of 4 digits entered',
+      locked: !done, unlocked: done,
+      signOut: function () { self.setState({ pin: '' }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

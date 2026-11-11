@@ -19,8 +19,9 @@ import { SupportModule } from '../support/support.module.js';
 import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 import { ShopAssistantModule } from '../classifieds/assistant/assistant.module.js';
 import { SellerScoresModule } from '../classifieds/scores/scores.module.js';
+import { PosModule } from '../pos/pos.module.js';
 import { ResaleModule } from '../resale/resale.module.js';
 import { MarketingModule } from '../marketing/marketing.controller.js';
 
-@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, SellerScoresModule, ResaleModule, MarketingModule, WhatsappModule], controllers: [CronController] })
+@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, SellerScoresModule, ResaleModule, MarketingModule, WhatsappModule, PosModule], controllers: [CronController] })
 export class CronModule {}

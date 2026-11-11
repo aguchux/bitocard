@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Take payment</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 960px; background: #F4F6F4; display: flex; flex-direction: column">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCE2DE; padding: 14px 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+<a href="Main.dc.html" aria-label="Back to the sale" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #DCE2DE; display: flex; align-items: center; justify-content: center; color: #14201B"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></a>
+<div style="display: flex; flex-direction: column; margin-right: auto">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 22px">Take payment · ₦38,700</h1>
+<span style="font-size: 13px; color: #56635C">POS-10482 · 4 items · Till 1 · Blessing M.</span>
+</div>
+<button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #14201B">Split payment</button>
+</header>
+
+<div style="flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 28px 24px 40px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<aside aria-label="Order" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+<h2 style="margin: 0 0 4px; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Order</h2>
+<div style="display: flex; justify-content: space-between"><span>Wireless Earbuds Pro</span><span>₦18,500</span></div>
+<div style="display: flex; justify-content: space-between"><span>USB-C Fast Charger 25W × 2</span><span>₦15,000</span></div>
+<div style="display: flex; justify-content: space-between"><span>Tempered Glass Protector</span><span>₦2,500</span></div>
+<div style="display: flex; justify-content: space-between; border-top: 1px solid #EDF0EE; padding-top: 10px; color: #33413A"><span>Subtotal</span><span>₦36,000</span></div>
+<div style="display: flex; justify-content: space-between; color: #33413A"><span>VAT 7.5%</span><span>₦2,700</span></div>
+<div style="display: flex; justify-content: space-between; font-family: 'Space Grotesk',sans-serif; font-size: 22px; font-weight: 700; padding-top: 4px"><span>Total</span><span>₦38,700</span></div>
+<div style="display: flex; justify-content: space-between; font-weight: 600"><span>Paid so far</span><span>{{paidSoFar}}</span></div>
+<div style="display: flex; justify-content: space-between; font-weight: 700; color: #8A4B08"><span>Balance due</span><span>{{balance}}</span></div>
+</aside>
+
+<section aria-label="Payment" style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div role="tablist" aria-label="Payment method" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+<sc-for list="{{methods}}" as="m" hint-placeholder-count="4">
+<button type="button" role="tab" aria-selected="{{m.on}}" sc-camel-on-click="{{m.pick}}" style="{{m.style}}"><span style="font-weight: 700; font-size: 15px">{{m.label}}</span><span style="font-size: 12px; color: #56635C">{{m.hint}}</span></button>
+</sc-for>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 18px; padding: 24px">
+
+<sc-if value="{{isUdozo}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+<div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 14px">
+<span style="font-size: 14px; color: #33413A">Ask the customer to transfer <strong>exactly {{balance}}</strong> to:</span>
+<div style="background: #10231C; color: #FFFFFF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; color: #B9CCC3">[Partner bank] · Udozo collection account</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 36px; font-weight: 700; letter-spacing: 0.06em">9123 456 780</span>
+<span style="font-size: 14px; font-weight: 600">UDOZO / ADA'S GADGET HUB</span>
+<span style="font-size: 12px; color: #8FE0C2">New account number for this sale · expires in 29:41</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="flex: 1; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #14201B">Copy details</button>
+<button type="button" style="flex: 1; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #14201B">Show on customer screen</button>
+</div>
+</div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 12px">
+<sc-if value="{{waiting}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 10px; background: #F4F6F4; border-radius: 14px; padding: 16px">
+<div style="display: flex; align-items: center; gap: 10px; font-weight: 700"><span style="width: 10px; height: 10px; border-radius: 5px; background: #E39A3B"></span>Waiting for transfer</div>
+<span style="font-size: 13px; color: #33413A; line-height: 1.5">The sale completes by itself when the money arrives. No need to check the customer's phone.</span>
+<span style="font-size: 12px; color: #56635C">Demo:</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<button type="button" sc-camel-on-click="{{gotFull}}" style="height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 12px; font-weight: 600; color: #33413A">₦38,700 arrives</button>
+<button type="button" sc-camel-on-click="{{gotPart}}" style="height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 12px; font-weight: 600; color: #33413A">₦35,000 arrives</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{partial}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px; background: #FDEFD9; border-radius: 14px; padding: 16px; color: #5A3405">
+<span style="font-weight: 700">₦35,000 received from CHIAMAKA O.</span>
+<span style="font-size: 13px; line-height: 1.5">₦3,700 still due. Ask for the rest by transfer to the same account, or take it in cash.</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<button type="button" sc-camel-on-click="{{gotFull}}" style="height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #C27A1A; background: #FFFFFF; font-size: 12px; font-weight: 600; color: #5A3405">Demo: ₦3,700 arrives</button>
+<button type="button" sc-camel-on-click="{{pickCash}}" style="height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #C27A1A; background: #FFFFFF; font-size: 12px; font-weight: 600; color: #5A3405">Take ₦3,700 in cash</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{paid}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px; background: #E6F3EE; border-radius: 14px; padding: 16px; color: #0E3B2D">
+<span style="font-weight: 700">Paid · ₦38,700 received</span>
+<span style="font-size: 13px; line-height: 1.5">Confirmed by the gateway. Settles to your bank on the next working day.</span>
+<a href="ReceiptShare.dc.html" style="height: 46px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Finish · receipt</a>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isCash}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 16px; max-width: 560px">
+<span style="font-size: 14px; color: #33413A">Cash due: <strong>{{balance}}</strong></span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{notes}}" as="n" hint-placeholder-count="4">
+<button type="button" sc-camel-on-click="{{n.pick}}" aria-pressed="{{n.on}}" style="{{n.style}}">{{n.label}}</button>
+</sc-for>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; background: #F4F6F4; border-radius: 14px; padding: 16px 18px">
+<span style="font-size: 15px; font-weight: 600">Change to give</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 30px; font-weight: 700">{{change}}</span>
+</div>
+<a href="ReceiptShare.dc.html" style="height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Cash received · open drawer</a>
+</div>
+</sc-if>
+
+<sc-if value="{{isOwn}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 560px">
+<span style="font-size: 14px; color: #33413A">Ask the customer to transfer <strong>{{balance}}</strong> to the shop's own account:</span>
+<div style="border: 1px solid #DCE2DE; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 13px; color: #56635C">[Bank name]</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 0.05em">[Account number]</span>
+<span style="font-size: 14px; font-weight: 600">Ada's Gadget Hub</span>
+</div>
+<div style="display: flex; gap: 10px; align-items: flex-start; background: #FDEFD9; border-radius: 12px; padding: 12px 14px; font-size: 13px; color: #5A3405; line-height: 1.5">
+<svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="#8A4B08" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 3l10 18H2L12 3zM12 10v5M12 18v.5"></path></svg>
+<span>Udozo can't see this account. Check the transfer has really arrived, in your banking app or by alert, before you confirm.</span>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Sender name or transfer reference
+<input type="text" placeholder="e.g. CHIAMAKA OKONKWO" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #0B7A5A">I've checked the money is in the shop's account</label>
+<a href="ReceiptShare.dc.html" style="height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Mark as paid (unverified)</a>
+<span style="font-size: 12px; color: #56635C">Logged under your name. Shows as "Shop account · unverified" in reports.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{isCard}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 560px">
+<span style="font-size: 14px; color: #33413A; line-height: 1.5">Take {{balance}} on your card terminal, then record it here. Udozo POS doesn't connect to card terminals yet.</span>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Terminal receipt number
+<input type="text" placeholder="From the terminal slip" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<a href="ReceiptShare.dc.html" style="height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Record card payment</a>
+</div>
+</sc-if>
+</div>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { method: 'udozo', got: 0, tendered: 40000 };
+  }
+  renderVals() {
+    var self = this; var st = this.state; var total = 38700;
+    var fmt = function (n) { return '₦' + n.toLocaleString('en-NG'); };
+    var due = total - st.got;
+    var defs = [['udozo', 'Udozo account', 'Transfer · confirms itself'], ['cash', 'Cash', 'Counts at cash-up'], ['own', 'Shop account', 'Transfer · you confirm'], ['card', 'Card', 'Recorded from terminal']];
+    var methods = defs.map(function (d) {
+      var on = st.method === d[0];
+      return { label: d[1], hint: d[2], on: on, pick: function () { self.setState({ method: d[0] }); },
+        style: 'display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 16px; border-radius: 14px; text-align: left; color: #14201B; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE') };
+    });
+    var opts = [due, 5000, 10000, 20000, 40000, 50000].filter(function (v, i, a) { return v >= due && a.indexOf(v) === i; });
+    var notes = opts.map(function (v) {
+      var on = st.tendered === v;
+      return { label: v === due ? 'Exact ' + fmt(v) : fmt(v), on: on, pick: function () { self.setState({ tendered: v }); },
+        style: 'height: 48px; padding: 0 18px; border-radius: 12px; font-size: 15px; font-weight: 700; color: #14201B; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE') };
+    });
+    var tend = Math.max(st.tendered, due);
+    return {
+      methods: methods, notes: notes,
+      isUdozo: st.method === 'udozo', isCash: st.method === 'cash', isOwn: st.method === 'own', isCard: st.method === 'card',
+      waiting: st.got === 0, partial: st.got > 0 && st.got < total, paid: st.got >= total,
+      paidSoFar: fmt(st.got), balance: fmt(due), change: fmt(tend - due),
+      gotFull: function () { self.setState({ got: total }); },
+      gotPart: function () { self.setState({ got: 35000 }); },
+      pickCash: function () { self.setState({ method: 'cash', tendered: 3700 }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

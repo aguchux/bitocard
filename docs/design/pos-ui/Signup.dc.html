@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Sign up</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 1000px; background: #F4F6F4; display: flex; flex-direction: column">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCE2DE; padding: 0 28px; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+<a href="PosLanding.dc.html" style="display: flex; align-items: center; gap: 10px; color: #14201B; text-decoration: none; margin-right: auto">
+<span style="width: 34px; height: 34px; border-radius: 10px; background: #19A47A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">Udozo POS</span>
+</a>
+<span style="font-size: 14px; color: #56635C">Already signed up?</span>
+<a href="PosLogin.dc.html" style="font-size: 14px; font-weight: 700">Sign in</a>
+</header>
+
+<div style="width: 100%; max-width: 1100px; margin: 0 auto; padding: 32px 24px 48px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+<ol aria-label="Sign-up steps" style="margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+<li aria-current="{{s.current}}" style="{{s.style}}"><span style="{{s.numStyle}}">{{s.num}}</span>{{s.label}}</li>
+</sc-for>
+</ol>
+
+<section style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 18px">
+
+<sc-if value="{{s1}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 18px">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 28px">Connect your Udozo seller account</h1>
+<p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Udozo POS uses your udozo.com listings, categories and stock. You'll sign in to the POS with this account as the shop owner.</p>
+<sc-if value="{{notConnected}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<button type="button" sc-camel-on-click="{{connect}}" style="height: 56px; border-radius: 14px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px"><span style="width: 28px; height: 28px; border-radius: 8px; background: #FFFFFF; color: #0B7A5A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700">U</span>Continue with Udozo</button>
+<span style="font-size: 14px; color: #33413A">Not selling on udozo.com yet? <a href="#" style="font-weight: 700">Create a free seller account</a>, then come back here.</span>
+</div>
+</sc-if>
+<sc-if value="{{connected}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 14px; border: 2px solid #0B7A5A; background: #E6F3EE; border-radius: 16px; padding: 16px">
+<span style="width: 48px; height: 48px; border-radius: 24px; background: #10231C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; flex: none">AO</span>
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0"><span style="font-weight: 700; font-size: 16px">Ada's Gadget Hub</span><span style="font-size: 13px; color: #33413A">Ada Okafor · 15 listings · 12 ticked “Sell at POS”</span></div>
+<span style="font-size: 12px; font-weight: 700; color: #075C43">Connected</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 14px">
+<div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 8px; font-size: 14px">
+<span style="font-weight: 700">Udozo POS can</span>
+<span style="display: flex; gap: 8px"><span style="color: #0B7A5A; font-weight: 700">✓</span>Read your listings, categories and stock</span>
+<span style="display: flex; gap: 8px"><span style="color: #0B7A5A; font-weight: 700">✓</span>Update stock after shop sales</span>
+<span style="display: flex; gap: 8px"><span style="color: #0B7A5A; font-weight: 700">✓</span>Bill the monthly plan to this account</span>
+</div>
+<div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 8px; font-size: 14px">
+<span style="font-weight: 700">It can't</span>
+<span style="display: flex; gap: 8px"><span style="color: #A2251A; font-weight: 700">✕</span>See or move your payouts</span>
+<span style="display: flex; gap: 8px"><span style="color: #A2251A; font-weight: 700">✕</span>Change your bank details or password</span>
+</div>
+</div>
+<button type="button" sc-camel-on-click="{{toPlan}}" style="height: 52px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 16px">Continue: choose a plan</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{s2}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<h1 style="margin: 0 auto 0 0; font-family: 'Space Grotesk',sans-serif; font-size: 28px">Choose your plan</h1>
+<div role="group" aria-label="Billing period" style="display: flex; background: #F4F6F4; border-radius: 12px; padding: 4px; gap: 4px">
+<button type="button" sc-camel-on-click="{{monthly}}" aria-pressed="{{isMonthly}}" style="{{monthlyTab}}">Monthly</button>
+<button type="button" sc-camel-on-click="{{yearly}}" aria-pressed="{{isYearly}}" style="{{yearlyTab}}">Yearly · save [X]%</button>
+</div>
+</div>
+<sc-for list="{{plans}}" as="p" hint-placeholder-count="3">
+<button type="button" sc-camel-on-click="{{p.pick}}" aria-pressed="{{p.on}}" style="{{p.style}}">
+<span style="{{p.dot}}"></span>
+<span style="display: flex; flex-direction: column; gap: 2px; flex: 1; text-align: left"><span style="font-weight: 700; font-size: 16px; color: #14201B">{{p.name}}</span><span style="font-size: 13px; color: #56635C">{{p.desc}}</span></span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px; color: #14201B">₦[price]<span style="font-family: Inter,sans-serif; font-size: 12px; font-weight: 500; color: #56635C">{{period}}</span></span>
+</button>
+</sc-for>
+<div style="display: flex; gap: 10px">
+<button type="button" sc-camel-on-click="{{toConnect}}" style="height: 52px; padding: 0 20px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 15px; color: #14201B">Back</button>
+<button type="button" sc-camel-on-click="{{toPay}}" style="flex: 1; height: 52px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 16px">Continue: payment</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{s3}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 28px">How would you like to pay?</h1>
+<p style="margin: 0; font-size: 15px; color: #33413A">Nothing is charged today. Your first payment is after the [X]-day free trial.</p>
+<sc-for list="{{pays}}" as="m" hint-placeholder-count="3">
+<button type="button" sc-camel-on-click="{{m.pick}}" aria-pressed="{{m.on}}" style="{{m.style}}">
+<span style="{{m.dot}}"></span>
+<span style="display: flex; flex-direction: column; gap: 2px; text-align: left"><span style="font-weight: 700; font-size: 15px; color: #14201B">{{m.name}}</span><span style="font-size: 13px; color: #56635C">{{m.desc}}</span></span>
+</button>
+</sc-for>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Renew automatically. I can cancel anytime in Settings › Plan.</label>
+<div style="display: flex; gap: 10px">
+<button type="button" sc-camel-on-click="{{toPlan}}" style="height: 52px; padding: 0 20px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 15px; color: #14201B">Back</button>
+<a href="Setup.dc.html" style="flex: 1; height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Start free trial and set up shop</a>
+</div>
+</div>
+</sc-if>
+</section>
+</div>
+
+<aside aria-label="Summary" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 12px; font-size: 14px">
+<h2 style="margin: 0 0 4px; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Summary</h2>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #56635C">Udozo account</span><span style="font-weight: 600; text-align: right">{{acct}}</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #56635C">Plan</span><span style="font-weight: 600">{{planName}}</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #56635C">Billing</span><span style="font-weight: 600">{{billing}}</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #56635C">Free trial</span><span style="font-weight: 600">[X] days</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #DCE2DE; padding-top: 12px; font-size: 16px"><span style="font-weight: 700">Due today</span><span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700">₦0</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #56635C">Then</span><span style="font-weight: 600">₦[price] {{period}}</span></div>
+<span style="font-size: 12px; color: #56635C; line-height: 1.5">Plan fees are separate from Udozo marketplace fees on online orders. VAT may apply.</span>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 1, connected: false, plan: 'business', yearly: false, pay: 'card' };
+  }
+  renderVals() {
+    var self = this; var st = this.state;
+    var radio = function (on) { return {
+      style: 'display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE'),
+      dot: 'flex: none; width: 20px; height: 20px; border-radius: 10px; box-sizing: border-box; background: #FFFFFF; border: ' + (on ? '6px solid #0B7A5A' : '2px solid #8A968F') }; };
+    var stepDefs = ['Udozo account', 'Plan', 'Payment'];
+    var steps = stepDefs.map(function (l, i) {
+      var n = i + 1; var cur = st.step === n; var done = st.step > n;
+      return { label: l, num: done ? '✓' : String(n), current: cur ? 'step' : 'false',
+        style: 'display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 6px; border-radius: 20px; font-size: 14px; font-weight: ' + (cur ? '700' : '600') + '; background: ' + (cur ? '#FFFFFF' : 'transparent') + '; border: 1px solid ' + (cur ? '#0B7A5A' : '#DCE2DE') + '; color: ' + (cur || done ? '#14201B' : '#56635C'),
+        numStyle: 'width: 28px; height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: ' + (cur || done ? '#0B7A5A' : '#EDF0EE') + '; color: ' + (cur || done ? '#FFFFFF' : '#44524B') };
+    });
+    var planDefs = [['starter', 'Starter', '1 shop · 1 till · up to 3 staff'], ['business', 'Business', '1 shop · up to 3 tills · 15 staff · accountant exports'], ['multi', 'Multi-shop', 'Up to 5 shops · unlimited tills and staff']];
+    var plans = planDefs.map(function (p) { var r = radio(st.plan === p[0]); return { name: p[1], desc: p[2], on: st.plan === p[0], style: r.style, dot: r.dot, pick: function () { self.setState({ plan: p[0] }); } }; });
+    var payDefs = [['card', 'Debit or credit card', 'Visa, Mastercard, Verve'], ['wallet', 'Udozo Wallet', 'Paid from your seller earnings each month'], ['transfer', 'Bank transfer', 'We send a payment link before each renewal']];
+    var pays = payDefs.map(function (p) { var r = radio(st.pay === p[0]); return { name: p[1], desc: p[2], on: st.pay === p[0], style: r.style, dot: r.dot, pick: function () { self.setState({ pay: p[0] }); } }; });
+    var tab = function (on) { return 'height: 40px; padding: 0 14px; border-radius: 9px; border: 0; font-weight: 700; font-size: 13px; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#14201B' : '#56635C'); };
+    var planName = planDefs.filter(function (p) { return p[0] === st.plan; })[0][1];
+    return {
+      steps: steps, plans: plans, pays: pays,
+      s1: st.step === 1, s2: st.step === 2, s3: st.step === 3,
+      connected: st.connected, notConnected: !st.connected,
+      connect: function () { self.setState({ connected: true }); },
+      toConnect: function () { self.setState({ step: 1 }); },
+      toPlan: function () { self.setState({ step: 2 }); },
+      toPay: function () { self.setState({ step: 3 }); },
+      isMonthly: !st.yearly, isYearly: st.yearly, monthlyTab: tab(!st.yearly), yearlyTab: tab(st.yearly),
+      monthly: function () { self.setState({ yearly: false }); },
+      yearly: function () { self.setState({ yearly: true }); },
+      period: st.yearly ? '/mo, billed yearly' : '/month',
+      acct: st.connected ? "Ada's Gadget Hub" : 'Not connected yet',
+      planName: planName, billing: st.yearly ? 'Yearly' : 'Monthly'
+    };
+  }
+}
+</script>
+
+
+</body></html>

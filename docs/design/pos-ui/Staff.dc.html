@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Settings: Staff and roles</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 1120px; display: flex; flex-wrap: wrap; background: #F4F6F4">
+
+<nav aria-label="Main" style="{{nav.navStyle}}">
+<div style="{{nav.headStyle}}">
+<div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+<div style="width: 34px; height: 34px; flex: none; border-radius: 10px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</div>
+<div style="{{nav.brandStyle}}">
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 17px; white-space: nowrap">Udozo POS</span>
+<span style="font-size: 12px; color: #B9CCC3; white-space: nowrap">Ada's Gadget Hub</span>
+</div>
+</div>
+<button type="button" sc-camel-on-click="{{nav.toggle}}" aria-expanded="{{nav.expanded}}" aria-label="{{nav.toggleLabel}}" title="{{nav.toggleLabel}}" style="width: 44px; height: 44px; flex: none; border-radius: 10px; border: 1px solid #2A4A3D; background: #1A3329; color: #D6E3DD; display: flex; align-items: center; justify-content: center; padding: 0"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{nav.chevStyle}}"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16M16 10l-2 2 2 2"></path></svg></button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<a href="Main.dc.html" title="Sell" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M7 20h10M12 16v4"></path></svg><span style="{{nav.lbl}}">Sell</span></a>
+<a href="Dashboard.dc.html" title="Overview" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span style="{{nav.lbl}}">Overview</span></a>
+<a href="Inventory.dc.html" title="Inventory" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"></path></svg><span style="{{nav.lbl}}">Inventory</span></a>
+<a href="Settlements.dc.html" title="Sales history" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3zM9 8h6M9 12h6"></path></svg><span style="{{nav.lbl}}">Sales history</span></a>
+<a href="#" title="Customers" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5"></path></svg><span style="{{nav.lbl}}">Customers</span></a>
+<a href="PostListing.dc.html" title="Post on Udozo" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 5v14M5 12h14"></path></svg><span style="{{nav.lbl}}">Post on Udozo</span></a>
+<a href="Staff.dc.html" title="Settings" aria-current="page" style="{{nav.activeStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 000 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"></path></svg><span style="{{nav.lbl}}">Settings</span></a>
+</div>
+<sc-if value="{{nav.open}}" hint-placeholder-val="{{true}}">
+<div style="margin-top: auto; background: #1A3329; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #B9CCC3">Signed in with Udozo account</span>
+<span style="font-size: 14px; font-weight: 600">Ada Okafor · Owner</span>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8FE0C2"><span style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>Synced with Udozo</div>
+</div>
+</sc-if>
+<sc-if value="{{nav.min}}" hint-placeholder-val="{{false}}">
+<div title="Ada Okafor · Owner · Synced with Udozo" style="margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="width: 38px; height: 38px; border-radius: 19px; background: #1A3329; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700">AO</span>
+<span role="img" aria-label="Synced with Udozo" style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>
+</div>
+</sc-if>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap; align-items: stretch">
+<section aria-label="Staff and roles" style="flex: 999 1 560px; min-width: 0; padding: 24px 28px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">Settings</h1>
+<div role="tablist" aria-label="Settings sections" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #DCE2DE">
+<button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 14px; border: 0; background: none; font-size: 14px; color: #56635C; font-weight: 500">Shop details</button>
+<button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 14px; border: 0; background: none; font-size: 14px; color: #56635C; font-weight: 500">Shops &amp; tills</button>
+<button type="button" role="tab" aria-selected="true" style="height: 44px; padding: 0 14px; border: 0; border-bottom: 3px solid #0B7A5A; background: none; font-size: 14px; color: #14201B; font-weight: 700">Staff &amp; roles</button>
+<a href="PaymentsSettings.dc.html" style="height: 44px; display: flex; align-items: center; padding: 0 14px; font-size: 14px; color: #56635C; font-weight: 500; text-decoration: none">Payments</a>
+<button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 14px; border: 0; background: none; font-size: 14px; color: #56635C; font-weight: 500">Receipts</button>
+<button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 14px; border: 0; background: none; font-size: 14px; color: #56635C; font-weight: 500">Udozo sync</button>
+</div>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; background: #E6F3EE; border-radius: 14px; padding: 14px 16px">
+<svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="#075C43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #0E3B2D"><strong>Staff work at POS level only.</strong> They sign in at pos.udozo.com or in the Udozo POS app (Android, iOS, Windows) with the shop code and their own PIN, with no Udozo account. They can't see your Udozo account, payouts, wallet or listings settings.</p>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<div role="group" aria-label="View" style="display: flex; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 4px; gap: 4px; margin-right: auto">
+<button type="button" sc-camel-on-click="{{showStaff}}" aria-pressed="{{isStaff}}" style="{{staffTabStyle}}">Staff (7)</button>
+<button type="button" sc-camel-on-click="{{showRoles}}" aria-pressed="{{isRoles}}" style="{{rolesTabStyle}}">Roles &amp; permissions (5)</button>
+</div>
+<button type="button" sc-camel-on-click="{{openInvite}}" style="height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 14px"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-6 7-6s7 2 7 6M19 8v6M16 11h6"></path></svg>Invite staff</button>
+</div>
+
+<sc-if value="{{isStaff}}" hint-placeholder-val="{{true}}">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; overflow-x: auto">
+<sc-raw-table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px">
+<sc-raw-thead>
+<sc-raw-tr style="text-align: left; color: #56635C; font-size: 12px; background: #F8FAF9">
+<sc-raw-th style="padding: 12px 16px; font-weight: 600">Name</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600">Role</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600">Can use</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600">Status</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600">Last active</sc-raw-th>
+<sc-raw-th style="padding: 12px 16px; font-weight: 600; text-align: right"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Actions</span></sc-raw-th>
+</sc-raw-tr>
+</sc-raw-thead>
+<sc-raw-tbody>
+<sc-for list="{{staff}}" as="s" hint-placeholder-count="6">
+<sc-raw-tr style="border-top: 1px solid #EDF0EE">
+<sc-raw-td style="padding: 12px 16px"><div style="display: flex; align-items: center; gap: 10px">
+<span style="{{s.avatarStyle}}">{{s.initials}}</span>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">{{s.name}}</span><span style="font-size: 12px; color: #56635C">{{s.contact}}</span></div>
+</div></sc-raw-td>
+<sc-raw-td style="padding: 12px 8px"><span style="{{s.roleStyle}}">{{s.role}}</span></sc-raw-td>
+<sc-raw-td style="padding: 12px 8px; color: #33413A">{{s.access}}</sc-raw-td>
+<sc-raw-td style="padding: 12px 8px"><span style="{{s.statusStyle}}">{{s.status}}</span></sc-raw-td>
+<sc-raw-td style="padding: 12px 8px; color: #33413A">{{s.last}}</sc-raw-td>
+<sc-raw-td style="padding: 8px 16px; text-align: right"><button type="button" aria-label="{{s.aria}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 13px; color: #14201B">{{s.action}}</button></sc-raw-td>
+</sc-raw-tr>
+</sc-for>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+<p style="margin: 0; font-size: 13px; color: #56635C">Removing someone signs them out of every till right away. Their past sales stay on your reports under their name.</p>
+</sc-if>
+
+<sc-if value="{{isRoles}}" hint-placeholder-val="{{false}}">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; overflow-x: auto">
+<sc-raw-table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px">
+<sc-raw-thead>
+<sc-raw-tr style="text-align: left; font-size: 13px; background: #F8FAF9">
+<sc-raw-th style="padding: 14px 16px; font-weight: 600; color: #56635C">Permission</sc-raw-th>
+<sc-raw-th style="padding: 14px 8px; font-weight: 700; text-align: center">Owner</sc-raw-th>
+<sc-raw-th style="padding: 14px 8px; font-weight: 700; text-align: center">Manager</sc-raw-th>
+<sc-raw-th style="padding: 14px 8px; font-weight: 700; text-align: center">Cashier</sc-raw-th>
+<sc-raw-th style="padding: 14px 8px; font-weight: 700; text-align: center">Stock keeper</sc-raw-th>
+<sc-raw-th style="padding: 14px 8px; font-weight: 700; text-align: center">Accountant</sc-raw-th>
+</sc-raw-tr>
+</sc-raw-thead>
+<sc-raw-tbody>
+<sc-for list="{{perms}}" as="p" hint-placeholder-count="14">
+<sc-raw-tr style="{{p.rowStyle}}">
+<sc-raw-td style="{{p.labelStyle}}">{{p.label}}</sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: center"><span style="{{p.c0.style}}" aria-label="{{p.c0.aria}}">{{p.c0.text}}</span></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: center"><span style="{{p.c1.style}}" aria-label="{{p.c1.aria}}">{{p.c1.text}}</span></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: center"><span style="{{p.c2.style}}" aria-label="{{p.c2.aria}}">{{p.c2.text}}</span></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: center"><span style="{{p.c3.style}}" aria-label="{{p.c3.aria}}">{{p.c3.text}}</span></sc-raw-td>
+<sc-raw-td style="padding: 10px 8px; text-align: center"><span style="{{p.c4.style}}" aria-label="{{p.c4.aria}}">{{p.c4.text}}</span></sc-raw-td>
+</sc-raw-tr>
+</sc-for>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+<button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px dashed #0B7A5A; background: #FFFFFF; color: #075C43; font-weight: 700; font-size: 14px">+ Create custom role</button>
+<span style="font-size: 13px; color: #56635C">The Udozo account rows stay with the owner's Udozo account and can't be given to staff.</span>
+</div>
+</sc-if>
+</section>
+
+<sc-if value="{{drawer}}" hint-placeholder-val="{{true}}">
+<aside aria-label="Invite staff" style="flex: 1 1 380px; max-width: 100%; background: #FFFFFF; border-left: 1px solid #DCE2DE; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; align-items: center">
+<h2 style="margin: 0 auto 0 0; font-family: 'Space Grotesk',sans-serif; font-size: 20px">Invite staff</h2>
+<button type="button" sc-camel-on-click="{{closeInvite}}" aria-label="Close" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 18px; color: #14201B">×</button>
+</div>
+
+<sc-if value="{{notSent}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Full name
+<input type="text" value="Kemi Adeyemi" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Phone number (WhatsApp or SMS)
+<input type="tel" value="0803 000 0000" style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; color: #14201B"></label>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 13px; font-weight: 600; color: #33413A; padding: 0 0 8px">Role</legend>
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="3">
+<button type="button" sc-camel-on-click="{{r.pick}}" aria-pressed="{{r.on}}" style="{{r.style}}">
+<span style="{{r.dotStyle}}"></span>
+<span style="display: flex; flex-direction: column; gap: 2px; text-align: left"><span style="font-weight: 700; font-size: 14px; color: #14201B">{{r.name}}</span><span style="font-size: 12px; color: #56635C; line-height: 1.4">{{r.desc}}</span></span>
+</button>
+</sc-for>
+</fieldset>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+<legend style="font-size: 13px; font-weight: 600; color: #33413A; padding: 0 0 8px">Where they can work</legend>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Main shop · Till 1</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Main shop · Till 2</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #0B7A5A">Mobile POS (their own phone)</label>
+</fieldset>
+
+<sc-if value="{{showDiscount}}" hint-placeholder-val="{{true}}">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Highest discount they can give without a manager
+<sc-raw-select style="height: 46px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; background: #FFFFFF; color: #14201B"><option>No discounts</option><option selected="">Up to 5%</option><option>Up to 10%</option><option>Any amount</option></sc-raw-select></label>
+</sc-if>
+
+<button type="button" sc-camel-on-click="{{send}}" style="height: 50px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 15px">Send invite</button>
+<span style="font-size: 12px; color: #56635C; line-height: 1.5">Kemi gets a link to set her own 4-digit PIN. The invite expires in 48 hours.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{sent}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 16px; align-items: stretch">
+<div style="width: 64px; height: 64px; border-radius: 32px; background: #E6F3EE; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="30" height="30" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></div>
+<h3 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 20px">Invite sent to Kemi</h3>
+<p style="margin: 0; font-size: 14px; color: #33413A; line-height: 1.5">Sent by WhatsApp to 0803 000 0000 as <strong>{{roleName}}</strong>. She'll show as "Invite pending" until she sets her PIN.</p>
+<div style="background: #F4F6F4; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #56635C">Shop code for the till</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 0.08em">ADA-4821</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="flex: 1; height: 46px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #14201B">Copy invite link</button>
+<button type="button" sc-camel-on-click="{{again}}" style="flex: 1; height: 46px; border-radius: 12px; border: 1px solid #0B7A5A; background: #E6F3EE; font-weight: 700; font-size: 14px; color: #075C43">Invite another</button>
+</div>
+</div>
+</sc-if>
+</aside>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1120}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'staff', drawer: true, role: 'cashier', sent: false };
+  }
+  navVals() {
+    var self = this;
+    var min = !!(this.state && this.state.navMin);
+    var link = 'display: flex; align-items: center; gap: 12px; border-radius: 10px; text-decoration: none; font-size: 14px; min-height: 44px; box-sizing: border-box; ' + (min ? 'justify-content: center; padding: 0' : 'padding: 11px 12px');
+    return {
+      open: !min, min: min, expanded: !min,
+      toggleLabel: min ? 'Expand menu' : 'Collapse menu',
+      toggle: function () { self.setState({ navMin: !min }); },
+      navStyle: 'background: #10231C; color: #FFFFFF; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; ' + (min ? 'flex: 0 0 76px; width: 76px; padding: 20px 10px' : 'flex: 1 1 220px; max-width: 100%; padding: 20px 14px'),
+      headStyle: 'display: flex; gap: 12px; ' + (min ? 'flex-direction: column; align-items: center' : 'align-items: center; justify-content: space-between; padding: 4px 0 4px 8px'),
+      brandStyle: min ? 'display: none' : 'display: flex; flex-direction: column; min-width: 0',
+      chevStyle: min ? 'transform: scaleX(-1)' : '',
+      lbl: min ? 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap' : 'white-space: nowrap',
+      linkStyle: link + '; color: #D6E3DD',
+      activeStyle: link + '; background: #19A47A; color: #FFFFFF; font-weight: 600'
+    };
+  }
+  renderVals() {
+    var self = this;
+    var seg = function (on) { return 'height: 38px; padding: 0 14px; border-radius: 9px; border: 0; font-weight: 600; font-size: 13px; background: ' + (on ? '#14201B' : 'transparent') + '; color: ' + (on ? '#FFFFFF' : '#33413A'); };
+    var roleColors = { Owner: ['#10231C', '#FFFFFF'], Manager: ['#E3EEFB', '#1D4F91'], Cashier: ['#E6F3EE', '#075C43'], 'Stock keeper': ['#FDEFD9', '#8A4B08'], Accountant: ['#EFE8FA', '#5B3A8E'] };
+    var statusColors = { Active: ['#E6F3EE', '#075C43'], 'Invite pending': ['#FDEFD9', '#8A4B08'], Suspended: ['#EEF1EF', '#44524B'] };
+    var staff = [
+      ['Ada Okafor', 'Udozo account holder', 'Owner', 'Everything', 'Active', 'Now', 'View'],
+      ['Chinedu Eze', '0802 •••• 114', 'Manager', 'All tills, mobile', 'Active', 'Today, 14:20', 'Edit'],
+      ['Blessing Musa', '0816 •••• 902', 'Cashier', 'Till 1', 'Active', 'Today, 15:46', 'Edit'],
+      ['Ngozi Obi', '0705 •••• 337', 'Stock keeper', 'Till 2', 'Active', 'Yesterday', 'Edit'],
+      ['Funmi Adebayo', 'funmi@example.com', 'Accountant', 'Reports (web only)', 'Active', 'Today, 09:15', 'Edit'],
+      ['Tunde Bakare', 'Sent by WhatsApp · 2 h ago', 'Cashier', 'Till 1, Till 2', 'Invite pending', '—', 'Resend'],
+      ['Emeka Nwosu', '0909 •••• 520', 'Cashier', 'Till 2', 'Suspended', '2 Nov', 'Restore']
+    ].map(function (s) {
+      var rc = roleColors[s[2]]; var sc = statusColors[s[4]];
+      return { name: s[0], contact: s[1], role: s[2], access: s[3], status: s[4], last: s[5], action: s[6],
+        aria: s[6] + ' ' + s[0],
+        initials: s[0].split(' ').map(function (w) { return w[0]; }).join(''),
+        avatarStyle: 'width: 38px; height: 38px; border-radius: 19px; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: ' + rc[0] + '; color: ' + rc[1],
+        roleStyle: 'font-size: 12px; font-weight: 700; border-radius: 6px; padding: 4px 8px; background: ' + rc[0] + '; color: ' + rc[1],
+        statusStyle: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 4px 8px; background: ' + sc[0] + '; color: ' + sc[1] };
+    });
+    var Y = 'y', N = 'n', L = 'l', A = 'a';
+    var raw = [
+      ['h', 'Selling'],
+      ['Make sales and take payments', Y, Y, Y, N, N],
+      ['Give discounts', Y, Y, 'Up to 5%', N, N],
+      ['Refund or void a sale', Y, Y, 'With approval', N, N],
+      ['Open and close a till', Y, Y, Y, N, N],
+      ['h', 'Stock'],
+      ['View stock levels', Y, Y, Y, Y, Y],
+      ['Receive deliveries and adjust stock', Y, Y, N, Y, N],
+      ['Change prices in the shop', Y, Y, N, N, N],
+      ['h', 'Reports & money'],
+      ['See own sales', Y, Y, Y, Y, N],
+      ['See all sales and reports', Y, Y, N, N, Y],
+      ['End-of-day totals and cash-up', Y, Y, N, N, Y],
+      ['Export for bookkeeping (CSV, PDF)', Y, N, N, N, Y],
+      ['h', 'Admin'],
+      ['Invite staff and assign roles', Y, A, N, N, N],
+      ['Change POS settings', Y, Y, N, N, N],
+      ['h', 'Udozo account (owner only)'],
+      ['Post or edit Udozo listings', L, N, N, N, N],
+      ['Wallet, payouts and bank details', L, N, N, N, N]
+    ];
+    var cell = function (v) {
+      if (v === Y) return { text: '✓', aria: 'Allowed', style: 'display: inline-flex; width: 28px; height: 28px; border-radius: 14px; align-items: center; justify-content: center; background: #E6F3EE; color: #075C43; font-weight: 700' };
+      if (v === N) return { text: '—', aria: 'Not allowed', style: 'color: #8A968F; font-weight: 600' };
+      if (v === L) return { text: 'Owner', aria: 'Owner only, through the Udozo account', style: 'font-size: 12px; font-weight: 700; border-radius: 6px; padding: 4px 8px; background: #10231C; color: #FFFFFF' };
+      if (v === A) return { text: 'Cashiers only', aria: 'Can invite cashiers only', style: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 4px 8px; background: #E3EEFB; color: #1D4F91' };
+      return { text: v, aria: v, style: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 4px 8px; background: #FDEFD9; color: #8A4B08' };
+    };
+    var perms = raw.map(function (r) {
+      if (r[0] === 'h') {
+        var blank = { text: '', aria: '', style: 'display: none' };
+        return { label: r[1], c0: blank, c1: blank, c2: blank, c3: blank, c4: blank, rowStyle: 'background: #F8FAF9; border-top: 1px solid #EDF0EE', labelStyle: 'padding: 10px 16px; font-size: 12px; font-weight: 700; color: #33413A; text-transform: uppercase; letter-spacing: 0.06em' };
+      }
+      return { label: r[0], c0: cell(r[1]), c1: cell(r[2]), c2: cell(r[3]), c3: cell(r[4]), c4: cell(r[5]), rowStyle: 'border-top: 1px solid #EDF0EE', labelStyle: 'padding: 12px 16px' };
+    });
+    var roleDefs = [
+      ['cashier', 'Cashier', 'Sells, takes payments and prints receipts. Small discounts only.'],
+      ['stock', 'Stock keeper', 'Receives deliveries and updates stock. Cannot sell.'],
+      ['manager', 'Manager', 'Everything in the shop, including refunds, reports and inviting cashiers.'],
+      ['accountant', 'Accountant', 'Sees all sales, end-of-day totals and exports. Cannot sell or change stock.']
+    ];
+    var roles = roleDefs.map(function (r) {
+      var on = self.state.role === r[0];
+      return { name: r[1], desc: r[2], on: on, pick: function () { self.setState({ role: r[0] }); },
+        style: 'display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE'),
+        dotStyle: 'flex: none; margin-top: 2px; width: 18px; height: 18px; border-radius: 9px; box-sizing: border-box; border: ' + (on ? '6px solid #0B7A5A' : '2px solid #8A968F') + '; background: #FFFFFF' };
+    });
+    var roleName = roleDefs.filter(function (r) { return r[0] === self.state.role; })[0][1];
+    var isStaff = this.state.tab === 'staff';
+    return { nav: this.navVals(),
+      isStaff: isStaff, isRoles: !isStaff,
+      staffTabStyle: seg(isStaff), rolesTabStyle: seg(!isStaff),
+      showStaff: function () { self.setState({ tab: 'staff' }); },
+      showRoles: function () { self.setState({ tab: 'roles' }); },
+      staff: staff, perms: perms, roles: roles, roleName: roleName,
+      showDiscount: this.state.role === 'cashier' || this.state.role === 'manager',
+      drawer: this.state.drawer, sent: this.state.sent, notSent: !this.state.sent,
+      openInvite: function () { self.setState({ drawer: true, sent: false }); },
+      closeInvite: function () { self.setState({ drawer: false }); },
+      send: function () { self.setState({ sent: true }); },
+      again: function () { self.setState({ sent: false }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

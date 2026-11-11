@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Receipt: print, email, WhatsApp</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 960px; background: #F4F6F4; display: flex; flex-direction: column">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #DCE2DE; padding: 14px 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+<a href="Main.dc.html" aria-label="Back to register" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #DCE2DE; display: flex; align-items: center; justify-content: center; color: #14201B"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></a>
+<div style="width: 40px; height: 40px; border-radius: 20px; background: #E6F3EE; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></div>
+<div style="display: flex; flex-direction: column; margin-right: auto">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 22px">Sale complete · ₦38,700</h1>
+<span style="font-size: 13px; color: #56635C">POS-10482 · Paid by bank transfer · Till 1 · Blessing M.</span>
+</div>
+<a href="Main.dc.html" style="height: 48px; display: flex; align-items: center; padding: 0 22px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 15px">Done · New sale</a>
+</header>
+
+<div style="flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 28px 24px 40px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+<section aria-label="Preview" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 14px; align-items: center">
+<div role="group" aria-label="Document" style="display: flex; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 4px; gap: 4px; align-self: stretch">
+<button type="button" sc-camel-on-click="{{docReceipt}}" aria-pressed="{{isReceipt}}" style="{{receiptTab}}">Receipt</button>
+<button type="button" sc-camel-on-click="{{docInvoice}}" aria-pressed="{{isInvoice}}" style="{{invoiceTab}}">A4 invoice</button>
+</div>
+
+<sc-if value="{{isReceipt}}" hint-placeholder-val="{{true}}">
+<div style="width: 300px; background: #FFFFFF; border-radius: 4px; box-shadow: 0 1px 2px rgba(20,32,27,0.08), 0 8px 24px rgba(20,32,27,0.10); padding: 22px 18px; box-sizing: border-box; font-family: 'IBM Plex Mono',monospace; font-size: 12px; color: #14201B; display: flex; flex-direction: column; gap: 10px">
+<div style="text-align: center; display: flex; flex-direction: column; gap: 3px">
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 18px; font-weight: 700">Ada's Gadget Hub</span>
+<span>[Shop address]</span><span>[Phone] · TIN [Number]</span>
+</div>
+<div style="border-top: 1px dashed #8A968F"></div>
+<div style="display: flex; justify-content: space-between"><span>POS-10482</span><span>10/11/26 16:12</span></div>
+<div style="border-top: 1px dashed #8A968F"></div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between"><span>Wireless Earbuds Pro</span><span>18,500</span></div>
+<div style="display: flex; justify-content: space-between"><span>USB-C Charger 25W ×2</span><span>15,000</span></div>
+<div style="display: flex; justify-content: space-between"><span>Tempered Glass</span><span>2,500</span></div>
+</div>
+<div style="border-top: 1px dashed #8A968F"></div>
+<div style="display: flex; justify-content: space-between"><span>Subtotal</span><span>36,000</span></div>
+<div style="display: flex; justify-content: space-between"><span>VAT 7.5%</span><span>2,700</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 600"><span>TOTAL ₦</span><span>38,700</span></div>
+<div style="display: flex; justify-content: space-between"><span>Bank transfer</span><span>38,700</span></div>
+<div style="border-top: 1px dashed #8A968F"></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+<svg role="img" aria-label="Sample QR code" width="96" height="96" sc-camel-view-box="0 0 25 25" shape-rendering="crispEdges"><path d="{{qr}}" fill="#14201B"></path></svg>
+<span>Scan for a PDF copy on WhatsApp</span>
+<span>Thank you for shopping!</span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isInvoice}}" hint-placeholder-val="{{false}}">
+<div style="width: 340px; aspect-ratio: 794 / 1123; background: #FFFFFF; border-radius: 4px; box-shadow: 0 1px 2px rgba(20,32,27,0.08), 0 8px 24px rgba(20,32,27,0.10); padding: 26px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; font-size: 9px; color: #33413A">
+<div style="display: flex; justify-content: space-between; align-items: flex-start">
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 14px; font-weight: 700; color: #14201B">Ada's Gadget Hub</span>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px"><span style="font-family: 'Space Grotesk',sans-serif; font-size: 16px; font-weight: 700; color: #0B7A5A">INVOICE</span><span>INV-2026-0148</span></div>
+</div>
+<div style="display: flex; justify-content: space-between"><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 700; color: #14201B">Bill to</span><span>[Customer name]</span></div><div style="display: flex; flex-direction: column; gap: 2px; text-align: right"><span>Issued 10 Nov 2026</span><span style="color: #075C43; font-weight: 700">PAID</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #DCE2DE; padding-top: 8px">
+<div style="display: flex; justify-content: space-between"><span>Wireless Earbuds Pro × 1</span><span>₦18,500</span></div>
+<div style="display: flex; justify-content: space-between"><span>USB-C Fast Charger 25W × 2</span><span>₦15,000</span></div>
+<div style="display: flex; justify-content: space-between"><span>Tempered Glass Protector × 1</span><span>₦2,500</span></div>
+</div>
+<div style="margin-left: auto; width: 55%; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid #DCE2DE; padding-top: 8px">
+<div style="display: flex; justify-content: space-between"><span>Subtotal</span><span>₦36,000</span></div>
+<div style="display: flex; justify-content: space-between"><span>VAT 7.5%</span><span>₦2,700</span></div>
+<div style="display: flex; justify-content: space-between; font-weight: 700; color: #14201B; font-size: 11px"><span>Total</span><span>₦38,700</span></div>
+</div>
+<a href="Invoice.dc.html" style="margin-top: auto; font-size: 11px; font-weight: 600">Open full-size invoice</a>
+</div>
+</sc-if>
+<span style="font-size: 12px; color: #56635C">Sample receipt. Shop details come from Settings › Receipts.</span>
+</section>
+
+<section aria-label="Send receipt" style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 22px">How does the customer want it?</h2>
+<div role="group" aria-label="Delivery method" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px">
+<sc-for list="{{methods}}" as="m" hint-placeholder-count="4">
+<button type="button" sc-camel-on-click="{{m.pick}}" aria-pressed="{{m.on}}" style="{{m.style}}">
+<span style="{{m.iconWrap}}"><svg aria-hidden="true" width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{m.icon}}"></path></svg></span>
+<span style="font-weight: 700; font-size: 15px">{{m.label}}</span>
+<span style="font-size: 12px; color: #56635C; line-height: 1.4">{{m.hint}}</span>
+</button>
+</sc-for>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 18px; padding: 24px">
+
+<sc-if value="{{isQr}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: center">
+<div style="width: 232px; height: 232px; flex: none; border-radius: 16px; border: 1px solid #DCE2DE; display: flex; align-items: center; justify-content: center; background: #FFFFFF">
+<svg role="img" aria-label="QR code that opens WhatsApp with this receipt request" width="200" height="200" sc-camel-view-box="0 0 25 25" shape-rendering="crispEdges"><path d="{{qr}}" fill="#14201B"></path></svg>
+</div>
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 14px">
+<h3 style="margin: 0; font-size: 18px">Customer scans to get a PDF on WhatsApp</h3>
+<ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: #33413A; line-height: 1.5">
+<li>They point their phone camera at the code.</li>
+<li>WhatsApp opens a chat with Udozo Receipts, with "Receipt POS-10482" already typed.</li>
+<li>They tap send and the receipt arrives as a PDF within seconds.</li>
+</ol>
+<sc-if value="{{waiting}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 10px; background: #F4F6F4; border-radius: 12px; padding: 12px 14px; font-size: 14px">
+<span style="width: 10px; height: 10px; border-radius: 5px; background: #E39A3B"></span>
+<span style="flex: 1">Waiting for scan · code expires in 10 min</span>
+<button type="button" sc-camel-on-click="{{simulate}}" style="height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 12px; font-weight: 600; color: #33413A">Demo: customer scanned</button>
+</div>
+</sc-if>
+<sc-if value="{{delivered}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 10px; background: #E6F3EE; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #0E3B2D">
+<svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>
+<span style="flex: 1"><strong>PDF delivered</strong> to +234 803 ••• 4417 at 16:13. Number saved to this sale.</span>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isWa}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 520px">
+<h3 style="margin: 0; font-size: 18px">Send the PDF to their WhatsApp</h3>
+<div style="display: flex; gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A; width: 110px">Country
+<sc-raw-select style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 10px; font-size: 15px; background: #FFFFFF; color: #14201B"><option>+234</option></sc-raw-select></label>
+<label style="flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Phone number
+<input type="tel" placeholder="803 000 0000" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 16px; color: #14201B"></label>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Save number to customer list</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #0B7A5A">Send the A4 invoice instead of the receipt</label>
+<button type="button" style="height: 50px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 15px">Send PDF on WhatsApp</button>
+<span style="font-size: 12px; color: #56635C">Sent from the Udozo Receipts business number. Customers can reply to it to ask for a copy again.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{isEmail}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 520px">
+<h3 style="margin: 0; font-size: 18px">Email the receipt</h3>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Customer email
+<input type="email" placeholder="name@example.com" style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 16px; color: #14201B"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #33413A">Attach
+<sc-raw-select style="height: 48px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 12px; font-size: 15px; background: #FFFFFF; color: #14201B"><option>Receipt (PDF)</option><option>A4 invoice (PDF)</option><option>Both</option></sc-raw-select></label>
+<div style="background: #F4F6F4; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px">
+<span style="color: #56635C">Subject</span>
+<span style="font-weight: 600">Your receipt from Ada's Gadget Hub · ₦38,700</span>
+</div>
+<button type="button" style="height: 50px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 15px">Send email</button>
+</div>
+</sc-if>
+
+<sc-if value="{{isPrint}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 520px">
+<h3 style="margin: 0; font-size: 18px">Print</h3>
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 13px; font-weight: 600; color: #33413A; padding: 0 0 8px">Printer</legend>
+<sc-for list="{{printers}}" as="p" hint-placeholder-count="3">
+<button type="button" sc-camel-on-click="{{p.pick}}" aria-pressed="{{p.on}}" style="{{p.style}}">
+<span style="{{p.dot}}"></span>
+<span style="display: flex; flex-direction: column; gap: 2px; text-align: left; flex: 1"><span style="font-weight: 700; font-size: 14px; color: #14201B">{{p.name}}</span><span style="font-size: 12px; color: #56635C">{{p.meta}}</span></span>
+<span style="{{p.statusStyle}}">{{p.status}}</span>
+</button>
+</sc-for>
+</fieldset>
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
+<span style="font-size: 14px; font-weight: 600">Copies</span>
+<div style="display: flex; align-items: center; gap: 6px">
+<button type="button" sc-camel-on-click="{{lessCopies}}" aria-label="Fewer copies" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 18px; color: #14201B">−</button>
+<span style="min-width: 28px; text-align: center; font-weight: 700; font-size: 16px">{{copies}}</span>
+<button type="button" sc-camel-on-click="{{moreCopies}}" aria-label="More copies" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 18px; color: #14201B">+</button>
+</div>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #0B7A5A">Gift receipt (hide prices)</label>
+<label style="display: flex; align-items: center; gap: 10px; font-size: 14px"><input type="checkbox" checked="" style="width: 20px; height: 20px; accent-color: #0B7A5A">Print the WhatsApp QR code on the receipt</label>
+<button type="button" style="height: 50px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 15px">{{printLabel}}</button>
+</div>
+</sc-if>
+</div>
+
+<label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #33413A; width: 288px; height: 45px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #0B7A5A">Always print a receipt after each sale on this till</label>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { method: 'qr', doc: 'receipt', delivered: false, printer: 0, copies: 1 };
+  }
+  qrPath() {
+    var n = 25, d = '', seed = 48211;
+    var rnd = function () { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    var finder = function (x, y) {
+      var c = [[0, 0], [n - 7, 0], [0, n - 7]];
+      for (var i = 0; i < 3; i++) {
+        var dx = x - c[i][0], dy = y - c[i][1];
+        if (dx >= -1 && dx <= 7 && dy >= -1 && dy <= 7) {
+          if (dx < 0 || dy < 0 || dx > 6 || dy > 6) return 0;
+          if (dx === 0 || dy === 0 || dx === 6 || dy === 6) return 1;
+          if (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4) return 1;
+          return 0;
+        }
+      }
+      return -1;
+    };
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        var f = finder(x, y);
+        var on = f === -1 ? (y === 6 ? x % 2 === 0 : (x === 6 ? y % 2 === 0 : rnd() < 0.5)) : f === 1;
+        if (on) d += 'M' + x + ' ' + y + 'h1v1h-1z';
+      }
+    }
+    return d;
+  }
+  renderVals() {
+    var self = this; var st = this.state;
+    var seg = function (on) { return 'flex: 1; height: 40px; border-radius: 9px; border: 0; font-weight: 600; font-size: 14px; background: ' + (on ? '#14201B' : 'transparent') + '; color: ' + (on ? '#FFFFFF' : '#33413A'); };
+    var defs = [
+      ['qr', 'Show QR code', 'Customer scans, gets PDF on WhatsApp', 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2'],
+      ['wa', 'WhatsApp', 'Type their number, we send the PDF', 'M21 12a9 9 0 01-13.5 7.8L3 21l1.2-4.5A9 9 0 1121 12zM8.5 9.5c.5 2.5 2.5 4.5 5 5l1.5-1.5 2 1-1 2c-4 0-8-4-8-8l2-1 1 2z'],
+      ['email', 'Email', 'Receipt or invoice as a PDF attachment', 'M3 6h18v12H3zM3 6l9 7 9-7'],
+      ['print', 'Print', 'Thermal receipt or A4 invoice', 'M7 8V3h10v5M7 17H4v-7h16v7h-3M7 14h10v7H7z']
+    ];
+    var methods = defs.map(function (m) {
+      var on = st.method === m[0];
+      return { label: m[1], hint: m[2], icon: m[3], on: on, pick: function () { self.setState({ method: m[0] }); },
+        style: 'display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; border-radius: 16px; text-align: left; color: #14201B; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE'),
+        iconWrap: 'width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: ' + (on ? '#0B7A5A' : '#F4F6F4') + '; color: ' + (on ? '#FFFFFF' : '#14201B') };
+    });
+    var pdefs = [['Thermal 80mm · Till 1', 'Bluetooth · receipt roll', 'Connected'], ['Thermal 58mm · Mobile', 'Bluetooth · pocket printer', 'Off'], ['Office printer (A4)', 'Wi-Fi · prints the invoice', 'Ready']];
+    var printers = pdefs.map(function (p, i) {
+      var on = st.printer === i; var ok = p[2] !== 'Off';
+      return { name: p[0], meta: p[1], status: p[2], on: on, pick: function () { self.setState({ printer: i }); },
+        style: 'display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE'),
+        dot: 'flex: none; width: 18px; height: 18px; border-radius: 9px; box-sizing: border-box; background: #FFFFFF; border: ' + (on ? '6px solid #0B7A5A' : '2px solid #8A968F'),
+        statusStyle: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 3px 8px; background: ' + (ok ? '#E6F3EE' : '#EEF1EF') + '; color: ' + (ok ? '#075C43' : '#44524B') };
+    });
+    var isReceipt = st.doc === 'receipt';
+    return {
+      qr: this.qrPath(), methods: methods, printers: printers,
+      isQr: st.method === 'qr', isWa: st.method === 'wa', isEmail: st.method === 'email', isPrint: st.method === 'print',
+      isReceipt: isReceipt, isInvoice: !isReceipt, receiptTab: seg(isReceipt), invoiceTab: seg(!isReceipt),
+      docReceipt: function () { self.setState({ doc: 'receipt' }); },
+      docInvoice: function () { self.setState({ doc: 'invoice' }); },
+      waiting: !st.delivered, delivered: st.delivered,
+      simulate: function () { self.setState({ delivered: true }); },
+      copies: st.copies,
+      lessCopies: function () { if (st.copies > 1) self.setState({ copies: st.copies - 1 }); },
+      moreCopies: function () { if (st.copies < 5) self.setState({ copies: st.copies + 1 }); },
+      printLabel: 'Print ' + st.copies + (st.copies > 1 ? ' copies' : ' copy') + (st.printer === 2 ? ' of the invoice' : ' of the receipt')
+    };
+  }
+}
+</script>
+
+
+</body></html>

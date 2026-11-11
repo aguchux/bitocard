@@ -1076,6 +1076,8 @@ enum AccountKind {
   /// below zero.
   connect_centre_earnings
   connect_auction_held
+  /// Udozo POS (docs/UDOZO_POS_PLAN.md): its plans' monthly fees, paid from the owner's Udozo wallet. Revenue.
+  pos_revenue
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -2850,6 +2852,7 @@ model Customer {
   connectAuctionsWon        ConnectAuction[]          @relation("ConnectAuctionBuyer")
   auctionsSelling           ConnectAuction[]          @relation("ConnectAuctionSeller")
   connectTransfers          ConnectTransfer[]         @relation("ConnectTransferRecipient")
+  posAccount                PosAccount?
   connectAuctionBids        ConnectAuctionBid[]
   connectAuctionClaims      ConnectAuctionClaim[]     @relation("ConnectAuctionClaimSeller")
 }
@@ -7876,4 +7879,132 @@ model ConnectAuctionBid {
   @@index([auctionId, amountMinor])
   @@index([bidderId])
   @@map("connect_auction_bids")
+}
+
+/// Udozo POS (docs/UDOZO_POS_PLAN.md): its three plans (Free, Premium, Multi-shop), set by Udozo's finance team: a
+/// monthly price per market currency (minor units; a paid plan without one is not offered there), the limits (null is
+/// unlimited) and the free trial.
+model PosPlan {
+  code        String   @id
+  name        String
+  description String
+  /// { "NGN": 1500000 }: the monthly price per currency, in minor units. Free has none.
+  prices      Json     @default("{}")
+  /// { "products": 50, "shops": 1, "tills": 2, "staff": 3 }: null or missing is unlimited.
+  limits      Json     @default("{}")
+  trialDays   Int      @default(0) @map("trial_days")
+  shown       Boolean  @default(true)
+  position    Int      @default(0)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  accounts    PosAccount[]
+
+  @@map("pos_plans")
+}
+
+/// A shop owner's Udozo POS account: one per Udozo customer, in their own country and currency. A paid plan is paid up
+/// to `period_end` (the trial's end while trialling); the `pos` job renews it then, from the owner's wallet.
+model PosAccount {
+  id                 String       @id @default(uuid()) @db.Uuid
+  customerId         String       @unique @map("customer_id") @db.Uuid
+  mode               LedgerMode
+  country            String       @db.VarChar(2)
+  currency           String       @db.VarChar(10)
+  planCode           String       @map("plan_code")
+  /// While trialling a paid plan: nothing is charged until it ends.
+  trialEndsAt        DateTime?    @map("trial_ends_at")
+  /// The paid plan was trialled once; never again.
+  trialUsedAt        DateTime?    @map("trial_used_at")
+  periodStart        DateTime?    @map("period_start")
+  periodEnd          DateTime?    @map("period_end")
+  /// A cheaper plan (or Free) taking over at the period's end.
+  nextPlanCode       String?      @map("next_plan_code")
+  /// A renewal the wallet could not pay: the plan stays for 7 days, then drops to Free.
+  pastDueSince       DateTime?    @map("past_due_since")
+  /// The paid plan it dropped from, to offer it back.
+  lapsedPlanCode     String?      @map("lapsed_plan_code")
+  /// The period whose renewal reminder was sent (its end), so it is sent once.
+  remindedFor        DateTime?    @map("reminded_for")
+  /// While the `pos` job (or a plan change) is working on it.
+  claimedAt          DateTime?    @map("claimed_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  customer           Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  plan               PosPlan      @relation(fields: [planCode], references: [code])
+  shops              PosShop[]
+  charges            PosCharge[]
+
+  @@index([planCode, periodEnd])
+  @@map("pos_accounts")
+}
+
+/// A shop of a POS account (one on Free and Premium, several on Multi-shop), with what its receipts say.
+model PosShop {
+  id            String     @id @default(uuid()) @db.Uuid
+  accountId     String     @map("account_id") @db.Uuid
+  name          String
+  address       String?
+  phone         String?
+  tin           String?
+  /// Staff sign in with it: three letters and four digits (ADA-4821), unique.
+  shopCode      String     @unique @map("shop_code")
+  /// VAT added to sales, in basis points (750 is 7.5%); 0 adds none.
+  vatBps        Int        @default(0) @map("vat_bps")
+  receiptFooter String?    @map("receipt_footer")
+  position      Int        @default(0)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tills         PosTill[]
+
+  @@index([accountId, position])
+  @@map("pos_shops")
+}
+
+/// A counter (till) in a shop, with its receipt printer's paper width.
+model PosTill {
+  id           String   @id @default(uuid()) @db.Uuid
+  shopId       String   @map("shop_id") @db.Uuid
+  name         String
+  printerWidth Int      @default(80) @map("printer_width")
+  autoPrint    Boolean  @default(false) @map("auto_print")
+  position     Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  shop         PosShop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, position])
+  @@map("pos_tills")
+}
+
+/// Every plan charge taken from the owner's wallet: an invoice (`PI-000123`), its ledger entry by `reference`.
+model PosCharge {
+  id          String     @id @default(uuid()) @db.Uuid
+  number      Int        @unique @default(autoincrement())
+  accountId   String     @map("account_id") @db.Uuid
+  planCode    String     @map("plan_code")
+  /// `signup`, `renewal` or `upgrade`.
+  kind        String
+  periodStart DateTime   @map("period_start")
+  periodEnd   DateTime   @map("period_end")
+  /// The plan's price, the credit for the unused part of the plan before (upgrades), and what was taken.
+  priceMinor  BigInt     @map("price_minor")
+  creditMinor BigInt     @default(0) @map("credit_minor")
+  amountMinor BigInt     @map("amount_minor")
+  currency    String     @db.VarChar(10)
+  mode        LedgerMode
+  reference   String     @unique
+  createdAt   DateTime   @default(now()) @map("created_at")
+  account     PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@map("pos_charges")
+}
+
+/// Where pos.udozo.com's download buttons go, once each app is in its store (null or missing: Coming soon).
+model PosAppLink {
+  platform  String   @id
+  url       String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("pos_app_links")
 }

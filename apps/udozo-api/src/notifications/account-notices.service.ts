@@ -58,4 +58,12 @@ export class AccountNotices {
       if (customer) await this.send(customer.email, notice, this.integrations.config.STOREFRONT_URL);
     }, customerId);
   }
+
+  /** To a udozo.com customer, linking into another of Udozo's own sites (pos.udozo.com) instead of udozo.com. */
+  customerAt(customerId: string, notice: AccountNotice, base: string) {
+    this.later(async () => {
+      const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { email: true } });
+      if (customer) await this.send(customer.email, notice, base);
+    }, customerId);
+  }
 }

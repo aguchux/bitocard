@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Sales overview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 1180px; display: flex; flex-wrap: wrap; background: #F4F6F4">
+
+<nav aria-label="Main" style="{{nav.navStyle}}">
+<div style="{{nav.headStyle}}">
+<div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+<div style="width: 34px; height: 34px; flex: none; border-radius: 10px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</div>
+<div style="{{nav.brandStyle}}">
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 17px; white-space: nowrap">Udozo POS</span>
+<span style="font-size: 12px; color: #B9CCC3; white-space: nowrap">Ada's Gadget Hub</span>
+</div>
+</div>
+<button type="button" sc-camel-on-click="{{nav.toggle}}" aria-expanded="{{nav.expanded}}" aria-label="{{nav.toggleLabel}}" title="{{nav.toggleLabel}}" style="width: 44px; height: 44px; flex: none; border-radius: 10px; border: 1px solid #2A4A3D; background: #1A3329; color: #D6E3DD; display: flex; align-items: center; justify-content: center; padding: 0"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{nav.chevStyle}}"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16M16 10l-2 2 2 2"></path></svg></button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<a href="Main.dc.html" title="Sell" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M7 20h10M12 16v4"></path></svg><span style="{{nav.lbl}}">Sell</span></a>
+<a href="Dashboard.dc.html" title="Overview" aria-current="page" style="{{nav.activeStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span style="{{nav.lbl}}">Overview</span></a>
+<a href="Inventory.dc.html" title="Inventory" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"></path></svg><span style="{{nav.lbl}}">Inventory</span></a>
+<a href="Settlements.dc.html" title="Sales history" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3zM9 8h6M9 12h6"></path></svg><span style="{{nav.lbl}}">Sales history</span></a>
+<a href="#" title="Customers" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5"></path></svg><span style="{{nav.lbl}}">Customers</span></a>
+<a href="PostListing.dc.html" title="Post on Udozo" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 5v14M5 12h14"></path></svg><span style="{{nav.lbl}}">Post on Udozo</span></a>
+<a href="Staff.dc.html" title="Settings" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 000 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"></path></svg><span style="{{nav.lbl}}">Settings</span></a>
+</div>
+<sc-if value="{{nav.open}}" hint-placeholder-val="{{true}}">
+<div style="margin-top: auto; background: #1A3329; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #B9CCC3">Till 1 · Shift open 08:02</span>
+<span style="font-size: 14px; font-weight: 600">Cashier: Ada O.</span>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8FE0C2"><span style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>Synced with Udozo</div>
+</div>
+</sc-if>
+<sc-if value="{{nav.min}}" hint-placeholder-val="{{false}}">
+<div title="Cashier: Ada O. · Synced with Udozo" style="margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="width: 38px; height: 38px; border-radius: 19px; background: #1A3329; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700">AO</span>
+<span role="img" aria-label="Synced with Udozo" style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>
+</div>
+</sc-if>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; padding: 24px 28px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">Sales overview</h1>
+<span style="font-size: 13px; color: #56635C">Tuesday, 10 November · in-shop and Udozo online combined</span>
+</div>
+<div role="group" aria-label="Date range" style="display: flex; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 4px; gap: 4px">
+<button type="button" aria-pressed="true" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 0; background: #14201B; color: #FFFFFF; font-weight: 600; font-size: 13px">Today</button>
+<button type="button" aria-pressed="false" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 0; background: transparent; color: #33413A; font-weight: 600; font-size: 13px">7 days</button>
+<button type="button" aria-pressed="false" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 0; background: transparent; color: #33413A; font-weight: 600; font-size: 13px">30 days</button>
+<button type="button" aria-pressed="false" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 0; background: transparent; color: #33413A; font-weight: 600; font-size: 13px">Custom</button>
+</div>
+<a href="Main.dc.html" style="height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 14px"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>New sale</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; color: #56635C; font-weight: 500">Sales today</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 30px; font-weight: 700">₦325,400</span>
+<span style="font-size: 12px; color: #075C43; font-weight: 600">▲ 12% vs last Tuesday, same time</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; color: #56635C; font-weight: 500">Transactions</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 30px; font-weight: 700">42</span>
+<span style="font-size: 12px; color: #56635C">34 in shop · 8 Udozo online</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; color: #56635C; font-weight: 500">Average basket</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 30px; font-weight: 700">₦7,748</span>
+<span style="font-size: 12px; color: #A2251A; font-weight: 600">▼ 3% vs last Tuesday</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; color: #56635C; font-weight: 500">Items sold</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 30px; font-weight: 700">96</span>
+<span style="font-size: 12px; color: #56635C">3 products now below reorder level</span>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 14px">
+<section aria-label="Sales by hour" style="flex: 2 1 520px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px">
+<h2 style="margin: 0 auto 0 0; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Sales by hour</h2>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #33413A"><span style="width: 10px; height: 10px; border-radius: 3px; background: #0B7A5A"></span>In shop (POS)</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #33413A"><span style="width: 10px; height: 10px; border-radius: 3px; background: #E39A3B"></span>Udozo online</span>
+</div>
+<div style="display: flex; gap: 10px; height: 220px">
+<div style="display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: #56635C; padding-bottom: 22px; text-align: right; min-width: 34px">
+<span>₦60k</span><span>₦40k</span><span>₦20k</span><span>₦0</span>
+</div>
+<div style="flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 8px; border-bottom: 1px solid #DCE2DE; padding-bottom: 0; position: relative">
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="13">
+<div style="flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative">
+<div title="{{h.tip}}" style="{{h.onlineStyle}}"></div>
+<div title="{{h.tip}}" style="{{h.posStyle}}"></div>
+<span style="position: absolute; bottom: -22px; font-size: 11px; color: #56635C">{{h.label}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<span style="font-size: 12px; color: #56635C; padding-top: 8px">Busiest hour so far: 13:00 – 14:00 (₦61,000). Remaining hours fill in as you sell.</span>
+</section>
+
+<section aria-label="Where sales come from" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Channel &amp; payment</h2>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px">
+<div style="width: 72%; background: #0B7A5A"></div>
+<div style="width: 28%; background: #E39A3B"></div>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="color: #56635C">In shop (POS) · 72%</span><span style="font-weight: 700; font-size: 16px">₦234,288</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; text-align: right"><span style="color: #56635C">Udozo online · 28%</span><span style="font-weight: 700; font-size: 16px">₦91,112</span></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #EDF0EE; padding-top: 16px">
+<span style="font-size: 13px; font-weight: 600; color: #33413A">Payment methods</span>
+<sc-for list="{{payMix}}" as="m" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 13px"><span>{{m.label}}</span><span style="font-weight: 600">{{m.pct}}</span></div>
+<div style="height: 8px; border-radius: 4px; background: #EDF0EE"><div style="{{m.barStyle}}"></div></div>
+</div>
+</sc-for>
+</div>
+</section>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 14px">
+<section aria-label="Top sellers" style="flex: 1.3 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline"><h2 style="margin: 0 auto 0 0; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Top sellers today</h2><a href="#" style="font-size: 13px; font-weight: 600">See all</a></div>
+<div style="overflow-x: auto">
+<sc-raw-table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px">
+<sc-raw-thead><sc-raw-tr style="text-align: left; color: #56635C; font-size: 12px"><sc-raw-th style="padding: 8px 0; font-weight: 600">Product</sc-raw-th><sc-raw-th style="padding: 8px 0; font-weight: 600; text-align: right">Sold</sc-raw-th><sc-raw-th style="padding: 8px 0; font-weight: 600; text-align: right">Revenue</sc-raw-th></sc-raw-tr></sc-raw-thead>
+<sc-raw-tbody>
+<sc-raw-tr style="border-top: 1px solid #EDF0EE"><sc-raw-td style="padding: 11px 0">Wireless Earbuds Pro</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right">6</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right; font-weight: 600">₦111,000</sc-raw-td></sc-raw-tr>
+<sc-raw-tr style="border-top: 1px solid #EDF0EE"><sc-raw-td style="padding: 11px 0">USB-C Fast Charger 25W</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right">9</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right; font-weight: 600">₦67,500</sc-raw-td></sc-raw-tr>
+<sc-raw-tr style="border-top: 1px solid #EDF0EE"><sc-raw-td style="padding: 11px 0">Power Bank 20,000mAh</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right">3</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right; font-weight: 600">₦63,000</sc-raw-td></sc-raw-tr>
+<sc-raw-tr style="border-top: 1px solid #EDF0EE"><sc-raw-td style="padding: 11px 0">Tempered Glass Protector</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right">14</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right; font-weight: 600">₦35,000</sc-raw-td></sc-raw-tr>
+<sc-raw-tr style="border-top: 1px solid #EDF0EE"><sc-raw-td style="padding: 11px 0">Bluetooth Speaker Mini</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right">2</sc-raw-td><sc-raw-td style="padding: 11px 0; text-align: right; font-weight: 600">₦30,000</sc-raw-td></sc-raw-tr>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+</section>
+
+<section aria-label="Recent sales" style="flex: 1.3 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: baseline"><h2 style="margin: 0 auto 0 0; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Recent sales</h2><a href="#" style="font-size: 13px; font-weight: 600">Sales history</a></div>
+<sc-for list="{{recent}}" as="r" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EDF0EE">
+<span style="{{r.badgeStyle}}">{{r.channel}}</span>
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0">
+<span style="font-size: 14px; font-weight: 600">{{r.id}}</span>
+<span style="font-size: 12px; color: #56635C">{{r.meta}}</span>
+</div>
+<span style="font-weight: 700; font-size: 14px">{{r.amount}}</span>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="Low stock" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline"><h2 style="margin: 0 auto 0 0; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Needs restocking</h2><a href="Inventory.dc.html" style="font-size: 13px; font-weight: 600">Inventory</a></div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: #FDE8E7">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-weight: 600; font-size: 14px">Silicone Phone Case</span><span style="font-size: 12px; font-weight: 700; color: #A2251A">Out of stock</span></div>
+<span style="font-size: 12px; color: #5B2420">Paused on Udozo until restocked</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: #FDEFD9">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-weight: 600; font-size: 14px">Smart Watch Band</span><span style="font-size: 12px; font-weight: 700; color: #8A4B08">3 left</span></div>
+<span style="font-size: 12px; color: #5A3405">Reorder level 5</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: #FDEFD9">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-weight: 600; font-size: 14px">Power Bank 20,000mAh</span><span style="font-size: 12px; font-weight: 700; color: #8A4B08">6 left</span></div>
+<span style="font-size: 12px; color: #5A3405">Reorder level 8 · selling 3 a day</span>
+</div>
+<button type="button" style="height: 46px; border-radius: 12px; border: 1px solid #0B7A5A; background: #FFFFFF; color: #075C43; font-weight: 700; font-size: 14px">Create restock order</button>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1180}}">
+class Component extends DCLogic {
+  navVals() {
+    var self = this;
+    var min = !!(this.state && this.state.navMin);
+    var link = 'display: flex; align-items: center; gap: 12px; border-radius: 10px; text-decoration: none; font-size: 14px; min-height: 44px; box-sizing: border-box; ' + (min ? 'justify-content: center; padding: 0' : 'padding: 11px 12px');
+    return {
+      open: !min, min: min, expanded: !min,
+      toggleLabel: min ? 'Expand menu' : 'Collapse menu',
+      toggle: function () { self.setState({ navMin: !min }); },
+      navStyle: 'background: #10231C; color: #FFFFFF; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; ' + (min ? 'flex: 0 0 76px; width: 76px; padding: 20px 10px' : 'flex: 1 1 220px; max-width: 100%; padding: 20px 14px'),
+      headStyle: 'display: flex; gap: 12px; ' + (min ? 'flex-direction: column; align-items: center' : 'align-items: center; justify-content: space-between; padding: 4px 0 4px 8px'),
+      brandStyle: min ? 'display: none' : 'display: flex; flex-direction: column; min-width: 0',
+      chevStyle: min ? 'transform: scaleX(-1)' : '',
+      lbl: min ? 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap' : 'white-space: nowrap',
+      linkStyle: link + '; color: #D6E3DD',
+      activeStyle: link + '; background: #19A47A; color: #FFFFFF; font-weight: 600'
+    };
+  }
+  renderVals() {
+    var data = [[8, 9, 3], [9, 21, 7], [10, 30, 11], [11, 29, 10], [12, 38, 14], [13, 45, 16], [14, 34, 14], [15, 28.288, 16.112], [16, 0, 0], [17, 0, 0], [18, 0, 0], [19, 0, 0], [20, 0, 0]];
+    var max = 60;
+    var hours = data.map(function (d) {
+      var pos = d[1], onl = d[2], future = pos + onl === 0;
+      return {
+        label: (d[0] < 10 ? '0' : '') + d[0] + ':00',
+        tip: future ? 'Not yet' : 'POS ₦' + Math.round(pos * 1000).toLocaleString('en-NG') + ' · Online ₦' + Math.round(onl * 1000).toLocaleString('en-NG'),
+        posStyle: future ? 'width: 100%; max-width: 34px; height: 4px; border-radius: 2px; background: #EDF0EE' : 'width: 100%; max-width: 34px; height: ' + (pos / max * 100) + '%; background: #0B7A5A; border-radius: 0 0 2px 2px',
+        onlineStyle: future ? 'display: none' : 'width: 100%; max-width: 34px; height: ' + (onl / max * 100) + '%; background: #E39A3B; border-radius: 4px 4px 0 0; margin-bottom: 2px'
+      };
+    });
+    var payMix = [['Udozo account (auto-confirmed)', 46, '#0B7A5A'], ['Cash', 28, '#3C6E5C'], ['Shop account (unverified)', 16, '#6F9C8B'], ['Card (recorded)', 10, '#E39A3B']].map(function (m) {
+      return { label: m[0], pct: m[1] + '%', barStyle: 'height: 8px; border-radius: 4px; width: ' + m[1] + '%; background: ' + m[2] };
+    });
+    var recent = [
+      ['POS-10481', 'POS', '15:46 · 3 items · Transfer', '₦25,800'],
+      ['UDZ-55302', 'Online', '15:31 · 1 item · Udozo Wallet · to dispatch', '₦18,500'],
+      ['POS-10480', 'POS', '15:22 · 1 item · Cash', '₦7,500'],
+      ['POS-10479', 'POS', '15:05 · 4 items · Card', '₦42,000'],
+      ['UDZ-55297', 'Online', '14:58 · 1 item · Transfer · pickup in shop', '₦3,500']
+    ].map(function (r) {
+      var pos = r[1] === 'POS';
+      return { id: r[0], channel: r[1], meta: r[2], amount: r[3],
+        badgeStyle: 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 4px 8px; min-width: 44px; text-align: center; ' + (pos ? 'background: #E6F3EE; color: #075C43' : 'background: #FDEFD9; color: #8A4B08') };
+    });
+    return { nav: this.navVals(), hours: hours, payMix: payMix, recent: recent };
+  }
+}
+</script>
+
+
+</body></html>

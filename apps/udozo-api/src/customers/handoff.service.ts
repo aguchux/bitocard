@@ -48,6 +48,8 @@ export class HandoffService {
     if (url.origin === store.origin) return url.origin;
     // Udozo Connect's dashboard, where Connect Centres apply and run their office with their Udozo account.
     if (this.config.APP_PRODUCT === 'udozo' && url.origin === new URL(this.config.CONNECT_URL).origin) return url.origin;
+    // Udozo POS, where shop owners run their tills with their Udozo account.
+    if (this.config.APP_PRODUCT === 'udozo' && url.origin === new URL(this.config.POS_URL).origin) return url.origin;
     const suffix = `.${store.host}`;
     const udozo = this.config.APP_PRODUCT === 'udozo';
     if (url.protocol === store.protocol && url.host.endsWith(suffix)) {

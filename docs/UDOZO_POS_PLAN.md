@@ -315,6 +315,55 @@ One local database per linked till (`udozo-pos-<shop>-<till>`), the same layout 
 - **Premium and Multi-shop** are paid monthly (yearly where set) from the wallet, with an optional trial. Moving from Free to a paid plan is charged at once.
 - **A paid plan that lapses** after its grace drops to Free's limits rather than stopping the POS: the till keeps selling the first 50 products, and the rest stay listed but cannot be sold at the till until the owner pays. A Multi-shop account that lapses keeps its main shop selling, and its other shops pause.
 
+## Build progress (pick up here)
+
+**Targets now (11 November 2026, the owner's decision): the web app (pos.udozo.com) and Windows.** Android and iOS come later.
+
+**The design** is saved in `docs/design/pos-ui/` as 22 design-canvas screens (`*.dc.html`, open with `support.js` beside them):
+- `PosLanding`, `Signup`, `PosLogin`, `Setup`, `Downloads`: milestone 1;
+- `Main` (the register), `Checkout`, `Inventory`, `Dashboard`: milestone 3;
+- `PostListing`: milestone 2;
+- `Staff`, `StaffLogin`, `AcceptInvite`: milestone 5;
+- `ReceiptShare`, `Receipt80mm`, `Invoice`, `CustomerQr`, `WhatsappReceipt`: milestone 6;
+- `PaymentsSettings`, `Settlements`: milestone 4;
+- `MobileSell`: later;
+- `Flow`: the whole journey.
+
+**The theme** to follow, which is the POS's own and not udozo.com's blue:
+- colours: primary green `#0B7A5A` (hover `#075C43`, the mark's tile `#19A47A`, a soft tint `#E6F3EE`); a dark green rail and header `#10231C` with panels `#1A3329` and borders `#2A4A3D`, its text `#D6E3DD` and muted `#B9CCC3`;
+- surfaces and text: text `#14201B`, secondary `#33413A`, muted `#56635C`; borders `#DCE2DE`; the page `#F4F6F4` on white cards;
+- warnings and errors: warning ink `#8A4B08` on `#FDEFD9`; error `#A2251A`;
+- type: headings in Space Grotesk 600/700, body in Inter;
+- shapes: cards with 18 to 20 px corners, buttons 44 to 56 px tall with 10 to 14 px corners.
+
+The design names its plans Starter, Business and Multi-shop with placeholder prices. **Use the owner's decided plans (Free, Premium, Multi-shop) and the prices finance sets.** The design's owner sign-in is an email and password form; **build it as Continue with Udozo (udozo.com's handoff)**, as decided, since pos.udozo.com never asks for a Udozo password.
+
+**Milestone 1: done so far (uncommitted work may exist; check `git status`):**
+- **API, in `apps/udozo-api/src/pos/`:**
+  - `money.ts`: sale totals (VAT added on the total after discounts, half-up rounding; the sample sale is ₦38,700), change, `addMonth`, `unusedCredit`;
+  - `plans.ts`: the plan codes `free`, `premium` and `multi_shop`, limits, `priceIn`, `offered`, `presentPlan`, shop codes like `ADA-4821`, `PI-000123` invoice numbers;
+  - `pos.service.ts`: the owner's status, sign-up (the shop, the first till, the plan; a trial charges nothing; otherwise paid from `customer_wallet` to `pos_revenue`), plan changes (dearer: charged now less unused credit; cheaper or Free: `next_plan` at the month's end; during a trial, swapped), shops and tills within limits (`pos_limit_reached`), charges;
+  - `billing.service.ts`: the hourly `pos` job (a reminder 3 days before, the renewal, 7 days' grace with notices, then Free with `lapsed_plan_code`);
+  - `pos-admin.service.ts`: accounts, plans (finance, step-up, audited `pos.plan_changed`), app links (store addresses only; Windows only `apps.microsoft.com/detail/<12 characters>`);
+  - `pos.controller.ts`: `GET /v1/pos/plans?country=`, `GET /v1/pos/apps` (public); `/v1/pos/owner` (`GET`, `POST signup`, `POST plan`, `GET charges`, `POST shops`, `PATCH shops/:id`, `POST shops/:id/tills`, `PATCH|DELETE tills/:id`; customer session); `/v1/admin/pos/accounts(/:id)`, `plans`, `PATCH plans/:code`, `apps`, `PUT apps/:platform`.
+- **Database:** migration `20270313000000_pos_foundation` makes `pos_plans` (seeded without prices), `pos_accounts`, `pos_shops`, `pos_tills`, `pos_charges` and `pos_app_links`, and adds `AccountKind` `pos_revenue`.
+- **Settings:** the switch `pos` (Udozo's, global or country, off), the notice type `customer.pos.plan`, `POS_URL` (default `https://pos.udozo.com`) as a handoff target, `AccountNotices.customerAt`, and the `pos` cron job (`jobs.ts`, `vercel.json` at `25 * * * *`).
+- **Tests:** `apps/udozo-api/test/pos.test.mjs`; `udozo-scope`, `vercel-crons` and `admin-step-up` updated.
+
+**Milestone 1: still to do, in order:**
+1. **`apps/udozo-pos` (`@udozo/pos`, port 3014)**, a Next.js app copied in structure from `apps/udozo-connect` (`lib/session.ts`, `lib/site.ts` with `POS_URL`, `lib/handoff-actions.ts`, `app/signin/route.ts`, `app/handoff/page.tsx`; its own cookie `udz_pos`), indexable for the public pages only:
+   - `/`: the landing page (`PosLanding`), with app buttons from `GET /v1/pos/apps`, Coming soon while null;
+   - `/pricing`, from `GET /v1/pos/plans?country=`;
+   - `/download` (`Downloads`): Windows goes to the Microsoft Store listing;
+   - `/signin` (`PosLogin`), with two doors: Continue with Udozo; staff sign-in arrives in milestone 5, so say so;
+   - `/signup` (`Signup`): connect, shop, plan, then pay from the wallet with Add funds on udozo.com (`/account/wallet`), then done;
+   - `/app` (after sign-in: the owner's home), `/app/setup` (`Setup`: shop details, VAT, tills), `/app/billing` (plan, change or cancel, invoices).
+   - Tests in `apps/udozo-pos/test` (Vitest), as Connect's.
+2. **Windows:** `apps/udozo-pos-windows`, a Tauri 2 shell with `src-tauri` (`tauri.conf.json`, `Cargo.toml`, `main.rs`): it opens pos.udozo.com in its own window for now (bundled screens and offline come in milestone 9), allows one copy at a time, builds an MSIX for the Microsoft Store, and works on Windows 10 or later. Rust is not installed on the owner's machine, so build it in CI (`windows-latest`, `tauri-apps/tauri-action`). Test the config with a Node test.
+3. **admin.udozo.com > POS:** accounts, plans and prices (finance, step-up), app links (operations), with hooks in `@bitocard/api-client/admin`.
+4. **AGENTS.md:** a Udozo POS entry, built, replacing "nothing built yet". Vercel project `udozo-pos` (root `apps/udozo-pos`, skip-unchanged, `VERCEL_DEEP_CLONE`), and DNS `pos.udozo.com` as a DNS-only CNAME in udozo.com's Cloudflare zone.
+5. **Legal:** POS terms (`/legal/pos` on udozo.com) before the switch goes on.
+
 ## Milestones (each a commit or a few, tested, deployable)
 
 0. **Plan:** this document saved and linked.

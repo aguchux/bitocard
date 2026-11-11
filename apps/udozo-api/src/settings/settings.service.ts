@@ -181,6 +181,11 @@ export const switchDefinitions = {
     description:
       "Udozo Connect: applications to run a Connect Centre on connect.udozo.com (docs/UDOZO_CONNECT_PLAN.md). On: customers in the market apply, pay the market's deposit from their UdozoPay wallet, and Udozo's team reviews, visits and approves them. Each state is open unless switched off on Connect > States. Off: no new applications (those under way finish).",
   },
+  pos: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo POS (pos.udozo.com, docs/UDOZO_POS_PLAN.md): shop owners in the market sign up with their Udozo account, choose Free, Premium or Multi-shop (paid from their Udozo wallet) and run their shop's tills. Off: pos.udozo.com still shows, and sign-up says it is coming to the country; accounts already open keep working.",
+  },
   connect_shipping: {
     scopes: ['global', 'country'],
     description:
@@ -298,6 +303,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'classifieds_wanted',
   'connect_applications',
   'connect_shipping',
+  'pos',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',

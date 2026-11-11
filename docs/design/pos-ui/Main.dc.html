@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Sell</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 960px; display: flex; flex-wrap: wrap; background: #F4F6F4">
+
+<nav aria-label="Main" style="{{nav.navStyle}}">
+<div style="{{nav.headStyle}}">
+<div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+<div style="width: 34px; height: 34px; flex: none; border-radius: 10px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</div>
+<div style="{{nav.brandStyle}}">
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 17px; white-space: nowrap">Udozo POS</span>
+<span style="font-size: 12px; color: #B9CCC3; white-space: nowrap">Ada's Gadget Hub</span>
+</div>
+</div>
+<button type="button" sc-camel-on-click="{{nav.toggle}}" aria-expanded="{{nav.expanded}}" aria-label="{{nav.toggleLabel}}" title="{{nav.toggleLabel}}" style="width: 44px; height: 44px; flex: none; border-radius: 10px; border: 1px solid #2A4A3D; background: #1A3329; color: #D6E3DD; display: flex; align-items: center; justify-content: center; padding: 0"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{nav.chevStyle}}"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16M16 10l-2 2 2 2"></path></svg></button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<a href="Main.dc.html" title="Sell" aria-current="page" style="{{nav.activeStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M7 20h10M12 16v4"></path></svg><span style="{{nav.lbl}}">Sell</span></a>
+<a href="Dashboard.dc.html" title="Overview" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span style="{{nav.lbl}}">Overview</span></a>
+<a href="Inventory.dc.html" title="Inventory" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"></path></svg><span style="{{nav.lbl}}">Inventory</span></a>
+<a href="Settlements.dc.html" title="Sales history" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3zM9 8h6M9 12h6"></path></svg><span style="{{nav.lbl}}">Sales history</span></a>
+<a href="#" title="Customers" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5"></path></svg><span style="{{nav.lbl}}">Customers</span></a>
+<a href="PostListing.dc.html" title="Post on Udozo" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 5v14M5 12h14"></path></svg><span style="{{nav.lbl}}">Post on Udozo</span></a>
+<a href="Staff.dc.html" title="Settings" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 000 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"></path></svg><span style="{{nav.lbl}}">Settings</span></a>
+</div>
+<sc-if value="{{nav.open}}" hint-placeholder-val="{{true}}">
+<div style="margin-top: auto; background: #1A3329; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #B9CCC3">Till 1 · Shift open 08:02</span>
+<span style="font-size: 14px; font-weight: 600">Cashier: Ada O.</span>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8FE0C2"><span style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>Synced with Udozo</div>
+</div>
+</sc-if>
+<sc-if value="{{nav.min}}" hint-placeholder-val="{{false}}">
+<div title="Cashier: Ada O. · Synced with Udozo" style="margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="width: 38px; height: 38px; border-radius: 19px; background: #1A3329; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700">AO</span>
+<span role="img" aria-label="Synced with Udozo" style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>
+</div>
+</sc-if>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap; align-items: stretch">
+
+<section aria-label="Products" style="flex: 999 1 520px; min-width: 0; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">New sale</h1>
+<span style="font-size: 13px; color: #56635C">Products listed on Udozo with POS enabled</span>
+</div>
+<label style="display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 0 14px; height: 46px; min-width: 260px; flex: 1 1 260px; max-width: 380px">
+<svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="#56635C" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search products</span>
+<input type="search" placeholder="Search name, SKU or barcode" style="border: 0; outline: none; background: transparent; font-size: 14px; flex: 1; min-width: 0; color: #14201B">
+</label>
+<button type="button" style="height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-radius: 12px; border: 1px solid #0B7A5A; background: #E6F3EE; color: #075C43; font-weight: 600; font-size: 14px"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M11 8v8M14 8v8M17 8v8"></path></svg>Scan barcode</button>
+</div>
+
+<div role="group" aria-label="Categories" style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="8">
+<button type="button" sc-camel-on-click="{{c.pick}}" aria-pressed="{{c.on}}" style="{{c.style}}">{{c.label}}</button>
+</sc-for>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 14px">
+<sc-for list="{{products}}" as="p" hint-placeholder-count="12">
+<button type="button" sc-camel-on-click="{{p.add}}" disabled="{{p.out}}" aria-label="{{p.aria}}" style="{{p.cardStyle}}">
+<div style="{{p.tileStyle}}">{{p.abbr}}</div>
+<div style="display: flex; flex-direction: column; gap: 4px; text-align: left; width: 100%">
+<span style="font-size: 14px; font-weight: 600; line-height: 1.3; min-height: 36px">{{p.name}}</span>
+<span style="font-size: 12px; color: #56635C">{{p.sku}}</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+<span style="font-family: 'Space Grotesk',sans-serif; font-size: 17px; font-weight: 700">{{p.priceLabel}}</span>
+<span style="{{p.stockStyle}}">{{p.stockLabel}}</span>
+</div>
+<sc-if value="{{p.online}}" hint-placeholder-val="{{true}}">
+<span style="position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 600; color: #075C43; background: #FFFFFF; border-radius: 6px; padding: 3px 7px">Also on Udozo</span>
+</sc-if>
+</button>
+</sc-for>
+</div>
+</section>
+
+<aside aria-label="Current sale" style="flex: 1 1 360px; max-width: 100%; background: #FFFFFF; border-left: 1px solid #DCE2DE; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+<sc-if value="{{notPaid}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 16px; height: 100%">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 20px">Current sale</h2>
+<span style="font-size: 13px; color: #56635C">{{itemCount}} items</span>
+</div>
+<button type="button" style="display: flex; align-items: center; gap: 10px; border: 1px dashed #B7C2BC; background: #F8FAF9; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #33413A; text-align: left"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>Add customer (phone or Udozo ID)</button>
+
+<div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 160px">
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: #56635C; font-size: 14px; padding: 40px 0">Tap a product or scan a barcode to start a sale</div>
+</sc-if>
+<sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #EDF0EE">
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0">
+<span style="font-size: 14px; font-weight: 600">{{l.name}}</span>
+<span style="font-size: 12px; color: #56635C">{{l.unit}} each</span>
+</div>
+<div style="display: flex; align-items: center; gap: 6px">
+<button type="button" sc-camel-on-click="{{l.dec}}" aria-label="{{l.decLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 18px; color: #14201B">−</button>
+<span style="min-width: 22px; text-align: center; font-weight: 600">{{l.qty}}</span>
+<button type="button" sc-camel-on-click="{{l.inc}}" aria-label="{{l.incLabel}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-size: 18px; color: #14201B">+</button>
+</div>
+<span style="min-width: 76px; text-align: right; font-weight: 600; font-size: 14px">{{l.total}}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #DCE2DE; padding-top: 14px">
+<div style="display: flex; justify-content: space-between"><span style="color: #56635C">Subtotal</span><span>{{subtotal}}</span></div>
+<div style="display: flex; justify-content: space-between"><span style="color: #56635C">Discount</span><button type="button" style="border: 0; background: none; color: #0B7A5A; font-weight: 600; font-size: 14px; padding: 0">Add discount</button></div>
+<div style="display: flex; justify-content: space-between"><span style="color: #56635C">VAT (7.5%)</span><span>{{vat}}</span></div>
+<div style="display: flex; justify-content: space-between; font-family: 'Space Grotesk',sans-serif; font-size: 22px; font-weight: 700; padding-top: 4px"><span>Total</span><span>{{total}}</span></div>
+</div>
+
+<div role="group" aria-label="Payment method" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{pays}}" as="m" hint-placeholder-count="4">
+<button type="button" sc-camel-on-click="{{m.pick}}" aria-pressed="{{m.on}}" style="{{m.style}}">{{m.label}}</button>
+</sc-for>
+</div>
+
+<div style="display: flex; gap: 8px">
+<button type="button" style="flex: 1; height: 52px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #14201B">Park sale</button>
+<a href="Checkout.dc.html" style="flex: 2.2; height: 52px; border-radius: 12px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px">Charge {{total}}</a>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{paid}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 60px 8px">
+<div style="width: 72px; height: 72px; border-radius: 36px; background: #E6F3EE; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="34" height="34" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></div>
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 24px">Sale complete</h2>
+<p style="margin: 0; color: #56635C; font-size: 14px; line-height: 1.5">{{paidSummary}}<br>Stock updated on Udozo.</p>
+<a href="ReceiptShare.dc.html" style="width: 100%; height: 48px; box-sizing: border-box; border-radius: 12px; border: 1px solid #0B7A5A; background: #E6F3EE; color: #075C43; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px">Receipt: print, email or WhatsApp</a>
+<button type="button" sc-camel-on-click="{{reset}}" style="width: 100%; height: 52px; border-radius: 12px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 16px">New sale</button>
+</div>
+</sc-if>
+</aside>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cart: { 1: 1, 2: 2, 6: 1 }, cat: 'All', pay: 'transfer', paid: false, receipt: '' };
+  }
+  navVals() {
+    var self = this;
+    var min = !!(this.state && this.state.navMin);
+    var link = 'display: flex; align-items: center; gap: 12px; border-radius: 10px; text-decoration: none; font-size: 14px; min-height: 44px; box-sizing: border-box; ' + (min ? 'justify-content: center; padding: 0' : 'padding: 11px 12px');
+    return {
+      open: !min, min: min, expanded: !min,
+      toggleLabel: min ? 'Expand menu' : 'Collapse menu',
+      toggle: function () { self.setState({ navMin: !min }); },
+      navStyle: 'background: #10231C; color: #FFFFFF; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; ' + (min ? 'flex: 0 0 76px; width: 76px; padding: 20px 10px' : 'flex: 1 1 220px; max-width: 100%; padding: 20px 14px'),
+      headStyle: 'display: flex; gap: 12px; ' + (min ? 'flex-direction: column; align-items: center' : 'align-items: center; justify-content: space-between; padding: 4px 0 4px 8px'),
+      brandStyle: min ? 'display: none' : 'display: flex; flex-direction: column; min-width: 0',
+      chevStyle: min ? 'transform: scaleX(-1)' : '',
+      lbl: min ? 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap' : 'white-space: nowrap',
+      linkStyle: link + '; color: #D6E3DD',
+      activeStyle: link + '; background: #19A47A; color: #FFFFFF; font-weight: 600'
+    };
+  }
+  renderVals() {
+    var self = this;
+    var fmt = function (n) { return '₦' + Math.round(n).toLocaleString('en-NG'); };
+    var tints = { Audio: ['#E3EEFB', '#1D4F91'], Chargers: ['#FDEFD9', '#8A4B08'], Power: ['#E6F3EE', '#075C43'], Cables: ['#EFE8FA', '#5B3A8E'], Cases: ['#FBE6EA', '#8E2A3E'], Wearables: ['#E2F4F6', '#1A5E66'], Storage: ['#F1F1EC', '#4A4A3A'], Accessories: ['#FFF3D6', '#7A5600'] };
+    var all = [
+      { id: 1, name: 'Wireless Earbuds Pro', sku: 'AUD-014', cat: 'Audio', price: 18500, stock: 24, online: true },
+      { id: 2, name: 'USB-C Fast Charger 25W', sku: 'CHG-031', cat: 'Chargers', price: 7500, stock: 41, online: true },
+      { id: 3, name: 'Power Bank 20,000mAh', sku: 'PWR-008', cat: 'Power', price: 21000, stock: 6, online: true },
+      { id: 4, name: 'USB-C to Lightning Cable 1m', sku: 'CBL-102', cat: 'Cables', price: 3500, stock: 88, online: true },
+      { id: 5, name: 'Silicone Phone Case', sku: 'CSE-210', cat: 'Cases', price: 4000, stock: 0, online: true },
+      { id: 6, name: 'Tempered Glass Protector', sku: 'SCR-055', cat: 'Cases', price: 2500, stock: 120, online: false },
+      { id: 7, name: 'Bluetooth Speaker Mini', sku: 'AUD-022', cat: 'Audio', price: 15000, stock: 9, online: true },
+      { id: 8, name: 'Smart Watch Band', sku: 'WRB-017', cat: 'Wearables', price: 3000, stock: 3, online: false },
+      { id: 9, name: 'Car Charger Dual USB', sku: 'CHG-044', cat: 'Chargers', price: 5500, stock: 17, online: true },
+      { id: 10, name: 'Ring Light 10 inch', sku: 'ACC-090', cat: 'Accessories', price: 12000, stock: 12, online: true },
+      { id: 11, name: 'Memory Card 64GB', sku: 'STO-012', cat: 'Storage', price: 6500, stock: 33, online: true },
+      { id: 12, name: 'Laptop Sleeve 15 inch', sku: 'ACC-071', cat: 'Accessories', price: 9000, stock: 14, online: false }
+    ];
+    var cart = this.state.cart;
+    var setQty = function (id, q) { var c = Object.assign({}, self.state.cart); if (q <= 0) { delete c[id]; } else { c[id] = q; } self.setState({ cart: c }); };
+    var catNames = ['All', 'Audio', 'Chargers', 'Power', 'Cables', 'Cases', 'Wearables', 'Storage', 'Accessories'];
+    var cats = catNames.map(function (c) {
+      var on = self.state.cat === c;
+      return { label: c, on: on, pick: function () { self.setState({ cat: c }); },
+        style: 'height: 44px; padding: 0 16px; border-radius: 22px; font-size: 14px; font-weight: 600; border: 1px solid ' + (on ? '#14201B' : '#DCE2DE') + '; background: ' + (on ? '#14201B' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#33413A') };
+    });
+    var products = all.filter(function (p) { return self.state.cat === 'All' || p.cat === self.state.cat; }).map(function (p) {
+      var t = tints[p.cat]; var out = p.stock === 0; var low = !out && p.stock <= 6; var inCart = cart[p.id] || 0;
+      return {
+        name: p.name, sku: p.sku, online: p.online, out: out, priceLabel: fmt(p.price),
+        abbr: p.name.split(' ').slice(0, 2).map(function (w) { return w[0]; }).join(''),
+        aria: 'Add ' + p.name + ', ' + fmt(p.price) + (out ? ', out of stock' : ''),
+        stockLabel: out ? 'Out of stock' : (low ? 'Only ' + p.stock + ' left' : p.stock + ' in stock'),
+        stockStyle: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 3px 7px; ' + (out ? 'background: #FDE8E7; color: #A2251A' : (low ? 'background: #FDEFD9; color: #8A4B08' : 'background: #EEF1EF; color: #44524B')),
+        tileStyle: 'width: 100%; height: 88px; border-radius: 10px; background: ' + t[0] + '; color: ' + t[1] + '; display: flex; align-items: center; justify-content: center; font-family: Space Grotesk, sans-serif; font-weight: 700; font-size: 26px',
+        cardStyle: 'position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 10px 10px 12px; border-radius: 14px; background: #FFFFFF; color: #14201B; border: ' + (inCart ? '2px solid #0B7A5A' : '1px solid #DCE2DE') + '; opacity: ' + (out ? '0.55' : '1'),
+        add: function () { var q = self.state.cart[p.id] || 0; if (q < p.stock) { setQty(p.id, q + 1); } }
+      };
+    });
+    var subtotal = 0; var count = 0;
+    var lines = all.filter(function (p) { return cart[p.id]; }).map(function (p) {
+      var q = cart[p.id]; subtotal += q * p.price; count += q;
+      return { name: p.name, qty: q, unit: fmt(p.price), total: fmt(q * p.price),
+        incLabel: 'Add one ' + p.name, decLabel: 'Remove one ' + p.name,
+        inc: function () { if (q < p.stock) { setQty(p.id, q + 1); } }, dec: function () { setQty(p.id, q - 1); } };
+    });
+    var vat = subtotal * 0.075; var total = subtotal + vat;
+    var payNames = [['transfer', 'Udozo account'], ['cash', 'Cash'], ['own', 'Shop account'], ['card', 'Card (recorded)']];
+    var pays = payNames.map(function (m) {
+      var on = self.state.pay === m[0];
+      return { label: m[1], on: on, pick: function () { self.setState({ pay: m[0] }); },
+        style: 'height: 46px; border-radius: 10px; font-size: 14px; font-weight: 600; border: ' + (on ? '2px solid #0B7A5A' : '1px solid #DCE2DE') + '; background: ' + (on ? '#E6F3EE' : '#FFFFFF') + '; color: ' + (on ? '#075C43' : '#33413A') };
+    });
+    var payLabel = payNames.filter(function (m) { return m[0] === self.state.pay; })[0][1];
+    return { nav: this.navVals(),
+      cats: cats, products: products, lines: lines, pays: pays,
+      itemCount: count, empty: count === 0, subtotal: fmt(subtotal), vat: fmt(vat), total: fmt(total),
+      paid: this.state.paid, notPaid: !this.state.paid,
+      paidSummary: this.state.receipt,
+      charge: function () { self.setState({ paid: true, receipt: fmt(total) + ' paid by ' + payLabel + ' · Receipt #POS-10482' }); },
+      reset: function () { self.setState({ paid: false, cart: {}, receipt: '' }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

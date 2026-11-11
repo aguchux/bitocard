@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — Settlements</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#F4F6F4}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 1100px; display: flex; flex-wrap: wrap; background: #F4F6F4">
+<nav aria-label="Main" style="{{nav.navStyle}}">
+<div style="{{nav.headStyle}}">
+<div style="display: flex; align-items: center; gap: 10px; min-width: 0">
+<div style="width: 34px; height: 34px; flex: none; border-radius: 10px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</div>
+<div style="{{nav.brandStyle}}">
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 17px; white-space: nowrap">Udozo POS</span>
+<span style="font-size: 12px; color: #B9CCC3; white-space: nowrap">Ada's Gadget Hub</span>
+</div>
+</div>
+<button type="button" sc-camel-on-click="{{nav.toggle}}" aria-expanded="{{nav.expanded}}" aria-label="{{nav.toggleLabel}}" title="{{nav.toggleLabel}}" style="width: 44px; height: 44px; flex: none; border-radius: 10px; border: 1px solid #2A4A3D; background: #1A3329; color: #D6E3DD; display: flex; align-items: center; justify-content: center; padding: 0"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{nav.chevStyle}}"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16M16 10l-2 2 2 2"></path></svg></button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<a href="Main.dc.html" title="Sell" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M7 20h10M12 16v4"></path></svg><span style="{{nav.lbl}}">Sell</span></a>
+<a href="Dashboard.dc.html" title="Overview" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span style="{{nav.lbl}}">Overview</span></a>
+<a href="Inventory.dc.html" title="Inventory" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"></path></svg><span style="{{nav.lbl}}">Inventory</span></a>
+<a href="Settlements.dc.html" title="Sales history" aria-current="page" style="{{nav.activeStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3zM9 8h6M9 12h6"></path></svg><span style="{{nav.lbl}}">Sales history</span></a>
+<a href="#" title="Customers" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5"></path></svg><span style="{{nav.lbl}}">Customers</span></a>
+<a href="PostListing.dc.html" title="Post on Udozo" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 5v14M5 12h14"></path></svg><span style="{{nav.lbl}}">Post on Udozo</span></a>
+<a href="Staff.dc.html" title="Settings" style="{{nav.linkStyle}}"><svg aria-hidden="true" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 000 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"></path></svg><span style="{{nav.lbl}}">Settings</span></a>
+</div>
+<sc-if value="{{nav.open}}" hint-placeholder-val="{{true}}">
+<div style="margin-top: auto; background: #1A3329; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #B9CCC3">Signed in with Udozo account</span>
+<span style="font-size: 14px; font-weight: 600">Ada Okafor · Owner</span>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8FE0C2"><span style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>Synced with Udozo</div>
+</div>
+</sc-if>
+<sc-if value="{{nav.min}}" hint-placeholder-val="{{false}}">
+<div title="Ada Okafor · Owner · Synced with Udozo" style="margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="width: 38px; height: 38px; border-radius: 19px; background: #1A3329; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700">AO</span>
+<span role="img" aria-label="Synced with Udozo" style="width: 8px; height: 8px; border-radius: 4px; background: #3DDC97"></span>
+</div>
+</sc-if>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 24px 28px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto">
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">Money</h1>
+<span style="font-size: 13px; color: #56635C">Settlements from your Udozo collection account, and how today's shop sales were paid</span>
+</div>
+<button type="button" style="height: 46px; padding: 0 16px; border-radius: 12px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #14201B">Export CSV</button>
+</div>
+
+<div role="tablist" aria-label="Money views" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #DCE2DE">
+<button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 14px; border: 0; background: none; font-size: 14px; color: #56635C">Sales</button>
+<button type="button" role="tab" aria-selected="{{isSettle}}" sc-camel-on-click="{{showSettle}}" style="{{settleTab}}">Settlements</button>
+<button type="button" role="tab" aria-selected="{{isUnmatched}}" sc-camel-on-click="{{showUnmatched}}" style="{{unmatchedTab}}">{{unmatchedLabel}}</button>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; color: #56635C">Paid to your bank today</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">{{paidToday}}</span><span style="font-size: 12px; color: #56635C">For sales on Mon 9 Nov</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; color: #56635C">Settling tomorrow</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">{{tomorrow}}</span><span style="font-size: 12px; color: #56635C">Today's collection-account sales, after fees</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; color: #56635C">Fees, last 4 days</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700">{{fees}}</span><span style="font-size: 12px; color: #56635C">Sample rate 0.5% until agreed</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; color: #56635C">Unmatched transfers</span><span style="font-family: 'Space Grotesk',sans-serif; font-size: 26px; font-weight: 700; color: #8A4B08">{{openCount}}</span><span style="font-size: 12px; color: #56635C">Need a manager to assign</span></div>
+</div>
+
+<sc-if value="{{isSettle}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start">
+<section aria-label="Settlements" style="flex: 2 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; overflow-x: auto">
+<sc-raw-table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px">
+<sc-raw-thead><sc-raw-tr style="text-align: left; color: #56635C; font-size: 12px; background: #F8FAF9">
+<sc-raw-th style="padding: 12px 16px; font-weight: 600">Sales date</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600; text-align: right">Transfers</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600; text-align: right">Gross</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600; text-align: right">Fees</sc-raw-th>
+<sc-raw-th style="padding: 12px 8px; font-weight: 600; text-align: right">Net to bank</sc-raw-th>
+<sc-raw-th style="padding: 12px 16px; font-weight: 600">Status</sc-raw-th>
+</sc-raw-tr></sc-raw-thead>
+<sc-raw-tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+<sc-raw-tr style="border-top: 1px solid #EDF0EE">
+<sc-raw-td style="padding: 12px 16px; font-weight: 600">{{r.date}}</sc-raw-td>
+<sc-raw-td style="padding: 12px 8px; text-align: right">{{r.count}}</sc-raw-td>
+<sc-raw-td style="padding: 12px 8px; text-align: right">{{r.gross}}</sc-raw-td>
+<sc-raw-td style="padding: 12px 8px; text-align: right; color: #33413A">{{r.fee}}</sc-raw-td>
+<sc-raw-td style="padding: 12px 8px; text-align: right; font-weight: 700">{{r.net}}</sc-raw-td>
+<sc-raw-td style="padding: 12px 16px"><span style="{{r.statusStyle}}">{{r.status}}</span></sc-raw-td>
+</sc-raw-tr>
+</sc-for>
+</sc-raw-tbody>
+</sc-raw-table>
+</section>
+
+<section aria-label="Today's payment methods" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 18px">Today in the shop</h2>
+<sc-for list="{{split}}" as="m" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 14px"><span>{{m.label}}</span><span style="font-weight: 700">{{m.amount}}</span></div>
+<div style="height: 8px; border-radius: 4px; background: #EDF0EE"><div style="{{m.bar}}"></div></div>
+<span style="font-size: 12px; color: #56635C">{{m.note}}</span>
+</div>
+</sc-for>
+<div style="display: flex; justify-content: space-between; border-top: 1px solid #EDF0EE; padding-top: 10px; font-weight: 700"><span>Total in-shop sales</span><span>₦234,288</span></div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{isUnmatched}}" hint-placeholder-val="{{false}}">
+<section aria-label="Unmatched transfers" style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 4px">
+<p style="margin: 0 0 8px; font-size: 14px; color: #33413A; line-height: 1.5">Money that reached your collection account but couldn't be matched to one sale. Assign it to the right sale, or refund it.</p>
+<sc-for list="{{unmatched}}" as="u" hint-placeholder-count="2">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid #EDF0EE">
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0">
+<span style="font-weight: 700; font-size: 15px">{{u.amount}} from {{u.sender}}</span>
+<span style="font-size: 12px; color: #56635C">{{u.meta}}</span>
+</div>
+<sc-if value="{{u.open}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="{{u.selId}}">Sale to assign</label>
+<sc-raw-select id="{{u.selId}}" style="height: 44px; border-radius: 10px; border: 1px solid #DCE2DE; padding: 0 10px; font-size: 14px; background: #FFFFFF; color: #14201B"><option>{{u.suggest}}</option><option>Pick another sale…</option></sc-raw-select>
+<button type="button" sc-camel-on-click="{{u.assign}}" style="height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: #0B7A5A; color: #FFFFFF; font-weight: 700; font-size: 14px">Assign</button>
+<button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #DCE2DE; background: #FFFFFF; font-weight: 600; font-size: 14px; color: #A2251A">Refund</button>
+</div>
+</sc-if>
+<sc-if value="{{u.done}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 13px; font-weight: 700; color: #075C43; background: #E6F3EE; border-radius: 6px; padding: 6px 10px">Assigned to {{u.suggest}}</span>
+</sc-if>
+</div>
+</sc-for>
+</section>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1100}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'settle', assigned: {} };
+  }
+  navVals() {
+    var self = this;
+    var min = !!(this.state && this.state.navMin);
+    var link = 'display: flex; align-items: center; gap: 12px; border-radius: 10px; text-decoration: none; font-size: 14px; min-height: 44px; box-sizing: border-box; ' + (min ? 'justify-content: center; padding: 0' : 'padding: 11px 12px');
+    return {
+      open: !min, min: min, expanded: !min,
+      toggleLabel: min ? 'Expand menu' : 'Collapse menu',
+      toggle: function () { self.setState({ navMin: !min }); },
+      navStyle: 'background: #10231C; color: #FFFFFF; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; ' + (min ? 'flex: 0 0 76px; width: 76px; padding: 20px 10px' : 'flex: 1 1 220px; max-width: 100%; padding: 20px 14px'),
+      headStyle: 'display: flex; gap: 12px; ' + (min ? 'flex-direction: column; align-items: center' : 'align-items: center; justify-content: space-between; padding: 4px 0 4px 8px'),
+      brandStyle: min ? 'display: none' : 'display: flex; flex-direction: column; min-width: 0',
+      chevStyle: min ? 'transform: scaleX(-1)' : '',
+      lbl: min ? 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap' : 'white-space: nowrap',
+      linkStyle: link + '; color: #D6E3DD',
+      activeStyle: link + '; background: #19A47A; color: #FFFFFF; font-weight: 600'
+    };
+  }
+  renderVals() {
+    var self = this; var st = this.state;
+    var fmt = function (n) { return '₦' + Math.round(n).toLocaleString('en-NG'); };
+    var rate = 0.005;
+    var data = [['Tue 10 Nov (today)', 14, 108000, 'Settles Wed 11 Nov'], ['Mon 9 Nov', 12, 98300, 'Paid Tue 10 Nov'], ['Sun 8 Nov', 21, 164900, 'Paid Mon 9 Nov'], ['Sat 7 Nov', 15, 120450, 'Paid Mon 9 Nov']];
+    var fees = 0;
+    var rows = data.map(function (d) {
+      var fee = Math.round(d[2] * rate); fees += fee; var paid = d[3].indexOf('Paid') === 0;
+      return { date: d[0], count: d[1], gross: fmt(d[2]), fee: fmt(fee), net: fmt(d[2] - fee), status: d[3],
+        statusStyle: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 4px 8px; white-space: nowrap; background: ' + (paid ? '#E6F3EE' : '#FDEFD9') + '; color: ' + (paid ? '#075C43' : '#8A4B08') };
+    });
+    var sp = [['Udozo account', 108000, '#0B7A5A', 'Auto-confirmed · settles next working day'], ['Cash', 65600, '#3C6E5C', 'In the drawer · count at cash-up'], ['Shop account (unverified)', 38188, '#6F9C8B', 'Confirmed by cashier · check your bank'], ['Card (recorded)', 22500, '#E39A3B', 'From your own terminal']];
+    var split = sp.map(function (m) { return { label: m[0], amount: fmt(m[1]), note: m[3], bar: 'height: 8px; border-radius: 4px; width: ' + (m[1] / 234288 * 100) + '%; background: ' + m[2] }; });
+    var ud = [['u1', 25000, 'CHIAMAKA N.', 'Fixed account · Till 1 · 15:52 · no open sale for this amount', 'POS-10483 · ₦25,000 · 15:50'], ['u2', 3700, 'EMEKA O.', 'Sale account expired 14:40 · arrived 14:52', 'POS-10471 · ₦3,700 balance due']];
+    var open = 0;
+    var unmatched = ud.map(function (u) {
+      var done = !!st.assigned[u[0]]; if (!done) open++;
+      return { amount: fmt(u[1]), sender: u[2], meta: u[3], suggest: u[4], open: !done, done: done, selId: 'sel-' + u[0],
+        assign: function () { var a = Object.assign({}, self.state.assigned); a[u[0]] = true; self.setState({ assigned: a }); } };
+    });
+    var tab = function (on) { return 'height: 44px; padding: 0 14px; border: 0; background: none; font-size: 14px; box-sizing: border-box; ' + (on ? 'color: #14201B; font-weight: 700; border-bottom: 3px solid #0B7A5A' : 'color: #56635C'); };
+    var isSettle = st.tab === 'settle';
+    return {
+      nav: this.navVals(),
+      rows: rows, split: split, unmatched: unmatched,
+      paidToday: fmt(98300 - Math.round(98300 * rate)), tomorrow: fmt(108000 - Math.round(108000 * rate)), fees: fmt(fees), openCount: open,
+      unmatchedLabel: 'Unmatched transfers (' + open + ')',
+      isSettle: isSettle, isUnmatched: !isSettle, settleTab: tab(isSettle), unmatchedTab: tab(!isSettle),
+      showSettle: function () { self.setState({ tab: 'settle' }); },
+      showUnmatched: function () { self.setState({ tab: 'unmatched' }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

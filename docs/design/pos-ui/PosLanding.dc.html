@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Udozo POS — the till for udozo.com sellers</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14201B;background:#FFFFFF}
+button{font-family:inherit;cursor:pointer}
+a{color:#0B7A5A}a:hover{color:#075C43}
+:focus-visible{outline:2px solid #0B7A5A;outline-offset:2px}
+summary{cursor:pointer}
+</style>
+</helmet>
+<div style="background: #FFFFFF; display: flex; flex-direction: column">
+
+<header style="position: relative; background: #10231C; color: #FFFFFF">
+<div style="max-width: 1200px; margin: 0 auto; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px">
+<a href="PosLanding.dc.html" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; margin-right: auto">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #19A47A; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 18px">U</span>
+<span style="font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 19px">Udozo POS</span>
+</a>
+<nav aria-label="Site" style="display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 15px">
+<a href="#features" style="color: #D6E3DD; text-decoration: none">Features</a>
+<a href="#pricing" style="color: #D6E3DD; text-decoration: none">Pricing</a>
+<a href="#apps" style="color: #D6E3DD; text-decoration: none">Apps</a>
+<a href="#faq" style="color: #D6E3DD; text-decoration: none">FAQ</a>
+<a href="#" style="color: #D6E3DD; text-decoration: none">udozo.com</a>
+</nav>
+<a href="PosLogin.dc.html" style="height: 44px; display: flex; align-items: center; padding: 0 16px; border-radius: 10px; border: 1px solid #2A4A3D; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 14px">Sign in</a>
+<a href="Signup.dc.html" style="height: 44px; display: flex; align-items: center; padding: 0 18px; border-radius: 10px; background: #19A47A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 14px">Start free trial</a>
+</div>
+
+<div style="max-width: 1200px; margin: 0 auto; padding: 56px 24px 88px; display: flex; flex-wrap: wrap; gap: 48px; align-items: center">
+<div style="flex: 1 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 22px">
+<span style="align-self: flex-start; font-size: 13px; font-weight: 700; color: #8FE0C2; background: #1A3329; border-radius: 20px; padding: 6px 12px">For udozo.com sellers with a physical shop</span>
+<h1 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 56px; line-height: 1.05; text-wrap: balance">The till that already knows your Udozo stock</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.55; color: #D6E3DD; max-width: 540px; text-wrap: pretty">Connect your udozo.com seller account and your listings, categories and stock appear on the till. Sell in the shop, and online stock updates by itself.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<a href="Signup.dc.html" style="height: 56px; display: flex; align-items: center; padding: 0 26px; border-radius: 14px; background: #19A47A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 17px">Start your [X]-day free trial</a>
+<a href="#apps" style="height: 56px; display: flex; align-items: center; padding: 0 22px; border-radius: 14px; border: 1px solid #3C5E50; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 16px">Download the app</a>
+</div>
+<span style="font-size: 14px; color: #B9CCC3">Monthly plans from ₦[price]. Cancel anytime. You need a udozo.com seller account (free).</span>
+</div>
+
+<div aria-hidden="true" style="flex: 1 1 440px; min-width: 0; background: #F4F6F4; border-radius: 22px; padding: 16px; display: flex; gap: 12px; color: #14201B; box-shadow: 0 30px 60px rgba(0,0,0,0.35)">
+<div style="flex: 1.4; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div style="background: #FFFFFF; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px"><div style="height: 64px; border-radius: 8px; background: #E3EEFB"></div><span style="font-size: 12px; font-weight: 600">Wireless Earbuds Pro</span><span style="font-size: 13px; font-weight: 700">₦18,500</span></div>
+<div style="background: #FFFFFF; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; border: 2px solid #0B7A5A"><div style="height: 64px; border-radius: 8px; background: #FDEFD9"></div><span style="font-size: 12px; font-weight: 600">USB-C Charger 25W</span><span style="font-size: 13px; font-weight: 700">₦7,500</span></div>
+<div style="background: #FFFFFF; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px"><div style="height: 64px; border-radius: 8px; background: #E6F3EE"></div><span style="font-size: 12px; font-weight: 600">Power Bank 20,000</span><span style="font-size: 11px; font-weight: 600; color: #8A4B08">Only 6 left</span></div>
+<div style="background: #FFFFFF; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px"><div style="height: 64px; border-radius: 8px; background: #EFE8FA"></div><span style="font-size: 12px; font-weight: 600">Lightning Cable 1m</span><span style="font-size: 13px; font-weight: 700">₦3,500</span></div>
+</div>
+<div style="flex: 1; background: #FFFFFF; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+<span style="font-weight: 700; font-size: 14px">Current sale</span>
+<div style="display: flex; justify-content: space-between"><span>Earbuds Pro</span><span>18,500</span></div>
+<div style="display: flex; justify-content: space-between"><span>Charger ×2</span><span>15,000</span></div>
+<div style="margin-top: auto; border-top: 1px solid #DCE2DE; padding-top: 8px; display: flex; justify-content: space-between; font-weight: 700; font-size: 15px"><span>Total</span><span>₦36,013</span></div>
+<div style="height: 38px; border-radius: 10px; background: #0B7A5A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700">Charge</div>
+<div style="display: flex; align-items: center; gap: 6px; color: #075C43; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #19A47A"></span>Synced with udozo.com</div>
+</div>
+</div>
+</div>
+</header>
+
+<section aria-label="How it works" style="max-width: 1200px; margin: 0 auto; padding: 80px 24px 40px; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; gap: 28px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 36px; text-align: center">Open your till in three steps</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px">
+<div style="border: 1px solid #DCE2DE; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 10px"><span style="font-family: 'Space Grotesk',sans-serif; font-size: 34px; font-weight: 700; color: #0B7A5A">1</span><h3 style="margin: 0; font-size: 19px">Tick “Sell at POS” on udozo.com</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">List products as usual with category, price and quantity. Tick the ones you also sell in your shop.</p></div>
+<div style="border: 1px solid #DCE2DE; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 10px"><span style="font-family: 'Space Grotesk',sans-serif; font-size: 34px; font-weight: 700; color: #0B7A5A">2</span><h3 style="margin: 0; font-size: 19px">Sign up and connect your account</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Choose a monthly plan and connect your Udozo seller account. Your products land on the till in seconds.</p></div>
+<div style="border: 1px solid #DCE2DE; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 10px"><span style="font-family: 'Space Grotesk',sans-serif; font-size: 34px; font-weight: 700; color: #0B7A5A">3</span><h3 style="margin: 0; font-size: 19px">Invite your team and sell</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Add cashiers, managers and your accountant. They sign in with a PIN on the web or the app.</p></div>
+</div>
+</section>
+
+<section id="features" aria-label="Features" style="max-width: 1200px; margin: 0 auto; padding: 48px 24px; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; gap: 28px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 36px; text-align: center">Built around how you already sell</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px">
+<div style="background: #F4F6F4; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 18px">One stock count</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Shop sales and online orders take from the same number. Sold-out items pause on udozo.com by themselves.</p></div>
+<div style="background: #F4F6F4; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 18px">Fast checkout</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Scan or tap, then take cash, transfer, card or Udozo Wallet. VAT is worked out for you.</p></div>
+<div style="background: #F4F6F4; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 18px">Receipts on WhatsApp</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Customers scan a code and get a PDF receipt on WhatsApp. Or print, or send by email.</p></div>
+<div style="background: #F4F6F4; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 18px">Staff and roles</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Cashiers, managers, stock keepers and accountants each see only what they need. Your Udozo account stays yours.</p></div>
+<div style="background: #F4F6F4; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 18px">Keeps selling offline</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">The apps keep taking sales when the internet drops and sync when it's back.</p></div>
+<div style="background: #F4F6F4; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 18px">Reports your accountant wants</h3><p style="margin: 0; font-size: 15px; color: #33413A; line-height: 1.55">Daily totals, cash-up, best sellers and stock value, with exports for bookkeeping.</p></div>
+</div>
+</section>
+
+<section id="apps" aria-label="Apps" style="background: #10231C; color: #FFFFFF; margin-top: 40px">
+<div style="max-width: 1200px; margin: 0 auto; padding: 64px 24px; display: flex; flex-wrap: wrap; gap: 32px; align-items: center">
+<div style="flex: 1 1 380px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 36px">On the counter, on your phone, in the browser</h2>
+<p style="margin: 0; font-size: 16px; color: #D6E3DD; line-height: 1.55">Install Udozo POS on Android, iPhone, iPad or a Windows PC, or just open pos.udozo.com. One sign-in everywhere.</p>
+</div>
+<div style="flex: 1 1 480px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<a href="Downloads.dc.html" style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-radius: 14px; background: #FFFFFF; color: #14201B; text-decoration: none; font-weight: 700; font-size: 15px"><svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M11 18h2"></path></svg><span style="display: flex; flex-direction: column"><span style="font-size: 12px; font-weight: 500; color: #56635C">Get it on</span>Google Play</span></a>
+<a href="Downloads.dc.html" style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-radius: 14px; background: #FFFFFF; color: #14201B; text-decoration: none; font-weight: 700; font-size: 15px"><svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="3"></rect><path d="M11 18h2"></path></svg><span style="display: flex; flex-direction: column"><span style="font-size: 12px; font-weight: 500; color: #56635C">Download on the</span>App Store</span></a>
+<a href="Downloads.dc.html" style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-radius: 14px; background: #FFFFFF; color: #14201B; text-decoration: none; font-weight: 700; font-size: 15px"><svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg><span style="display: flex; flex-direction: column"><span style="font-size: 12px; font-weight: 500; color: #56635C">Download for</span>Windows</span></a>
+<a href="PosLogin.dc.html" style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-radius: 14px; border: 1px solid #3C5E50; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 15px"><svg aria-hidden="true" width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"></path></svg><span style="display: flex; flex-direction: column"><span style="font-size: 12px; font-weight: 500; color: #B9CCC3">Use in browser</span>pos.udozo.com</span></a>
+</div>
+</div>
+</section>
+
+<section id="pricing" aria-label="Pricing" style="max-width: 1200px; margin: 0 auto; padding: 80px 24px 48px; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; gap: 24px; align-items: center">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 36px; text-align: center">Simple monthly plans</h2>
+<p style="margin: 0; font-size: 16px; color: #33413A; text-align: center">Every plan starts with a [X]-day free trial. Billed to your Udozo account.</p>
+<div role="group" aria-label="Billing period" style="display: flex; background: #F4F6F4; border-radius: 12px; padding: 4px; gap: 4px">
+<button type="button" sc-camel-on-click="{{monthly}}" aria-pressed="{{isMonthly}}" style="{{monthlyTab}}">Monthly</button>
+<button type="button" sc-camel-on-click="{{yearly}}" aria-pressed="{{isYearly}}" style="{{yearlyTab}}">Yearly · save [X]%</button>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; width: 100%">
+<sc-for list="{{plans}}" as="p" hint-placeholder-count="3">
+<div style="{{p.cardStyle}}">
+<sc-if value="{{p.popular}}" hint-placeholder-val="{{false}}"><span style="align-self: flex-start; font-size: 12px; font-weight: 700; color: #FFFFFF; background: #0B7A5A; border-radius: 6px; padding: 4px 10px">Most popular</span></sc-if>
+<h3 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 24px">{{p.name}}</h3>
+<span style="font-size: 14px; color: #33413A">{{p.who}}</span>
+<div style="display: flex; align-items: baseline; gap: 6px"><span style="font-family: 'Space Grotesk',sans-serif; font-size: 38px; font-weight: 700">₦[price]</span><span style="font-size: 14px; color: #56635C">{{period}}</span></div>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+<sc-for list="{{p.features}}" as="f" hint-placeholder-count="4"><li style="display: flex; gap: 10px"><span style="color: #0B7A5A; font-weight: 700">✓</span>{{f.t}}</li></sc-for>
+</ul>
+<a href="Signup.dc.html" style="{{p.ctaStyle}}">Start free trial</a>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 13px; color: #56635C">Prices are placeholders. VAT may apply. Udozo marketplace fees on online sales are separate.</span>
+</section>
+
+<section id="faq" aria-label="Questions" style="max-width: 820px; margin: 0 auto; padding: 32px 24px 64px; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0 0 12px; font-family: 'Space Grotesk',sans-serif; font-size: 32px; text-align: center">Questions</h2>
+<details style="border: 1px solid #DCE2DE; border-radius: 14px; padding: 18px 20px"><summary style="font-weight: 700; font-size: 16px">Do I need a udozo.com account?</summary><p style="margin: 10px 0 0; font-size: 15px; color: #33413A; line-height: 1.55">Yes, the shop owner signs up with a Udozo seller account, which is free. Your staff don't need one; they get a PIN.</p></details>
+<details style="border: 1px solid #DCE2DE; border-radius: 14px; padding: 18px 20px"><summary style="font-weight: 700; font-size: 16px">Can I sell items that aren't shown online?</summary><p style="margin: 10px 0 0; font-size: 15px; color: #33413A; line-height: 1.55">Yes. Add them on udozo.com, tick "Sell at POS" and set them to shop only.</p></details>
+<details style="border: 1px solid #DCE2DE; border-radius: 14px; padding: 18px 20px"><summary style="font-weight: 700; font-size: 16px">What equipment do I need?</summary><p style="margin: 10px 0 0; font-size: 15px; color: #33413A; line-height: 1.55">Any phone, tablet or PC works. Bluetooth or USB receipt printers, barcode scanners and cash drawers are optional.</p></details>
+<details style="border: 1px solid #DCE2DE; border-radius: 14px; padding: 18px 20px"><summary style="font-weight: 700; font-size: 16px">Can I cancel?</summary><p style="margin: 10px 0 0; font-size: 15px; color: #33413A; line-height: 1.55">Anytime, from Settings › Plan. Your udozo.com listings keep working as before.</p></details>
+</section>
+
+<section aria-label="Get started" style="background: #E6F3EE">
+<div style="max-width: 1200px; margin: 0 auto; padding: 56px 24px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between">
+<h2 style="margin: 0; font-family: 'Space Grotesk',sans-serif; font-size: 32px; max-width: 620px">Ready to open your till?</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<a href="Signup.dc.html" style="height: 56px; display: flex; align-items: center; padding: 0 26px; border-radius: 14px; background: #0B7A5A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 17px">Start free trial</a>
+<a href="PosLogin.dc.html" style="height: 56px; display: flex; align-items: center; padding: 0 22px; border-radius: 14px; border: 1px solid #0B7A5A; color: #075C43; text-decoration: none; font-weight: 700; font-size: 16px">Sign in</a>
+</div>
+</div>
+</section>
+
+<footer style="background: #10231C; color: #B9CCC3; font-size: 14px">
+<div style="max-width: 1200px; margin: 0 auto; padding: 32px 24px; display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center">
+<span style="margin-right: auto">Udozo POS is part of udozo.com</span>
+<a href="#" style="color: #D6E3DD">Help centre</a>
+<a href="#" style="color: #D6E3DD">Terms</a>
+<a href="#" style="color: #D6E3DD">Privacy</a>
+<a href="#" style="color: #D6E3DD">Contact sales</a>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:3400}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { yearly: false };
+  }
+  renderVals() {
+    var self = this; var y = this.state.yearly;
+    var tab = function (on) { return 'height: 44px; padding: 0 18px; border-radius: 9px; border: 0; font-weight: 700; font-size: 14px; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#14201B' : '#56635C') + '; box-shadow: ' + (on ? '0 1px 2px rgba(20,32,27,0.12)' : 'none'); };
+    var defs = [
+      ['Starter', 'One shop, one counter', false, ['1 shop · 1 till', 'Up to 3 staff', 'Receipts by WhatsApp, email and print', 'Daily sales report']],
+      ['Business', 'Busy shops with a team', true, ['1 shop · up to 3 tills', 'Up to 15 staff, all roles', 'Accountant exports and cash-up', 'Offline selling on the apps']],
+      ['Multi-shop', 'Several branches', false, ['Up to 5 shops · unlimited tills', 'Unlimited staff', 'Stock transfers between shops', 'Priority support']]
+    ];
+    var plans = defs.map(function (d) {
+      return { name: d[0], who: d[1], popular: d[2], features: d[3].map(function (t) { return { t: t }; }),
+        cardStyle: 'display: flex; flex-direction: column; gap: 14px; padding: 26px; border-radius: 20px; background: #FFFFFF; border: ' + (d[2] ? '2px solid #0B7A5A' : '1px solid #DCE2DE'),
+        ctaStyle: 'margin-top: auto; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 700; font-size: 15px; ' + (d[2] ? 'background: #0B7A5A; color: #FFFFFF' : 'border: 1px solid #0B7A5A; color: #075C43') };
+    });
+    return {
+      plans: plans, period: y ? '/month, billed yearly' : '/month',
+      isMonthly: !y, isYearly: y, monthlyTab: tab(!y), yearlyTab: tab(y),
+      monthly: function () { self.setState({ yearly: false }); },
+      yearly: function () { self.setState({ yearly: true }); }
+    };
+  }
+}
+</script>
+
+
+</body></html>

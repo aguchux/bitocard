@@ -23,6 +23,7 @@ export const jobOwners: Readonly<Record<string, Product>> = {
   marketing: 'udozo',
   'seller-scores': 'udozo',
   whatsapp: 'udozo',
+  pos: 'udozo',
 };
 
 /** Whether a job runs on this product's instance. */
