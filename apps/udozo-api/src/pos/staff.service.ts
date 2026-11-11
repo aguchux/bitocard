@@ -689,6 +689,27 @@ export class PosStaffService {
     return { object: 'list' as const, data: rows.map(row => ({ object: 'pos_approval' as const, id: row.id, action: row.action, subject_id: row.subjectId, requested_by: row.requestedByName, approved_by: row.approvedByName, till_id: row.tillId, created_at: row.createdAt.toISOString() })) };
   }
 
+  /**
+   * Who may approve at the session's till what this member of staff may not do alone: active colleagues whose role
+   * sells (a bigger discount, up to their own limit), refunds or changes stock outright. Names and roles only.
+   */
+  async approvers(context: PosStaffContext) {
+    const rows = await this.prisma.posStaff.findMany({ where: { accountId: context.account.id, status: 'active', id: { not: context.staff.id } }, include: staffInclude, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] });
+    const tills = context.tillId ? [context.tillId] : context.tills === 'all' ? null : context.tills;
+    return rows
+      .filter(row => !tills || row.allTills || row.tills.some(item => tills.includes(item.tillId)))
+      .map(row => ({ row, role: this.resolveRole(row) }))
+      .filter(({ role }) => ['sell', 'refund', 'stock_adjust'].some(key => role.permissions[key as PosPermission] === 'yes'))
+      .map(({ row, role }) => ({
+        id: row.id,
+        name: fullName(row),
+        role: role.name,
+        discount_limit_bps: role.permissions.sell === 'yes' ? role.discountLimitBps : 0,
+        refund: role.permissions.refund === 'yes',
+        stock_adjust: role.permissions.stock_adjust === 'yes',
+      }));
+  }
+
   /** What a staff session may do, for the till to hide what it cannot (the API decides). */
   presentContext(context: PosStaffContext) {
     return {

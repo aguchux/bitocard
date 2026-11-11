@@ -16,6 +16,7 @@ import { PosSalesService } from './sales.service.js';
 import { PosWalletService, walletTokenPattern } from './wallet.service.js';
 import { posPlanCodes } from './plans.js';
 import { PosService } from './pos.service.js';
+import { PosStaffService } from './staff.service.js';
 import { posShopKindCodes, presentShopKind } from './shop-kinds.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
@@ -690,7 +691,19 @@ export class AdminPosController {
     private readonly admin: PosAdminService,
     private readonly customers: PosCustomersService,
     private readonly collections: PosCollectionsService,
+    private readonly staff: PosStaffService,
   ) {}
+
+  /**
+   * An account's staff (role, tills, status, last active; never PINs), its own roles, its tills' linked devices and
+   * the latest managers' approvals, read only.
+   */
+  @Get('accounts/:id/staff')
+  async accountStaff(@Param('id', ParseUUIDPipe) id: string) {
+    await this.admin.account(id);
+    const [staff, roles, devices, approvals] = await Promise.all([this.staff.list(id), this.staff.roles(id), this.staff.devices(id), this.staff.approvals(id, 20)]);
+    return { object: 'pos_account_staff' as const, staff, roles, devices: devices.data, approvals: approvals.data };
+  }
 
   /** Transfers into every owner's collection accounts (or one account's), newest first. */
   @Get('collections')

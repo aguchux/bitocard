@@ -414,6 +414,8 @@ export class PosStaffController {
       currency: me.currency,
       account: { id: account.id, mode: account.mode, plan: { code: account.plan.code, name: account.plan.name }, shops },
       transfer_accounts: transferAccounts,
+      /** Who may give a manager's PIN at this till, for what this role may only do with approval. */
+      approvers: await this.staff.approvers(context),
     };
   }
 

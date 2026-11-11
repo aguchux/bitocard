@@ -336,6 +336,15 @@ describe('every role against every route', () => {
     assert.equal((await prisma.posStaff.findUniqueOrThrow({ where: { id: staff.manager.id } })).failedTries, 0, 'the right PIN clears the wrong one');
   });
 
+  test('the till lists who may approve, by name and role only', async () => {
+    const approvers = (await staff.cashier.get('/v1/pos/staff')).json.approvers;
+    const manager = approvers.find(row => row.id === staff.manager.id);
+    assert.deepEqual(manager, { id: staff.manager.id, name: 'manager Test', role: 'Manager', discount_limit_bps: null, refund: true, stock_adjust: true });
+    assert.equal(approvers.some(row => row.id === staff.cashier.id), false, 'never themselves');
+    assert.equal(approvers.some(row => row.id === staff.accountant.id), false, 'an accountant approves nothing');
+    assert.equal(JSON.stringify(approvers).includes('+234'), false, 'never phones');
+  });
+
   test('discounts: a cashier gives up to 5%, more with a manager’s PIN', async () => {
     const five = await sale(staff.cashier, { discount: 5_000 });
     assert.equal(five.status, 201, JSON.stringify(five.json));
@@ -498,6 +507,20 @@ describe('a staff session never reaches the owner’s Udozo account', () => {
       const res = await fetch(`${server.base}${route.url}`, { method: route.method, headers: { 'bitocard-customer-session': owner.token, ...(route.method === 'POST' ? { 'idempotency-key': `sep-${randomUUID()}`, 'content-type': 'application/json' } : {}) }, body: route.method === 'POST' ? '{}' : undefined });
       assert.equal(res.status, 401, `${route.method} ${route.url}`);
     }
+  });
+
+  test('Udozo’s admins read an account’s staff, roles, devices and approvals, never a PIN', async () => {
+    const admin = await adminClient(server);
+    const account = await prisma.posAccount.findUniqueOrThrow({ where: { customerId: owner.id } });
+    const res = await admin.get(`/v1/admin/pos/accounts/${account.id}/staff`);
+    assert.equal(res.status, 200, JSON.stringify(res.json));
+    assert.ok(res.json.staff.data.some(row => row.id === staff.manager.id && row.role.name === 'Manager'));
+    assert.ok(res.json.roles.data.some(row => row.name === 'Weekend help'));
+    assert.ok(res.json.devices.length >= 1);
+    assert.ok(res.json.approvals.some(row => row.action === 'refund'));
+    assert.equal(JSON.stringify(res.json).includes('pin_hash'), false);
+    assert.equal(JSON.stringify(res.json).includes('$argon2'), false);
+    assert.equal((await admin.get(`/v1/admin/pos/accounts/${anyId}/staff`)).status, 404);
   });
 
   test('staff never see the owner’s wallet, plan billing or payouts', async () => {
