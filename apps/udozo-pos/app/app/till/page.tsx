@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Till", robots: { index: false, follo
  * Udozo at once, so stock is right on udozo.com and every other till; selling without the internet comes later.
  */
 export default async function TillPage({ searchParams }: { searchParams: Promise<{ till?: string }> }) {
-  const [pos, catalogue, { till: asked }] = await Promise.all([needs("sell"), tillCatalogue(), searchParams]);
+  const [pos, { till: asked }] = await Promise.all([needs("sell"), searchParams]);
   if (!pos.ok) return null;
   const view = pos.data;
   // Staff see only the tills they may use; on a linked device, only its own.
@@ -40,7 +40,7 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
       </section>
     );
   }
-  const shift = await currentShift(till.id);
+  const [shift, catalogue] = await Promise.all([currentShift(till.id), tillCatalogue(till.shop.id)]);
   const canShift = allows(view.permissions, "till") || allows(view.permissions, "cash_up");
   if (!catalogue.ok) {
     return (
@@ -79,6 +79,11 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
           <Link href="/app/shifts" className="font-semibold">
             {shift.data.shift ? "Close or count" : "Open a shift"}
           </Link>
+        </p>
+      ) : null}
+      {till.shop.paused ? (
+        <p role="alert" className="rounded-xl bg-pos-warn-bg px-4 py-3 font-semibold text-pos-warn">
+          {till.shop.name} is paused: your plan keeps only your main shop selling. {view.actor === "owner" ? "Change plan in Plan and billing to sell here again." : "Ask the owner."}
         </p>
       ) : null}
       {catalogue.data.summary.products === 0 ? (

@@ -12,11 +12,15 @@ export type PosPlan = {
   description: string | null;
   /** The monthly price in the market's currency (minor units); null where it is not priced there. */
   price: { amount: number; currency: string } | null;
+  /** The yearly price where finance set one (null: monthly only). */
+  yearly_price?: { amount: number; currency: string } | null;
   available: boolean;
   paid: boolean;
   limits: PosLimits;
   trial_days: number;
 };
+
+export type BillingInterval = "month" | "year";
 
 export type PosPlans = { object: "list"; country: string | null; currency: string | null; open: boolean; data: PosPlan[] };
 
@@ -40,6 +44,10 @@ export type PosShop = {
   bank?: { name: string | null; account_name: string | null; account_number: string | null } | null;
   /** Printed receipts carry the QR code that gets the PDF on WhatsApp. */
   receipt_qr?: boolean;
+  /** The main shop (first), the one online orders take from, and paused (past the plan's shop limit). */
+  main?: boolean;
+  fulfils_online?: boolean;
+  paused?: boolean;
   /** What kind of shop it is; the till leads with its categories. */
   kind: PosShopKind;
   tills: PosTill[];
@@ -59,6 +67,9 @@ export type PosAccount = {
   status: PosAccountStatus;
   plan: PosPlan;
   next_plan: PosPlan["code"] | null;
+  /** Paid monthly or yearly, and the interval taking over when the paid period ends. */
+  billing_interval?: BillingInterval;
+  next_interval?: BillingInterval | null;
   trial_ends_at: string | null;
   period_start: string | null;
   period_end: string | null;
@@ -90,6 +101,7 @@ export type PosCharge = {
   number: string;
   plan: { code: string; name: string };
   kind: "signup" | "renewal" | "upgrade";
+  interval?: BillingInterval;
   period_start: string;
   period_end: string;
   price: number;
@@ -109,9 +121,18 @@ export function money(amount: number, currency: string) {
 }
 
 /** A plan's monthly price in words: Free, its price a month, or that it is not offered in this country yet. */
-export function priceText(plan: Pick<PosPlan, "paid" | "price">) {
+export function priceText(plan: Pick<PosPlan, "paid" | "price" | "yearly_price">, interval: BillingInterval = "month") {
   if (!plan.paid) return "Free";
+  if (interval === "year") return plan.yearly_price ? `${money(plan.yearly_price.amount, plan.yearly_price.currency)} a year` : "Monthly only";
   return plan.price ? `${money(plan.price.amount, plan.price.currency)} a month` : "Price coming soon";
+}
+
+/** What paying yearly saves against twelve months, as a whole percentage; null without both prices or a saving. */
+export function yearlySaving(plan: Pick<PosPlan, "price" | "yearly_price">) {
+  if (!plan.price || !plan.yearly_price) return null;
+  const twelve = plan.price.amount * 12;
+  const saving = Math.round(((twelve - plan.yearly_price.amount) / twelve) * 100);
+  return saving > 0 ? saving : null;
 }
 
 /** One limit in words: "Unlimited tills", "1 shop", "50 products at the till". */
@@ -133,15 +154,16 @@ export const planOrder: PosPlan["code"][] = ["free", "premium", "multi_shop"];
 export const sortPlans = <T extends Pick<PosPlan, "code">>(plans: T[]) => [...plans].sort((a, b) => planOrder.indexOf(a.code) - planOrder.indexOf(b.code));
 
 /** What signing up for a plan takes from the wallet today: nothing for Free or a trial, else its first month. */
-export function dueToday(plan: Pick<PosPlan, "paid" | "price" | "trial_days">) {
-  if (!plan.paid || plan.trial_days > 0 || !plan.price) return 0;
-  return plan.price.amount;
+export function dueToday(plan: Pick<PosPlan, "paid" | "price" | "yearly_price" | "trial_days">, interval: BillingInterval = "month") {
+  const price = interval === "year" ? plan.yearly_price : plan.price;
+  if (!plan.paid || plan.trial_days > 0 || !price) return 0;
+  return price.amount;
 }
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 /** Where the account's plan stands, in one sentence. */
-export function statusText(account: Pick<PosAccount, "status" | "plan" | "next_plan" | "trial_ends_at" | "period_end" | "drops_to_free_at">, plans: Pick<PosPlan, "code" | "name">[] = []) {
+export function statusText(account: Pick<PosAccount, "status" | "plan" | "next_plan" | "next_interval" | "trial_ends_at" | "period_end" | "drops_to_free_at">, plans: Pick<PosPlan, "code" | "name">[] = []) {
   const name = (code: string | null) => plans.find(plan => plan.code === code)?.name ?? code ?? "";
   switch (account.status) {
     case "free":
@@ -153,6 +175,9 @@ export function statusText(account: Pick<PosAccount, "status" | "plan" | "next_p
     case "past_due":
       return `We could not take this month's payment for ${account.plan.name}. Add funds to your Udozo wallet by ${account.drops_to_free_at ? day(account.drops_to_free_at) : "the end of the grace period"}, or your shop moves to Free.`;
     default:
+      if (account.next_interval && (!account.next_plan || account.next_plan === account.plan.code)) {
+        return `${account.plan.name} is paid until ${account.period_end ? day(account.period_end) : "its renewal date"}, then renews ${account.next_interval === "year" ? "yearly" : "monthly"}.`;
+      }
       return account.next_plan && account.next_plan !== account.plan.code
         ? `${account.plan.name} renews on ${account.period_end ? day(account.period_end) : "its renewal date"}, when your shop moves to ${name(account.next_plan)}.`
         : `${account.plan.name} renews on ${account.period_end ? day(account.period_end) : "its renewal date"}, from your Udozo wallet.`;
@@ -196,6 +221,8 @@ export type PosProduct = {
   /** Units held for online buyers: never sold at the till. */
   held: number;
   available: number;
+  /** Several shops: each shop's level, and what is in no shop (online). */
+  levels?: { online: number; shops: Array<{ shop_id: string; quantity: number }> } | null;
   reorder_level: number | null;
   low_stock: boolean;
   /** Also on udozo.com; false for a shop-only listing. */
@@ -212,6 +239,10 @@ export type PosCatalogue = {
   plan: { code: string; name: string };
   /** The shop's kind: its categories come first (`featured`). */
   shop_kind: { code: string; name: string };
+  /** Several shops: stock is split between them, and `available` is the asked shop's. */
+  split?: boolean;
+  shop?: { id: string; name: string } | null;
+  shops?: Array<{ id: string; name: string; fulfils_online: boolean }>;
   summary: { products: number; limit: number | null; over_limit: number; sellable: number; low_stock: number; out_of_stock: number };
   categories: Array<{ id: string; name: string; count: number; featured: boolean }>;
   total: number;
@@ -260,6 +291,14 @@ export function blockText(product: Pick<PosProduct, "blocked" | "status">, planN
 }
 
 /** The stock line: what the till can sell, and what online buyers hold. */
+/** With several shops, where a product's stock is: "Ikeja shop 5 · Lekki shop 3 · Online 2" (online only when there is some). */
+export function levelsText(product: Pick<PosProduct, "levels">, shops: Array<{ id: string; name: string }>) {
+  if (!product.levels) return null;
+  const parts = shops.map(shop => `${shop.name} ${(product.levels!.shops.find(level => level.shop_id === shop.id)?.quantity ?? 0).toLocaleString("en-GB")}`);
+  if (product.levels.online > 0) parts.push(`Online ${product.levels.online.toLocaleString("en-GB")}`);
+  return parts.join(" · ");
+}
+
 export function stockLine(product: Pick<PosProduct, "stock" | "held" | "available">) {
   if (product.stock === 0) return "Out of stock";
   const free = `${product.available.toLocaleString("en-GB")} free to sell`;
@@ -919,6 +958,8 @@ export type PosOverview = {
   series: Array<{ key: string; label: string; pos: number; online: number }>;
   busiest: { label: string; amount: number } | null;
   payment_methods: Array<{ method: string; amount: number; share_pct: number }>;
+  /** Several shops: each one's sales and takings. */
+  by_shop?: Array<{ shop_id: string; name: string; sales: number; total: number }>;
   top_sellers: Array<{ listing_id: string; title: string; quantity: number; revenue: number; pos_quantity: number; online_quantity: number }>;
   recent: Array<{ channel: "pos" | "online"; id: string; number: string | null; title: string; meta: string; methods: string[]; amount: number; status: string; at: string }>;
   restock: Array<{ listing_id: string; title: string; stock: number; available: number; reorder_level: number | null; per_day: number; days_left: number | null }>;
@@ -976,3 +1017,20 @@ export function readCash(text: string) {
   const minor = Math.round(Number(clean) * 100);
   return Number.isSafeInteger(minor) && minor <= 10_000_000_000 ? minor : null;
 }
+
+// ---- Several shops (milestone 8) ----
+
+/** Stock moved between shops, or between a shop and online (`id` null). */
+export type PosStockTransfer = {
+  object: "pos_stock_transfer";
+  id: string;
+  number: string;
+  from: { id: string | null; name: string };
+  to: { id: string | null; name: string };
+  lines: Array<{ listing_id: string; title: string; quantity: number }>;
+  units: number;
+  note: string | null;
+  by: string;
+  created_at: string;
+};
+export type PosStockTransfers = { object: "list"; total: number; has_more: boolean; data: PosStockTransfer[] };

@@ -48,6 +48,19 @@ function EditPlan({ plan, currencies, onClose }: { plan: AdminPosPlan; currencie
             </div>
           </fieldset>
         ) : null}
+        {plan.paid ? (
+          <fieldset className="grid gap-2">
+            <legend className="text-sm font-semibold text-ink">Yearly price</legend>
+            <p className="text-xs text-muted">Optional, for owners who pay a year at once (usually less than twelve months). Empty: monthly only in that currency.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {currencies.map(currency => (
+                <Field key={currency} label={`${currency} a year`} htmlFor={`${id}-yearly-${currency}`}>
+                  <Input id={`${id}-yearly-${currency}`} inputMode="decimal" value={draft.yearly?.[currency] ?? ""} onChange={event => set({ yearly: { ...draft.yearly, [currency]: event.target.value } })} />
+                </Field>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         <fieldset className="grid gap-2">
           <legend className="text-sm font-semibold text-ink">Limits</legend>
           <p className="text-xs text-muted">{plan.paid ? "Empty is unlimited." : "Free always has a limit on each."}</p>
@@ -96,6 +109,7 @@ function PlanCard({ plan, currencies, edits }: { plan: AdminPosPlan; currencies:
       <KeyValue
         items={[
           { label: "Monthly price", value: plan.paid ? currencies.map(currency => `${currency} ${plan.prices[currency] === undefined ? "not priced" : money(plan.prices[currency], currency)}`).join(" · ") : "Free" },
+          ...(plan.paid ? [{ label: "Yearly price", value: Object.keys(plan.yearly_prices ?? {}).length ? currencies.filter(currency => plan.yearly_prices?.[currency] !== undefined).map(currency => `${currency} ${money(plan.yearly_prices![currency]!, currency)}`).join(" · ") : "Monthly only" }] : []),
           { label: "Limits", value: limitsLine(plan.limits) },
           ...(plan.paid ? [{ label: "Free trial", value: plan.trial_days ? `${plan.trial_days} days` : "None" }] : []),
           { label: "Accounts on it", value: plan.accounts.toLocaleString("en-GB") },

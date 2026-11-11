@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { dueToday, money, type PosPlan, planFeatures, priceText, readVat, sortPlans } from "@/lib/pos";
+import { type BillingInterval, dueToday, money, type PosPlan, planFeatures, priceText, readVat, sortPlans, yearlySaving } from "@/lib/pos";
 import { type ShopFields, signUp } from "@/lib/pos-actions";
 
 const input = "mt-1 h-12 w-full rounded-xl border border-pos-line bg-white px-3 text-pos-ink focus:border-pos-600 focus:ring-2 focus:ring-pos-50 focus:outline-none";
@@ -30,8 +30,12 @@ export function SignupWizard({ plans, currency, wallet, initialPlan, addFundsUrl
   const [code, setCode] = useState(choices.find(plan => plan.code === initialPlan)?.code ?? choices[0]?.code ?? "free");
   const [problem, setProblem] = useState<{ message: string; param: string | null; short?: boolean } | null>(null);
   const [busy, start] = useTransition();
+  const [interval, setInterval] = useState<BillingInterval>("month");
   const plan = choices.find(item => item.code === code) ?? choices[0];
-  const due = plan ? dueToday(plan) : 0;
+  // Yearly only where the chosen plan has a yearly price.
+  const paidAs: BillingInterval = plan?.paid && plan.yearly_price && interval === "year" ? "year" : "month";
+  const due = plan ? dueToday(plan, paidAs) : 0;
+  const yearly = choices.some(item => item.yearly_price);
   const short = due > wallet;
 
   const toPlan = (event: React.FormEvent) => {
@@ -46,7 +50,7 @@ export function SignupWizard({ plans, currency, wallet, initialPlan, addFundsUrl
     if (!plan) return;
     const fields: ShopFields = { name: shop.name, address: shop.address || null, phone: shop.phone || null, tin: shop.tin || null, vat_bps: readVat(shop.vat) ?? 0 };
     start(async () => {
-      const result = await signUp(plan.code, fields, due);
+      const result = await signUp(plan.code, fields, due, paidAs);
       if (result.ok) return router.push("/app/setup?welcome=1");
       if (result.code === "price_changed") router.refresh();
       if (result.param?.startsWith("shop") || result.param === "vat_bps") setStep("shop");
@@ -101,6 +105,15 @@ export function SignupWizard({ plans, currency, wallet, initialPlan, addFundsUrl
           <h2 id={`${ids}-plan`} className="font-display text-2xl font-bold text-pos-ink">
             Choose your plan
           </h2>
+          {yearly ? (
+            <div role="radiogroup" aria-label="How to pay" className="flex w-fit gap-1 rounded-full bg-pos-page p-1">
+              {(["month", "year"] as const).map(option => (
+                <button key={option} type="button" role="radio" aria-checked={interval === option} onClick={() => setInterval(option)} className={`h-10 rounded-full px-4 text-sm font-semibold ${interval === option ? "bg-pos-600 text-white" : "text-pos-ink-2 hover:bg-white"}`}>
+                  {option === "month" ? "Monthly" : "Yearly"}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <fieldset className="grid gap-3">
             <legend className="sr-only">Plan</legend>
             {choices.map(item => (
@@ -108,8 +121,10 @@ export function SignupWizard({ plans, currency, wallet, initialPlan, addFundsUrl
                 <input type="radio" name="plan" value={item.code} checked={item.code === code} onChange={() => setCode(item.code)} className="mt-1 size-5 accent-pos-600" />
                 <span className="grid gap-1">
                   <span className="font-display text-lg font-bold text-pos-ink">
-                    {item.name} · {priceText(item)}
+                    {item.name} · {priceText(item, item.paid && item.yearly_price && interval === "year" ? "year" : "month")}
                   </span>
+                  {interval === "year" && item.paid && !item.yearly_price ? <span className="text-sm text-pos-muted">Monthly only</span> : null}
+                  {interval === "year" && yearlySaving(item) ? <span className="text-sm font-semibold text-pos-700">Save {yearlySaving(item)}% on twelve months</span> : null}
                   {item.paid && item.trial_days > 0 ? <span className="text-sm font-semibold text-pos-700">{item.trial_days}-day free trial</span> : null}
                   <span className="text-sm text-pos-ink-2">{planFeatures(item).slice(0, 4).join(" · ")}</span>
                 </span>
@@ -154,7 +169,7 @@ export function SignupWizard({ plans, currency, wallet, initialPlan, addFundsUrl
             {plan.paid && plan.price ? (
               <div className="flex justify-between gap-3">
                 <dt>Then</dt>
-                <dd className="font-semibold text-pos-ink">{priceText(plan)}, from your Udozo wallet</dd>
+                <dd className="font-semibold text-pos-ink">{priceText(plan, paidAs)}, from your Udozo wallet</dd>
               </div>
             ) : null}
           </dl>

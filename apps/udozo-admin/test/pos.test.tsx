@@ -177,6 +177,17 @@ describe("Udozo POS", () => {
     expect(planChange(premium, ["NGN"], { ...draftOf(premium, ["NGN"]), prices: { NGN: "0" } })).toEqual({ error: "The NGN price is not an amount above zero." });
   });
 
+  test("yearly prices: set beside a monthly one, cleared when emptied, refused without one", () => {
+    const premium = { ...(plan("premium") as object), prices: { NGN: 1_500_000 }, yearly_prices: { NGN: 15_000_000 } } as never;
+    const draft = draftOf(premium, ["NGN", "GHS"]);
+    expect(draft.yearly).toEqual({ NGN: "150000", GHS: "" });
+    const changed = planChange(premium, ["NGN", "GHS"], { ...draft, yearly: { NGN: "140000", GHS: "" } });
+    expect("change" in changed && changed.change.yearly_prices).toEqual({ NGN: 14_000_000 });
+    const cleared = planChange(premium, ["NGN", "GHS"], { ...draft, yearly: { NGN: "", GHS: "" } });
+    expect("change" in cleared && cleared.change.yearly_prices).toEqual({ NGN: null });
+    expect(planChange(premium, ["NGN", "GHS"], { ...draft, yearly: { NGN: "150000", GHS: "1000" } })).toEqual({ error: "Give GHS's monthly price before its yearly one." });
+  });
+
   test("only finance can change plans", async () => {
     roles = ["support"];
     shown(<PlansPage />);

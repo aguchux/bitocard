@@ -13,12 +13,13 @@ const day = /^\d{4}-\d{2}-\d{2}$/;
  * The overview (S2): the shop's takings beside the owner's udozo.com sales, against the period before; by the hour or
  * day; the channels and payment methods; top sellers; the latest sales; and what needs restocking.
  */
-export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ period?: string; from?: string; to?: string }> }) {
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ period?: string; from?: string; to?: string; shop?: string }> }) {
   await needs("all_sales");
   const asked = await searchParams;
   const period: ReportPeriod = reportPeriods.some(item => item.value === asked.period) ? (asked.period as ReportPeriod) : "today";
   const custom = period === "custom" && asked.from && asked.to && day.test(asked.from) && day.test(asked.to);
-  const result = await posOverview(custom ? { period, from: asked.from, to: asked.to } : { period: period === "custom" ? "today" : period });
+  const shop = asked.shop && /^[0-9a-f-]{36}$/i.test(asked.shop) ? asked.shop : undefined;
+  const result = await posOverview({ ...(custom ? { period, from: asked.from, to: asked.to } : { period: period === "custom" ? "today" : period }), shop });
   if (!result.ok) {
     return (
       <p role="alert" className="rounded-[20px] bg-white p-6 text-pos-error">
@@ -43,7 +44,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold text-pos-ink">Sales overview</h1>
-          <p className="mt-1 text-pos-ink-2">{when} · in the shop and on udozo.com together</p>
+          <p className="mt-1 text-pos-ink-2">
+            {when} · {view.shop ? `${view.shop.name} and udozo.com` : (view.by_shop?.length ?? 0) > 1 ? "all your shops and udozo.com together" : "in the shop and on udozo.com together"}
+          </p>
         </div>
         <Link href="/app/till" className="flex h-12 items-center rounded-xl bg-pos-600 px-6 font-bold text-white no-underline hover:bg-pos-700">
           New sale
@@ -54,12 +57,13 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         {reportPeriods
           .filter(item => item.value !== "custom")
           .map(item => (
-            <Link key={item.value} href={`/app/overview?period=${item.value}`} aria-current={view.period === item.value ? "page" : undefined} className={pill(view.period === item.value)}>
+            <Link key={item.value} href={`/app/overview?period=${item.value}${view.shop ? `&shop=${view.shop.id}` : ""}`} aria-current={view.period === item.value ? "page" : undefined} className={pill(view.period === item.value)}>
               {item.label}
             </Link>
           ))}
         <form action="/app/overview" className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="period" value="custom" />
+          {view.shop ? <input type="hidden" name="shop" value={view.shop.id} /> : null}
           <label className="sr-only" htmlFor="overview-from">
             From
           </label>
@@ -73,6 +77,20 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           </button>
         </form>
       </nav>
+
+      {(view.by_shop?.length ?? 0) > 1 ? (
+        <nav aria-label="Shop" className="flex flex-wrap gap-2">
+          {[{ shop_id: "", name: "All shops" }, ...view.by_shop!].map(item => {
+            const current = (view.shop?.id ?? "") === item.shop_id;
+            const query = new URLSearchParams({ period: view.period, ...(view.period === "custom" ? { from: view.from, to: view.to } : {}), ...(item.shop_id ? { shop: item.shop_id } : {}) });
+            return (
+              <Link key={item.shop_id || "all"} href={`/app/overview?${query}`} aria-current={current ? "page" : undefined} className={pill(current)}>
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
 
       <section aria-label="Totals" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cards.map(card => (
@@ -122,6 +140,21 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           ) : (
             <p className="text-sm text-pos-muted">No sales in the shop yet.</p>
           )}
+          {(view.by_shop?.length ?? 0) > 1 ? (
+            <>
+              <h3 className="font-semibold text-pos-ink">By shop</h3>
+              <ul className="grid gap-1 text-sm">
+                {view.by_shop!.map(row => (
+                  <li key={row.shop_id} className="flex justify-between gap-2">
+                    <span className="min-w-0 truncate">
+                      {row.name} · {row.sales} {row.sales === 1 ? "sale" : "sales"}
+                    </span>
+                    <span className="shrink-0 font-semibold">{at(row.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           {view.totals.refunds.count ? (
             <p className="text-sm text-pos-warn">
               {view.totals.refunds.count} {view.totals.refunds.count === 1 ? "refund" : "refunds"} · {at(view.totals.refunds.amount)}

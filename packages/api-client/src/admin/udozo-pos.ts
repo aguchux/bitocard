@@ -26,9 +26,9 @@ export type PosPlanSummary = {
 };
 
 /** A plan as admins see it: its monthly price per market currency (minor units), whether owners can choose it, and how many accounts are on it. */
-export type AdminPosPlan = PosPlanSummary & { shown: boolean; prices: Record<string, number>; accounts: number };
+export type AdminPosPlan = PosPlanSummary & { shown: boolean; prices: Record<string, number>; /** Yearly prices (none: monthly only there). */ yearly_prices?: Record<string, number>; accounts: number };
 export type AdminPosPlans = { object: 'list'; currencies: string[]; data: AdminPosPlan[] };
-export type PosPlanChange = { name?: string; description?: string; prices?: Record<string, number | null>; limits?: Partial<PosLimits>; trial_days?: number; shown?: boolean };
+export type PosPlanChange = { name?: string; description?: string; prices?: Record<string, number | null>; yearly_prices?: Record<string, number | null>; limits?: Partial<PosLimits>; trial_days?: number; shown?: boolean };
 
 export type PosTill = { object: 'pos_till'; id: string; name: string; printer_width: 58 | 80; auto_print: boolean };
 export type PosShop = { object: 'pos_shop'; id: string; name: string; address: string | null; phone: string | null; tin: string | null; shop_code: string; vat_bps: number; receipt_footer: string | null; tills: PosTill[] };

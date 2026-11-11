@@ -31,12 +31,13 @@ export function accountState(account: Pick<AdminPosAccount, "status" | "plan" | 
 export const vatWords = (bps: number) => `${(bps / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}%`;
 
 /** What the form holds: each field as typed. */
-export type PlanDraft = { name: string; description: string; prices: Record<string, string>; limits: Record<keyof PosLimits, string>; trial_days: string; shown: boolean };
+export type PlanDraft = { name: string; description: string; prices: Record<string, string>; yearly: Record<string, string>; limits: Record<keyof PosLimits, string>; trial_days: string; shown: boolean };
 
 export const draftOf = (plan: AdminPosPlan, currencies: string[]): PlanDraft => ({
   name: plan.name,
   description: plan.description ?? "",
   prices: Object.fromEntries(currencies.map(currency => [currency, plan.prices[currency] === undefined ? "" : toMajor(plan.prices[currency]!, currency)])),
+  yearly: Object.fromEntries(currencies.map(currency => [currency, plan.yearly_prices?.[currency] === undefined ? "" : toMajor(plan.yearly_prices[currency]!, currency)])),
   limits: Object.fromEntries(posLimitKeys.map(key => [key, plan.limits[key] === null ? "" : String(plan.limits[key])])) as PlanDraft["limits"],
   trial_days: String(plan.trial_days),
   shown: plan.shown,
@@ -60,6 +61,20 @@ export function planChange(plan: AdminPosPlan, currencies: string[], draft: Plan
       prices[currency] = minor;
     }
     change.prices = prices;
+    // Yearly prices, each beside a monthly one in its currency.
+    const yearly: Record<string, number | null> = {};
+    for (const currency of currencies) {
+      const typed = draft.yearly?.[currency]?.trim() ?? "";
+      if (!typed) {
+        if (plan.yearly_prices?.[currency] !== undefined) yearly[currency] = null;
+        continue;
+      }
+      const minor = toMinor(typed, currency);
+      if (minor === null || minor <= 0) return { error: `The ${currency} yearly price is not an amount above zero.` };
+      if (prices[currency] === null || (prices[currency] === undefined && plan.prices[currency] === undefined)) return { error: `Give ${currency}'s monthly price before its yearly one.` };
+      yearly[currency] = minor;
+    }
+    if (Object.keys(yearly).length) change.yearly_prices = yearly;
   }
   const limits: Partial<PosLimits> = {};
   for (const key of posLimitKeys) {

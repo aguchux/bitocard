@@ -1,5 +1,6 @@
 import { ownerOnly } from "@/lib/gates";
 import { ShopForm } from "@/components/shop-form";
+import { ShopsPanel } from "@/components/shops-panel";
 import { Tills } from "@/components/tills";
 import Link from "next/link";
 import { DeviceList, LinkDevice } from "@/components/devices";
@@ -23,18 +24,24 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
         </p>
       ) : null}
       <h1 className="font-display text-3xl font-bold text-pos-ink">Shop and tills</h1>
+      <section aria-labelledby="shops-title" className="rounded-[20px] bg-white p-6">
+        <h2 id="shops-title" className="mb-4 font-display text-xl font-bold text-pos-ink">
+          {account.shops.length > 1 ? "Your shops" : "Your shop"}
+        </h2>
+        <ShopsPanel shops={account.shops} limit={account.limits.shops} planName={account.plan.name} />
+      </section>
       {account.shops.map(shop => (
         <div key={shop.id} className="grid gap-6">
           <section aria-labelledby={`shop-${shop.id}`} className="rounded-[20px] bg-white p-6">
             <h2 id={`shop-${shop.id}`} className="font-display text-xl font-bold text-pos-ink">
-              Shop details
+              {account.shops.length > 1 ? shop.name : "Shop details"}
             </h2>
             <p className="mt-1 mb-4 text-pos-ink-2">Printed on your receipts. Shop code {shop.shop_code}.</p>
             <ShopForm shop={shop} kinds={kinds} />
           </section>
           <section id="tills" aria-labelledby={`tills-${shop.id}`} className="rounded-[20px] bg-white p-6">
             <h2 id={`tills-${shop.id}`} className="font-display text-xl font-bold text-pos-ink">
-              Tills
+              {account.shops.length > 1 ? `${shop.name}: tills` : "Tills"}
             </h2>
             <p className="mt-1 mb-4 text-pos-ink-2">One for each counter or device you sell from.</p>
             <Tills shopId={shop.id} tills={shop.tills} limit={account.limits.tills} used={used} />

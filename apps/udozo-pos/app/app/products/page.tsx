@@ -2,7 +2,7 @@ import { needs } from "@/lib/gates";
 /* eslint-disable @next/next/no-img-element -- listing photos come from udozo.com's own image addresses. */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, money, type PosApprover, type PosProduct, stockLine } from "@/lib/pos";
+import { blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, levelsText, money, type PosApprover, type PosProduct, stockLine } from "@/lib/pos";
 import { StockAdjust } from "@/components/stock-adjust";
 import { ownerCatalogue } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
@@ -51,9 +51,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <h1 className="font-display text-3xl font-bold text-pos-ink">Products</h1>
           <p className="mt-1 max-w-2xl text-pos-ink-2">Your udozo.com listings ticked Sell at POS. Prices, photos, stock and barcodes are your listings&apos; own, so change them on udozo.com and the till follows.</p>
         </div>
-        <a href={udozoUrl("/account/listings")} target="_blank" rel="noopener" className="inline-flex h-11 items-center rounded-xl border border-pos-600 px-4 font-semibold text-pos-700 no-underline hover:bg-pos-50">
-          My listings on udozo.com
-        </a>
+        <span className="flex flex-wrap gap-2">
+          {catalogue.split && view && view.permissions.stock_adjust === "yes" ? (
+            <a href="/app/products/move" className="inline-flex h-11 items-center rounded-xl bg-pos-600 px-4 font-semibold text-white no-underline hover:bg-pos-700">
+              Move stock between shops
+            </a>
+          ) : null}
+          <a href={udozoUrl("/account/listings")} target="_blank" rel="noopener" className="inline-flex h-11 items-center rounded-xl border border-pos-600 px-4 font-semibold text-pos-700 no-underline hover:bg-pos-50">
+            My listings on udozo.com
+          </a>
+        </span>
       </div>
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -132,7 +139,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           {catalogue.data.length ? (
             <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {catalogue.data.map(product => (
-                <ProductCard key={product.id} product={product} planName={catalogue.plan.name} stock={view && view.permissions.stock_adjust !== "no" ? view.approvers : null} />
+                <ProductCard key={product.id} product={product} planName={catalogue.plan.name} stock={view && view.permissions.stock_adjust !== "no" ? view.approvers : null} shops={catalogue.shops ?? []} />
               ))}
             </ul>
           ) : (
@@ -176,7 +183,8 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: "
 }
 
 /** `stock`: who may approve a stock change (staff), or null where their role may not change stock at all. */
-function ProductCard({ product, planName, stock }: { product: PosProduct; planName: string; stock: PosApprover[] | null }) {
+function ProductCard({ product, planName, stock, shops }: { product: PosProduct; planName: string; stock: PosApprover[] | null; shops: Array<{ id: string; name: string }> }) {
+  const where = levelsText(product, shops);
   const why = blockText(product, planName);
   const price = product.price.amount === null ? "No price" : `${money(product.price.amount, product.price.currency)}${product.price.kind === "negotiable" ? ", negotiable" : ""}`;
   return (
@@ -186,6 +194,7 @@ function ProductCard({ product, planName, stock }: { product: PosProduct; planNa
         <span className="truncate font-semibold text-pos-ink">{product.title ?? "Untitled draft"}</span>
         <span className="font-display text-lg font-bold text-pos-ink">{price}</span>
         <span className="text-sm text-pos-ink-2">{stockLine(product)}</span>
+        {where ? <span className="text-sm text-pos-ink-2">{where}</span> : null}
         <span className="flex flex-wrap gap-1.5 text-xs font-semibold">
           {product.blocked === null ? <span className="rounded-full bg-pos-50 px-2 py-0.5 text-pos-700">Selling</span> : null}
           {product.low_stock ? <span className="rounded-full bg-pos-warn-bg px-2 py-0.5 text-pos-warn">Low stock</span> : null}
@@ -195,7 +204,7 @@ function ProductCard({ product, planName, stock }: { product: PosProduct; planNa
           {[product.sku, product.barcode ? `Barcode ${product.barcode}` : "No barcode", product.category?.name].filter(Boolean).join(" · ")}
         </span>
         {why ? <span className="text-sm text-pos-warn">{why}</span> : null}
-        {stock ? <StockAdjust id={product.id} title={product.title ?? "Untitled draft"} stock={product.stock} approvers={stock} /> : null}
+        {stock ? <StockAdjust id={product.id} title={product.title ?? "Untitled draft"} stock={product.stock} approvers={stock} shops={shops} levels={product.levels} /> : null}
         <a href={product.edit_url} target="_blank" rel="noopener" className="text-sm font-semibold">
           Edit on udozo.com
           <span className="sr-only"> ({product.title ?? "draft"})</span>

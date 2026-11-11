@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { ApprovalBox } from "@/components/approval-box";
-import { movementText, type PosApprover, type PosStockMovement, saleTime } from "@/lib/pos";
+import { movementText, type PosApprover, type PosProduct, type PosStockMovement, saleTime } from "@/lib/pos";
 import { type Approval, adjustStock, type StockKind, stockHistory } from "@/lib/pos-actions";
 
 const kinds: Array<{ value: StockKind; label: string; quantity: string }> = [
@@ -16,7 +16,7 @@ const kinds: Array<{ value: StockKind; label: string; quantity: string }> = [
  * Changing a product's stock from the POS: new stock in, a shelf count, or units damaged or lost, each kept with its
  * history. The stock is the listing's own, so udozo.com shows it at once.
  */
-export function StockAdjust({ id, title, stock, approvers = [] }: { id: string; title: string; stock: number; approvers?: PosApprover[] }) {
+export function StockAdjust({ id, title, stock, approvers = [], shops = [], levels = null }: { id: string; title: string; stock: number; approvers?: PosApprover[]; shops?: Array<{ id: string; name: string }>; levels?: PosProduct["levels"] }) {
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
   const [kind, setKind] = useState<StockKind>("restock");
@@ -26,6 +26,9 @@ export function StockAdjust({ id, title, stock, approvers = [] }: { id: string; 
   const [history, setHistory] = useState<PosStockMovement[] | null>(null);
   const [pending, start] = useTransition();
   const [approving, setApproving] = useState<string | null>(null);
+  // Several shops: the change is one shop's, and a count is of its shelf.
+  const [shopId, setShopId] = useState(shops[0]?.id ?? "");
+  const level = levels?.shops.find(item => item.shop_id === shopId)?.quantity ?? 0;
 
   const open = () => {
     setMessage(null);
@@ -45,7 +48,7 @@ export function StockAdjust({ id, title, stock, approvers = [] }: { id: string; 
       return;
     }
     start(async () => {
-      const result = await adjustStock(id, kind, count, note, approval);
+      const result = await adjustStock(id, kind, count, note, approval, shops.length ? shopId : null);
       if (!result.ok) {
         if (result.code === "approval_required" || result.code === "approval_invalid") {
           setApproving(result.message);
@@ -82,7 +85,19 @@ export function StockAdjust({ id, title, stock, approvers = [] }: { id: string; 
           <h2 id={`stock-${id}`} className="font-display text-xl font-bold text-pos-ink">
             {title}
           </h2>
-          <p className="text-pos-ink-2">In stock now: {stock.toLocaleString("en-GB")}</p>
+          {shops.length ? (
+            <label className="text-sm font-semibold text-pos-ink-2">
+              Which shop
+              <select value={shopId} onChange={event => setShopId(event.target.value)} className={field}>
+                {shops.map(shop => (
+                  <option key={shop.id} value={shop.id}>
+                    {shop.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <p className="text-pos-ink-2">{shops.length ? `At this shop now: ${level.toLocaleString("en-GB")} (${stock.toLocaleString("en-GB")} in all)` : `In stock now: ${stock.toLocaleString("en-GB")}`}</p>
           <fieldset className="grid gap-1">
             <legend className="text-sm font-semibold text-pos-ink-2">What happened</legend>
             {kinds.map(item => (

@@ -68,7 +68,7 @@ describe("sign-up", () => {
     act(() => button(host, "Continue")!.click());
     expect(host.textContent).toContain("Free needs no payment.");
     await act(async () => button(host, "Open my shop")!.click());
-    expect(actions.signUp).toHaveBeenCalledWith("free", { name: "Ada's Gadget Hub", address: null, phone: null, tin: null, vat_bps: 750 }, 0);
+    expect(actions.signUp).toHaveBeenCalledWith("free", { name: "Ada's Gadget Hub", address: null, phone: null, tin: null, vat_bps: 750 }, 0, "month");
     expect(router.push).toHaveBeenCalledWith("/app/setup?welcome=1");
   });
 
@@ -81,7 +81,7 @@ describe("sign-up", () => {
     expect(host.textContent).toContain("14 days");
     expect(host.textContent).toContain("Nothing is taken today.");
     await act(async () => button(host, "Start free trial")!.click());
-    expect(actions.signUp).toHaveBeenCalledWith("premium", expect.objectContaining({ name: "Ada" }), 0);
+    expect(actions.signUp).toHaveBeenCalledWith("premium", expect.objectContaining({ name: "Ada" }), 0, "month");
   });
 
   it("will not take a first month the wallet cannot cover, and links Add funds", () => {
@@ -124,15 +124,15 @@ describe("changing plan", () => {
     await act(async () => button(host, "Choose Premium")!.click());
     expect(document.querySelector("dialog")!.textContent).toContain("Premium's first month (₦15,000) is taken from your Udozo wallet now");
     await act(async () => dialogButton("Move to Premium").click());
-    expect(actions.changePlan).toHaveBeenCalledWith("premium");
+    expect(actions.changePlan).toHaveBeenCalledWith("premium", "month");
     expect(router.refresh).toHaveBeenCalled();
   });
 
   it("words every kind of change", () => {
     const premium = account({ status: "active", plan: plan("premium") });
     expect(changeWords(premium, plan("free"))).toBe("Premium runs to the end of the month you paid for, then your shop moves to Free.");
-    expect(changeWords(account({ status: "active", plan: plan("multi_shop") }), plan("premium"))).toBe("Premium starts when the month you paid for ends.");
-    expect(changeWords(account({ status: "trial", plan: plan("premium") }), plan("multi_shop"))).toBe("Your trial carries on with Multi-shop.");
+    expect(changeWords(account({ status: "active", plan: plan("multi_shop") }), plan("premium"))).toBe("Premium, paid monthly, starts when the month you paid for ends.");
+    expect(changeWords(account({ status: "trial", plan: plan("premium") }), plan("multi_shop"))).toBe("Your trial carries on with Multi-shop, paid monthly once it ends.");
     expect(changeWords(account({ status: "trial", plan: plan("premium") }), plan("free"))).toMatch(/trial ends now/);
     expect(changeWords(account({ status: "past_due", plan: plan("premium") }), plan("free"))).toBe("Your shop moves to Free now.");
   });
@@ -140,7 +140,7 @@ describe("changing plan", () => {
   it("shows a change waiting for the month's end, and links Add funds when the wallet is short", async () => {
     actions.changePlan.mockResolvedValue({ ok: false, message: "Your Udozo wallet needs NGN 40000.00 for this.", code: "wallet_balance_low", param: null });
     const host = mount(createElement(PlanChanger, { account: account({ status: "active", plan: plan("premium"), next_plan: "free" }), plans: plans(), addFundsUrl: "https://udozo.test/account/wallet" }));
-    expect(host.textContent).toContain("Starts at the month's end");
+    expect(host.textContent).toContain("Starts when this period ends");
     await act(async () => button(host, "Choose Multi-shop")!.click());
     await act(async () => dialogButton("Move to Multi-shop").click());
     expect(host.querySelector('[role="alert"]')!.textContent).toContain("Add funds");

@@ -53,13 +53,15 @@ const tillPages = 20;
  * Every product at the till, read page by page (a shop is never cut off at one page), the summary and categories from
  * the first. Fails as the first page fails; a later page that fails stops there with what was read.
  */
-export async function tillCatalogue(): Promise<ApiResult<PosCatalogue>> {
-  const first = await ownerCatalogue(`?show=all&limit=${tillPage}&offset=0`);
+export async function tillCatalogue(shopId?: string): Promise<ApiResult<PosCatalogue>> {
+  // With several shops, what this till's shop can sell.
+  const shop = shopId && /^[0-9a-f-]{36}$/i.test(shopId) ? `&shop=${shopId}` : "";
+  const first = await ownerCatalogue(`?show=all&limit=${tillPage}&offset=0${shop}`);
   if (!first.ok) return first;
   const data = [...first.data.data];
   let more = first.data.has_more;
   for (let page = 1; more && page < tillPages; page += 1) {
-    const next = await ownerCatalogue(`?show=all&limit=${tillPage}&offset=${page * tillPage}`);
+    const next = await ownerCatalogue(`?show=all&limit=${tillPage}&offset=${page * tillPage}${shop}`);
     if (!next.ok) break;
     data.push(...next.data.data);
     more = next.data.has_more;

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type PosAccount, type PosCollection, type PosCollectionAccount, type PosCollectionsOverview, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosTransferRequest, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
+import { type BillingInterval, type PosAccount, type PosCollection, type PosCollectionAccount, type PosCollectionsOverview, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosStockTransfer, type PosTransferRequest, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
 import { type ApiResult, customerApi, dropSession, dropStaffSession } from "./session";
 import { posApi } from "./pos-api";
 
@@ -59,19 +59,40 @@ const isPlan = (code: string): code is PosPlan["code"] => (planOrder as string[]
  * Signing up: the shop, its first till and the plan. `expected` is what the owner was shown due today (minor units),
  * so a price that moved meanwhile is refused (`price_changed`) instead of taken.
  */
-export async function signUp(plan: string, shop: ShopFields, expected: number): Promise<PosResult<PosAccount>> {
+export async function signUp(plan: string, shop: ShopFields, expected: number, interval: BillingInterval = "month"): Promise<PosResult<PosAccount>> {
   if (!isPlan(plan)) return refused("Choose a plan.", "plan");
   if (!shop.name?.trim()) return refused("Give your shop's name.", "shop.name", "parameter_missing");
   if (!Number.isSafeInteger(expected) || expected < 0) return refused("Choose a plan.", "plan");
   const body = shopBody(shop);
   if (!body) return refused("VAT is from 0% to 50%.", "vat_bps");
-  return answer(await customerApi<PosAccount>("POST", "/v1/pos/owner/signup", { plan, shop: body, expected_amount: expected }));
+  return answer(await customerApi<PosAccount>("POST", "/v1/pos/owner/signup", { plan, shop: body, expected_amount: expected, ...(interval === "year" ? { interval } : {}) }));
 }
 
 /** Moving to another plan: dearer ones are charged now (less what is unused), cheaper ones from the month's end. */
-export async function changePlan(plan: string): Promise<PosResult<PosAccount>> {
+export async function changePlan(plan: string, interval?: BillingInterval): Promise<PosResult<PosAccount>> {
   if (!isPlan(plan)) return refused("Choose a plan.", "plan");
-  return answer(await customerApi<PosAccount>("POST", "/v1/pos/owner/plan", { plan }));
+  if (interval !== undefined && interval !== "month" && interval !== "year") return refused("Choose monthly or yearly.", "interval");
+  return answer(await customerApi<PosAccount>("POST", "/v1/pos/owner/plan", { plan, ...(interval ? { interval } : {}) }));
+}
+
+/** Opens another shop (within the plan's shop limit): from the second, stock is split between the shops. */
+export async function addShop(name: string): Promise<PosResult<PosAccount>> {
+  if (!name.trim()) return refused("Give the shop's name.", "name", "parameter_missing");
+  return answer(await customerApi<PosAccount>("POST", "/v1/pos/owner/shops", { name: name.trim().slice(0, 80) }));
+}
+
+/** The owner's choices for a shop: first in the list (main), or the one online orders take from. */
+export async function chooseShop(id: string, choice: "main" | "fulfils_online"): Promise<PosResult<PosAccount>> {
+  if (!uuid.test(id)) return refused("No such shop.", null, "resource_missing");
+  return answer(await customerApi<PosAccount>("PATCH", `/v1/pos/owner/shops/${id}`, { [choice]: true }));
+}
+
+/** Moves stock between shops, or between a shop and online (null). */
+export async function moveStock(input: { from: string | null; to: string | null; lines: Array<{ listing_id: string; quantity: number }>; note?: string }): Promise<PosResult<PosStockTransfer>> {
+  if ((input.from !== null && !uuid.test(input.from)) || (input.to !== null && !uuid.test(input.to))) return refused("Choose where it leaves and where it goes.", "to_shop_id");
+  if (input.from === input.to) return refused("Choose two different places.", "to_shop_id");
+  if (!input.lines.length || input.lines.some(line => !uuid.test(line.listing_id) || !Number.isSafeInteger(line.quantity) || line.quantity < 1)) return refused("Choose the products and how many of each.", "lines");
+  return answer(await posApi<PosStockTransfer>("POST", "/stock-transfers", { from_shop_id: input.from, to_shop_id: input.to, lines: input.lines, ...(input.note?.trim() ? { note: input.note.trim().slice(0, 300) } : {}) }));
 }
 
 export async function updateShop(id: string, fields: ShopFields): Promise<PosResult<PosAccount>> {
@@ -246,11 +267,12 @@ export type StockKind = "restock" | "count" | "damage";
 export type StockAnswer = { object: "pos_stock"; listing_id: string; stock: number; held: number; available: number; movement: PosStockMovement };
 
 /** Restocks, counts or writes off a product's units. */
-export async function adjustStock(listingId: string, kind: StockKind, quantity: number, note = "", approval: Approval | null = null): Promise<PosResult<StockAnswer>> {
+export async function adjustStock(listingId: string, kind: StockKind, quantity: number, note = "", approval: Approval | null = null, shopId: string | null = null): Promise<PosResult<StockAnswer>> {
   if (!uuid.test(listingId)) return refused("No such product.", null, "resource_missing");
   if (!["restock", "count", "damage"].includes(kind)) return refused("Choose what happened.", "kind");
   if (!whole(quantity, kind === "count" ? 0 : 1) || quantity > 100_000) return refused(kind === "count" ? "Count what is on the shelf: 0 or more." : "Give how many, from 1.", "quantity");
-  return answer(await posApi<StockAnswer>("POST", `/stock/${listingId}`, { kind, quantity, ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}), ...approvalOf(approval) }));
+  if (shopId !== null && !uuid.test(shopId)) return refused("Choose which shop.", "shop_id");
+  return answer(await posApi<StockAnswer>("POST", `/stock/${listingId}`, { kind, quantity, ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}), ...approvalOf(approval), ...(shopId ? { shop_id: shopId } : {}) }));
 }
 
 /** A product's latest stock movements, newest first. */
