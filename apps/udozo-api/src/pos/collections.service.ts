@@ -32,6 +32,7 @@ import {
 } from './collection-rules.js';
 import { PosCustomersService } from './customers.service.js';
 import { freePlan } from './plans.js';
+import { ownerBy, type PosBy, type PosSellOptions } from './actor.js';
 import { PosSalesService, type SaleInput } from './sales.service.js';
 
 export type TransferRequestInput = SaleInput & { transfer_amount: number };
@@ -262,7 +263,7 @@ export class PosCollectionsService implements OnModuleInit {
    * taken. The till shows the bank, number and name; the transfer for exactly this amount makes the sale. Asking again
    * at the same till replaces the request waiting there, so a transfer only ever pays the basket on the counter.
    */
-  async ask(owner: CustomerWithStore, input: TransferRequestInput) {
+  async ask(owner: CustomerWithStore, input: TransferRequestInput, options: PosSellOptions = {}) {
     const account = await this.sales.account(owner);
     const till = await this.sales.till(account.id, input.till_id);
     this.sales.checkShape(input);
@@ -273,7 +274,8 @@ export class PosCollectionsService implements OnModuleInit {
     if (await this.prisma.posSale.findUnique({ where: { accountId_clientSaleId: { accountId: account.id, clientSaleId: input.client_sale_id } }, select: { id: true } })) {
       throw conflict('sale_exists', 'This basket is already a sale. Start a new sale.', 'client_sale_id');
     }
-    const built = await this.prisma.$transaction(tx => this.sales.build(tx, { account, till, ownerId: owner.id, input, transfer: amount }));
+    const built = await this.prisma.$transaction(tx => this.sales.build(tx, { account, till, ownerId: owner.id, input, transfer: amount, discount: options.discount }));
+    const by = options.by ?? ownerBy(owner);
     const basket: Basket = {
       client_sale_id: input.client_sale_id,
       lines: input.lines.map(line => ({ listing_id: line.listing_id, quantity: line.quantity, ...(line.discount ? { discount: line.discount } : {}) })),
@@ -298,8 +300,9 @@ export class PosCollectionsService implements OnModuleInit {
           amountMinor: amount,
           totalMinor: built.totals.total,
           basket: basket as unknown as Prisma.InputJsonValue,
-          soldByCustomerId: owner.id,
-          soldByName: owner.name,
+          soldByCustomerId: by.customerId,
+          soldByName: by.name,
+          soldByStaffId: by.staffId,
           customerId: input.customer_id ?? null,
           expiresAt: new Date(now.getTime() + transferRequestMs),
         },
@@ -435,7 +438,7 @@ export class PosCollectionsService implements OnModuleInit {
         const saleId = await this.sales.record(tx, {
           account,
           till,
-          soldBy: { id: request.soldByCustomerId, name: request.soldByName },
+          soldBy: { customerId: request.soldByCustomerId, staffId: request.soldByStaffId, name: request.soldByName },
           input,
           built,
           now,
@@ -488,7 +491,7 @@ export class PosCollectionsService implements OnModuleInit {
   }
 
   /** Attaches an unmatched transfer to the sale it was for (waiting, or run out of time), making the sale. */
-  async attach(owner: CustomerWithStore, id: string, requestId: string) {
+  async attach(owner: CustomerWithStore, id: string, requestId: string, by: PosBy = ownerBy(owner)) {
     const account = await this.sales.account(owner);
     const collection = await this.prisma.posCollection.findFirst({ where: { id, accountId: account.id } });
     if (!collection) throw notFound('transfer');
@@ -497,7 +500,7 @@ export class PosCollectionsService implements OnModuleInit {
     if (!request) throw notFound('transfer request');
     if (!['waiting', 'expired'].includes(request.status)) throw conflict('transfer_closed', 'That sale was paid or cancelled already. Ring it up again, then attach the transfer.');
     if (request.amountMinor !== collection.amountMinor) throw conflict('amount_mismatch', `The transfer is ${formatMoney(collection.amountMinor, collection.currency)} and the sale asked ${formatMoney(request.amountMinor, request.currency)}.`, 'transfer_request_id');
-    const paid = await this.pay(request, collection, owner.name);
+    const paid = await this.pay(request, collection, by.name);
     if (!paid) {
       const after = await this.prisma.posTransferRequest.findUniqueOrThrow({ where: { id: request.id } });
       throw conflict('basket_changed', after.failure ?? 'The sale could not be made. Ring it up again, then keep the transfer.');
@@ -506,9 +509,9 @@ export class PosCollectionsService implements OnModuleInit {
   }
 
   /** The owner says an unmatched transfer is for no sale: it is settled all the same (refunding the payer is the shop's). */
-  async keep(owner: CustomerWithStore, id: string, note: string | null | undefined) {
+  async keep(owner: CustomerWithStore, id: string, note: string | null | undefined, by: PosBy = ownerBy(owner)) {
     const account = await this.sales.account(owner);
-    const updated = await this.prisma.posCollection.updateMany({ where: { id, accountId: account.id, status: 'unmatched' }, data: { status: 'kept', note: text(note, 300), decidedByName: owner.name } });
+    const updated = await this.prisma.posCollection.updateMany({ where: { id, accountId: account.id, status: 'unmatched' }, data: { status: 'kept', note: text(note, 300), decidedByName: by.name } });
     if (!updated.count) {
       if (!(await this.prisma.posCollection.findFirst({ where: { id, accountId: account.id }, select: { id: true } }))) throw notFound('transfer');
       throw conflict('collection_decided', 'This transfer is settled already.');

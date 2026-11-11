@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module.js';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
@@ -14,12 +15,15 @@ import { AdminPosController, PosOwnerController, PosPaymentsController, PublicPo
 import { PosService } from './pos.service.js';
 import { PosSalesService } from './sales.service.js';
 import { PosWalletService } from './wallet.service.js';
+import { PosDeviceGuard, PosGuard } from './pos.guard.js';
+import { PosDeviceController, PosOwnerStaffController, PosStaffAuthController, PosStaffController } from './staff.controller.js';
+import { PosStaffService } from './staff.service.js';
 
 /** Udozo POS (docs/UDOZO_POS_PLAN.md): owners' accounts, shops and tills, the three plans and their monthly charges. */
 @Module({
-  imports: [CheckoutModule, SettingsModule, ClassifiedsModule, PaymentsModule, PayoutsModule, CustomerCashModule],
-  controllers: [PublicPosController, PosOwnerController, PosPaymentsController, AdminPosController],
-  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService, PosCustomersService, PosCollectionsService],
+  imports: [AuthModule, CheckoutModule, SettingsModule, ClassifiedsModule, PaymentsModule, PayoutsModule, CustomerCashModule],
+  controllers: [PublicPosController, PosOwnerController, PosPaymentsController, AdminPosController, PosStaffAuthController, PosDeviceController, PosOwnerStaffController, PosStaffController],
+  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService, PosCustomersService, PosCollectionsService, PosStaffService, PosGuard, PosDeviceGuard],
   exports: [PosBillingService, PosCollectionsService],
 })
 export class PosModule {}

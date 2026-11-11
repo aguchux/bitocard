@@ -7967,6 +7967,11 @@ model PosAccount {
   transferRequests   PosTransferRequest[]
   collections        PosCollection[]
   settlements        PosSettlement[]
+  roles              PosRole[]
+  staff              PosStaff[]
+  devices            PosDevice[]
+  staffSessions      PosStaffSession[]
+  approvals          PosApproval[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -8020,6 +8025,9 @@ model PosTill {
   collectionAccounts PosCollectionAccount[]
   transferRequests   PosTransferRequest[]
   collections        PosCollection[]
+  staffTills         PosStaffTill[]
+  devices            PosDevice[]
+  staffSessions      PosStaffSession[]
 
   @@index([shopId, position])
   @@map("pos_tills")
@@ -8047,6 +8055,10 @@ model PosSale {
   status          String     @default("completed") @db.VarChar(16)
   soldByCustomerId String?   @map("sold_by_customer_id") @db.Uuid
   soldByName      String     @map("sold_by_name")
+  /// The member of staff who sold it (null: the owner).
+  soldByStaffId   String?    @map("sold_by_staff_id") @db.Uuid
+  refundedByName  String?    @map("refunded_by_name") @db.VarChar(120)
+  refundedByStaffId String?  @map("refunded_by_staff_id") @db.Uuid
   note            String?    @db.VarChar(300)
   refundedAt      DateTime?  @map("refunded_at")
   refundReason    String?    @map("refund_reason") @db.VarChar(300)
@@ -8133,6 +8145,7 @@ model PosWalletRequest {
   basket           Json
   soldByCustomerId String?    @map("sold_by_customer_id") @db.Uuid
   soldByName       String     @map("sold_by_name")
+  soldByStaffId    String?    @map("sold_by_staff_id") @db.Uuid
   buyerCustomerId  String?    @map("buyer_customer_id") @db.Uuid
   /// The shop's customer the cashier chose, if any.
   customerId       String?    @map("customer_id") @db.Uuid
@@ -8220,6 +8233,7 @@ model PosStockMovement {
   note         String?           @db.VarChar(200)
   byCustomerId String?           @map("by_customer_id") @db.Uuid
   byName       String?           @map("by_name")
+  byStaffId    String?           @map("by_staff_id") @db.Uuid
   createdAt    DateTime          @default(now()) @map("created_at")
   account      PosAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
   listing      ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -8326,6 +8340,7 @@ model PosTransferRequest {
   basket              Json
   soldByCustomerId    String?    @map("sold_by_customer_id") @db.Uuid
   soldByName          String     @map("sold_by_name") @db.VarChar(120)
+  soldByStaffId       String?    @map("sold_by_staff_id") @db.Uuid
   customerId          String?    @map("customer_id") @db.Uuid
   /// `waiting`, `paid`, `cancelled`, `expired` or `failed`.
   status              String     @default("waiting") @db.VarChar(16)
@@ -8412,4 +8427,144 @@ model PosSettlement {
 
   @@unique([accountId, day], map: "pos_settlements_account_day_key")
   @@map("pos_settlements")
+}
+
+/// A POS owner's own role (the four fixed roles are in code, `src/pos/permissions.ts`): each permission and the most
+/// discount it gives without a manager (null: any amount).
+model PosRole {
+  id               String     @id @default(uuid()) @db.Uuid
+  accountId        String     @map("account_id") @db.Uuid
+  name             String     @db.VarChar(40)
+  description      String?    @db.VarChar(200)
+  permissions      Json       @default("{}")
+  discountLimitBps Int?       @map("discount_limit_bps")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  account          PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  staff            PosStaff[]
+
+  @@map("pos_roles")
+}
+
+/// A member of a POS owner's staff: signs in with the shop code, their phone and a 4-digit PIN, never a Udozo account.
+model PosStaff {
+  id            String     @id @default(uuid()) @db.Uuid
+  accountId     String     @map("account_id") @db.Uuid
+  firstName     String     @map("first_name") @db.VarChar(60)
+  lastName      String     @map("last_name") @db.VarChar(60)
+  phone         String     @db.VarChar(20)
+  email         String?    @db.VarChar(254)
+  /// A fixed role (`manager`, `cashier`, `stock_keeper`, `accountant`), or `roleId` for the owner's own.
+  roleKey       String?    @map("role_key") @db.VarChar(32)
+  roleId        String?    @map("role_id") @db.Uuid
+  allTills      Boolean    @default(false) @map("all_tills")
+  /// May sell from their own phone (the mobile POS, later).
+  mobile        Boolean    @default(false)
+  /// `invited` (until they set their PIN), `active`, `suspended` or `removed`.
+  status        String     @default("invited") @db.VarChar(16)
+  pinHash       String?    @map("pin_hash")
+  pinSetAt      DateTime?  @map("pin_set_at")
+  failedTries   Int        @default(0) @map("failed_tries")
+  lockedUntil   DateTime?  @map("locked_until")
+  lastActiveAt  DateTime?  @map("last_active_at")
+  invitedByName String     @map("invited_by_name") @db.VarChar(120)
+  removedAt     DateTime?  @map("removed_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  role          PosRole?   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  tills         PosStaffTill[]
+  invites       PosInvite[]
+  sessions      PosStaffSession[]
+
+  @@index([accountId, status], map: "pos_staff_account_idx")
+  @@map("pos_staff")
+}
+
+model PosStaffTill {
+  staffId String   @map("staff_id") @db.Uuid
+  tillId  String   @map("till_id") @db.Uuid
+  staff   PosStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  till    PosTill  @relation(fields: [tillId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, tillId])
+  @@map("pos_staff_tills")
+}
+
+/// An invitation to set a PIN (also a PIN reset): single use, 48 hours.
+model PosInvite {
+  id         String    @id @default(uuid()) @db.Uuid
+  staffId    String    @map("staff_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(64)
+  /// `sms`, `whatsapp` (the owner sends it) or `link` (copied).
+  sentVia    String    @map("sent_via") @db.VarChar(16)
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  replacedAt DateTime? @map("replaced_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  staff      PosStaff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId], map: "pos_invites_staff_idx")
+  @@map("pos_invites")
+}
+
+/// A till's device: linked with a one-time code, then known by its token.
+model PosDevice {
+  id            String     @id @default(uuid()) @db.Uuid
+  accountId     String     @map("account_id") @db.Uuid
+  tillId        String     @map("till_id") @db.Uuid
+  name          String?    @db.VarChar(60)
+  platform      String?    @db.VarChar(16)
+  codeHash      String?    @unique @map("code_hash") @db.VarChar(64)
+  codeExpiresAt DateTime?  @map("code_expires_at")
+  tokenHash     String?    @unique @map("token_hash") @db.VarChar(64)
+  linkedAt      DateTime?  @map("linked_at")
+  lastSeenAt    DateTime?  @map("last_seen_at")
+  revokedAt     DateTime?  @map("revoked_at")
+  createdByName String     @map("created_by_name") @db.VarChar(120)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  till          PosTill    @relation(fields: [tillId], references: [id], onDelete: Cascade)
+  sessions      PosStaffSession[]
+
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_devices_account_idx")
+  @@map("pos_devices")
+}
+
+/// A member of staff signed in (on a linked device, or the web): ends after 12 hours idle or when ended.
+model PosStaffSession {
+  id          String     @id @default(uuid()) @db.Uuid
+  accountId   String     @map("account_id") @db.Uuid
+  staffId     String     @map("staff_id") @db.Uuid
+  deviceId    String?    @map("device_id") @db.Uuid
+  tillId      String?    @map("till_id") @db.Uuid
+  tokenHash   String     @unique @map("token_hash") @db.VarChar(64)
+  lastSeenAt  DateTime   @default(now()) @map("last_seen_at")
+  endedAt     DateTime?  @map("ended_at")
+  endedReason String?    @map("ended_reason") @db.VarChar(32)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  account     PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  staff       PosStaff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  device      PosDevice? @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  till        PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+
+  @@map("pos_sessions")
+}
+
+/// A manager's PIN given at the till for something a member of staff may only do with approval.
+model PosApproval {
+  id                 String     @id @default(uuid()) @db.Uuid
+  accountId          String     @map("account_id") @db.Uuid
+  action             String     @db.VarChar(32)
+  subjectId          String?    @map("subject_id") @db.Uuid
+  requestedByStaffId String     @map("requested_by_staff_id") @db.Uuid
+  requestedByName    String     @map("requested_by_name") @db.VarChar(120)
+  approvedByStaffId  String     @map("approved_by_staff_id") @db.Uuid
+  approvedByName     String     @map("approved_by_name") @db.VarChar(120)
+  tillId             String?    @map("till_id") @db.Uuid
+  createdAt          DateTime   @default(now()) @map("created_at")
+  account            PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_approvals_account_idx")
+  @@map("pos_approvals")
 }

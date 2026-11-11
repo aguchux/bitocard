@@ -20,7 +20,7 @@ import { posShopKindCodes, presentShopKind } from './shop-kinds.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
-class ShopDto {
+export class ShopDto {
   @IsOptional() @IsString() @MaxLength(80)
   name?: string;
 
@@ -65,7 +65,7 @@ class PlanDto {
   expected_amount?: number;
 }
 
-class TillDto {
+export class TillDto {
   @IsOptional() @IsString() @MaxLength(60)
   name?: string;
 
@@ -76,7 +76,7 @@ class TillDto {
   auto_print?: boolean;
 }
 
-class CatalogueDto {
+export class CatalogueDto {
   @IsOptional() @IsString() @MaxLength(80)
   q?: string;
 
@@ -125,7 +125,7 @@ class SalePaymentDto {
   reference?: string | null;
 }
 
-class SaleDto {
+export class SaleDto {
   @IsUUID()
   till_id: string;
 
@@ -157,7 +157,7 @@ class SaleDto {
   customer_id?: string | null;
 }
 
-class CustomerDto {
+export class CustomerDto {
   @IsOptional() @IsString() @MaxLength(120)
   name?: string;
 
@@ -179,7 +179,7 @@ class CustomerDto {
   credit_limit?: number | null;
 }
 
-class CustomersDto {
+export class CustomersDto {
   @IsOptional() @IsString() @MaxLength(80)
   q?: string;
 
@@ -194,7 +194,7 @@ class CustomersDto {
   offset?: number;
 }
 
-class RepaymentDto {
+export class RepaymentDto {
   @IsInt() @Min(1)
   amount: number;
 
@@ -208,7 +208,7 @@ class RepaymentDto {
   note?: string | null;
 }
 
-class WalletRequestDto extends SaleDto {
+export class WalletRequestDto extends SaleDto {
   /** The part paid from the buyer's Udozo wallet, in minor units; the rest is in `payments`. */
   @IsInt() @Min(1)
   wallet_amount: number;
@@ -218,7 +218,7 @@ class WalletRequestDto extends SaleDto {
   phone?: string | null;
 }
 
-class TransferRequestDto extends SaleDto {
+export class TransferRequestDto extends SaleDto {
   /** The part paid by transfer into the till's Udozo collection account, in minor units; the rest is in `payments`. */
   @IsInt() @Min(1)
   transfer_amount: number;
@@ -244,7 +244,7 @@ class SimulateTransferDto {
   payer_name?: string | null;
 }
 
-class CollectionsDto {
+export class CollectionsDto {
   @IsOptional() @IsIn(['matched', 'unmatched', 'kept'])
   status?: 'matched' | 'unmatched' | 'kept';
 
@@ -255,12 +255,12 @@ class CollectionsDto {
   offset?: number;
 }
 
-class AttachDto {
+export class AttachDto {
   @IsUUID()
   transfer_request_id: string;
 }
 
-class KeepDto {
+export class KeepDto {
   @IsOptional() @IsString() @MaxLength(300)
   note?: string | null;
 }
@@ -293,7 +293,7 @@ class PayDto {
   expected_amount: number;
 }
 
-class SalesDto {
+export class SalesDto {
   @IsOptional() @IsUUID()
   shop?: string;
 
@@ -319,7 +319,7 @@ class SalesDto {
   offset?: number;
 }
 
-class RefundDto {
+export class RefundDto {
   @IsString() @MaxLength(300)
   reason: string;
 
@@ -328,7 +328,7 @@ class RefundDto {
   restock?: boolean;
 }
 
-class StockDto {
+export class StockDto {
   @IsIn(stockAdjustments)
   kind: (typeof stockAdjustments)[number];
 

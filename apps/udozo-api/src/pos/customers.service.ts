@@ -6,6 +6,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type PosCustomer } from '../generated/prisma/client.js';
+import { ownerBy, type PosBy } from './actor.js';
 import { recordedPaymentMethods, type RecordedPaymentMethod } from './sale-rules.js';
 
 export type CustomerFields = { name?: string; phone?: string | null; email?: string | null; address?: string | null; notes?: string | null; credit_limit?: number | null };
@@ -188,7 +189,7 @@ export class PosCustomersService {
   }
 
   /** A repayment of what the customer owes, recorded as it was paid (the money is the shop's own). */
-  async repay(owner: CustomerWithStore, id: string, input: { amount: number; method: RecordedPaymentMethod; reference?: string | null; note?: string | null }) {
+  async repay(owner: CustomerWithStore, id: string, input: { amount: number; method: RecordedPaymentMethod; reference?: string | null; note?: string | null }, by: PosBy = ownerBy(owner)) {
     const account = await this.account(owner);
     await this.own(this.prisma, account.id, id);
     if (!Number.isSafeInteger(input.amount) || input.amount < 1) throw invalid('parameter_invalid', 'Give how much they paid.', 'amount');
@@ -197,7 +198,7 @@ export class PosCustomersService {
     await this.prisma.$transaction(async tx => {
       const [after] = await tx.$queryRaw<Array<{ owed: bigint }>>`UPDATE "pos_customers" SET "owed_minor" = "owed_minor" - ${amount}, "updated_at" = now() WHERE "id" = ${id}::uuid AND "owed_minor" >= ${amount} RETURNING "owed_minor" AS "owed"`;
       if (!after) throw conflict('repayment_too_much', 'That is more than they owe.', 'amount');
-      await tx.posCustomerEntry.create({ data: { customerId: id, kind: 'repayment', amountMinor: -amount, owedAfterMinor: after.owed, method: input.method, reference: text(input.reference, 80), note: text(input.note, 300), byName: owner.name } });
+      await tx.posCustomerEntry.create({ data: { customerId: id, kind: 'repayment', amountMinor: -amount, owedAfterMinor: after.owed, method: input.method, reference: text(input.reference, 80), note: text(input.note, 300), byName: by.name } });
     });
     return this.detail(account.id, account.country, id);
   }

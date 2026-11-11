@@ -160,6 +160,9 @@ export function callerScope(req: Request) {
   // A BitoCard Verify applicant: their app session (set by its guard, never the token).
   const kyc = (req as Request & { kycSessionId?: string }).kycSessionId;
   if (kyc) return `kyc:${kyc}`;
+  // A shop's member of staff at the till (Udozo POS): their session (set by `PosGuard`, never the token).
+  const pos = (req as Request & { posSessionId?: string }).posSessionId;
+  if (pos) return `pos:${pos}`;
   // An order page (`/v1/store/access/<token>/…`) acts for whoever holds its link: scoped by the link (its hash, never
   // the token), so its money actions are idempotent without sharing the anonymous scope.
   const access = /^\/v1\/store\/access\/(bca_[A-Za-z0-9_-]+)\//.exec(req.path ?? '');

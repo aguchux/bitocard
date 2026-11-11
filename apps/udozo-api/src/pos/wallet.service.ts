@@ -12,6 +12,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { normalisePhone } from '../auth/auth.service.js';
 import { PosCustomersService } from './customers.service.js';
+import { ownerBy, type PosSellOptions } from './actor.js';
 import { PosSalesService, type SaleInput } from './sales.service.js';
 
 export type WalletRequestInput = SaleInput & { wallet_amount: number; phone?: string | null };
@@ -55,7 +56,7 @@ export class PosWalletService {
   }
 
   /** Asks for the wallet part of a basket: checked as a sale would be, nothing taken. Returns the link's token once. */
-  async request(owner: CustomerWithStore, input: WalletRequestInput) {
+  async request(owner: CustomerWithStore, input: WalletRequestInput, options: PosSellOptions = {}) {
     const account = await this.sales.account(owner);
     await this.open(account.country);
     const till = await this.sales.till(account.id, input.till_id);
@@ -77,7 +78,8 @@ export class PosWalletService {
     }
     const buyerId = buyer?.id ?? null;
 
-    const built = await this.prisma.$transaction(tx => this.sales.build(tx, { account, till, ownerId: owner.id, input, wallet }));
+    const built = await this.prisma.$transaction(tx => this.sales.build(tx, { account, till, ownerId: owner.id, input, wallet, discount: options.discount }));
+    const by = options.by ?? ownerBy(owner);
     const basket: Basket = {
       client_sale_id: input.client_sale_id,
       lines: input.lines.map(line => ({ listing_id: line.listing_id, quantity: line.quantity, ...(line.discount ? { discount: line.discount } : {}) })),
@@ -107,8 +109,9 @@ export class PosWalletService {
           amountMinor: wallet,
           totalMinor: built.totals.total,
           basket: basket as unknown as Prisma.InputJsonValue,
-          soldByCustomerId: owner.id,
-          soldByName: owner.name,
+          soldByCustomerId: by.customerId,
+          soldByName: by.name,
+          soldByStaffId: by.staffId,
           buyerCustomerId: buyerId,
           customerId,
           expiresAt: new Date(now.getTime() + walletRequestMs),
@@ -209,7 +212,7 @@ export class PosWalletService {
         const customer = await this.customers.linkUdozo(tx, account.id, { id: buyer.id, name: buyer.name, phone: buyer.phone, phoneVerifiedAt: buyer.phoneVerifiedAt }, row.customerId);
         input.customer_id = customer.id;
         const built = await this.sales.build(tx, { account, till, ownerId: row.account.customerId, input, wallet: row.amountMinor });
-        const saleId = await this.sales.record(tx, { account, till, soldBy: { id: row.soldByCustomerId, name: row.soldByName }, input, built, now, walletRequest: { id: row.id, number } });
+        const saleId = await this.sales.record(tx, { account, till, soldBy: { customerId: row.soldByCustomerId, staffId: row.soldByStaffId, name: row.soldByName }, input, built, now, walletRequest: { id: row.id, number } });
         await tx.posWalletRequest.update({ where: { id: row.id }, data: { saleId } });
         await this.ledger.write(tx, entry);
       });

@@ -10,6 +10,8 @@ import { formatMoney } from '../notifications/templates.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { posCountedStatuses, tillBlock } from './catalogue-rules.js';
 import { saleTotals } from './money.js';
+import { type DiscountRule, ownerBy, type PosBy, type PosSellOptions } from './actor.js';
+import { discountBps } from './permissions.js';
 import { limitsOf } from './plans.js';
 import { customerUnknown } from './customers.service.js';
 import { adjustedStock, checkPayments, maxLineQuantity, maxSaleLines, type PaymentInput, saleNumber, type StockAdjustment, tillPaymentMethods, type TillPaymentMethod } from './sale-rules.js';
@@ -30,6 +32,8 @@ export type SaleInput = {
 };
 
 export type SalesFilter = { shop?: string; till?: string; status?: 'completed' | 'refunded'; q?: string; from?: string; to?: string; limit?: number; offset?: number };
+/** What a member of staff sees of the sales: only their own (`soldByStaff`), and only at their tills (`tills`). */
+export type SalesScope = { soldByStaff?: string; tills?: string[] };
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 const conflict = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
@@ -70,7 +74,7 @@ export class PosSalesService {
     return account;
   }
 
-  async sell(customer: CustomerWithStore, input: SaleInput) {
+  async sell(customer: CustomerWithStore, input: SaleInput, options: PosSellOptions = {}) {
     const account = await this.account(customer);
     const till = await this.till(account.id, input.till_id);
 
@@ -82,8 +86,8 @@ export class PosSalesService {
 
     try {
       const saleId = await this.prisma.$transaction(async tx => {
-        const built = await this.build(tx, { account, till, ownerId: customer.id, input });
-        return this.record(tx, { account, till, soldBy: { id: customer.id, name: customer.name }, input, built, now });
+        const built = await this.build(tx, { account, till, ownerId: customer.id, input, discount: options.discount });
+        return this.record(tx, { account, till, soldBy: options.by ?? ownerBy(customer), input, built, now });
       });
       return this.present(await this.prisma.posSale.findUniqueOrThrow({ where: { id: saleId }, include: saleInclude }));
     } catch (error) {
@@ -120,7 +124,7 @@ export class PosSalesService {
    * stock; the totals as the till showed them; and the payments adding up to the total, with `wallet` (minor units) the
    * part paid from a Udozo wallet. Takes nothing.
    */
-  async build(tx: Prisma.TransactionClient, args: { account: Account; till: Till; ownerId: string; input: SaleInput; wallet?: bigint; transfer?: bigint }) {
+  async build(tx: Prisma.TransactionClient, args: { account: Account; till: Till; ownerId: string; input: SaleInput; wallet?: bigint; transfer?: bigint; discount?: DiscountRule }) {
     const { account, till, ownerId, input } = args;
     const ids = input.lines.map(line => line.listing_id);
     await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ANY(${[...ids].sort()}::uuid[]) ORDER BY "id" FOR UPDATE`;
@@ -149,6 +153,7 @@ export class PosSalesService {
 
     const totals = saleTotals(lines, { discount: minor(input.discount, 'discount'), vatBps: till.shop.vatBps });
     if (BigInt(input.expected_total) !== totals.total) throw conflict('price_changed', 'A price changed since the till showed the total. Look again, then take payment.', 'expected_total');
+    this.checkDiscount(totals, args.discount);
     const parts: PaymentInput[] = input.payments.map((payment, index) => {
       if (!tillPaymentMethods.includes(payment.method as TillPaymentMethod)) throw invalid('parameter_invalid', 'Choose cash, transfer, card, other or pay later.', `payments[${index}].method`);
       return { method: payment.method, amount: minor(payment.amount, `payments[${index}].amount`), tendered: payment.tendered === undefined || payment.tendered === null ? null : minor(payment.tendered, `payments[${index}].tendered`), reference: payment.reference ?? null };
@@ -168,13 +173,30 @@ export class PosSalesService {
     return { lines, totals, paid, customer, credit };
   }
 
+  /**
+   * A member of staff's discount, held to their role's limit: more needs a manager's PIN (`approval_required`), and a
+   * manager's limit then (`approval_invalid` beyond it). The owner gives any discount.
+   */
+  checkDiscount(totals: { subtotal: bigint; discount: bigint }, rule: DiscountRule | undefined) {
+    if (!rule) return;
+    const share = discountBps(totals.discount, totals.subtotal);
+    if (rule.limit === null || share <= rule.limit) return;
+    if (!rule.approved) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'approval_required', `A discount of ${(share / 100).toFixed(2).replace(/\.?0+$/, '')}% needs a manager's approval: ask them to enter their PIN.`, 'discount');
+    if (rule.approverLimit !== null && rule.approverLimit !== undefined && share > rule.approverLimit) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'approval_invalid', 'That is more discount than the manager may give.', 'discount');
+  }
+
+  /** Whether a sale's discount went past the member of staff's own limit (so a manager's PIN approved it). */
+  discountApproved(totals: { subtotal: bigint; discount: bigint }, rule: DiscountRule | undefined) {
+    return Boolean(rule && rule.limit !== null && discountBps(totals.discount, totals.subtotal) > rule.limit);
+  }
+
   /** Makes the sale `build` checked, in the same `tx`: numbered for its shop, its units taken off stock with a movement each. */
   async record(
     tx: Prisma.TransactionClient,
     args: {
       account: Account;
       till: Till;
-      soldBy: { id: string | null; name: string };
+      soldBy: PosBy;
       input: SaleInput;
       built: Built;
       now: Date;
@@ -207,8 +229,9 @@ export class PosSalesService {
         vatMinor: totals.vat,
         totalMinor: totals.total,
         changeMinor: paid.change,
-        soldByCustomerId: soldBy.id,
+        soldByCustomerId: soldBy.customerId,
         soldByName: soldBy.name,
+        soldByStaffId: soldBy.staffId,
         customerId: built.customer?.id ?? null,
         note: text(input.note, 300),
         clientCreatedAt: input.client_created_at ? new Date(input.client_created_at) : null,
@@ -253,7 +276,7 @@ export class PosSalesService {
     for (const line of lines) {
       const stock = line.row.stock - line.quantity;
       await this.setStock(tx, line.row, stock, now);
-      await tx.posStockMovement.create({ data: { accountId: account.id, listingId: line.row.id, shopId: till.shopId, reason: 'sale', delta: -line.quantity, stockAfter: stock, saleId: sale.id, byCustomerId: soldBy.id, byName: soldBy.name } });
+      await tx.posStockMovement.create({ data: { accountId: account.id, listingId: line.row.id, shopId: till.shopId, reason: 'sale', delta: -line.quantity, stockAfter: stock, saleId: sale.id, byCustomerId: soldBy.customerId, byStaffId: soldBy.staffId, byName: soldBy.name } });
     }
     return sale.id;
   }
@@ -273,7 +296,7 @@ export class PosSalesService {
     return (await tx.classifiedMarketSettings.findUnique({ where: { country }, select: { listingDays: true } }))?.listingDays ?? 30;
   }
 
-  async list(customer: CustomerWithStore, filter: SalesFilter) {
+  async list(customer: CustomerWithStore, filter: SalesFilter, scope: SalesScope = {}) {
     const account = await this.account(customer);
     const from = filter.from ? new Date(filter.from) : null;
     const to = filter.to ? new Date(filter.to) : null;
@@ -281,6 +304,8 @@ export class PosSalesService {
       accountId: account.id,
       ...(filter.shop ? { shopId: filter.shop } : {}),
       ...(filter.till ? { tillId: filter.till } : {}),
+      ...(scope.tills ? { AND: [{ tillId: { in: scope.tills } }] } : {}),
+      ...(scope.soldByStaff ? { soldByStaffId: scope.soldByStaff } : {}),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.q?.trim() ? { number: { contains: filter.q.trim().toUpperCase() } } : {}),
       ...(from || to ? { createdAt: { ...(from && !Number.isNaN(from.getTime()) ? { gte: from } : {}), ...(to && !Number.isNaN(to.getTime()) ? { lt: to } : {}) } } : {}),
@@ -305,9 +330,9 @@ export class PosSalesService {
     };
   }
 
-  async get(customer: CustomerWithStore, id: string) {
+  async get(customer: CustomerWithStore, id: string, scope: SalesScope = {}) {
     const account = await this.account(customer);
-    const sale = await this.prisma.posSale.findFirst({ where: { id, accountId: account.id }, include: saleInclude });
+    const sale = await this.prisma.posSale.findFirst({ where: { id, accountId: account.id, ...(scope.tills ? { tillId: { in: scope.tills } } : {}), ...(scope.soldByStaff ? { soldByStaffId: scope.soldByStaff } : {}) }, include: saleInclude });
     if (!sale) throw notFound('sale');
     return this.present(sale);
   }
@@ -318,12 +343,13 @@ export class PosSalesService {
    * a Udozo wallet part goes back from the owner's payouts to the buyer's wallet (`pos_wallet_refund:<request>`), and
    * while the owner's payouts hold less than it, the refund waits (`refund_funds_short`).
    */
-  async refund(customer: CustomerWithStore, id: string, input: { reason: string; restock?: boolean }) {
+  async refund(customer: CustomerWithStore, id: string, input: { reason: string; restock?: boolean }, options: { by?: PosBy; tills?: string[] } = {}) {
     const account = await this.account(customer);
+    const by = options.by ?? ownerBy(customer);
     const reason = text(input.reason, 300);
     if (!reason) throw invalid('parameter_missing', 'Say why it is refunded.', 'reason');
     const restock = input.restock ?? true;
-    const sale = await this.prisma.posSale.findFirst({ where: { id, accountId: account.id }, include: { lines: true, payments: { include: { walletRequest: { select: { id: true, buyerCustomerId: true } } } } } });
+    const sale = await this.prisma.posSale.findFirst({ where: { id, accountId: account.id, ...(options.tills ? { tillId: { in: options.tills } } : {}) }, include: { lines: true, payments: { include: { walletRequest: { select: { id: true, buyerCustomerId: true } } } } } });
     if (!sale) throw notFound('sale');
     if (sale.status === 'refunded') throw conflict('sale_refunded', `${sale.number} was refunded already.`);
     const now = new Date();
@@ -344,7 +370,7 @@ export class PosSalesService {
         ),
     );
     try {
-      await this.refundIn(sale, { account, customer, reason, restock, now, reversals });
+      await this.refundIn(sale, { account, customer, by, reason, restock, now, reversals });
     } catch (error) {
       if (error instanceof ApiError && error.code === 'insufficient_funds') {
         throw conflict('refund_funds_short', 'Your Udozo payouts hold less than the wallet part of this sale, as it was paid out. Refund it once more money has come in.');
@@ -356,11 +382,11 @@ export class PosSalesService {
 
   private async refundIn(
     sale: { id: string; number: string; shopId: string; customerId: string | null; totalMinor: bigint; lines: Array<{ listingId: string; quantity: number }>; payments: Array<{ method: string; amountMinor: bigint }> },
-    args: { account: Account; customer: CustomerWithStore; reason: string; restock: boolean; now: Date; reversals: Awaited<ReturnType<LedgerService['prepare']>>[] },
+    args: { account: Account; customer: CustomerWithStore; by: PosBy; reason: string; restock: boolean; now: Date; reversals: Awaited<ReturnType<LedgerService['prepare']>>[] },
   ) {
-    const { account, customer, reason, restock, now } = args;
+    const { account, by, reason, restock, now } = args;
     await this.prisma.$transaction(async tx => {
-      const claimed = await tx.posSale.updateMany({ where: { id: sale.id, status: 'completed' }, data: { status: 'refunded', refundedAt: now, refundReason: reason, restocked: restock } });
+      const claimed = await tx.posSale.updateMany({ where: { id: sale.id, status: 'completed' }, data: { status: 'refunded', refundedAt: now, refundReason: reason, restocked: restock, refundedByName: by.name.slice(0, 120), refundedByStaffId: by.staffId } });
       if (claimed.count === 0) throw conflict('sale_refunded', `${sale.number} was refunded already.`);
       for (const entry of args.reversals) await this.ledger.write(tx, entry);
       if (sale.customerId) {
@@ -370,7 +396,7 @@ export class PosSalesService {
         if (before) {
           const off = credit < before.owed ? credit : before.owed;
           await tx.$executeRaw`UPDATE "pos_customers" SET "owed_minor" = "owed_minor" - ${off}, "spent_minor" = GREATEST("spent_minor" - ${sale.totalMinor}, 0), "updated_at" = ${now} WHERE "id" = ${sale.customerId}::uuid`;
-          if (off > 0n) await tx.posCustomerEntry.create({ data: { customerId: sale.customerId, kind: 'refund', amountMinor: -off, owedAfterMinor: before.owed - off, saleId: sale.id, note: reason.slice(0, 300), byName: customer.name } });
+          if (off > 0n) await tx.posCustomerEntry.create({ data: { customerId: sale.customerId, kind: 'refund', amountMinor: -off, owedAfterMinor: before.owed - off, saleId: sale.id, note: reason.slice(0, 300), byName: by.name } });
         }
       }
       if (!restock) return;
@@ -385,13 +411,13 @@ export class PosSalesService {
         const stock = Math.min(maxStock, row.stock + line.quantity);
         await this.setStock(tx, row, stock, now);
         row.stock = stock;
-        await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId: sale.shopId, reason: 'refund', delta: line.quantity, stockAfter: stock, saleId: sale.id, note: reason.slice(0, 200), byCustomerId: customer.id, byName: customer.name } });
+        await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId: sale.shopId, reason: 'refund', delta: line.quantity, stockAfter: stock, saleId: sale.id, note: reason.slice(0, 200), byCustomerId: by.customerId, byStaffId: by.staffId, byName: by.name } });
       }
     });
   }
 
   /** Restocks, counts or writes off damaged units of one of the owner's products at the till. */
-  async adjustStock(customer: CustomerWithStore, listingId: string, input: { kind: StockAdjustment; quantity: number; note?: string | null; shop_id?: string | null }) {
+  async adjustStock(customer: CustomerWithStore, listingId: string, input: { kind: StockAdjustment; quantity: number; note?: string | null; shop_id?: string | null }, by: PosBy = ownerBy(customer)) {
     const account = await this.account(customer);
     if (!Number.isInteger(input.quantity) || input.quantity < (input.kind === 'count' ? 0 : 1) || input.quantity > maxStock) throw invalid('parameter_invalid', input.kind === 'count' ? 'Count what is on the shelf: 0 or more.' : 'Give how many, from 1.', 'quantity');
     const shopId = input.shop_id ? ((await this.prisma.posShop.findFirst({ where: { id: input.shop_id, accountId: account.id }, select: { id: true } }))?.id ?? null) : null;
@@ -404,7 +430,7 @@ export class PosSalesService {
       const held = await heldUnits(tx, row.id);
       const stock = adjustedStock(row.stock, input.kind, input.quantity, held, maxStock);
       await this.setStock(tx, row, stock, now);
-      const movement = await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId, reason: input.kind, delta: stock - row.stock, stockAfter: stock, note: text(input.note, 200), byCustomerId: customer.id, byName: customer.name } });
+      const movement = await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId, reason: input.kind, delta: stock - row.stock, stockAfter: stock, note: text(input.note, 200), byCustomerId: by.customerId, byStaffId: by.staffId, byName: by.name } });
       return { object: 'pos_stock' as const, listing_id: row.id, stock, held, available: Math.max(0, stock - held), movement: this.presentMovement(movement) };
     });
   }
@@ -443,6 +469,8 @@ export class PosSalesService {
       /** The shop's customer it was sold to, if one was chosen. */
       customer: sale.customer ? { id: sale.customer.id, name: sale.customer.name, number: `C-${String(sale.customer.number).padStart(6, '0')}` } : null,
       sold_by: sale.soldByName,
+      sold_by_staff_id: sale.soldByStaffId,
+      refunded_by: sale.refundedByName,
       note: sale.note,
       refunded_at: iso(sale.refundedAt),
       refund_reason: sale.refundReason,
