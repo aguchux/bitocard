@@ -270,6 +270,31 @@ Nothing is installed into a folder the shop chooses. Everything belongs to the b
   - **Printed receipts** remain the shop's paper record.
   - **Shops that go offline often are steered to the apps,** whose SQLite database sits in the app's own storage and is not cleared with the browser.
 
+**How the offline data is stored**
+
+One local database per linked till (`udozo-pos-<shop>-<till>`), the same layout in the web app (IndexedDB) and the apps (SQLite). Both sit behind one `PosStore` interface in a shared package, so the till's code does not know which it runs on.
+
+| Store | What it holds | Sealed? |
+|---|---|---|
+| `meta` | device and till ids, schema version, last sync time and cursor, when it went offline, sales count offline, the next provisional number | no |
+| `products` | each listing ticked Sell at POS: id, title, price, barcode (indexed for scanning), category, free stock when last synced, units sold here since, updated at | no (nothing secret, and the barcode index must be readable) |
+| `photos` | small thumbnails (200 px, the first 1,000 products) in Cache Storage or the app's files | no |
+| `staff` | id, name, role, PIN check (Argon2id hash and salt), failed tries, locked until | yes |
+| `roles`, `settings` | permissions and discount limits; the shop's details, VAT, receipt layout, bank details | settings yes |
+| `sales` | each sale in full: client id, provisional number, lines, payments, staff, time, status (`waiting`, `uploaded`, `flagged`) and, once uploaded, its `POS-` number | yes |
+| `outbox` | the queue of things to upload, numbered in the order they happened: sale, refund, void, shift opened or closed, stock count; with attempts and the last error | yes |
+| `shifts` | open and closed shifts with their cash | yes |
+| `messages` | WhatsApp and email receipts waiting to be sent | yes |
+
+- **Sealed** means the record is encrypted with AES-GCM under the device key, which the browser (WebCrypto, non-extractable) or the phone's keystore holds. The files are useless copied to another machine.
+- **A sale is one local transaction:**
+  - writing the sale, its outbox entry and the stock change happens all at once or not at all;
+  - a crash, a closed tab or a flat battery mid-sale leaves nothing half-written;
+  - the sale is never shown as complete before it is saved.
+- **Uploading** takes the outbox in its numbered order, a batch at a time. The API answers each entry's client id with its result (the `POS-` number, or a flag); the till marks it uploaded and moves on, and a failed entry is retried without skipping ahead. Uploaded sales stay on the device 30 days for reprinting, then are removed.
+- **Refreshing the copy** asks only for what changed since the last sync (the `meta` cursor): prices, stock, products ticked or unticked, staff and roles. Units sold here are kept until the API confirms them, so free stock never counts a sale twice.
+- **Size:** a shop of 5,000 products is a few megabytes, plus the thumbnails. The till warns if the browser offers less space than it needs.
+
 **Rollout:** offline comes in milestone 9, but every sale carries its client id from milestone 3, so nothing in the API changes for it.
 1. The web app first (IndexedDB, service worker, cash and recorded methods), so shops can use it on any device.
 2. The Android, iOS and Windows apps, where storage is reliable and printers and cash drawers connect.
