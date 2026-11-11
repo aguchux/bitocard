@@ -1,13 +1,13 @@
 import { ShopForm } from "@/components/shop-form";
 import { Tills } from "@/components/tills";
 import Link from "next/link";
-import { currentOwner, ownerCatalogue } from "@/lib/pos-data";
+import { currentOwner, ownerCatalogue, shopKinds } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
 
 /** First-run setup and later changes: each shop's details for receipts, its VAT, and its tills. */
 export default async function SetupPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const welcome = (await searchParams).welcome === "1";
-  const [owner, catalogue] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1")]);
+  const [owner, catalogue, kinds] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1"), shopKinds()]);
   if (!owner.ok || !owner.data.account) return null;
   const products = catalogue.ok ? catalogue.data.summary.products : 0;
   const { account } = owner.data;
@@ -27,7 +27,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
               Shop details
             </h2>
             <p className="mt-1 mb-4 text-pos-ink-2">Printed on your receipts. Shop code {shop.shop_code}.</p>
-            <ShopForm shop={shop} />
+            <ShopForm shop={shop} kinds={kinds} />
           </section>
           <section id="tills" aria-labelledby={`tills-${shop.id}`} className="rounded-[20px] bg-white p-6">
             <h2 id={`tills-${shop.id}`} className="font-display text-xl font-bold text-pos-ink">

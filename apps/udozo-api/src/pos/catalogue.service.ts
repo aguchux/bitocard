@@ -7,9 +7,10 @@ import { PrismaService } from '../database/prisma.service.js';
 import { WatermarkService } from '../watermarks/watermarks.service.js';
 import { posCountedStatuses, tillBlock } from './catalogue-rules.js';
 import { limitsOf } from './plans.js';
+import { presentShopKind } from './shop-kinds.js';
 
 export type CatalogueFilter = { q?: string; category?: string; barcode?: string; show?: 'all' | 'sellable' | 'low_stock' | 'out_of_stock' | 'blocked'; limit?: number; offset?: number };
-export type ProductBlock = 'plan_limit' | 'not_live' | 'no_price' | 'out_of_stock';
+export type ProductBlock = 'plan_limit' | 'incomplete' | 'no_price' | 'out_of_stock';
 
 const noAccount = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'pos_account_missing', 'You have not signed up for Udozo POS yet.');
 
@@ -27,9 +28,10 @@ export class PosCatalogueService {
   ) {}
 
   async catalogue(customer: CustomerWithStore, filter: CatalogueFilter) {
-    const account = await this.prisma.posAccount.findUnique({ where: { customerId: customer.id }, include: { plan: true } });
+    const account = await this.prisma.posAccount.findUnique({ where: { customerId: customer.id }, include: { plan: true, shops: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], take: 1, select: { kind: true } } } });
     if (!account) throw noAccount();
     const limit = limitsOf(account.plan).products;
+    const kind = presentShopKind(account.shops[0]?.kind ?? 'general');
 
     // Every listing ticked, light, in the order it was ticked: the plan's limit keeps the first ones selling.
     const rows = await this.prisma.classifiedListing.findMany({
@@ -74,12 +76,14 @@ export class PosCatalogueService {
       select: { id: true, category: { select: { id: true, name: true, parent: { select: { id: true, name: true } } } }, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1 } },
     });
     const byId = new Map(details.map(item => [item.id, item]));
-    const categories = await this.categories(rows.map(row => row.categoryId).filter((id): id is string => id !== null));
+    const categories = await this.categories(rows.map(row => row.categoryId).filter((id): id is string => id !== null), kind.categories);
 
     return {
       object: 'list' as const,
       currency: account.currency,
       plan: { code: account.plan.code, name: account.plan.name },
+      /** The shop's kind: its categories come first. */
+      shop_kind: { code: kind.code, name: kind.name },
       summary: {
         products: products.length,
         limit,
@@ -134,19 +138,25 @@ export class PosCatalogueService {
     return totals;
   }
 
-  /** The top categories the shop's products are in, with how many each holds, for the catalogue's filter. */
-  private async categories(ids: string[]) {
+  /**
+   * The top categories the shop's products are in, with how many each holds, for the catalogue's filter: the shop
+   * kind's own first (`featured`), in the kind's order, then the rest by how many they hold.
+   */
+  private async categories(ids: string[], kindSlugs: readonly string[]) {
     if (!ids.length) return [];
-    const rows = await this.prisma.classifiedCategory.findMany({ where: { id: { in: [...new Set(ids)] } }, select: { id: true, name: true, parent: { select: { id: true, name: true } } } });
-    const tops = new Map<string, { id: string; name: string; count: number }>();
-    const topOf = new Map(rows.map(row => [row.id, row.parent ?? { id: row.id, name: row.name }]));
+    const rows = await this.prisma.classifiedCategory.findMany({ where: { id: { in: [...new Set(ids)] } }, select: { id: true, slug: true, name: true, parent: { select: { id: true, slug: true, name: true } } } });
+    const tops = new Map<string, { id: string; name: string; count: number; featured: boolean; rank: number }>();
+    const rankOf = (slugs: string[]) => Math.min(...slugs.map(slug => (kindSlugs.includes(slug) ? kindSlugs.indexOf(slug) : Infinity)));
+    const topOf = new Map(rows.map(row => [row.id, { ...(row.parent ?? { id: row.id, slug: row.slug, name: row.name }), rank: rankOf([row.slug, row.parent?.slug ?? row.slug]) }]));
     for (const id of ids) {
       const top = topOf.get(id);
       if (!top) continue;
-      const entry = tops.get(top.id) ?? { id: top.id, name: top.name, count: 0 };
+      const entry = tops.get(top.id) ?? { id: top.id, name: top.name, count: 0, featured: false, rank: Infinity };
       entry.count += 1;
+      entry.rank = Math.min(entry.rank, top.rank);
+      entry.featured = entry.rank !== Infinity;
       tops.set(top.id, entry);
     }
-    return [...tops.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return [...tops.values()].sort((a, b) => a.rank - b.rank || b.count - a.count || a.name.localeCompare(b.name)).map(entry => ({ id: entry.id, name: entry.name, count: entry.count, featured: entry.featured }));
   }
 }

@@ -20,6 +20,7 @@ const { Tills } = await import("@/components/tills");
 const { PlanCards } = await import("@/components/plan-cards");
 const { AppButtons } = await import("@/components/app-buttons");
 const { OwnerNav } = await import("@/components/owner-nav");
+const { ShopForm } = await import("@/components/shop-form");
 const { PosMark, UdozoMark } = await import("@/components/site-chrome");
 
 const mounted: Array<() => void> = [];
@@ -143,6 +144,25 @@ describe("changing plan", () => {
     await act(async () => button(host, "Choose Multi-shop")!.click());
     await act(async () => dialogButton("Move to Multi-shop").click());
     expect(host.querySelector('[role="alert"]')!.textContent).toContain("Add funds");
+  });
+});
+
+describe("the shop's kind", () => {
+  it("is chosen from Udozo's list and saved with the shop's details", async () => {
+    actions.updateShop.mockResolvedValue({ ok: true, data: account() });
+    const kinds = [
+      { code: "general", name: "General shop", categories: [] },
+      { code: "pharmacy", name: "Pharmacy or chemist", categories: ["pharmacy"] },
+    ];
+    const host = mount(createElement(ShopForm, { shop: account().shops[0]!, kinds }));
+    const select = host.querySelector<HTMLSelectElement>("select")!;
+    expect([...select.options].map(option => option.textContent)).toEqual(["General shop", "Pharmacy or chemist"]);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "pharmacy");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => submitForm(host));
+    expect(actions.updateShop).toHaveBeenCalledWith(account().shops[0]!.id, expect.objectContaining({ kind: "pharmacy" }));
   });
 });
 

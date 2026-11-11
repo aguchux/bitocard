@@ -170,6 +170,8 @@ export type ShopCategory = {
   name: string;
   icon: string;
   b2b: boolean;
+  /** Sold only at a seller's shop through Udozo POS, never on the public market (offered to sellers with Udozo POS). */
+  shop_only?: boolean;
   /** What people call the things sold here ("plastic chair", "carpet"), matched as typed. */
   keywords?: string[];
   /** A top category's banner across the top of its pages (4:1); null for subcategories and when none is uploaded. */

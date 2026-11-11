@@ -65,4 +65,22 @@ describe("the Where to sell step", () => {
     expect(listingChannelTags({ ...base, on_shop: false, pos_enabled: true })).toEqual(["Shop only"]);
     expect(listingChannelTags(base)).toEqual([]);
   });
+
+  it("sold at the shop only, needs no photos, condition or area, only a price for the till", () => {
+    const shopOnly = { ...values, pos: true, shopOnly: true, readyPhotos: 0, condition: null, areaId: null };
+    for (const step of [1, 3, 4]) expect(stepProblem(step, shopOnly), `step ${step}`).toBeNull();
+    expect(stepProblem(2, shopOnly)).toBeNull();
+    expect(stepProblem(2, { ...shopOnly, priceKind: "on_request" })?.message).toBe("Enter the price your till sells it at.");
+    expect(stepProblem(1, { ...shopOnly, shopOnly: false })?.param).toBe("photos");
+  });
+
+  it("in a shop-only category, Udozo and resellers cannot be ticked and the shop stays ticked", () => {
+    const value = { ...sellWhereFrom(null, null), onShop: false, pos: true };
+    const html = renderToStaticMarkup(createElement(ResaleFields, { value, availability: null, pos: status(), shopCategory: true, priceMinor: 100000, priceOnRequest: false, currency: "NGN", invalid: () => false, onChange: () => undefined }));
+    const boxes = [...html.matchAll(/<input type="checkbox"[^>]*>/g)].map(match => match[0]);
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) expect(box).toContain("disabled");
+    expect(html).toContain("Its category is sold only at your shop with Udozo POS");
+    expect(html).not.toContain("Set up Udozo POS");
+  });
 });

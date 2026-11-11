@@ -199,6 +199,7 @@ export function ListingForm({
     onShop: sellWhere.onShop,
     resale: sellWhere.resale,
     pos: sellWhere.pos,
+    shopOnly: !sellWhere.onShop && !sellWhere.resale && sellWhere.pos,
     areaId,
   });
   // A saved draft carries on at its first step still missing something; a live ad opens at the start.
@@ -651,6 +652,8 @@ export function ListingForm({
             invalid={problem?.param === "category_id"}
             onChange={category => {
               setCategoryId(category.id);
+              // A shop-only category (a pharmacy's medicines) sells at the seller's shop only; Udozo makes it so too.
+              if (categories.find(top => top.children.some(child => child.id === category.id))?.shop_only) setSellWhere(previous => ({ ...previous, onShop: false, resale: false, pos: true }));
               save({ category_id: category.id });
             }}
           />
@@ -934,6 +937,7 @@ export function ListingForm({
             value={sellWhere}
             availability={resale}
             pos={pos}
+            shopCategory={Boolean(found?.top.shop_only)}
             priceMinor={toMinor(price)}
             priceOnRequest={priceKind === "on_request"}
             currency={currency}

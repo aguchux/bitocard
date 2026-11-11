@@ -50,6 +50,8 @@ export type PostValues = {
   resale: boolean;
   /** Sold at the seller's shop through Udozo POS. */
   pos?: boolean;
+  /** Sold at the shop only: never public, so no photos, condition or area are needed, only a price for the till. */
+  shopOnly?: boolean;
   areaId: string | null;
 };
 
@@ -69,12 +71,16 @@ export function stepProblem(step: number, values: PostValues): StepProblem | nul
     case 1:
       if (values.uploadingPhotos > 0) return { message: "Wait for your photos to finish uploading.", param: "photos" };
       if (values.failedPhotos > 0) return { message: "Remove the photo that could not be used, or add it again.", param: "photos" };
-      if (values.readyPhotos < values.minPhotos) return { message: `Add at least ${values.minPhotos} photos.`, param: "photos" };
+      if (!values.shopOnly && values.readyPhotos < values.minPhotos) return { message: `Add at least ${values.minPhotos} photos.`, param: "photos" };
       return null;
     case 2:
       if (values.saleMethod === "auction") {
         if (!values.priceMinor) return { message: "Enter the starting price: bidding starts there.", param: "price" };
         if (!values.auctionDays) return { message: "Choose how long the auction runs.", param: "auction_days" };
+      }
+      if (values.shopOnly) {
+        if (values.priceKind === "on_request" || !values.priceMinor) return { message: "Enter the price your till sells it at.", param: "price" };
+        return null;
       }
       if (values.priceKind !== "on_request" && !values.priceMinor) return { message: "Enter the price, or choose Contact for price.", param: "price" };
       if (!values.condition) return { message: "Choose its condition.", param: "condition" };
@@ -83,7 +89,7 @@ export function stepProblem(step: number, values: PostValues): StepProblem | nul
       if (!values.onShop && !values.resale && !values.pos) return { message: "Choose at least one place to sell it.", param: "on_shop" };
       return null;
     case 4:
-      if (!values.areaId) return { message: "Choose where it is: the area it is in.", param: "area_id" };
+      if (!values.shopOnly && !values.areaId) return { message: "Choose where it is: the area it is in.", param: "area_id" };
       return null;
     default:
       return null;

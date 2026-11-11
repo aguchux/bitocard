@@ -11,6 +11,7 @@ import { type PlanChange, PosAdminService, posAppPlatforms, type PosAppPlatform 
 import { PosCatalogueService } from './catalogue.service.js';
 import { posPlanCodes } from './plans.js';
 import { PosService } from './pos.service.js';
+import { posShopKindCodes, presentShopKind } from './shop-kinds.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -33,6 +34,10 @@ class ShopDto {
 
   @IsOptional() @IsString() @MaxLength(300)
   receipt_footer?: string | null;
+
+  /** What kind of shop it is (`GET /v1/pos/shop-kinds`): the till leads with its categories. */
+  @IsOptional() @IsIn(posShopKindCodes)
+  kind?: string;
 }
 
 class SignupDto {
@@ -152,6 +157,12 @@ export class PublicPosController {
   @Get('apps')
   apps() {
     return this.admin.appLinks();
+  }
+
+  /** The kinds of shop the till can be tailored to. */
+  @Get('shop-kinds')
+  shopKinds() {
+    return { object: 'list' as const, data: posShopKindCodes.map(presentShopKind) };
   }
 }
 

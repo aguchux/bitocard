@@ -64,6 +64,7 @@ export function ResaleFields({
   value,
   availability,
   pos = null,
+  shopCategory = false,
   priceMinor,
   priceOnRequest,
   currency,
@@ -74,6 +75,8 @@ export function ResaleFields({
   availability: ShopResaleAvailability | null;
   /** Whether the seller has Udozo POS and room in its plan (null: not known). */
   pos?: ShopPosStatus | null;
+  /** Its category sells only at the seller's shop (a pharmacy's medicines): never on Udozo or through resellers. */
+  shopCategory?: boolean;
   priceMinor: number | null;
   priceOnRequest: boolean;
   currency: string;
@@ -87,7 +90,7 @@ export function ResaleFields({
   // The identity check counts only where the market requires it (older answers say nothing: required).
   const identityMissing = Boolean(availability && !availability.identity_checked && availability.identity_required !== false);
   const box = "size-5 shrink-0 accent-brand-700";
-  const shop = posOption(pos, value.pos);
+  const shop = shopCategory ? { allowed: false, note: "Its category is sold only at your shop with Udozo POS: it never shows on Udozo or with resellers." } : posOption(pos, value.pos);
   const field = (param: string) => `h-12 rounded-xl border bg-white px-3 text-base font-normal ${invalid(param) ? "border-brand-600" : "border-slate-200"}`;
   return (
     <section aria-labelledby="sell-where" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4">
@@ -113,14 +116,14 @@ export function ResaleFields({
       </label>
       <div className="grid gap-3">
         <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" className={box} checked={value.onShop} onChange={event => onChange({ ...value, onShop: event.target.checked }, ["on_shop"])} />
+          <input type="checkbox" className={box} checked={value.onShop} disabled={shopCategory} onChange={event => onChange({ ...value, onShop: event.target.checked }, ["on_shop"])} />
           <span>
             <span className="font-semibold">Sell on Udozo</span>
             <span className="block text-slate-600">Buyers find it on Udozo and contact you.</span>
           </span>
         </label>
         <label className={`flex items-start gap-3 text-sm ${open ? "" : "opacity-60"}`}>
-          <input type="checkbox" className={box} checked={value.resale} disabled={!open && !value.resale} onChange={event => onChange({ ...value, resale: event.target.checked }, ["resale"])} />
+          <input type="checkbox" className={box} checked={value.resale} disabled={shopCategory || (!open && !value.resale)} onChange={event => onChange({ ...value, resale: event.target.checked }, ["resale"])} />
           <span>
             <span className="inline-flex items-center gap-1.5 font-semibold">
               <Store className="size-4 text-brand-700" aria-hidden="true" />
@@ -144,7 +147,7 @@ export function ResaleFields({
             </span>
             <span className="block text-slate-600">
               {shop.note}{" "}
-              {!pos?.account || !shop.allowed ? (
+              {!shopCategory && (!pos?.account || !shop.allowed) ? (
                 <a href={pos?.account ? `${posUrl}/app/billing` : `${posUrl}/signup`} target="_blank" rel="noopener" className="font-semibold text-brand-700 underline">
                   {pos?.account ? "See the plans" : "Set up Udozo POS"}
                 </a>

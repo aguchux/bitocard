@@ -39,10 +39,11 @@ const catalogue = (data: PosProduct[], over: Partial<PosCatalogue> = {}): PosCat
   object: "list",
   currency: "NGN",
   plan: { code: "free", name: "Free" },
+  shop_kind: { code: "phones_electronics", name: "Phones and electronics" },
   summary: { products: data.length, limit: 50, over_limit: 0, sellable: data.filter(item => !item.blocked).length, low_stock: 1, out_of_stock: 0 },
   categories: [
-    { id: "top", name: "Electronics", count: 2 },
-    { id: "home", name: "Home and living", count: 1 },
+    { id: "top", name: "Electronics", count: 2, featured: true },
+    { id: "home", name: "Home and living", count: 1, featured: false },
   ],
   total: data.length,
   has_more: false,
@@ -81,7 +82,7 @@ describe("the catalogue's words and filters", () => {
 
   it("says why a product does not sell, and what the till can sell", () => {
     expect(blockText(product({ blocked: "plan_limit" }), "Free")).toMatch(/^Over Free's product limit/);
-    expect(blockText(product({ blocked: "not_live", status: "pending_review" }), "Free")).toBe("Waiting for Udozo's review: it sells once it is live.");
+    expect(blockText(product({ blocked: "incomplete", title: null }), "Free")).toBe("No title yet: finish it on udozo.com to sell it.");
     expect(blockText(product({ blocked: "no_price" }), "Free")).toMatch(/No price/);
     expect(blockText(product(), "Free")).toBeNull();
     expect(stockLine(product())).toBe("3 free to sell (1 held for online buyers)");

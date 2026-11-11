@@ -33,11 +33,15 @@ export function cleanBarcode(raw: string | null): string | null {
   return code;
 }
 
-export type PosSellable = { status: string; priceKind: string; priceMinor: bigint | null; saleMethod: string };
+export type PosSellable = { title: string | null; priceKind: string; priceMinor: bigint | null };
 
-/** Why a listing ticked Sell at POS cannot be sold at the till now, or null when it can (stock apart). */
-export function tillBlock(listing: PosSellable, withinPlan: boolean): 'plan_limit' | 'not_live' | 'no_price' | null {
-  if (listing.status !== 'active') return 'not_live';
+/**
+ * Why a listing ticked Sell at POS cannot be sold at the till now, or null when it can (stock apart). The till sells what
+ * the shop has, whether or not its ad is live on udozo.com (in review, expired, or a draft): it needs only a title and a
+ * price, within the plan's product limit. Sold, removed and deleted listings are not counted at all.
+ */
+export function tillBlock(listing: PosSellable, withinPlan: boolean): 'plan_limit' | 'incomplete' | 'no_price' | null {
+  if (!listing.title) return 'incomplete';
   if (listing.priceKind === 'on_request' || listing.priceMinor === null) return 'no_price';
   if (!withinPlan) return 'plan_limit';
   return null;

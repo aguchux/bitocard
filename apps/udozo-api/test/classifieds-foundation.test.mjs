@@ -72,7 +72,8 @@ describe('feature registry', () => {
 
 describe('categories', () => {
   test('two levels, each subcategory with suggested features and a checklist to inherit', async () => {
-    const categories = await prisma.classifiedCategory.findMany({ include: { features: { include: { feature: true } }, countries: true } });
+    // The public tree: shop-only categories (a pharmacy's, sold through Udozo POS) are never in a market.
+    const categories = await prisma.classifiedCategory.findMany({ where: { shopOnly: false }, include: { features: { include: { feature: true } }, countries: true } });
     const top = categories.filter(c => !c.parentId);
     const subs = categories.filter(c => c.parentId);
     assert.equal(top.length, 16);
@@ -99,7 +100,7 @@ describe('categories', () => {
   });
 
   test("Udozo's own tree: its order and words, every category with an icon, and categories that are not Udozo's dropped", async () => {
-    const categories = await prisma.classifiedCategory.findMany({ orderBy: { position: 'asc' } });
+    const categories = await prisma.classifiedCategory.findMany({ where: { shopOnly: false }, orderBy: { position: 'asc' } });
     const top = categories.filter(c => !c.parentId);
     assert.deepEqual(top.map(c => [c.slug, c.name]), [
       ['phones-tablets', 'Phones and tablets'], ['electronics', 'Electronics'], ['vehicles', 'Vehicles'], ['property', 'Property'],

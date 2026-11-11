@@ -471,6 +471,7 @@ export class ClassifiedListingsController {
     private readonly moderation: ModerationService,
     private readonly favourites: FavouritesService,
     private readonly resale: ResaleService,
+    private readonly reference: ClassifiedReferenceService,
   ) {}
 
   /** The BitoCard Shop terms' current version and whether the customer has accepted it (needed to post or use UdozoPay). */
@@ -520,6 +521,13 @@ export class ClassifiedListingsController {
   @Get('me/pos')
   posStatus(@CurrentCustomer() caller: CustomerCaller) {
     return this.listings.posStatus(caller.customer);
+  }
+
+  /** The shop-only categories (a pharmacy's medicines) for a seller with Udozo POS; none without it. */
+  @Get('me/shop-categories')
+  async shopCategories(@CurrentCustomer() caller: CustomerCaller) {
+    const status = await this.listings.posStatus(caller.customer);
+    return status.account ? this.reference.shopCategories() : { object: 'list' as const, data: [] };
   }
 
   @Get('me/listings')

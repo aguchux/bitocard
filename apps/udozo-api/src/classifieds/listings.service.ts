@@ -93,9 +93,21 @@ const limitWindowMs = 30 * dayMs;
 /** What submitting an ad needs filled in. */
 export type ListingParts = { categoryId: string | null; areaId: string | null; title: string | null; condition: string | null; priceKind: string; priceMinor: bigint | null; saleMethod?: string; auctionDays?: number | null };
 
-/** What a draft still lacks before it can be submitted (photos apart), as the field and how a seller reads it. */
-export function missingParts(listing: ListingParts): [string, string][] {
+/** Sold only at the seller's shop through Udozo POS: on neither Udozo nor resellers' stores, so never public. */
+export const isShopOnly = (listing: { onShop: boolean; resale: boolean; posEnabledAt: Date | null }) => !listing.onShop && !listing.resale && listing.posEnabledAt !== null;
+
+/**
+ * What a draft still lacks before it can be submitted (photos apart), as the field and how a seller reads it. A
+ * shop-only listing is never public, so it needs only what the till does: a title, a category and a price.
+ */
+export function missingParts(listing: ListingParts, shopOnly = false): [string, string][] {
   const missing: [string, string][] = [];
+  if (shopOnly) {
+    if (!listing.title) missing.push(['title', 'a title']);
+    if (!listing.categoryId) missing.push(['category_id', 'a category']);
+    if (listing.priceKind === 'on_request' || listing.priceMinor === null) missing.push(['price', 'the price your till sells it at']);
+    return missing;
+  }
   if (!listing.title) missing.push(['title', 'a title']);
   if (!listing.categoryId) missing.push(['category_id', 'a category']);
   if (!listing.condition) missing.push(['condition', 'its condition']);
@@ -140,6 +152,10 @@ type ListingFields = {
   posEnabledAt?: Date | null;
   barcode?: string | null;
   reorderLevel?: number | null;
+  status?: string;
+  publishedAt?: Date | null;
+  expiresAt?: Date | null;
+  outOfStockAt?: Date | null;
   connect?: boolean;
   connectAllCentres?: boolean;
   saleMethod?: string;
@@ -264,8 +280,13 @@ export class ListingsService {
     const restocking = listing.status === 'expired' && sent.length === 1 && sent[0] === 'stock';
     if (!['draft', 'pending_review', 'active', 'rejected'].includes(listing.status) && !restocking) throw conflict('listing_closed', 'This listing can no longer be changed.');
     const data = await this.changes(country, input, listing, customer.id);
-    if (listing.status !== 'draft' && !restocking) {
-      this.requireComplete({ ...listing, ...data.fields });
+    const wasShopOnly = isShopOnly(listing);
+    const shopOnly = isShopOnly({ ...listing, ...data.fields });
+    if (wasShopOnly && !shopOnly && listing.status !== 'draft') {
+      // Sold on Udozo too from now: it goes back to a draft, posted to the public market through Post an ad's checks.
+      Object.assign(data.fields, { status: 'draft', expiresAt: null });
+    } else if (listing.status !== 'draft' && !restocking) {
+      this.requireComplete({ ...listing, ...data.fields }, shopOnly);
       // Opening a submitted listing to resellers needs what submitting one does.
       if (data.fields.resale && !listing.resale) {
         await this.terms.require(customer.id);
@@ -281,7 +302,8 @@ export class ListingsService {
         if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are held for buyers (paid with UdozoPay, or buy orders you accepted): stock cannot go below that.`);
         // Running out starts the 90 days out of stock; restocking ends them (the stock as it is now, read under the lock).
         const current = await tx.classifiedListing.findUniqueOrThrow({ where: { id }, select: { status: true, stock: true, outOfStockAt: true, expiresAt: true } });
-        Object.assign(data.fields, stockChange(current, data.fields.stock, listingDays, new Date()));
+        // A shop-only listing never leaves the till for being out of stock.
+        if (!shopOnly) Object.assign(data.fields, stockChange(current, data.fields.stock, listingDays, new Date()));
       }
       // A listing in another category takes a SKU there, so its prefix is always its category's.
       const moved = data.fields.categoryId !== undefined && data.fields.categoryId !== listing.categoryId;
@@ -300,7 +322,7 @@ export class ListingsService {
     });
     // A live listing whose words, category or price changed is checked again, and goes back to review if doubtful.
     const changed = ['title', 'description', 'categoryId', 'priceMinor'].some(key => key in data.fields) || data.features !== null;
-    if (listing.status === 'active' && changed) await this.recheck(id);
+    if (listing.status === 'active' && changed && !shopOnly) await this.recheck(id);
     const saved = await this.own(customer, id);
     if (saved.status !== 'draft' && data.features) await this.noteBrand(customer.id, saved);
     return this.present(saved);
@@ -371,6 +393,7 @@ export class ListingsService {
     const settings = await this.marketSettings(country);
     const listing = await this.own(customer, id);
     if (!['draft', 'rejected'].includes(listing.status)) throw conflict('listing_not_draft', 'Only drafts and rejected listings are submitted.');
+    if (isShopOnly(listing)) return this.submitShopOnly(customer, listing);
     await this.terms.require(customer.id);
     this.requireComplete(listing);
     await this.shipping.requireComplete(this.prisma, listing.id, listing);
@@ -411,6 +434,24 @@ export class ListingsService {
     // Live at once: an auction listing's bidding opens now (one held for review opens when it is approved).
     await this.auctions?.live(id);
     return this.present(await this.own(customer, id));
+  }
+
+  /**
+   * A shop-only listing is never public, so none of the market's checks apply (photos, review, the posting limit, its
+   * terms): with a title, category and price it is live at the seller's shop at once, with no end date.
+   */
+  private async submitShopOnly(customer: CustomerWithStore, listing: ListingRow) {
+    this.requireComplete(listing, true);
+    const now = new Date();
+    await this.prisma.$transaction(async tx => {
+      const claimed = await tx.classifiedListing.updateMany({
+        where: { id: listing.id, status: listing.status },
+        data: { status: 'active', reviewReason: null, reviewFlags: [], submittedAt: listing.submittedAt ?? now, expiresAt: null, outOfStockAt: null },
+      });
+      if (!claimed.count) throw conflict('listing_not_draft', 'This listing was already submitted.');
+      if (!(await tx.classifiedPriceHistory.count({ where: { listingId: listing.id } })) && listing.priceMinor !== null) await this.recordPrice(tx, listing.id, listing.priceMinor);
+    });
+    return this.present(await this.own(customer, listing.id));
   }
 
   /** Another listing period, from now: a listing about to expire, or one that has. */
@@ -469,7 +510,7 @@ export class ListingsService {
    */
   async expireDue(now = new Date()) {
     const due = await this.prisma.classifiedListing.findMany({
-      where: { status: 'active', expiresAt: { lte: now } },
+      where: { status: 'active', expiresAt: { lte: now }, OR: [{ onShop: true }, { resale: true }] },
       select: { id: true, title: true, stock: true, expiresAt: true, customer: { select: { id: true, storeId: true } } },
       take: 2000,
     });
@@ -494,14 +535,16 @@ export class ListingsService {
   }
 
   /** Everything a listing past draft must have. */
-  private requireComplete(listing: ListingParts) {
-    const missing = missingParts(listing);
+  private requireComplete(listing: ListingParts, shopOnly = false) {
+    const missing = missingParts(listing, shopOnly);
     if (missing.length) throw invalid('listing_incomplete', `Add ${missing.map(([, label]) => label).join(', ')}.`, missing[0][0]);
   }
 
   /** The columns and feature values a request changes, each checked. */
   private async changes(country: string, input: ListingInput, current: ListingRow | null, customerId: string) {
     const fields: ListingFields = {};
+    // Whether its category sells only at the seller's shop (its own, or the one it moves to).
+    let categoryShopOnly = Boolean(current?.category && (current.category.shopOnly || current.category.parent?.shopOnly));
     if (input.title !== undefined) {
       fields.title = input.title === null ? null : checkTitle(input.title);
       fields.slug = fields.title ? slugify(fields.title) : null;
@@ -522,9 +565,13 @@ export class ListingsService {
       else {
         const category = await this.prisma.classifiedCategory.findUnique({ where: { id: input.category_id }, include: { parent: { include: { countries: true } }, countries: true, children: { select: { id: true }, take: 1 } } });
         const open = (c: { enabled: boolean; countries: { country: string; enabled: boolean }[] } | null) => !c || (c.enabled && c.countries.some(row => row.country === country && row.enabled));
-        if (!category || !category.enabled || !open(category) || (category.parent && !open(category.parent))) throw invalid('parameter_invalid', 'Choose a category open in your country.', 'category_id');
+        // A shop-only category is never opened in a market: sellers with Udozo POS use it wherever they are.
+        const shopCategory = Boolean(category && (category.shopOnly || category.parent?.shopOnly));
+        const usable = shopCategory ? category!.enabled && (!category!.parent || category!.parent.enabled) : category && category.enabled && open(category) && (!category.parent || open(category.parent));
+        if (!category || !usable) throw invalid('parameter_invalid', 'Choose a category open in your country.', 'category_id');
         if (category.children.length) throw invalid('parameter_invalid', 'Choose a subcategory.', 'category_id');
         fields.categoryId = category.id;
+        categoryShopOnly = shopCategory;
       }
     }
     if (input.area_id !== undefined) {
@@ -624,6 +671,15 @@ export class ListingsService {
     }
     // Sold at the seller's shop through Udozo POS: their POS account and its plan's product limit, a barcode, a reorder level.
     if (input.pos_enabled !== undefined) fields.posEnabledAt = input.pos_enabled ? (current?.posEnabledAt ?? new Date()) : null;
+    // A shop-only category's listings are sold at the seller's shop only: never on Udozo or through resellers.
+    if (categoryShopOnly && fields.categoryId !== null) {
+      if (input.on_shop === true || input.resale === true) throw invalid('shop_only_category', 'This category is sold only at your shop with Udozo POS, never on Udozo or through resellers.', 'on_shop');
+      if (input.pos_enabled === false) throw invalid('shop_only_category', 'This category is sold only at your shop with Udozo POS: choose another category to stop selling it there.', 'pos_enabled');
+      fields.onShop = false;
+      fields.resale = false;
+      if (!('posEnabledAt' in fields) && !current?.posEnabledAt) fields.posEnabledAt = new Date();
+    }
+    const ticking = (fields.posEnabledAt ?? null) !== null && !current?.posEnabledAt;
     if (input.barcode !== undefined) fields.barcode = cleanBarcode(input.barcode);
     if (input.reorder_level !== undefined) {
       if (input.reorder_level !== null && (!Number.isInteger(input.reorder_level) || input.reorder_level < 0 || input.reorder_level > maxStock)) throw invalid('parameter_invalid', `The reorder level is a whole number from 0 to ${maxStock.toLocaleString('en-GB')}.`, 'reorder_level');
@@ -631,7 +687,7 @@ export class ListingsService {
     }
     const atPos = 'posEnabledAt' in fields ? fields.posEnabledAt !== null : (current?.posEnabledAt ?? null) !== null;
     if (atPos && saleMethod === 'auction') throw invalid('parameter_invalid', 'A listing sold by auction is sold on Udozo only, not at your shop.', 'pos_enabled');
-    if (input.pos_enabled && !current?.posEnabledAt) await this.requirePosRoom(customerId, current?.id ?? null);
+    if (ticking) await this.requirePosRoom(customerId, current?.id ?? null);
     if (fields.barcode) await this.requireBarcodeFree(customerId, fields.barcode, current?.id ?? null);
 
     const onShop = fields.onShop ?? current?.onShop ?? true;

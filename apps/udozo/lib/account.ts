@@ -85,6 +85,15 @@ export async function posStatus(): Promise<ShopPosStatus | null> {
   return result.ok ? result.data : null;
 }
 
+/**
+ * The shop-only categories (a pharmacy's medicines) for a seller with Udozo POS, named so Post an ad's picker says they
+ * are sold at the seller's shop only; none without Udozo POS.
+ */
+export async function shopCategories(): Promise<ShopTopCategory[]> {
+  const result = await customerApi<{ data: ShopTopCategory[] }>("GET", "/v1/classifieds/me/shop-categories");
+  return result.ok ? result.data.data.map(top => ({ ...top, name: `${top.name} (at your shop only)` })) : [];
+}
+
 async function publicList<T>(path: string): Promise<T[]> {
   try {
     const res = await fetch(apiUrl(path), { next: { revalidate: 300, tags: ["shop"] } });

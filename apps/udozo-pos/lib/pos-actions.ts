@@ -17,7 +17,7 @@ function answer<T>(result: ApiResult<T>): PosResult<T> {
   return { ok: true, data: result.data };
 }
 
-export type ShopFields = { name?: string; address?: string | null; phone?: string | null; tin?: string | null; vat_bps?: number; receipt_footer?: string | null };
+export type ShopFields = { name?: string; address?: string | null; phone?: string | null; tin?: string | null; vat_bps?: number; receipt_footer?: string | null; kind?: string };
 
 const text = (value: string | null | undefined, max: number) => (value === null || value === undefined ? value : value.trim().slice(0, max) || null);
 
@@ -30,6 +30,7 @@ function shopBody(fields: ShopFields) {
     ...(fields.tin !== undefined ? { tin: text(fields.tin, 40) } : {}),
     ...(fields.vat_bps !== undefined ? { vat_bps: fields.vat_bps } : {}),
     ...(fields.receipt_footer !== undefined ? { receipt_footer: text(fields.receipt_footer, 300) } : {}),
+    ...(fields.kind !== undefined && /^[a-z_]{1,32}$/.test(fields.kind) ? { kind: fields.kind } : {}),
   };
 }
 

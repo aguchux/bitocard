@@ -12,6 +12,7 @@ import { AccountNotices } from '../notifications/account-notices.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { addMonth, unusedCredit } from './money.js';
+import { isPosShopKind, presentShopKind } from './shop-kinds.js';
 import { chargeNumber, freePlan, graceDays, isPosPlanCode, limitsOf, offered, type PosLimitKey, presentPlan, priceIn, shopCodeFor } from './plans.js';
 
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -22,7 +23,7 @@ const changed = () => conflict('pos_account_changed', 'Your Udozo POS account ch
 const walletLow = (amount: bigint, currency: string) =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'wallet_balance_low', `Your Udozo wallet needs ${currency} ${(Number(amount) / 100).toFixed(2)} for this. Add funds on udozo.com, then try again.`);
 
-export type ShopInput = { name?: string; address?: string | null; phone?: string | null; tin?: string | null; vat_bps?: number; receipt_footer?: string | null };
+export type ShopInput = { name?: string; address?: string | null; phone?: string | null; tin?: string | null; vat_bps?: number; receipt_footer?: string | null; kind?: string };
 export type TillInput = { name?: string; printer_width?: 58 | 80; auto_print?: boolean };
 
 type AccountRow = PosAccount & { plan: PosPlan; shops: Array<PosShop & { tills: PosTill[] }> };
@@ -289,7 +290,9 @@ export class PosService {
     const name = clean(input.name, 80);
     if (creating && !name) throw invalid('parameter_missing', "Give your shop's name.", 'shop.name');
     if (input.vat_bps !== undefined && (!Number.isInteger(input.vat_bps) || input.vat_bps < 0 || input.vat_bps > 5000)) throw invalid('parameter_invalid', 'VAT is from 0% to 50%.', 'vat_bps');
+    if (input.kind !== undefined && !isPosShopKind(input.kind)) throw invalid('parameter_invalid', 'Choose what kind of shop it is from the list.', 'kind');
     return {
+      ...(input.kind !== undefined ? { kind: input.kind } : {}),
       ...(name ? { name } : {}),
       ...(input.address !== undefined ? { address: clean(input.address, 300) } : {}),
       ...(input.phone !== undefined ? { phone: clean(input.phone, 30) } : {}),
@@ -394,6 +397,8 @@ export class PosService {
         shop_code: shop.shopCode,
         vat_bps: shop.vatBps,
         receipt_footer: shop.receiptFooter,
+        /** What kind of shop it is, and its categories that come first at the till. */
+        kind: presentShopKind(shop.kind),
         tills: shop.tills.map(till => ({ object: 'pos_till' as const, id: till.id, name: till.name, printer_width: till.printerWidth, auto_print: till.autoPrint })),
       })),
       created_at: row.createdAt.toISOString(),

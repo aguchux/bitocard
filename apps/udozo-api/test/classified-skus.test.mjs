@@ -64,7 +64,8 @@ const draft = async (slug, title = 'Samsung Galaxy A15 128GB') => {
 describe('the prefixes', () => {
   test('every category has its own three letters', async () => {
     const rows = await prisma.classifiedCategory.findMany({ select: { slug: true, skuPrefix: true } });
-    assert.equal(rows.length, 121);
+    // Udozo's 121, and the 5 shop-only ones (a pharmacy's, sold through Udozo POS).
+    assert.equal(rows.length, 126);
     assert.ok(rows.every(row => /^[A-Z]{3}$/.test(row.skuPrefix)));
     assert.equal(new Set(rows.map(row => row.skuPrefix)).size, rows.length);
     const bySlug = Object.fromEntries(rows.map(row => [row.slug, row.skuPrefix]));

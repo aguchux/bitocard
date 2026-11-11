@@ -4425,6 +4425,9 @@ model ClassifiedCategory {
   skuNext         Int                         @default(1) @map("sku_next")
   /// What people call the things sold here ("plastic chair", "carpet"), matched as typed on Post an ad, in search suggestions and by the assistants.
   keywords        String[]                    @default([])
+  /// Sold only at a seller's shop through Udozo POS, never on the public market (a pharmacy's medicines): never opened in
+  /// a market (no `countries` rows), offered in Post an ad to sellers with Udozo POS, and its listings always shop-only.
+  shopOnly        Boolean                     @default(false) @map("shop_only")
   /// Top categories only: a banner across the top of its pages on udozo.com (`classified_category_banner`, 4:1).
   bannerUrl       String?                     @map("banner_url")
   /// Top categories only: a cut-out of what is sold there, drawn on a circle beside its name (`classified_category_spotlight`).
@@ -7956,6 +7959,8 @@ model PosShop {
   shopCode      String     @unique @map("shop_code")
   /// VAT added to sales, in basis points (750 is 7.5%); 0 adds none.
   vatBps        Int        @default(0) @map("vat_bps")
+  /// What kind of shop it is (`posShopKinds`: general, pharmacy, auto_parts…), so the till is tailored to it.
+  kind          String     @default("general") @db.VarChar(32)
   receiptFooter String?    @map("receipt_footer")
   position      Int        @default(0)
   createdAt     DateTime   @default(now()) @map("created_at")

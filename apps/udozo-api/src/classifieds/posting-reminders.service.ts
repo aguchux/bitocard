@@ -87,7 +87,7 @@ export class PostingRemindersService {
       JOIN "customers" c ON c."id" = l."customer_id" AND c."status" = 'active' AND c."email_verified_at" IS NOT NULL
       LEFT JOIN "classified_sellers" s ON s."customer_id" = l."customer_id"
       CROSS JOIN LATERAL (SELECT count(*)::int AS "photos" FROM "classified_media" m WHERE m."listing_id" = l."id" AND m."kind" = 'photo' AND m."status" = 'ready') p
-      WHERE l."status" = 'draft' AND l."country" = ${country} AND s."suspended_at" IS NULL
+      WHERE l."status" = 'draft' AND (l."on_shop" OR l."resale") AND l."country" = ${country} AND s."suspended_at" IS NULL
         AND l."unfinished_reminded_at" IS NULL AND l."ready_reminders" = 0 AND l."updated_at" <= ${before}
         AND l."title" IS NOT NULL AND l."category_id" IS NOT NULL AND p."photos" >= 1
         AND NOT (l."area_id" IS NOT NULL AND l."condition" IS NOT NULL AND (l."price_kind" = 'on_request' OR l."price_minor" IS NOT NULL) AND p."photos" >= ${minPhotos})
@@ -116,7 +116,7 @@ export class PostingRemindersService {
       FROM "classified_listings" l
       JOIN "customers" c ON c."id" = l."customer_id" AND c."status" = 'active' AND c."email_verified_at" IS NOT NULL
       LEFT JOIN "classified_sellers" s ON s."customer_id" = l."customer_id"
-      WHERE l."status" = 'draft' AND l."country" = ${country} AND s."suspended_at" IS NULL
+      WHERE l."status" = 'draft' AND (l."on_shop" OR l."resale") AND l."country" = ${country} AND s."suspended_at" IS NULL
         AND l."title" IS NOT NULL AND l."category_id" IS NOT NULL AND l."area_id" IS NOT NULL AND l."condition" IS NOT NULL
         AND (l."price_kind" = 'on_request' OR l."price_minor" IS NOT NULL)
         AND (SELECT count(*) FROM "classified_media" m WHERE m."listing_id" = l."id" AND m."kind" = 'photo' AND m."status" = 'ready') >= ${minPhotos}

@@ -148,7 +148,7 @@ describe('somewhere for what fits no category', () => {
   test('Other services last under Services, as Jiji has it, and Everything else last of all with Other items', async () => {
     const services = await prisma.classifiedCategory.findMany({ where: { parent: { slug: 'services' } }, orderBy: { position: 'asc' } });
     assert.deepEqual([services.at(-1).slug, services.at(-1).name], ['other-services', 'Other services']);
-    const tops = await prisma.classifiedCategory.findMany({ where: { parentId: null }, orderBy: { position: 'asc' }, include: { children: true, countries: true } });
+    const tops = await prisma.classifiedCategory.findMany({ where: { parentId: null, shopOnly: false }, orderBy: { position: 'asc' }, include: { children: true, countries: true } });
     const last = tops.at(-1);
     assert.deepEqual([last.slug, last.name, last.b2b], ['everything-else', 'Everything else', false]);
     assert.deepEqual(last.children.map(c => [c.slug, c.name]), [['other-items', 'Other items']]);

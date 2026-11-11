@@ -248,7 +248,7 @@ export class HeroSlidesService {
         }));
     } else if (kind === 'category') {
       const rows = await this.prisma.classifiedCategory.findMany({
-        where: { enabled: true, ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { slug: { startsWith: q.toLowerCase() } }, { keywords: { has: q.toLowerCase() } }] } : { parentId: null }) },
+        where: { enabled: true, shopOnly: false, ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { slug: { startsWith: q.toLowerCase() } }, { keywords: { has: q.toLowerCase() } }] } : { parentId: null }) },
         select: { slug: true, name: true, parent: { select: { name: true } } },
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
         take: take * 3,

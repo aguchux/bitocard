@@ -171,7 +171,7 @@ describe('the POS catalogue', () => {
 
     const tv = await live(person, 'Samsung 43 inch smart TV', { pos_enabled: true, barcode: '036000291452', reorder_level: 5, stock: 4 });
     const fan = await live(person, 'Binatone standing fan', { pos_enabled: true, stock: 0 });
-    const asking = await draft(person, 'Thermocool freezer', { pos_enabled: true });
+    const asking = await draft(person, 'Thermocool freezer', { pos_enabled: true, price_kind: 'on_request' });
     await live(person, 'Not at the shop: Nokia phone');
 
     const all = await catalogue(person);
@@ -187,7 +187,7 @@ describe('the POS catalogue', () => {
     assert.equal(byId[tv.id].edit_url, `https://udozo.com/account/listings/${tv.id}`);
     assert.equal(byId[tv.id].category.name, 'TVs and home cinema');
     assert.equal(byId[fan.id].blocked, 'out_of_stock');
-    assert.equal(byId[asking.id].blocked, 'not_live');
+    assert.equal(byId[asking.id].blocked, 'no_price', 'the till sells at a price');
     assert.deepEqual(all.categories.map(item => item.count), [3]);
 
     // Found by barcode, words or number; filtered.
@@ -222,5 +222,72 @@ describe('the POS catalogue', () => {
     assert.deepEqual([listed.summary.limit, listed.summary.over_limit, listed.summary.sellable], [1, 1, 1]);
     await prisma.posAccount.update({ where: { id: account.id }, data: { planCode: 'free' } });
     await prisma.posPlan.delete({ where: { code: plan.code } });
+  });
+});
+
+describe('selling at the shop only', () => {
+  test('a shop-only listing needs only a title, category and price, goes live at once with no end, and never leaves the till for running out', async () => {
+    const person = await seller();
+    const category = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } });
+    const made = await person.post('/v1/classifieds/listings', { title: 'Shop counter TV', category_id: category.id, price: 9_000_000, on_shop: false, pos_enabled: true, stock: 2 });
+    assert.equal(made.status, 201, JSON.stringify(made.json));
+    // A draft with its price already sells at the till.
+    assert.equal((await catalogue(person)).data.find(item => item.id === made.json.id).blocked, null);
+    const posted = await person.post(`/v1/classifieds/listings/${made.json.id}/submit`);
+    assert.equal(posted.status, 200, JSON.stringify(posted.json));
+    assert.deepEqual([posted.json.status, posted.json.expires_at, posted.json.published_at, posted.json.url], ['active', null, null, null], 'no photos, area, condition, review or end date');
+    const out = await person.patch(`/v1/classifieds/listings/${made.json.id}`, { stock: 0 });
+    assert.deepEqual([out.json.status, out.json.expires_at, out.json.delist_at], ['active', null, null], 'out of stock, it stays at the till');
+    // Sold on Udozo too from now: back to a draft, posted through the public checks.
+    const opened = await person.patch(`/v1/classifieds/listings/${made.json.id}`, { on_shop: true });
+    assert.equal(opened.json.status, 'draft');
+    assert.equal((await person.post(`/v1/classifieds/listings/${made.json.id}/submit`)).json.error?.code, 'listing_incomplete');
+  });
+
+  test('shop-only categories are offered only to sellers with Udozo POS, never on the public market, and keep their listings at the shop', async () => {
+    const person = await seller();
+    const shopCategories = (await person.get('/v1/classifieds/me/shop-categories')).json.data;
+    assert.deepEqual(shopCategories.map(top => top.slug), ['pharmacy']);
+    assert.deepEqual(shopCategories[0].children.map(child => child.slug), ['prescription-medicines', 'otc-medicines', 'herbal-medicines', 'vitamins-supplements']);
+    assert.equal(shopCategories[0].shop_only, true);
+    assert.ok(shopCategories[0].children[0].features.some(feature => feature.key === 'expiry'));
+    assert.deepEqual((await (await seller(false)).get('/v1/classifieds/me/shop-categories')).json.data, []);
+    const market = await storeServer().get('/v1/classifieds/categories?country=NG');
+    assert.ok(!market.json.data.some(top => top.slug === 'pharmacy'), 'never in the public market');
+
+    const rx = shopCategories[0].children[0];
+    const made = await person.post('/v1/classifieds/listings', { title: 'Amoxicillin 500mg capsules, pack of 21', category_id: rx.id, price: 350_000, stock: 30 });
+    assert.equal(made.status, 201, JSON.stringify(made.json));
+    assert.deepEqual([made.json.on_shop, made.json.resale.enabled, made.json.pos_enabled], [false, false, true], 'made shop-only by its category');
+    assert.equal((await person.post(`/v1/classifieds/listings/${made.json.id}/submit`)).json.status, 'active');
+    for (const change of [{ on_shop: true }, { resale: true }, { pos_enabled: false }]) {
+      assert.equal((await person.patch(`/v1/classifieds/listings/${made.json.id}`, change)).json.error?.code, 'shop_only_category', JSON.stringify(change));
+    }
+    assert.equal((await storeServer().get(`/v1/classifieds/listings/${made.json.ref}?country=NG`)).status, 404);
+
+    const without = await seller(false);
+    assert.equal((await without.post('/v1/classifieds/listings', { title: 'Amoxicillin capsules', category_id: rx.id })).json.error?.code, 'pos_account_required');
+  });
+});
+
+describe('shop kinds', () => {
+  test('a shop says what kind it is, and the catalogue leads with that kind’s categories', async () => {
+    const kinds = (await storeServer().get('/v1/pos/shop-kinds')).json.data;
+    assert.deepEqual(kinds.map(kind => kind.code), ['general', 'pharmacy', 'auto_parts', 'phones_electronics', 'supermarket', 'fashion_beauty', 'building_hardware']);
+    const person = await seller();
+    const owner = (await person.get('/v1/pos/owner')).json;
+    const shop = owner.account.shops[0];
+    assert.equal(shop.kind.code, 'general');
+    assert.equal((await person.patch(`/v1/pos/owner/shops/${shop.id}`, { kind: 'bakery' })).status, 400);
+    const changed = await person.patch(`/v1/pos/owner/shops/${shop.id}`, { kind: 'pharmacy' });
+    assert.equal(changed.status, 200, JSON.stringify(changed.json));
+
+    const tv = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'tvs' } });
+    const rx = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'otc-medicines' } });
+    for (const title of ['Hisense 32 inch TV', 'Sony 40 inch TV']) await person.post('/v1/classifieds/listings', { title, category_id: tv.id, price: 100_000, on_shop: false, pos_enabled: true });
+    await person.post('/v1/classifieds/listings', { title: 'Paracetamol 500mg tablets', category_id: rx.id, price: 50_000 });
+    const listed = await catalogue(person);
+    assert.deepEqual(listed.shop_kind, { code: 'pharmacy', name: 'Pharmacy or chemist' });
+    assert.deepEqual(listed.categories.map(item => [item.name, item.count, item.featured]), [['Pharmacy and medicines', 1, true], ['Electronics', 2, false]]);
   });
 });

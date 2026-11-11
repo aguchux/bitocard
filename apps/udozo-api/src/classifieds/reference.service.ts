@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
-import type { ClassifiedFeature } from '../generated/prisma/client.js';
+import type { ClassifiedFeature, Prisma } from '../generated/prisma/client.js';
 import { ListingsService } from './listings.service.js';
 
 /** How a registry entry reads in the API: everything the seller's value field needs. */
@@ -53,8 +53,17 @@ export class ClassifiedReferenceService {
   /** The country's open categories, top categories first with their subcategories, each with its suggested keys in order. */
   async categories(country: string) {
     await this.listings.requireOpen(country);
+    return this.tree({ enabled: true, countries: { some: { country, enabled: true } } });
+  }
+
+  /** The shop-only categories (a pharmacy's medicines), offered in Post an ad to sellers with Udozo POS. */
+  async shopCategories() {
+    return this.tree({ enabled: true, shopOnly: true });
+  }
+
+  private async tree(where: Prisma.ClassifiedCategoryWhereInput) {
     const rows = await this.prisma.classifiedCategory.findMany({
-      where: { enabled: true, countries: { some: { country, enabled: true } } },
+      where,
       include: { features: { include: { feature: true }, orderBy: { position: 'asc' } } },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
@@ -65,6 +74,8 @@ export class ClassifiedReferenceService {
       name: category.name,
       icon: category.icon,
       b2b: category.b2b,
+      /** Sold only at a seller's shop through Udozo POS, never on the public market. */
+      shop_only: category.shopOnly,
       /** What people call the things sold here, for matching what they type. */
       keywords: category.keywords,
       /** Top categories' own pictures on udozo.com (null for subcategories, which show their top category's banner). */

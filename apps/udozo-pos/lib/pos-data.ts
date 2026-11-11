@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { PosApps, PosCatalogue, PosCharge, PosOwner, PosPlans } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosOwner, PosPlans, PosShopKind } from "./pos";
 import { type ApiResult, customerApi } from "./session";
 import { apiUrl } from "./site";
 
@@ -29,6 +29,11 @@ export function marketFor(customerCountry: string | null | undefined, asked?: st
 /** Where each app's button goes; every one Coming soon when the API cannot say. */
 export async function posApps(): Promise<PosApps> {
   return (await publicRead<PosApps>("/v1/pos/apps")) ?? { object: "pos_apps", android: null, ios: null, windows: null };
+}
+
+/** The kinds of shop the till is tailored to (General shop alone when the API cannot say). */
+export async function shopKinds(): Promise<PosShopKind[]> {
+  return (await publicRead<{ data: PosShopKind[] }>("/v1/pos/shop-kinds"))?.data ?? [{ code: "general", name: "General shop", categories: [] }];
 }
 
 /** The signed-in owner's place: POS open in their country, their wallet, the plans and their account (or none yet). */

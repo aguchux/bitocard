@@ -34,8 +34,13 @@ export type PosShop = {
   shop_code: string;
   vat_bps: number;
   receipt_footer: string | null;
+  /** What kind of shop it is; the till leads with its categories. */
+  kind: PosShopKind;
   tills: PosTill[];
 };
+
+/** A kind of shop the till is tailored to, with its udozo.com category slugs. */
+export type PosShopKind = { code: string; name: string; categories: string[] };
 
 export type PosAccountStatus = "free" | "trial" | "active" | "cancelling" | "past_due";
 
@@ -163,8 +168,8 @@ export const appPlatforms = [
 
 // ---- The catalogue: the owner's listings ticked Sell at POS on udozo.com (milestone 2) ----
 
-/** Why the till cannot sell a product now: the plan's product limit, not live on udozo.com yet, no price, or none free. */
-export type PosProductBlock = "plan_limit" | "not_live" | "no_price" | "out_of_stock";
+/** Why the till cannot sell a product now: the plan's product limit, no title yet, no price, or none free. */
+export type PosProductBlock = "plan_limit" | "incomplete" | "no_price" | "out_of_stock";
 
 export type PosProduct = {
   object: "pos_product";
@@ -195,8 +200,10 @@ export type PosCatalogue = {
   object: "list";
   currency: string;
   plan: { code: string; name: string };
+  /** The shop's kind: its categories come first (`featured`). */
+  shop_kind: { code: string; name: string };
   summary: { products: number; limit: number | null; over_limit: number; sellable: number; low_stock: number; out_of_stock: number };
-  categories: Array<{ id: string; name: string; count: number }>;
+  categories: Array<{ id: string; name: string; count: number; featured: boolean }>;
   total: number;
   has_more: boolean;
   data: PosProduct[];
@@ -231,8 +238,8 @@ export function blockText(product: Pick<PosProduct, "blocked" | "status">, planN
   switch (product.blocked) {
     case "plan_limit":
       return `Over ${planName}'s product limit: choose a bigger plan, or untick Sell at POS on another listing.`;
-    case "not_live":
-      return product.status === "pending_review" ? "Waiting for Udozo's review: it sells once it is live." : product.status === "draft" ? "A draft: post it on udozo.com to sell it." : "Not live on udozo.com: renew or edit it there.";
+    case "incomplete":
+      return "No title yet: finish it on udozo.com to sell it.";
     case "no_price":
       return "No price: give it one on udozo.com to sell it at the till.";
     case "out_of_stock":

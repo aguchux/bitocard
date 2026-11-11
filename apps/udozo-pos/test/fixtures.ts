@@ -50,6 +50,7 @@ export function account(over: Partial<PosAccount> = {}): PosAccount {
         shop_code: "ADA-4821",
         vat_bps: 750,
         receipt_footer: null,
+      kind: { code: "general", name: "General shop", categories: [] },
         tills: [{ object: "pos_till", id: "7c6b5a49-3827-4e1d-9c0b-a1b2c3d4e5f6", name: "Till 1", printer_width: 80, auto_print: false }],
       },
     ],
