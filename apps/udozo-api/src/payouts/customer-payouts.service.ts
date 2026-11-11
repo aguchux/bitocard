@@ -125,7 +125,7 @@ export class CustomerPayoutsService {
     const recent =
       holdDays > 0
         ? await db.ledgerPosting.aggregate({
-            where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['classified_release', 'classified_partial'] }, createdAt: { gt: holdStart } } },
+            where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['classified_release', 'classified_partial', 'pos_wallet_payment'] }, createdAt: { gt: holdStart } } },
             _sum: { amountMinor: true },
           })
         : { _sum: { amountMinor: 0n } };

@@ -9,8 +9,9 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import { ProductOnly } from '../products/product.js';
 import { type PlanChange, PosAdminService, posAppPlatforms, type PosAppPlatform } from './pos-admin.service.js';
 import { PosCatalogueService } from './catalogue.service.js';
-import { maxSaleLines, maxSalePayments, posPaymentMethods, stockAdjustments } from './sale-rules.js';
+import { maxSaleLines, maxSalePayments, recordedPaymentMethods, stockAdjustments } from './sale-rules.js';
 import { PosSalesService } from './sales.service.js';
+import { PosWalletService, walletTokenPattern } from './wallet.service.js';
 import { posPlanCodes } from './plans.js';
 import { PosService } from './pos.service.js';
 import { posShopKindCodes, presentShopKind } from './shop-kinds.js';
@@ -86,7 +87,7 @@ class CatalogueDto {
   @IsOptional() @IsIn(['all', 'sellable', 'low_stock', 'out_of_stock', 'blocked'])
   show?: 'all' | 'sellable' | 'low_stock' | 'out_of_stock' | 'blocked';
 
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200)
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000)
   limit?: number;
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(0)
@@ -106,8 +107,8 @@ class SaleLineDto {
 }
 
 class SalePaymentDto {
-  @IsIn(posPaymentMethods)
-  method: (typeof posPaymentMethods)[number];
+  @IsIn(recordedPaymentMethods)
+  method: (typeof recordedPaymentMethods)[number];
 
   @IsInt() @Min(1)
   amount: number;
@@ -147,6 +148,22 @@ class SaleDto {
 
   @IsOptional() @IsDateString()
   client_created_at?: string;
+}
+
+class WalletRequestDto extends SaleDto {
+  /** The part paid from the buyer's Udozo wallet, in minor units; the rest is in `payments`. */
+  @IsInt() @Min(1)
+  wallet_amount: number;
+
+  /** The buyer's Udozo mobile number (E.164): asked of them on udozo.com. Without it, a QR code anyone signed in may pay. */
+  @IsOptional() @IsString() @MaxLength(20)
+  phone?: string | null;
+}
+
+class PayDto {
+  /** The amount the buyer saw, in minor units. */
+  @IsInt() @Min(1)
+  expected_amount: number;
 }
 
 class SalesDto {
@@ -285,6 +302,7 @@ export class PosOwnerController {
     private readonly pos: PosService,
     private readonly catalogue: PosCatalogueService,
     private readonly sales: PosSalesService,
+    private readonly wallet: PosWalletService,
   ) {}
 
   @Get()
@@ -331,6 +349,23 @@ export class PosOwnerController {
     return this.sales.refund(caller.customer, id, body);
   }
 
+  /** Asks for the Udozo wallet part of a basket: a QR code, or a request to one buyer by their mobile number. */
+  @Post('wallet-requests')
+  walletRequest(@CurrentCustomer() caller: CustomerCaller, @Body() body: WalletRequestDto) {
+    return this.wallet.request(caller.customer, body);
+  }
+
+  @Get('wallet-requests/:id')
+  walletStatus(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.wallet.status(caller.customer, id);
+  }
+
+  @Post('wallet-requests/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  walletCancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.wallet.cancel(caller.customer, id);
+  }
+
   /** Restock, count or write off a product's units. */
   @Post('stock/:listing')
   @HttpCode(HttpStatus.OK)
@@ -371,6 +406,38 @@ export class PosOwnerController {
   @Delete('tills/:id')
   removeTill(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.pos.removeTill(caller.customer, id);
+  }
+}
+
+/** A buyer on udozo.com paying a shop's till from their Udozo wallet (the link the till's QR code or request opens). */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('store/account/pos-payments')
+@ProductOnly('udozo')
+export class PosPaymentsController {
+  constructor(private readonly wallet: PosWalletService) {}
+
+  private static token(token: string) {
+    if (!walletTokenPattern.test(token)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'This payment request is not here any more. Ask the shop for a new one.');
+    return token;
+  }
+
+  @Get(':token')
+  view(@CurrentCustomer() caller: CustomerCaller, @Param('token') token: string) {
+    return this.wallet.view(caller.customer, PosPaymentsController.token(token));
+  }
+
+  @Post(':token/pay')
+  @HttpCode(HttpStatus.OK)
+  pay(@CurrentCustomer() caller: CustomerCaller, @Param('token') token: string, @Body() body: PayDto) {
+    return this.wallet.pay(caller.customer, PosPaymentsController.token(token), body.expected_amount);
+  }
+
+  @Post(':token/decline')
+  @HttpCode(HttpStatus.OK)
+  decline(@CurrentCustomer() caller: CustomerCaller, @Param('token') token: string) {
+    return this.wallet.decline(caller.customer, PosPaymentsController.token(token));
   }
 }
 

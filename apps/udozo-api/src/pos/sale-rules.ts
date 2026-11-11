@@ -8,7 +8,11 @@ import { cashChange } from './money.js';
  * own account, a card on the shop's own terminal, or other. No money moves through Udozo.
  */
 
-export const posPaymentMethods = ['cash', 'transfer', 'card', 'other'] as const;
+/** What a till records: the money is the shop's own and never enters Udozo's ledger. */
+export const recordedPaymentMethods = ['cash', 'transfer', 'card', 'other'] as const;
+export type RecordedPaymentMethod = (typeof recordedPaymentMethods)[number];
+/** Every way a sale is paid: the recorded ones, and the buyer's Udozo wallet (confirmed by the buyer on udozo.com). */
+export const posPaymentMethods = [...recordedPaymentMethods, 'udozo_wallet'] as const;
 export type PosPaymentMethod = (typeof posPaymentMethods)[number];
 
 /** What one sale may hold. */

@@ -186,6 +186,11 @@ export const switchDefinitions = {
     description:
       "Udozo POS (pos.udozo.com, docs/UDOZO_POS_PLAN.md): shop owners in the market sign up with their Udozo account, choose Free, Premium or Multi-shop (paid from their Udozo wallet) and run their shop's tills. Off: pos.udozo.com still shows, and sign-up says it is coming to the country; accounts already open keep working.",
   },
+  pos_wallet_payments: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo POS wallet payments (docs/UDOZO_POS_PLAN.md): a shop's till takes payment from the buyer's Udozo wallet, by a QR code or the buyer's mobile number; the buyer confirms on udozo.com and the money goes to the owner's payouts after the market's payout hold. Needs pos on. Off (until lawyers clear it): tills take cash, transfers, cards and other recorded payments only.",
+  },
   connect_shipping: {
     scopes: ['global', 'country'],
     description:
@@ -304,6 +309,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'connect_applications',
   'connect_shipping',
   'pos',
+  'pos_wallet_payments',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',

@@ -42,6 +42,28 @@ export const currentOwner = cache((): Promise<ApiResult<PosOwner>> => customerAp
 /** The listings ticked Sell at POS, read live from udozo.com (`query` from `catalogueQuery`). */
 export const ownerCatalogue = (query = "") => customerApi<PosCatalogue>("GET", `/v1/pos/owner/catalogue${query}`);
 
+/** How many products the till reads a call, and the most calls (20,000 products). */
+export const tillPage = 1000;
+const tillPages = 20;
+
+/**
+ * Every product at the till, read page by page (a shop is never cut off at one page), the summary and categories from
+ * the first. Fails as the first page fails; a later page that fails stops there with what was read.
+ */
+export async function tillCatalogue(): Promise<ApiResult<PosCatalogue>> {
+  const first = await ownerCatalogue(`?show=all&limit=${tillPage}&offset=0`);
+  if (!first.ok) return first;
+  const data = [...first.data.data];
+  let more = first.data.has_more;
+  for (let page = 1; more && page < tillPages; page += 1) {
+    const next = await ownerCatalogue(`?show=all&limit=${tillPage}&offset=${page * tillPage}`);
+    if (!next.ok) break;
+    data.push(...next.data.data);
+    more = next.data.has_more;
+  }
+  return { ok: true, data: { ...first.data, data, has_more: more } };
+}
+
 /** Every charge for the plan, newest first. */
 export const ownerCharges = () => customerApi<{ object: "list"; data: PosCharge[] }>("GET", "/v1/pos/owner/charges");
 

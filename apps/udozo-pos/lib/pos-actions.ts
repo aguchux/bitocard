@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type PosAccount, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, paymentMethods, planOrder } from "./pos";
+import { type PosAccount, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
 import { type ApiResult, customerApi, dropSession } from "./session";
 
 /** What an action answers: the account as it now is, or Udozo's refusal in words with the field it names. */
@@ -120,6 +120,45 @@ export async function refundSale(id: string, reason: string, restock = true): Pr
   if (!uuid.test(id)) return refused("No such sale.", null, "resource_missing");
   if (!reason.trim()) return refused("Say why it is refunded.", "reason", "parameter_missing");
   return answer(await customerApi<PosSale>("POST", `/v1/pos/owner/sales/${id}/refund`, { reason: reason.trim().slice(0, 300), restock }));
+}
+
+/**
+ * Asks the buyer to pay the rest of the basket from their Udozo wallet: a QR code for whoever signs in on udozo.com to
+ * pay, or, with `phone`, a request to that buyer. Nothing is taken until they press Pay there.
+ */
+export async function askWallet(sale: RingUp & { wallet_amount: number; phone?: string }): Promise<PosResult<PosWalletRequest & { token: string; pay_url: string }>> {
+  if (!uuid.test(sale.till_id) || !uuid.test(sale.client_sale_id)) return refused("Start a new sale.", "client_sale_id");
+  if (!sale.lines.length || sale.lines.some(line => !uuid.test(line.listing_id) || !whole(line.quantity, 1))) return refused("Add products to the sale.", "lines");
+  if (!whole(sale.wallet_amount, 1) || !whole(sale.expected_total)) return refused("Check the total.", "wallet_amount");
+  const phone = sale.phone?.replace(/[\s-]/g, "") ?? "";
+  if (phone && !/^\+\d{8,15}$/.test(phone)) return refused("Give the buyer's number with its country code, like +234 803 000 0000.", "phone");
+  const body = {
+    till_id: sale.till_id,
+    client_sale_id: sale.client_sale_id,
+    lines: sale.lines.map(line => ({ listing_id: line.listing_id, quantity: line.quantity })),
+    ...(sale.discount ? { discount: sale.discount } : {}),
+    payments: sale.payments.map(payment => ({ method: payment.method, amount: payment.amount, ...(payment.method === "cash" && payment.tendered ? { tendered: payment.tendered } : {}), ...(payment.reference?.trim() ? { reference: payment.reference.trim().slice(0, 80) } : {}) })),
+    wallet_amount: sale.wallet_amount,
+    expected_total: sale.expected_total,
+    ...(phone ? { phone } : {}),
+  };
+  const result = await customerApi<PosWalletRequest & { token: string; pay_url: string }>("POST", "/v1/pos/owner/wallet-requests", body);
+  return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.status === 401 ? "Your session ended. Sign in again to carry on." : result.message, code: result.code, param: result.param };
+}
+
+/** Where a wallet request stands; once paid, it carries the sale. */
+export async function walletStatus(id: string): Promise<PosResult<PosWalletRequest>> {
+  if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
+  const result = await customerApi<PosWalletRequest>("GET", `/v1/pos/owner/wallet-requests/${id}`);
+  if (!result.ok) return { ok: false, message: result.message, code: result.code, param: result.param };
+  if (result.data.status === "paid") revalidatePath("/app", "layout");
+  return { ok: true, data: result.data };
+}
+
+export async function cancelWallet(id: string): Promise<PosResult<PosWalletRequest>> {
+  if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
+  const result = await customerApi<PosWalletRequest>("POST", `/v1/pos/owner/wallet-requests/${id}/cancel`);
+  return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.message, code: result.code, param: result.param };
 }
 
 export type StockKind = "restock" | "count" | "damage";

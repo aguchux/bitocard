@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Register } from "@/components/register";
-import { ownerCatalogue, currentOwner } from "@/lib/pos-data";
+import { currentOwner, tillCatalogue } from "@/lib/pos-data";
 
 export const metadata: Metadata = { title: "Till", robots: { index: false, follow: false } };
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Till", robots: { index: false, follo
  * Udozo at once, so stock is right on udozo.com and every other till; selling without the internet comes later.
  */
 export default async function TillPage({ searchParams }: { searchParams: Promise<{ till?: string }> }) {
-  const [owner, catalogue, { till: asked }] = await Promise.all([currentOwner(), ownerCatalogue("?show=all&limit=200"), searchParams]);
+  const [owner, catalogue, { till: asked }] = await Promise.all([currentOwner(), tillCatalogue(), searchParams]);
   const account = owner.ok ? owner.data.account : null;
   if (!account) return null;
   const tills = account.shops.flatMap(shop => shop.tills.map(till => ({ ...till, shop })));
@@ -64,7 +64,7 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
           </Link>
         </section>
       ) : (
-        <Register key={till.id} tillId={till.id} vatBps={till.shop.vat_bps} currency={catalogue.data.currency} products={catalogue.data.data} categories={catalogue.data.categories} planName={catalogue.data.plan.name} />
+        <Register key={till.id} tillId={till.id} vatBps={till.shop.vat_bps} currency={catalogue.data.currency} products={catalogue.data.data} categories={catalogue.data.categories} planName={catalogue.data.plan.name} walletPayments={owner.ok && owner.data.wallet_payments === true} />
       )}
     </div>
   );

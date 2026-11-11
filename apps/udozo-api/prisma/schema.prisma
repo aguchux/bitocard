@@ -2853,6 +2853,7 @@ model Customer {
   auctionsSelling           ConnectAuction[]          @relation("ConnectAuctionSeller")
   connectTransfers          ConnectTransfer[]         @relation("ConnectTransferRecipient")
   posAccount                PosAccount?
+  posWalletRequests         PosWalletRequest[]        @relation("PosWalletBuyer")
   connectAuctionBids        ConnectAuctionBid[]
   connectAuctionClaims      ConnectAuctionClaim[]     @relation("ConnectAuctionClaimSeller")
 }
@@ -7946,6 +7947,7 @@ model PosAccount {
   charges            PosCharge[]
   sales              PosSale[]
   stockMovements     PosStockMovement[]
+  walletRequests     PosWalletRequest[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -7974,6 +7976,7 @@ model PosShop {
   account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   tills         PosTill[]
   sales         PosSale[]
+  walletRequests PosWalletRequest[]
 
   @@index([accountId, position])
   @@map("pos_shops")
@@ -7991,6 +7994,7 @@ model PosTill {
   updatedAt    DateTime @updatedAt @map("updated_at")
   shop         PosShop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
   sales        PosSale[]
+  walletRequests PosWalletRequest[]
 
   @@index([shopId, position])
   @@map("pos_tills")
@@ -8030,6 +8034,7 @@ model PosSale {
   lines           PosSaleLine[]
   payments        PosPayment[]
   movements       PosStockMovement[]
+  walletRequests  PosWalletRequest[]
 
   @@unique([shopId, number], map: "pos_sales_shop_number_key")
   @@unique([accountId, clientSaleId], map: "pos_sales_client_key")
@@ -8068,10 +8073,49 @@ model PosPayment {
   tenderedMinor BigInt? @map("tendered_minor")
   changeMinor   BigInt  @default(0) @map("change_minor")
   reference     String? @db.VarChar(80)
+  /// The Udozo wallet request a `udozo_wallet` part was paid through.
+  walletRequestId String? @map("wallet_request_id") @db.Uuid
   sale          PosSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  walletRequest PosWalletRequest? @relation(fields: [walletRequestId], references: [id], onDelete: SetNull)
 
   @@index([saleId, position], map: "pos_payments_sale_idx")
   @@map("pos_payments")
+}
+
+/// A till asking for the Udozo wallet part of a basket (`PW-000123`): by a QR code anyone signed in may pay, or by one
+/// buyer's mobile number. The buyer confirms on udozo.com, which makes the sale and moves the money in one transaction.
+model PosWalletRequest {
+  id               String     @id @default(uuid()) @db.Uuid
+  number           Int        @unique @default(autoincrement())
+  accountId        String     @map("account_id") @db.Uuid
+  shopId           String     @map("shop_id") @db.Uuid
+  tillId           String?    @map("till_id") @db.Uuid
+  tokenHash        String     @unique @map("token_hash") @db.Char(64)
+  clientSaleId     String     @map("client_sale_id") @db.Uuid
+  mode             LedgerMode
+  currency         String     @db.VarChar(10)
+  amountMinor      BigInt     @map("amount_minor")
+  totalMinor       BigInt     @map("total_minor")
+  basket           Json
+  soldByCustomerId String?    @map("sold_by_customer_id") @db.Uuid
+  soldByName       String     @map("sold_by_name")
+  buyerCustomerId  String?    @map("buyer_customer_id") @db.Uuid
+  /// `waiting`, `paid`, `declined`, `cancelled` or `expired`.
+  status           String     @default("waiting") @db.VarChar(16)
+  saleId           String?    @map("sale_id") @db.Uuid
+  expiresAt        DateTime   @map("expires_at")
+  paidAt           DateTime?  @map("paid_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  account          PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  shop             PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  till             PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+  buyer            Customer?  @relation("PosWalletBuyer", fields: [buyerCustomerId], references: [id], onDelete: SetNull)
+  sale             PosSale?   @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  payments         PosPayment[]
+
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_wallet_requests_account_idx")
+  @@map("pos_wallet_requests")
 }
 
 /// A change to a listing's stock made from the POS: `sale`, `refund`, `restock`, `count` or `damage`.

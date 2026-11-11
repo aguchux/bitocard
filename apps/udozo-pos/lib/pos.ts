@@ -67,6 +67,8 @@ export type PosAccount = {
 export type PosOwner = {
   object: "pos_owner";
   open: boolean;
+  /** The till may take payment from a buyer's Udozo wallet (the market's `pos_wallet_payments`). */
+  wallet_payments?: boolean;
   country: string;
   currency: string;
   wallet: { balance: number; currency: string };
@@ -258,6 +260,7 @@ export function stockLine(product: Pick<PosProduct, "stock" | "held" | "availabl
 
 // ---- Sales at the till (milestone 3) ----
 
+/** What the till records itself; the Udozo wallet (`udozo_wallet`) is asked of the buyer instead. */
 export type PosPaymentMethod = "cash" | "transfer" | "card" | "other";
 
 export const paymentMethods: Array<{ value: PosPaymentMethod; label: string; hint: string }> = [
@@ -267,10 +270,10 @@ export const paymentMethods: Array<{ value: PosPaymentMethod; label: string; hin
   { value: "other", label: "Other", hint: "Anything else, recorded as it is." },
 ];
 
-export const methodLabel = (method: string) => paymentMethods.find(item => item.value === method)?.label ?? method;
+export const methodLabel = (method: string) => (method === "udozo_wallet" ? "Udozo wallet" : (paymentMethods.find(item => item.value === method)?.label ?? method));
 
 export type PosSaleLine = { listing_id: string; title: string; sku: string | null; barcode: string | null; quantity: number; unit_price: number; discount: number; total: number };
-export type PosSalePayment = { method: PosPaymentMethod; amount: number; tendered: number | null; change: number; reference: string | null };
+export type PosSalePayment = { method: PosPaymentMethod | "udozo_wallet"; amount: number; tendered: number | null; change: number; reference: string | null };
 
 export type PosSale = {
   object: "pos_sale";
@@ -396,3 +399,43 @@ export function salesQuery(params: { q?: string; status?: string; day?: string; 
 
 const movementWords: Record<PosStockMovement["reason"], string> = { sale: "Sold", refund: "Refunded", restock: "Restocked", count: "Counted", damage: "Damaged or lost" };
 export const movementText = (movement: Pick<PosStockMovement, "reason" | "delta">) => `${movementWords[movement.reason]} ${movement.delta > 0 ? "+" : ""}${movement.delta.toLocaleString("en-GB")}`;
+
+// ---- The Udozo wallet at the till ----
+
+export type PosWalletRequest = {
+  object: "pos_wallet_request";
+  id: string;
+  number: string;
+  status: "waiting" | "paid" | "declined" | "cancelled" | "expired";
+  currency: string;
+  amount: number;
+  total: number;
+  client_sale_id: string;
+  for_buyer: boolean;
+  expires_at: string;
+  paid_at: string | null;
+  sale: PosSale | null;
+};
+
+/** What the till shows while a wallet request is not paid, or null while it waits. */
+export function walletOutcome(status: PosWalletRequest["status"]) {
+  switch (status) {
+    case "declined":
+      return "The buyer declined to pay from their Udozo wallet.";
+    case "expired":
+      return "Five minutes passed without the buyer paying. Ask again, or take another payment.";
+    case "cancelled":
+      return "The request was cancelled. If the buyer was paying, ask them to look at the till again.";
+    default:
+      return null;
+  }
+}
+
+/** Minutes and seconds left, from now to `until` ("4:05"); "0:00" once past. */
+export function timeLeft(until: string, now = Date.now()) {
+  const seconds = Math.max(0, Math.round((new Date(until).getTime() - now) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** How many products the till draws at once; the rest are found by search or category. */
+export const tillShown = 120;
