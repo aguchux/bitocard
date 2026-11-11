@@ -28,6 +28,8 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   const pos = await currentPos();
   // A staff session that ended (12 hours idle, signed out elsewhere, suspended or the device unlinked): sign in again.
   if (staff && !pos.ok && (pos.status === 401 || pos.status === 403)) redirect("/signin/staff/end");
+  // A PIN from before PINs were 6 digits: a new one before anything else.
+  if (staff && pos.ok && pos.data.pinChangeRequired) redirect("/signin/pin");
   const linked = await hasDevice();
   const onDevice = staff && linked;
   return (

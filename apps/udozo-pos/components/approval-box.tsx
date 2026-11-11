@@ -28,7 +28,7 @@ export function ApprovalBox({ approvers, what, reason, pending, onApprove, onCan
         <form
           onSubmit={event => {
             event.preventDefault();
-            if (staffId && /^\d{4}$/.test(pin)) onApprove({ staff_id: staffId, pin });
+            if (staffId && /^(?:\d{4}|\d{6})$/.test(pin)) onApprove({ staff_id: staffId, pin });
           }}
           className="grid gap-3"
         >
@@ -47,7 +47,7 @@ export function ApprovalBox({ approvers, what, reason, pending, onApprove, onCan
             <button type="button" onClick={onCancel} className="h-12 rounded-xl border border-pos-line bg-white font-bold">
               Cancel
             </button>
-            <button type="submit" disabled={pending || pin.length !== 4} className="h-12 rounded-xl bg-pos-600 font-bold text-white hover:bg-pos-700 disabled:opacity-50">
+            <button type="submit" disabled={pending || (pin.length !== 6 && pin.length !== 4)} className="h-12 rounded-xl bg-pos-600 font-bold text-white hover:bg-pos-700 disabled:opacity-50">
               {pending ? "Checking…" : "Approve"}
             </button>
           </div>

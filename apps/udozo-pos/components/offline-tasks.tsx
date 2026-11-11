@@ -63,7 +63,7 @@ export function ManagerPin({ staff, checks, need, asking, onApproved, onCancel }
             autoFocus
             onChange={next => {
               setPin(next);
-              if (next.length !== 4) return;
+              if (next.length !== 6) return;
               void checkPin(who.id, next).then(answer => {
                 setPin("");
                 if (answer === "ok") onApproved(who);

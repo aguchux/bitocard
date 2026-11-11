@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { PinPad } from "@/components/pin-pad";
-import { type PosDeviceInfo, type PosInviteInfo, weakPin } from "@/lib/pos";
-import { acceptInvite, deviceGone, deviceSignIn, linkDevice, lookupInvite, staffSignIn } from "@/lib/staff-actions";
+import { easyPinText, type PosDeviceInfo, type PosInviteInfo, weakPin } from "@/lib/pos";
+import { acceptInvite, changePin, deviceGone, deviceSignIn, linkDevice, lookupInvite, staffSignIn } from "@/lib/staff-actions";
 import { rememberPin } from "@/lib/offline-store";
 
 const field = "mt-1 h-12 w-full rounded-xl border border-pos-line bg-white px-4 text-base";
@@ -18,7 +18,7 @@ function Problem({ message }: { message: string | null }) {
   ) : null;
 }
 
-/** Staff on the web: the shop code, their phone and their 4-digit PIN. No Udozo account. */
+/** Staff on the web: the shop code, their phone and their 6-digit PIN (4 for a PIN set before). No Udozo account. */
 export function StaffSignInForm() {
   const router = useRouter();
   const [shopCode, setShopCode] = useState("");
@@ -53,7 +53,7 @@ export function StaffSignInForm() {
       </label>
       <PinPad value={pin} onChange={setPin} label="Your PIN" disabled={pending} />
       <Problem message={message} />
-      <button type="submit" disabled={pending || pin.length !== 4} className={primary}>
+      <button type="submit" disabled={pending || (pin.length !== 6 && pin.length !== 4)} className={primary}>
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>
@@ -68,10 +68,10 @@ export function TillTiles({ device }: { device: PosDeviceInfo }) {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  // The fourth digit signs them in, once: a wrong PIN clears the box for the next try.
-  const enter = (next: string) => {
-    setPin(next);
-    if (!chosen || next.length !== 4 || pending) return;
+  // The sixth digit signs them in, once: a wrong PIN clears the box for the next try. A 4-digit PIN from before PINs were
+  // 6 digits signs in with the button, then they choose a new one.
+  const submit = (next: string) => {
+    if (!chosen || (next.length !== 6 && next.length !== 4) || pending) return;
     start(async () => {
       const result = await deviceSignIn(chosen.id, next);
       if (!result.ok) {
@@ -79,11 +79,15 @@ export function TillTiles({ device }: { device: PosDeviceInfo }) {
         setPin("");
         return;
       }
-      // The till keeps a check of this PIN (never the PIN), so they can sign in here offline.
-      void rememberPin(chosen.id, next).catch(() => undefined);
+      // The till keeps a check of this PIN (never the PIN), so they can sign in here offline: 6-digit PINs only.
+      if (next.length === 6) void rememberPin(chosen.id, next).catch(() => undefined);
       router.push("/app/till");
       router.refresh();
     });
+  };
+  const enter = (next: string) => {
+    setPin(next);
+    if (next.length === 6) submit(next);
   };
 
   if (chosen) {
@@ -94,6 +98,11 @@ export function TillTiles({ device }: { device: PosDeviceInfo }) {
         </h2>
         <PinPad value={pin} onChange={enter} label="Your PIN" disabled={pending} autoFocus />
         <Problem message={message} />
+        {pin.length === 4 ? (
+          <button type="button" onClick={() => submit(pin)} disabled={pending} className={primary}>
+            Sign in with my old 4-digit PIN
+          </button>
+        ) : null}
         <button type="button" onClick={() => {
             setChosen(null);
             setPin("");
@@ -205,7 +214,7 @@ export function DeviceGone() {
   );
 }
 
-/** The invite page: who invited them, the role and what it allows, then their own 4-digit PIN, twice. */
+/** The invite page: who invited them, the role and what it allows, then their own 6-digit PIN, twice. */
 export function AcceptInviteForm() {
   const router = useRouter();
   const token = useRef<string | null>(null);
@@ -238,7 +247,7 @@ export function AcceptInviteForm() {
   if (!invite) {
     return message ? <Problem message={message} /> : <p className="text-pos-ink-2">Opening your invite…</p>;
   }
-  const easy = pin.length === 4 && weakPin(pin);
+  const easy = pin.length === 6 && weakPin(pin);
   return (
     <div className="grid gap-5">
       <div>
@@ -274,7 +283,7 @@ export function AcceptInviteForm() {
             return;
           }
           if (weakPin(pin)) {
-            setMessage("Choose a PIN that is harder to guess: not 1234, one digit four times or a year.");
+            setMessage(easyPinText);
             return;
           }
           start(async () => {
@@ -289,11 +298,11 @@ export function AcceptInviteForm() {
         }}
         className="grid gap-4 rounded-[20px] bg-white p-5"
       >
-        <PinPad value={pin} onChange={setPin} label="Create your 4-digit PIN" disabled={pending} />
-        {easy ? <p className="text-sm font-semibold text-pos-warn">That PIN is easy to guess. Avoid 1234, one digit four times or your birth year.</p> : null}
+        <PinPad value={pin} onChange={setPin} label="Create your 6-digit PIN" disabled={pending} />
+        {easy ? <p className="text-sm font-semibold text-pos-warn">{easyPinText}</p> : null}
         <PinPad value={again} onChange={setAgain} label="Type it again" disabled={pending} />
         <Problem message={message} />
-        <button type="submit" disabled={pending || pin.length !== 4 || again.length !== 4} className={primary}>
+        <button type="submit" disabled={pending || pin.length !== 6 || again.length !== 6} className={primary}>
           {pending ? "Joining…" : invite.reset ? "Save my PIN" : "Join the shop"}
         </button>
         <p className="text-sm text-pos-muted">
@@ -301,5 +310,51 @@ export function AcceptInviteForm() {
         </p>
       </form>
     </div>
+  );
+}
+
+/**
+ * Choosing a new PIN (PINs are now 6 digits): the current PIN, then the new one twice. Someone whose PIN is from before
+ * does this before anything else; on a linked till the new PIN is kept for signing in offline.
+ */
+export function ChangePinForm({ staffId, onDevice, required }: { staffId: string; onDevice: boolean; required: boolean }) {
+  const router = useRouter();
+  const [current, setCurrent] = useState("");
+  const [pin, setPin] = useState("");
+  const [again, setAgain] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const easy = pin.length === 6 && weakPin(pin);
+  return (
+    <form
+      onSubmit={event => {
+        event.preventDefault();
+        if (pin !== again) return setMessage("The two new PINs are not the same.");
+        if (weakPin(pin)) return setMessage(easyPinText);
+        start(async () => {
+          const result = await changePin(current, pin);
+          if (!result.ok) {
+            setMessage(result.message);
+            if (result.param === "current_pin") setCurrent("");
+            return;
+          }
+          if (onDevice) void rememberPin(staffId, pin).catch(() => undefined);
+          router.push("/app");
+          router.refresh();
+        });
+      }}
+      className="mx-auto grid w-full max-w-md gap-4 rounded-[20px] bg-white p-6"
+    >
+      <h1 className="font-display text-2xl font-bold text-pos-ink">{required ? "PINs are now 6 digits" : "Change your PIN"}</h1>
+      {required ? <p className="text-pos-ink-2">Choose a new 6-digit PIN to carry on. Your old 4-digit PIN stops working once you do.</p> : null}
+      <PinPad value={current} onChange={setCurrent} label="Your current PIN" disabled={pending} autoFocus />
+      <PinPad value={pin} onChange={setPin} label="Your new 6-digit PIN" disabled={pending} />
+      {easy ? <p className="text-sm font-semibold text-pos-warn">{easyPinText}</p> : null}
+      <PinPad value={again} onChange={setAgain} label="Type the new PIN again" disabled={pending} />
+      <Problem message={message} />
+      <button type="submit" disabled={pending || (current.length !== 4 && current.length !== 6) || pin.length !== 6 || again.length !== 6} className={primary}>
+        {pending ? "Saving…" : "Save my new PIN"}
+      </button>
+    </form>
   );
 }

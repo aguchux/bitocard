@@ -742,6 +742,8 @@ export type PosStaffMe = {
   account: { id: string; mode: "live" | "test"; plan: { code: string; name: string }; shops: PosShop[] };
   transfer_accounts: Array<{ till_id: string; bank_name: string; account_number: string; account_name: string }>;
   approvers: PosApprover[];
+  /** Their PIN is from before PINs were 6 digits: they choose a new one before anything else. */
+  pin_change_required?: boolean;
 };
 
 export type PosRoleView = {
@@ -824,15 +826,22 @@ export function levelText(level: PermissionLevel) {
 /** A discount limit in words: none, up to a share, or any amount. */
 export const discountText = (bps: number | null) => (bps === null ? "Any amount" : bps === 0 ? "No discounts" : `Up to ${(bps / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}%`);
 
-/** Easy PINs the API refuses: all one digit, a run up or down, or a year from 1900 to 2099. */
+/** A staff PIN is 6 digits; sign-in also takes 4 from someone whose PIN was set before PINs were 6 digits. */
+export const pinLength = 6;
+export const signInPin = (pin: string) => /^(?:\d{4}|\d{6})$/.test(pin);
+
+/** Easy PINs the API refuses: one or two digits only, a run up or down, the same three twice, or two digits three times. */
 export function weakPin(pin: string) {
-  if (!/^\d{4}$/.test(pin)) return true;
-  if (new Set(pin).size === 1) return true;
+  if (!/^\d{6}$/.test(pin)) return true;
+  if (new Set(pin).size <= 2) return true;
   const digits = [...pin].map(Number);
   const up = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 1) % 10);
   const down = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 9) % 10);
-  return up || down || /^(19|20)\d\d$/.test(pin);
+  return up || down || pin.slice(0, 3) === pin.slice(3) || (pin.slice(0, 2) === pin.slice(2, 4) && pin.slice(2, 4) === pin.slice(4));
 }
+
+/** What an easy PIN is, in words. */
+export const easyPinText = "That PIN is easy to guess. Avoid 123456, one or two digits repeated, or the same three twice.";
 
 // ---- Receipts (milestone 6) ----
 

@@ -22,12 +22,15 @@ const staff = vi.hoisted(() => ({
   setStaffStatus: vi.fn(),
   saveRole: vi.fn(),
   deleteRole: vi.fn(),
+  changePin: vi.fn(),
 }));
+const offline = vi.hoisted(() => ({ rememberPin: vi.fn(async () => undefined) }));
+vi.mock("@/lib/offline-store", () => offline);
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("@/lib/staff-actions", () => staff);
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
-const { TillTiles, AcceptInviteForm } = await import("@/components/staff-auth");
+const { TillTiles, AcceptInviteForm, ChangePinForm } = await import("@/components/staff-auth");
 const { ApprovalBox } = await import("@/components/approval-box");
 const { InviteStaff, StaffTable, RolesMatrix } = await import("@/components/staff-manager");
 
@@ -84,17 +87,49 @@ describe("a linked till", () => {
     expect(button(host, "EN").disabled).toBe(true);
     await act(async () => button(host, "KA").click());
     expect(host.textContent).toContain("Signing in as Kemi Ade");
-    for (const digit of ["4", "8", "2", "6"]) await act(async () => button(host, digit).click());
+    for (const digit of ["4", "8", "2", "6", "5", "2"]) await act(async () => button(host, digit).click());
+    await settle();
+    expect(staff.deviceSignIn).toHaveBeenCalledWith("k1", "482652");
+    expect(router.push).toHaveBeenCalledWith("/app/till");
+  });
+
+  it("signs in with an old 4-digit PIN by its button, keeping no offline check of it", async () => {
+    staff.deviceSignIn.mockResolvedValue({ ok: true, data: { name: "Kemi Ade" } });
+    const host = mount(createElement(TillTiles, { device }));
+    await act(async () => button(host, "KA").click());
+    type(host.querySelector('input[type="password"]')!, "4826");
+    expect(staff.deviceSignIn).not.toHaveBeenCalled();
+    await act(async () => button(host, "Sign in with my old 4-digit PIN").click());
     await settle();
     expect(staff.deviceSignIn).toHaveBeenCalledWith("k1", "4826");
-    expect(router.push).toHaveBeenCalledWith("/app/till");
+    expect(offline.rememberPin).not.toHaveBeenCalled();
+  });
+
+  it("asks for a new 6-digit PIN, refusing an easy one, and keeps it for offline on a till", async () => {
+    staff.changePin.mockResolvedValue({ ok: true, data: { changed: true } });
+    const host = mount(createElement(ChangePinForm, { staffId: "k1", onDevice: true, required: true }));
+    expect(host.textContent).toContain("PINs are now 6 digits");
+    const pins = host.querySelectorAll<HTMLInputElement>('input[type="password"]');
+    type(pins[0]!, "4826");
+    type(pins[1]!, "121212");
+    type(pins[2]!, "121212");
+    expect(host.textContent).toContain("That PIN is easy to guess");
+    await act(async () => button(host, "Save my new PIN").click());
+    expect(staff.changePin).not.toHaveBeenCalled();
+    type(pins[1]!, "846271");
+    type(pins[2]!, "846271");
+    await act(async () => button(host, "Save my new PIN").click());
+    await settle();
+    expect(staff.changePin).toHaveBeenCalledWith("4826", "846271");
+    expect(offline.rememberPin).toHaveBeenCalledWith("k1", "846271");
+    expect(router.push).toHaveBeenCalledWith("/app");
   });
 
   it("clears the PIN and says why when it is wrong", async () => {
     staff.deviceSignIn.mockResolvedValue({ ok: false, message: "The shop code, phone number or PIN is not right.", code: "invalid_credentials", param: null });
     const host = mount(createElement(TillTiles, { device }));
     await act(async () => button(host, "KA").click());
-    type(host.querySelector('input[type="password"]')!, "1357");
+    type(host.querySelector('input[type="password"]')!, "135752");
     await settle();
     expect(host.querySelector("[role=alert]")!.textContent).toBe("The shop code, phone number or PIN is not right.");
     expect(host.querySelector<HTMLInputElement>('input[type="password"]')!.value).toBe("");
@@ -113,19 +148,19 @@ describe("the invite page", () => {
     expect(host.textContent).toContain("Hi Kemi, you’re invited to sell at Ada's Gadget Hub");
     expect(host.textContent).toContain("Give discounts up to 5%");
     const pins = host.querySelectorAll<HTMLInputElement>('input[type="password"]');
-    type(pins[0]!, "1234");
+    type(pins[0]!, "123456");
     expect(host.textContent).toContain("That PIN is easy to guess");
-    type(pins[1]!, "1234");
+    type(pins[1]!, "123456");
     await act(async () => button(host, "Join the shop").click());
-    expect(host.querySelector("[role=alert]")!.textContent).toMatch(/harder to guess/);
+    expect(host.querySelector("[role=alert]")!.textContent).toMatch(/easy to guess/);
     expect(staff.acceptInvite).not.toHaveBeenCalled();
-    type(pins[0]!, "2468");
-    type(pins[1]!, "2486");
+    type(pins[0]!, "246852");
+    type(pins[1]!, "248652");
     await act(async () => button(host, "Join the shop").click());
     expect(host.querySelector("[role=alert]")!.textContent).toBe("The two PINs are not the same.");
-    type(pins[1]!, "2468");
+    type(pins[1]!, "246852");
     await act(async () => button(host, "Join the shop").click());
-    expect(staff.acceptInvite).toHaveBeenCalledWith(`upi_${"a".repeat(43)}`, "2468");
+    expect(staff.acceptInvite).toHaveBeenCalledWith(`upi_${"a".repeat(43)}`, "246852");
     expect(router.push).toHaveBeenCalledWith("/app");
   });
 
@@ -147,9 +182,9 @@ describe("a manager's approval", () => {
     const onApprove = vi.fn();
     const host = mount(createElement(ApprovalBox, { approvers, what: "refund", reason: "A refund needs a manager's approval.", pending: false, onApprove, onCancel: vi.fn() }));
     expect([...host.querySelectorAll("option")].map(option => option.textContent)).toEqual(["Chinedu Eze · Manager"]);
-    type(host.querySelector('input[type="password"]')!, "4826");
+    type(host.querySelector('input[type="password"]')!, "482652");
     await act(async () => button(host, "Approve").click());
-    expect(onApprove).toHaveBeenCalledWith({ staff_id: "m1", pin: "4826" });
+    expect(onApprove).toHaveBeenCalledWith({ staff_id: "m1", pin: "482652" });
   });
 
   it("says when nobody here may approve", () => {

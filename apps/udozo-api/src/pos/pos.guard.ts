@@ -8,6 +8,10 @@ import { levelOf, type PosPermission } from './permissions.js';
 import { deviceHeader, PosStaffService, type PosStaffContext, staffSessionHeader } from './staff.service.js';
 
 const ROUTE_POS_ALLOWS = 'pos:allows';
+const ROUTE_PIN_CHANGE = 'pos:pin-change';
+
+/** A staff route open while their PIN must still be changed (who they are, signing out, changing the PIN). */
+export const AllowPinChange = () => SetMetadata(ROUTE_PIN_CHANGE, true);
 
 /**
  * What a staff route needs: any one of these permissions at `yes` (or at `approval` where `approval` is set, the route
@@ -40,6 +44,9 @@ export class PosGuard implements CanActivate {
     const token = req.get(staffSessionHeader);
     const found = token ? await this.staff.resolve(token, id => this.owner(id)) : null;
     if (!found) throw staffSignInRequired();
+    if (found.pinChangeRequired && !this.reflector.getAllAndOverride<boolean>(ROUTE_PIN_CHANGE, [context.getHandler(), context.getClass()])) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'pin_change_required', 'PINs are now 6 digits. Choose your new PIN first.');
+    }
     const allows = this.reflector.getAllAndOverride<{ permissions: PosPermission[]; approval: boolean } | undefined>(ROUTE_POS_ALLOWS, [context.getHandler(), context.getClass()]);
     // A route that names no permission is refused: nothing is open to every role by mistake.
     if (!allows) throw permissionRequired();

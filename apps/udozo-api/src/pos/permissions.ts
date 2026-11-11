@@ -179,14 +179,24 @@ export function allowedLines(role: Pick<ResolvedRole, 'permissions' | 'discountL
   return lines;
 }
 
-/** Easy PINs a shop's staff may not choose: all one digit, a run up or down, or a year from 1900 to 2099. */
+/** A staff PIN: 6 digits. */
+export const pinDigits = 6;
+export const pinPattern = /^\d{6}$/;
+/** What sign-in and a manager's approval accept: 6 digits, or 4 for a PIN set before PINs were 6 digits. */
+export const signInPinPattern = /^(?:\d{4}|\d{6})$/;
+
+/**
+ * Easy PINs a shop's staff may not choose: one or two digits only, a run up or down (123456, 654321), the same three
+ * twice (123123) or two digits three times (121212).
+ */
 export function weakPin(pin: string) {
-  if (!/^\d{4}$/.test(pin)) return true;
-  if (new Set(pin).size === 1) return true;
+  if (!pinPattern.test(pin)) return true;
+  if (new Set(pin).size <= 2) return true;
   const digits = [...pin].map(Number);
   const up = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 1) % 10);
   const down = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 9) % 10);
   if (up || down) return true;
-  if (/^(19|20)\d\d$/.test(pin)) return true;
+  if (pin.slice(0, 3) === pin.slice(3)) return true;
+  if (pin.slice(0, 2) === pin.slice(2, 4) && pin.slice(2, 4) === pin.slice(4)) return true;
   return false;
 }

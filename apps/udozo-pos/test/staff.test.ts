@@ -99,9 +99,21 @@ describe("signing staff in", () => {
   it("accepts an invite with a PIN; a broken link never reaches the API", async () => {
     reply = () => Response.json({ session: { token: "ups_new" }, staff: { name: "Tunde Bakare" }, till_id: null });
     const token = `upi_${"a".repeat(43)}`;
-    expect(await staff.acceptInvite(token, "2468")).toEqual({ ok: true, data: { name: "Tunde Bakare" } });
-    expect(sent[0]).toMatchObject({ url: "/v1/pos/invites/accept", body: { token, pin: "2468" } });
+    expect(await staff.acceptInvite(token, "2468")).toMatchObject({ ok: false, param: "pin" });
+    expect(await staff.acceptInvite(token, "246852")).toEqual({ ok: true, data: { name: "Tunde Bakare" } });
+    expect(sent[0]).toMatchObject({ url: "/v1/pos/invites/accept", body: { token, pin: "246852" } });
     expect(await staff.lookupInvite("nope")).toMatchObject({ ok: false, code: "invite_invalid" });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("changes a PIN: the current one (4 or 6 digits) and a new 6-digit one that is not easy", async () => {
+    setRequest({}, { udz_pos_staff: "ups_x" });
+    reply = () => Response.json({ object: "pos_pin", changed: true });
+    expect(await staff.changePin("4826", "846271")).toMatchObject({ ok: true });
+    expect(sent[0]).toMatchObject({ method: "POST", url: "/v1/pos/staff/pin", body: { current_pin: "4826", new_pin: "846271" } });
+    expect(await staff.changePin("4826", "123456")).toMatchObject({ ok: false, code: "pin_too_easy" });
+    expect(await staff.changePin("48", "846271")).toMatchObject({ ok: false, param: "current_pin" });
+    expect(await staff.changePin("4826", "8462")).toMatchObject({ ok: false, param: "new_pin" });
     expect(sent).toHaveLength(1);
   });
 
@@ -177,8 +189,8 @@ describe("words and places", () => {
   });
 
   it("words PINs, limits, levels and where someone works", () => {
-    expect(["1234", "0000", "1990", "9876"].every(weakPin)).toBe(true);
-    expect(weakPin("4826")).toBe(false);
+    expect(["123456", "000000", "654321", "121212", "123123", "112211", "4826"].every(weakPin)).toBe(true);
+    expect(weakPin("482652")).toBe(false);
     expect(discountText(null)).toBe("Any amount");
     expect(discountText(0)).toBe("No discounts");
     expect(discountText(750)).toBe("Up to 7.5%");

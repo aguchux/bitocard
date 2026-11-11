@@ -56,7 +56,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           <h2 id="staff" className="font-display text-2xl font-bold text-pos-ink">
             Staff
           </h2>
-          <p className="mt-2 text-pos-ink-2">Sign in with your shop’s code, your phone number and the 4-digit PIN you set from your invite. No Udozo account needed.</p>
+          <p className="mt-2 text-pos-ink-2">Sign in with your shop’s code, your phone number and the 6-digit PIN you set from your invite. No Udozo account needed.</p>
           {ended ? <p className="mt-3 rounded-xl bg-pos-warn-bg p-3 text-sm font-semibold text-pos-warn">You were signed out. Sign in again to carry on.</p> : null}
           <StaffSignInForm />
           <p className="mt-3 text-sm text-pos-muted">

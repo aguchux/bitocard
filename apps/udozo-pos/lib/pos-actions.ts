@@ -200,8 +200,8 @@ export type RingUp = {
 /** A manager's PIN given at the till for what a member of staff may only do with approval. */
 export type Approval = { staff_id: string; pin: string };
 
-/** The approval to send, if it is one: a colleague's id and a 4-digit PIN. */
-const approvalOf = (approval: Approval | null | undefined) => (approval && uuid.test(approval.staff_id) && /^\d{4}$/.test(approval.pin) ? { approval: { staff_id: approval.staff_id, pin: approval.pin } } : {});
+/** The approval to send, if it is one: a colleague's id and their PIN (6 digits, or 4 if set before PINs were 6). */
+const approvalOf = (approval: Approval | null | undefined) => (approval && uuid.test(approval.staff_id) && /^(?:\d{4}|\d{6})$/.test(approval.pin) ? { approval: { staff_id: approval.staff_id, pin: approval.pin } } : {});
 
 const tillMethods = [...paymentMethods.map(item => item.value), "credit"];
 

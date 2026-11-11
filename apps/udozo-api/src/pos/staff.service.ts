@@ -24,6 +24,8 @@ import {
   type SystemRoleKey,
   systemRoleKeys,
   systemRoles,
+  pinPattern,
+  signInPinPattern,
   weakPin,
 } from './permissions.js';
 
@@ -48,6 +50,8 @@ export type PosStaffContext = {
   account: { id: string; customerId: string; country: string; currency: string; mode: 'live' | 'test' };
   owner: CustomerWithStore;
   by: PosBy;
+  /** Their PIN is from before PINs were 6 digits: they choose a new one before anything else. */
+  pinChangeRequired: boolean;
 };
 
 /** A manager's PIN given at the till, for an action the member of staff may only do with approval. */
@@ -68,6 +72,7 @@ const conflict = (code: string, message: string, param?: string) => new ApiError
 const forbidden = (code: string, message: string, param?: string) => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', code, message, param);
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `There is no such ${what} on this Udozo POS account.`);
 const badPin = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'invalid_credentials', 'The shop code, phone number or PIN is not right.');
+const pinTooEasy = () => invalid('pin_too_easy', 'Choose a PIN that is harder to guess: not 123456, not one or two digits repeated, not the same three twice.', 'pin');
 const locked = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'pin_locked', `Too many wrong PINs. Try again in ${lockMinutes} minutes, or ask a manager to reset your PIN.`);
 const inviteGone = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'invite_invalid', 'This invite has been used, replaced or has expired. Ask the shop for a new one.');
 
@@ -349,8 +354,8 @@ export class PosStaffService {
     const url = `${this.config.POS_URL}/invite#t=${token}`;
     const shop = account.shops[0];
     const message = reset
-      ? `${shop?.name ?? 'Your shop'}: set a new 4-digit PIN for Udozo POS (shop code ${shop?.shopCode ?? ''}). This link works for ${inviteHours} hours: ${url}`
-      : `${invitedBy} invited you to sell at ${shop?.name ?? 'their shop'} on Udozo POS. Set your 4-digit PIN (shop code ${shop?.shopCode ?? ''}). This link works for ${inviteHours} hours: ${url}`;
+      ? `${shop?.name ?? 'Your shop'}: set a new 6-digit PIN for Udozo POS (shop code ${shop?.shopCode ?? ''}). This link works for ${inviteHours} hours: ${url}`
+      : `${invitedBy} invited you to sell at ${shop?.name ?? 'their shop'} on Udozo POS. Set your 6-digit PIN (shop code ${shop?.shopCode ?? ''}). This link works for ${inviteHours} hours: ${url}`;
     let sent = false;
     if (sendVia === 'sms') {
       try {
@@ -462,14 +467,14 @@ export class PosStaffService {
 
   /** Sets the PIN the invite asked for and signs them in on the web (no till chosen yet). */
   async acceptInvite(token: string, pin: string) {
-    if (typeof pin !== 'string' || !/^\d{4}$/.test(pin)) throw invalid('parameter_invalid', 'Your PIN is 4 digits.', 'pin');
-    if (weakPin(pin)) throw invalid('pin_too_easy', 'Choose a PIN that is harder to guess: not 1234, one digit four times or a year.', 'pin');
+    if (typeof pin !== 'string' || !pinPattern.test(pin)) throw invalid('parameter_invalid', 'Your PIN is 6 digits.', 'pin');
+    if (weakPin(pin)) throw pinTooEasy();
     const invite = await this.inviteRow(token);
     const now = new Date();
     const pinHash = await this.passwords.hash(pin);
     const claimed = await this.prisma.posInvite.updateMany({ where: { id: invite.id, usedAt: null, replacedAt: null }, data: { usedAt: now } });
     if (!claimed.count) throw inviteGone();
-    await this.prisma.posStaff.update({ where: { id: invite.staffId }, data: { status: 'active', pinHash, pinSetAt: now, failedTries: 0, lockedUntil: null } });
+    await this.prisma.posStaff.update({ where: { id: invite.staffId }, data: { status: 'active', pinHash, pinSetAt: now, pinDigits: 6, failedTries: 0, lockedUntil: null } });
     await this.audit.record({ actorId: null, action: 'pos.staff_pin_set', targetType: 'pos_staff', targetId: invite.staffId, after: { reset: Boolean(invite.staff.pinSetAt) } });
     return this.openSession(invite.staff.accountId, invite.staffId, { deviceId: null, tillId: null });
   }
@@ -496,6 +501,23 @@ export class PosStaffService {
     return true;
   }
 
+  /**
+   * A member of staff changes their own PIN: the current one (counted towards their lockout), then a new 6-digit PIN
+   * that is not easy to guess. Their other sessions end; this one carries on.
+   */
+  async changePin(context: PosStaffContext, input: { current_pin: string; new_pin: string }) {
+    if (typeof input.new_pin !== 'string' || !pinPattern.test(input.new_pin)) throw invalid('parameter_invalid', 'Your new PIN is 6 digits.', 'new_pin');
+    if (weakPin(input.new_pin)) throw pinTooEasy();
+    const staff = await this.prisma.posStaff.findUniqueOrThrow({ where: { id: context.staff.id }, select: { id: true, pinHash: true } });
+    if (typeof input.current_pin !== 'string' || !signInPinPattern.test(input.current_pin) || !(await this.checkPin(staff, input.current_pin))) throw invalid('pin_wrong', 'Your current PIN is not right.', 'current_pin');
+    if (input.current_pin === input.new_pin) throw invalid('pin_unchanged', 'Choose a PIN you have not used.', 'new_pin');
+    const now = new Date();
+    await this.prisma.posStaff.update({ where: { id: staff.id }, data: { pinHash: await this.passwords.hash(input.new_pin), pinSetAt: now, pinDigits: 6, failedTries: 0, lockedUntil: null } });
+    await this.prisma.posStaffSession.updateMany({ where: { staffId: staff.id, endedAt: null, id: { not: context.sessionId } }, data: { endedAt: now } });
+    await this.audit.record({ actorId: null, action: 'pos.staff_pin_changed', targetType: 'pos_staff', targetId: staff.id, after: { by: 'self' } });
+    return { object: 'pos_pin' as const, changed: true };
+  }
+
   // ---- Signing in ----
 
   /** Staff on the web: the shop code, their phone and PIN, and optionally the till they sell at. */
@@ -514,7 +536,7 @@ export class PosStaffService {
       await this.passwords.verify(null, input.pin ?? '');
       throw badPin();
     }
-    if (!(await this.checkPin(staff, input.pin ?? ''))) throw badPin();
+    if (!signInPinPattern.test(input.pin ?? '') || !(await this.checkPin(staff, input.pin ?? ''))) throw badPin();
     const tillId = input.till_id ? await this.tillAllowed(staff, input.till_id) : null;
     return this.openSession(staff.accountId, staff.id, { deviceId: null, tillId });
   }
@@ -575,6 +597,7 @@ export class PosStaffService {
       account: { id: session.account.id, customerId: session.account.customerId, country: session.account.country, currency: session.account.currency, mode: session.account.mode },
       owner,
       by: { customerId: null, staffId: session.staff.id, name },
+      pinChangeRequired: session.staff.pinDigits !== 6,
     };
   }
 
@@ -658,7 +681,7 @@ export class PosStaffService {
       await this.passwords.verify(null, input.pin ?? '');
       throw badPin();
     }
-    if (!(await this.checkPin(staff, input.pin ?? ''))) throw badPin();
+    if (!signInPinPattern.test(input.pin ?? '') || !(await this.checkPin(staff, input.pin ?? ''))) throw badPin();
     if (!staff.allTills && !staff.tills.some(item => item.tillId === device.tillId)) throw forbidden('till_not_allowed', 'You may not use this till: ask the shop owner.');
     return this.openSession(device.accountId, staff.id, { deviceId: device.id, tillId: device.tillId });
   }

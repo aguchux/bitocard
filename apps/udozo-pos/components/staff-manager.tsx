@@ -179,7 +179,7 @@ export function InviteStaff({ roles, tills }: { roles: RoleChoice[]; tills: Till
               {pending ? "Sending…" : "Send invite"}
             </button>
           </div>
-          <p className="text-sm text-pos-muted">They get a link to set their own 4-digit PIN. The invite expires in 48 hours.</p>
+          <p className="text-sm text-pos-muted">They get a link to set their own 6-digit PIN. The invite expires in 48 hours.</p>
         </form>
       </dialog>
     </>

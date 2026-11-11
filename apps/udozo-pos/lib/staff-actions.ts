@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { PermissionSet, PosDeviceInfo, PosInviteInfo, PosInviteSent, PosLinkCode, PosRoleView, PosStaffMember } from "./pos";
+import { type PermissionSet, type PosDeviceInfo, type PosInviteInfo, type PosInviteSent, type PosLinkCode, type PosRoleView, type PosStaffMember, signInPin, weakPin } from "./pos";
 import { actorKind } from "./pos-api";
 import type { PosResult } from "./pos-actions";
 import { type ApiResult, customerApi, deviceApi, dropDevice, dropStaffSession, hasDevice, keepDevice, keepStaffSession, publicApi, staffApi } from "./session";
@@ -15,7 +15,7 @@ const answer = <T,>(result: ApiResult<T>, refresh = true): PosResult<T> => {
   return { ok: true, data: result.data };
 };
 type Session = { session: { token: string }; staff: PosStaffMember; till_id: string | null };
-const pinOk = (pin: string) => /^\d{4}$/.test(pin);
+const pinOk = (pin: string) => /^\d{6}$/.test(pin);
 
 // ---- Signing in at the till ----
 
@@ -24,7 +24,7 @@ export async function staffSignIn(shopCode: string, phone: string, pin: string, 
   const code = shopCode.trim().toUpperCase();
   if (!/^[A-Z]{3}-\d{4}$/.test(code)) return refused("The shop code is three letters and four digits, such as ADA-4821.", "shop_code");
   if (!phone.trim()) return refused("Give your phone number.", "phone");
-  if (!pinOk(pin)) return refused("Your PIN is 4 digits.", "pin");
+  if (!signInPin(pin)) return refused("Your PIN is 6 digits.", "pin");
   const result = await publicApi<Session>("POST", "/v1/pos/staff/sign-in", { shop_code: code, phone: phone.trim().slice(0, 20), pin, ...(tillId && uuid.test(tillId) ? { till_id: tillId } : {}) });
   if (!result.ok) return answer(result, false);
   await keepStaffSession(result.data.session.token);
@@ -34,11 +34,19 @@ export async function staffSignIn(shopCode: string, phone: string, pin: string, 
 /** On a linked till: a name tile and PIN. */
 export async function deviceSignIn(staffId: string, pin: string): Promise<PosResult<{ name: string }>> {
   if (!uuid.test(staffId)) return refused("Tap your name.", "staff_id");
-  if (!pinOk(pin)) return refused("Your PIN is 4 digits.", "pin");
+  if (!signInPin(pin)) return refused("Your PIN is 6 digits.", "pin");
   const result = await deviceApi<Session>("POST", "/v1/pos/device/sign-in", { staff_id: staffId, pin });
   if (!result.ok) return answer(result, false);
   await keepStaffSession(result.data.session.token);
   return { ok: true, data: { name: result.data.staff.name } };
+}
+
+/** A member of staff changes their own PIN: the current one, then a new 6-digit one. */
+export async function changePin(currentPin: string, newPin: string): Promise<PosResult<{ changed: true }>> {
+  if (!signInPin(currentPin)) return refused("Type your current PIN.", "current_pin");
+  if (!pinOk(newPin)) return refused("Your new PIN is 6 digits.", "new_pin");
+  if (weakPin(newPin)) return refused("Choose a PIN that is harder to guess.", "new_pin", "pin_too_easy");
+  return answer(await staffApi<{ changed: true }>("POST", "/v1/pos/staff/pin", { current_pin: currentPin, new_pin: newPin }));
 }
 
 /** Signs the member of staff out; a linked till goes back to its name tiles. */
@@ -58,7 +66,7 @@ export async function lookupInvite(token: string): Promise<PosResult<PosInviteIn
 /** Sets the PIN the invite asked for and signs them in. */
 export async function acceptInvite(token: string, pin: string): Promise<PosResult<{ name: string }>> {
   if (!/^upi_[A-Za-z0-9_-]{20,80}$/.test(token)) return refused("This invite link is not complete. Open it again from the message.", null, "invite_invalid");
-  if (!pinOk(pin)) return refused("Your PIN is 4 digits.", "pin");
+  if (!pinOk(pin)) return refused("Your PIN is 6 digits.", "pin");
   const result = await publicApi<Session>("POST", "/v1/pos/invites/accept", { token, pin });
   if (!result.ok) return answer(result, false);
   await keepStaffSession(result.data.session.token);

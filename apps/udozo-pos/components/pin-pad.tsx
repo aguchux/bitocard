@@ -5,14 +5,14 @@ import { useId } from "react";
 const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"] as const;
 
 /**
- * A 4-digit PIN: typed (a password field with the number keyboard on phones) or tapped on the keypad, as a till's
+ * A PIN, 6 digits: typed (a password field with the number keyboard on phones) or tapped on the keypad, as a till's
  * touch screen needs. Each digit shows as a dot; the PIN itself is never shown.
  */
-export function PinPad({ value, onChange, label = "PIN", disabled = false, autoFocus = false }: { value: string; onChange: (pin: string) => void; label?: string; disabled?: boolean; autoFocus?: boolean }) {
+export function PinPad({ value, onChange, label = "PIN", disabled = false, autoFocus = false, length = 6 }: { value: string; onChange: (pin: string) => void; label?: string; disabled?: boolean; autoFocus?: boolean; length?: number }) {
   const id = useId();
   const press = (key: (typeof keys)[number]) => {
     if (key === "back") onChange(value.slice(0, -1));
-    else if (key && value.length < 4) onChange(value + key);
+    else if (key && value.length < length) onChange(value + key);
   };
   return (
     <div className="grid gap-3">
@@ -24,11 +24,11 @@ export function PinPad({ value, onChange, label = "PIN", disabled = false, autoF
         type="password"
         inputMode="numeric"
         autoComplete="off"
-        maxLength={4}
+        maxLength={length}
         value={value}
         disabled={disabled}
         autoFocus={autoFocus}
-        onChange={event => onChange(event.target.value.replace(/\D/g, "").slice(0, 4))}
+        onChange={event => onChange(event.target.value.replace(/\D/g, "").slice(0, length))}
         className="h-14 w-full rounded-xl border border-pos-line bg-white px-4 text-center font-display text-3xl tracking-[0.6em]"
       />
       <div className="grid grid-cols-3 gap-2" aria-hidden="true">

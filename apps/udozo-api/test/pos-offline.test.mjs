@@ -141,9 +141,9 @@ describe('prices per shop', () => {
     assert.equal(sold.json.lines[0].unit_price, 120_000);
     assert.equal((await sell(ada, ikeja.tills[0].id, tv)).status, 201, 'Ikeja still at the listing price');
 
-    const cashier = await hire(ada, 'cashier', '7391', [ikeja.tills[0].id]);
+    const cashier = await hire(ada, 'cashier', '739152', [ikeja.tills[0].id]);
     assert.equal((await cashier.put(`/v1/pos/staff/products/${tv.id}/prices`, { shop_id: lekki.id, price: 90_000 })).status, 403);
-    const manager = await hire(ada, 'manager', '4826', [ikeja.tills[0].id]);
+    const manager = await hire(ada, 'manager', '482652', [ikeja.tills[0].id]);
     assert.equal((await manager.put(`/v1/pos/staff/products/${tv.id}/prices`, { shop_id: lekki.id, price: null })).json.shops[1].own, false, 'back to the listing price');
   });
 });
@@ -227,7 +227,7 @@ describe('selling with no internet', () => {
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'Sony 65 inch TV', { stock: 4 });
     await ada.put(`/v1/pos/owner/products/${tv.id}/prices`, { shop_id: ada.account.shops[0].id, price: 95_000 });
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
     const device = await linkDevice(ada, till.id);
     const copy = await device.get('/v1/pos/device/sync');
     assert.equal(copy.status, 200, JSON.stringify(copy.json));
@@ -249,8 +249,8 @@ describe('selling with no internet', () => {
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'Hisense 50 inch TV', { stock: 2 });
     const radio = await product(ada, 'Sony radio', { stock: 5, price: 20_000 });
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
-    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
+    const manager = await hire(ada, 'manager', '582052', [till.id]);
     const device = await linkDevice(ada, till.id);
     await device.get('/v1/pos/device/sync');
 
@@ -295,7 +295,7 @@ describe('selling with no internet', () => {
     const ada = await owner();
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'Philips 40 inch TV', { stock: 3 });
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
     const device = await linkDevice(ada, till.id);
     await prisma.posStaff.update({ where: { id: cashier.id }, data: { status: 'suspended' } });
     const suspended = await device.post('/v1/pos/device/upload', { entries: [offlineSale(cashier.id, tv)] });
@@ -326,8 +326,8 @@ describe('selling with no internet', () => {
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'LG 43 inch TV', { stock: 5 });
     await prisma.posPlan.update({ where: { code: 'multi_shop' }, data: { offlineHours: 24, offlineSales: 200 } });
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
-    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
+    const manager = await hire(ada, 'manager', '582052', [till.id]);
     // The cashier's stock changes need a manager's PIN (the owner's own role).
     const role = await ada.post('/v1/pos/owner/roles', { name: 'Counter and stock', permissions: { sell: 'yes', till: 'yes', stock_view: 'yes', own_sales: 'yes', refund: 'approval', stock_adjust: 'approval' }, discount_limit_bps: 500 });
     assert.equal(role.status, 201, JSON.stringify(role.json));
@@ -381,7 +381,7 @@ describe('selling with no internet', () => {
     const ada = await owner();
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'TCL 55 inch TV', { stock: 3 });
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
     const device = await linkDevice(ada, till.id);
     const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
     const jwk = publicKey.export({ format: 'jwk' });
@@ -421,9 +421,9 @@ describe('selling with no internet', () => {
     const tv = await product(ada, 'Samsung 32 inch TV', { stock: 6 });
     const [ikeja, lekki] = await addShops(ada, 1);
     const till = ikeja.tills[0];
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
-    const elsewhere = await hire(ada, 'cashier', '4826', [lekki.tills[0].id]);
-    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
+    const elsewhere = await hire(ada, 'cashier', '482652', [lekki.tills[0].id]);
+    const manager = await hire(ada, 'manager', '582052', [till.id]);
     const device = await linkDevice(ada, till.id);
 
     // A bad listing id, a wrong type and an over-long note are each refused on their own; the sale after them applies.
@@ -463,7 +463,7 @@ describe('selling with no internet', () => {
     const ada = await owner();
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'Panasonic 43 inch TV', { stock: 10 });
-    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    const manager = await hire(ada, 'manager', '582052', [till.id]);
     const device = await linkDevice(ada, till.id);
     const countedAt = new Date(Date.now() - 2 * 3_600_000);
     // Counted 7 two hours ago; 2 sold online since.
@@ -481,7 +481,7 @@ describe('selling with no internet', () => {
     const ada = await owner();
     const till = ada.account.shops[0].tills[0];
     const tv = await product(ada, 'Hisense 24 inch TV', { stock: 3 });
-    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const cashier = await hire(ada, 'cashier', '739152', [till.id]);
     const device = await linkDevice(ada, till.id);
     const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
     await device.put('/v1/pos/device/key', { public_key: publicKey.export({ format: 'jwk' }) });

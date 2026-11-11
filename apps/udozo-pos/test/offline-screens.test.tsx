@@ -104,12 +104,12 @@ describe("the offline till", () => {
     await settle();
     await click(button(host, "BABola Ade"));
     store.checkPin.mockResolvedValueOnce("wrong").mockResolvedValueOnce("ok");
-    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "1111");
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "111111");
     await settle();
     expect(host.textContent).toContain("That PIN is not right.");
-    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "7391");
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "739152");
     await settle();
-    expect(store.checkPin).toHaveBeenLastCalledWith("bola", "7391");
+    expect(store.checkPin).toHaveBeenLastCalledWith("bola", "739152");
     expect(host.textContent).toContain("Basket");
 
     // Past the copy's stock needs a colleague's PIN; nobody who could give it signed in here.
@@ -155,7 +155,7 @@ describe("the offline till", () => {
     await settle();
     await click(button(host, "BABola Ade"));
     store.checkPin.mockResolvedValue("ok");
-    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "7391");
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "739152");
     await settle();
     return host;
   }
@@ -165,9 +165,9 @@ describe("the offline till", () => {
     const host = await signIn();
     await click(button(host, "Hisense TV"));
     await click(button(host, "Ngozi Uche"));
-    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "5820");
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "582052");
     await settle();
-    expect(store.checkPin).toHaveBeenLastCalledWith("mgr", "5820");
+    expect(store.checkPin).toHaveBeenLastCalledWith("mgr", "582052");
     expect(host.textContent).toContain("Approved by Ngozi Uche");
     await click(button(host, "Take this payment"));
     await type(host.querySelector<HTMLInputElement>('input[aria-label="Email address for the receipt"]')!, "ada@example.com");
@@ -192,7 +192,7 @@ describe("the offline till", () => {
     await type([...host.querySelectorAll<HTMLInputElement>("input")].find(input => !input.type || input.type === "text")!, "Faulty");
     await click(button(host, "Refund ₦200"));
     await click(button(host, "Ngozi Uche"));
-    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "5820");
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "582052");
     await settle();
     expect(store.saveEntry).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "refund", entry: expect.objectContaining({ sale_client_id: "s1", reason: "Faulty", restock: true, staff_id: "bola", approved_by_staff_id: "mgr" }) }));
     expect(store.markRefunded).toHaveBeenCalledWith("s1");

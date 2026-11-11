@@ -14,7 +14,7 @@ import { PosCollectionsService } from './collections.service.js';
 import { PosCustomersService } from './customers.service.js';
 import { levelOf, type PosPermission, type ResolvedRole } from './permissions.js';
 import { AttachDto, CatalogueDto, CollectionsDto, CustomerDto, CustomersDto, KeepDto, RefundDto, RepaymentDto, SaleDto, SalesDto, ShopDto, StockDto, TillDto, TransferRequestDto, WalletRequestDto } from './pos.controller.js';
-import { CurrentDevice, CurrentStaff, PosAllows, PosDeviceGuard, PosGuard } from './pos.guard.js';
+import { AllowPinChange, CurrentDevice, CurrentStaff, PosAllows, PosDeviceGuard, PosGuard } from './pos.guard.js';
 import { PosService } from './pos.service.js';
 import { PosSalesService } from './sales.service.js';
 import { type ApprovalInput, ownerBy, type PosManager, PosStaffService, type PosStaffContext } from './staff.service.js';
@@ -29,7 +29,7 @@ class SignInDto {
   @IsString() @MaxLength(20)
   phone: string;
 
-  @IsString() @Matches(/^\d{4}$/, { message: 'Your PIN is 4 digits.' })
+  @IsString() @Matches(/^(?:\d{4}|\d{6})$/, { message: 'Your PIN is 6 digits.' })
   pin: string;
 
   @IsOptional() @IsUUID()
@@ -42,8 +42,17 @@ class InviteTokenDto {
 }
 
 class AcceptInviteDto extends InviteTokenDto {
-  @IsString() @Matches(/^\d{4}$/, { message: 'Your PIN is 4 digits.' })
+  @IsString() @Matches(/^\d{6}$/, { message: 'Your PIN is 6 digits.' })
   pin: string;
+}
+
+class ChangePinDto {
+  /** The PIN they sign in with now (4 digits if set before PINs were 6). */
+  @IsString() @Matches(/^(?:\d{4}|\d{6})$/, { message: 'Your current PIN is 4 or 6 digits.' })
+  current_pin: string;
+
+  @IsString() @Matches(/^\d{6}$/, { message: 'Your new PIN is 6 digits.' })
+  new_pin: string;
 }
 
 class LinkDto {
@@ -61,7 +70,7 @@ class DeviceSignInDto {
   @IsUUID()
   staff_id: string;
 
-  @IsString() @Matches(/^\d{4}$/, { message: 'Your PIN is 4 digits.' })
+  @IsString() @Matches(/^(?:\d{4}|\d{6})$/, { message: 'Your PIN is 6 digits.' })
   pin: string;
 }
 
@@ -150,7 +159,7 @@ class ApprovalDto {
   @IsUUID()
   staff_id: string;
 
-  @IsString() @Matches(/^\d{4}$/, { message: 'The PIN is 4 digits.' })
+  @IsString() @Matches(/^(?:\d{4}|\d{6})$/, { message: 'The PIN is 6 digits.' })
   pin: string;
 }
 
@@ -394,6 +403,7 @@ export class PosStaffController {
 
   @Get()
   @PosAllows([])
+  @AllowPinChange()
   async me(@CurrentStaff() context: PosStaffContext) {
     const me = await this.pos.me(context.owner);
     const account = me.account!;
@@ -416,6 +426,8 @@ export class PosStaffController {
       transfer_accounts: transferAccounts,
       /** Who may give a manager's PIN at this till, for what this role may only do with approval. */
       approvers: await this.staff.approvers(context),
+      /** Their PIN is from before PINs were 6 digits: nothing else works until they choose a new one. */
+      pin_change_required: context.pinChangeRequired,
     };
   }
 
@@ -423,8 +435,19 @@ export class PosStaffController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @SkipIdempotency()
   @PosAllows([])
+  @AllowPinChange()
   async signOut(@CurrentStaff() context: PosStaffContext) {
     await this.staff.signOut(context.sessionId);
+  }
+
+  /** Changes their own PIN (the current one, then a new 6-digit one). */
+  @Post('pin')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  @PosAllows([])
+  @AllowPinChange()
+  changePin(@CurrentStaff() context: PosStaffContext, @Body() body: ChangePinDto) {
+    return this.staff.changePin(context, body);
   }
 
   @Get('catalogue')

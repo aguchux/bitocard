@@ -102,6 +102,9 @@ export const staffMe = cache(() => staffApi<PosStaffMe>("GET", "/v1/pos/staff"))
  */
 export type PosView = {
   actor: "owner" | "staff";
+  /** A member of staff whose PIN is from before PINs were 6 digits (they choose a new one first). */
+  pinChangeRequired?: boolean;
+  staffId?: string;
   name: string;
   role: string;
   permissions: PermissionSet;
@@ -141,6 +144,8 @@ export const currentPos = cache(async (): Promise<ApiResult<PosView>> => {
         transferTills: me.data.transfer_accounts.map(item => item.till_id),
         approvers: me.data.approvers,
         planName: me.data.account.plan.name,
+        pinChangeRequired: Boolean(me.data.pin_change_required),
+        staffId: me.data.staff.id,
       },
     };
   }

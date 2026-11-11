@@ -207,7 +207,7 @@ describe('several shops', () => {
       const invited = await ada.post('/v1/pos/owner/staff', { first_name: role, last_name: 'Test', phone: testMobile('NG'), role, all_tills: true, send_via: 'link' });
       assert.equal(invited.status, 201, JSON.stringify(invited.json));
       const who = client('staff');
-      assert.equal((await who.post('/v1/pos/invites/accept', { token: new URL(invited.json.invite.url).hash.slice(3), pin: '3917' })).status, 201);
+      assert.equal((await who.post('/v1/pos/invites/accept', { token: new URL(invited.json.invite.url).hash.slice(3), pin: '391752' })).status, 201);
       return who;
     };
     const keeper = await hire('stock_keeper');

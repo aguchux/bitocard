@@ -8525,6 +8525,8 @@ model PosStaff {
   status        String     @default("invited") @db.VarChar(16)
   pinHash       String?    @map("pin_hash")
   pinSetAt      DateTime?  @map("pin_set_at")
+  /// How many digits the PIN has: 6, or 4 for a PIN set before PINs were 6 digits (to be changed at sign-in).
+  pinDigits     Int?       @map("pin_digits") @db.SmallInt
   failedTries   Int        @default(0) @map("failed_tries")
   lockedUntil   DateTime?  @map("locked_until")
   lastActiveAt  DateTime?  @map("last_active_at")

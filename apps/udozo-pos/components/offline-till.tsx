@@ -181,7 +181,7 @@ export function OfflineTill() {
               autoFocus
               onChange={next => {
                 setPin(next);
-                if (next.length !== 4) return;
+                if (next.length !== 6) return;
                 void checkPin(chosen.id, next).then(answer => {
                   setPin("");
                   if (answer === "ok") {

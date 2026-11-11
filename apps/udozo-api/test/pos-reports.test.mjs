@@ -78,7 +78,7 @@ async function hire(boss, role) {
   const invited = await boss.post('/v1/pos/owner/staff', { first_name: role.replace('_', ' '), last_name: 'Test', phone: testMobile('NG'), role, all_tills: true, send_via: 'link' });
   assert.equal(invited.status, 201, JSON.stringify(invited.json));
   const who = client('staff');
-  const accepted = await who.post('/v1/pos/invites/accept', { token: new URL(invited.json.invite.url).hash.slice(3), pin: '3917' });
+  const accepted = await who.post('/v1/pos/invites/accept', { token: new URL(invited.json.invite.url).hash.slice(3), pin: '391752' });
   assert.equal(accepted.status, 201, JSON.stringify(accepted.json));
   return who;
 }

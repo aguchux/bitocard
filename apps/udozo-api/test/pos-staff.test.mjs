@@ -1,5 +1,5 @@
 // Udozo POS milestone 5 (docs/UDOZO_POS_PLAN.md): staff, roles and tills. The owner invites staff by SMS, WhatsApp or a
-// link to set a 4-digit PIN; staff sign in with the shop code, phone and PIN (or a name tile and PIN on a linked till);
+// link to set a 6-digit PIN; staff sign in with the shop code, phone and PIN (or a name tile and PIN on a linked till);
 // five wrong PINs lock for 15 minutes; what each may do is their role's, every cell of the matrix held by the API; a
 // manager's PIN approves what a role may only do with approval; and a staff session never reaches a customer route.
 import assert from 'node:assert/strict';
@@ -108,7 +108,7 @@ async function product(who, title, { price = 100_000, stock = 5 } = {}) {
   return submitted.json;
 }
 
-const pins = { manager: '4826', cashier: '7391', stock_keeper: '5180', accountant: '6294' };
+const pins = { manager: '482652', cashier: '739152', stock_keeper: '518052', accountant: '629452' };
 
 /** Invites a member of staff by link, accepts with a PIN and returns their signed-in client. */
 async function hire(role, { all_tills = false, till_ids, pin, by = owner, first = role } = {}) {
@@ -117,11 +117,11 @@ async function hire(role, { all_tills = false, till_ids, pin, by = owner, first 
   assert.equal(invited.status, 201, JSON.stringify(invited.json));
   const token = new URL(invited.json.invite.url).hash.slice(3);
   const who = client('staff');
-  const accepted = await who.post('/v1/pos/invites/accept', { token, pin: pin ?? pins[role] ?? '3917' });
+  const accepted = await who.post('/v1/pos/invites/accept', { token, pin: pin ?? pins[role] ?? '391752' });
   assert.equal(accepted.status, 201, JSON.stringify(accepted.json));
   who.id = invited.json.id;
   who.phone = phone;
-  who.pin = pin ?? pins[role] ?? '3917';
+  who.pin = pin ?? pins[role] ?? '391752';
   return who;
 }
 
@@ -165,8 +165,8 @@ describe('the rules', () => {
   });
 
   test('easy PINs, permissions sent and discounts as a share', () => {
-    for (const pin of ['1234', '4321', '0000', '7777', '1987', '2026', '8901', '12a4', '123']) assert.equal(rules.weakPin(pin), true, pin);
-    for (const pin of ['4826', '7391', '5180', '0913']) assert.equal(rules.weakPin(pin), false, pin);
+    for (const pin of ['123456', '654321', '000000', '777777', '121212', '123123', '112211', '890123', '12a456', '4826', '1234567']) assert.equal(rules.weakPin(pin), true, pin);
+    for (const pin of ['482652', '739152', '518052', '091352', '271828']) assert.equal(rules.weakPin(pin), false, pin);
     assert.equal(rules.permissionsProblem({ sell: 'yes', refund: 'approval', staff: 'cashiers' }), null);
     assert.equal(rules.permissionsProblem({ sell: 'approval' }).param, 'permissions.sell', 'selling is yes or no');
     assert.equal(rules.permissionsProblem({ staff: 'yes' }).param, 'permissions.staff', 'only the owner manages every member of staff');
@@ -211,8 +211,8 @@ describe('inviting and signing in', () => {
     assert.deepEqual(info.json.tills, ['Till 1', 'Counter 2']);
     assert.ok(info.json.role.allows.includes('Give discounts up to 5%'));
     assert.equal(JSON.stringify(info.json).includes(invited.json.phone), false, 'never the phone');
-    assert.equal((await who.post('/v1/pos/invites/accept', { token, pin: '1234' })).json.error.code, 'pin_too_easy');
-    const accepted = await who.post('/v1/pos/invites/accept', { token, pin: '2468' });
+    assert.equal((await who.post('/v1/pos/invites/accept', { token, pin: '123456' })).json.error.code, 'pin_too_easy');
+    const accepted = await who.post('/v1/pos/invites/accept', { token, pin: '246852' });
     assert.equal(accepted.status, 201);
     assert.match(who.token, /^ups_/);
     assert.equal((await who.get('/v1/pos/staff')).json.role.name, 'Cashier');
@@ -221,52 +221,74 @@ describe('inviting and signing in', () => {
   });
 
   test('signing in with the shop code, phone and PIN; five wrong PINs lock, even at once', async () => {
-    const kemi = await hire('cashier', { pin: '8642', first: 'Lock' });
+    const kemi = await hire('cashier', { pin: '864252', first: 'Lock' });
     const fresh = client('staff');
     const local = `0${kemi.phone.slice(4)}`;
-    const ok = await fresh.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code.toLowerCase(), phone: local, pin: '8642', till_id: owner.till.id });
+    const ok = await fresh.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code.toLowerCase(), phone: local, pin: '864252', till_id: owner.till.id });
     assert.equal(ok.status, 201, JSON.stringify(ok.json));
     assert.equal(ok.json.till_id, owner.till.id);
-    for (const wrong of [{ shop_code: 'ZZZ-0000', phone: local, pin: '8642' }, { shop_code: owner.shop.shop_code, phone: testMobile('NG'), pin: '8642' }]) {
+    for (const wrong of [{ shop_code: 'ZZZ-0000', phone: local, pin: '864252' }, { shop_code: owner.shop.shop_code, phone: testMobile('NG'), pin: '864252' }]) {
       assert.equal((await client('staff').post('/v1/pos/staff/sign-in', wrong)).json.error.code, 'invalid_credentials');
     }
     // Eight wrong PINs at once: only five are tried, the rest find them locked.
-    const tries = await Promise.all(Array.from({ length: 8 }, () => client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: local, pin: '1357' })));
+    const tries = await Promise.all(Array.from({ length: 8 }, () => client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: local, pin: '135752' })));
     const codes = tries.map(res => res.json.error.code);
     assert.equal(codes.filter(code => code === 'invalid_credentials').length, 5, codes.join());
     assert.equal(codes.filter(code => code === 'pin_locked').length, 3);
-    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: local, pin: '8642' })).json.error.code, 'pin_locked', 'even the right PIN, while locked');
+    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: local, pin: '864252' })).json.error.code, 'pin_locked', 'even the right PIN, while locked');
     await prisma.posStaff.update({ where: { id: kemi.id }, data: { lockedUntil: new Date(Date.now() - 1000) } });
-    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: local, pin: '8642' })).status, 201, '15 minutes later');
+    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: local, pin: '864252' })).status, 201, '15 minutes later');
     const row = await prisma.posStaff.findUniqueOrThrow({ where: { id: kemi.id } });
     assert.equal(row.failedTries, 0);
     assert.equal(await prisma.posStaffSession.count({ where: { staffId: kemi.id, tokenHash: { contains: 'ups_' } } }), 0, 'only hashes are kept');
   });
 
+  test('a PIN from before PINs were 6 digits signs in once, then nothing works until a new 6-digit PIN is chosen', async () => {
+    const who = await hire('cashier', { pin: '531952', first: 'Legacy' });
+    const passwords = server.app.get((await import('../dist/auth/passwords.service.js')).PasswordsService);
+    await prisma.posStaff.update({ where: { id: who.id }, data: { pinHash: await passwords.hash('5319'), pinDigits: 4 } });
+    const old = client('staff');
+    assert.equal((await old.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '5319' })).status, 201);
+    const me = await old.get('/v1/pos/staff');
+    assert.equal(me.json.pin_change_required, true);
+    assert.equal((await old.get('/v1/pos/staff/catalogue')).json.error.code, 'pin_change_required');
+    assert.equal((await old.post('/v1/pos/staff/pin', { current_pin: '5319', new_pin: '111111' })).json.error.code, 'pin_too_easy');
+    assert.equal((await old.post('/v1/pos/staff/pin', { current_pin: '9999', new_pin: '531952' })).json.error.code, 'pin_wrong');
+    assert.equal((await old.post('/v1/pos/staff/pin', { current_pin: '5319', new_pin: '53195' })).status, 400);
+    const changed = await old.post('/v1/pos/staff/pin', { current_pin: '5319', new_pin: '846271' });
+    assert.equal(changed.status, 200, JSON.stringify(changed.json));
+    assert.equal((await old.get('/v1/pos/staff')).json.pin_change_required, false);
+    assert.equal((await old.get('/v1/pos/staff/catalogue')).status, 200);
+    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '5319' })).json.error.code, 'invalid_credentials');
+    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '846271' })).status, 201);
+    // A new invite asks 6 digits.
+    assert.equal((await client('staff').post('/v1/pos/invites/accept', { token: 'upi_' + 'x'.repeat(30), pin: '5319' })).status, 400);
+  });
+
   test('a session ends after 12 hours idle, at sign-out, and when they are suspended or removed', async () => {
-    const who = await hire('cashier', { pin: '9753', first: 'Idle' });
+    const who = await hire('cashier', { pin: '975352', first: 'Idle' });
     assert.equal((await who.get('/v1/pos/staff')).status, 200);
     await prisma.posStaffSession.updateMany({ where: { staffId: who.id }, data: { lastSeenAt: new Date(Date.now() - 13 * 3_600_000) } });
     assert.equal((await who.get('/v1/pos/staff')).json.error.code, 'pos_sign_in_required');
 
     const next = client('staff');
-    await next.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '9753' });
+    await next.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '975352' });
     assert.equal((await next.post('/v1/pos/staff/sign-out')).status, 204);
     assert.equal((await next.get('/v1/pos/staff')).status, 401);
 
-    await next.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '9753' });
+    await next.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '975352' });
     assert.equal((await owner.post(`/v1/pos/owner/staff/${who.id}/suspend`)).json.status, 'suspended');
     assert.equal((await next.get('/v1/pos/staff')).status, 401, 'signed out at once');
-    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '9753' })).json.error.code, 'invalid_credentials');
+    assert.equal((await client('staff').post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '975352' })).json.error.code, 'invalid_credentials');
     assert.equal((await owner.post(`/v1/pos/owner/staff/${who.id}/restore`)).json.status, 'active');
-    assert.equal((await next.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '9753' })).status, 201);
+    assert.equal((await next.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: who.phone, pin: '975352' })).status, 201);
     assert.equal((await owner.del(`/v1/pos/owner/staff/${who.id}`)).json.status, 'removed');
     assert.equal((await next.get('/v1/pos/staff')).status, 401);
     assert.equal((await owner.get('/v1/pos/owner/staff')).json.data.some(row => row.id === who.id), false);
   });
 
   test('a new invite to someone signed in before resets their PIN', async () => {
-    const who = await hire('cashier', { pin: '3579', first: 'Reset' });
+    const who = await hire('cashier', { pin: '357952', first: 'Reset' });
     const resent = await owner.post(`/v1/pos/owner/staff/${who.id}/resend`, { send_via: 'link' });
     assert.equal(resent.json.status, 'invited');
     assert.equal((await who.get('/v1/pos/staff')).status, 401, 'signed out');
@@ -304,7 +326,7 @@ describe('every role against every route', () => {
         // The owner's own role: selling and seeing stock, refunds with approval, nothing else.
         const made = await owner.post('/v1/pos/owner/roles', { name: 'Weekend helper', permissions: { sell: 'yes', stock_view: 'yes', refund: 'approval', stock_adjust: 'approval' }, discount_limit_bps: 0 });
         assert.equal(made.status, 201, JSON.stringify(made.json));
-        who = staff.custom = await hire(made.json.id, { all_tills: true, pin: '2580', first: 'Weekend' });
+        who = staff.custom = await hire(made.json.id, { all_tills: true, pin: '258052', first: 'Weekend' });
         role = { permissions: made.json.permissions };
       }
       const me = await who.get('/v1/pos/staff');
@@ -325,9 +347,9 @@ describe('every role against every route', () => {
     assert.equal(made.status, 201);
     const url = `/v1/pos/staff/sales/${made.json.id}/refund`;
     assert.equal((await staff.cashier.post(url, { reason: 'Wrong size' })).json.error.code, 'approval_required');
-    const otherCashier = await hire('cashier', { all_tills: true, pin: '1470', first: 'Other' });
-    assert.equal((await staff.cashier.post(url, { reason: 'Wrong size', approval: { staff_id: otherCashier.id, pin: '1470' } })).json.error.code, 'approval_invalid');
-    assert.equal((await staff.cashier.post(url, { reason: 'Wrong size', approval: { staff_id: staff.manager.id, pin: '0000' } })).json.error.param, 'approval.pin');
+    const otherCashier = await hire('cashier', { all_tills: true, pin: '147052', first: 'Other' });
+    assert.equal((await staff.cashier.post(url, { reason: 'Wrong size', approval: { staff_id: otherCashier.id, pin: '147052' } })).json.error.code, 'approval_invalid');
+    assert.equal((await staff.cashier.post(url, { reason: 'Wrong size', approval: { staff_id: staff.manager.id, pin: '000052' } })).json.error.param, 'approval.pin');
     const refunded = await staff.cashier.post(url, { reason: 'Wrong size', approval: { staff_id: staff.manager.id, pin: pins.manager } });
     assert.equal(refunded.status, 200, JSON.stringify(refunded.json));
     assert.equal(refunded.json.refunded_by, 'cashier Test');
@@ -393,7 +415,7 @@ describe('every role against every route', () => {
   test('a manager invites and manages cashiers only; staff and roles beyond stay the owner’s', async () => {
     const accountant = await staff.manager.post('/v1/pos/staff/staff', { first_name: 'Funmi', last_name: 'A', phone: testMobile('NG'), role: 'accountant', all_tills: true, send_via: 'link' });
     assert.equal(accountant.json.error.code, 'pos_permission_required');
-    const cashier = await hire('cashier', { by: staff.manager, all_tills: true, pin: '3691', first: 'ManagersHire' });
+    const cashier = await hire('cashier', { by: staff.manager, all_tills: true, pin: '369152', first: 'ManagersHire' });
     assert.equal((await owner.get(`/v1/pos/owner/staff/${cashier.id}`)).json.invited_by, 'manager Test');
     assert.equal((await staff.manager.patch(`/v1/pos/staff/staff/${cashier.id}`, { role: 'manager' })).json.error.code, 'pos_permission_required');
     assert.equal((await staff.manager.post(`/v1/pos/staff/staff/${staff.accountant.id}/suspend`)).json.error.code, 'pos_permission_required');
@@ -419,15 +441,15 @@ describe('every role against every route', () => {
 
 describe('tills and devices', () => {
   test('staff sell only at their tills', async () => {
-    const one = await hire('cashier', { till_ids: [owner.till.id], pin: '2581', first: 'OneTill' });
+    const one = await hire('cashier', { till_ids: [owner.till.id], pin: '258152', first: 'OneTill' });
     assert.equal((await sale(one, { till: tillB.id })).json.error.code, 'till_not_allowed');
     assert.equal((await sale(one)).status, 201);
     const chosen = client('staff');
-    assert.equal((await chosen.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: one.phone, pin: '2581', till_id: tillB.id })).json.error.code, 'till_not_allowed');
+    assert.equal((await chosen.post('/v1/pos/staff/sign-in', { shop_code: owner.shop.shop_code, phone: one.phone, pin: '258152', till_id: tillB.id })).json.error.code, 'till_not_allowed');
   });
 
   test('linking a device: a one-time code, the name tiles, PIN sign-in at its till, and unlinking ends it at once', async () => {
-    const onlyB = await hire('cashier', { till_ids: [tillB.id], pin: '7410', first: 'OnlyB' });
+    const onlyB = await hire('cashier', { till_ids: [tillB.id], pin: '741052', first: 'OnlyB' });
     const code = await owner.post(`/v1/pos/owner/tills/${owner.till.id}/devices/link-code`);
     assert.equal(code.status, 201, JSON.stringify(code.json));
     assert.match(code.json.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
@@ -442,7 +464,7 @@ describe('tills and devices', () => {
     assert.ok(tiles.staff.some(row => row.id === staff.cashier.id));
     assert.equal(tiles.staff.some(row => row.id === onlyB.id), false, 'only who may sell at this till');
     assert.equal(JSON.stringify(tiles).includes(staff.cashier.phone), false, 'never their phones');
-    assert.equal((await device.post('/v1/pos/device/sign-in', { staff_id: onlyB.id, pin: '7410' })).json.error.code, 'till_not_allowed');
+    assert.equal((await device.post('/v1/pos/device/sign-in', { staff_id: onlyB.id, pin: '741052' })).json.error.code, 'till_not_allowed');
     const signed = await device.post('/v1/pos/device/sign-in', { staff_id: staff.cashier.id, pin: pins.cashier });
     assert.equal(signed.status, 201, JSON.stringify(signed.json));
     assert.equal(signed.json.till_id, owner.till.id);
