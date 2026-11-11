@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { flagText, methodLabel, money, type PosFlaggedSale, type PosOfflineHeld, saleTime } from "@/lib/pos";
-import { decideHeld, resolveFlags } from "@/lib/pos-actions";
+import { decideHeld, importOfflineFile, resolveFlags } from "@/lib/pos-actions";
 
 /**
  * A sale rung up offline with something to look at (milestone 9): what happened in words, and **Mark as looked at**
@@ -113,5 +113,48 @@ export function HeldSale({ held, currency }: { held: PosOfflineHeld; currency: s
       ) : null}
       {dialog}
     </li>
+  );
+}
+
+/**
+ * A file of a till's unsent sales (saved on the till with **Save unsent to a file**), uploaded from here: Udozo checks
+ * it was signed by that till and applies each sale and step once, so a file uploaded twice, or after the till synced,
+ * changes nothing more.
+ */
+export function ImportUnsent() {
+  const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="grid gap-2">
+      <label className="grid max-w-md gap-1 text-sm font-semibold text-pos-ink-2">
+        File of unsent sales
+        <input
+          type="file"
+          accept="application/json,.json"
+          disabled={pending}
+          onChange={event => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            if (file.size > 4_000_000) return setMessage("That file is too big to upload here. Upload the till's sales from the till once it is online.");
+            start(async () => {
+              const result = await importOfflineFile(await file.text());
+              if (!result.ok) return setMessage(result.message);
+              const count = (status: string) => result.data.results.filter(row => row.status === status).length;
+              const refused = result.data.results.filter(row => row.status === "rejected");
+              setMessage(`${result.data.device.name ?? "The till"}: ${count("applied")} applied, ${count("duplicate")} already in, ${count("held")} held, ${refused.length} refused${refused.length ? ` (${refused[0]!.error?.message ?? "refused"})` : ""}.`);
+              router.refresh();
+            });
+          }}
+          className="text-sm font-normal"
+        />
+      </label>
+      {message ? (
+        <p role="status" className="text-sm font-semibold text-pos-ink">
+          {message}
+        </p>
+      ) : null}
+    </div>
   );
 }

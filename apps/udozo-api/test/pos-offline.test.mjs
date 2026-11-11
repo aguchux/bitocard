@@ -2,7 +2,7 @@
 // order, never undoing a sale, flagging what to look at, holding an unlinked device's sales for the owner), and with it
 // prices per shop, stock in transit between shops and closing a shop.
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, confirmMobile, lastEmailCode, startApp, testMobile } from './helpers.mjs';
 
@@ -232,6 +232,8 @@ describe('selling with no internet', () => {
     const copy = await device.get('/v1/pos/device/sync');
     assert.equal(copy.status, 200, JSON.stringify(copy.json));
     assert.deepEqual(copy.json.limits, { hours: 72, sales: 500, warn_hours: 48 });
+    assert.equal(copy.json.shift, null);
+    assert.equal(copy.json.products.find(item => item.id === tv.id).on_hand, 4);
     assert.deepEqual([copy.json.till.id, copy.json.shop.name, copy.json.shop.paused, copy.json.shop.closed], [till.id, 'Ikeja shop', false, false]);
     const row = copy.json.products.find(item => item.id === tv.id);
     assert.deepEqual([row.price, row.available, row.blocked], [95_000, 4, null]);
@@ -248,6 +250,7 @@ describe('selling with no internet', () => {
     const tv = await product(ada, 'Hisense 50 inch TV', { stock: 2 });
     const radio = await product(ada, 'Sony radio', { stock: 5, price: 20_000 });
     const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const manager = await hire(ada, 'manager', '5820', [till.id]);
     const device = await linkDevice(ada, till.id);
     await device.get('/v1/pos/device/sync');
 
@@ -257,7 +260,7 @@ describe('selling with no internet', () => {
     const oldPrice = offlineSale(cashier.id, radio, { unit: 18_000, number: 'T1-0003' });
     const credit = offlineSale(cashier.id, radio, { unit: 20_000, payments: [{ method: 'credit', amount: 20_000 }] });
     const wrong = { ...offlineSale(cashier.id, radio, { unit: 20_000 }), total: 25_000 };
-    const refund = { kind: 'refund', client_id: randomUUID(), sale_client_id: first.client_sale_id, reason: 'Wrong colour', restock: true, staff_id: cashier.id };
+    const refund = { kind: 'refund', client_id: randomUUID(), sale_client_id: first.client_sale_id, reason: 'Wrong colour', restock: true, staff_id: cashier.id, approved_by_staff_id: manager.id };
     const upload = await device.post('/v1/pos/device/upload', { entries: [first, oversold, oldPrice, credit, wrong, refund] });
     assert.equal(upload.status, 200, JSON.stringify(upload.json));
     const results = upload.json.results;
@@ -316,5 +319,100 @@ describe('selling with no internet', () => {
     assert.equal((await ada.post(`/v1/pos/owner/offline/held/${waiting[1].id}/reject`)).json.status, 'rejected');
     assert.equal((await ada.post(`/v1/pos/owner/offline/held/${waiting[1].id}/accept`)).json.error.code, 'held_decided');
     assert.equal(await stockOf(tv), 1);
+  });
+
+  test('shifts, cash and stock changes made offline upload once; approvals and discounts are checked', async () => {
+    const ada = await owner();
+    const till = ada.account.shops[0].tills[0];
+    const tv = await product(ada, 'LG 43 inch TV', { stock: 5 });
+    await prisma.posPlan.update({ where: { code: 'multi_shop' }, data: { offlineHours: 24, offlineSales: 200 } });
+    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const manager = await hire(ada, 'manager', '5820', [till.id]);
+    // The cashier's stock changes need a manager's PIN (the owner's own role).
+    const role = await ada.post('/v1/pos/owner/roles', { name: 'Counter and stock', permissions: { sell: 'yes', till: 'yes', stock_view: 'yes', own_sales: 'yes', refund: 'approval', stock_adjust: 'approval' }, discount_limit_bps: 500 });
+    assert.equal(role.status, 201, JSON.stringify(role.json));
+    await prisma.posStaff.update({ where: { id: cashier.id }, data: { roleKey: null, roleId: role.json.id } });
+    const device = await linkDevice(ada, till.id);
+    assert.deepEqual((await device.get('/v1/pos/device/sync')).json.limits, { hours: 24, sales: 200, warn_hours: 16 });
+
+    const shiftId = randomUUID();
+    const base = Date.now() - 120 * 60_000;
+    const at = minutes => new Date(base + minutes * 60_000).toISOString();
+    const entries = [
+      { kind: 'shift_open', client_id: shiftId, staff_id: cashier.id, at: at(0), opening_float: 500_000 },
+      offlineSale(cashier.id, tv, { at: new Date(at(10)) }),
+      { kind: 'shift_cash', client_id: randomUUID(), staff_id: cashier.id, at: at(20), shift_client_id: shiftId, cash_kind: 'out', amount: 50_000, reason: 'Fuel' },
+      { kind: 'stock', client_id: randomUUID(), staff_id: cashier.id, at: at(30), listing_id: tv.id, adjustment: 'damage', quantity: 1 },
+      { kind: 'stock', client_id: randomUUID(), staff_id: cashier.id, at: at(31), listing_id: tv.id, adjustment: 'damage', quantity: 1, approved_by_staff_id: manager.id },
+      { ...offlineSale(cashier.id, tv, { at: new Date(at(40)), unit: 50_000 }), lines: [{ listing_id: tv.id, quantity: 1, unit_price: 100_000 }], discount: 50_000 },
+      { kind: 'shift_close', client_id: randomUUID(), staff_id: cashier.id, at: at(60), shift_client_id: shiftId, counted: 600_000 },
+    ];
+    const upload = await device.post('/v1/pos/device/upload', { entries });
+    assert.equal(upload.status, 200, JSON.stringify(upload.json));
+    const results = upload.json.results;
+    assert.deepEqual(results.map(row => [row.kind, row.status]), [['shift_open', 'applied'], ['sale', 'applied'], ['shift_cash', 'applied'], ['stock', 'rejected'], ['stock', 'applied'], ['sale', 'applied'], ['shift_close', 'applied']], JSON.stringify(results));
+    assert.equal(results[3].error.code, 'approval_required');
+    assert.equal(results[5].sale.flags[0].code, 'discount_over_limit');
+
+    const shift = await prisma.posShift.findFirst({ where: { clientId: shiftId } });
+    assert.deepEqual([shift.status, shift.openedAt.toISOString(), shift.closedAt.toISOString(), Number(shift.openingFloatMinor)], ['closed', at(0), at(60), 500_000]);
+    assert.equal(await prisma.posSale.count({ where: { shiftId: shift.id } }), 2);
+    assert.equal(await stockOf(tv), 2, 'two sold, one damaged');
+    assert.equal(await prisma.posApproval.count({ where: { action: 'offline_stock', approvedByStaffId: manager.id } }), 1);
+
+    // Sent again: nothing twice.
+    const again = await device.post('/v1/pos/device/upload', { entries });
+    assert.deepEqual(again.json.results.map(row => row.status), ['duplicate', 'duplicate', 'duplicate', 'rejected', 'duplicate', 'duplicate', 'duplicate']);
+    assert.equal(await stockOf(tv), 2);
+
+    // A refund by a cashier with nobody's PIN stands and is flagged.
+    const refund = await device.post('/v1/pos/device/upload', { entries: [{ kind: 'refund', client_id: randomUUID(), sale_client_id: entries[1].client_sale_id, reason: 'Faulty', restock: false, staff_id: cashier.id }] });
+    assert.equal(refund.json.results[0].status, 'applied', JSON.stringify(refund.json));
+    assert.deepEqual(refund.json.results[0].sale.flags, [{ code: 'refund_unapproved', staff: 'cashier Test' }]);
+    await prisma.posStaff.update({ where: { id: cashier.id }, data: { roleKey: 'cashier', roleId: null } });
+
+    // The copy carries the till's recent sales to refund offline.
+    const copy = (await device.get('/v1/pos/device/sync')).json;
+    assert.ok(copy.recent_sales.some(row => row.client_sale_id === entries[5].client_sale_id && row.refundable_offline));
+    await prisma.posPlan.update({ where: { code: 'multi_shop' }, data: { offlineHours: 72, offlineSales: 500 } });
+  });
+
+  test('a file of unsent sales signed by the till is imported by the owner; a changed one is refused', async () => {
+    const ada = await owner();
+    const till = ada.account.shops[0].tills[0];
+    const tv = await product(ada, 'TCL 55 inch TV', { stock: 3 });
+    const cashier = await hire(ada, 'cashier', '7391', [till.id]);
+    const device = await linkDevice(ada, till.id);
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    const jwk = publicKey.export({ format: 'jwk' });
+    assert.equal((await device.put('/v1/pos/device/key', { public_key: { kty: 'RSA' } })).status, 400);
+    assert.equal((await device.put('/v1/pos/device/key', { public_key: jwk })).status, 200);
+
+    const payload = JSON.stringify({ object: 'pos_offline_export', device_id: device.id, entries: [offlineSale(cashier.id, tv, { number: 'T1-0004' })] });
+    const signature = sign('sha256', Buffer.from(payload), { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64');
+    const changed = await ada.post('/v1/pos/owner/offline/import', { payload: payload.replace('T1-0004', 'T1-0005'), signature });
+    assert.equal(changed.json.error.code, 'file_signature_invalid');
+    const imported = await ada.post('/v1/pos/owner/offline/import', { payload, signature });
+    assert.equal(imported.status, 200, JSON.stringify(imported.json));
+    assert.deepEqual(imported.json.results.map(row => row.status), ['applied']);
+    assert.equal((await ada.post('/v1/pos/owner/offline/import', { payload, signature })).json.results[0].status, 'duplicate');
+    assert.equal(await stockOf(tv), 2);
+    const other = await owner();
+    assert.equal((await other.post('/v1/pos/owner/offline/import', { payload, signature })).status, 404);
+  });
+
+  test('the owner is told once when a till has not synced for a day', async () => {
+    const ada = await owner();
+    const device = await linkDevice(ada, ada.account.shops[0].tills[0].id);
+    const service = server.app.get((await import('../dist/pos/offline.service.js')).PosOfflineService);
+    const old = new Date(Date.now() - 30 * 3_600_000);
+    await prisma.posDevice.update({ where: { id: device.id }, data: { linkedAt: old, lastSyncedAt: old } });
+    assert.ok((await service.notifyUnsynced()).told >= 1);
+    assert.ok((await prisma.posDevice.findUnique({ where: { id: device.id } })).unsyncedNotifiedAt);
+    await service.notifyUnsynced();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.equal(await prisma.notification.count({ where: { customerId: ada.customerId, type: 'customer.pos.till' } }), 1);
+    await device.get('/v1/pos/device/sync');
+    assert.equal((await prisma.posDevice.findUnique({ where: { id: device.id } })).unsyncedNotifiedAt, null);
   });
 });

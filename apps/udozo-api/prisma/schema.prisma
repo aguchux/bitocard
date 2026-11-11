@@ -7919,6 +7919,9 @@ model PosPlan {
   trialDays   Int      @default(0) @map("trial_days")
   shown       Boolean  @default(true)
   position    Int      @default(0)
+  /// How long and how much a linked till may sell with no internet before it must sync.
+  offlineHours Int     @default(72) @map("offline_hours")
+  offlineSales Int     @default(500) @map("offline_sales")
   updatedAt   DateTime @updatedAt @map("updated_at")
   accounts    PosAccount[]
 
@@ -8284,6 +8287,8 @@ model PosStockMovement {
   saleId       String?           @map("sale_id") @db.Uuid
   /// The stock transfer it was part of.
   transferId   String?           @map("transfer_id") @db.Uuid
+  /// The till's id for a change made offline.
+  clientId     String?           @map("client_id") @db.Uuid
   note         String?           @db.VarChar(200)
   byCustomerId String?           @map("by_customer_id") @db.Uuid
   byName       String?           @map("by_name")
@@ -8580,6 +8585,10 @@ model PosDevice {
   /// When it last read its offline copy, and last uploaded sales made offline.
   lastSyncedAt  DateTime?  @map("last_synced_at")
   lastUploadAt  DateTime?  @map("last_upload_at")
+  /// The device's own ECDSA P-256 public key (JWK): a file of its unsent sales is checked against it.
+  publicKey     Json?      @map("public_key")
+  /// When the owner was told it had not synced for a day (cleared when it syncs).
+  unsyncedNotifiedAt DateTime? @map("unsynced_notified_at")
   createdByName String     @map("created_by_name") @db.VarChar(120)
   createdAt     DateTime   @default(now()) @map("created_at")
   account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
@@ -8691,6 +8700,8 @@ model PosShift {
   closedAt          DateTime?  @map("closed_at")
   closedByName      String?    @map("closed_by_name") @db.VarChar(120)
   closedByStaffId   String?    @map("closed_by_staff_id") @db.Uuid
+  /// The id a till gave a shift it opened offline, so its upload makes it once.
+  clientId          String?    @map("client_id") @db.Uuid
   expectedCashMinor BigInt?    @map("expected_cash_minor")
   countedCashMinor  BigInt?    @map("counted_cash_minor")
   differenceMinor   BigInt?    @map("difference_minor")
@@ -8715,6 +8726,8 @@ model PosShiftCash {
   kind        String   @db.VarChar(8)
   amountMinor BigInt   @map("amount_minor")
   reason      String   @db.VarChar(200)
+  /// The till's id for cash moved offline.
+  clientId    String?  @map("client_id") @db.Uuid
   byName      String   @map("by_name") @db.VarChar(120)
   byStaffId   String?  @map("by_staff_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")

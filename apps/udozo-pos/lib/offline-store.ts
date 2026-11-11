@@ -1,6 +1,6 @@
 "use client";
 
-import type { LocalSale, OfflineCopy, OfflineMeta } from "./offline-rules";
+import type { LocalSale, LocalShift, OfflineCopy, OfflineMeta, OutboxEntry } from "./offline-rules";
 
 /**
  * The offline till's copy on this device (docs/UDOZO_POS_PLAN.md, How the offline data is stored): IndexedDB for
@@ -10,15 +10,15 @@ import type { LocalSale, OfflineCopy, OfflineMeta } from "./offline-rules";
  */
 
 const dbName = "udozo-pos-offline";
-const version = 1;
-type Store = "kv" | "checks" | "sales";
+const version = 2;
+type Store = "kv" | "checks" | "sales" | "outbox";
 
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, version);
     request.onupgradeneeded = () => {
       const db = request.result;
-      for (const name of ["kv", "checks", "sales"]) if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+      for (const name of ["kv", "checks", "sales", "outbox"]) if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -95,6 +95,56 @@ export async function readSales(): Promise<LocalSale[]> {
 }
 
 export const dropSale = (id: string) => run("sales", "readwrite", s => void s.delete(id));
+
+// ---- Shifts, refunds and stock changes waiting to upload ----
+
+export async function saveEntry(entry: OutboxEntry) {
+  await put("outbox", entry.client_id, await seal(entry));
+}
+
+export async function readEntries(): Promise<OutboxEntry[]> {
+  const rows = (await all<Sealed>("outbox")) ?? [];
+  const entries = (await Promise.all(rows.map(row => unseal<OutboxEntry>(row)))).filter((entry): entry is OutboxEntry => entry !== null);
+  return entries.sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+export const dropEntry = (id: string) => run("outbox", "readwrite", s => void s.delete(id));
+
+/** The till's shift as the device knows it (null: none open). */
+export const readShift = () => get<LocalShift | null>("kv", "shift").then(shift => shift ?? null);
+export const writeShift = (shift: LocalShift | null) => put("kv", "shift", shift);
+
+/** Sales refunded on this till offline (their client ids), so they are not refunded twice. */
+export const readRefunded = () => get<string[]>("kv", "refunded").then(ids => new Set(ids ?? []));
+export async function markRefunded(id: string) {
+  const ids = await readRefunded();
+  ids.add(id);
+  await put("kv", "refunded", [...ids].slice(-500));
+}
+
+// ---- The device's signing key (a file of unsent sales) ----
+
+async function signingKey(): Promise<CryptoKeyPair> {
+  const kept = await get<CryptoKeyPair>("kv", "signing");
+  if (kept) return kept;
+  // The private key never leaves the browser (not extractable); Udozo keeps the public one.
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, ["sign", "verify"]);
+  await put("kv", "signing", pair);
+  return pair;
+}
+
+export const publicKey = async () => crypto.subtle.exportKey("jwk", (await signingKey()).publicKey);
+
+/** Signs a file's payload: ECDSA P-256 with SHA-256, the signature in base64 (r and s, 64 bytes). */
+export async function signPayload(payload: string) {
+  const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, (await signingKey()).privateKey, new TextEncoder().encode(payload)));
+  let text = "";
+  for (const byte of signature) text += String.fromCharCode(byte);
+  return btoa(text);
+}
+
+export const keySentFor = () => get<string>("kv", "key_sent").then(id => id ?? null);
+export const markKeySent = (deviceId: string) => put("kv", "key_sent", deviceId);
 
 // ---- Staff PIN checks ----
 

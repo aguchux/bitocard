@@ -10,8 +10,8 @@ import type { PosFlaggedSale, PosOfflineHeld, PosShop, PosStockTransfer } from "
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const actions = vi.hoisted(() => ({ addShop: vi.fn(), chooseShop: vi.fn(), closeShop: vi.fn(), receiveStock: vi.fn(), takeBackStock: vi.fn(), moveStock: vi.fn(), resolveFlags: vi.fn(), decideHeld: vi.fn(), setShopPrice: vi.fn(), shopPrices: vi.fn() }));
-const store = vi.hoisted(() => ({ readCopy: vi.fn(), readMeta: vi.fn(), readSales: vi.fn(), hasPinCheck: vi.fn(), checkPin: vi.fn(), saveSale: vi.fn(), writeMeta: vi.fn() }));
+const actions = vi.hoisted(() => ({ importOfflineFile: vi.fn(), addShop: vi.fn(), chooseShop: vi.fn(), closeShop: vi.fn(), receiveStock: vi.fn(), takeBackStock: vi.fn(), moveStock: vi.fn(), resolveFlags: vi.fn(), decideHeld: vi.fn(), setShopPrice: vi.fn(), shopPrices: vi.fn() }));
+const store = vi.hoisted(() => ({ readCopy: vi.fn(), readMeta: vi.fn(), readSales: vi.fn(), readEntries: vi.fn(async () => []), readShift: vi.fn(async () => null), readRefunded: vi.fn(async () => new Set()), hasPinCheck: vi.fn(), checkPin: vi.fn(), saveSale: vi.fn(), saveEntry: vi.fn(), writeShift: vi.fn(), markRefunded: vi.fn(), signPayload: vi.fn(), writeMeta: vi.fn() }));
 const sync = vi.hoisted(() => ({ syncNow: vi.fn() }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("@/lib/pos-actions", () => actions);
@@ -20,7 +20,7 @@ vi.mock("@/lib/offline-sync", () => sync);
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const { OfflineTill } = await import("@/components/offline-till");
-const { FlaggedSale, HeldSale } = await import("@/components/offline-review");
+const { FlaggedSale, HeldSale, ImportUnsent } = await import("@/components/offline-review");
 const { TransferRow } = await import("@/components/move-stock");
 const { ShopsPanel } = await import("@/components/shops-panel");
 const { ShopPrices } = await import("@/components/shop-prices");
@@ -112,9 +112,14 @@ describe("the offline till", () => {
     expect(store.checkPin).toHaveBeenLastCalledWith("bola", "7391");
     expect(host.textContent).toContain("Basket");
 
-    expect(button(host, "Hisense TV").disabled).toBe(true);
+    // Past the copy's stock needs a colleague's PIN; nobody who could give it signed in here.
+    await click(button(host, "Hisense TV"));
+    expect(host.textContent).toContain("A manager’s PIN");
+    expect(host.textContent).toContain("Nobody who can approve it");
+    await click(button(host, "Cancel"));
     await click(button(host, "Sony radio"));
     await click(button(host, "Sony radio"));
+    await click(button(host, "Cancel"));
     expect(host.textContent).toContain("Only 1 of “Sony radio” free on this till's copy.");
     await type(host.querySelector<HTMLInputElement>('input[aria-label="Cash handed over"]')!, "250");
     await click(button(host, "Take this payment"));
@@ -136,6 +141,61 @@ describe("the offline till", () => {
     await settle();
     expect(host.textContent).toContain("This till cannot sell offline now");
     expect(host.textContent).toContain("more than 72 hours");
+  });
+
+  const manager = { id: "mgr", name: "Ngozi Uche", first_name: "Ngozi", initials: "NU", role: { id: "manager", name: "Manager", discount_limit_bps: null }, permissions: { sell: "yes", refund: "yes", stock_adjust: "yes", till: "yes", cash_up: "yes" } } as const;
+  const withManager: OfflineCopy = { ...copy, device: { id: "dev", key: true }, staff: [{ ...copy.staff[0]!, permissions: { sell: "yes", till: "yes", refund: "approval" } }, manager] };
+  async function signIn() {
+    store.readCopy.mockResolvedValue(withManager);
+    store.readMeta.mockResolvedValue({ synced_at: withManager.synced_at, next_number: 7, offline_sales: 0 });
+    store.hasPinCheck.mockResolvedValue(true);
+    sync.syncNow.mockResolvedValue({ waiting: 0, uploaded: 0 });
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    const host = mount(createElement(OfflineTill));
+    await settle();
+    await click(button(host, "BABola Ade"));
+    store.checkPin.mockResolvedValue("ok");
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "7391");
+    await settle();
+    return host;
+  }
+
+  it("sells past the copy with a manager's PIN, and keeps the receipt to send", async () => {
+    store.readSales.mockResolvedValue([]);
+    const host = await signIn();
+    await click(button(host, "Hisense TV"));
+    await click(button(host, "Ngozi Uche"));
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "5820");
+    await settle();
+    expect(store.checkPin).toHaveBeenLastCalledWith("mgr", "5820");
+    expect(host.textContent).toContain("Approved by Ngozi Uche");
+    await click(button(host, "Take this payment"));
+    await type(host.querySelector<HTMLInputElement>('input[aria-label="Email address for the receipt"]')!, "ada@example.com");
+    await click(button(host, "Complete sale"));
+    await settle();
+    expect(store.saveSale).toHaveBeenCalledWith(expect.objectContaining({ approved_by_staff_id: "mgr", receipt: { whatsapp: null, email: "ada@example.com" }, total: 100_000 }));
+  });
+
+  it("opens the shift and refunds with a manager's PIN, saving each step to upload", async () => {
+    const sale = { client_sale_id: "s1", client_number: "T2-0006", created_at: new Date().toISOString(), staff_id: "bola", staff_name: "Bola Ade", approved_by_staff_id: null, lines: [{ listing_id: "radio", title: "Sony radio", quantity: 1, unit_price: 20_000 }], discount: 0, vat_bps: 0, subtotal: 20_000, vat: 0, total: 20_000, change: 0, payments: [{ method: "cash", amount: 20_000, tendered: null, reference: null }], status: "uploaded", number: "POS-000006", error: null };
+    store.readSales.mockResolvedValue([sale]);
+    const host = await signIn();
+    await click(button(host, "Shift"));
+    await type(host.querySelector<HTMLInputElement>("input[inputmode=decimal]")!, "50");
+    await click(button(host, "Open the shift"));
+    await settle();
+    expect(store.saveEntry).toHaveBeenCalledWith(expect.objectContaining({ kind: "shift_open", entry: expect.objectContaining({ kind: "shift_open", staff_id: "bola", opening_float: 5_000 }) }));
+    expect(store.writeShift).toHaveBeenCalledWith(expect.objectContaining({ opening_float: 5_000, opened_by: "Bola Ade" }));
+
+    await click(button(host, "Refund"));
+    await click(button(host, "POS-000006"));
+    await type([...host.querySelectorAll<HTMLInputElement>("input")].find(input => !input.type || input.type === "text")!, "Faulty");
+    await click(button(host, "Refund ₦200"));
+    await click(button(host, "Ngozi Uche"));
+    await type(host.querySelector<HTMLInputElement>("input[type=password]")!, "5820");
+    await settle();
+    expect(store.saveEntry).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "refund", entry: expect.objectContaining({ sale_client_id: "s1", reason: "Faulty", restock: true, staff_id: "bola", approved_by_staff_id: "mgr" }) }));
+    expect(store.markRefunded).toHaveBeenCalledWith("s1");
   });
 });
 
@@ -193,5 +253,21 @@ describe("stock in transit and shops", () => {
     await click(button(document, "Save"));
     expect(actions.setShopPrice).toHaveBeenCalledWith("radio", "a", 22_000);
     expect(document.body.textContent).toContain("Ikeja shop now sells it at ₦220.");
+  });
+});
+
+describe("a till's file of unsent sales", () => {
+  it("is uploaded by the owner, saying what was applied", async () => {
+    actions.importOfflineFile.mockResolvedValue({ ok: true, data: { device: { id: "dev", name: "Front counter" }, results: [{ client_id: "a", kind: "sale", status: "applied" }, { client_id: "b", kind: "sale", status: "duplicate" }] } });
+    const host = mount(createElement(ImportUnsent));
+    const input = host.querySelector<HTMLInputElement>("input[type=file]")!;
+    const file = new File([JSON.stringify({ payload: "{}", signature: "x" })], "unsent.json", { type: "application/json" });
+    Object.defineProperty(input, "files", { configurable: true, value: [file] });
+    await act(async () => void input.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+    await settle();
+    expect(actions.importOfflineFile).toHaveBeenCalledWith(JSON.stringify({ payload: "{}", signature: "x" }));
+    expect(host.textContent).toContain("Front counter: 1 applied, 1 already in, 0 held, 0 refused.");
+    expect(router.refresh).toHaveBeenCalled();
   });
 });

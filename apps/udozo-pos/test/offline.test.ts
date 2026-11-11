@@ -70,9 +70,53 @@ describe("a sale made offline", () => {
   });
 });
 
+describe("shifts, refunds, stock and approvals offline", () => {
+  const person = (id: string, permissions: Record<string, "yes" | "approval" | "no">, limit: number | null = 500) => ({ id, name: id, first_name: id, initials: "XX", role: { id: null, name: "Role", discount_limit_bps: limit }, permissions });
+  const sale = (id: string, at: string, payments = [{ method: "cash" as const, amount: 1_000, tendered: null, reference: null }], status: "waiting" | "uploaded" | "failed" = "waiting") => ({ client_sale_id: id, client_number: "T1-0001", created_at: at, staff_id: "p", staff_name: "P", approved_by_staff_id: null, lines: [{ listing_id: "a", title: "A", quantity: 1, unit_price: 1_000 }], discount: 0, vat_bps: 0, subtotal: 1_000, vat: 0, total: 1_000, change: 0, payments, status, number: null, error: null });
+
+  it("uploads sales and steps in the order they happened", () => {
+    const opened = rules.newEntry("shift_open", "Shift opened", { client_id: "e1", staff_id: "p", at: "2026-11-11T08:00:00Z", opening_float: 500 }, new Date("2026-11-11T08:00:00Z"));
+    expect(opened).toMatchObject({ client_id: "e1", kind: "shift_open", status: "waiting", entry: { kind: "shift_open", client_id: "e1", opening_float: 500 } });
+    const rows = rules.pendingUpload([sale("s2", "2026-11-11T09:00:00Z"), sale("s0", "2026-11-11T07:00:00Z", undefined, "uploaded")], [opened]);
+    expect(rows.map(row => row.id)).toEqual(["e1", "s2"]);
+    expect(rules.afterEntryUpload(opened, { client_id: "e1", status: "rejected", error: { code: "shift_open", message: "Open already." } })).toMatchObject({ status: "failed", error: "Open already." });
+  });
+
+  it("works out the drawer's cash and who may approve what", () => {
+    const shift = { id: null, client_id: "e1", opened_at: "2026-11-11T08:00:00Z", opened_by: "P", opening_float: 5_000, cash: [{ kind: "out" as const, amount: 500 }] };
+    expect(rules.expectedCash(shift, [sale("s1", "2026-11-11T09:00:00Z"), sale("s0", "2026-11-11T07:00:00Z")], 200)).toBe(5_300);
+    const staff = [person("cashier", { sell: "yes", refund: "approval" }), person("manager", { sell: "yes", refund: "yes", stock_adjust: "yes" }, null), person("away", { sell: "yes", refund: "yes" }, null)];
+    const checks = new Set(["cashier", "manager"]);
+    expect(rules.approversFor(staff, checks, { kind: "refund" }, "cashier").map(p => p.id)).toEqual(["manager"]);
+    expect(rules.approversFor(staff, checks, { kind: "discount", bps: 2_000 }, "manager").map(p => p.id)).toEqual([]);
+    expect(rules.approversFor(staff, checks, { kind: "oversell" }, "cashier").map(p => p.id)).toEqual(["manager"]);
+    expect(rules.shareBps(1, 3)).toBe(3_334);
+    expect(rules.mayRunShift(staff[0]!)).toBe(false);
+    expect(rules.countsBlind(person("x", { till: "yes" }))).toBe(true);
+  });
+
+  it("lists what may be refunded offline, never twice nor paid through Udozo", () => {
+    const recent = [
+      { id: "r1", client_sale_id: "c1", number: "POS-000001", client_number: null, created_at: "2026-11-10T10:00:00Z", sold_by: "P", total: 2_000, lines: [], payments: [{ method: "card", amount: 2_000 }], refundable_offline: true },
+      { id: "r2", client_sale_id: "c2", number: "POS-000002", client_number: null, created_at: "2026-11-10T11:00:00Z", sold_by: "P", total: 2_000, lines: [], payments: [{ method: "udozo_wallet", amount: 2_000 }], refundable_offline: false },
+    ];
+    expect(rules.refundables([sale("s1", "2026-11-11T09:00:00Z")], recent, new Set()).map(row => row.client_sale_id)).toEqual(["s1", "c1"]);
+    expect(rules.refundables([sale("s1", "2026-11-11T09:00:00Z")], recent, new Set(["s1"])).map(row => row.client_sale_id)).toEqual(["c1"]);
+  });
+
+  it("sends receipts asked for with the sale, and names the device in an exported file", () => {
+    const made = rules.makeSale({ client_sale_id: "s", client_number: "T1-0001", now: new Date(now), staff: { id: "p", name: "P" }, lines: [{ listing_id: "a", title: "A", quantity: 1, unit_price: 1_000 }], discount: 0, vat_bps: 0, payments: [{ method: "card", amount: 1_000, tendered: null, reference: null }], receipt: { whatsapp: "08031234567", email: null } });
+    if (!made.ok) throw new Error("not made");
+    expect(rules.uploadEntry(made.sale).receipt).toEqual({ whatsapp: "08031234567", email: null });
+    expect(JSON.parse(rules.exportPayload("dev", [{ kind: "sale" }], new Date(now)))).toEqual({ object: "pos_offline_export", device_id: "dev", made_at: "2026-11-11T12:00:00.000Z", entries: [{ kind: "sale" }] });
+  });
+});
+
 describe("the service worker", () => {
   it("keeps the offline till and sends pages that cannot load to it, caching nothing private", () => {
     const worker = offlineWorker("abc123");
+    expect(worker).toContain('"/udozo-mark-light.png"');
+    expect(worker).toContain("SHELL.includes(url.pathname)");
     expect(worker).toContain('const CACHE = "udozo-pos-abc123"');
     expect(worker).toContain('"/offline"');
     expect(worker).toContain('request.mode === "navigate"');
@@ -119,6 +163,11 @@ describe("routes and actions", () => {
     const entry = { kind: "sale", client_sale_id: listing };
     expect((await POST(new Request("https://pos.udozo.com/api/offline/upload", { method: "POST", headers: { "sec-fetch-site": "same-origin" }, body: JSON.stringify({ entries: [entry] }) }))).status).toBe(200);
     expect(sent[1]).toMatchObject({ method: "POST", url: "/v1/pos/device/upload", body: { entries: [entry] } });
+    const { PUT } = await import("@/app/api/offline/key/route");
+    const key = { kty: "EC", crv: "P-256", x: "x", y: "y" };
+    expect((await PUT(new Request("https://pos.udozo.com/api/offline/key", { method: "PUT", headers: { "sec-fetch-site": "cross-site" }, body: JSON.stringify({ public_key: key }) }))).status).toBe(403);
+    expect((await PUT(new Request("https://pos.udozo.com/api/offline/key", { method: "PUT", body: JSON.stringify({ public_key: key }) }))).status).toBe(200);
+    expect(sent[2]).toMatchObject({ method: "PUT", url: "/v1/pos/device/key", body: { public_key: key } });
   });
 
   it("the owner's actions send what Udozo takes", async () => {
@@ -140,6 +189,11 @@ describe("routes and actions", () => {
     expect(sent.at(-1)!.url).toBe(`/v1/pos/owner/sales/${listing}/flags/resolve`);
     await actions.decideHeld(listing, "accept");
     expect(sent.at(-1)!.url).toBe(`/v1/pos/owner/offline/held/${listing}/accept`);
+    await actions.importOfflineFile(JSON.stringify({ payload: "{}", signature: "c2ln" }));
+    expect(sent.at(-1)).toMatchObject({ method: "POST", url: "/v1/pos/owner/offline/import", body: { payload: "{}", signature: "c2ln" } });
+    const sentBefore = sent.length;
+    expect((await actions.importOfflineFile("not json")).ok).toBe(false);
+    expect(sent.length).toBe(sentBefore);
     const before = sent.length;
     expect((await actions.closeShop("nope", null)).ok).toBe(false);
     expect(sent.length).toBe(before);

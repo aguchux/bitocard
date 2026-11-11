@@ -429,6 +429,14 @@ class PlanChangeDto {
   @IsOptional() @IsInt() @Min(0) @Max(90)
   trial_days?: number;
 
+  /** How long a till may sell with no internet (1 to 168 hours). */
+  @IsOptional() @IsInt() @Min(1) @Max(168)
+  offline_hours?: number;
+
+  /** How many sales a till may make with no internet (1 to 5,000). */
+  @IsOptional() @IsInt() @Min(1) @Max(5000)
+  offline_sales?: number;
+
   @IsOptional() @IsBoolean()
   shown?: boolean;
 }

@@ -7,7 +7,7 @@
 export function offlineWorker(version: string) {
   return `/* Udozo POS offline worker ${version} */
 const CACHE = "udozo-pos-${version.replace(/[^\w.-]/g, "")}";
-const SHELL = ["/offline", "/icon-192.png", "/udozo-mark.png"];
+const SHELL = ["/offline", "/icon-192.png", "/udozo-mark.png", "/udozo-mark-light.png"];
 
 async function precache() {
   const cache = await caches.open(CACHE);
@@ -35,6 +35,11 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(async () => (await caches.match("/offline")) || Response.error()));
+    return;
+  }
+  // The till's logo and icon, kept with it so its header draws with no internet.
+  if (SHELL.includes(url.pathname) && url.pathname !== "/offline") {
+    event.respondWith(caches.match(url.pathname).then(hit => hit || fetch(request)));
     return;
   }
   if (url.pathname.startsWith("/_next/static/")) {

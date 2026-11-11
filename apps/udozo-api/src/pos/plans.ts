@@ -66,6 +66,8 @@ export function presentPlan(plan: PosPlan, currency: string | null) {
     paid: plan.code !== freePlan,
     limits: limitsOf(plan),
     trial_days: plan.code === freePlan ? 0 : plan.trialDays,
+    /** How long and how much a linked till may sell with no internet before it must sync. */
+    offline: { hours: plan.offlineHours, sales: plan.offlineSales },
   };
 }
 

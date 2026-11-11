@@ -8,6 +8,8 @@ import { createNextConfig } from "@bitocard/next-config";
  */
 export default createNextConfig({
   indexable: true,
+  // A file of a till's unsent sales comes through a server action (Vercel takes 4.5 MB a request).
+  experimental: { serverActions: { bodySizeLimit: "4.5mb" } },
   async headers() {
     return [{ source: "/:path*", headers: [{ key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=()" }] }];
   },

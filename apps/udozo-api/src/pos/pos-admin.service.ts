@@ -20,7 +20,7 @@ const storeAddress: Record<PosAppPlatform, RegExp> = {
 
 export const appLinkValid = (platform: PosAppPlatform, url: string) => storeAddress[platform].test(url);
 
-export type PlanChange = { name?: string; description?: string; prices?: Record<string, number | null>; yearly_prices?: Record<string, number | null>; limits?: Partial<PosLimits>; trial_days?: number; shown?: boolean };
+export type PlanChange = { name?: string; description?: string; prices?: Record<string, number | null>; yearly_prices?: Record<string, number | null>; limits?: Partial<PosLimits>; trial_days?: number; shown?: boolean; offline_hours?: number; offline_sales?: number };
 
 /**
  * Udozo's team on Udozo POS (admin.udozo.com > POS): every owner's account, the three plans (finance sets their prices per
@@ -125,6 +125,14 @@ export class PosAdminService {
     if (change.trial_days !== undefined) {
       if (code === 'free' && change.trial_days !== 0) throw invalid('parameter_invalid', 'Free has no trial.', 'trial_days');
       data.trialDays = change.trial_days;
+    }
+    if (change.offline_hours !== undefined) {
+      if (!Number.isInteger(change.offline_hours) || change.offline_hours < 1 || change.offline_hours > 168) throw invalid('parameter_invalid', 'A till sells offline for 1 to 168 hours.', 'offline_hours');
+      data.offlineHours = change.offline_hours;
+    }
+    if (change.offline_sales !== undefined) {
+      if (!Number.isInteger(change.offline_sales) || change.offline_sales < 1 || change.offline_sales > 5000) throw invalid('parameter_invalid', 'A till makes 1 to 5,000 sales offline.', 'offline_sales');
+      data.offlineSales = change.offline_sales;
     }
     if (change.shown !== undefined) {
       if (code === 'free' && !change.shown) throw invalid('parameter_invalid', 'Free is always offered.', 'shown');

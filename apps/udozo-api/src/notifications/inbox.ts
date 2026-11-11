@@ -243,6 +243,7 @@ export const notificationTypes = {
   'customer.pos.payment': { realm: 'customer', severity: 'warning', label: 'A shop asked you to pay from your wallet', push: true },
   'customer.pos.collection': { realm: 'customer', severity: 'info', label: 'A transfer into your Udozo POS account', push: true },
   'customer.pos.settlement': { realm: 'customer', severity: 'info', label: 'Your Udozo POS settlements', push: true },
+  'customer.pos.till': { realm: 'customer', severity: 'warning', label: 'Udozo POS tills not syncing', push: true },
   'customer.classifieds.contact_request': { realm: 'customer', severity: 'info', label: 'A buyer asked for your contact details', push: true },
   'customer.classifieds.contact_answered': { realm: 'customer', severity: 'info', label: 'A seller answered your contact request', push: true },
   'customer.classifieds.callback_request': { realm: 'customer', severity: 'info', label: 'A buyer asked you to call them back', push: true },

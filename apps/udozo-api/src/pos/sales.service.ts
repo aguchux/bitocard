@@ -449,7 +449,7 @@ export class PosSalesService {
    * Restocks, counts or writes off damaged units of one of the owner's products at the till. With several shops it is
    * one shop's (`shop_id`, `shop_required`): a count is of that shop's shelf, and its level moves with the stock.
    */
-  async adjustStock(customer: CustomerWithStore, listingId: string, input: { kind: StockAdjustment; quantity: number; note?: string | null; shop_id?: string | null }, by: PosBy = ownerBy(customer)) {
+  async adjustStock(customer: CustomerWithStore, listingId: string, input: { kind: StockAdjustment; quantity: number; note?: string | null; shop_id?: string | null; client_id?: string | null; at?: Date }, by: PosBy = ownerBy(customer)) {
     const account = await this.account(customer);
     if (!Number.isInteger(input.quantity) || input.quantity < (input.kind === 'count' ? 0 : 1) || input.quantity > maxStock) throw invalid('parameter_invalid', input.kind === 'count' ? 'Count what is on the shelf: 0 or more.' : 'Give how many, from 1.', 'quantity');
     const shopId = input.shop_id ? ((await this.prisma.posShop.findFirst({ where: { id: input.shop_id, accountId: account.id }, select: { id: true } }))?.id ?? null) : null;
@@ -477,7 +477,7 @@ export class PosSalesService {
         await this.setStock(tx, row, stock, now);
         if (delta > 0) await changeLevel(tx, row.id, shopId, delta, now);
       }
-      const movement = await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId, reason: input.kind, delta: stock - row.stock, stockAfter: stock, note: text(input.note, 200), byCustomerId: by.customerId, byStaffId: by.staffId, byName: by.name } });
+      const movement = await tx.posStockMovement.create({ data: { accountId: account.id, listingId: row.id, shopId, reason: input.kind, delta: stock - row.stock, stockAfter: stock, note: text(input.note, 200), byCustomerId: by.customerId, byStaffId: by.staffId, byName: by.name, ...(input.client_id ? { clientId: input.client_id } : {}), ...(input.at ? { createdAt: input.at } : {}) } });
       return { object: 'pos_stock' as const, listing_id: row.id, stock, held, available: Math.max(0, stock - held), movement: this.presentMovement(movement) };
     });
   }

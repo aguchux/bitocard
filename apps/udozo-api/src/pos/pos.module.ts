@@ -35,6 +35,6 @@ import { PosStaffService } from './staff.service.js';
   imports: [AuthModule, CheckoutModule, SettingsModule, ClassifiedsModule, PaymentsModule, PayoutsModule, CustomerCashModule, WhatsappModule],
   controllers: [PublicPosController, PosOwnerController, PosPaymentsController, AdminPosController, PosStaffAuthController, PosDeviceController, PosOwnerStaffController, PosStaffController, PosOwnerReceiptsController, PosStaffReceiptsController, PosOwnerReportsController, PosStaffReportsController, PosOwnerTransfersController, PosStaffTransfersController, PosDeviceOfflineController, PosOwnerOfflineController, PosStaffOfflineController],
   providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService, PosCustomersService, PosCollectionsService, PosStaffService, PosReceiptsService, PosShiftsService, PosReportsService, PosStockTransfersService, PosOfflineService, PosShopPricesService, PosGuard, PosDeviceGuard, PosDeviceUploadGuard],
-  exports: [PosBillingService, PosCollectionsService],
+  exports: [PosBillingService, PosCollectionsService, PosOfflineService],
 })
 export class PosModule {}

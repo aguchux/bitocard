@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FlaggedSale, HeldSale } from "@/components/offline-review";
+import { FlaggedSale, HeldSale, ImportUnsent } from "@/components/offline-review";
 import { needs } from "@/lib/gates";
 import { allows, saleTime } from "@/lib/pos";
 import { offlineFlagged, offlineHeld, ownerDevices } from "@/lib/pos-data";
@@ -105,6 +105,18 @@ export default async function OfflinePage({ searchParams }: { searchParams: Prom
               to sell offline on it.
             </p>
           )}
+        </section>
+      ) : null}
+
+      {owner ? (
+        <section aria-labelledby="import" className="grid gap-3 rounded-[20px] bg-white p-5">
+          <div>
+            <h2 id="import" className="font-display text-xl font-bold text-pos-ink">
+              Upload a till&apos;s file
+            </h2>
+            <p className="mt-1 text-sm text-pos-ink-2">A till that cannot get online saves what it sold to a file (Save unsent to a file on its offline screen). Bring the file here: Udozo checks it came from that till, and nothing is applied twice.</p>
+          </div>
+          <ImportUnsent />
         </section>
       ) : null}
     </div>

@@ -164,14 +164,16 @@ describe("Udozo POS", () => {
     fireEvent.click(dialog.getByRole("button", { name: "Save plan" }));
     await waitFor(() => expect(lastSent("/pos/plans/premium")).toBeTruthy());
     expect(lastSent("/pos/plans/premium")!.method).toBe("PATCH");
-    expect(lastSent("/pos/plans/premium")!.body).toEqual({ name: "Premium", description: "", prices: { NGN: null, GHS: 15_050 }, limits: { products: null, shops: 1, tills: 4, staff: null }, trial_days: 14, shown: true });
+    expect(lastSent("/pos/plans/premium")!.body).toEqual({ name: "Premium", description: "", prices: { NGN: null, GHS: 15_050 }, limits: { products: null, shops: 1, tills: 4, staff: null }, offline_hours: 72, offline_sales: 500, trial_days: 14, shown: true });
   });
 
   test("refuses what the API would, before asking it", () => {
     const free = plan("free") as never;
     const draft = draftOf(free, ["NGN"]);
     expect(planChange(free, ["NGN"], { ...draft, limits: { ...draft.limits, tills: "" } })).toEqual({ error: "Free always has a limit: give tills." });
-    expect(planChange(free, ["NGN"], draft)).toEqual({ change: { name: "Free", description: "", limits } });
+    expect(planChange(free, ["NGN"], draft)).toEqual({ change: { name: "Free", description: "", limits, offline_hours: 72, offline_sales: 500 } });
+    expect(planChange(free, ["NGN"], { ...draft, offline_hours: "200" })).toEqual({ error: "A till sells offline for 1 to 168 hours." });
+    expect(planChange(free, ["NGN"], { ...draft, offline_sales: "0" })).toEqual({ error: "A till makes 1 to 5,000 sales offline." });
     const premium = plan("premium") as never;
     expect(planChange(premium, ["NGN"], { ...draftOf(premium, ["NGN"]), trial_days: "91" })).toEqual({ error: "The trial is from 0 to 90 days." });
     expect(planChange(premium, ["NGN"], { ...draftOf(premium, ["NGN"]), prices: { NGN: "0" } })).toEqual({ error: "The NGN price is not an amount above zero." });

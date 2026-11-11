@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Max, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBase64, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { Public } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
@@ -16,6 +16,22 @@ class UploadDto {
   /** What the till did offline, in the order it happened: sales and refunds, each with its own id. Checked entry by entry. */
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(maxUploadEntries)
   entries: OfflineEntry[];
+}
+
+class DeviceKeyDto {
+  /** The device's own ECDSA P-256 public key as a JWK (its private key never leaves the browser). */
+  @IsObject()
+  public_key: Record<string, unknown>;
+}
+
+class ImportDto {
+  /** The file's payload exactly as the till wrote it (JSON text). */
+  @IsString() @MaxLength(5_000_000)
+  payload: string;
+
+  /** The till's ECDSA P-256 signature of the payload (base64, 64 bytes). */
+  @IsBase64() @MaxLength(200)
+  signature: string;
 }
 
 class FlaggedDto {
@@ -65,6 +81,13 @@ export class PosDeviceOfflineController {
   upload(@CurrentDevice() device: { id: string; accountId: string; tillId: string; revokedAt: Date | null; lastSyncedAt: Date | null; name: string | null }, @Body() body: UploadDto) {
     return this.offline.upload(device, body.entries);
   }
+
+  /** The device's public key, so a file of its unsent sales can be checked when brought to another device. */
+  @Put('key')
+  @UseGuards(PosDeviceGuard)
+  setKey(@CurrentDevice() device: { id: string }, @Body() body: DeviceKeyDto) {
+    return this.offline.setKey(device, body.public_key);
+  }
 }
 
 /** The owner's offline sales to look at, held sales of unlinked devices, and prices per shop. */
@@ -88,6 +111,14 @@ export class PosOwnerOfflineController {
   @HttpCode(HttpStatus.OK)
   resolve(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.offline.resolve(caller.customer, id, ownerBy(caller.customer));
+  }
+
+  /** A file of a till's unsent sales, checked against the till's key and applied like its upload. */
+  @Post('offline/import')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  importFile(@CurrentCustomer() caller: CustomerCaller, @Body() body: ImportDto) {
+    return this.offline.importFile(caller.customer, body);
   }
 
   @Get('offline/held')

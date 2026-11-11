@@ -133,6 +133,22 @@ export async function resolveFlags(saleId: string): Promise<PosResult<PosFlagged
   return answer(await posApi<PosFlaggedSale>("POST", `/sales/${saleId}/flags/resolve`));
 }
 
+export type OfflineImport = { device: { id: string; name: string | null }; results: Array<{ client_id: string; kind: string; status: "applied" | "duplicate" | "held" | "rejected"; error?: { message: string } }> };
+
+/** Uploads a file of a till's unsent sales (signed by the till, checked by Udozo). The owner's alone. */
+export async function importOfflineFile(file: string): Promise<PosResult<OfflineImport>> {
+  let body: { payload?: unknown; signature?: unknown };
+  try {
+    body = JSON.parse(file);
+  } catch {
+    return refused("This is not a file of unsent sales from Udozo POS.", "file");
+  }
+  if (typeof body?.payload !== "string" || typeof body.signature !== "string") return refused("This is not a file of unsent sales from Udozo POS.", "file");
+  const result = answer(await customerApi<OfflineImport>("POST", "/v1/pos/owner/offline/import", { payload: body.payload, signature: body.signature }));
+  if (result.ok) revalidatePath("/app/offline");
+  return result;
+}
+
 /** Accepts or rejects a sale an unlinked device uploaded. The owner's alone. */
 export async function decideHeld(id: string, decision: "accept" | "reject"): Promise<PosResult<PosOfflineHeld>> {
   if (!uuid.test(id)) return refused("No such sale.", null, "resource_missing");

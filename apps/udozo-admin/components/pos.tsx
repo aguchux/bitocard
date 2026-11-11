@@ -31,7 +31,7 @@ export function accountState(account: Pick<AdminPosAccount, "status" | "plan" | 
 export const vatWords = (bps: number) => `${(bps / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}%`;
 
 /** What the form holds: each field as typed. */
-export type PlanDraft = { name: string; description: string; prices: Record<string, string>; yearly: Record<string, string>; limits: Record<keyof PosLimits, string>; trial_days: string; shown: boolean };
+export type PlanDraft = { name: string; description: string; prices: Record<string, string>; yearly: Record<string, string>; limits: Record<keyof PosLimits, string>; trial_days: string; shown: boolean; offline_hours: string; offline_sales: string };
 
 export const draftOf = (plan: AdminPosPlan, currencies: string[]): PlanDraft => ({
   name: plan.name,
@@ -41,6 +41,8 @@ export const draftOf = (plan: AdminPosPlan, currencies: string[]): PlanDraft => 
   limits: Object.fromEntries(posLimitKeys.map(key => [key, plan.limits[key] === null ? "" : String(plan.limits[key])])) as PlanDraft["limits"],
   trial_days: String(plan.trial_days),
   shown: plan.shown,
+  offline_hours: String(plan.offline?.hours ?? 72),
+  offline_sales: String(plan.offline?.sales ?? 500),
 });
 
 /** The change the form asks for, or the first thing wrong with it. */
@@ -89,6 +91,12 @@ export function planChange(plan: AdminPosPlan, currencies: string[], draft: Plan
     limits[key] = value;
   }
   change.limits = limits;
+  const hours = Number(draft.offline_hours.trim());
+  if (!Number.isInteger(hours) || hours < 1 || hours > 168) return { error: "A till sells offline for 1 to 168 hours." };
+  const sales = Number(draft.offline_sales.trim());
+  if (!Number.isInteger(sales) || sales < 1 || sales > 5000) return { error: "A till makes 1 to 5,000 sales offline." };
+  change.offline_hours = hours;
+  change.offline_sales = sales;
   if (plan.paid) {
     const trial = Number(draft.trial_days.trim() || "0");
     if (!Number.isInteger(trial) || trial < 0 || trial > 90) return { error: "The trial is from 0 to 90 days." };

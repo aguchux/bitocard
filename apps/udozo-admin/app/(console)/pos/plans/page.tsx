@@ -72,6 +72,18 @@ function EditPlan({ plan, currencies, onClose }: { plan: AdminPosPlan; currencie
             ))}
           </div>
         </fieldset>
+        <fieldset className="grid gap-2">
+          <legend className="text-sm font-semibold text-ink">Selling offline</legend>
+          <p className="text-xs text-muted">How long and how much a linked till may sell with no internet before it must get online again.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label="Hours offline" htmlFor={`${id}-offline-hours`} hint="1 to 168 (a week).">
+              <Input id={`${id}-offline-hours`} inputMode="numeric" value={draft.offline_hours} onChange={event => set({ offline_hours: event.target.value })} />
+            </Field>
+            <Field label="Sales offline" htmlFor={`${id}-offline-sales`} hint="1 to 5,000.">
+              <Input id={`${id}-offline-sales`} inputMode="numeric" value={draft.offline_sales} onChange={event => set({ offline_sales: event.target.value })} />
+            </Field>
+          </div>
+        </fieldset>
         {plan.paid ? (
           <>
             <Field label="Free trial (days)" htmlFor={`${id}-trial`} hint="0 to 90. Only an owner's first paid plan has one.">
@@ -112,6 +124,7 @@ function PlanCard({ plan, currencies, edits }: { plan: AdminPosPlan; currencies:
           ...(plan.paid ? [{ label: "Yearly price", value: Object.keys(plan.yearly_prices ?? {}).length ? currencies.filter(currency => plan.yearly_prices?.[currency] !== undefined).map(currency => `${currency} ${money(plan.yearly_prices![currency]!, currency)}`).join(" · ") : "Monthly only" }] : []),
           { label: "Limits", value: limitsLine(plan.limits) },
           ...(plan.paid ? [{ label: "Free trial", value: plan.trial_days ? `${plan.trial_days} days` : "None" }] : []),
+          { label: "Selling offline", value: plan.offline ? `${plan.offline.hours} hours, ${plan.offline.sales.toLocaleString("en-GB")} sales` : "72 hours, 500 sales" },
           { label: "Accounts on it", value: plan.accounts.toLocaleString("en-GB") },
         ]}
       />

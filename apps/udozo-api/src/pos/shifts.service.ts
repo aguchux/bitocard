@@ -76,7 +76,7 @@ export class PosShiftsService {
   }
 
   /** Opens a shift at a till with the cash in its drawer. */
-  async open(customer: CustomerWithStore, input: { till_id: string; opening_float?: number; note?: string | null }, options: { by?: PosBy; scope?: ShiftScope } & ShiftView = {}) {
+  async open(customer: CustomerWithStore, input: { till_id: string; opening_float?: number; note?: string | null }, options: { by?: PosBy; scope?: ShiftScope; at?: Date; clientId?: string } & ShiftView = {}) {
     const account = await this.account(customer);
     const scope = options.scope ?? {};
     const till = await this.till(account.id, input.till_id, scope);
@@ -84,7 +84,7 @@ export class PosShiftsService {
     const by = options.by ?? ownerBy(customer);
     try {
       const row = await this.prisma.posShift.create({
-        data: { accountId: account.id, shopId: till.shopId, tillId: till.id, tillName: till.name, currency: account.currency, openedByName: by.name.slice(0, 120), openedByStaffId: by.staffId, openingFloatMinor: float, note: text(input.note, 300) },
+        data: { accountId: account.id, shopId: till.shopId, tillId: till.id, tillName: till.name, currency: account.currency, openedByName: by.name.slice(0, 120), openedByStaffId: by.staffId, openingFloatMinor: float, note: text(input.note, 300), ...(options.at ? { openedAt: options.at } : {}), ...(options.clientId ? { clientId: options.clientId } : {}) },
         include: { cash: true },
       });
       return this.present(row, await this.totals(row), options);
@@ -134,7 +134,7 @@ export class PosShiftsService {
   }
 
   /** Cash paid into the drawer or out of it during an open shift, with why. */
-  async cash(customer: CustomerWithStore, id: string, input: { kind: 'in' | 'out'; amount: number; reason: string }, options: { by?: PosBy; scope?: ShiftScope } & ShiftView = {}) {
+  async cash(customer: CustomerWithStore, id: string, input: { kind: 'in' | 'out'; amount: number; reason: string }, options: { by?: PosBy; scope?: ShiftScope; at?: Date; clientId?: string } & ShiftView = {}) {
     const account = await this.account(customer);
     const row = await this.shift(account.id, id, options.scope ?? {});
     if (input.kind !== 'in' && input.kind !== 'out') throw invalid('parameter_invalid', 'Say whether cash went in or out.', 'kind');
@@ -145,7 +145,7 @@ export class PosShiftsService {
     await this.prisma.$transaction(async tx => {
       const [locked] = await tx.$queryRaw<Array<{ status: string }>>`SELECT "status" FROM "pos_shifts" WHERE "id" = ${row.id}::uuid FOR UPDATE`;
       if (locked?.status !== 'open') throw conflict('shift_closed', 'This shift is closed.');
-      await tx.posShiftCash.create({ data: { shiftId: row.id, kind: input.kind, amountMinor: amount, reason, byName: by.name.slice(0, 120), byStaffId: by.staffId } });
+      await tx.posShiftCash.create({ data: { shiftId: row.id, kind: input.kind, amountMinor: amount, reason, byName: by.name.slice(0, 120), byStaffId: by.staffId, ...(options.at ? { createdAt: options.at } : {}), ...(options.clientId ? { clientId: options.clientId } : {}) } });
     });
     return this.get(customer, id, options);
   }
@@ -154,7 +154,7 @@ export class PosShiftsService {
    * Closes a shift with the cash counted: what was expected and the difference are worked out and kept with its totals,
    * under the shift's own lock, so a sale still being rung up at the till is counted before it closes.
    */
-  async close(customer: CustomerWithStore, id: string, input: { counted: number; note?: string | null }, options: { by?: PosBy; scope?: ShiftScope } & ShiftView = {}) {
+  async close(customer: CustomerWithStore, id: string, input: { counted: number; note?: string | null }, options: { by?: PosBy; scope?: ShiftScope; at?: Date } & ShiftView = {}) {
     const account = await this.account(customer);
     const row = await this.shift(account.id, id, options.scope ?? {});
     const counted = cashAmount(input.counted, 'counted');
@@ -170,7 +170,7 @@ export class PosShiftsService {
         where: { id: row.id },
         data: {
           status: 'closed',
-          closedAt: new Date(),
+          closedAt: options.at ?? new Date(),
           closedByName: by.name.slice(0, 120),
           closedByStaffId: by.staffId,
           expectedCashMinor: expected,

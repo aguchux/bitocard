@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PinPad } from "@/components/pin-pad";
 import { cashSuggestions, findProducts, money, paymentMethods, readAmount, tillShown, tillTotals } from "@/lib/pos";
-import { freeNow, type LocalSale, makeSale, maySell, type OfflineCopy, type OfflineMeta, type OfflinePayment, type OfflinePaymentMethod, offlineState, provisionalNumber, soldSince } from "@/lib/offline-rules";
-import { checkPin, hasPinCheck, readCopy, readMeta, readSales, saveSale, writeMeta } from "@/lib/offline-store";
+import { ExportUnsent, ManagerPin, RefundPanel, ShiftPanel, StockPanel } from "@/components/offline-tasks";
+import { type ApprovalNeed, freeNow, level, type LocalSale, type LocalShift, makeSale, mayRunShift, maySell, type OfflineCopy, type OfflineMeta, type OfflinePayment, type OfflinePaymentMethod, offlineState, type OutboxEntry, pendingUpload, provisionalNumber, shareBps, soldSince } from "@/lib/offline-rules";
+import { checkPin, hasPinCheck, readCopy, readEntries, readMeta, readRefunded, readSales, readShift, saveSale, writeMeta } from "@/lib/offline-store";
 import { syncNow } from "@/lib/offline-sync";
 
 type Person = OfflineCopy["staff"][number];
-type Loaded = { copy: OfflineCopy | null; meta: OfflineMeta; sales: LocalSale[]; checks: Set<string> };
+type Loaded = { copy: OfflineCopy | null; meta: OfflineMeta; sales: LocalSale[]; entries: OutboxEntry[]; shift: LocalShift | null; refunded: Set<string>; checks: Set<string> };
+type Mode = "sell" | "shift" | "refund" | "stock";
 
 const newId = () => crypto.randomUUID();
 const button = "inline-flex h-12 items-center justify-center rounded-xl px-5 font-bold disabled:cursor-not-allowed disabled:opacity-50";
@@ -17,10 +19,22 @@ const quiet = `${button} border border-pos-line bg-white text-pos-ink hover:bg-p
 const statusWords: Record<LocalSale["status"], string> = { waiting: "Waiting to upload", uploaded: "Uploaded", flagged: "Uploaded, to look at", failed: "Refused" };
 
 async function load(): Promise<Loaded> {
-  const [copy, meta, sales] = await Promise.all([readCopy(), readMeta(), readSales()]);
+  const [copy, meta, sales, entries, shift, refunded] = await Promise.all([readCopy(), readMeta(), readSales(), readEntries(), readShift(), readRefunded()]);
   const checks = new Set<string>();
   for (const person of copy?.staff ?? []) if (await hasPinCheck(person.id)) checks.add(person.id);
-  return { copy, meta, sales, checks };
+  return { copy, meta, sales, entries, shift, refunded, checks };
+}
+
+/** Cash given back for refunds made on this till since the shift opened. */
+function refundedCash(data: Loaded) {
+  const shift = data.shift;
+  if (!shift) return 0;
+  const cashOf = (id: string) => {
+    const local = data.sales.find(sale => sale.client_sale_id === id);
+    const payments: ReadonlyArray<{ method: string; amount: number }> = local?.payments ?? data.copy?.recent_sales?.find(sale => sale.client_sale_id === id)?.payments ?? [];
+    return payments.filter(payment => payment.method === "cash").reduce((sum, payment) => sum + payment.amount, 0);
+  };
+  return data.entries.filter(entry => entry.kind === "refund" && entry.status !== "failed" && entry.created_at >= shift.opened_at).reduce((sum, entry) => sum + cashOf(String(entry.entry.sale_client_id)), 0);
 }
 
 /**
@@ -28,7 +42,9 @@ async function load(): Promise<Loaded> {
  * online sign in with their PIN against this till's own check; they sell from the till's copy (its prices, what was
  * free less what this till sold since) for cash, card, a transfer to the shop or another recorded payment; each sale is
  * saved on the device with a provisional number naming the till, printed with the browser, and uploaded in order as
- * soon as there is a connection. It stops selling past 72 hours or 500 sales offline.
+ * soon as there is a connection. Shifts, refunds and stock changes are made offline too, a colleague's PIN approving
+ * what the role cannot do alone (a bigger discount, selling past the copy's stock, a refund or a stock change), and
+ * receipts asked for by WhatsApp or email go once the sale reaches Udozo. It stops selling past its plan's limits.
  */
 export function OfflineTill() {
   const [data, setData] = useState<Loaded | null>(null);
@@ -47,6 +63,11 @@ export function OfflineTill() {
   const [amountText, setAmountText] = useState("");
   const [tenderedText, setTenderedText] = useState("");
   const [done, setDone] = useState<LocalSale | null>(null);
+  const [mode, setMode] = useState<Mode>("sell");
+  const [approval, setApproval] = useState<{ need: ApprovalNeed; then: (approver: Person) => void } | null>(null);
+  const [saleApprover, setSaleApprover] = useState<Person | null>(null);
+  const [receiptPhone, setReceiptPhone] = useState("");
+  const [receiptEmail, setReceiptEmail] = useState("");
 
   const reload = useCallback(() => load().then(next => (setData(next), setNow(Date.now()))), []);
   const sync = useCallback(async () => {
@@ -83,7 +104,7 @@ export function OfflineTill() {
   const sold = useMemo(() => soldSince(data?.sales ?? []), [data]);
   const products = useMemo(() => (copy?.products ?? []).filter(product => product.price !== null && product.blocked !== "plan_limit"), [copy]);
   const byId = useMemo(() => new Map(products.map(product => [product.id, product])), [products]);
-  const waiting = (data?.sales ?? []).filter(sale => sale.status === "waiting").length;
+  const waiting = data ? pendingUpload(data.sales, data.entries).length : 0;
 
   if (!data) return <p className="p-6 text-pos-ink-2">Opening the till…</p>;
   const state = offlineState(copy, data.meta, now || new Date(copy?.synced_at ?? 0).getTime());
@@ -93,11 +114,12 @@ export function OfflineTill() {
       <div>
         <p className="font-display text-xl font-bold text-pos-ink">{copy ? `${copy.shop.name} · ${copy.till.name}` : "Offline till"}</p>
         <p className="text-sm text-pos-muted">
-          {online ? "Online" : "Offline"} · {waiting ? `${waiting} ${waiting === 1 ? "sale" : "sales"} waiting to upload` : "Nothing waiting to upload"}
+          {online ? "Online" : "Offline"} · {waiting ? `${waiting} waiting to upload` : "Nothing waiting to upload"}
           {copy ? ` · copy from ${new Date(copy.synced_at).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}` : ""}
         </p>
       </div>
-      <span className="flex flex-wrap gap-2">
+      <span className="flex flex-wrap items-start gap-2">
+        {copy ? <ExportUnsent copy={copy} sales={data.sales} entries={data.entries} /> : null}
         {online ? (
           <button type="button" onClick={() => void sync()} disabled={syncing} className={quiet}>
             {syncing ? "Syncing…" : "Upload and sync"}
@@ -116,6 +138,9 @@ export function OfflineTill() {
               setCart([]);
               setPayments([]);
               setDone(null);
+              setMode("sell");
+              setApproval(null);
+              setSaleApprover(null);
             }}
             className={quiet}
           >
@@ -213,6 +238,58 @@ export function OfflineTill() {
     );
   }
 
+  const ask = (need: ApprovalNeed, then: (approver: Person) => void) => setApproval({ need, then });
+  const tabs: Array<[Mode, string]> = [
+    ["sell", "Sell"],
+    ...(mayRunShift(person) ? ([["shift", "Shift"]] as Array<[Mode, string]>) : []),
+    ...(level(person, "refund") !== "no" ? ([["refund", "Refund"]] as Array<[Mode, string]>) : []),
+    ...(level(person, "stock_adjust") !== "no" ? ([["stock", "Stock"]] as Array<[Mode, string]>) : []),
+  ];
+  const nav = (
+    <nav aria-label="Offline till" className="no-print flex flex-wrap gap-2">
+      {tabs.map(([key, label]) => (
+        <button key={key} type="button" aria-pressed={mode === key} onClick={() => (setMode(key), setMessage(null))} className={`h-10 rounded-full px-4 text-sm font-semibold ${mode === key ? "bg-pos-600 text-white" : "border border-pos-line bg-white"}`}>
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+  if (approval) {
+    return (
+      <div className="grid gap-4">
+        {header}
+        <ManagerPin
+          staff={copy!.staff}
+          checks={data.checks}
+          need={approval.need}
+          asking={person.id}
+          onApproved={approver => {
+            const then = approval.then;
+            setApproval(null);
+            then(approver);
+          }}
+          onCancel={() => setApproval(null)}
+        />
+      </div>
+    );
+  }
+  if (mode !== "sell" && !done) {
+    const changed = () => {
+      void reload();
+      if (navigator.onLine) void sync();
+    };
+    return (
+      <div className="grid gap-4">
+        {header}
+        {nav}
+        {mode === "shift" ? <ShiftPanel person={person} copy={copy!} shift={data.shift} sales={data.sales} refundedCash={refundedCash(data)} onChange={changed} /> : null}
+        {mode === "refund" ? <RefundPanel person={person} copy={copy!} sales={data.sales} refunded={data.refunded} ask={ask} onChange={changed} /> : null}
+        {mode === "stock" ? <StockPanel person={person} copy={copy!} ask={ask} onChange={changed} /> : null}
+        <RecentSales sales={data.sales} currency={currency} />
+      </div>
+    );
+  }
+
   // ---- A sale done ----
   if (done) {
     return (
@@ -223,7 +300,7 @@ export function OfflineTill() {
           <button type="button" onClick={() => window.print()} className={quiet}>
             Print receipt
           </button>
-          <button type="button" autoFocus onClick={() => (setDone(null), setCart([]), setPayments([]), setDiscountText(""))} className={primary}>
+          <button type="button" autoFocus onClick={() => (setDone(null), setCart([]), setPayments([]), setDiscountText(""), setSaleApprover(null), setReceiptPhone(""), setReceiptEmail(""))} className={primary}>
             New sale
           </button>
         </div>
@@ -239,7 +316,9 @@ export function OfflineTill() {
   const discount = readAmount(discountText) ?? 0;
   const totals = tillTotals(lines.map(line => ({ id: line.product.id, unit: line.product.price!, quantity: line.quantity })), { discount, vatBps: copy!.shop.vat_bps });
   const limit = person.role.discount_limit_bps;
-  const overLimit = limit !== null && totals.subtotal > 0 && Math.ceil((totals.discount * 10_000) / totals.subtotal) > limit;
+  const share = shareBps(totals.discount, totals.subtotal);
+  const approverCovers = saleApprover !== null && level(saleApprover, "sell") === "yes" && (saleApprover.role.discount_limit_bps === null || share <= saleApprover.role.discount_limit_bps);
+  const overLimit = limit !== null && share > limit && !approverCovers;
   const paid = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const remaining = Math.max(0, totals.total - paid);
   const found = findProducts(products, words).matches.slice(0, tillShown);
@@ -248,12 +327,20 @@ export function OfflineTill() {
     if (!product) return;
     const free = freeNow(product, sold);
     const line = cart.find(item => item.id === id);
+    const put = () => setCart(current => (current.some(item => item.id === id) ? current.map(item => (item.id === id ? { ...item, quantity: item.quantity + 1 } : item)) : [...current, { id, quantity: 1 }]));
     if ((line?.quantity ?? 0) >= free) {
+      // Past the copy's stock: a colleague who changes stock may say it is on the shelf (Udozo flags it if it was not).
+      if (saleApprover && level(saleApprover, "stock_adjust") === "yes") return (setMessage(null), put());
       setMessage(free ? `Only ${free} of “${product.title}” free on this till's copy.` : `“${product.title}” is out of stock on this till's copy.`);
+      ask({ kind: "oversell" }, approver => {
+        setSaleApprover(approver);
+        setMessage(null);
+        put();
+      });
       return;
     }
     setMessage(null);
-    setCart(line ? cart.map(item => (item.id === id ? { ...item, quantity: item.quantity + 1 } : item)) : [...cart, { id, quantity: 1 }]);
+    put();
   };
   const addPayment = () => {
     const amount = readAmount(amountText) ?? remaining;
@@ -266,13 +353,24 @@ export function OfflineTill() {
     setMessage(null);
   };
   const complete = async () => {
-    if (overLimit) return setMessage("That discount is more than your role allows. A manager can give it online.");
+    if (overLimit) {
+      ask({ kind: "discount", bps: share }, approver => {
+        setSaleApprover(approver);
+        setMessage("Approved. Complete the sale.");
+      });
+      return;
+    }
+    const phone = receiptPhone.trim() || null;
+    const email = receiptEmail.trim() || null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMessage("That email address does not look right.");
     const meta = await readMeta();
     const made = makeSale({
       client_sale_id: newId(),
       client_number: provisionalNumber(copy!.till.name, meta.next_number),
       now: new Date(),
       staff: { id: person.id, name: person.name },
+      approved_by_staff_id: saleApprover?.id ?? null,
+      receipt: { whatsapp: phone, email },
       lines: lines.map(line => ({ listing_id: line.product.id, title: line.product.title ?? "Untitled", quantity: line.quantity, unit_price: line.product.price! })),
       discount: totals.discount,
       vat_bps: copy!.shop.vat_bps,
@@ -290,6 +388,7 @@ export function OfflineTill() {
   return (
     <div className="grid gap-4">
       {header}
+      {nav}
       {state.warn ? (
         <p role="alert" className="rounded-xl bg-pos-warn-bg px-4 py-3 font-semibold text-pos-warn">
           {state.warn}
@@ -324,7 +423,7 @@ export function OfflineTill() {
               const free = freeNow(product, sold);
               return (
                 <li key={product.id} className="min-w-0">
-                  <button type="button" disabled={free === 0} onClick={() => add(product.id)} className="grid h-full w-full content-start gap-1 rounded-[16px] bg-white p-2 text-left hover:ring-2 hover:ring-pos-600 disabled:opacity-55">
+                  <button type="button" onClick={() => add(product.id)} className="grid h-full w-full content-start gap-1 rounded-[16px] bg-white p-2 text-left hover:ring-2 hover:ring-pos-600 disabled:opacity-55">
                     <span className="line-clamp-2 text-sm font-semibold text-pos-ink">{product.title ?? "Untitled"}</span>
                     <span className="font-display font-bold text-pos-ink">{money(product.price!, currency)}</span>
                     <span className={`text-xs ${free ? "text-pos-muted" : "text-pos-warn"}`}>{free ? `${free} free` : "Out of stock"}</span>
@@ -422,6 +521,16 @@ export function OfflineTill() {
               ) : null}
             </fieldset>
           ) : null}
+          {lines.length ? (
+            <details className="text-sm">
+              <summary className="cursor-pointer font-semibold text-pos-ink-2">Send the receipt (when back online)</summary>
+              <div className="mt-2 grid gap-2">
+                <input inputMode="tel" value={receiptPhone} onChange={event => setReceiptPhone(event.target.value)} placeholder="WhatsApp number" aria-label="WhatsApp number for the receipt" className="h-11 rounded-xl border border-pos-line px-3" />
+                <input type="email" value={receiptEmail} onChange={event => setReceiptEmail(event.target.value)} placeholder="Email address" aria-label="Email address for the receipt" className="h-11 rounded-xl border border-pos-line px-3" />
+              </div>
+            </details>
+          ) : null}
+          {saleApprover ? <p className="text-sm text-pos-muted">Approved by {saleApprover.name}</p> : null}
           {message ? (
             <p role="alert" className="text-sm font-semibold text-pos-error">
               {message}
