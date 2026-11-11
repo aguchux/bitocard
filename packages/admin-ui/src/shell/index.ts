@@ -7,3 +7,4 @@ export { NotificationBell, NotificationsInbox, unreadPollMs } from './notificati
 export { PushSettings, pushSupported, usePushSync } from './push';
 export { docsOrigins, goNext, returnOrigins, safeNext, verifyOrigins } from './return-to';
 export { StepUpPrompt } from './step-up';
+export { UdozoAuthLayout, type UdozoAuthFeature, type UdozoAuthLayoutProps } from './udozo-auth';

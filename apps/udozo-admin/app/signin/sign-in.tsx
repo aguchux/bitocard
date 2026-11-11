@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import { ArrowLeft, Lock, Mail, MailCheck, ShieldCheck } from "lucide-react";
 import { Button, cn, CodeInput, Field, Input, Notice, PasswordToggleButton } from "@bitocard/admin-ui";
-import { UdozoWordmark } from "@/components/wordmark";
 import {
   useAdminForgotPasswordMutation,
   useAdminMfaSetupMutation,
@@ -152,10 +151,6 @@ export function SignIn() {
 
   return (
     <div className="w-full max-w-md space-y-6">
-      <div className="flex items-center justify-center lg:hidden">
-        <UdozoWordmark className="text-3xl" />
-      </div>
-
       {step.kind === "email" ? (
         <form onSubmit={submitEmail} className="space-y-5" noValidate>
           <div className="text-center">

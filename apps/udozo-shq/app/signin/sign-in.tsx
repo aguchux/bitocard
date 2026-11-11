@@ -9,7 +9,6 @@ import { TwoStepSignIn } from "@/components/two-step";
 import { useSignOut } from "@/components/reseller";
 import { AppLink, goNext } from "@bitocard/admin-ui/shell";
 import { Button, cn, errorMessage, Input, Notice, PasswordToggleButton } from "@bitocard/admin-ui";
-import { UdozoWordmark } from "@/components/wordmark";
 
 export { goNext } from "@bitocard/admin-ui/shell";
 
@@ -160,9 +159,6 @@ export function SignIn() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8 flex items-center lg:hidden">
-        <UdozoWordmark suffix="Seller HQ" className="text-3xl" />
-      </div>
       <h2 className="text-3xl font-extrabold tracking-tight text-ink">Sign in</h2>
       <p className="mt-2 text-sm text-muted">Welcome back. Sign in to run your store, orders and wallet.</p>
 

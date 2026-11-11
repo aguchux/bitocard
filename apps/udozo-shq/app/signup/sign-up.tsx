@@ -15,7 +15,6 @@ import {
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { PhoneInput } from "@bitocard/ui/phone-input";
 import { Button, CodeInput, cn, errorMessage, Notice, PasswordToggleButton, Select, Skeleton } from "@bitocard/admin-ui";
-import { UdozoWordmark } from "@/components/wordmark";
 import { continueWithFacebook, continueWithGoogle, FacebookMark, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
 type Step = "details" | "verify" | "business" | "phone" | "password";
@@ -221,9 +220,6 @@ export function SignUp({ sellerTermsUrl, termsUrl, privacyUrl }: { sellerTermsUr
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8 flex items-center lg:hidden">
-        <UdozoWordmark suffix="Seller HQ" className="text-3xl" />
-      </div>
       <h2 className="text-3xl font-extrabold tracking-tight text-ink">{invitation ? "Join your team" : "Create your Seller HQ account"}</h2>
       <p className="mt-2 text-sm text-muted">
         {invitation
