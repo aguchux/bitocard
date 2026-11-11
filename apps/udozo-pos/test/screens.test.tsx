@@ -20,6 +20,7 @@ const { Tills } = await import("@/components/tills");
 const { PlanCards } = await import("@/components/plan-cards");
 const { AppButtons } = await import("@/components/app-buttons");
 const { OwnerNav } = await import("@/components/owner-nav");
+const { PosMark, UdozoMark } = await import("@/components/site-chrome");
 
 const mounted: Array<() => void> = [];
 function mount(element: ReturnType<typeof createElement>) {
@@ -177,6 +178,15 @@ describe("the public pieces", () => {
     const links = [...host.querySelectorAll("a")].map(item => item.getAttribute("href"));
     expect(links).toEqual(["https://play.google.com/store/apps/details?id=com.udozo.pos", "/app"]);
     expect(host.textContent!.match(/Coming soon/g)).toHaveLength(2);
+  });
+
+  it("wears udozo.com's own mark, white on the dark green and blue on light pages, never a drawn stand-in", () => {
+    const dark = mount(createElement(PosMark));
+    expect(dark.querySelector("img")!.getAttribute("src")).toContain("udozo-mark-light.png");
+    expect(dark.textContent).toBe("Udozo POS");
+    const light = mount(createElement(UdozoMark, { tone: "light" }));
+    expect(light.querySelector("img")!.getAttribute("src")).toContain("udozo-mark.png");
+    expect(light.querySelector("img")!.getAttribute("src")).not.toContain("light");
   });
 
   it("marks the owner's current place", () => {

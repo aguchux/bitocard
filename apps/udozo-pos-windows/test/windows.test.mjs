@@ -91,6 +91,12 @@ describe('icons and Store tiles', () => {
     for (const icon of config.bundle.icon) assert.ok(existsSync(join(here, 'src-tauri', icon)), icon);
   });
 
+  test('are drawn from Udozo’s own logo, the master udozo.com’s icons come from', () => {
+    const script = readFileSync(join(here, '..', '..', 'scripts', 'brand-assets.py'), 'utf8');
+    assert.match(script, /DESKTOP = \{"udozo": \[ROOT \/ "apps" \/ "udozo-pos-windows"\]\}/);
+    assert.match(script, /\("udozo", ROOT \/ "assets" \/ "udozo" \/ "logo\.png"/);
+  });
+
   test('every tile the manifest names exists at the size Windows expects', () => {
     const manifest = read('msix/AppxManifest.xml');
     const named = [...manifest.matchAll(/Assets\\([A-Za-z0-9]+)\.png/g)].map(match => match[1]);

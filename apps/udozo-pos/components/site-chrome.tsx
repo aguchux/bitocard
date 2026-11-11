@@ -1,13 +1,17 @@
+import Image from "next/image";
 import Link from "next/link";
 import { udozoUrl } from "@/lib/site";
 
-/** Udozo POS's mark: a green tile with its U, and the name beside it. */
+/** Udozo's own mark, as udozo.com shows it: blue on light backgrounds, white on the POS's dark green. */
+export function UdozoMark({ tone = "dark", className = "h-9 w-9" }: { tone?: "dark" | "light"; className?: string }) {
+  return <Image src={tone === "dark" ? "/udozo-mark-light.png" : "/udozo-mark.png"} alt="" width={512} height={512} className={className} priority />;
+}
+
+/** Udozo POS's lockup: Udozo's mark, and the name beside it. */
 export function PosMark({ tone = "dark" }: { tone?: "dark" | "light" }) {
   return (
     <span className="flex items-center gap-2.5">
-      <span aria-hidden="true" className="flex size-9 items-center justify-center rounded-[10px] bg-pos-500 font-display text-lg font-bold text-white">
-        U
-      </span>
+      <UdozoMark tone={tone} />
       <span className={`font-display text-[19px] font-bold ${tone === "dark" ? "text-white" : "text-pos-ink"}`}>Udozo POS</span>
     </span>
   );

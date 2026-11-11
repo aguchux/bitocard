@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentCustomer } from "@/lib/session";
 import { safeNext, signInPath, udozoUrl } from "@/lib/site";
+import { UdozoMark } from "@/components/site-chrome";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: true }, alternates: { canonical: "/signin" } };
 
@@ -41,9 +42,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           </h2>
           <p className="mt-2 text-pos-ink-2">Use the account you sell with on udozo.com. You get full admin rights for your shop.</p>
           <a href={signInPath(next)} className="mt-5 flex h-12 items-center justify-center gap-2 rounded-xl bg-pos-600 font-bold text-white no-underline hover:bg-pos-700">
-            <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-md bg-white/20 font-display text-sm">
-              U
-            </span>
+            <UdozoMark className="h-6 w-6" />
             Continue with Udozo
           </a>
           <p className="mt-3 text-sm text-pos-muted">
