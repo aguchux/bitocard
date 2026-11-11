@@ -568,5 +568,10 @@
     "own": true,
     "hex": "384254",
     "source": "https://ieetek.com/wp-content/uploads/2021/07/ieetek-logo-300x77.png"
+  },
+  "ratel-power": {
+    "own": true,
+    "hex": "38C810",
+    "source": "https://ratelpower.com/logo.png"
   }
 }

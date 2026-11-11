@@ -169,6 +169,20 @@ describe('reading a title', () => {
     const panel = await detect('Initial Entropy Energy SP200 foldable solar panel', 'generators-solar');
     assert.deepEqual([panel.brand?.name, panel.model], ['IEE', 'SP200 solar panel']);
   });
+
+  test('Ratel Power: its bundled logo and every model its shop lists, each in the category it is sold in', async () => {
+    const ratel = await prisma.classifiedBrand.findUniqueOrThrow({ where: { slug: 'ratel-power' }, include: { categories: { include: { category: true } } } });
+    assert.deepEqual([ratel.name, ratel.logoFile, ratel.color], ['Ratel Power', 'ratel-power', '#38C810']);
+    assert.deepEqual(ratel.categories.map(link => link.category.slug).sort(), ['cameras', 'generators-solar', 'home-accessories', 'home-appliances', 'phone-accessories', 'vehicle-parts']);
+    assert.equal(await prisma.classifiedBrandModel.count({ where: { brandId: ratel.id } }), 18);
+    const stations = await visitor.get('/v1/classifieds/models?brand=Ratel%20Power&category=generators-solar&limit=50');
+    assert.equal(stations.status, 200, JSON.stringify(stations.json));
+    assert.equal(stations.json.data.length, 7);
+    const station = await detect('Ratel RP2400 power station, 2232Wh LiFePO4', 'generators-solar');
+    assert.deepEqual([station.brand?.name, station.model], ['Ratel Power', 'RP2400 power station']);
+    const socket = await detect('Ratel power inverter socket RPi 500 for cars', 'vehicle-parts');
+    assert.deepEqual([socket.brand?.name, socket.model], ['Ratel Power', 'Power inverter socket RPi 500']);
+  });
 });
 
 describe("listings' models", () => {
