@@ -7974,6 +7974,7 @@ model PosAccount {
   approvals          PosApproval[]
   receiptCodes       PosReceiptCode[]
   receiptSends       PosReceiptSend[]
+  shifts             PosShift[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -8015,6 +8016,7 @@ model PosShop {
   collectionAccounts PosCollectionAccount[]
   transferRequests   PosTransferRequest[]
   collections        PosCollection[]
+  shifts             PosShift[]
 
   @@index([accountId, position])
   @@map("pos_shops")
@@ -8039,6 +8041,7 @@ model PosTill {
   staffTills         PosStaffTill[]
   devices            PosDevice[]
   staffSessions      PosStaffSession[]
+  shifts             PosShift[]
 
   @@index([shopId, position])
   @@map("pos_tills")
@@ -8080,6 +8083,11 @@ model PosSale {
   invoiceIssuedAt DateTime?  @map("invoice_issued_at")
   receiptCodes    PosReceiptCode[]
   receiptSends    PosReceiptSend[]
+  /// The till's shift it was rung up in, and the one its refund was paid out of.
+  shiftId         String?    @map("shift_id") @db.Uuid
+  refundShiftId   String?    @map("refund_shift_id") @db.Uuid
+  shift           PosShift?  @relation("PosShiftSales", fields: [shiftId], references: [id], onDelete: SetNull)
+  refundShift     PosShift?  @relation("PosShiftRefunds", fields: [refundShiftId], references: [id], onDelete: SetNull)
   createdAt       DateTime   @default(now()) @map("created_at")
   account         PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   shop            PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
@@ -8097,6 +8105,8 @@ model PosSale {
 
   @@unique([shopId, number], map: "pos_sales_shop_number_key")
   @@unique([shopId, invoiceNumber], map: "pos_sales_shop_invoice_key")
+  @@index([shiftId], map: "pos_sales_shift_idx")
+  @@index([refundShiftId], map: "pos_sales_refund_shift_idx")
   @@unique([accountId, clientSaleId], map: "pos_sales_client_key")
   @@index([accountId, createdAt(sort: Desc)], map: "pos_sales_account_created_idx")
   @@map("pos_sales")
@@ -8629,4 +8639,55 @@ model PosReceiptSend {
   @@index([saleId, createdAt(sort: Desc)], map: "pos_receipt_sends_sale_idx")
   @@index([accountId, createdAt(sort: Desc)], map: "pos_receipt_sends_account_idx")
   @@map("pos_receipt_sends")
+}
+
+/// A till's shift (Udozo POS milestone 7): opened with the cash in the drawer, closed with the cash counted against what
+/// was expected (the float, cash sales and refunds while it was open, money paid in and out). One open shift a till.
+model PosShift {
+  id                String     @id @default(uuid()) @db.Uuid
+  accountId         String     @map("account_id") @db.Uuid
+  shopId            String     @map("shop_id") @db.Uuid
+  tillId            String?    @map("till_id") @db.Uuid
+  tillName          String     @map("till_name")
+  currency          String     @db.VarChar(10)
+  /// `open` or `closed`.
+  status            String     @default("open") @db.VarChar(16)
+  openedAt          DateTime   @default(now()) @map("opened_at")
+  openedByName      String     @map("opened_by_name") @db.VarChar(120)
+  openedByStaffId   String?    @map("opened_by_staff_id") @db.Uuid
+  openingFloatMinor BigInt     @default(0) @map("opening_float_minor")
+  closedAt          DateTime?  @map("closed_at")
+  closedByName      String?    @map("closed_by_name") @db.VarChar(120)
+  closedByStaffId   String?    @map("closed_by_staff_id") @db.Uuid
+  expectedCashMinor BigInt?    @map("expected_cash_minor")
+  countedCashMinor  BigInt?    @map("counted_cash_minor")
+  differenceMinor   BigInt?    @map("difference_minor")
+  /// At closing: what it took by payment method, its sales, refunds and items, as they were.
+  totals            Json?
+  note              String?    @db.VarChar(300)
+  account           PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  shop              PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  till              PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+  cash              PosShiftCash[]
+  sales             PosSale[]  @relation("PosShiftSales")
+  refunds           PosSale[]  @relation("PosShiftRefunds")
+
+  @@index([accountId, openedAt(sort: Desc)], map: "pos_shifts_account_opened_idx")
+  @@map("pos_shifts")
+}
+
+/// Cash paid into (`in`) or out of (`out`) a till's drawer during a shift, with why.
+model PosShiftCash {
+  id          String   @id @default(uuid()) @db.Uuid
+  shiftId     String   @map("shift_id") @db.Uuid
+  kind        String   @db.VarChar(8)
+  amountMinor BigInt   @map("amount_minor")
+  reason      String   @db.VarChar(200)
+  byName      String   @map("by_name") @db.VarChar(120)
+  byStaffId   String?  @map("by_staff_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  shift       PosShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([shiftId, createdAt], map: "pos_shift_cash_shift_idx")
+  @@map("pos_shift_cash")
 }

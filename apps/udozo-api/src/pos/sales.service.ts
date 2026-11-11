@@ -47,6 +47,15 @@ type Till = Prisma.PosTillGetPayload<{ include: { shop: true } }>;
 export type Built = Awaited<ReturnType<PosSalesService['build']>>;
 
 const iso = (date: Date | null) => (date ? date.toISOString() : null);
+
+/**
+ * The till's open shift, if any, for a sale rung up or refunded in it: read with a share lock, so closing the shift (which
+ * locks it for update) waits for the sale and counts it, and a sale after the close finds it closed.
+ */
+export async function openShiftOf(tx: Prisma.TransactionClient, tillId: string) {
+  const [row] = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "pos_shifts" WHERE "till_id" = ${tillId}::uuid AND "status" = 'open' FOR SHARE`;
+  return row?.id ?? null;
+}
 const text = (value: string | null | undefined, max: number) => (value?.trim() ? value.trim().slice(0, max) : null);
 const minor = (value: number | undefined | null, param: string) => {
   if (value === undefined || value === null) return 0n;
@@ -209,6 +218,7 @@ export class PosSalesService {
     const { lines, totals, paid } = built;
     const [counter] = await tx.$queryRaw<Array<{ n: number }>>`UPDATE "pos_shops" SET "sale_next" = "sale_next" + 1 WHERE "id" = ${till.shopId}::uuid RETURNING "sale_next" - 1 AS "n"`;
     // Each line's own share of the discounts, as saleTotals worked them out.
+    const shiftId = await openShiftOf(tx, till.id);
     const lineTotals = lines.map(line => {
       const gross = line.unit * BigInt(line.quantity);
       const off = line.discount > gross ? gross : line.discount;
@@ -232,6 +242,7 @@ export class PosSalesService {
         soldByCustomerId: soldBy.customerId,
         soldByName: soldBy.name,
         soldByStaffId: soldBy.staffId,
+        shiftId,
         customerId: built.customer?.id ?? null,
         note: text(input.note, 300),
         clientCreatedAt: input.client_created_at ? new Date(input.client_created_at) : null,
@@ -381,12 +392,13 @@ export class PosSalesService {
   }
 
   private async refundIn(
-    sale: { id: string; number: string; shopId: string; customerId: string | null; totalMinor: bigint; lines: Array<{ listingId: string; quantity: number }>; payments: Array<{ method: string; amountMinor: bigint }> },
+    sale: { id: string; number: string; shopId: string; tillId: string | null; customerId: string | null; totalMinor: bigint; lines: Array<{ listingId: string; quantity: number }>; payments: Array<{ method: string; amountMinor: bigint }> },
     args: { account: Account; customer: CustomerWithStore; by: PosBy; reason: string; restock: boolean; now: Date; reversals: Awaited<ReturnType<LedgerService['prepare']>>[] },
   ) {
     const { account, by, reason, restock, now } = args;
     await this.prisma.$transaction(async tx => {
-      const claimed = await tx.posSale.updateMany({ where: { id: sale.id, status: 'completed' }, data: { status: 'refunded', refundedAt: now, refundReason: reason, restocked: restock, refundedByName: by.name.slice(0, 120), refundedByStaffId: by.staffId } });
+      const refundShiftId = sale.tillId ? await openShiftOf(tx, sale.tillId) : null;
+      const claimed = await tx.posSale.updateMany({ where: { id: sale.id, status: 'completed' }, data: { status: 'refunded', refundedAt: now, refundReason: reason, restocked: restock, refundedByName: by.name.slice(0, 120), refundedByStaffId: by.staffId, refundShiftId } });
       if (claimed.count === 0) throw conflict('sale_refunded', `${sale.number} was refunded already.`);
       for (const entry of args.reversals) await this.ledger.write(tx, entry);
       if (sale.customerId) {
@@ -475,6 +487,9 @@ export class PosSalesService {
       refunded_at: iso(sale.refundedAt),
       refund_reason: sale.refundReason,
       restocked: sale.restocked,
+      /** The till's shift it was rung up in, and the one its refund was paid out of. */
+      shift_id: sale.shiftId,
+      refund_shift_id: sale.refundShiftId,
       created_at: sale.createdAt.toISOString(),
       client_created_at: iso(sale.clientCreatedAt),
     };

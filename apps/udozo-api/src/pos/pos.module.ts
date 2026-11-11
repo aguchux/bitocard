@@ -9,6 +9,9 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { WhatsappModule } from '../whatsapp/whatsapp.module.js';
 import { PosOwnerReceiptsController, PosStaffReceiptsController } from './receipts.controller.js';
 import { PosReceiptsService } from './receipts.service.js';
+import { PosOwnerReportsController, PosStaffReportsController } from './reports.controller.js';
+import { PosReportsService } from './reports.service.js';
+import { PosShiftsService } from './shifts.service.js';
 import { PosCollectionsService } from './collections.service.js';
 import { PosCustomersService } from './customers.service.js';
 import { PosBillingService } from './billing.service.js';
@@ -25,8 +28,8 @@ import { PosStaffService } from './staff.service.js';
 /** Udozo POS (docs/UDOZO_POS_PLAN.md): owners' accounts, shops and tills, the three plans and their monthly charges. */
 @Module({
   imports: [AuthModule, CheckoutModule, SettingsModule, ClassifiedsModule, PaymentsModule, PayoutsModule, CustomerCashModule, WhatsappModule],
-  controllers: [PublicPosController, PosOwnerController, PosPaymentsController, AdminPosController, PosStaffAuthController, PosDeviceController, PosOwnerStaffController, PosStaffController, PosOwnerReceiptsController, PosStaffReceiptsController],
-  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService, PosCustomersService, PosCollectionsService, PosStaffService, PosReceiptsService, PosGuard, PosDeviceGuard],
+  controllers: [PublicPosController, PosOwnerController, PosPaymentsController, AdminPosController, PosStaffAuthController, PosDeviceController, PosOwnerStaffController, PosStaffController, PosOwnerReceiptsController, PosStaffReceiptsController, PosOwnerReportsController, PosStaffReportsController],
+  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService, PosCustomersService, PosCollectionsService, PosStaffService, PosReceiptsService, PosShiftsService, PosReportsService, PosGuard, PosDeviceGuard],
   exports: [PosBillingService, PosCollectionsService],
 })
 export class PosModule {}
