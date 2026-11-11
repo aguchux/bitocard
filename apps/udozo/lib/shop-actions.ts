@@ -90,6 +90,12 @@ export type ListingFields = Partial<{
   resale_markup_max_bps: number;
   /** Units to sell, shared by every channel. */
   stock: number;
+  /** Sold at the seller's shop through Udozo POS. */
+  pos_enabled: boolean;
+  /** What the till scans, as typed; empty removes it. */
+  barcode: string;
+  /** Low stock at the POS once stock is this or fewer, as typed; empty: never. */
+  reorder_level: string;
   /** Ship through Udozo Connect, to a Connect Centre in the states below. */
   connect: boolean;
   /** The states it ships to through Udozo Connect, each with its shipping charge as typed ("1,500"; empty is free). */
@@ -133,6 +139,13 @@ function body(fields: ListingFields): { body: Record<string, unknown> } | { prob
       out.auction_reserve = minor;
     }
   }
+  if (fields.barcode !== undefined) out.barcode = fields.barcode.trim() || null;
+  if (fields.reorder_level !== undefined) {
+    const typed = fields.reorder_level.trim();
+    const level = typed ? Number(typed) : null;
+    if (level !== null && (!Number.isInteger(level) || level < 0 || level > 100000)) return { problem: refused("Give the reorder level as a whole number, such as 5 (or leave it empty).", "reorder_level") };
+    out.reorder_level = level;
+  }
   if (fields.connect !== undefined) out.connect = fields.connect;
   if (fields.connect_states !== undefined) {
     const states: Array<{ state_id: string; shipping: number }> = [];
@@ -145,7 +158,7 @@ function body(fields: ListingFields): { body: Record<string, unknown> } | { prob
   }
   if (fields.connect_centres !== undefined) out.connect_centres = fields.connect_centres;
   if (fields.features) out.features = fields.features.filter(item => item.value !== null && item.value !== "");
-  for (const key of ["on_shop", "resale", "resale_discount_bps", "resale_markup_max_bps", "stock"] as const) if (fields[key] !== undefined) out[key] = fields[key];
+  for (const key of ["on_shop", "resale", "resale_discount_bps", "resale_markup_max_bps", "stock", "pos_enabled"] as const) if (fields[key] !== undefined) out[key] = fields[key];
   return { body: out };
 }
 

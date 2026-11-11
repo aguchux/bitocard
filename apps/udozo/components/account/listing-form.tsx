@@ -22,6 +22,7 @@ import {
   type ShopModelMatch,
   type ShopMyListing,
   type ShopPriceKind,
+  type ShopPosStatus,
   type ShopResaleAvailability,
   type ShopState,
   type ShopTopCategory,
@@ -123,6 +124,7 @@ export function ListingForm({
   minPhotos,
   assistant = null,
   resale = null,
+  pos = null,
   source = "direct",
   connect = null,
   auctions = false,
@@ -138,6 +140,8 @@ export function ListingForm({
   assistant?: { name: string } | null;
   /** Whether the seller can open listings to resellers, and Udozo's limits (null: not known). */
   resale?: ShopResaleAvailability | null;
+  /** Whether the seller has Udozo POS, to sell it at their shop (null: not known). */
+  pos?: ShopPosStatus | null;
   /** Where Sell was pressed (`/sell?from=`), for the seller's posting journey. */
   source?: SellSource;
   /** Where Udozo Connect shipping is open in the market: its open centres, to ship to (null: not offered). */
@@ -194,6 +198,7 @@ export function ListingForm({
     condition,
     onShop: sellWhere.onShop,
     resale: sellWhere.resale,
+    pos: sellWhere.pos,
     areaId,
   });
   // A saved draft carries on at its first step still missing something; a live ad opens at the start.
@@ -554,7 +559,7 @@ export function ListingForm({
       : price.trim()
         ? `${symbol}${price}${priceKind === "negotiable" ? ", negotiable" : ""}`
         : "No price yet";
-  const places = [sellWhere.onShop ? "Udozo" : null, sellWhere.resale ? "resellers' stores" : null].filter(Boolean).join(" and ");
+  const places = [sellWhere.onShop ? "Udozo" : null, sellWhere.resale ? "resellers' stores" : null, sellWhere.pos ? "your shop" : null].filter(Boolean).join(", ").replace(/, ([^,]+)$/, " and $1");
   const summary: Array<[number, string, string]> = [
     [0, "Title and category", `${title.trim() || "No title yet"}${found ? ` · ${found.top.name} › ${found.category.name}` : ""}`],
     [1, "Photos and video", `${ready} photo${ready === 1 ? "" : "s"}${video && video.status !== "failed" ? " and a video" : ""}`],
@@ -928,6 +933,7 @@ export function ListingForm({
           <ResaleFields
             value={sellWhere}
             availability={resale}
+            pos={pos}
             priceMinor={toMinor(price)}
             priceOnRequest={priceKind === "on_request"}
             currency={currency}
@@ -938,6 +944,8 @@ export function ListingForm({
               if (keys.includes("on_shop")) changes.on_shop = next.onShop;
               if (keys.includes("stock")) changes.stock = next.stock;
               if (keys.includes("resale")) Object.assign(changes, resaleChanges(next));
+              if (keys.includes("pos_enabled")) changes.pos_enabled = next.pos;
+              if (keys.includes("pos_details")) Object.assign(changes, { barcode: next.barcode, reorder_level: next.reorderLevel });
               if (Object.keys(changes).length) save(changes);
             }}
           />

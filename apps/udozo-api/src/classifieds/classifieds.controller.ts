@@ -210,6 +210,18 @@ class ListingDto {
   @IsOptional() @IsInt() @Min(0) @Max(maxStock)
   stock?: number;
 
+  /** Sold at the seller's shop through Udozo POS (their POS account, within its plan's product limit). */
+  @IsOptional() @IsBoolean()
+  pos_enabled?: boolean;
+
+  /** What the till scans (an EAN or UPC is checked); null or empty removes it. */
+  @IsOptional() @IsString() @MaxLength(60)
+  barcode?: string | null;
+
+  /** Low stock at the POS once stock is this or fewer; null: never. */
+  @IsOptional() @IsInt() @Min(0) @Max(maxStock)
+  reorder_level?: number | null;
+
   /** Sold at its price, or by auction (its price the starting price). */
   @IsOptional() @IsIn(['fixed', 'auction'])
   sale_method?: 'fixed' | 'auction';
@@ -502,6 +514,12 @@ export class ClassifiedListingsController {
   @Get('me/resale')
   async resaleAvailability(@CurrentCustomer() caller: CustomerCaller) {
     return this.resale.forSupplier(caller.customer, await this.listings.sellerCountry(caller.customer));
+  }
+
+  /** Whether the seller has Udozo POS, and room in its plan to tick Sell at POS. */
+  @Get('me/pos')
+  posStatus(@CurrentCustomer() caller: CustomerCaller) {
+    return this.listings.posStatus(caller.customer);
   }
 
   @Get('me/listings')

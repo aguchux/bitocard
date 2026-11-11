@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 export const ownerLinks = [
   { href: "/app", label: "Home" },
+  { href: "/app/products", label: "Products" },
   { href: "/app/setup", label: "Shop and tills" },
   { href: "/app/billing", label: "Plan and billing" },
 ] as const;

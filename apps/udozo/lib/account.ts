@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import type { ShopAssistantProfile, ShopResaleAvailability, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
+import type { ShopAssistantProfile, ShopPosStatus, ShopResaleAvailability, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
 import type { PlaceCounts } from "./account-places";
 import { apiUrl, markets } from "./api";
 import { confirmationPending, type Customer, currentCustomer, customerApi, signInPath } from "./customer";
@@ -76,6 +76,12 @@ export const sellerAssistant = cache(async (country: string): Promise<{ name: st
 /** Whether the signed-in seller can open listings to resellers, and Udozo's limits there (null: not known). */
 export async function resaleAvailability(): Promise<ShopResaleAvailability | null> {
   const result = await customerApi<ShopResaleAvailability>("GET", "/v1/classifieds/me/resale");
+  return result.ok ? result.data : null;
+}
+
+/** Whether the signed-in seller has Udozo POS, and room in its plan to tick Sell at POS (null: not known). */
+export async function posStatus(): Promise<ShopPosStatus | null> {
+  const result = await customerApi<ShopPosStatus>("GET", "/v1/classifieds/me/pos");
   return result.ok ? result.data : null;
 }
 

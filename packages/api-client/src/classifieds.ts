@@ -876,6 +876,12 @@ export type ShopMyListing = {
   resale: { enabled: boolean; discount_bps: number | null; markup_max_bps: number | null; paused: boolean };
   /** Units left to sell, shared by every channel (none until the seller says how many). */
   stock: number;
+  /** Sold at the seller's shop through Udozo POS; with neither on_shop nor resale, at the shop only. */
+  pos_enabled?: boolean;
+  /** What the shop's till scans. */
+  barcode?: string | null;
+  /** Low stock at the POS once stock is this or fewer (null: never). */
+  reorder_level?: number | null;
   /** Udozo: whether any are left; out of stock, it stays live 90 days (`delist_at`), then Anjio takes it off. */
   in_stock?: boolean;
   out_of_stock_at?: string | null;
@@ -893,6 +899,9 @@ export type ShopMyListing = {
   sold_at: string | null;
 };
 export type ShopMyListings = { object: 'list'; data: ShopMyListing[]; has_more: boolean };
+
+/** Whether the seller has Udozo POS, and how many listings its plan lets them tick Sell at POS (null: no limit). */
+export type ShopPosStatus = { object: 'pos_status'; account: boolean; plan: { code: string; name: string } | null; products: { used: number; limit: number | null } };
 
 // ---- The account dashboard (udozo.com's /account) ----
 

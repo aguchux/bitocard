@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Store } from "lucide-react";
-import { shopMoney, type ShopResaleAvailability } from "@bitocard/api-client/classifieds";
+import { ScanBarcode, Store } from "lucide-react";
+import { shopMoney, type ShopPosStatus, type ShopResaleAvailability } from "@bitocard/api-client/classifieds";
+import { posUrl } from "@/lib/connect";
 import { bpsText, resaleSums } from "@/lib/shop";
 
-export type SellWhere = { onShop: boolean; resale: boolean; discountBps: number; markupMaxBps: number; stock: number };
+/** Where it sells: Udozo, resellers' stores, and the seller's own shop through Udozo POS (with what its till needs). */
+export type SellWhere = { onShop: boolean; resale: boolean; discountBps: number; markupMaxBps: number; stock: number; pos: boolean; barcode: string; reorderLevel: string };
 
 /** Where a new listing starts: on Udozo, not resold, none in stock until the seller says; the resale terms at the country's smallest discount. */
-export function sellWhereFrom(listing: { on_shop: boolean; resale: { enabled: boolean; discount_bps: number | null; markup_max_bps: number | null }; stock: number } | null, availability: ShopResaleAvailability | null): SellWhere {
+export function sellWhereFrom(
+  listing: { on_shop: boolean; resale: { enabled: boolean; discount_bps: number | null; markup_max_bps: number | null }; stock: number; pos_enabled?: boolean; barcode?: string | null; reorder_level?: number | null } | null,
+  availability: ShopResaleAvailability | null,
+): SellWhere {
   const limits = availability ?? { discount_min_bps: 500, markup_max_bps: 3000 };
   return {
     onShop: listing?.on_shop ?? true,
@@ -16,7 +21,23 @@ export function sellWhereFrom(listing: { on_shop: boolean; resale: { enabled: bo
     discountBps: listing?.resale.discount_bps ?? limits.discount_min_bps,
     markupMaxBps: listing?.resale.markup_max_bps ?? Math.min(2000, limits.markup_max_bps),
     stock: listing?.stock ?? 0,
+    pos: listing?.pos_enabled ?? false,
+    barcode: listing?.barcode ?? "",
+    reorderLevel: listing?.reorder_level === null || listing?.reorder_level === undefined ? "" : String(listing.reorder_level),
   };
+}
+
+/**
+ * Whether the seller can tick Sell at POS now, and what to say: no Udozo POS yet (set it up at pos.udozo.com), its plan's
+ * product limit reached (untick another or upgrade), or how many they have used. A listing already ticked can always stay.
+ */
+export function posOption(status: ShopPosStatus | null, ticked: boolean): { allowed: boolean; note: string } {
+  if (ticked) return { allowed: true, note: "Your shop's till sells it from the same stock, and shows it as soon as it is live." };
+  if (!status) return { allowed: false, note: "Udozo POS could not be checked just now. Try again shortly." };
+  if (!status.account) return { allowed: false, note: "Set up your shop on Udozo POS first: it is free to start." };
+  const { used, limit } = status.products;
+  if (limit !== null && used >= limit) return { allowed: false, note: `Your ${status.plan?.name ?? "plan"} sells ${limit} products at your shop, and all are used. Untick another listing, or choose a bigger plan on Udozo POS.` };
+  return { allowed: true, note: limit === null ? "Sold at your shop's till from the same stock." : `Sold at your shop's till from the same stock (${used} of ${limit} on ${status.plan?.name ?? "your plan"}).` };
 }
 
 /** The resale terms as the API takes them, sent together so a listing never holds half of them. */
@@ -42,6 +63,7 @@ const slider = "h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-
 export function ResaleFields({
   value,
   availability,
+  pos = null,
   priceMinor,
   priceOnRequest,
   currency,
@@ -50,12 +72,14 @@ export function ResaleFields({
 }: {
   value: SellWhere;
   availability: ShopResaleAvailability | null;
+  /** Whether the seller has Udozo POS and room in its plan (null: not known). */
+  pos?: ShopPosStatus | null;
   priceMinor: number | null;
   priceOnRequest: boolean;
   currency: string;
   invalid: (param: string) => boolean;
-  /** `save` names the fields to save now; sliders save once let go. */
-  onChange: (next: SellWhere, save: Array<"on_shop" | "resale" | "stock">) => void;
+  /** `save` names the fields to save now; sliders save once let go, the barcode and reorder level once left. */
+  onChange: (next: SellWhere, save: Array<"on_shop" | "resale" | "stock" | "pos_enabled" | "pos_details">) => void;
 }) {
   const sums = resaleSums(priceMinor, value.discountBps, value.markupMaxBps);
   const money = (minor: number) => shopMoney(minor, currency);
@@ -63,6 +87,8 @@ export function ResaleFields({
   // The identity check counts only where the market requires it (older answers say nothing: required).
   const identityMissing = Boolean(availability && !availability.identity_checked && availability.identity_required !== false);
   const box = "size-5 shrink-0 accent-brand-700";
+  const shop = posOption(pos, value.pos);
+  const field = (param: string) => `h-12 rounded-xl border bg-white px-3 text-base font-normal ${invalid(param) ? "border-brand-600" : "border-slate-200"}`;
   return (
     <section aria-labelledby="sell-where" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4">
       <h2 id="sell-where" className="text-base font-bold">
@@ -109,8 +135,62 @@ export function ResaleFields({
             </span>
           </span>
         </label>
+        <label className={`flex items-start gap-3 text-sm ${shop.allowed ? "" : "opacity-70"}`}>
+          <input type="checkbox" className={box} checked={value.pos} disabled={!shop.allowed} onChange={event => onChange({ ...value, pos: event.target.checked }, ["pos_enabled"])} />
+          <span>
+            <span className="inline-flex items-center gap-1.5 font-semibold">
+              <ScanBarcode className="size-4 text-brand-700" aria-hidden="true" />
+              Sell at your shop with Udozo POS
+            </span>
+            <span className="block text-slate-600">
+              {shop.note}{" "}
+              {!pos?.account || !shop.allowed ? (
+                <a href={pos?.account ? `${posUrl}/app/billing` : `${posUrl}/signup`} target="_blank" rel="noopener" className="font-semibold text-brand-700 underline">
+                  {pos?.account ? "See the plans" : "Set up Udozo POS"}
+                </a>
+              ) : null}
+            </span>
+            {value.pos && !value.onShop && !value.resale ? <span className="mt-1 block text-xs font-semibold text-navy-900">At your shop only: it never shows on Udozo.</span> : null}
+          </span>
+        </label>
         {invalid("on_shop") ? <p className="text-sm font-semibold text-brand-700">Choose at least one.</p> : null}
       </div>
+
+      {value.pos ? (
+        <div className="grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Barcode (optional)
+            <input
+              value={value.barcode}
+              inputMode="text"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={48}
+              placeholder="Scan or type it"
+              aria-invalid={invalid("barcode") || undefined}
+              onChange={event => onChange({ ...value, barcode: event.target.value }, [])}
+              onBlur={() => onChange(value, ["pos_details"])}
+              className={field("barcode")}
+            />
+            <span className="text-xs font-normal text-slate-600">What your till scans. Most packaging has one; a code of your own works too.</span>
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Reorder level (optional)
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={100000}
+              value={value.reorderLevel}
+              aria-invalid={invalid("reorder_level") || undefined}
+              onChange={event => onChange({ ...value, reorderLevel: event.target.value }, [])}
+              onBlur={() => onChange(value, ["pos_details"])}
+              className={field("reorder_level")}
+            />
+            <span className="text-xs font-normal text-slate-600">Udozo POS marks it low on stock at this many or fewer.</span>
+          </label>
+        </div>
+      ) : null}
 
       {value.resale ? (
         <div className="grid gap-4 border-t border-slate-100 pt-4">

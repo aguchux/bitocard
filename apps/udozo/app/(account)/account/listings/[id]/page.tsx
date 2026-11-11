@@ -6,7 +6,7 @@ import { ListingForm } from "@/components/account/listing-form";
 import { connectShippingFor } from "@/lib/connect-centres";
 import { customerApi } from "@/lib/customer";
 import { uuidPattern } from "@/lib/shop";
-import { requireSeller, sellerAssistant, listingHref, sellReference, resaleAvailability } from "@/lib/account";
+import { posStatus, requireSeller, sellerAssistant, listingHref, sellReference, resaleAvailability } from "@/lib/account";
 
 export const metadata: Metadata = { title: "Your ad" };
 
@@ -17,13 +17,14 @@ export default async function ListingPage({ params }: Props) {
   const { id } = await params;
   const { customer, market } = await requireSeller(`/account/listings/${id}`);
   if (!uuidPattern.test(id)) notFound();
-  const [listing, stats, reference, assistant, resale, connect] = await Promise.all([
+  const [listing, stats, reference, assistant, resale, connect, pos] = await Promise.all([
     customerApi<ShopMyListing>("GET", `/v1/classifieds/me/listings/${id}`),
     customerApi<ShopListingStats>("GET", `/v1/classifieds/me/listings/${id}/stats`),
     sellReference(market.country),
     sellerAssistant(market.country),
     resaleAvailability(),
     connectShippingFor(market),
+    posStatus(),
   ]);
   if (!listing.ok) notFound();
   const closed = ["sold", "expired", "removed"].includes(listing.data.status);
@@ -72,7 +73,7 @@ export default async function ListingPage({ params }: Props) {
           </Link>
         </div>
       ) : (
-        <ListingForm listing={listing.data} categories={reference.categories} states={reference.states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} connect={connect} auctions={Boolean(market.auctions)} />
+        <ListingForm listing={listing.data} categories={reference.categories} states={reference.states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} pos={pos} connect={connect} auctions={Boolean(market.auctions)} />
       )}
     </div>
   );

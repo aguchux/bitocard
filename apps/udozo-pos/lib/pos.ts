@@ -160,3 +160,91 @@ export const appPlatforms = [
   { key: "ios", name: "iPhone and iPad", store: "App Store", lead: "Download on the" },
   { key: "windows", name: "Windows", store: "Microsoft Store", lead: "Get it from the" },
 ] as const;
+
+// ---- The catalogue: the owner's listings ticked Sell at POS on udozo.com (milestone 2) ----
+
+/** Why the till cannot sell a product now: the plan's product limit, not live on udozo.com yet, no price, or none free. */
+export type PosProductBlock = "plan_limit" | "not_live" | "no_price" | "out_of_stock";
+
+export type PosProduct = {
+  object: "pos_product";
+  id: string;
+  ref: number;
+  sku: string | null;
+  title: string | null;
+  price: { kind: "fixed" | "negotiable" | "on_request"; amount: number | null; currency: string };
+  barcode: string | null;
+  category: { id: string; name: string; parent: { id: string; name: string } | null } | null;
+  photo_url: string | null;
+  status: string;
+  stock: number;
+  /** Units held for online buyers: never sold at the till. */
+  held: number;
+  available: number;
+  reorder_level: number | null;
+  low_stock: boolean;
+  /** Also on udozo.com; false for a shop-only listing. */
+  on_udozo: boolean;
+  blocked: PosProductBlock | null;
+  ticked_at: string;
+  /** The listing on udozo.com, where its price, photos, stock and barcode are changed. */
+  edit_url: string;
+};
+
+export type PosCatalogue = {
+  object: "list";
+  currency: string;
+  plan: { code: string; name: string };
+  summary: { products: number; limit: number | null; over_limit: number; sellable: number; low_stock: number; out_of_stock: number };
+  categories: Array<{ id: string; name: string; count: number }>;
+  total: number;
+  has_more: boolean;
+  data: PosProduct[];
+};
+
+export const catalogueViews = [
+  { value: "all", label: "All" },
+  { value: "sellable", label: "Selling" },
+  { value: "low_stock", label: "Low stock" },
+  { value: "out_of_stock", label: "Out of stock" },
+  { value: "blocked", label: "Not selling" },
+] as const;
+export type CatalogueView = (typeof catalogueViews)[number]["value"];
+
+/** How many products a page shows. */
+export const cataloguePage = 24;
+
+/** The catalogue's filters from the address, cleaned: unknown views fall back to All, pages start at 1. */
+export function catalogueQuery(params: { q?: string; show?: string; category?: string; page?: string }) {
+  const show: CatalogueView = catalogueViews.some(view => view.value === params.show) ? (params.show as CatalogueView) : "all";
+  const page = Math.max(1, Math.floor(Number(params.page) || 1));
+  const q = (params.q ?? "").trim().slice(0, 80);
+  const category = /^[0-9a-f-]{36}$/i.test(params.category ?? "") ? params.category! : "";
+  const search = new URLSearchParams({ show, limit: String(cataloguePage), offset: String((page - 1) * cataloguePage) });
+  if (q) search.set("q", q);
+  if (category) search.set("category", category);
+  return { show, page, q, category, api: `?${search.toString()}` };
+}
+
+/** Why a product does not sell at the till, in words. */
+export function blockText(product: Pick<PosProduct, "blocked" | "status">, planName: string) {
+  switch (product.blocked) {
+    case "plan_limit":
+      return `Over ${planName}'s product limit: choose a bigger plan, or untick Sell at POS on another listing.`;
+    case "not_live":
+      return product.status === "pending_review" ? "Waiting for Udozo's review: it sells once it is live." : product.status === "draft" ? "A draft: post it on udozo.com to sell it." : "Not live on udozo.com: renew or edit it there.";
+    case "no_price":
+      return "No price: give it one on udozo.com to sell it at the till.";
+    case "out_of_stock":
+      return "None free to sell: restock it on udozo.com.";
+    default:
+      return null;
+  }
+}
+
+/** The stock line: what the till can sell, and what online buyers hold. */
+export function stockLine(product: Pick<PosProduct, "stock" | "held" | "available">) {
+  if (product.stock === 0) return "Out of stock";
+  const free = `${product.available.toLocaleString("en-GB")} free to sell`;
+  return product.held > 0 ? `${free} (${product.held.toLocaleString("en-GB")} held for online buyers)` : free;
+}

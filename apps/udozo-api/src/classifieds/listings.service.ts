@@ -34,6 +34,8 @@ import {
   type priceKinds,
   slugify,
 } from './rules.js';
+import { cleanBarcode, posCountedStatuses } from '../pos/catalogue-rules.js';
+import { limitsOf } from '../pos/plans.js';
 import { liveUntil, outOfStockDays, stockChange } from './stock.js';
 
 export type ListingInput = ConnectInput & {
@@ -61,6 +63,12 @@ export type ListingInput = ConnectInput & {
   resale_paused?: boolean;
   /** Units to sell, shared by every channel. */
   stock?: number;
+  /** Sold at the seller's shop through Udozo POS (their POS account, within its plan's product limit). */
+  pos_enabled?: boolean;
+  /** What the till scans; null or empty removes it. */
+  barcode?: string | null;
+  /** Low stock at the POS once stock is this or fewer; null: never. */
+  reorder_level?: number | null;
   /** Sold at its price (fixed) or by auction: then its price is the starting price, with an optional hidden reserve and a length. */
   sale_method?: 'fixed' | 'auction';
   auction_reserve?: number | null;
@@ -129,6 +137,9 @@ type ListingFields = {
   resaleMarkupMaxBps?: number | null;
   resalePausedAt?: Date | null;
   stock?: number;
+  posEnabledAt?: Date | null;
+  barcode?: string | null;
+  reorderLevel?: number | null;
   connect?: boolean;
   connectAllCentres?: boolean;
   saleMethod?: string;
@@ -233,7 +244,7 @@ export class ListingsService {
   async create(customer: CustomerWithStore, input: ListingInput) {
     const country = await this.sellerCountry(customer);
     const market = await this.prisma.country.findUniqueOrThrow({ where: { code: country } });
-    const data = await this.changes(country, input, null);
+    const data = await this.changes(country, input, null, customer.id);
     const created = await this.prisma.$transaction(async tx => {
       const sku = data.fields.categoryId ? await this.issueSku(tx, data.fields.categoryId) : null;
       const listing = await tx.classifiedListing.create({ data: { customerId: customer.id, country, currency: market.currency, ...data.fields, sku } });
@@ -252,7 +263,7 @@ export class ListingsService {
     const sent = Object.entries(input).filter(([, value]) => value !== undefined).map(([key]) => key);
     const restocking = listing.status === 'expired' && sent.length === 1 && sent[0] === 'stock';
     if (!['draft', 'pending_review', 'active', 'rejected'].includes(listing.status) && !restocking) throw conflict('listing_closed', 'This listing can no longer be changed.');
-    const data = await this.changes(country, input, listing);
+    const data = await this.changes(country, input, listing, customer.id);
     if (listing.status !== 'draft' && !restocking) {
       this.requireComplete({ ...listing, ...data.fields });
       // Opening a submitted listing to resellers needs what submitting one does.
@@ -489,7 +500,7 @@ export class ListingsService {
   }
 
   /** The columns and feature values a request changes, each checked. */
-  private async changes(country: string, input: ListingInput, current: ListingRow | null) {
+  private async changes(country: string, input: ListingInput, current: ListingRow | null, customerId: string) {
     const fields: ListingFields = {};
     if (input.title !== undefined) {
       fields.title = input.title === null ? null : checkTitle(input.title);
@@ -611,9 +622,21 @@ export class ListingsService {
       if (!Number.isInteger(input.stock) || input.stock < 0 || input.stock > maxStock) throw invalid('parameter_invalid', `Stock is a whole number from 0 (out of stock) to ${maxStock.toLocaleString('en-GB')}.`, 'stock');
       fields.stock = input.stock;
     }
+    // Sold at the seller's shop through Udozo POS: their POS account and its plan's product limit, a barcode, a reorder level.
+    if (input.pos_enabled !== undefined) fields.posEnabledAt = input.pos_enabled ? (current?.posEnabledAt ?? new Date()) : null;
+    if (input.barcode !== undefined) fields.barcode = cleanBarcode(input.barcode);
+    if (input.reorder_level !== undefined) {
+      if (input.reorder_level !== null && (!Number.isInteger(input.reorder_level) || input.reorder_level < 0 || input.reorder_level > maxStock)) throw invalid('parameter_invalid', `The reorder level is a whole number from 0 to ${maxStock.toLocaleString('en-GB')}.`, 'reorder_level');
+      fields.reorderLevel = input.reorder_level;
+    }
+    const atPos = 'posEnabledAt' in fields ? fields.posEnabledAt !== null : (current?.posEnabledAt ?? null) !== null;
+    if (atPos && saleMethod === 'auction') throw invalid('parameter_invalid', 'A listing sold by auction is sold on Udozo only, not at your shop.', 'pos_enabled');
+    if (input.pos_enabled && !current?.posEnabledAt) await this.requirePosRoom(customerId, current?.id ?? null);
+    if (fields.barcode) await this.requireBarcodeFree(customerId, fields.barcode, current?.id ?? null);
+
     const onShop = fields.onShop ?? current?.onShop ?? true;
     const resale = fields.resale ?? current?.resale ?? false;
-    if (!onShop && !resale) throw invalid('channel_required', 'Sell it on Udozo, through resellers, or both.', 'on_shop');
+    if (!onShop && !resale && !atPos) throw invalid('channel_required', 'Sell it on Udozo, through resellers, at your shop with Udozo POS, or more than one.', 'on_shop');
     if (resale && ['resale', 'resaleDiscountBps', 'resaleMarkupMaxBps', 'priceKind'].some(key => key in fields)) {
       if (priceKind === 'on_request') throw invalid('resale_price_required', 'Resellers sell at a price: give one to let them sell it.', 'price_kind');
       const discount = 'resaleDiscountBps' in fields ? fields.resaleDiscountBps! : (current?.resaleDiscountBps ?? null);
@@ -623,6 +646,38 @@ export class ListingsService {
     // An auction sells one item.
     if (saleMethod === 'auction') fields.stock = 1;
     return { fields, features, connect };
+  }
+
+  /**
+   * Ticking Sell at POS needs the seller's Udozo POS account (pos.udozo.com), and room in its plan's product limit:
+   * the listings ticked that are not sold, removed or deleted (`posCountedStatuses`).
+   */
+  private async requirePosRoom(customerId: string, exceptId: string | null) {
+    const account = await this.prisma.posAccount.findUnique({ where: { customerId }, include: { plan: true } });
+    if (!account) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'pos_account_required', 'Set up your shop on Udozo POS (pos.udozo.com) first, then tick Sell at POS.', 'pos_enabled');
+    const limit = limitsOf(account.plan).products;
+    if (limit === null) return;
+    const used = await this.prisma.classifiedListing.count({ where: { customerId, posEnabledAt: { not: null }, status: { in: posCountedStatuses }, ...(exceptId ? { id: { not: exceptId } } : {}) } });
+    if (used >= limit) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'pos_limit_reached', `${account.plan.name} sells ${limit} products at your shop. Untick Sell at POS on another listing, or choose a bigger plan on pos.udozo.com.`, 'pos_enabled');
+  }
+
+  /** A barcode names one of the seller's listings (deleted ones apart). */
+  private async requireBarcodeFree(customerId: string, barcode: string, exceptId: string | null) {
+    const other = await this.prisma.classifiedListing.findFirst({ where: { customerId, barcode, status: { not: 'deleted' }, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { sku: true, title: true } });
+    if (other) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'barcode_taken', `Your listing ${other.sku ?? `“${other.title ?? 'draft'}”`} already has this barcode.`, 'barcode');
+  }
+
+  /** Whether the seller has Udozo POS, and how many listings its plan lets them tick Sell at POS (udozo.com's Post an ad). */
+  async posStatus(customer: CustomerWithStore) {
+    await this.sellerCountry(customer);
+    const account = await this.prisma.posAccount.findUnique({ where: { customerId: customer.id }, include: { plan: true } });
+    const used = account ? await this.prisma.classifiedListing.count({ where: { customerId: customer.id, posEnabledAt: { not: null }, status: { in: posCountedStatuses } } }) : 0;
+    return {
+      object: 'pos_status' as const,
+      account: account !== null,
+      plan: account ? { code: account.plan.code, name: account.plan.name } : null,
+      products: { used, limit: account ? limitsOf(account.plan).products : null },
+    };
   }
 
   /** The seller's view of a listing. */
@@ -670,6 +725,10 @@ export class ListingsService {
         markup_max_bps: listing.resaleMarkupMaxBps,
         paused: listing.resalePausedAt !== null,
       },
+      /** Sold at the seller's shop through Udozo POS; with neither on_shop nor resale, at the shop only. */
+      pos_enabled: listing.posEnabledAt !== null,
+      barcode: listing.barcode,
+      reorder_level: listing.reorderLevel,
       stock: listing.stock,
       /** Some to sell (units held for buyers count: they are theirs). Out of stock, buying is closed. */
       in_stock: listing.stock > 0,

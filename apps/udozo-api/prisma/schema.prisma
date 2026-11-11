@@ -4849,7 +4849,7 @@ model ClassifiedListing {
   closedAt     DateTime?                  @map("closed_at")
   views        Int                        @default(0)
   leads        Int                        @default(0)
-  /// Sold on BitoCard Shop itself (its pages, search, chats, Safe pay). At least one of onShop and resale (a database check).
+  /// Sold on BitoCard Shop itself (its pages, search, chats, Safe pay). At least one of onShop, resale and posEnabledAt (a database check).
   onShop       Boolean                    @default(true) @map("on_shop")
   /// Open to resellers' stores (`docs/BITOCARD_B2B_RESELLING_PLAN.md`), with the discount and markup limit below.
   resale       Boolean                    @default(false)
@@ -4863,6 +4863,13 @@ model ClassifiedListing {
   /// many); Safe pay and buy orders holding it take one each, and a sale takes one away. A live listing at none stays
   /// live, out of stock, for 90 days (`outOfStockDays`), then Anjio (the `classifieds` job) takes it off.
   stock        Int                        @default(0)
+  /// When the seller ticked Sell at POS (null: not sold at their shop through Udozo POS). With it, a listing may be
+  /// sold at the shop only (neither onShop nor resale). Free's product limit keeps the first ticked selling.
+  posEnabledAt DateTime?                  @map("pos_enabled_at")
+  /// What the till scans (an EAN/UPC is checked), unique among the seller's listings that are not deleted.
+  barcode      String?                    @db.VarChar(48)
+  /// Low stock at the POS once stock is this or fewer (null: never).
+  reorderLevel Int?                       @map("reorder_level")
   /// When a posted listing's stock reached none (null while it has some, and for drafts).
   outOfStockAt DateTime?                  @map("out_of_stock_at")
   /// Why an expired listing left the market: `out_of_stock` when Anjio took it off after 90 days without stock.

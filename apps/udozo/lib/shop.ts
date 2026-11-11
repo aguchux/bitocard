@@ -34,9 +34,11 @@ export function resaleSums(priceMinor: number | null, discountBps: number, marku
 }
 
 /** My listings' tags for where a listing is sold and what is left: "Resellers", "Resellers only", paused, "3 left", "Out of stock". */
-export function listingChannelTags(listing: Pick<ShopMyListing, "on_shop" | "resale" | "stock" | "status">) {
+export function listingChannelTags(listing: Pick<ShopMyListing, "on_shop" | "resale" | "stock" | "status" | "pos_enabled">) {
   const tags: string[] = [];
   if (listing.resale.enabled) tags.push(listing.resale.paused ? "Resellers paused" : listing.on_shop ? "Resellers" : "Resellers only");
+  // Sold at the seller's shop through Udozo POS; neither on Udozo nor through resellers, at the shop only.
+  if (listing.pos_enabled) tags.push(listing.on_shop || listing.resale.enabled ? "At your shop" : "Shop only");
   if (["active", "pending_review", "expired"].includes(listing.status) && listing.stock === 0) tags.push("Out of stock");
   else if (listing.stock > 1 && !["sold", "removed"].includes(listing.status)) tags.push(`${listing.stock.toLocaleString("en-GB")} left`);
   return tags;

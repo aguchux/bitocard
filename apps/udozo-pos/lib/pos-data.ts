@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { PosApps, PosCharge, PosOwner, PosPlans } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosOwner, PosPlans } from "./pos";
 import { type ApiResult, customerApi } from "./session";
 import { apiUrl } from "./site";
 
@@ -33,6 +33,9 @@ export async function posApps(): Promise<PosApps> {
 
 /** The signed-in owner's place: POS open in their country, their wallet, the plans and their account (or none yet). */
 export const currentOwner = cache((): Promise<ApiResult<PosOwner>> => customerApi<PosOwner>("GET", "/v1/pos/owner"));
+
+/** The listings ticked Sell at POS, read live from udozo.com (`query` from `catalogueQuery`). */
+export const ownerCatalogue = (query = "") => customerApi<PosCatalogue>("GET", `/v1/pos/owner/catalogue${query}`);
 
 /** Every charge for the plan, newest first. */
 export const ownerCharges = () => customerApi<{ object: "list"; data: PosCharge[] }>("GET", "/v1/pos/owner/charges");

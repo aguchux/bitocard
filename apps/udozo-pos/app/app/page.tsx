@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { limitText, statusText } from "@/lib/pos";
-import { currentOwner } from "@/lib/pos-data";
+import { currentOwner, ownerCatalogue } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
 
 /**
@@ -8,8 +8,9 @@ import { udozoUrl } from "@/lib/site";
  * staff come in the next milestones, and say so.
  */
 export default async function OwnerHome() {
-  const owner = await currentOwner();
+  const [owner, catalogue] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1")]);
   if (!owner.ok || !owner.data.account) return null;
+  const products = catalogue.ok ? catalogue.data.summary.products : 0;
   const { account, plans } = owner.data;
   const shop = account.shops[0];
   const tills = account.shops.reduce((sum, item) => sum + item.tills.length, 0);
@@ -17,7 +18,9 @@ export default async function OwnerHome() {
   const next = [
     { done: Boolean(shop?.address), title: "Add your shop's address", body: "It is printed on every receipt.", href: "/app/setup", action: "Shop details" },
     { done: tills > 0, title: "Name your tills", body: "One for each counter or device you sell from.", href: "/app/setup#tills", action: "Tills" },
-    { done: false, title: "Tick Sell at POS on your listings", body: "The products you sell in the shop come to the till with their stock. Coming soon.", href: udozoUrl("/account/listings"), action: "My listings on udozo.com" },
+    products > 0
+      ? { done: true, title: "Tick Sell at POS on your listings", body: `${products} ${products === 1 ? "product is" : "products are"} at the till, with their stock from udozo.com.`, href: "/app/products", action: "Products" }
+      : { done: false, title: "Tick Sell at POS on your listings", body: "On udozo.com, tick Sell at your shop with Udozo POS on what you sell in the shop. It comes to the till with its stock.", href: udozoUrl("/account/listings"), action: "My listings on udozo.com" },
     { done: false, title: "Invite your team", body: "Cashiers and managers sign in with a PIN. Coming soon.", href: null, action: null },
   ];
   return (

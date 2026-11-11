@@ -27,7 +27,7 @@ export function stepOf(param: string | null | undefined): number | null {
   if (param === "title" || param === "category_id") return 0;
   if (param === "photos" || param === "video" || param.startsWith("media")) return 1;
   if (param === "price" || param === "price_kind" || param === "sale_method" || param.startsWith("auction") || param === "safe_pay" || param === "condition" || param.startsWith("features") || param === "description") return 2;
-  if (param === "on_shop" || param === "stock" || param.startsWith("resale")) return 3;
+  if (param === "on_shop" || param === "stock" || param.startsWith("resale") || param === "pos_enabled" || param === "barcode" || param === "reorder_level") return 3;
   if (param === "area_id" || param.startsWith("delivery") || param.startsWith("connect") || param === "pickup" || param === "contact") return 4;
   return null;
 }
@@ -48,6 +48,8 @@ export type PostValues = {
   condition: string | null;
   onShop: boolean;
   resale: boolean;
+  /** Sold at the seller's shop through Udozo POS. */
+  pos?: boolean;
   areaId: string | null;
 };
 
@@ -78,7 +80,7 @@ export function stepProblem(step: number, values: PostValues): StepProblem | nul
       if (!values.condition) return { message: "Choose its condition.", param: "condition" };
       return null;
     case 3:
-      if (!values.onShop && !values.resale) return { message: "Choose at least one place to sell it.", param: "on_shop" };
+      if (!values.onShop && !values.resale && !values.pos) return { message: "Choose at least one place to sell it.", param: "on_shop" };
       return null;
     case 4:
       if (!values.areaId) return { message: "Choose where it is: the area it is in.", param: "area_id" };

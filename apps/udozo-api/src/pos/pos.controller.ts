@@ -1,13 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { ProductOnly } from '../products/product.js';
 import { type PlanChange, PosAdminService, posAppPlatforms, type PosAppPlatform } from './pos-admin.service.js';
+import { PosCatalogueService } from './catalogue.service.js';
 import { posPlanCodes } from './plans.js';
 import { PosService } from './pos.service.js';
 
@@ -63,6 +64,26 @@ class TillDto {
 
   @IsOptional() @IsBoolean()
   auto_print?: boolean;
+}
+
+class CatalogueDto {
+  @IsOptional() @IsString() @MaxLength(80)
+  q?: string;
+
+  @IsOptional() @IsUUID()
+  category?: string;
+
+  @IsOptional() @IsString() @MaxLength(60)
+  barcode?: string;
+
+  @IsOptional() @IsIn(['all', 'sellable', 'low_stock', 'out_of_stock', 'blocked'])
+  show?: 'all' | 'sellable' | 'low_stock' | 'out_of_stock' | 'blocked';
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
 }
 
 class CountryDto {
@@ -141,7 +162,10 @@ export class PublicPosController {
 @Controller('pos/owner')
 @ProductOnly('udozo')
 export class PosOwnerController {
-  constructor(private readonly pos: PosService) {}
+  constructor(
+    private readonly pos: PosService,
+    private readonly catalogue: PosCatalogueService,
+  ) {}
 
   @Get()
   me(@CurrentCustomer() caller: CustomerCaller) {
@@ -157,6 +181,12 @@ export class PosOwnerController {
   @HttpCode(HttpStatus.OK)
   plan(@CurrentCustomer() caller: CustomerCaller, @Body() body: PlanDto) {
     return this.pos.changePlan(caller.customer, body.plan, body.expected_amount);
+  }
+
+  /** The listings ticked Sell at POS, read live, with the stock free to sell and why one cannot be sold. */
+  @Get('catalogue')
+  products(@CurrentCustomer() caller: CustomerCaller, @Query() query: CatalogueDto) {
+    return this.catalogue.catalogue(caller.customer, query);
   }
 
   @Get('charges')
