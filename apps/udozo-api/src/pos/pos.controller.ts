@@ -41,6 +41,24 @@ export class ShopDto {
   @IsOptional() @IsString() @MaxLength(300)
   receipt_footer?: string | null;
 
+  /** Shown on invoices. */
+  @IsOptional() @IsString() @MaxLength(254)
+  email?: string | null;
+
+  /** The shop's own bank account for later payments, printed on invoices (never used by Udozo). */
+  @IsOptional() @IsString() @MaxLength(80)
+  bank_name?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(120)
+  bank_account_name?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(30)
+  bank_account_number?: string | null;
+
+  /** Printed receipts carry the QR code that gets the PDF on WhatsApp. */
+  @IsOptional() @IsBoolean()
+  receipt_qr?: boolean;
+
   /** What kind of shop it is (`GET /v1/pos/shop-kinds`): the till leads with its categories. */
   @IsOptional() @IsIn(posShopKindCodes)
   kind?: string;

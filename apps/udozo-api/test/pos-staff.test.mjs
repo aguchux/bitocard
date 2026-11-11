@@ -369,6 +369,19 @@ describe('every role against every route', () => {
     assert.ok((await owner.get('/v1/pos/owner/sales?limit=100')).json.data.some(row => row.sold_by === 'cashier Test'), 'the owner sees who sold each');
   });
 
+  test('receipts: staff print and send the receipts of the sales they see, in their own name', async () => {
+    const mine = (await sale(staff.cashier)).json;
+    const overview = await staff.cashier.get(`/v1/pos/staff/sales/${mine.id}/receipts`);
+    assert.equal(overview.status, 200, JSON.stringify(overview.json));
+    assert.equal(overview.json.number, mine.number);
+    const sent = await staff.cashier.post(`/v1/pos/staff/sales/${mine.id}/receipt/email`, { email: 'buyer@example.com' });
+    assert.deepEqual([sent.status, sent.json.by, sent.json.to], [201, 'cashier Test', 'b***@example.com']);
+    const managerSale = (await sale(staff.manager)).json;
+    assert.equal((await staff.cashier.get(`/v1/pos/staff/sales/${managerSale.id}/receipts`)).status, 404, 'not theirs to see');
+    assert.equal((await staff.cashier.post(`/v1/pos/staff/sales/${managerSale.id}/receipt/email`, { email: 'buyer@example.com' })).status, 404);
+    assert.equal((await staff.accountant.get(`/v1/pos/staff/sales/${managerSale.id}/receipts`)).status, 200, 'an accountant sees every sale');
+  });
+
   test('a stock keeper changes stock with a movement in their name; a custom role needs approval for it', async () => {
     const res = await staff.stock_keeper.post(`/v1/pos/staff/stock/${tv.id}`, { kind: 'restock', quantity: 2, note: 'Delivery' });
     assert.equal(res.status, 201, JSON.stringify(res.json));

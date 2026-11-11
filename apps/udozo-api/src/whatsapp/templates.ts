@@ -53,6 +53,12 @@ export const whatsappTemplates = {
     button: 'Copy code',
     category: 'AUTHENTICATION',
   },
+  udozo_pos_receipt: {
+    purpose: "A shop's receipt from Udozo POS, sent to the number the cashier typed while the 24-hour window is closed: its button brings the PDF.",
+    body: 'Your receipt from {{1}} is ready: {{2}}, {{3}}. Tap Get receipt to receive it here as a PDF.',
+    examples: ["Ada's Gadget Hub", 'POS-000123', 'NGN 38,700.00'],
+    button: 'Get receipt',
+  },
   udozo_link_confirmed: {
     purpose: 'Sent once when a number is connected to an account from udozo.com.',
     body: 'Your WhatsApp is now connected to your Udozo account, {{1}}. Tap Menu to find, sell or ask for something.',

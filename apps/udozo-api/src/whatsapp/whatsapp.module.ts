@@ -18,13 +18,14 @@ import { WhatsappJobs } from './jobs.service.js';
 import { WhatsappNotices } from './notices.service.js';
 import { WhatsappOutbox } from './outbox.service.js';
 import { WhatsappRelay } from './relay.service.js';
+import { WhatsappReceiptsHub } from './receipts.js';
 import { ClassifiedChannelsController, WhatsappAccountController, WhatsappAdminController, WhatsappSignInController, WhatsappWebhookController } from './whatsapp.controller.js';
 
 /** Udozo on WhatsApp (docs/UDOZO_WHATSAPP_PLAN.md): Udozo's own number through Meta's Cloud API. */
 @Module({
   imports: [CheckoutModule, ClassifiedsModule, SettingsModule, ShopAssistantModule],
   controllers: [ClassifiedChannelsController, WhatsappWebhookController, WhatsappAccountController, WhatsappSignInController, WhatsappAdminController],
-  providers: [KycStorage, WhatsappAnjio, WhatsappCodes, WhatsappDirect, WhatsappOutbox, WhatsappContactsService, WhatsappBot, WhatsappNotices, WhatsappRelay, WhatsappAdminService, WhatsappJobs, SellFlow, WantedFlow, SignupFlow, WhatsappSignIns],
-  exports: [WhatsappJobs, WhatsappContactsService],
+  providers: [KycStorage, WhatsappAnjio, WhatsappCodes, WhatsappDirect, WhatsappOutbox, WhatsappContactsService, WhatsappBot, WhatsappNotices, WhatsappRelay, WhatsappAdminService, WhatsappJobs, SellFlow, WantedFlow, SignupFlow, WhatsappSignIns, WhatsappReceiptsHub],
+  exports: [WhatsappJobs, WhatsappContactsService, WhatsappOutbox, WhatsappReceiptsHub],
 })
 export class WhatsappModule {}

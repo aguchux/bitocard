@@ -6,8 +6,11 @@ import type { AppConfig } from '../config/config.js';
 import type { Platform } from '../generated/prisma/client.js';
 import { inProductWords } from '../products/product.js';
 
+/** A file sent with an email (a POS receipt's PDF). */
+export type EmailAttachment = { filename: string; content: Buffer; contentType: string };
+
 /** `from` is set only on captured messages (the outbox), to show which sender was chosen. */
-export type EmailMessage = { to: string; subject: string; text: string; html: string; from?: string };
+export type EmailMessage = { to: string; subject: string; text: string; html: string; from?: string; attachments?: EmailAttachment[] };
 
 /** One email provider. Adapters translate BitoCard's message into the provider's API. */
 export interface EmailProvider {
@@ -35,7 +38,14 @@ export class ResendProvider implements EmailProvider {
   ) {}
 
   send(from: string, message: EmailMessage) {
-    return postJson(`${this.baseUrl}/emails`, this.apiKey, { from, to: [message.to], subject: message.subject, text: message.text, html: message.html });
+    return postJson(`${this.baseUrl}/emails`, this.apiKey, {
+      from,
+      to: [message.to],
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+      ...(message.attachments?.length ? { attachments: message.attachments.map(file => ({ filename: file.filename, content: file.content.toString('base64'), content_type: file.contentType })) } : {}),
+    });
   }
 }
 
@@ -55,6 +65,7 @@ export class MailerSendProvider implements EmailProvider {
       subject: message.subject,
       text: message.text,
       html: message.html,
+      ...(message.attachments?.length ? { attachments: message.attachments.map(file => ({ filename: file.filename, content: file.content.toString('base64'), disposition: 'attachment' })) } : {}),
     });
   }
 }

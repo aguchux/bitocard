@@ -52,6 +52,8 @@ export type Row = { id: string; title: string; description?: string };
 export type OutgoingMessage =
   | { type: 'text'; body: string; previewUrl?: boolean }
   | { type: 'image'; link?: string; id?: string; caption?: string }
+  /** A file (a receipt's PDF), by the media id `upload` gave. */
+  | { type: 'document'; id: string; filename: string; caption?: string }
   | { type: 'buttons'; body: string; buttons: Button[]; header?: string; footer?: string }
   | { type: 'list'; body: string; button: string; rows: Row[]; header?: string; footer?: string }
   /** A message with one button opening an address (Meta's call-to-action URL button). */
@@ -68,6 +70,8 @@ export function messageBody(to: string, message: OutgoingMessage, replyTo?: stri
       return { ...base, type: 'text', text: { body: cut(message.body, 4096), preview_url: message.previewUrl ?? false } };
     case 'image':
       return { ...base, type: 'image', image: { ...(message.id ? { id: message.id } : { link: message.link }), ...(message.caption ? { caption: cut(message.caption, 1024) } : {}) } };
+    case 'document':
+      return { ...base, type: 'document', document: { id: message.id, filename: cut(message.filename, 240), ...(message.caption ? { caption: cut(message.caption, 1024) } : {}) } };
     case 'buttons':
       return {
         ...base,
@@ -211,12 +215,12 @@ export class WhatsappCloud {
     return id;
   }
 
-  /** Uploads a photo to Meta (a chat photo from the private bucket, never a public link); its media id. */
-  async upload(bytes: Buffer, contentType: string) {
+  /** Uploads a photo (a chat photo from the private bucket) or a PDF (a receipt) to Meta, never a public link; its media id. */
+  async upload(bytes: Buffer, contentType: string, filename?: string) {
     const form = new FormData();
     form.set('messaging_product', 'whatsapp');
     form.set('type', contentType);
-    form.set('file', new Blob([new Uint8Array(bytes)], { type: contentType }), contentType === 'image/png' ? 'photo.png' : 'photo.jpg');
+    form.set('file', new Blob([new Uint8Array(bytes)], { type: contentType }), filename ?? (contentType === 'image/png' ? 'photo.png' : 'photo.jpg'));
     let res: Response;
     try {
       res = await fetch(`${this.base}/${encodeURIComponent(this.config.WHATSAPP_PHONE_NUMBER_ID?.trim() ?? '')}/media`, {

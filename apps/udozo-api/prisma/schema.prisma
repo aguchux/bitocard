@@ -7972,6 +7972,8 @@ model PosAccount {
   devices            PosDevice[]
   staffSessions      PosStaffSession[]
   approvals          PosApproval[]
+  receiptCodes       PosReceiptCode[]
+  receiptSends       PosReceiptSend[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -7992,6 +7994,15 @@ model PosShop {
   /// What kind of shop it is (`posShopKinds`: general, pharmacy, auto_parts…), so the till is tailored to it.
   kind          String     @default("general") @db.VarChar(32)
   receiptFooter String?    @map("receipt_footer")
+  /// Shown on invoices, with the shop's own bank account for later payments (never used by Udozo).
+  email             String?  @db.VarChar(254)
+  bankName          String?  @map("bank_name") @db.VarChar(80)
+  bankAccountName   String?  @map("bank_account_name") @db.VarChar(120)
+  bankAccountNumber String?  @map("bank_account_number") @db.VarChar(30)
+  /// Printed receipts carry the QR code that gets the PDF on WhatsApp.
+  receiptQr     Boolean    @default(true) @map("receipt_qr")
+  /// The next invoice's number, claimed with one UPDATE … RETURNING.
+  invoiceNext   Int        @default(1) @map("invoice_next")
   /// The next sale's number (POS-000001…), claimed with one UPDATE … RETURNING.
   saleNext      Int        @default(1) @map("sale_next")
   position      Int        @default(0)
@@ -8064,6 +8075,11 @@ model PosSale {
   refundReason    String?    @map("refund_reason") @db.VarChar(300)
   restocked       Boolean?
   clientCreatedAt DateTime?  @map("client_created_at")
+  /// Its invoice's number (INV-2026-0148), given the first time its invoice is drawn.
+  invoiceNumber   String?    @map("invoice_number") @db.VarChar(20)
+  invoiceIssuedAt DateTime?  @map("invoice_issued_at")
+  receiptCodes    PosReceiptCode[]
+  receiptSends    PosReceiptSend[]
   createdAt       DateTime   @default(now()) @map("created_at")
   account         PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   shop            PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
@@ -8080,6 +8096,7 @@ model PosSale {
   customerEntries PosCustomerEntry[]
 
   @@unique([shopId, number], map: "pos_sales_shop_number_key")
+  @@unique([shopId, invoiceNumber], map: "pos_sales_shop_invoice_key")
   @@unique([accountId, clientSaleId], map: "pos_sales_client_key")
   @@index([accountId, createdAt(sort: Desc)], map: "pos_sales_account_created_idx")
   @@map("pos_sales")
@@ -8567,4 +8584,49 @@ model PosApproval {
 
   @@index([accountId, createdAt(sort: Desc)], map: "pos_approvals_account_idx")
   @@map("pos_approvals")
+}
+
+/// A receipt's code, sent to Udozo's WhatsApp number as "RECEIPT POS-000123-<code>" to get the PDF (only its hash kept).
+/// `purpose`: `screen` (shown at the till, 10 minutes), `print` (on a printed receipt, 30 days), `whatsapp` (sent to a number, 7 days).
+model PosReceiptCode {
+  id          String     @id @default(uuid()) @db.Uuid
+  accountId   String     @map("account_id") @db.Uuid
+  saleId      String     @map("sale_id") @db.Uuid
+  kind        String     @default("receipt") @db.VarChar(16)
+  purpose     String     @db.VarChar(16)
+  tokenHash   String     @unique(map: "pos_receipt_codes_token_key") @map("token_hash") @db.VarChar(64)
+  expiresAt   DateTime   @map("expires_at")
+  usedAt      DateTime?  @map("used_at")
+  usedCount   Int        @default(0) @map("used_count")
+  /// Where its PDF went, masked.
+  deliveredTo String?    @map("delivered_to") @db.VarChar(40)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  account     PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sale        PosSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId, createdAt(sort: Desc)], map: "pos_receipt_codes_sale_idx")
+  @@map("pos_receipt_codes")
+}
+
+/// A receipt sent: `via` WhatsApp (to a number), `qr` (to whoever sent its code) or email; where to, masked.
+model PosReceiptSend {
+  id                String     @id @default(uuid()) @db.Uuid
+  accountId         String     @map("account_id") @db.Uuid
+  saleId            String     @map("sale_id") @db.Uuid
+  kind              String     @db.VarChar(16)
+  via               String     @db.VarChar(16)
+  toHint            String     @map("to_hint") @db.VarChar(80)
+  /// `queued` (WhatsApp, read live from its message), `sent` or `failed`.
+  status            String     @db.VarChar(16)
+  error             String?    @db.VarChar(300)
+  whatsappMessageId String?    @map("whatsapp_message_id") @db.Uuid
+  byName            String?    @map("by_name") @db.VarChar(120)
+  byStaffId         String?    @map("by_staff_id") @db.Uuid
+  createdAt         DateTime   @default(now()) @map("created_at")
+  account           PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sale              PosSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId, createdAt(sort: Desc)], map: "pos_receipt_sends_sale_idx")
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_receipt_sends_account_idx")
+  @@map("pos_receipt_sends")
 }

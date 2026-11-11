@@ -1,4 +1,4 @@
-import type { EmailMessage } from './email.service.js';
+import type { EmailAttachment, EmailMessage } from './email.service.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
@@ -774,4 +774,26 @@ export function resaleOrderEmail(to: string, input: { title: string; body: strin
     '</div>',
   ].join('');
   return { to, subject, html, text: [input.title, '', ...paragraphs, '', `${input.action}: ${input.link}`, '', input.signature].join('\n') };
+}
+
+/**
+ * A shop's receipt from Udozo POS, sent by its cashier to the customer's email with the PDF attached. The shop is the
+ * seller; Udozo only carries it. Never anything but the shop's own words and the sale's number and total.
+ */
+export function posReceiptEmail(input: { to: string; shop: string; number: string; total: string; when: string; attachments: EmailAttachment[]; invoice: boolean }): EmailMessage {
+  const what = input.invoice && input.attachments.length === 1 ? 'invoice' : 'receipt';
+  return {
+    to: input.to,
+    subject: `Your ${what} from ${input.shop} · ${input.total}`,
+    attachments: input.attachments,
+    ...layout(
+      `Your ${what} from ${input.shop}`,
+      [
+        `Thank you for shopping at ${input.shop}. Your ${what} for ${input.number} (${input.total}, ${input.when}) is attached as a PDF.`,
+        `For anything about what you bought, ask ${input.shop}. They sent this through Udozo POS.`,
+      ],
+      undefined,
+      'Udozo',
+    ),
+  };
 }

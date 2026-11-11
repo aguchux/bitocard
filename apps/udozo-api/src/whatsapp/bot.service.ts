@@ -11,6 +11,7 @@ import { conditionName, isOnShop, priceText } from '../classifieds/rules.js';
 import { ListingSearchService, publicName } from '../classifieds/search.service.js';
 import { WhatsappAnjio, looksLikeQuestion, searchWordsOf } from './anjio.service.js';
 import { WhatsappContactsService, linkCodeIn } from './contacts.service.js';
+import { receiptCodeIn, WhatsappReceiptsHub } from './receipts.js';
 import { WhatsappDirect, directGreeting, directLink, phoneText } from './direct.service.js';
 import { type Inbound } from './inbound.js';
 import { words } from './messages.js';
@@ -54,6 +55,7 @@ export class WhatsappBot {
     private readonly direct: WhatsappDirect,
     private readonly signup: SignupFlow,
     private readonly signIns: WhatsappSignIns,
+    private readonly receipts: WhatsappReceiptsHub,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -125,6 +127,15 @@ export class WhatsappBot {
       if (ctx.contact.optedOutAt) ctx.contact = await this.contacts.optIn(ctx.contact.id);
       if (!(await this.contacts.openIn(ctx.country))) return ctx.say({ type: 'text', body: words.notOpen });
       return this.signInWith(ctx, signInCode);
+    }
+    // A shop's receipt (its QR code fills the words in): sending it is asking for the PDF, so it opts in. Udozo POS
+    // checks WhatsApp is open in the shop's country.
+    const receipt = ctx.input.kind === 'text' && this.receipts.handler ? receiptCodeIn(text) : null;
+    if (receipt) {
+      if (ctx.contact.optedOutAt) ctx.contact = await this.contacts.optIn(ctx.contact.id);
+      const problem = await this.receipts.handler!.request({ contactId: ctx.contact.id, waId: ctx.contact.waId }, receipt.number, receipt.code);
+      if (problem) await ctx.say({ type: 'text', body: problem });
+      return;
     }
     if (ctx.contact.optedOutAt) {
       if (!isWord(text, 'START')) return;
@@ -242,6 +253,12 @@ export class WhatsappBot {
         return this.anjio.sendDraft(ctx, id!, Number(action));
       case 'aperson':
         return this.anjio.person(ctx, id!);
+      case 'rcpt':
+      case 'rinv': {
+        const problem = this.receipts.handler ? await this.receipts.handler.choose({ contactId: ctx.contact.id, waId: ctx.contact.waId }, head === 'rinv' ? 'invoice' : 'receipt', id ?? '') : null;
+        if (problem) await ctx.say({ type: 'text', body: problem });
+        return;
+      }
       default:
         return this.menu(ctx);
     }

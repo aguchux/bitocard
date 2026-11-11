@@ -23,7 +23,23 @@ const changed = () => conflict('pos_account_changed', 'Your Udozo POS account ch
 const walletLow = (amount: bigint, currency: string) =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'wallet_balance_low', `Your Udozo wallet needs ${currency} ${(Number(amount) / 100).toFixed(2)} for this. Add funds on udozo.com, then try again.`);
 
-export type ShopInput = { name?: string; address?: string | null; phone?: string | null; tin?: string | null; vat_bps?: number; receipt_footer?: string | null; kind?: string };
+export type ShopInput = {
+  name?: string;
+  address?: string | null;
+  phone?: string | null;
+  tin?: string | null;
+  vat_bps?: number;
+  receipt_footer?: string | null;
+  kind?: string;
+  /** Shown on invoices. */
+  email?: string | null;
+  /** The shop's own bank account for later payments, on invoices (shown, never used by Udozo): all three, or none. */
+  bank_name?: string | null;
+  bank_account_name?: string | null;
+  bank_account_number?: string | null;
+  /** Printed receipts carry the WhatsApp QR code. */
+  receipt_qr?: boolean;
+};
 export type TillInput = { name?: string; printer_width?: 58 | 80; auto_print?: boolean };
 
 type AccountRow = PosAccount & { plan: PosPlan; shops: Array<PosShop & { tills: PosTill[] }> };
@@ -303,7 +319,24 @@ export class PosService {
       ...(input.tin !== undefined ? { tin: clean(input.tin, 40) } : {}),
       ...(input.vat_bps !== undefined ? { vatBps: input.vat_bps } : {}),
       ...(input.receipt_footer !== undefined ? { receiptFooter: clean(input.receipt_footer, 300) } : {}),
+      ...(input.email !== undefined ? { email: this.shopEmail(input.email) } : {}),
+      ...(input.bank_name !== undefined ? { bankName: clean(input.bank_name, 80) } : {}),
+      ...(input.bank_account_name !== undefined ? { bankAccountName: clean(input.bank_account_name, 120) } : {}),
+      ...(input.bank_account_number !== undefined ? { bankAccountNumber: this.accountNumber(input.bank_account_number) } : {}),
+      ...(input.receipt_qr !== undefined ? { receiptQr: input.receipt_qr } : {}),
     };
+  }
+
+  private shopEmail(value: string | null) {
+    const email = clean(value, 254)?.toLowerCase() ?? null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw invalid('parameter_invalid', "Enter the shop's email address, or leave it empty.", 'email');
+    return email;
+  }
+
+  private accountNumber(value: string | null) {
+    const number = clean(value, 30)?.replace(/\s+/g, '') ?? null;
+    if (number && !/^[0-9A-Z-]{5,30}$/i.test(number)) throw invalid('parameter_invalid', "Enter the shop's account number: digits only.", 'bank_account_number');
+    return number;
   }
 
   private async createShop(tx: Prisma.TransactionClient, accountId: string, fields: ReturnType<PosService['shopFields']>, position: number) {
@@ -401,6 +434,9 @@ export class PosService {
         shop_code: shop.shopCode,
         vat_bps: shop.vatBps,
         receipt_footer: shop.receiptFooter,
+        email: shop.email,
+        bank: shop.bankName || shop.bankAccountName || shop.bankAccountNumber ? { name: shop.bankName, account_name: shop.bankAccountName, account_number: shop.bankAccountNumber } : null,
+        receipt_qr: shop.receiptQr,
         /** What kind of shop it is, and its categories that come first at the till. */
         kind: presentShopKind(shop.kind),
         tills: shop.tills.map(till => ({ object: 'pos_till' as const, id: till.id, name: till.name, printer_width: till.printerWidth, auto_print: till.autoPrint })),

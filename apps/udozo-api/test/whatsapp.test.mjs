@@ -467,7 +467,7 @@ describe('admins', () => {
     assert.ok(before.json.data.every(item => item.status === 'not_submitted'));
     const submitted = await admin.post('/v1/admin/whatsapp/templates/submit', {});
     assert.deepEqual(submitted.json.failed, [], 'none starts or ends with a variable');
-    assert.equal(submitted.json.submitted.length, 6);
+    assert.equal(submitted.json.submitted.length, 7, 'udozo_pos_receipt among them');
     assert.ok(submitted.json.templates.every(item => item.status === 'pending'));
     const contact = await admin.get('/v1/admin/whatsapp/contacts?phone=%2B2348022223333');
     assert.equal(contact.status, 200);
