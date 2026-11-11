@@ -121,11 +121,11 @@ pos.udozo.com's home is **public and indexed**. It is Udozo POS's own marketing 
     - features: register and barcode, one inventory with udozo.com, staff and roles, receipts by print, WhatsApp and email, reports, offline later;
     - the apps band, pricing, questions and a closing call;
   - `/pricing`: Free, Premium and Multi-shop side by side (monthly, and yearly if admins set it), what each includes, the trial, and that paid plans are paid from the Udozo wallet;
-  - `/download`: Android, iOS and Windows, plus Use it in your browser;
+  - `/download`: Android, iOS and Windows, plus Use it in your browser; **Download for Windows** opens Udozo POS's Microsoft Store listing (the Store's web page, which offers to open the Store app and install), never a file from pos.udozo.com;
   - `/signup` and `/signin`;
   - legal pages: POS terms and privacy link to udozo.com's `/legal/pos` and `/legal/privacy`.
 - **App buttons** (Google Play, App Store and Microsoft Store):
-  - each points at its store once that app is live, with the links set in admin (`pos_app_links`);
+  - each points at its store once that app is live, with the links set in admin (`pos_app_links`; Windows takes only a Microsoft Store address, `apps.microsoft.com/detail/<product id>`, refused otherwise);
   - until then the button says **Coming soon** and is not a link, so the site never claims an app that does not exist;
   - Use in browser always works, and offers to install the web app (`@bitocard/ui/install`).
 - **Sign-up** (`/signup`, the owner only):
