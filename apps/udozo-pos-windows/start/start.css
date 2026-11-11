@@ -1,0 +1,8 @@
+:root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f4f6f4; color: #14201b; }
+main { text-align: center; padding: 24px; max-width: 420px; }
+h1 { font-size: 28px; margin: 16px 0 8px; }
+p { color: #33413a; line-height: 1.5; margin: 0 0 20px; }
+button { min-height: 48px; padding: 0 24px; border: 0; border-radius: 12px; background: #0b7a5a; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+button:hover { background: #075c43; }
+button:focus-visible { outline: 3px solid #19a47a; outline-offset: 2px; }

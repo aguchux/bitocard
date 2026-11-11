@@ -1,4 +1,4 @@
-// Udozo POS for Windows. For now the window shows pos.udozo.com's own pages: the bundled start page (dist/index.html)
+// Udozo POS for Windows. For now the window shows pos.udozo.com's own pages: the bundled start page (start/index.html)
 // waits for the internet, then opens the till. Bundled screens, offline selling, printing and the cash drawer come with
 // milestone 9 (docs/UDOZO_POS_PLAN.md). The pages it shows get no access to this app's commands: there are no
 // capabilities, so nothing on pos.udozo.com can call into Windows.

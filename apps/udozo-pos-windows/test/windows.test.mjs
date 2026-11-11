@@ -33,7 +33,7 @@ describe('the Tauri app', () => {
     assert.match(cargo, new RegExp(`^version = "${config.version.replace(/\./g, '\\.')}"$`, 'm'), 'Cargo.toml has the same version');
     // The MSIX is made by makeappx from the bare executable; Tauri's own MSI and NSIS installers are never built.
     assert.equal(config.bundle.active, false);
-    assert.equal(config.build.frontendDist, '../dist');
+    assert.equal(config.build.frontendDist, '../start');
     assert.deepEqual(config.app.windows, [], 'the window is made in main.rs, with its navigation rules');
   });
 
@@ -58,7 +58,7 @@ describe('the Tauri app', () => {
   });
 
   test('starts on the bundled page, which opens the till once online', () => {
-    const start = read('dist/start.js');
+    const start = read('start/start.js');
     const [, target] = start.match(/const START = "([^"]+)"/);
     const [, probe] = start.match(/const PROBE = "([^"]+)"/);
     for (const address of [target, probe]) {
@@ -71,7 +71,7 @@ describe('the Tauri app', () => {
     const csp = Object.fromEntries(config.app.security.csp.split(';').map(part => part.trim().split(/\s+/)).map(([name, ...values]) => [name, values]));
     assert.deepEqual(csp['script-src'], ["'self'"]);
     assert.deepEqual(csp['connect-src'], [new URL(probe).origin]);
-    const html = read('dist/index.html');
+    const html = read('start/index.html');
     assert.ok(!/<script>/.test(html) && !/style="/.test(html), 'no inline script or style, so the policy can stay strict');
     assert.match(html, /src="start\.js"/);
     assert.match(html, /role="status"/);
@@ -84,7 +84,7 @@ describe('icons and Store tiles', () => {
     assert.deepEqual(png('src-tauri/icons/128x128.png'), [128, 128]);
     assert.deepEqual(png('src-tauri/icons/128x128@2x.png'), [256, 256]);
     assert.deepEqual(png('src-tauri/icons/icon.png'), [512, 512]);
-    assert.deepEqual(png('dist/icon.png'), [128, 128]);
+    assert.deepEqual(png('start/icon.png'), [128, 128]);
     const ico = readFileSync(join(here, 'src-tauri/icons/icon.ico'));
     const sizes = Array.from({ length: ico.readUInt16LE(4) }, (_, index) => ico[6 + index * 16] || 256);
     assert.ok(sizes.includes(16) && sizes.includes(256), 'the executable icon goes from 16 to 256 pixels');

@@ -201,8 +201,8 @@ def write_desktop(folder, dark: Image.Image):
     }.items():
         boxed(dark, width, height, fill).save(assets / file, optimize=True)
     # The bundled start page's picture.
-    (folder / "dist").mkdir(parents=True, exist_ok=True)
-    fitted(dark, 128, 0.9).save(folder / "dist" / "icon.png", optimize=True)
+    (folder / "start").mkdir(parents=True, exist_ok=True)
+    fitted(dark, 128, 0.9).save(folder / "start" / "icon.png", optimize=True)
     print(f"Wrote the desktop icons and Store tiles to {folder.relative_to(ROOT)}")
 
 

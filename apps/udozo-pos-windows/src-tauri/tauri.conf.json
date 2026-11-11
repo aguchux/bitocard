@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.udozo.pos",
   "build": {
-    "frontendDist": "../dist"
+    "frontendDist": "../start"
   },
   "app": {
     "windows": [],
