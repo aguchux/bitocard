@@ -2,7 +2,14 @@
 
 /* eslint-disable @next/next/no-img-element -- listing photos come from udozo.com's own image addresses. */
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { CameraScan } from "@/components/camera-scan";
 import { type WaitingRequest, WalletWait } from "@/components/wallet-wait";
 import {
@@ -21,12 +28,20 @@ import {
   vatText,
 } from "@/lib/pos";
 import { askWallet, ringUp } from "@/lib/pos-actions";
+import { TillCustomer } from "@/components/till-customer";
+import type { PosCustomerBrief } from "@/lib/pos";
 
 type Payment = {
-  method: PosPaymentMethod;
+  method: PosPaymentMethod | "credit";
   amount: number;
   tendered: number | null;
   reference: string;
+};
+
+const creditMethod = {
+  value: "credit" as const,
+  label: "Pay later",
+  hint: "The customer owes you this part: record it on their page when they pay it back.",
 };
 
 const walletMethod = {
@@ -88,6 +103,7 @@ export function Register({
   const [payments, setPayments] = useState<Payment[]>([]);
   const [done, setDone] = useState<PosSale | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [customer, setCustomer] = useState<PosCustomerBrief | null>(null);
   const [pending, start] = useTransition();
 
   const byId = useMemo(
@@ -199,6 +215,7 @@ export function Register({
     setDone(null);
     setMessage(null);
     setWalletRequest(null);
+    setCustomer(null);
     setSaleId(newId());
     setStage("basket");
     setTimeout(() => search.current?.focus(), 0);
@@ -222,6 +239,7 @@ export function Register({
           reference: payment.reference,
         })),
         expected_total: totals.total,
+        ...(customer ? { customer_id: customer.id } : {}),
       });
       if (result.ok) {
         setDone(result.data);
@@ -264,6 +282,7 @@ export function Register({
         wallet_amount: remaining,
         expected_total: totals.total,
         ...(phone.trim() ? { phone } : {}),
+        ...(customer ? { customer_id: customer.id } : {}),
       });
       if (!result.ok) {
         setMessage(result.message);
@@ -541,6 +560,15 @@ export function Register({
               </p>
             )}
 
+            {lines.length ? (
+              <TillCustomer
+                customer={customer}
+                onChange={setCustomer}
+                disabled={stage !== "basket"}
+                currency={currency}
+              />
+            ) : null}
+
             {lines.length && stage === "basket" ? (
               <div>
                 <label
@@ -623,6 +651,7 @@ export function Register({
                 setPayments={setPayments}
                 pending={pending}
                 walletPayments={walletPayments}
+                credit={customer !== null}
                 onAskWallet={askForWallet}
                 onBack={() => setStage("basket")}
                 onComplete={complete}
@@ -656,6 +685,7 @@ function PaymentStep({
   setPayments,
   pending,
   walletPayments,
+  credit,
   onAskWallet,
   onBack,
   onComplete,
@@ -667,13 +697,15 @@ function PaymentStep({
   setPayments: (payments: Payment[]) => void;
   pending: boolean;
   walletPayments: boolean;
+  /** A customer is chosen, so the sale may be paid later in part. */
+  credit: boolean;
   onAskWallet: (phone: string) => void;
   onBack: () => void;
   onComplete: () => void;
 }) {
-  const [method, setMethod] = useState<PosPaymentMethod | "udozo_wallet">(
-    "cash",
-  );
+  const [method, setMethod] = useState<
+    PosPaymentMethod | "credit" | "udozo_wallet"
+  >("cash");
   const [phone, setPhone] = useState("");
   const [amountText, setAmountText] = useState("");
   const [tenderedText, setTenderedText] = useState("");
@@ -754,10 +786,11 @@ function PaymentStep({
               Paid by
             </legend>
             <div
-              className={`mt-1 grid gap-1 ${walletPayments ? "grid-cols-3 sm:grid-cols-5" : "grid-cols-4"}`}
+              className={`mt-1 grid gap-1 ${walletPayments || credit ? "grid-cols-3" : "grid-cols-4"}`}
             >
               {[
                 ...paymentMethods,
+                ...(credit ? [creditMethod] : []),
                 ...(walletPayments ? [walletMethod] : []),
               ].map((item) => (
                 <button
@@ -774,7 +807,9 @@ function PaymentStep({
             <p className="mt-1 text-xs text-pos-muted">
               {method === "udozo_wallet"
                 ? walletMethod.hint
-                : paymentMethods.find((item) => item.value === method)?.hint}
+                : method === "credit"
+                  ? creditMethod.hint
+                  : paymentMethods.find((item) => item.value === method)?.hint}
             </p>
           </fieldset>
           {method === "udozo_wallet" ? (

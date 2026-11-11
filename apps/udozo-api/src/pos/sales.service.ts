@@ -6,18 +6,22 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { formatMoney } from '../notifications/templates.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { posCountedStatuses, tillBlock } from './catalogue-rules.js';
 import { saleTotals } from './money.js';
 import { limitsOf } from './plans.js';
-import { adjustedStock, checkPayments, maxLineQuantity, maxSaleLines, type PaymentInput, recordedPaymentMethods, type RecordedPaymentMethod, saleNumber, type StockAdjustment } from './sale-rules.js';
+import { customerUnknown } from './customers.service.js';
+import { adjustedStock, checkPayments, maxLineQuantity, maxSaleLines, type PaymentInput, saleNumber, type StockAdjustment, tillPaymentMethods, type TillPaymentMethod } from './sale-rules.js';
 
 export type SaleInput = {
   till_id: string;
   client_sale_id: string;
   lines: Array<{ listing_id: string; quantity: number; discount?: number }>;
   discount?: number;
-  payments: Array<{ method: RecordedPaymentMethod; amount: number; tendered?: number | null; reference?: string | null }>;
+  payments: Array<{ method: TillPaymentMethod; amount: number; tendered?: number | null; reference?: string | null }>;
+  /** The shop's customer the sale is made to (needed to sell on credit). */
+  customer_id?: string | null;
   /** The total the till showed, in minor units: a different one is refused (`price_changed`). */
   expected_total: number;
   note?: string | null;
@@ -32,7 +36,7 @@ const conflict = (code: string, message: string, param?: string) => new ApiError
 const noAccount = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'pos_account_missing', 'You have not signed up for Udozo POS yet.');
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `There is no such ${what} on your Udozo POS account.`);
 
-const saleInclude = { lines: { orderBy: { position: 'asc' } }, payments: { orderBy: { position: 'asc' } }, shop: { select: { id: true, name: true } } } satisfies Prisma.PosSaleInclude;
+const saleInclude = { lines: { orderBy: { position: 'asc' } }, payments: { orderBy: { position: 'asc' } }, shop: { select: { id: true, name: true } }, customer: { select: { id: true, name: true, number: true } } } satisfies Prisma.PosSaleInclude;
 type SaleRow = Prisma.PosSaleGetPayload<{ include: typeof saleInclude }>;
 type Account = Prisma.PosAccountGetPayload<{ include: { plan: true } }>;
 type Till = Prisma.PosTillGetPayload<{ include: { shop: true } }>;
@@ -146,12 +150,21 @@ export class PosSalesService {
     const totals = saleTotals(lines, { discount: minor(input.discount, 'discount'), vatBps: till.shop.vatBps });
     if (BigInt(input.expected_total) !== totals.total) throw conflict('price_changed', 'A price changed since the till showed the total. Look again, then take payment.', 'expected_total');
     const parts: PaymentInput[] = input.payments.map((payment, index) => {
-      if (!recordedPaymentMethods.includes(payment.method as RecordedPaymentMethod)) throw invalid('parameter_invalid', 'Choose cash, transfer, card or other.', `payments[${index}].method`);
+      if (!tillPaymentMethods.includes(payment.method as TillPaymentMethod)) throw invalid('parameter_invalid', 'Choose cash, transfer, card, other or pay later.', `payments[${index}].method`);
       return { method: payment.method, amount: minor(payment.amount, `payments[${index}].amount`), tendered: payment.tendered === undefined || payment.tendered === null ? null : minor(payment.tendered, `payments[${index}].tendered`), reference: payment.reference ?? null };
     });
     if (args.wallet !== undefined) parts.push({ method: 'udozo_wallet', amount: args.wallet, tendered: null, reference: null });
     const paid = checkPayments(parts, totals.total);
-    return { lines, totals, paid };
+
+    // The customer: needed to sell on credit, which their limit (if the shop set one) may not pass.
+    const customer = input.customer_id ? await tx.posCustomer.findFirst({ where: { id: input.customer_id, accountId: account.id } }) : null;
+    if (input.customer_id && !customer) throw customerUnknown('customer_id');
+    const credit = paid.payments.filter(payment => payment.method === 'credit').reduce((sum, payment) => sum + payment.amount, 0n);
+    if (credit > 0n && !customer) throw invalid('customer_required', 'Choose the customer who will pay later.', 'customer_id');
+    if (credit > 0n && customer!.creditLimitMinor !== null && customer!.owedMinor + credit > customer!.creditLimitMinor) {
+      throw conflict('credit_limit_reached', `${customer!.name} may owe at most ${formatMoney(customer!.creditLimitMinor, account.currency)} and owes ${formatMoney(customer!.owedMinor, account.currency)} already.`, 'customer_id');
+    }
+    return { lines, totals, paid, customer, credit };
   }
 
   /** Makes the sale `build` checked, in the same `tx`: numbered for its shop, its units taken off stock with a movement each. */
@@ -185,6 +198,7 @@ export class PosSalesService {
         changeMinor: paid.change,
         soldByCustomerId: soldBy.id,
         soldByName: soldBy.name,
+        customerId: built.customer?.id ?? null,
         note: text(input.note, 300),
         clientCreatedAt: input.client_created_at ? new Date(input.client_created_at) : null,
         lines: {
@@ -213,6 +227,16 @@ export class PosSalesService {
         },
       },
     });
+
+    if (built.customer) {
+      // Their purchases, and what they now owe (the limit held again here, as two tills may sell to them at once).
+      const [after] = await tx.$queryRaw<Array<{ owed: bigint }>>`
+        UPDATE "pos_customers" SET "owed_minor" = "owed_minor" + ${built.credit}, "sales_count" = "sales_count" + 1, "spent_minor" = "spent_minor" + ${totals.total}, "last_sale_at" = ${now}, "updated_at" = ${now}
+        WHERE "id" = ${built.customer.id}::uuid AND ("credit_limit_minor" IS NULL OR "owed_minor" + ${built.credit} <= "credit_limit_minor")
+        RETURNING "owed_minor" AS "owed"`;
+      if (!after) throw conflict('credit_limit_reached', `${built.customer.name} has reached their credit limit.`, 'customer_id');
+      if (built.credit > 0n) await tx.posCustomerEntry.create({ data: { customerId: built.customer.id, kind: 'credit_sale', amountMinor: built.credit, owedAfterMinor: after.owed, saleId: sale.id, byName: soldBy.name } });
+    }
 
     for (const line of lines) {
       const stock = line.row.stock - line.quantity;
@@ -318,7 +342,7 @@ export class PosSalesService {
   }
 
   private async refundIn(
-    sale: { id: string; number: string; shopId: string; lines: Array<{ listingId: string; quantity: number }> },
+    sale: { id: string; number: string; shopId: string; customerId: string | null; totalMinor: bigint; lines: Array<{ listingId: string; quantity: number }>; payments: Array<{ method: string; amountMinor: bigint }> },
     args: { account: Account; customer: CustomerWithStore; reason: string; restock: boolean; now: Date; reversals: Awaited<ReturnType<LedgerService['prepare']>>[] },
   ) {
     const { account, customer, reason, restock, now } = args;
@@ -326,6 +350,16 @@ export class PosSalesService {
       const claimed = await tx.posSale.updateMany({ where: { id: sale.id, status: 'completed' }, data: { status: 'refunded', refundedAt: now, refundReason: reason, restocked: restock } });
       if (claimed.count === 0) throw conflict('sale_refunded', `${sale.number} was refunded already.`);
       for (const entry of args.reversals) await this.ledger.write(tx, entry);
+      if (sale.customerId) {
+        // What they spent goes down, and what they owe by as much as the sale put on credit (never below nothing).
+        const credit = sale.payments.filter(payment => payment.method === 'credit').reduce((sum, payment) => sum + payment.amountMinor, 0n);
+        const [before] = await tx.$queryRaw<Array<{ owed: bigint }>>`SELECT "owed_minor" AS "owed" FROM "pos_customers" WHERE "id" = ${sale.customerId}::uuid FOR UPDATE`;
+        if (before) {
+          const off = credit < before.owed ? credit : before.owed;
+          await tx.$executeRaw`UPDATE "pos_customers" SET "owed_minor" = "owed_minor" - ${off}, "spent_minor" = GREATEST("spent_minor" - ${sale.totalMinor}, 0), "updated_at" = ${now} WHERE "id" = ${sale.customerId}::uuid`;
+          if (off > 0n) await tx.posCustomerEntry.create({ data: { customerId: sale.customerId, kind: 'refund', amountMinor: -off, owedAfterMinor: before.owed - off, saleId: sale.id, note: reason.slice(0, 300), byName: customer.name } });
+        }
+      }
       if (!restock) return;
       const listingIds = [...new Set(sale.lines.map(line => line.listingId))].sort();
       await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ANY(${listingIds}::uuid[]) ORDER BY "id" FOR UPDATE`;
@@ -393,6 +427,8 @@ export class PosSalesService {
       change: Number(sale.changeMinor),
       lines: sale.lines.map(line => ({ listing_id: line.listingId, title: line.title, sku: line.sku, barcode: line.barcode, quantity: line.quantity, unit_price: Number(line.unitPriceMinor), discount: Number(line.discountMinor), total: Number(line.totalMinor) })),
       payments: sale.payments.map(payment => ({ method: payment.method, amount: Number(payment.amountMinor), tendered: payment.tenderedMinor === null ? null : Number(payment.tenderedMinor), change: Number(payment.changeMinor), reference: payment.reference })),
+      /** The shop's customer it was sold to, if one was chosen. */
+      customer: sale.customer ? { id: sale.customer.id, name: sale.customer.name, number: `C-${String(sale.customer.number).padStart(6, '0')}` } : null,
       sold_by: sale.soldByName,
       note: sale.note,
       refunded_at: iso(sale.refundedAt),

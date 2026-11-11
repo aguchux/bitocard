@@ -72,6 +72,32 @@ export type AdminPosAccount = {
 export type AdminPosAccountDetail = AdminPosAccount & { charges: PosCharge[] };
 export type PosAccountFilter = { q?: string; country?: string; plan?: PosPlanCode; limit?: number; offset?: number };
 
+/** A POS shop's own customer (no Udozo account needed); `udozo` when linked to the account they paid through Udozo with. */
+export type AdminPosCustomer = {
+  object: 'pos_customer';
+  id: string;
+  number: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  udozo: boolean;
+  owed: number;
+  credit_limit: number | null;
+  sales_count: number;
+  spent: number;
+  last_sale_at: string | null;
+};
+export type AdminPosCustomerDetail = AdminPosCustomer & {
+  address: string | null;
+  notes: string | null;
+  source: 'shop' | 'udozo';
+  udozo_rating: { member_since: string; in_good_standing: boolean; reviews: { positive: number; neutral: number; negative: number; counted: number; positive_pct: number | null } | null; scores: { band?: string | null } | null } | null;
+  created_at: string;
+  sales: Array<{ id: string; number: string; status: 'completed' | 'refunded'; total: number; currency: string; created_at: string }>;
+  entries: Array<{ id: string; kind: 'credit_sale' | 'repayment' | 'refund'; amount: number; owed_after: number; sale: { id: string; number: string | null } | null; method: string | null; reference: string | null; note: string | null; by: string | null; created_at: string }>;
+};
+export type AdminPosCustomers = { object: 'list'; summary: { owing: number; owed: number }; total: number; has_more: boolean; data: AdminPosCustomer[] };
+
 export const posAppPlatforms = ['android', 'ios', 'windows'] as const;
 export type PosAppPlatform = (typeof posAppPlatforms)[number];
 export type PosApps = { object: 'pos_apps' } & Record<PosAppPlatform, string | null>;
@@ -87,6 +113,15 @@ export const adminUdozoPosApi = bitocardApi.injectEndpoints({
     posAccount: build.query<AdminPosAccountDetail, string>({
       query: id => `/v1/admin/pos/accounts/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'PosAccounts', id }],
+    }),
+    /** A shop's customers under its POS account (support, operations and finance read). */
+    posCustomers: build.query<AdminPosCustomers, { account: string; q?: string; owing?: boolean; limit?: number; offset?: number }>({
+      query: ({ account, ...filter }) => ({ url: `/v1/admin/pos/accounts/${account}/customers`, params: clean(filter) }),
+      providesTags: (_result, _error, { account }) => [{ type: 'PosAccounts', id: account }],
+    }),
+    posCustomer: build.query<AdminPosCustomerDetail, { account: string; id: string }>({
+      query: ({ account, id }) => `/v1/admin/pos/accounts/${account}/customers/${id}`,
+      providesTags: (_result, _error, { account }) => [{ type: 'PosAccounts', id: account }],
     }),
     posPlans: build.query<AdminPosPlans, void>({
       query: () => '/v1/admin/pos/plans',
@@ -109,4 +144,4 @@ export const adminUdozoPosApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { usePosAccountsQuery, usePosAccountQuery, usePosPlansQuery, useUpdatePosPlanMutation, usePosAppsQuery, useSetPosAppMutation } = adminUdozoPosApi;
+export const { usePosAccountsQuery, usePosAccountQuery, usePosCustomersQuery, usePosCustomerQuery, usePosPlansQuery, useUpdatePosPlanMutation, usePosAppsQuery, useSetPosAppMutation } = adminUdozoPosApi;

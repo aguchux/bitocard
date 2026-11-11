@@ -10,6 +10,8 @@ import { formatMoney } from '../notifications/templates.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { normalisePhone } from '../auth/auth.service.js';
+import { PosCustomersService } from './customers.service.js';
 import { PosSalesService, type SaleInput } from './sales.service.js';
 
 export type WalletRequestInput = SaleInput & { wallet_amount: number; phone?: string | null };
@@ -42,6 +44,7 @@ export class PosWalletService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sales: PosSalesService,
+    private readonly customers: PosCustomersService,
     private readonly ledger: LedgerService,
     private readonly settings: SettingsService,
     private readonly inbox: InboxService,
@@ -64,15 +67,15 @@ export class PosWalletService {
     }
 
     // Asked of one buyer: their confirmed Udozo mobile number, in the shop's country.
-    let buyerId: string | null = null;
-    const phone = input.phone?.replace(/[\s-]/g, '') ?? '';
-    if (phone) {
-      if (!/^\+\d{8,15}$/.test(phone)) throw invalid('parameter_invalid', 'Give the buyer’s mobile number with its country code, like +234 803 000 0000.', 'phone');
-      const buyer = await this.prisma.customer.findFirst({ where: { storeId: houseStoreId, phone, phoneVerifiedAt: { not: null }, status: 'active' }, select: { id: true, country: true } });
-      if (!buyer || buyer.country !== account.country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'buyer_unknown', 'No Udozo account in your country has this mobile number confirmed. Show the QR code instead.', 'phone');
-      if (buyer.id === owner.id) throw conflict('same_person', 'This is your own Udozo account: you cannot pay your own shop.', 'phone');
-      buyerId = buyer.id;
+    let buyer: { id: string; name: string; phone: string | null; phoneVerifiedAt: Date | null } | null = null;
+    if (input.phone?.trim()) {
+      const phone = normalisePhone(input.phone.trim(), account.country);
+      const found = await this.prisma.customer.findFirst({ where: { storeId: houseStoreId, phone, phoneVerifiedAt: { not: null }, status: 'active' }, select: { id: true, name: true, phone: true, phoneVerifiedAt: true, country: true } });
+      if (!found || found.country !== account.country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'buyer_unknown', 'No Udozo account in your country has this mobile number confirmed. Show the QR code instead.', 'phone');
+      if (found.id === owner.id) throw conflict('same_person', 'This is your own Udozo account: you cannot pay your own shop.', 'phone');
+      buyer = found;
     }
+    const buyerId = buyer?.id ?? null;
 
     const built = await this.prisma.$transaction(tx => this.sales.build(tx, { account, till, ownerId: owner.id, input, wallet }));
     const basket: Basket = {
@@ -84,11 +87,14 @@ export class PosWalletService {
       ...(input.note ? { note: input.note } : {}),
       ...(input.client_created_at ? { client_created_at: input.client_created_at } : {}),
     };
+    let customerId = input.customer_id ?? null;
     const token = `pw_${randomBytes(24).toString('base64url')}`;
     const now = new Date();
     const row = await this.prisma.$transaction(async tx => {
       // Asking again for the same basket replaces the request waiting for it.
       await tx.posWalletRequest.updateMany({ where: { accountId: account.id, clientSaleId: input.client_sale_id, status: 'waiting' }, data: { status: 'cancelled' } });
+      // Asked of a Udozo customer by their number: they join the shop's customers now, linked to their account.
+      if (buyer) customerId = (await this.customers.linkUdozo(tx, account.id, buyer, customerId)).id;
       return tx.posWalletRequest.create({
         data: {
           accountId: account.id,
@@ -104,6 +110,7 @@ export class PosWalletService {
           soldByCustomerId: owner.id,
           soldByName: owner.name,
           buyerCustomerId: buyerId,
+          customerId,
           expiresAt: new Date(now.getTime() + walletRequestMs),
         },
       });
@@ -198,6 +205,9 @@ export class PosWalletService {
       await this.prisma.$transaction(async tx => {
         const claimed = await tx.posWalletRequest.updateMany({ where: { id: row.id, status: 'waiting', expiresAt: { gt: now } }, data: { status: 'paid', buyerCustomerId: buyer.id, paidAt: now } });
         if (!claimed.count) throw conflict('request_closed', 'This payment request has closed. Ask the shop for a new one.');
+        // The payer joins the shop's customers (or is found there), linked to their Udozo account, and the sale is theirs.
+        const customer = await this.customers.linkUdozo(tx, account.id, { id: buyer.id, name: buyer.name, phone: buyer.phone, phoneVerifiedAt: buyer.phoneVerifiedAt }, row.customerId);
+        input.customer_id = customer.id;
         const built = await this.sales.build(tx, { account, till, ownerId: row.account.customerId, input, wallet: row.amountMinor });
         const saleId = await this.sales.record(tx, { account, till, soldBy: { id: row.soldByCustomerId, name: row.soldByName }, input, built, now, walletRequest: { id: row.id, number } });
         await tx.posWalletRequest.update({ where: { id: row.id }, data: { saleId } });

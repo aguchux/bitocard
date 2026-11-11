@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { CheckoutModule } from '../checkout/checkout.module.js';
+import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
+import { PosCustomersService } from './customers.service.js';
 import { PosBillingService } from './billing.service.js';
 import { PosCatalogueService } from './catalogue.service.js';
 import { PosAdminService } from './pos-admin.service.js';
@@ -11,9 +13,9 @@ import { PosWalletService } from './wallet.service.js';
 
 /** Udozo POS (docs/UDOZO_POS_PLAN.md): owners' accounts, shops and tills, the three plans and their monthly charges. */
 @Module({
-  imports: [CheckoutModule, SettingsModule],
+  imports: [CheckoutModule, SettingsModule, ClassifiedsModule],
   controllers: [PublicPosController, PosOwnerController, PosPaymentsController, AdminPosController],
-  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService],
+  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService, PosWalletService, PosCustomersService],
   exports: [PosBillingService],
 })
 export class PosModule {}

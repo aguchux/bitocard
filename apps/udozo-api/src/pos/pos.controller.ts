@@ -9,7 +9,8 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import { ProductOnly } from '../products/product.js';
 import { type PlanChange, PosAdminService, posAppPlatforms, type PosAppPlatform } from './pos-admin.service.js';
 import { PosCatalogueService } from './catalogue.service.js';
-import { maxSaleLines, maxSalePayments, recordedPaymentMethods, stockAdjustments } from './sale-rules.js';
+import { PosCustomersService } from './customers.service.js';
+import { maxSaleLines, maxSalePayments, recordedPaymentMethods, stockAdjustments, tillPaymentMethods } from './sale-rules.js';
 import { PosSalesService } from './sales.service.js';
 import { PosWalletService, walletTokenPattern } from './wallet.service.js';
 import { posPlanCodes } from './plans.js';
@@ -107,8 +108,9 @@ class SaleLineDto {
 }
 
 class SalePaymentDto {
-  @IsIn(recordedPaymentMethods)
-  method: (typeof recordedPaymentMethods)[number];
+  /** `credit` is pay later: the sale's customer owes the shop that part. */
+  @IsIn(tillPaymentMethods)
+  method: (typeof tillPaymentMethods)[number];
 
   @IsInt() @Min(1)
   amount: number;
@@ -148,6 +150,61 @@ class SaleDto {
 
   @IsOptional() @IsDateString()
   client_created_at?: string;
+
+  /** The shop's customer the sale is made to (needed to sell on credit). */
+  @IsOptional() @IsUUID()
+  customer_id?: string | null;
+}
+
+class CustomerDto {
+  @IsOptional() @IsString() @MaxLength(120)
+  name?: string;
+
+  /** A mobile number of the shop's country, with or without its dialling code. */
+  @IsOptional() @IsString() @MaxLength(30)
+  phone?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(254)
+  email?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(300)
+  address?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  notes?: string | null;
+
+  /** The most they may owe, in minor units; null for no limit. */
+  @IsOptional() @IsInt() @Min(0)
+  credit_limit?: number | null;
+}
+
+class CustomersDto {
+  @IsOptional() @IsString() @MaxLength(80)
+  q?: string;
+
+  @IsOptional() @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  owing?: boolean;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class RepaymentDto {
+  @IsInt() @Min(1)
+  amount: number;
+
+  @IsIn(recordedPaymentMethods)
+  method: (typeof recordedPaymentMethods)[number];
+
+  @IsOptional() @IsString() @MaxLength(80)
+  reference?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(300)
+  note?: string | null;
 }
 
 class WalletRequestDto extends SaleDto {
@@ -303,7 +360,42 @@ export class PosOwnerController {
     private readonly catalogue: PosCatalogueService,
     private readonly sales: PosSalesService,
     private readonly wallet: PosWalletService,
+    private readonly customers: PosCustomersService,
   ) {}
+
+  /** The shop's customers: its own records, no Udozo account needed. */
+  @Get('customers')
+  customerList(@CurrentCustomer() caller: CustomerCaller, @Query() query: CustomersDto) {
+    return this.customers.list(caller.customer, query);
+  }
+
+  @Post('customers')
+  addCustomer(@CurrentCustomer() caller: CustomerCaller, @Body() body: CustomerDto) {
+    return this.customers.create(caller.customer, body);
+  }
+
+  @Get('customers/:id')
+  customer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.customers.get(caller.customer, id);
+  }
+
+  @Patch('customers/:id')
+  updateCustomer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CustomerDto) {
+    return this.customers.update(caller.customer, id, body);
+  }
+
+  @Delete('customers/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeCustomer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    await this.customers.remove(caller.customer, id);
+  }
+
+  /** A repayment of what a customer owes for goods sold on credit. */
+  @Post('customers/:id/repayments')
+  @HttpCode(HttpStatus.OK)
+  repay(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: RepaymentDto) {
+    return this.customers.repay(caller.customer, id, body);
+  }
 
   @Get()
   me(@CurrentCustomer() caller: CustomerCaller) {
@@ -448,7 +540,21 @@ export class PosPaymentsController {
 @Controller('admin/pos')
 @ProductOnly('udozo')
 export class AdminPosController {
-  constructor(private readonly admin: PosAdminService) {}
+  constructor(
+    private readonly admin: PosAdminService,
+    private readonly customers: PosCustomersService,
+  ) {}
+
+  /** A shop's customers, read under its POS account. */
+  @Get('accounts/:id/customers')
+  accountCustomers(@Param('id', ParseUUIDPipe) id: string, @Query() query: CustomersDto) {
+    return this.customers.adminList(id, query);
+  }
+
+  @Get('accounts/:id/customers/:customer')
+  accountCustomer(@Param('id', ParseUUIDPipe) id: string, @Param('customer', ParseUUIDPipe) customer: string) {
+    return this.customers.adminGet(id, customer);
+  }
 
   @Get('accounts')
   accounts(@Query() query: AccountsDto) {

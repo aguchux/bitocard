@@ -2854,6 +2854,7 @@ model Customer {
   connectTransfers          ConnectTransfer[]         @relation("ConnectTransferRecipient")
   posAccount                PosAccount?
   posWalletRequests         PosWalletRequest[]        @relation("PosWalletBuyer")
+  posCustomers              PosCustomer[]             @relation("PosCustomerUdozo")
   connectAuctionBids        ConnectAuctionBid[]
   connectAuctionClaims      ConnectAuctionClaim[]     @relation("ConnectAuctionClaimSeller")
 }
@@ -7948,6 +7949,7 @@ model PosAccount {
   sales              PosSale[]
   stockMovements     PosStockMovement[]
   walletRequests     PosWalletRequest[]
+  customers          PosCustomer[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -8035,6 +8037,10 @@ model PosSale {
   payments        PosPayment[]
   movements       PosStockMovement[]
   walletRequests  PosWalletRequest[]
+  /// The shop's customer the sale was made to, if one was chosen.
+  customerId      String?    @map("customer_id") @db.Uuid
+  customer        PosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerEntries PosCustomerEntry[]
 
   @@unique([shopId, number], map: "pos_sales_shop_number_key")
   @@unique([accountId, clientSaleId], map: "pos_sales_client_key")
@@ -8100,6 +8106,9 @@ model PosWalletRequest {
   soldByCustomerId String?    @map("sold_by_customer_id") @db.Uuid
   soldByName       String     @map("sold_by_name")
   buyerCustomerId  String?    @map("buyer_customer_id") @db.Uuid
+  /// The shop's customer the cashier chose, if any.
+  customerId       String?    @map("customer_id") @db.Uuid
+  customer         PosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   /// `waiting`, `paid`, `declined`, `cancelled` or `expired`.
   status           String     @default("waiting") @db.VarChar(16)
   saleId           String?    @map("sale_id") @db.Uuid
@@ -8116,6 +8125,57 @@ model PosWalletRequest {
 
   @@index([accountId, createdAt(sort: Desc)], map: "pos_wallet_requests_account_idx")
   @@map("pos_wallet_requests")
+}
+
+/// A customer of a POS shop: the shop's own record, needing no Udozo account (`C-000123`). One who paid through Udozo is
+/// linked to their Udozo account (`udozo_customer_id`). Keeps what they owe for goods sold on credit.
+model PosCustomer {
+  id               String     @id @default(uuid()) @db.Uuid
+  number           Int        @unique @default(autoincrement())
+  accountId        String     @map("account_id") @db.Uuid
+  name             String     @db.VarChar(120)
+  phone            String?    @db.VarChar(20)
+  email            String?    @db.VarChar(254)
+  address          String?    @db.VarChar(300)
+  notes            String?    @db.VarChar(1000)
+  udozoCustomerId  String?    @map("udozo_customer_id") @db.Uuid
+  creditLimitMinor BigInt?    @map("credit_limit_minor")
+  owedMinor        BigInt     @default(0) @map("owed_minor")
+  salesCount       Int        @default(0) @map("sales_count")
+  spentMinor       BigInt     @default(0) @map("spent_minor")
+  lastSaleAt       DateTime?  @map("last_sale_at")
+  /// `shop` or `udozo`.
+  source           String     @default("shop") @db.VarChar(16)
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  account          PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  udozoCustomer    Customer?  @relation("PosCustomerUdozo", fields: [udozoCustomerId], references: [id], onDelete: SetNull)
+  sales            PosSale[]
+  entries          PosCustomerEntry[]
+  walletRequests   PosWalletRequest[]
+
+  @@index([accountId, updatedAt(sort: Desc)], map: "pos_customers_account_idx")
+  @@map("pos_customers")
+}
+
+/// A line of what a POS customer owes: `credit_sale` (+), `repayment` or `refund` (-).
+model PosCustomerEntry {
+  id             String      @id @default(uuid()) @db.Uuid
+  customerId     String      @map("customer_id") @db.Uuid
+  kind           String      @db.VarChar(16)
+  amountMinor    BigInt      @map("amount_minor")
+  owedAfterMinor BigInt      @map("owed_after_minor")
+  saleId         String?     @map("sale_id") @db.Uuid
+  method         String?     @db.VarChar(16)
+  reference      String?     @db.VarChar(80)
+  note           String?     @db.VarChar(300)
+  byName         String?     @map("by_name")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  customer       PosCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sale           PosSale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt(sort: Desc)], map: "pos_customer_entries_customer_idx")
+  @@map("pos_customer_entries")
 }
 
 /// A change to a listing's stock made from the POS: `sale`, `refund`, `restock`, `count` or `damage`.

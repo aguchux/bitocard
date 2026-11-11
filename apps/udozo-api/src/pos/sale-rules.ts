@@ -11,8 +11,11 @@ import { cashChange } from './money.js';
 /** What a till records: the money is the shop's own and never enters Udozo's ledger. */
 export const recordedPaymentMethods = ['cash', 'transfer', 'card', 'other'] as const;
 export type RecordedPaymentMethod = (typeof recordedPaymentMethods)[number];
-/** Every way a sale is paid: the recorded ones, and the buyer's Udozo wallet (confirmed by the buyer on udozo.com). */
-export const posPaymentMethods = [...recordedPaymentMethods, 'udozo_wallet'] as const;
+/** What a till may put on a sale itself: the recorded methods, and `credit` (pay later: a customer owes the shop it). */
+export const tillPaymentMethods = [...recordedPaymentMethods, 'credit'] as const;
+export type TillPaymentMethod = (typeof tillPaymentMethods)[number];
+/** Every way a sale is paid: the till's own, and the buyer's Udozo wallet (confirmed by the buyer on udozo.com). */
+export const posPaymentMethods = [...tillPaymentMethods, 'udozo_wallet'] as const;
 export type PosPaymentMethod = (typeof posPaymentMethods)[number];
 
 /** What one sale may hold. */

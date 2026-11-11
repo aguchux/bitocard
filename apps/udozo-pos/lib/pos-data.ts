@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { PosApps, PosCatalogue, PosCharge, PosOwner, PosPlans, PosSale, PosSales, PosShopKind } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosCustomer, PosCustomers, PosOwner, PosPlans, PosSale, PosSales, PosShopKind } from "./pos";
 import { type ApiResult, customerApi } from "./session";
 import { apiUrl } from "./site";
 
@@ -72,3 +72,7 @@ export const ownerSales = (query = "") => customerApi<PosSales>("GET", `/v1/pos/
 
 /** One sale with its lines and payments. */
 export const ownerSale = (id: string) => customerApi<PosSale>("GET", `/v1/pos/owner/sales/${id}`);
+
+/** The shop's customers (`query` from `customersQuery`), and one with its sales and what it owes. */
+export const ownerCustomers = (query = "") => customerApi<PosCustomers>("GET", `/v1/pos/owner/customers${query}`);
+export const ownerCustomer = (id: string) => customerApi<PosCustomer>("GET", `/v1/pos/owner/customers/${id}`);

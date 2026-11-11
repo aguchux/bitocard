@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type PosAccount, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
+import { type PosAccount, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
 import { type ApiResult, customerApi, dropSession } from "./session";
 
 /** What an action answers: the account as it now is, or Udozo's refusal in words with the field it names. */
@@ -88,10 +88,14 @@ export type RingUp = {
   client_sale_id: string;
   lines: Array<{ listing_id: string; quantity: number; discount?: number }>;
   discount?: number;
-  payments: Array<{ method: PosPaymentMethod; amount: number; tendered?: number | null; reference?: string | null }>;
+  payments: Array<{ method: PosPaymentMethod | "credit"; amount: number; tendered?: number | null; reference?: string | null }>;
   expected_total: number;
   note?: string | null;
+  /** The shop's customer the sale is made to (needed to sell on credit). */
+  customer_id?: string | null;
 };
+
+const tillMethods = [...paymentMethods.map(item => item.value), "credit"];
 
 const whole = (value: unknown, min = 0) => typeof value === "number" && Number.isSafeInteger(value) && value >= min;
 
@@ -100,7 +104,9 @@ export async function ringUp(sale: RingUp): Promise<PosResult<PosSale>> {
   if (!uuid.test(sale.till_id)) return refused("Choose a till.", "till_id", "resource_missing");
   if (!uuid.test(sale.client_sale_id)) return refused("Start a new sale.", "client_sale_id");
   if (!sale.lines.length || sale.lines.length > 100 || sale.lines.some(line => !uuid.test(line.listing_id) || !whole(line.quantity, 1) || (line.discount !== undefined && !whole(line.discount)))) return refused("Add products to the sale.", "lines");
-  if (sale.payments.length > 5 || sale.payments.some(payment => !paymentMethods.some(item => item.value === payment.method) || !whole(payment.amount, 1) || (payment.tendered != null && !whole(payment.tendered, 1)))) return refused("Record how it was paid.", "payments");
+  if (sale.payments.length > 5 || sale.payments.some(payment => !tillMethods.includes(payment.method) || !whole(payment.amount, 1) || (payment.tendered != null && !whole(payment.tendered, 1)))) return refused("Record how it was paid.", "payments");
+  if (sale.customer_id && !uuid.test(sale.customer_id)) return refused("Choose the customer again.", "customer_id");
+  if (sale.payments.some(payment => payment.method === "credit") && !sale.customer_id) return refused("Choose the customer who will pay later.", "customer_id");
   if (!whole(sale.expected_total) || (sale.discount !== undefined && !whole(sale.discount))) return refused("Check the total.", "expected_total");
   const body = {
     till_id: sale.till_id,
@@ -110,6 +116,7 @@ export async function ringUp(sale: RingUp): Promise<PosResult<PosSale>> {
     payments: sale.payments.map(payment => ({ method: payment.method, amount: payment.amount, ...(payment.method === "cash" && payment.tendered ? { tendered: payment.tendered } : {}), ...(payment.reference?.trim() ? { reference: payment.reference.trim().slice(0, 80) } : {}) })),
     expected_total: sale.expected_total,
     ...(sale.note?.trim() ? { note: sale.note.trim().slice(0, 300) } : {}),
+    ...(sale.customer_id ? { customer_id: sale.customer_id } : {}),
   };
   // The basket's own id is the idempotency key too, so a send that lost its reply is never a second sale.
   return answer(await customerApi<PosSale>("POST", "/v1/pos/owner/sales", body, { idempotencyKey: `sale-${sale.client_sale_id}` }));
@@ -131,7 +138,7 @@ export async function askWallet(sale: RingUp & { wallet_amount: number; phone?: 
   if (!sale.lines.length || sale.lines.some(line => !uuid.test(line.listing_id) || !whole(line.quantity, 1))) return refused("Add products to the sale.", "lines");
   if (!whole(sale.wallet_amount, 1) || !whole(sale.expected_total)) return refused("Check the total.", "wallet_amount");
   const phone = sale.phone?.replace(/[\s-]/g, "") ?? "";
-  if (phone && !/^\+\d{8,15}$/.test(phone)) return refused("Give the buyer's number with its country code, like +234 803 000 0000.", "phone");
+  if (phone && !/^\+?\d{7,15}$/.test(phone)) return refused("Give the buyer's Udozo mobile number.", "phone");
   const body = {
     till_id: sale.till_id,
     client_sale_id: sale.client_sale_id,
@@ -141,6 +148,7 @@ export async function askWallet(sale: RingUp & { wallet_amount: number; phone?: 
     wallet_amount: sale.wallet_amount,
     expected_total: sale.expected_total,
     ...(phone ? { phone } : {}),
+    ...(sale.customer_id && uuid.test(sale.customer_id) ? { customer_id: sale.customer_id } : {}),
   };
   const result = await customerApi<PosWalletRequest & { token: string; pay_url: string }>("POST", "/v1/pos/owner/wallet-requests", body);
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.status === 401 ? "Your session ended. Sign in again to carry on." : result.message, code: result.code, param: result.param };
@@ -159,6 +167,50 @@ export async function cancelWallet(id: string): Promise<PosResult<PosWalletReque
   if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
   const result = await customerApi<PosWalletRequest>("POST", `/v1/pos/owner/wallet-requests/${id}/cancel`);
   return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.message, code: result.code, param: result.param };
+}
+
+export type CustomerFields = { name?: string; phone?: string | null; email?: string | null; address?: string | null; notes?: string | null; credit_limit?: number | null };
+
+function customerBody(fields: CustomerFields) {
+  const clean = (value: string | null | undefined, max: number) => (value === undefined ? undefined : value === null ? null : value.trim().slice(0, max) || null);
+  return {
+    ...(fields.name !== undefined ? { name: fields.name.trim().slice(0, 120) } : {}),
+    ...(fields.phone !== undefined ? { phone: clean(fields.phone, 30) } : {}),
+    ...(fields.email !== undefined ? { email: clean(fields.email, 254) } : {}),
+    ...(fields.address !== undefined ? { address: clean(fields.address, 300) } : {}),
+    ...(fields.notes !== undefined ? { notes: clean(fields.notes, 1000) } : {}),
+    ...(fields.credit_limit !== undefined ? { credit_limit: fields.credit_limit } : {}),
+  };
+}
+
+/** Adds one of the shop's customers (`id` null) or changes one: their own record, no Udozo account needed. */
+export async function saveCustomer(id: string | null, fields: CustomerFields): Promise<PosResult<PosCustomer>> {
+  if (id !== null && !uuid.test(id)) return refused("No such customer.", null, "resource_missing");
+  if ((id === null || fields.name !== undefined) && !fields.name?.trim()) return refused("Give the customer's name.", "name", "parameter_missing");
+  if (fields.credit_limit != null && !whole(fields.credit_limit)) return refused("A credit limit is an amount from nothing up.", "credit_limit");
+  const result = id === null ? await customerApi<PosCustomer>("POST", "/v1/pos/owner/customers", customerBody(fields)) : await customerApi<PosCustomer>("PATCH", `/v1/pos/owner/customers/${id}`, customerBody(fields));
+  return answer(result);
+}
+
+export async function removeCustomer(id: string): Promise<PosResult<null>> {
+  if (!uuid.test(id)) return refused("No such customer.", null, "resource_missing");
+  const result = await customerApi<null>("DELETE", `/v1/pos/owner/customers/${id}`);
+  return result.ok ? answer({ ok: true, data: null }) : answer(result);
+}
+
+/** A repayment of what a customer owes, recorded as it was paid. */
+export async function repayCustomer(id: string, amount: number, method: PosPaymentMethod, reference = ""): Promise<PosResult<PosCustomer>> {
+  if (!uuid.test(id)) return refused("No such customer.", null, "resource_missing");
+  if (!whole(amount, 1)) return refused("Give how much they paid.", "amount");
+  if (!paymentMethods.some(item => item.value === method)) return refused("Choose how they paid.", "method");
+  return answer(await customerApi<PosCustomer>("POST", `/v1/pos/owner/customers/${id}/repayments`, { amount, method, ...(reference.trim() ? { reference: reference.trim().slice(0, 80) } : {}) }));
+}
+
+/** Customers matching what the cashier typed, for the till. */
+export async function findCustomers(words: string): Promise<PosResult<PosCustomerBrief[]>> {
+  const q = words.trim().slice(0, 80);
+  const result = await customerApi<PosCustomers>("GET", `/v1/pos/owner/customers?limit=8${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+  return result.ok ? { ok: true, data: result.data.data } : { ok: false, message: result.message, code: result.code, param: result.param };
 }
 
 export type StockKind = "restock" | "count" | "damage";

@@ -35,6 +35,14 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         <p className="mt-1 text-pos-ink-2">
           {saleTime(sale.created_at)} · {sale.shop.name}, {sale.till.name} · by {sale.sold_by}
         </p>
+        {sale.customer ? (
+          <p className="mt-1 text-pos-ink-2">
+            Customer:{" "}
+            <Link href={`/app/customers/${sale.customer.id}`} className="font-semibold">
+              {sale.customer.name}
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <section aria-labelledby="lines" className="rounded-[20px] bg-white p-5">

@@ -270,10 +270,10 @@ export const paymentMethods: Array<{ value: PosPaymentMethod; label: string; hin
   { value: "other", label: "Other", hint: "Anything else, recorded as it is." },
 ];
 
-export const methodLabel = (method: string) => (method === "udozo_wallet" ? "Udozo wallet" : (paymentMethods.find(item => item.value === method)?.label ?? method));
+export const methodLabel = (method: string) => (method === "udozo_wallet" ? "Udozo wallet" : method === "credit" ? "Pay later" : (paymentMethods.find(item => item.value === method)?.label ?? method));
 
 export type PosSaleLine = { listing_id: string; title: string; sku: string | null; barcode: string | null; quantity: number; unit_price: number; discount: number; total: number };
-export type PosSalePayment = { method: PosPaymentMethod | "udozo_wallet"; amount: number; tendered: number | null; change: number; reference: string | null };
+export type PosSalePayment = { method: PosPaymentMethod | "udozo_wallet" | "credit"; amount: number; tendered: number | null; change: number; reference: string | null };
 
 export type PosSale = {
   object: "pos_sale";
@@ -293,6 +293,8 @@ export type PosSale = {
   change: number;
   lines: PosSaleLine[];
   payments: PosSalePayment[];
+  /** The shop's customer it was sold to, if one was chosen. */
+  customer?: { id: string; name: string; number: string } | null;
   sold_by: string;
   note: string | null;
   refunded_at: string | null;
@@ -439,3 +441,70 @@ export function timeLeft(until: string, now = Date.now()) {
 
 /** How many products the till draws at once; the rest are found by search or category. */
 export const tillShown = 120;
+
+// ---- The shop's customers: its own records, no Udozo account needed ----
+
+export type PosCustomerBrief = {
+  object: "pos_customer";
+  id: string;
+  number: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  /** Linked to the Udozo account they paid through Udozo with. */
+  udozo: boolean;
+  /** What they owe the shop for goods sold on credit, in minor units. */
+  owed: number;
+  credit_limit: number | null;
+  sales_count: number;
+  spent: number;
+  last_sale_at: string | null;
+};
+
+export type PosUdozoRating = {
+  member_since: string;
+  in_good_standing: boolean;
+  reviews: { positive: number; neutral: number; negative: number; counted: number; positive_pct: number | null } | null;
+  scores: { band?: string | null; response?: string | null; attention?: string | null } | null;
+};
+
+export type PosCustomerEntry = { id: string; kind: "credit_sale" | "repayment" | "refund"; amount: number; owed_after: number; sale: { id: string; number: string | null } | null; method: string | null; reference: string | null; note: string | null; by: string | null; created_at: string };
+
+export type PosCustomer = PosCustomerBrief & {
+  address: string | null;
+  notes: string | null;
+  source: "shop" | "udozo";
+  udozo_rating: PosUdozoRating | null;
+  created_at: string;
+  sales?: Array<{ id: string; number: string; status: "completed" | "refunded"; total: number; currency: string; created_at: string }>;
+  entries?: PosCustomerEntry[];
+};
+
+export type PosCustomers = { object: "list"; summary: { owing: number; owed: number }; total: number; has_more: boolean; data: PosCustomerBrief[] };
+
+export const customersPage = 25;
+
+/** The customers list's filters from the address, cleaned. */
+export function customersQuery(params: { q?: string; owing?: string; page?: string }) {
+  const q = (params.q ?? "").trim().slice(0, 80);
+  const owing = params.owing === "1";
+  const page = Math.max(1, Math.floor(Number(params.page) || 1));
+  const search = new URLSearchParams({ limit: String(customersPage), offset: String((page - 1) * customersPage) });
+  if (q) search.set("q", q);
+  if (owing) search.set("owing", "true");
+  return { q, owing, page, api: `?${search.toString()}` };
+}
+
+const entryWords: Record<PosCustomerEntry["kind"], string> = { credit_sale: "Bought on credit", repayment: "Paid back", refund: "Refunded" };
+export const entryText = (entry: Pick<PosCustomerEntry, "kind" | "method">) => `${entryWords[entry.kind]}${entry.kind === "repayment" && entry.method ? ` (${methodLabel(entry.method).toLowerCase()})` : ""}`;
+
+/** A linked customer's Udozo rating in one line: their reviews, Anjio's words, and since when they are on Udozo. */
+export function ratingText(rating: PosUdozoRating) {
+  const parts: string[] = [];
+  if (rating.reviews?.positive_pct != null) parts.push(`${rating.reviews.positive_pct}% positive from ${rating.reviews.counted} reviews`);
+  else if (rating.reviews) parts.push(`${rating.reviews.counted} review${rating.reviews.counted === 1 ? "" : "s"}`);
+  if (rating.scores?.band) parts.push(rating.scores.band);
+  parts.push(`on Udozo since ${new Date(rating.member_since).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}`);
+  if (!rating.in_good_standing) parts.push("their Udozo account is suspended");
+  return parts.join(" · ");
+}
