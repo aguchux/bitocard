@@ -14,8 +14,11 @@ export type RecordedPaymentMethod = (typeof recordedPaymentMethods)[number];
 /** What a till may put on a sale itself: the recorded methods, and `credit` (pay later: a customer owes the shop it). */
 export const tillPaymentMethods = [...recordedPaymentMethods, 'credit'] as const;
 export type TillPaymentMethod = (typeof tillPaymentMethods)[number];
-/** Every way a sale is paid: the till's own, and the buyer's Udozo wallet (confirmed by the buyer on udozo.com). */
-export const posPaymentMethods = [...tillPaymentMethods, 'udozo_wallet'] as const;
+/**
+ * Every way a sale is paid: the till's own, the buyer's Udozo wallet (confirmed by the buyer on udozo.com) and a transfer
+ * into the till's Udozo collection account (confirmed by the gateway): both made by Udozo, never sent by the till.
+ */
+export const posPaymentMethods = [...tillPaymentMethods, 'udozo_wallet', 'udozo_transfer'] as const;
 export type PosPaymentMethod = (typeof posPaymentMethods)[number];
 
 /** What one sale may hold. */

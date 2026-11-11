@@ -92,6 +92,8 @@ const protectedRoutes = [
   ['put', '/v1/admin/connect/settings/NG', { deposit: 5000000 }],
   ['post', `/v1/admin/connect/claims/${randomId}/pay`, {}],
   ['patch', '/v1/admin/pos/plans/premium', { prices: { NGN: 1500000 } }],
+  ['post', '/v1/admin/pos/accounts/00000000-0000-4000-8000-000000000001/settlements/release', { reason: 'cleared' }],
+  ['put', '/v1/admin/pos/market-settings/NG', { collection_fee_bps: 50, collection_fee_min: 0 }],
 ];
 
 describe('admin step-up window', () => {

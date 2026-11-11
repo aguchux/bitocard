@@ -130,6 +130,12 @@ export function ghanaPhone(phone: string | null | undefined) {
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger('Payments');
+  /** Udozo POS's collection accounts (`bc_rp_`), registered by its module so payments never import the POS. */
+  private posDeposits?: (provider: string, result: ChargeResult) => Promise<{ credited: boolean; reason?: string } | null>;
+
+  usePosDeposits(handler: (provider: string, result: ChargeResult) => Promise<{ credited: boolean; reason?: string } | null>) {
+    this.posDeposits = handler;
+  }
   private checkoutListener: CheckoutListener | null = null;
   private ownGateway: OwnGatewayResolver = async () => null;
 
@@ -839,6 +845,11 @@ export class PaymentsService {
    */
   async recordDeposit(provider: string, result: ChargeResult) {
     if (result.status !== 'succeeded') return { credited: false, reason: 'not_successful' };
+    // A transfer into a Udozo POS till's collection account is the POS's to credit (it answers null for an account it does not know).
+    if (result.reference.startsWith('bc_rp_') && this.posDeposits) {
+      const handled = await this.posDeposits(provider, result);
+      if (handled) return handled;
+    }
     const found = await this.prisma.reservedAccount.findFirst({ where: { provider, providerReference: result.reference } });
     // An account whose number never reached us (the reply was lost) is still on record through its request.
     const request = found ? null : await this.prisma.reservedAccountRequest.findUnique({ where: { provider_reference: { provider, reference: result.reference } } });

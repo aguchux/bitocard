@@ -125,6 +125,8 @@ export class PosService {
       open: await this.settings.isOnForCountry('pos', market.code),
       /** The till may take payment from a buyer's Udozo wallet (`pos_wallet_payments`). */
       wallet_payments: await this.settings.isOnForCountry('pos_wallet_payments', market.code),
+      /** Owners on a paid plan may ask for Udozo collection accounts for their tills (`pos_collections`). */
+      collections: await this.settings.isOnForCountry('pos_collections', market.code),
       country: market.code,
       currency: market.currency,
       wallet: { balance: Number(await this.walletBalance(customer.id, mode, market.currency)), currency: market.currency },

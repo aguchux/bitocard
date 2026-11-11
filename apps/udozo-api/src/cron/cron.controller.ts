@@ -20,6 +20,7 @@ import { ReviewsService } from '../classifieds/reviews/reviews.service.js';
 import { InteractionRatingsService } from '../classifieds/ratings/interaction-ratings.service.js';
 import { SellerScoresService } from '../classifieds/scores/scores.service.js';
 import { PosBillingService } from '../pos/billing.service.js';
+import { PosCollectionsService } from '../pos/collections.service.js';
 import { ResaleOrdersService } from '../resale/resale-orders.service.js';
 import { CallsService } from '../classifieds/calls.service.js';
 import { DiscoveryAdminService } from '../classifieds/discovery/discovery-admin.service.js';
@@ -142,6 +143,7 @@ export class CronController {
     interactionRatings: InteractionRatingsService,
     sellerScores: SellerScoresService,
     posBilling: PosBillingService,
+    posCollections: PosCollectionsService,
     postingJourneys: PostingJourneysService,
     postingReminders: PostingRemindersService,
     wanted: WantedService,
@@ -223,8 +225,11 @@ export class CronController {
        */
       /** Hourly 01:17 to 04:17 UTC (Udozo): Anjio's seller scores, summaries and the month's snapshot, carrying on where it stopped. */
       'seller-scores': () => sellerScores.run(),
-      /** Hourly (Udozo): Udozo POS plan reminders, renewals from owners' wallets, the 7 days' grace and dropping to Free. */
-      pos: () => posBilling.run(),
+      /**
+       * Hourly (Udozo): Udozo POS plan reminders, renewals from owners' wallets, the 7 days' grace and dropping to Free;
+       * then, on each market's working days, settling owners' collection accounts (what came in before the day began).
+       */
+      pos: async () => ({ ...(await posBilling.run()), collections: await posCollections.run() }),
       marketing: async () => ({ ...(await marketing.purge()), signup_journeys: await signupJourneys.purge(), traffic: await traffic.purge(), posting_journeys: { ...(await postingJourneys.reconcile()), ...(await postingJourneys.purge()) }, discovery: await discovery.daily(), old_buy_orders: await buyOrders.purgeOld(), reviews: await reviews.purge(), interaction_ratings: await interactionRatings.purge() }),
       /**
        * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then

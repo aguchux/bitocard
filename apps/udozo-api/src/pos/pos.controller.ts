@@ -9,6 +9,7 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import { ProductOnly } from '../products/product.js';
 import { type PlanChange, PosAdminService, posAppPlatforms, type PosAppPlatform } from './pos-admin.service.js';
 import { PosCatalogueService } from './catalogue.service.js';
+import { PosCollectionsService } from './collections.service.js';
 import { PosCustomersService } from './customers.service.js';
 import { maxSaleLines, maxSalePayments, recordedPaymentMethods, stockAdjustments, tillPaymentMethods } from './sale-rules.js';
 import { PosSalesService } from './sales.service.js';
@@ -217,6 +218,75 @@ class WalletRequestDto extends SaleDto {
   phone?: string | null;
 }
 
+class TransferRequestDto extends SaleDto {
+  /** The part paid by transfer into the till's Udozo collection account, in minor units; the rest is in `payments`. */
+  @IsInt() @Min(1)
+  transfer_amount: number;
+}
+
+class OpenCollectionAccountDto {
+  /** Nigeria, live: the owner's BVN, which the banks need to open the account (passed on, never kept). */
+  @IsOptional() @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
+  bvn?: string | null;
+}
+
+class SettlementAccountDto {
+  /** One of the owner's payout bank accounts on udozo.com; null: none (collections stay in their Udozo payouts). */
+  @IsOptional() @IsUUID()
+  bank_account_id: string | null;
+}
+
+class SimulateTransferDto {
+  @IsInt() @Min(1) @Max(1_000_000_000_00)
+  amount: number;
+
+  @IsOptional() @IsString() @MaxLength(120)
+  payer_name?: string | null;
+}
+
+class CollectionsDto {
+  @IsOptional() @IsIn(['matched', 'unmatched', 'kept'])
+  status?: 'matched' | 'unmatched' | 'kept';
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class AttachDto {
+  @IsUUID()
+  transfer_request_id: string;
+}
+
+class KeepDto {
+  @IsOptional() @IsString() @MaxLength(300)
+  note?: string | null;
+}
+
+class AdminCollectionsDto extends CollectionsDto {
+  @IsOptional() @IsUUID()
+  account?: string;
+}
+
+class HoldDto {
+  @IsString() @MaxLength(300)
+  reason: string;
+}
+
+class MarketSettingsDto {
+  /** Udozo's margin on each transfer, on top of the gateway's fee: basis points (100 is 1%), at most 10%. */
+  @IsInt() @Min(0) @Max(1000)
+  collection_fee_bps: number;
+
+  @IsInt() @Min(0)
+  collection_fee_min: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  collection_fee_cap: number | null;
+}
+
 class PayDto {
   /** The amount the buyer saw, in minor units. */
   @IsInt() @Min(1)
@@ -361,7 +431,83 @@ export class PosOwnerController {
     private readonly sales: PosSalesService,
     private readonly wallet: PosWalletService,
     private readonly customers: PosCustomersService,
+    private readonly collections: PosCollectionsService,
   ) {}
+
+  /** The owner's Udozo collection accounts: whether they may open one, where collections are paid, each till's account. */
+  @Get('collections')
+  collectionsOverview(@CurrentCustomer() caller: CustomerCaller) {
+    return this.collections.overview(caller.customer);
+  }
+
+  @Put('collections/settlement-account')
+  settlementAccount(@CurrentCustomer() caller: CustomerCaller, @Body() body: SettlementAccountDto) {
+    return this.collections.setSettlementAccount(caller.customer, body.bank_account_id ?? null);
+  }
+
+  @Post('tills/:id/collection-account')
+  @HttpCode(HttpStatus.OK)
+  openCollectionAccount(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: OpenCollectionAccountDto) {
+    return this.collections.openAccount(caller.customer, id, body);
+  }
+
+  @Post('collection-accounts/:id/close')
+  @HttpCode(HttpStatus.OK)
+  closeCollectionAccount(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.collections.closeAccount(caller.customer, id);
+  }
+
+  /** The sandbox only: a made-up transfer into a collection account. */
+  @Post('collection-accounts/:id/simulate')
+  @HttpCode(HttpStatus.OK)
+  simulateTransfer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SimulateTransferDto) {
+    return this.collections.simulate(caller.customer, id, body);
+  }
+
+  /** Transfers into the owner's collection accounts, newest first. */
+  @Get('collections/transfers')
+  collectionTransfers(@CurrentCustomer() caller: CustomerCaller, @Query() query: CollectionsDto) {
+    return this.collections.collections(caller.customer, query);
+  }
+
+  @Post('collections/transfers/:id/attach')
+  @HttpCode(HttpStatus.OK)
+  attachTransfer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: AttachDto) {
+    return this.collections.attach(caller.customer, id, body.transfer_request_id);
+  }
+
+  @Post('collections/transfers/:id/keep')
+  @HttpCode(HttpStatus.OK)
+  keepTransfer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: KeepDto) {
+    return this.collections.keep(caller.customer, id, body.note);
+  }
+
+  @Get('collections/settlements')
+  settlements(@CurrentCustomer() caller: CustomerCaller, @Query() query: CollectionsDto) {
+    return this.collections.settlementList(caller.customer, query);
+  }
+
+  @Get('collections/settlements/:id')
+  settlement(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.collections.settlement(caller.customer, id);
+  }
+
+  /** The till asks for the rest of a basket by transfer into its collection account; the transfer makes the sale. */
+  @Post('transfer-requests')
+  transferRequest(@CurrentCustomer() caller: CustomerCaller, @Body() body: TransferRequestDto) {
+    return this.collections.ask(caller.customer, body);
+  }
+
+  @Get('transfer-requests/:id')
+  transferStatus(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.collections.request(caller.customer, id);
+  }
+
+  @Post('transfer-requests/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  transferCancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.collections.cancel(caller.customer, id);
+  }
 
   /** The shop's customers: its own records, no Udozo account needed. */
   @Get('customers')
@@ -543,7 +689,48 @@ export class AdminPosController {
   constructor(
     private readonly admin: PosAdminService,
     private readonly customers: PosCustomersService,
+    private readonly collections: PosCollectionsService,
   ) {}
+
+  /** Transfers into every owner's collection accounts (or one account's), newest first. */
+  @Get('collections')
+  allCollections(@Query() query: AdminCollectionsDto) {
+    return this.collections.adminCollections(query);
+  }
+
+  @Get('accounts/:id/collections')
+  accountCollections(@Param('id', ParseUUIDPipe) id: string) {
+    return this.collections.adminAccount(id);
+  }
+
+  /** Holds an owner's settlements (fraud, a dispute): collections keep coming in, nothing is paid out. */
+  @Post('accounts/:id/settlements/hold')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('finance', 'operations')
+  holdSettlements(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: HoldDto) {
+    return this.collections.hold(adminId(caller), id, { held: true, reason: body.reason });
+  }
+
+  @Post('accounts/:id/settlements/release')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('finance')
+  @StepUp()
+  releaseSettlements(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: HoldDto) {
+    return this.collections.hold(adminId(caller), id, { held: false, reason: body.reason });
+  }
+
+  /** Udozo's collection fee per market. */
+  @Get('market-settings')
+  marketSettings() {
+    return this.collections.marketSettings();
+  }
+
+  @Put('market-settings/:country')
+  @AdminRoles('finance')
+  @StepUp()
+  setMarketSettings(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: MarketSettingsDto) {
+    return this.collections.setMarketSettings(adminId(caller), country.toUpperCase(), { collection_fee_bps: body.collection_fee_bps, collection_fee_min: body.collection_fee_min, collection_fee_cap: body.collection_fee_cap ?? null });
+  }
 
   /** A shop's customers, read under its POS account. */
   @Get('accounts/:id/customers')

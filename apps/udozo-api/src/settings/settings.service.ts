@@ -191,6 +191,11 @@ export const switchDefinitions = {
     description:
       "Udozo POS wallet payments (docs/UDOZO_POS_PLAN.md): a shop's till takes payment from the buyer's Udozo wallet, by a QR code or the buyer's mobile number; the buyer confirms on udozo.com and the money goes to the owner's payouts after the market's payout hold. Needs pos on. Off (until lawyers clear it): tills take cash, transfers, cards and other recorded payments only.",
   },
+  pos_collections: {
+    scopes: ['global', 'country'],
+    description:
+      "Udozo POS collection accounts (docs/UDOZO_POS_PLAN.md, milestone 4): owners on a paid plan ask for a bank account number per till, opened by Udozo's gateways; transfers into it pay the sale waiting at the till and are paid to the owner's bank account the next working day, less Udozo's collection fee. Needs pos on. Off (until lawyers and the gateways clear it): no new accounts; those open still take transfers and settle.",
+  },
   connect_shipping: {
     scopes: ['global', 'country'],
     description:
@@ -310,6 +315,7 @@ export const udozoSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'connect_shipping',
   'pos',
   'pos_wallet_payments',
+  'pos_collections',
   'classifieds_reviews',
   'classifieds_interaction_ratings',
   'seller_scores',

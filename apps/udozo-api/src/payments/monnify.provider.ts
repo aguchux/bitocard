@@ -21,6 +21,7 @@ type MonnifyTransaction = {
   currencyCode?: string;
   currency?: string;
   product?: { type: string; reference: string };
+  paymentSourceInformation?: Array<{ accountName?: string }>;
 };
 type MonnifyCheckoutTransaction = {
   transactionReference: string;
@@ -194,6 +195,7 @@ export class MonnifyProvider implements ReservedAccountProvider, CheckoutProvide
       amount,
       currency: tx.currencyCode ?? tx.currency ?? 'NGN',
       fee: amount > settled ? amount - settled : 0n,
+      ...(tx.paymentSourceInformation?.[0]?.accountName?.trim() ? { payerName: tx.paymentSourceInformation[0].accountName.trim().slice(0, 120) } : {}),
     };
   }
 }

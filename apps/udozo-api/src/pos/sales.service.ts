@@ -120,7 +120,7 @@ export class PosSalesService {
    * stock; the totals as the till showed them; and the payments adding up to the total, with `wallet` (minor units) the
    * part paid from a Udozo wallet. Takes nothing.
    */
-  async build(tx: Prisma.TransactionClient, args: { account: Account; till: Till; ownerId: string; input: SaleInput; wallet?: bigint }) {
+  async build(tx: Prisma.TransactionClient, args: { account: Account; till: Till; ownerId: string; input: SaleInput; wallet?: bigint; transfer?: bigint }) {
     const { account, till, ownerId, input } = args;
     const ids = input.lines.map(line => line.listing_id);
     await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ANY(${[...ids].sort()}::uuid[]) ORDER BY "id" FOR UPDATE`;
@@ -154,6 +154,7 @@ export class PosSalesService {
       return { method: payment.method, amount: minor(payment.amount, `payments[${index}].amount`), tendered: payment.tendered === undefined || payment.tendered === null ? null : minor(payment.tendered, `payments[${index}].tendered`), reference: payment.reference ?? null };
     });
     if (args.wallet !== undefined) parts.push({ method: 'udozo_wallet', amount: args.wallet, tendered: null, reference: null });
+    if (args.transfer !== undefined) parts.push({ method: 'udozo_transfer', amount: args.transfer, tendered: null, reference: null });
     const paid = checkPayments(parts, totals.total);
 
     // The customer: needed to sell on credit, which their limit (if the shop set one) may not pass.
@@ -170,7 +171,17 @@ export class PosSalesService {
   /** Makes the sale `build` checked, in the same `tx`: numbered for its shop, its units taken off stock with a movement each. */
   async record(
     tx: Prisma.TransactionClient,
-    args: { account: Account; till: Till; soldBy: { id: string | null; name: string }; input: SaleInput; built: Built; now: Date; walletRequest?: { id: string; number: string } },
+    args: {
+      account: Account;
+      till: Till;
+      soldBy: { id: string | null; name: string };
+      input: SaleInput;
+      built: Built;
+      now: Date;
+      walletRequest?: { id: string; number: string };
+      /** The transfer request a `udozo_transfer` part came through, and what its reference says (its number and the payer). */
+      transferRequest?: { id: string; reference: string };
+    },
   ) {
     const { account, till, soldBy, input, built, now } = args;
     const { lines, totals, paid } = built;
@@ -221,8 +232,9 @@ export class PosSalesService {
             amountMinor: payment.amount,
             tenderedMinor: payment.tendered,
             changeMinor: payment.change,
-            reference: payment.method === 'udozo_wallet' ? (args.walletRequest?.number ?? null) : payment.reference,
+            reference: payment.method === 'udozo_wallet' ? (args.walletRequest?.number ?? null) : payment.method === 'udozo_transfer' ? (args.transferRequest?.reference.slice(0, 80) ?? null) : payment.reference,
             walletRequestId: payment.method === 'udozo_wallet' ? (args.walletRequest?.id ?? null) : null,
+            transferRequestId: payment.method === 'udozo_transfer' ? (args.transferRequest?.id ?? null) : null,
           })),
         },
       },
@@ -301,7 +313,8 @@ export class PosSalesService {
   }
 
   /**
-   * Refunds a whole sale, putting its units back unless `restock` is false. The shop pays back what it took itself;
+   * Refunds a whole sale, putting its units back unless `restock` is false. The shop pays back what it took itself
+   * (a transfer into its Udozo collection account included: Udozo has no account of the payer's to send it back to);
    * a Udozo wallet part goes back from the owner's payouts to the buyer's wallet (`pos_wallet_refund:<request>`), and
    * while the owner's payouts hold less than it, the refund waits (`refund_funds_short`).
    */

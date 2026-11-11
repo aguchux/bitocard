@@ -16,15 +16,15 @@ import {
 } from './providers.js';
 
 type FlwResponse<T> = { status: string; message?: string; data: T };
-type FlwCharge = { id: number; tx_ref: string; status: string; amount: number; currency: string; app_fee?: number; processor_response?: string };
+type FlwCharge = { id: number; tx_ref: string; status: string; amount: number; currency: string; app_fee?: number; processor_response?: string; meta?: { originatorname?: string } | null };
 type FlwRefund = { id: number; status: string; comments?: string; tx_id?: number | string };
 type FlwTransfer = { id: number; status: string; fee?: number; complete_message?: string; reference?: string };
 type FlwVirtualAccount = { account_number?: string; bank_name?: string; order_ref?: string; flw_ref?: string; note?: string; account_status?: string };
 type FlwListedCharge = { id: number; tx_ref?: string; status?: string; payment_type?: string; currency?: string };
 type FlwPage<T> = FlwResponse<T> & { meta?: { page_info?: { total?: number; current_page?: number; total_pages?: number } } };
 
-/** Our references for reserved accounts: resellers' (`bc_ra_`) and store customers' (`bc_rc_`). */
-export const reservedReference = /^bc_r[ac]_/;
+/** Our references for reserved accounts: resellers' (`bc_ra_`), store customers' (`bc_rc_`) and POS tills' collection accounts (`bc_rp_`). */
+export const reservedReference = /^bc_r[acp]_/;
 
 /**
  * The narration Flutterwave shows as the account's name: letters, digits, spaces and a little punctuation, at most 35
@@ -143,6 +143,7 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
       currency: data.currency,
       fee: fromMajor(data.app_fee),
       failureReason: status === 'failed' ? (data.processor_response ?? 'Payment failed') : undefined,
+      ...(data.meta?.originatorname?.trim() ? { payerName: data.meta.originatorname.trim().slice(0, 120) } : {}),
     };
   }
 

@@ -24,6 +24,8 @@ export type ChargeResult = {
   /** What the provider charged BitoCard for it. */
   fee: bigint;
   failureReason?: string;
+  /** For a bank transfer into an account: the name of the account it came from, when the gateway says. */
+  payerName?: string;
 };
 
 export type CheckoutInput = {

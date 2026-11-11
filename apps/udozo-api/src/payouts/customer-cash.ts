@@ -170,5 +170,6 @@ export class AdminCustomerPayoutsController {
   imports: [CheckoutModule, IdentityModule, PayoutsModule, SettingsModule],
   controllers: [CustomerCashController, AdminCustomerPayoutsController],
   providers: [CustomerCashService],
+  exports: [CustomerCashService],
 })
 export class CustomerCashModule {}

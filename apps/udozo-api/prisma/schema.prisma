@@ -1078,6 +1078,9 @@ enum AccountKind {
   connect_auction_held
   /// Udozo POS (docs/UDOZO_POS_PLAN.md): its plans' monthly fees, paid from the owner's Udozo wallet. Revenue.
   pos_revenue
+  /// Udozo POS collection accounts (docs/UDOZO_POS_PLAN.md, milestone 4): transfers into a shop's collection accounts,
+  /// less Udozo's fee, owed to its owner until the next working day's settlement. A customer account, never below zero.
+  pos_collected
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -3318,6 +3321,8 @@ model CustomerBankAccount {
   removedAt              DateTime?        @map("removed_at")
   customer               Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
   payouts                CustomerPayout[]
+  posAccounts            PosAccount[]
+  posSettlements         PosSettlement[]
 
   @@index([customerId, mode])
   @@map("customer_bank_accounts")
@@ -3343,6 +3348,7 @@ model CustomerPayout {
   completedAt        DateTime?           @map("completed_at")
   customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
   bankAccount        CustomerBankAccount @relation(fields: [bankAccountId], references: [id])
+  posSettlements     PosSettlement[]
 
   @@index([customerId, createdAt])
   @@index([status])
@@ -7950,6 +7956,17 @@ model PosAccount {
   stockMovements     PosStockMovement[]
   walletRequests     PosWalletRequest[]
   customers          PosCustomer[]
+  /// Where its collections are paid each working day (one of the owner's udozo.com payout bank accounts).
+  settlementBankAccountId String?  @map("settlement_bank_account_id") @db.Uuid
+  settlementBankAccount   CustomerBankAccount? @relation(fields: [settlementBankAccountId], references: [id], onDelete: SetNull)
+  /// An admin's hold on its settlements (fraud, a dispute), with why and who.
+  settlementHeldAt        DateTime? @map("settlement_held_at")
+  settlementHoldReason    String?   @map("settlement_hold_reason") @db.VarChar(300)
+  settlementHeldBy        String?   @map("settlement_held_by") @db.VarChar(120)
+  collectionAccounts PosCollectionAccount[]
+  transferRequests   PosTransferRequest[]
+  collections        PosCollection[]
+  settlements        PosSettlement[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -7979,6 +7996,9 @@ model PosShop {
   tills         PosTill[]
   sales         PosSale[]
   walletRequests PosWalletRequest[]
+  collectionAccounts PosCollectionAccount[]
+  transferRequests   PosTransferRequest[]
+  collections        PosCollection[]
 
   @@index([accountId, position])
   @@map("pos_shops")
@@ -7997,6 +8017,9 @@ model PosTill {
   shop         PosShop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
   sales        PosSale[]
   walletRequests PosWalletRequest[]
+  collectionAccounts PosCollectionAccount[]
+  transferRequests   PosTransferRequest[]
+  collections        PosCollection[]
 
   @@index([shopId, position])
   @@map("pos_tills")
@@ -8037,6 +8060,8 @@ model PosSale {
   payments        PosPayment[]
   movements       PosStockMovement[]
   walletRequests  PosWalletRequest[]
+  transferRequests PosTransferRequest[]
+  collections     PosCollection[]
   /// The shop's customer the sale was made to, if one was chosen.
   customerId      String?    @map("customer_id") @db.Uuid
   customer        PosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -8083,6 +8108,9 @@ model PosPayment {
   walletRequestId String? @map("wallet_request_id") @db.Uuid
   sale          PosSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
   walletRequest PosWalletRequest? @relation(fields: [walletRequestId], references: [id], onDelete: SetNull)
+  /// The transfer request a `udozo_transfer` part was paid through.
+  transferRequestId String? @map("transfer_request_id") @db.Uuid
+  transferRequest   PosTransferRequest? @relation(fields: [transferRequestId], references: [id], onDelete: SetNull)
 
   @@index([saleId, position], map: "pos_payments_sale_idx")
   @@map("pos_payments")
@@ -8153,6 +8181,7 @@ model PosCustomer {
   sales            PosSale[]
   entries          PosCustomerEntry[]
   walletRequests   PosWalletRequest[]
+  transferRequests PosTransferRequest[]
 
   @@index([accountId, updatedAt(sort: Desc)], map: "pos_customers_account_idx")
   @@map("pos_customers")
@@ -8232,4 +8261,155 @@ model PosAppLink {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("pos_app_links")
+}
+
+/// Udozo's collection fee per market (docs/UDOZO_POS_PLAN.md, milestone 4): a margin on top of the gateway's own fee.
+model PosMarketSettings {
+  country               String   @id @db.VarChar(2)
+  collectionFeeBps      Int      @default(0) @map("collection_fee_bps")
+  collectionFeeMinMinor BigInt   @default(0) @map("collection_fee_min_minor")
+  collectionFeeCapMinor BigInt?  @map("collection_fee_cap_minor")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("pos_market_settings")
+}
+
+/// A till's Udozo collection account: a bank account number a gateway opened in Udozo's name for the shop, as reserved
+/// accounts are. `opening` (its number not back yet), `active`, `refused` or `closed`; one open per till.
+model PosCollectionAccount {
+  id                String     @id @default(uuid()) @db.Uuid
+  accountId         String     @map("account_id") @db.Uuid
+  shopId            String     @map("shop_id") @db.Uuid
+  tillId            String?    @map("till_id") @db.Uuid
+  mode              LedgerMode
+  currency          String     @db.VarChar(10)
+  /// `bc_rp_<mode>_<id>`, sent as the gateway's reference: every transfer into it carries it back.
+  reference         String     @unique @db.VarChar(64)
+  status            String     @default("opening") @db.VarChar(16)
+  provider          String?    @db.VarChar(32)
+  providerAccountId String?    @map("provider_account_id") @db.VarChar(120)
+  bankName          String?    @map("bank_name") @db.VarChar(120)
+  accountNumber     String?    @map("account_number") @db.VarChar(20)
+  accountName       String?    @map("account_name") @db.VarChar(120)
+  attempts          Int        @default(0)
+  lastError         String?    @map("last_error") @db.VarChar(300)
+  /// While a request is asking the gateways (a minute), so a double click opens one.
+  claimedAt         DateTime?  @map("claimed_at")
+  openedAt          DateTime?  @map("opened_at")
+  closedAt          DateTime?  @map("closed_at")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @default(now()) @updatedAt @map("updated_at")
+  account           PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  shop              PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  till              PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+  transferRequests  PosTransferRequest[]
+  collections       PosCollection[]
+
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_collection_accounts_account_idx")
+  @@map("pos_collection_accounts")
+}
+
+/// A till waiting for a transfer into its collection account (`PT-000123`), holding the basket: the transfer for exactly
+/// its amount makes the sale.
+model PosTransferRequest {
+  id                  String     @id @default(uuid()) @db.Uuid
+  number              Int        @unique @default(autoincrement())
+  accountId           String     @map("account_id") @db.Uuid
+  shopId              String     @map("shop_id") @db.Uuid
+  tillId              String?    @map("till_id") @db.Uuid
+  collectionAccountId String     @map("collection_account_id") @db.Uuid
+  clientSaleId        String     @map("client_sale_id") @db.Uuid
+  mode                LedgerMode
+  currency            String     @db.VarChar(10)
+  amountMinor         BigInt     @map("amount_minor")
+  totalMinor          BigInt     @map("total_minor")
+  basket              Json
+  soldByCustomerId    String?    @map("sold_by_customer_id") @db.Uuid
+  soldByName          String     @map("sold_by_name") @db.VarChar(120)
+  customerId          String?    @map("customer_id") @db.Uuid
+  /// `waiting`, `paid`, `cancelled`, `expired` or `failed`.
+  status              String     @default("waiting") @db.VarChar(16)
+  failure             String?    @db.VarChar(300)
+  saleId              String?    @map("sale_id") @db.Uuid
+  expiresAt           DateTime   @map("expires_at")
+  paidAt              DateTime?  @map("paid_at")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @default(now()) @updatedAt @map("updated_at")
+  account             PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  shop                PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  till                PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+  collectionAccount   PosCollectionAccount @relation(fields: [collectionAccountId], references: [id], onDelete: Cascade)
+  customer            PosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  sale                PosSale?   @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  payments            PosPayment[]
+  collections         PosCollection[]
+
+  @@index([collectionAccountId, status, amountMinor], map: "pos_transfer_requests_waiting_idx")
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_transfer_requests_account_idx")
+  @@map("pos_transfer_requests")
+}
+
+/// A transfer into a collection account (`PC-000123`), credited once per gateway transaction: `matched`, `unmatched` or `kept`.
+model PosCollection {
+  id                    String     @id @default(uuid()) @db.Uuid
+  number                Int        @unique @default(autoincrement())
+  accountId             String     @map("account_id") @db.Uuid
+  collectionAccountId   String?    @map("collection_account_id") @db.Uuid
+  shopId                String?    @map("shop_id") @db.Uuid
+  tillId                String?    @map("till_id") @db.Uuid
+  mode                  LedgerMode
+  currency              String     @db.VarChar(10)
+  provider              String     @db.VarChar(32)
+  providerTransactionId String     @map("provider_transaction_id") @db.VarChar(120)
+  amountMinor           BigInt     @map("amount_minor")
+  gatewayFeeMinor       BigInt     @default(0) @map("gateway_fee_minor")
+  feeMinor              BigInt     @default(0) @map("fee_minor")
+  collectedMinor        BigInt     @map("collected_minor")
+  payerName             String?    @map("payer_name") @db.VarChar(120)
+  status                String     @default("unmatched") @db.VarChar(16)
+  saleId                String?    @map("sale_id") @db.Uuid
+  transferRequestId     String?    @map("transfer_request_id") @db.Uuid
+  settlementId          String?    @map("settlement_id") @db.Uuid
+  note                  String?    @db.VarChar(300)
+  decidedByName         String?    @map("decided_by_name") @db.VarChar(120)
+  receivedAt            DateTime   @default(now()) @map("received_at")
+  updatedAt             DateTime   @default(now()) @updatedAt @map("updated_at")
+  account               PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  collectionAccount     PosCollectionAccount? @relation(fields: [collectionAccountId], references: [id], onDelete: SetNull)
+  shop                  PosShop?   @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  till                  PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+  sale                  PosSale?   @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  transferRequest       PosTransferRequest? @relation(fields: [transferRequestId], references: [id], onDelete: SetNull)
+  settlement            PosSettlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerTransactionId], map: "pos_collections_provider_transaction_key")
+  @@index([accountId, receivedAt(sort: Desc)], map: "pos_collections_account_idx")
+  @@map("pos_collections")
+}
+
+/// A working day's settlement of an owner's collections (`PS-000123`): moved to their withdrawable balance and paid to
+/// their bank account as a customer payout (`paying`), or left in their Udozo payouts with why (`kept`).
+model PosSettlement {
+  id            String     @id @default(uuid()) @db.Uuid
+  number        Int        @unique @default(autoincrement())
+  accountId     String     @map("account_id") @db.Uuid
+  mode          LedgerMode
+  currency      String     @db.VarChar(10)
+  day           DateTime   @db.Date
+  collections   Int
+  grossMinor    BigInt     @map("gross_minor")
+  feesMinor     BigInt     @map("fees_minor")
+  amountMinor   BigInt     @map("amount_minor")
+  status        String     @db.VarChar(16)
+  keptReason    String?    @map("kept_reason") @db.VarChar(300)
+  bankAccountId String?    @map("bank_account_id") @db.Uuid
+  payoutId      String?    @map("payout_id") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at")
+  account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  bankAccount   CustomerBankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  payout        CustomerPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  items         PosCollection[]
+
+  @@unique([accountId, day], map: "pos_settlements_account_day_key")
+  @@map("pos_settlements")
 }
