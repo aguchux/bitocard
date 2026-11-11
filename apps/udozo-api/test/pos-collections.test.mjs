@@ -163,6 +163,7 @@ describe('collection accounts', () => {
     assert.equal(row.reference, rules.collectionReference(row.mode, row.id));
     const overview = (await who.get('/v1/pos/owner/collections')).json;
     assert.equal(overview.blocked, null);
+    assert.equal(overview.bvn_required, false, 'the sandbox asks no BVN');
     assert.equal(overview.tills[0].collection_account.account_number, first.account_number);
     assert.equal(overview.settlement_bank_account_id, who.bank.id);
   });

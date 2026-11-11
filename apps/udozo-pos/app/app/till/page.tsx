@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Register } from "@/components/register";
-import { currentOwner, tillCatalogue } from "@/lib/pos-data";
+import { currentOwner, ownerCollections, tillCatalogue } from "@/lib/pos-data";
 
 export const metadata: Metadata = { title: "Till", robots: { index: false, follow: false } };
 
@@ -15,6 +15,9 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
   if (!account) return null;
   const tills = account.shops.flatMap(shop => shop.tills.map(till => ({ ...till, shop })));
   const till = tills.find(item => item.id === asked) ?? tills[0];
+  // Buyers may transfer to the till's own Udozo account, once it has one (the open accounts are read only where collections are).
+  const collections = till && owner.ok && owner.data.collections ? await ownerCollections() : null;
+  const transferAccount = collections?.ok === true && collections.data.tills.some(item => item.id === till?.id && item.collection_account?.status === "active");
   if (!till) {
     return (
       <section className="rounded-[20px] bg-white p-6">
@@ -64,7 +67,7 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
           </Link>
         </section>
       ) : (
-        <Register key={till.id} tillId={till.id} vatBps={till.shop.vat_bps} currency={catalogue.data.currency} products={catalogue.data.data} categories={catalogue.data.categories} planName={catalogue.data.plan.name} walletPayments={owner.ok && owner.data.wallet_payments === true} />
+        <Register key={till.id} tillId={till.id} vatBps={till.shop.vat_bps} currency={catalogue.data.currency} products={catalogue.data.data} categories={catalogue.data.categories} planName={catalogue.data.plan.name} walletPayments={owner.ok && owner.data.wallet_payments === true} transferAccount={transferAccount} />
       )}
     </div>
   );

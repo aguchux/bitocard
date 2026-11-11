@@ -11,6 +11,7 @@ import {
   useTransition,
 } from "react";
 import { CameraScan } from "@/components/camera-scan";
+import { TransferWait } from "@/components/transfer-wait";
 import { type WaitingRequest, WalletWait } from "@/components/wallet-wait";
 import {
   cashSuggestions,
@@ -22,12 +23,13 @@ import {
   type PosPaymentMethod,
   type PosProduct,
   type PosSale,
+  type PosTransferRequest,
   readAmount,
   tillShown,
   tillTotals,
   vatText,
 } from "@/lib/pos";
-import { askWallet, ringUp } from "@/lib/pos-actions";
+import { askTransfer, askWallet, ringUp } from "@/lib/pos-actions";
 import { TillCustomer } from "@/components/till-customer";
 import type { PosCustomerBrief } from "@/lib/pos";
 
@@ -48,6 +50,12 @@ const walletMethod = {
   value: "udozo_wallet" as const,
   label: "Udozo wallet",
   hint: "The buyer pays the rest from their Udozo wallet, confirming on their phone.",
+};
+
+const transferMethod = {
+  value: "udozo_transfer" as const,
+  label: "Udozo account",
+  hint: "The buyer transfers to this till's own account number; the sale completes when the bank tells Udozo.",
 };
 
 const newId = () =>
@@ -77,6 +85,7 @@ export function Register({
   categories,
   planName,
   walletPayments = false,
+  transferAccount = false,
 }: {
   tillId: string;
   vatBps: number;
@@ -85,6 +94,8 @@ export function Register({
   categories: PosCatalogue["categories"];
   planName: string;
   walletPayments?: boolean;
+  /** This till has an open Udozo collection account, so buyers can pay by transfer to it. */
+  transferAccount?: boolean;
 }) {
   const router = useRouter();
   const search = useRef<HTMLInputElement>(null);
@@ -93,9 +104,11 @@ export function Register({
   const [cart, setCart] = useState<Array<{ id: string; quantity: number }>>([]);
   const [discountText, setDiscountText] = useState("");
   const [saleId, setSaleId] = useState(newId);
-  const [stage, setStage] = useState<"basket" | "pay" | "wallet" | "done">(
-    "basket",
-  );
+  const [stage, setStage] = useState<
+    "basket" | "pay" | "wallet" | "transfer" | "done"
+  >("basket");
+  const [transferRequest, setTransferRequest] =
+    useState<PosTransferRequest | null>(null);
   const [walletRequest, setWalletRequest] = useState<WaitingRequest | null>(
     null,
   );
@@ -215,6 +228,7 @@ export function Register({
     setDone(null);
     setMessage(null);
     setWalletRequest(null);
+    setTransferRequest(null);
     setCustomer(null);
     setSaleId(newId());
     setStage("basket");
@@ -302,10 +316,52 @@ export function Register({
       setStage("wallet");
     });
 
+  /** Asks for the rest of the basket by transfer into this till's Udozo account; the till then waits for the bank. */
+  const askForTransfer = () =>
+    start(async () => {
+      setMessage(null);
+      const result = await askTransfer({
+        till_id: tillId,
+        client_sale_id: saleId,
+        lines: lines.map((line) => ({
+          listing_id: line.id,
+          quantity: line.quantity,
+        })),
+        ...(totals.discount ? { discount } : {}),
+        payments: payments.map((payment) => ({
+          method: payment.method,
+          amount: payment.amount,
+          tendered: payment.tendered,
+          reference: payment.reference,
+        })),
+        transfer_amount: remaining,
+        expected_total: totals.total,
+        ...(customer ? { customer_id: customer.id } : {}),
+      });
+      if (!result.ok) {
+        setMessage(result.message);
+        if (
+          result.code === "stock_short" ||
+          result.code === "price_changed" ||
+          result.code === "product_unavailable" ||
+          result.code === "plan_limit"
+        ) {
+          setPayments([]);
+          setStage("basket");
+          router.refresh();
+        }
+        return;
+      }
+      setTransferRequest(result.data);
+      setStage("transfer");
+    });
+
+  /** The buyer paid through Udozo (their wallet, or a transfer to the till's account): the sale is made. */
   const walletPaid = useCallback(
     (sale: PosSale) => {
       setDone(sale);
       setWalletRequest(null);
+      setTransferRequest(null);
       setStage("done");
       router.refresh();
     },
@@ -314,6 +370,7 @@ export function Register({
   const walletClosed = useCallback((text: string) => {
     setMessage(text);
     setWalletRequest(null);
+    setTransferRequest(null);
     setStage("pay");
   }, []);
 
@@ -642,6 +699,12 @@ export function Register({
                 onPaid={walletPaid}
                 onClosed={walletClosed}
               />
+            ) : stage === "transfer" && transferRequest ? (
+              <TransferWait
+                request={transferRequest}
+                onPaid={walletPaid}
+                onClosed={walletClosed}
+              />
             ) : (
               <PaymentStep
                 currency={currency}
@@ -651,8 +714,10 @@ export function Register({
                 setPayments={setPayments}
                 pending={pending}
                 walletPayments={walletPayments}
+                transferAccount={transferAccount}
                 credit={customer !== null}
                 onAskWallet={askForWallet}
+                onAskTransfer={askForTransfer}
                 onBack={() => setStage("basket")}
                 onComplete={complete}
               />
@@ -685,8 +750,10 @@ function PaymentStep({
   setPayments,
   pending,
   walletPayments,
+  transferAccount,
   credit,
   onAskWallet,
+  onAskTransfer,
   onBack,
   onComplete,
 }: {
@@ -697,15 +764,19 @@ function PaymentStep({
   setPayments: (payments: Payment[]) => void;
   pending: boolean;
   walletPayments: boolean;
+  transferAccount: boolean;
   /** A customer is chosen, so the sale may be paid later in part. */
   credit: boolean;
   onAskWallet: (phone: string) => void;
+  onAskTransfer: () => void;
   onBack: () => void;
   onComplete: () => void;
 }) {
   const [method, setMethod] = useState<
-    PosPaymentMethod | "credit" | "udozo_wallet"
+    PosPaymentMethod | "credit" | "udozo_wallet" | "udozo_transfer"
   >("cash");
+  /** Paid through Udozo: asked of the buyer, never added as a part by the till. */
+  const remote = method === "udozo_wallet" || method === "udozo_transfer";
   const [phone, setPhone] = useState("");
   const [amountText, setAmountText] = useState("");
   const [tenderedText, setTenderedText] = useState("");
@@ -719,7 +790,7 @@ function PaymentStep({
 
   const addPart = (handed: number | null = tendered) => {
     if (
-      method === "udozo_wallet" ||
+      remote ||
       amount === null ||
       amount <= 0 ||
       amount > remaining
@@ -786,11 +857,12 @@ function PaymentStep({
               Paid by
             </legend>
             <div
-              className={`mt-1 grid gap-1 ${walletPayments || credit ? "grid-cols-3" : "grid-cols-4"}`}
+              className={`mt-1 grid gap-1 ${walletPayments || credit || transferAccount ? "grid-cols-3" : "grid-cols-4"}`}
             >
               {[
                 ...paymentMethods,
                 ...(credit ? [creditMethod] : []),
+                ...(transferAccount ? [transferMethod] : []),
                 ...(walletPayments ? [walletMethod] : []),
               ].map((item) => (
                 <button
@@ -807,7 +879,9 @@ function PaymentStep({
             <p className="mt-1 text-xs text-pos-muted">
               {method === "udozo_wallet"
                 ? walletMethod.hint
-                : method === "credit"
+                : method === "udozo_transfer"
+                  ? transferMethod.hint
+                  : method === "credit"
                   ? creditMethod.hint
                   : paymentMethods.find((item) => item.value === method)?.hint}
             </p>
@@ -851,7 +925,26 @@ function PaymentStep({
               </button>
             </div>
           ) : null}
-          {method !== "udozo_wallet" ? (
+          {method === "udozo_transfer" ? (
+            <div className="grid gap-2">
+              <p className="text-pos-ink-2">
+                The buyer transfers{" "}
+                <strong className="text-pos-ink">
+                  {money(remaining, currency)}
+                </strong>{" "}
+                to this till&apos;s Udozo account. Show them its number.
+              </p>
+              <button
+                type="button"
+                onClick={onAskTransfer}
+                disabled={pending}
+                className={primary}
+              >
+                {pending ? "Asking…" : "Show the account number"}
+              </button>
+            </div>
+          ) : null}
+          {!remote ? (
             <>
               <div>
                 <label

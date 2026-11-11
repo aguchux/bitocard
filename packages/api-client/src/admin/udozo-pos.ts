@@ -98,6 +98,55 @@ export type AdminPosCustomerDetail = AdminPosCustomer & {
 };
 export type AdminPosCustomers = { object: 'list'; summary: { owing: number; owed: number }; total: number; has_more: boolean; data: AdminPosCustomer[] };
 
+/** A transfer into a till's Udozo collection account (milestone 4). */
+export type AdminPosCollection = {
+  object: 'pos_collection';
+  id: string;
+  number: string;
+  status: 'matched' | 'unmatched' | 'kept';
+  mode: 'live' | 'test';
+  currency: string;
+  amount: number;
+  fee: number;
+  collected: number;
+  payer_name: string | null;
+  till: { id: string | null; name: string } | null;
+  sale: { id: string; number: string } | null;
+  settlement: { id: string; number: string } | null;
+  note: string | null;
+  decided_by: string | null;
+  received_at: string;
+  account?: { id: string; shop: string | null };
+};
+export type AdminPosCollections = { object: 'list'; total: number; has_more: boolean; totals: Array<{ currency: string; mode: 'live' | 'test'; amount: number; fees: number }>; data: AdminPosCollection[] };
+export type AdminPosSettlement = {
+  object: 'pos_settlement';
+  id: string;
+  number: string;
+  day: string;
+  mode: 'live' | 'test';
+  currency: string;
+  collections: number;
+  gross: number;
+  fees: number;
+  amount: number;
+  status: 'paying' | 'kept';
+  kept_reason: string | null;
+  bank_account: { bank_name: string; last4: string } | null;
+  payout: { id: string; status: 'pending' | 'processing' | 'paid' | 'failed'; completed_at: string | null } | null;
+  created_at: string;
+};
+export type AdminPosAccountCollections = {
+  object: 'pos_account_collections';
+  currency: string;
+  collected: number;
+  unmatched: number;
+  held: { at: string; reason: string | null; by: string | null } | null;
+  accounts: Array<{ id: string; status: 'opening' | 'active' | 'refused' | 'closed'; till: string | null; bank_name: string | null; account_number: string | null; account_name: string | null; attempts: number; last_error: string | null; opened_at: string | null; closed_at: string | null; created_at: string }>;
+  settlements: AdminPosSettlement[];
+};
+export type AdminPosMarketSetting = { country: string; name: string; currency: string; collection_fee_bps: number; collection_fee_min: number; collection_fee_cap: number | null };
+
 export const posAppPlatforms = ['android', 'ios', 'windows'] as const;
 export type PosAppPlatform = (typeof posAppPlatforms)[number];
 export type PosApps = { object: 'pos_apps' } & Record<PosAppPlatform, string | null>;
@@ -123,6 +172,34 @@ export const adminUdozoPosApi = bitocardApi.injectEndpoints({
       query: ({ account, id }) => `/v1/admin/pos/accounts/${account}/customers/${id}`,
       providesTags: (_result, _error, { account }) => [{ type: 'PosAccounts', id: account }],
     }),
+    /** Transfers into every owner's collection accounts (or one account's), newest first. */
+    posCollections: build.query<AdminPosCollections, { account?: string; status?: AdminPosCollection['status']; limit?: number; offset?: number } | void>({
+      query: filter => ({ url: '/v1/admin/pos/collections', params: clean(filter ?? {}) }),
+      providesTags: [{ type: 'PosAccounts', id: 'COLLECTIONS' }],
+    }),
+    posAccountCollections: build.query<AdminPosAccountCollections, string>({
+      query: id => `/v1/admin/pos/accounts/${id}/collections`,
+      providesTags: (_result, _error, id) => [{ type: 'PosAccounts', id }],
+    }),
+    /** Finance or operations: nothing is paid out while held (collections keep coming in). */
+    holdPosSettlements: build.mutation<AdminPosAccountCollections, { account: string; reason: string }>({
+      query: ({ account, reason }) => ({ url: `/v1/admin/pos/accounts/${account}/settlements/hold`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { account }) => [{ type: 'PosAccounts', id: account }, 'Activity'],
+    }),
+    /** Finance, after step-up. */
+    releasePosSettlements: build.mutation<AdminPosAccountCollections, { account: string; reason: string }>({
+      query: ({ account, reason }) => ({ url: `/v1/admin/pos/accounts/${account}/settlements/release`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { account }) => [{ type: 'PosAccounts', id: account }, 'Activity'],
+    }),
+    posMarketSettings: build.query<{ object: 'list'; data: AdminPosMarketSetting[] }, void>({
+      query: () => '/v1/admin/pos/market-settings',
+      providesTags: [{ type: 'PosPlans', id: 'MARKETS' }],
+    }),
+    /** Finance, after step-up: Udozo's margin on each transfer, on top of the gateway's fee. */
+    setPosMarketSettings: build.mutation<{ object: 'list'; data: AdminPosMarketSetting[] }, { country: string; collection_fee_bps: number; collection_fee_min: number; collection_fee_cap: number | null }>({
+      query: ({ country, ...body }) => ({ url: `/v1/admin/pos/market-settings/${country}`, method: 'PUT', body }),
+      invalidatesTags: [{ type: 'PosPlans', id: 'MARKETS' }, 'Activity'],
+    }),
     posPlans: build.query<AdminPosPlans, void>({
       query: () => '/v1/admin/pos/plans',
       providesTags: ['PosPlans'],
@@ -144,4 +221,19 @@ export const adminUdozoPosApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { usePosAccountsQuery, usePosAccountQuery, usePosCustomersQuery, usePosCustomerQuery, usePosPlansQuery, useUpdatePosPlanMutation, usePosAppsQuery, useSetPosAppMutation } = adminUdozoPosApi;
+export const {
+  usePosAccountsQuery,
+  usePosAccountQuery,
+  usePosCustomersQuery,
+  usePosCustomerQuery,
+  usePosCollectionsQuery,
+  usePosAccountCollectionsQuery,
+  useHoldPosSettlementsMutation,
+  useReleasePosSettlementsMutation,
+  usePosMarketSettingsQuery,
+  useSetPosMarketSettingsMutation,
+  usePosPlansQuery,
+  useUpdatePosPlanMutation,
+  usePosAppsQuery,
+  useSetPosAppMutation,
+} = adminUdozoPosApi;

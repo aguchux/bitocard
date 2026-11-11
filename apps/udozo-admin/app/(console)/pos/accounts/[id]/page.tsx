@@ -6,6 +6,7 @@ import { AppLink } from "@bitocard/admin-ui/shell";
 import { type AdminPosAccountDetail, posAccountStatusLabels, usePosAccountQuery } from "@bitocard/api-client/admin";
 import { money } from "@/components/connect";
 import { accountState, limitsLine, posStatusTones, vatWords } from "@/components/pos";
+import { PosCollectionsCard } from "@/components/pos-collections";
 import { PosCustomersCard } from "@/components/pos-customers";
 import { UdozoShell } from "@/components/shell";
 
@@ -63,6 +64,7 @@ function AccountView({ account }: { account: AdminPosAccountDetail }) {
         </Card>
       ))}
       <PosCustomersCard account={account.id} currency={account.currency} />
+      <PosCollectionsCard account={account.id} />
       <Card>
         <CardHeader title="Charges" description="Taken from the owner's Udozo wallet into POS revenue." />
         {account.charges.length ? (

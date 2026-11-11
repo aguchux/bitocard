@@ -69,6 +69,8 @@ export type PosOwner = {
   open: boolean;
   /** The till may take payment from a buyer's Udozo wallet (the market's `pos_wallet_payments`). */
   wallet_payments?: boolean;
+  /** Owners on a paid plan may ask for Udozo collection accounts for their tills (the market's `pos_collections`). */
+  collections?: boolean;
   country: string;
   currency: string;
   wallet: { balance: number; currency: string };
@@ -270,10 +272,11 @@ export const paymentMethods: Array<{ value: PosPaymentMethod; label: string; hin
   { value: "other", label: "Other", hint: "Anything else, recorded as it is." },
 ];
 
-export const methodLabel = (method: string) => (method === "udozo_wallet" ? "Udozo wallet" : method === "credit" ? "Pay later" : (paymentMethods.find(item => item.value === method)?.label ?? method));
+export const methodLabel = (method: string) =>
+  method === "udozo_wallet" ? "Udozo wallet" : method === "udozo_transfer" ? "Transfer to your Udozo account" : method === "credit" ? "Pay later" : (paymentMethods.find(item => item.value === method)?.label ?? method);
 
 export type PosSaleLine = { listing_id: string; title: string; sku: string | null; barcode: string | null; quantity: number; unit_price: number; discount: number; total: number };
-export type PosSalePayment = { method: PosPaymentMethod | "udozo_wallet" | "credit"; amount: number; tendered: number | null; change: number; reference: string | null };
+export type PosSalePayment = { method: PosPaymentMethod | "udozo_wallet" | "udozo_transfer" | "credit"; amount: number; tendered: number | null; change: number; reference: string | null };
 
 export type PosSale = {
   object: "pos_sale";
@@ -507,4 +510,152 @@ export function ratingText(rating: PosUdozoRating) {
   parts.push(`on Udozo since ${new Date(rating.member_since).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}`);
   if (!rating.in_good_standing) parts.push("their Udozo account is suspended");
   return parts.join(" · ");
+}
+
+// ---- Udozo collection accounts and next-day settlement (milestone 4) ----
+
+/** A till's bank account number, opened by Udozo's gateways for the shop. */
+export type PosCollectionAccount = {
+  object: "pos_collection_account";
+  id: string;
+  status: "opening" | "active" | "refused" | "closed";
+  till_id: string | null;
+  bank_name: string | null;
+  account_number: string | null;
+  account_name: string | null;
+  currency: string;
+  opened_at: string | null;
+  closed_at: string | null;
+  created_at: string;
+};
+
+export type PosCollectionsOverview = {
+  object: "pos_collections";
+  open: boolean;
+  /** Why no new account can be opened now: not open in the country, a free plan, or no settlement account chosen. */
+  blocked: "unavailable" | "plan" | "settlement_account" | null;
+  currency: string;
+  mode: "live" | "test";
+  bvn_required: boolean;
+  collected: number;
+  unmatched: number;
+  next_settlement: string;
+  held: { at: string; reason: string | null } | null;
+  settlement_bank_account_id: string | null;
+  bank_accounts: Array<{ id: string; bank_name: string; last4: string; account_name: string; usable_from: string }>;
+  tills: Array<{ id: string; name: string; shop: { id: string; name: string }; collection_account: PosCollectionAccount | null }>;
+};
+
+export type PosCollection = {
+  object: "pos_collection";
+  id: string;
+  number: string;
+  status: "matched" | "unmatched" | "kept";
+  mode: "live" | "test";
+  currency: string;
+  amount: number;
+  fee: number;
+  collected: number;
+  payer_name: string | null;
+  till: { id: string | null; name: string } | null;
+  sale: { id: string; number: string } | null;
+  settlement: { id: string; number: string } | null;
+  note: string | null;
+  decided_by: string | null;
+  received_at: string;
+  /** The sales an unmatched transfer could be for: asked at a till for its amount, waiting or run out of time. */
+  attachable?: Array<{ id: string; number: string; till: string | null; status: string; created_at: string }>;
+};
+
+export type PosCollections = { object: "list"; currency: string; total: number; has_more: boolean; data: PosCollection[] };
+
+export type PosSettlement = {
+  object: "pos_settlement";
+  id: string;
+  number: string;
+  day: string;
+  mode: "live" | "test";
+  currency: string;
+  collections: number;
+  gross: number;
+  fees: number;
+  amount: number;
+  status: "paying" | "kept";
+  kept_reason: string | null;
+  bank_account: { bank_name: string; last4: string } | null;
+  payout: { id: string; status: "pending" | "processing" | "paid" | "failed"; completed_at: string | null } | null;
+  created_at: string;
+  items?: PosCollection[];
+};
+
+export type PosSettlements = { object: "list"; currency: string; total: number; has_more: boolean; data: PosSettlement[] };
+
+export type PosTransferRequest = {
+  object: "pos_transfer_request";
+  id: string;
+  number: string;
+  status: "waiting" | "paid" | "cancelled" | "expired" | "failed";
+  currency: string;
+  amount: number;
+  total: number;
+  client_sale_id: string;
+  pay_to: { bank_name: string | null; account_number: string | null; account_name: string | null };
+  failure: string | null;
+  expires_at: string;
+  paid_at: string | null;
+  sale_id: string | null;
+};
+
+/** Why an owner cannot open a collection account yet, in words. */
+export function collectionBlockText(blocked: PosCollectionsOverview["blocked"]) {
+  switch (blocked) {
+    case "unavailable":
+      return "Udozo collection accounts are not open in your country yet.";
+    case "plan":
+      return "Collection accounts come with Premium and Multi-shop.";
+    case "settlement_account":
+      return "Choose the bank account your collections are paid to first.";
+    default:
+      return null;
+  }
+}
+
+/** Where a settlement stands, in words. */
+export function settlementText(settlement: Pick<PosSettlement, "status" | "kept_reason" | "payout" | "bank_account">) {
+  if (settlement.status === "kept") return `In your Udozo payouts: ${settlement.kept_reason ?? "pay it out from udozo.com."}`;
+  const to = settlement.bank_account ? `${settlement.bank_account.bank_name} ••••${settlement.bank_account.last4}` : "your bank";
+  switch (settlement.payout?.status) {
+    case "paid":
+      return `Paid to ${to}.`;
+    case "failed":
+      return `The bank refused it: it is back in your Udozo payouts. Pay it out from udozo.com.`;
+    default:
+      return `On its way to ${to}.`;
+  }
+}
+
+/** What a transfer into a collection account is, in words. */
+export function collectionText(collection: Pick<PosCollection, "status" | "sale" | "note">) {
+  if (collection.status === "matched") return collection.sale ? `Paid ${collection.sale.number}` : "Paid a sale";
+  if (collection.status === "kept") return collection.note ? `Kept: ${collection.note}` : "Kept, for no sale";
+  return "Not matched to a sale yet";
+}
+
+/** Why the till stopped waiting for a transfer, or null while it waits or once it is paid. */
+export function transferOutcome(request: Pick<PosTransferRequest, "status" | "failure">) {
+  switch (request.status) {
+    case "expired":
+      return "30 minutes passed without the transfer. If it comes later, attach it to the sale under Payments.";
+    case "cancelled":
+      return "The request was cancelled.";
+    case "failed":
+      return `The transfer came, but the sale could not be made: ${request.failure ?? "something changed"} It is under Payments, to attach or keep.`;
+    default:
+      return null;
+  }
+}
+
+/** A market's date, written out: Wed 25 Mar. */
+export function dayText(day: string) {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 }

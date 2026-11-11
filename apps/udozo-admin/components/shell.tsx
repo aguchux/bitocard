@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Gavel, Globe2, HandCoins, Handshake, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, PackageSearch, Paintbrush, Percent, PlugZap, ReceiptText, ScanBarcode, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, Truck, UserCheck, Undo2, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
+import { Award, Banknote, Bell, BookCheck, Bot, Building2, ChartNoAxesColumn, ClipboardList, Compass, Cpu, Crown, FilePlus2, Flag, Footprints, FlaskConical, Gauge, GalleryHorizontal, GalleryHorizontalEnd, Gavel, Globe2, HandCoins, Handshake, Landmark, History, House, Inbox, LayoutTemplate, LifeBuoy, ListChecks, Mail, MapPin, MapPinned, Megaphone, MessageCircle, MessageSquareWarning, MessagesSquare, Package, PackageSearch, Paintbrush, Percent, PlugZap, ReceiptText, ScanBarcode, Repeat, Route, ScanFace, Settings, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Stamp, Star, Store, Tags, ToggleRight, TrendingUp, Truck, UserCheck, Undo2, UserRound, Users, UsersRound, Wallet, Warehouse } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
 import { AccountMenu, AppLink, ConsoleShell, type Crumb, type NavItem, NotificationBell, StepUpPrompt, type SubNavItem, useAdmin, useMode } from "@bitocard/admin-ui/shell";
 import { useAdminSignOutMutation } from "@bitocard/api-client/admin";
@@ -83,6 +83,7 @@ export const menus: Record<UdozoSection, { title: string; items: SubNavItem[] }>
     title: "Udozo POS",
     items: [
       { label: "Accounts", href: "/pos/accounts", icon: Store },
+      { label: "Collections", href: "/pos/collections", icon: Landmark },
       { label: "Plans and prices", href: "/pos/plans", icon: Crown },
       { label: "App links", href: "/pos/apps", icon: Smartphone },
     ],

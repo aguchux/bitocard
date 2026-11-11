@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { PosApps, PosCatalogue, PosCharge, PosCustomer, PosCustomers, PosOwner, PosPlans, PosSale, PosSales, PosShopKind } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosPlans, PosSale, PosSales, PosSettlement, PosSettlements, PosShopKind } from "./pos";
 import { type ApiResult, customerApi } from "./session";
 import { apiUrl } from "./site";
 
@@ -76,3 +76,10 @@ export const ownerSale = (id: string) => customerApi<PosSale>("GET", `/v1/pos/ow
 /** The shop's customers (`query` from `customersQuery`), and one with its sales and what it owes. */
 export const ownerCustomers = (query = "") => customerApi<PosCustomers>("GET", `/v1/pos/owner/customers${query}`);
 export const ownerCustomer = (id: string) => customerApi<PosCustomer>("GET", `/v1/pos/owner/customers/${id}`);
+
+/** The owner's collection accounts: whether they may open one, where collections are paid, each till's account. */
+export const ownerCollections = cache(() => customerApi<PosCollectionsOverview>("GET", "/v1/pos/owner/collections"));
+/** Transfers into them, newest first (`status`: matched, unmatched or kept). */
+export const ownerCollectionTransfers = (status?: string) => customerApi<PosCollections>("GET", `/v1/pos/owner/collections/transfers?limit=50${status && /^[a-z]+$/.test(status) ? `&status=${status}` : ""}`);
+export const ownerSettlements = () => customerApi<PosSettlements>("GET", "/v1/pos/owner/collections/settlements?limit=30");
+export const ownerSettlement = (id: string) => customerApi<PosSettlement>("GET", `/v1/pos/owner/collections/settlements/${id}`);

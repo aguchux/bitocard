@@ -123,7 +123,7 @@ const lastSent = (suffix: string) => sent.filter(item => item.method !== "GET" &
 describe("Udozo POS", () => {
   test("has its own section with accounts, plans and prices, and app links", () => {
     expect(sections.some(item => item.key === "pos" && item.href === "/pos/accounts")).toBe(true);
-    expect(menus.pos.items.map(item => item.href)).toEqual(["/pos/accounts", "/pos/plans", "/pos/apps"]);
+    expect(menus.pos.items.map(item => item.href)).toEqual(["/pos/accounts", "/pos/collections", "/pos/plans", "/pos/apps"]);
   });
 
   test("lists accounts with where the plan stands, and opens one", async () => {

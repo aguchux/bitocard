@@ -108,6 +108,8 @@ export class PosCollectionsService implements OnModuleInit {
       blocked,
       currency: account.currency,
       mode: account.mode,
+      /** Opening one needs the owner's BVN (Nigeria, live): the banks ask for it. */
+      bvn_required: account.mode === 'live' && account.country === 'NG',
       /** Collected and not yet settled (less Udozo's fee). */
       collected: Number(balance),
       unmatched,

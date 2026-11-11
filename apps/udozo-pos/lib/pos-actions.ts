@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type PosAccount, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
+import { type PosAccount, type PosCollection, type PosCollectionAccount, type PosCollectionsOverview, type PosCustomer, type PosCustomerBrief, type PosCustomers, type PosPaymentMethod, type PosPlan, type PosSale, type PosStockMovement, type PosTransferRequest, type PosWalletRequest, paymentMethods, planOrder } from "./pos";
 import { type ApiResult, customerApi, dropSession } from "./session";
 
 /** What an action answers: the account as it now is, or Udozo's refusal in words with the field it names. */
@@ -236,4 +236,80 @@ export async function signOut() {
   await customerApi("POST", "/v1/store/account/signout");
   await dropSession();
   redirect("/");
+}
+
+// ---- Udozo collection accounts (milestone 4) ----
+
+/** Where collections are paid: one of the owner's udozo.com payout bank accounts, or none. */
+export async function setSettlementAccount(bankAccountId: string | null): Promise<PosResult<PosCollectionsOverview>> {
+  if (bankAccountId !== null && !uuid.test(bankAccountId)) return refused("Choose one of your bank accounts.", "bank_account_id");
+  return answer(await customerApi<PosCollectionsOverview>("PUT", "/v1/pos/owner/collections/settlement-account", { bank_account_id: bankAccountId }));
+}
+
+/** Asks Udozo's banks for a till's account number; in Nigeria, live, with the owner's BVN (passed on, never kept). */
+export async function openCollectionAccount(tillId: string, bvn = ""): Promise<PosResult<PosCollectionAccount>> {
+  if (!uuid.test(tillId)) return refused("Choose a till.", "till_id", "resource_missing");
+  const digits = bvn.replace(/\s/g, "");
+  if (digits && !/^\d{11}$/.test(digits)) return refused("A BVN is 11 digits.", "bvn");
+  return answer(await customerApi<PosCollectionAccount>("POST", `/v1/pos/owner/tills/${tillId}/collection-account`, digits ? { bvn: digits } : {}));
+}
+
+export async function closeCollectionAccount(id: string): Promise<PosResult<PosCollectionAccount>> {
+  if (!uuid.test(id)) return refused("No such account.", null, "resource_missing");
+  return answer(await customerApi<PosCollectionAccount>("POST", `/v1/pos/owner/collection-accounts/${id}/close`));
+}
+
+/** The sandbox only: a made-up transfer into an account, to try it. */
+export async function simulateCollection(id: string, amount: number, payerName = ""): Promise<PosResult<PosCollection>> {
+  if (!uuid.test(id)) return refused("No such account.", null, "resource_missing");
+  if (!whole(amount, 1)) return refused("Give the amount.", "amount");
+  return answer(await customerApi<PosCollection>("POST", `/v1/pos/owner/collection-accounts/${id}/simulate`, { amount, ...(payerName.trim() ? { payer_name: payerName.trim().slice(0, 120) } : {}) }));
+}
+
+/** Attaches an unmatched transfer to the sale it was for, which makes the sale. */
+export async function attachCollection(id: string, requestId: string): Promise<PosResult<PosCollection>> {
+  if (!uuid.test(id) || !uuid.test(requestId)) return refused("Choose the sale it was for.", "transfer_request_id");
+  return answer(await customerApi<PosCollection>("POST", `/v1/pos/owner/collections/transfers/${id}/attach`, { transfer_request_id: requestId }));
+}
+
+/** Keeps an unmatched transfer for no sale: it is paid to the bank with the day's collections all the same. */
+export async function keepCollection(id: string, note = ""): Promise<PosResult<PosCollection>> {
+  if (!uuid.test(id)) return refused("No such transfer.", null, "resource_missing");
+  return answer(await customerApi<PosCollection>("POST", `/v1/pos/owner/collections/transfers/${id}/keep`, note.trim() ? { note: note.trim().slice(0, 300) } : {}));
+}
+
+/** The till asks for the rest of the basket by transfer into its Udozo account: the transfer makes the sale. */
+export async function askTransfer(sale: RingUp & { transfer_amount: number }): Promise<PosResult<PosTransferRequest>> {
+  if (!uuid.test(sale.till_id) || !uuid.test(sale.client_sale_id)) return refused("Start a new sale.", "client_sale_id");
+  if (!sale.lines.length || sale.lines.some(line => !uuid.test(line.listing_id) || !whole(line.quantity, 1))) return refused("Add products to the sale.", "lines");
+  if (!whole(sale.transfer_amount, 1) || !whole(sale.expected_total)) return refused("Check the total.", "transfer_amount");
+  const body = {
+    till_id: sale.till_id,
+    client_sale_id: sale.client_sale_id,
+    lines: sale.lines.map(line => ({ listing_id: line.listing_id, quantity: line.quantity })),
+    ...(sale.discount ? { discount: sale.discount } : {}),
+    payments: sale.payments.map(payment => ({ method: payment.method, amount: payment.amount, ...(payment.method === "cash" && payment.tendered ? { tendered: payment.tendered } : {}), ...(payment.reference?.trim() ? { reference: payment.reference.trim().slice(0, 80) } : {}) })),
+    transfer_amount: sale.transfer_amount,
+    expected_total: sale.expected_total,
+    ...(sale.customer_id && uuid.test(sale.customer_id) ? { customer_id: sale.customer_id } : {}),
+  };
+  const result = await customerApi<PosTransferRequest>("POST", "/v1/pos/owner/transfer-requests", body);
+  return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.status === 401 ? "Your session ended. Sign in again to carry on." : result.message, code: result.code, param: result.param };
+}
+
+/** Where a transfer request stands; once paid, with the sale it made. */
+export async function transferStatus(id: string): Promise<PosResult<PosTransferRequest & { sale: PosSale | null }>> {
+  if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
+  const result = await customerApi<PosTransferRequest>("GET", `/v1/pos/owner/transfer-requests/${id}`);
+  if (!result.ok) return { ok: false, message: result.message, code: result.code, param: result.param };
+  if (result.data.status !== "paid" || !result.data.sale_id) return { ok: true, data: { ...result.data, sale: null } };
+  const sale = await customerApi<PosSale>("GET", `/v1/pos/owner/sales/${result.data.sale_id}`);
+  revalidatePath("/app", "layout");
+  return { ok: true, data: { ...result.data, sale: sale.ok ? sale.data : null } };
+}
+
+export async function cancelTransfer(id: string): Promise<PosResult<PosTransferRequest>> {
+  if (!uuid.test(id)) return refused("No such request.", null, "resource_missing");
+  const result = await customerApi<PosTransferRequest>("POST", `/v1/pos/owner/transfer-requests/${id}/cancel`);
+  return result.ok ? { ok: true, data: result.data } : { ok: false, message: result.message, code: result.code, param: result.param };
 }

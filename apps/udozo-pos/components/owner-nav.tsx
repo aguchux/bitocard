@@ -8,6 +8,7 @@ export const ownerLinks = [
   { href: "/app/till", label: "Till" },
   { href: "/app/sales", label: "Sales" },
   { href: "/app/customers", label: "Customers" },
+  { href: "/app/collections", label: "Payments" },
   { href: "/app/products", label: "Products" },
   { href: "/app/setup", label: "Shop and tills" },
   { href: "/app/billing", label: "Plan and billing" },
