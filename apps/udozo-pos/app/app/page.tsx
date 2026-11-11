@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { limitText, statusText } from "@/lib/pos";
-import { currentOwner, ownerCatalogue } from "@/lib/pos-data";
+import { limitText, money, salesQuery, shopToday, statusText } from "@/lib/pos";
+import { currentOwner, ownerCatalogue, ownerSales } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
 
 /**
- * The owner's home: their shop, where the plan stands, and what to do next. The register, products at the till and
- * staff come in the next milestones, and say so.
+ * The owner's home: today's takings with the till a tap away, their shop, where the plan stands, and what to do next.
+ * Staff come in a later milestone, and say so.
  */
 export default async function OwnerHome() {
-  const [owner, catalogue] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1")]);
+  const today = shopToday();
+  const [owner, catalogue, sales] = await Promise.all([currentOwner(), ownerCatalogue("?limit=1"), ownerSales(salesQuery({ day: today }).api.replace(/limit=\d+/, "limit=1"))]);
   if (!owner.ok || !owner.data.account) return null;
   const products = catalogue.ok ? catalogue.data.summary.products : 0;
   const { account, plans } = owner.data;
@@ -70,11 +71,25 @@ export default async function OwnerHome() {
         </ol>
       </section>
 
-      <section aria-labelledby="register" className="rounded-[20px] border border-dashed border-pos-line bg-white p-6">
-        <h2 id="register" className="font-display text-xl font-bold text-pos-ink">
-          The register
-        </h2>
-        <p className="mt-1 text-pos-ink-2">Selling at the till, with your products and stock from udozo.com, opens here soon. Your shop and tills are ready for it.</p>
+      <section aria-labelledby="register" className="flex flex-wrap items-center gap-4 rounded-[20px] bg-white p-6">
+        <div className="min-w-0 flex-1">
+          <h2 id="register" className="font-display text-xl font-bold text-pos-ink">
+            Today
+          </h2>
+          <p className="mt-1 text-pos-ink-2">
+            {sales.ok
+              ? sales.data.summary.sales
+                ? `${sales.data.summary.sales} ${sales.data.summary.sales === 1 ? "sale" : "sales"}, ${money(sales.data.summary.takings, sales.data.currency)} taken.`
+                : "No sales yet today."
+              : "Your sales could not be read just now."}
+          </p>
+        </div>
+        <Link href={`/app/sales?day=${today}`} className="font-semibold">
+          Sales
+        </Link>
+        <Link href="/app/till" className="inline-flex h-12 items-center rounded-xl bg-pos-600 px-5 font-bold text-white no-underline hover:bg-pos-700">
+          Open the till
+        </Link>
       </section>
     </div>
   );

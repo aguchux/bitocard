@@ -6,12 +6,13 @@ import { PosCatalogueService } from './catalogue.service.js';
 import { PosAdminService } from './pos-admin.service.js';
 import { AdminPosController, PosOwnerController, PublicPosController } from './pos.controller.js';
 import { PosService } from './pos.service.js';
+import { PosSalesService } from './sales.service.js';
 
 /** Udozo POS (docs/UDOZO_POS_PLAN.md): owners' accounts, shops and tills, the three plans and their monthly charges. */
 @Module({
   imports: [CheckoutModule, SettingsModule],
   controllers: [PublicPosController, PosOwnerController, AdminPosController],
-  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService],
+  providers: [PosService, PosBillingService, PosAdminService, PosCatalogueService, PosSalesService],
   exports: [PosBillingService],
 })
 export class PosModule {}

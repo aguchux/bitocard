@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { PosApps, PosCatalogue, PosCharge, PosOwner, PosPlans, PosShopKind } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosOwner, PosPlans, PosSale, PosSales, PosShopKind } from "./pos";
 import { type ApiResult, customerApi } from "./session";
 import { apiUrl } from "./site";
 
@@ -44,3 +44,9 @@ export const ownerCatalogue = (query = "") => customerApi<PosCatalogue>("GET", `
 
 /** Every charge for the plan, newest first. */
 export const ownerCharges = () => customerApi<{ object: "list"; data: PosCharge[] }>("GET", "/v1/pos/owner/charges");
+
+/** The owner's sales, newest first, with the filter's takings (`query` from `salesQuery`). */
+export const ownerSales = (query = "") => customerApi<PosSales>("GET", `/v1/pos/owner/sales${query}`);
+
+/** One sale with its lines and payments. */
+export const ownerSale = (id: string) => customerApi<PosSale>("GET", `/v1/pos/owner/sales/${id}`);

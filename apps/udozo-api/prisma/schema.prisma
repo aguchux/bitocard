@@ -4920,6 +4920,8 @@ model ClassifiedListing {
   @@index([status, reviewedAt])
   @@map("classified_listings")
   auctions     ConnectAuction[]
+  posSaleLines      PosSaleLine[]
+  posStockMovements PosStockMovement[]
 }
 
 /// A listing's feature values, one per key, checked against the registry; numbers in the key's unit.
@@ -7942,6 +7944,8 @@ model PosAccount {
   plan               PosPlan      @relation(fields: [planCode], references: [code])
   shops              PosShop[]
   charges            PosCharge[]
+  sales              PosSale[]
+  stockMovements     PosStockMovement[]
 
   @@index([planCode, periodEnd])
   @@map("pos_accounts")
@@ -7962,11 +7966,14 @@ model PosShop {
   /// What kind of shop it is (`posShopKinds`: general, pharmacy, auto_parts…), so the till is tailored to it.
   kind          String     @default("general") @db.VarChar(32)
   receiptFooter String?    @map("receipt_footer")
+  /// The next sale's number (POS-000001…), claimed with one UPDATE … RETURNING.
+  saleNext      Int        @default(1) @map("sale_next")
   position      Int        @default(0)
   createdAt     DateTime   @default(now()) @map("created_at")
   updatedAt     DateTime   @updatedAt @map("updated_at")
   account       PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   tills         PosTill[]
+  sales         PosSale[]
 
   @@index([accountId, position])
   @@map("pos_shops")
@@ -7983,9 +7990,111 @@ model PosTill {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   shop         PosShop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  sales        PosSale[]
 
   @@index([shopId, position])
   @@map("pos_tills")
+}
+
+/// A sale rung up at a till (`POS-000123`, numbered per shop): its lines, how it was paid and its totals. Paid outside
+/// Udozo (cash, the shop's own account or terminal, other), so nothing moves in the ledger; the units come out of the
+/// listing's own stock. `client_sale_id` is made by the till, so a sale sent twice is one sale.
+model PosSale {
+  id              String     @id @default(uuid()) @db.Uuid
+  accountId       String     @map("account_id") @db.Uuid
+  shopId          String     @map("shop_id") @db.Uuid
+  tillId          String?    @map("till_id") @db.Uuid
+  tillName        String     @map("till_name")
+  number          String     @db.VarChar(16)
+  clientSaleId    String     @map("client_sale_id") @db.Uuid
+  currency        String     @db.VarChar(10)
+  subtotalMinor   BigInt     @map("subtotal_minor")
+  discountMinor   BigInt     @default(0) @map("discount_minor")
+  vatBps          Int        @default(0) @map("vat_bps")
+  vatMinor        BigInt     @default(0) @map("vat_minor")
+  totalMinor      BigInt     @map("total_minor")
+  changeMinor     BigInt     @default(0) @map("change_minor")
+  /// `completed` or `refunded`.
+  status          String     @default("completed") @db.VarChar(16)
+  soldByCustomerId String?   @map("sold_by_customer_id") @db.Uuid
+  soldByName      String     @map("sold_by_name")
+  note            String?    @db.VarChar(300)
+  refundedAt      DateTime?  @map("refunded_at")
+  refundReason    String?    @map("refund_reason") @db.VarChar(300)
+  restocked       Boolean?
+  clientCreatedAt DateTime?  @map("client_created_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  account         PosAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  shop            PosShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  till            PosTill?   @relation(fields: [tillId], references: [id], onDelete: SetNull)
+  lines           PosSaleLine[]
+  payments        PosPayment[]
+  movements       PosStockMovement[]
+
+  @@unique([shopId, number], map: "pos_sales_shop_number_key")
+  @@unique([accountId, clientSaleId], map: "pos_sales_client_key")
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_sales_account_created_idx")
+  @@map("pos_sales")
+}
+
+/// A line of a sale, as it was sold (title, SKU, price), whatever the listing becomes.
+model PosSaleLine {
+  id             String            @id @default(uuid()) @db.Uuid
+  saleId         String            @map("sale_id") @db.Uuid
+  listingId      String            @map("listing_id") @db.Uuid
+  position       Int
+  title          String
+  sku            String?           @db.VarChar(16)
+  barcode        String?           @db.VarChar(48)
+  quantity       Int
+  unitPriceMinor BigInt            @map("unit_price_minor")
+  discountMinor  BigInt            @default(0) @map("discount_minor")
+  totalMinor     BigInt            @map("total_minor")
+  sale           PosSale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  listing        ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+
+  @@index([saleId, position], map: "pos_sale_lines_sale_idx")
+  @@index([listingId], map: "pos_sale_lines_listing_idx")
+  @@map("pos_sale_lines")
+}
+
+/// How a sale was paid: `cash` (with what was handed over and its change), `transfer`, `card` or `other`.
+model PosPayment {
+  id            String  @id @default(uuid()) @db.Uuid
+  saleId        String  @map("sale_id") @db.Uuid
+  position      Int
+  method        String  @db.VarChar(16)
+  amountMinor   BigInt  @map("amount_minor")
+  tenderedMinor BigInt? @map("tendered_minor")
+  changeMinor   BigInt  @default(0) @map("change_minor")
+  reference     String? @db.VarChar(80)
+  sale          PosSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId, position], map: "pos_payments_sale_idx")
+  @@map("pos_payments")
+}
+
+/// A change to a listing's stock made from the POS: `sale`, `refund`, `restock`, `count` or `damage`.
+model PosStockMovement {
+  id           String            @id @default(uuid()) @db.Uuid
+  accountId    String            @map("account_id") @db.Uuid
+  listingId    String            @map("listing_id") @db.Uuid
+  shopId       String?           @map("shop_id") @db.Uuid
+  reason       String            @db.VarChar(16)
+  delta        Int
+  stockAfter   Int               @map("stock_after")
+  saleId       String?           @map("sale_id") @db.Uuid
+  note         String?           @db.VarChar(200)
+  byCustomerId String?           @map("by_customer_id") @db.Uuid
+  byName       String?           @map("by_name")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  account      PosAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  listing      ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sale         PosSale?          @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  @@index([listingId, createdAt(sort: Desc)], map: "pos_stock_movements_listing_idx")
+  @@index([accountId, createdAt(sort: Desc)], map: "pos_stock_movements_account_idx")
+  @@map("pos_stock_movements")
 }
 
 /// Every plan charge taken from the owner's wallet: an invoice (`PI-000123`), its ledger entry by `reference`.

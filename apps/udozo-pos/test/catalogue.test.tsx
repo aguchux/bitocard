@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PosCatalogue, PosProduct } from "@/lib/pos";
 import { setRequest } from "./request";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/app/products", redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/app/products", useRouter: () => ({ refresh: vi.fn() }), redirect: vi.fn() }));
 
 const { blockText, catalogueQuery, stockLine } = await import("@/lib/pos");
 const { ownerCatalogue } = await import("@/lib/pos-data");

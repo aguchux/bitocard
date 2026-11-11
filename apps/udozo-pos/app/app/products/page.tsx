@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { blockText, type CatalogueView, catalogueQuery, catalogueViews, cataloguePage, money, type PosProduct, stockLine } from "@/lib/pos";
+import { StockAdjust } from "@/components/stock-adjust";
 import { ownerCatalogue } from "@/lib/pos-data";
 import { udozoUrl } from "@/lib/site";
 
@@ -190,6 +191,7 @@ function ProductCard({ product, planName }: { product: PosProduct; planName: str
           {[product.sku, product.barcode ? `Barcode ${product.barcode}` : "No barcode", product.category?.name].filter(Boolean).join(" · ")}
         </span>
         {why ? <span className="text-sm text-pos-warn">{why}</span> : null}
+        <StockAdjust id={product.id} title={product.title ?? "Untitled draft"} stock={product.stock} />
         <a href={product.edit_url} target="_blank" rel="noopener" className="text-sm font-semibold">
           Edit on udozo.com
           <span className="sr-only"> ({product.title ?? "draft"})</span>
