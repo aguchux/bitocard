@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { type ApiResult, customerApi, staffApi, staffCookie } from "./session";
+import { apiFile, type ApiResult, customerApi, staffApi, staffCookie } from "./session";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -19,4 +19,9 @@ export async function actorKind(): Promise<"owner" | "staff"> {
  */
 export async function posApi<T>(method: Method, path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<ApiResult<T>> {
   return (await actorKind()) === "staff" ? staffApi<T>(method, `/v1/pos/staff${path}`, body, options) : customerApi<T>(method, `/v1/pos/owner${path}`, body, options);
+}
+
+/** A file from a shared route (a receipt's PDF), as the owner or the member of staff at the till. */
+export async function posFile(path: string) {
+  return (await actorKind()) === "staff" ? apiFile("staff", `/v1/pos/staff${path}`) : apiFile("customer", `/v1/pos/owner${path}`);
 }

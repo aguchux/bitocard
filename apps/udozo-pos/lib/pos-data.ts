@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { ownerPermissions, type PermissionSet, type PosApprover, type PosDeviceInfo, type PosDeviceRow, type PosRoles, type PosShop, type PosStaffList, type PosStaffMe } from "./pos";
-import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosPlans, PosSale, PosSales, PosSettlement, PosSettlements, PosShopKind } from "./pos";
+import type { PosApps, PosCatalogue, PosCharge, PosCollections, PosCollectionsOverview, PosCustomer, PosCustomers, PosOwner, PosPlans, PosReceipts, PosSale, PosSales, PosSettlement, PosSettlements, PosShopKind } from "./pos";
 import { actorKind } from "./pos-api";
 import { type ApiResult, currentCustomer, customerApi, deviceApi, staffApi } from "./session";
 import { posApi } from "./pos-api";
@@ -75,6 +75,8 @@ export const ownerSales = (query = "") => posApi<PosSales>("GET", `/sales${query
 
 /** One sale with its lines and payments. */
 export const ownerSale = (id: string) => posApi<PosSale>("GET", `/sales/${id}`);
+/** A sale's receipts: how they can go, the printed QR code, the shop and what was sent (milestone 6). */
+export const saleReceipts = (id: string) => posApi<PosReceipts>("GET", `/sales/${id}/receipts`);
 
 /** The shop's customers (`query` from `customersQuery`), and one with its sales and what it owes. */
 export const ownerCustomers = (query = "") => posApi<PosCustomers>("GET", `/customers${query}`);

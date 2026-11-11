@@ -88,6 +88,7 @@ export function Register({
   walletPayments = false,
   transferAccount = false,
   approvers = [],
+  autoPrint = false,
 }: {
   tillId: string;
   vatBps: number;
@@ -100,6 +101,8 @@ export function Register({
   transferAccount?: boolean;
   /** Staff: who may give a manager's PIN here, for a discount past their own limit (none for the owner). */
   approvers?: PosApprover[];
+  /** The till prints each receipt: the print dialog opens by itself once a sale is done. */
+  autoPrint?: boolean;
 }) {
   const router = useRouter();
   const search = useRef<HTMLInputElement>(null);
@@ -574,6 +577,10 @@ export function Register({
             <button type="button" autoFocus onClick={reset} className={primary}>
               New sale
             </button>
+            <a href={`/app/sales/${done.id}/receipt`} className="flex h-12 items-center justify-center rounded-xl border border-pos-line bg-white px-5 font-semibold text-pos-ink no-underline hover:bg-pos-50">
+              Receipt: print, WhatsApp or email
+            </a>
+            {autoPrint ? <iframe title={`Printing receipt ${done.number}`} src={`/print/${done.id}?auto=1`} className="sr-only" tabIndex={-1} /> : null}
           </div>
         ) : (
           <>

@@ -77,7 +77,7 @@ export default async function TillPage({ searchParams }: { searchParams: Promise
           </Link>
         </section>
       ) : (
-        <Register key={till.id} tillId={till.id} vatBps={till.shop.vat_bps} currency={catalogue.data.currency} products={catalogue.data.data} categories={catalogue.data.categories} planName={catalogue.data.plan.name} walletPayments={view.walletPayments} transferAccount={transferAccount} approvers={view.approvers} />
+        <Register key={till.id} tillId={till.id} vatBps={till.shop.vat_bps} currency={catalogue.data.currency} products={catalogue.data.data} categories={catalogue.data.categories} planName={catalogue.data.plan.name} walletPayments={view.walletPayments} transferAccount={transferAccount} approvers={view.approvers} autoPrint={till.auto_print} />
       )}
     </div>
   );

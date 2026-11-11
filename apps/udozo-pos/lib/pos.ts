@@ -34,6 +34,12 @@ export type PosShop = {
   shop_code: string;
   vat_bps: number;
   receipt_footer: string | null;
+  /** Shown on invoices. */
+  email?: string | null;
+  /** The shop's own bank account for later payments, printed on invoices (never used by Udozo). */
+  bank?: { name: string | null; account_name: string | null; account_number: string | null } | null;
+  /** Printed receipts carry the QR code that gets the PDF on WhatsApp. */
+  receipt_qr?: boolean;
   /** What kind of shop it is; the till leads with its categories. */
   kind: PosShopKind;
   tills: PosTill[];
@@ -786,4 +792,65 @@ export function weakPin(pin: string) {
   const up = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 1) % 10);
   const down = digits.every((digit, index) => index === 0 || digit === (digits[index - 1]! + 9) % 10);
   return up || down || /^(19|20)\d\d$/.test(pin);
+}
+
+// ---- Receipts (milestone 6) ----
+
+export type ReceiptKind = "receipt" | "invoice";
+
+/** A receipt sent: on WhatsApp to a number, to whoever sent its QR code's words (`qr`), or by email; where to, masked. */
+export type PosReceiptSend = {
+  object: "pos_receipt_send";
+  id: string;
+  kind: ReceiptKind | "both";
+  via: "whatsapp" | "qr" | "email";
+  to: string;
+  status: "sending" | "sent" | "delivered" | "read" | "failed";
+  /** A template went in its place (outside WhatsApp's 24-hour window): they tap Get receipt to have the PDF. */
+  template: boolean;
+  error: string | null;
+  by: string | null;
+  created_at: string;
+};
+
+/** A receipt's code: the words its QR code fills in on WhatsApp, and whether the customer has had it yet. */
+export type PosReceiptCode = { object: "pos_receipt_code"; id: string; kind: ReceiptKind; purpose: "screen" | "print" | "whatsapp"; expires_at: string; used_at: string | null; delivered_to: string | null; text?: string; whatsapp_url?: string | null };
+
+/** What the receipt screen needs: how it can go, the printed QR code, the shop's details, the customer and what was sent. */
+export type PosReceipts = {
+  object: "pos_receipts";
+  sale_id: string;
+  number: string;
+  invoice_number: string | null;
+  whatsapp: { available: boolean; reason: string | null };
+  email: { available: boolean };
+  print: { width: 58 | 80; auto_print: boolean; qr: { text: string; whatsapp_url: string | null } | null };
+  shop: { name: string; address: string | null; phone: string | null; tin: string | null; email: string | null; footer: string | null; online: string | null };
+  customer: { id: string; name: string; phone: string | null; email: string | null } | null;
+  sends: PosReceiptSend[];
+};
+
+/** How a receipt sent reads: where it went, what and how it stands. */
+export function sendText(send: PosReceiptSend) {
+  const what = send.kind === "both" ? "Receipt and invoice" : send.kind === "invoice" ? "Invoice" : "Receipt";
+  const how = send.via === "email" ? "by email" : send.via === "qr" ? "on WhatsApp (scanned)" : "on WhatsApp";
+  const state =
+    send.status === "failed"
+      ? `not sent${send.error ? `: ${send.error}` : ""}`
+      : send.template && send.status !== "sending"
+        ? "they tap Get receipt to have it"
+        : { sending: "sending", sent: "sent", delivered: "delivered", read: "read" }[send.status];
+  return `${what} ${how} to ${send.to}, ${state}`;
+}
+
+/** The receipt's paper widths. */
+export const paperWidths = [80, 58] as const;
+
+/** The money as a printed receipt shows it: the currency's code and two decimals, as the PDF does. */
+export const receiptAmount = (minor: number) => (minor / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** "Blessing M.": a cashier as receipts print them. */
+export function shortName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]![0]!.toUpperCase()}.` : (parts[0] ?? "");
 }

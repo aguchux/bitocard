@@ -38,6 +38,9 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         <p className="mt-1 text-pos-ink-2">
           {saleTime(sale.created_at)} · {sale.shop.name}, {sale.till.name} · by {sale.sold_by}
         </p>
+        <Link href={`/app/sales/${sale.id}/receipt`} className="mt-3 inline-flex h-11 items-center rounded-xl bg-pos-600 px-5 font-bold text-white hover:bg-pos-700">
+          Receipt: print, WhatsApp or email
+        </Link>
         {sale.customer ? (
           <p className="mt-1 text-pos-ink-2">
             Customer:{" "}

@@ -105,6 +105,28 @@ async function callApi<T>(auth: Auth, method: Method, path: string, body?: unkno
   return { ok: false, status: res.status, code: json?.error?.code ?? null, message: json?.error?.message ?? "Something went wrong. Try again.", param: json?.error?.param ?? null };
 }
 
+/** A file the API sends (a receipt's PDF), read whole on the server. */
+export type ApiFile = { ok: true; bytes: ArrayBuffer; contentType: string; disposition: string | null } | { ok: false; status: number; message: string };
+
+/** GETs a file with these credentials (never cached); never throws. */
+export async function apiFile(auth: "customer" | "staff", path: string): Promise<ApiFile> {
+  if (typeof window !== "undefined") throw new Error("The API is called from the server only.");
+  const jar = await cookies();
+  const [name, value] = auth === "customer" ? [sessionHeader, jar.get(sessionCookie)?.value] : [staffHeader, jar.get(staffCookie)?.value];
+  if (!value) return { ok: false, status: 401, message: "Sign in again to carry on." };
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), { cache: "no-store", headers: { accept: "application/pdf, application/json", [name]: value, ...(await clientHeaders()) } });
+  } catch {
+    return { ok: false, status: 0, message: "We could not reach Udozo. Try again shortly." };
+  }
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    return { ok: false, status: res.status, message: json?.error?.message ?? "Something went wrong. Try again." };
+  }
+  return { ok: true, bytes: await res.arrayBuffer(), contentType: res.headers.get("content-type") ?? "application/pdf", disposition: res.headers.get("content-disposition") };
+}
+
 /** The signed-in customer, or null. Asked once per request. */
 export const currentCustomer = cache(async (): Promise<Customer | null> => {
   if (!(await cookies()).get(sessionCookie)?.value) return null;

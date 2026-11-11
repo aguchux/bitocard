@@ -122,7 +122,7 @@ export function CustomerForm({
         />
       </div>
       <p className="text-xs text-pos-muted">
-        Receipts go to their mobile or email once receipts come to Udozo POS.
+        Their receipts can go to this mobile on WhatsApp, or to this email.
         Only your shop and Udozo&apos;s team see this record.
       </p>
       {message ? (

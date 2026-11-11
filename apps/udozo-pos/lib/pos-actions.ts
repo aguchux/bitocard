@@ -18,7 +18,20 @@ function answer<T>(result: ApiResult<T>): PosResult<T> {
   return { ok: true, data: result.data };
 }
 
-export type ShopFields = { name?: string; address?: string | null; phone?: string | null; tin?: string | null; vat_bps?: number; receipt_footer?: string | null; kind?: string };
+export type ShopFields = {
+  name?: string;
+  address?: string | null;
+  phone?: string | null;
+  tin?: string | null;
+  vat_bps?: number;
+  receipt_footer?: string | null;
+  kind?: string;
+  email?: string | null;
+  bank_name?: string | null;
+  bank_account_name?: string | null;
+  bank_account_number?: string | null;
+  receipt_qr?: boolean;
+};
 
 const text = (value: string | null | undefined, max: number) => (value === null || value === undefined ? value : value.trim().slice(0, max) || null);
 
@@ -32,6 +45,11 @@ function shopBody(fields: ShopFields) {
     ...(fields.vat_bps !== undefined ? { vat_bps: fields.vat_bps } : {}),
     ...(fields.receipt_footer !== undefined ? { receipt_footer: text(fields.receipt_footer, 300) } : {}),
     ...(fields.kind !== undefined && /^[a-z_]{1,32}$/.test(fields.kind) ? { kind: fields.kind } : {}),
+    ...(fields.email !== undefined ? { email: text(fields.email, 254) } : {}),
+    ...(fields.bank_name !== undefined ? { bank_name: text(fields.bank_name, 80) } : {}),
+    ...(fields.bank_account_name !== undefined ? { bank_account_name: text(fields.bank_account_name, 120) } : {}),
+    ...(fields.bank_account_number !== undefined ? { bank_account_number: text(fields.bank_account_number, 30) } : {}),
+    ...(fields.receipt_qr !== undefined ? { receipt_qr: fields.receipt_qr === true } : {}),
   };
 }
 

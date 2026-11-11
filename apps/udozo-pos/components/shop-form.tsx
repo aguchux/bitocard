@@ -12,7 +12,20 @@ const label = "block text-sm font-semibold text-pos-ink-2";
 export function ShopForm({ shop, kinds = [] }: { shop: PosShop; kinds?: PosShopKind[] }) {
   const router = useRouter();
   const ids = useId();
-  const [form, setForm] = useState({ name: shop.name, address: shop.address ?? "", phone: shop.phone ?? "", tin: shop.tin ?? "", vat: vatText(shop.vat_bps).replace("%", ""), footer: shop.receipt_footer ?? "", kind: shop.kind?.code ?? "general" });
+  const [form, setForm] = useState({
+    name: shop.name,
+    address: shop.address ?? "",
+    phone: shop.phone ?? "",
+    tin: shop.tin ?? "",
+    vat: vatText(shop.vat_bps).replace("%", ""),
+    footer: shop.receipt_footer ?? "",
+    kind: shop.kind?.code ?? "general",
+    email: shop.email ?? "",
+    bank: shop.bank?.name ?? "",
+    accountName: shop.bank?.account_name ?? "",
+    accountNumber: shop.bank?.account_number ?? "",
+  });
+  const [receiptQr, setReceiptQr] = useState(shop.receipt_qr !== false);
   const [state, setState] = useState<{ ok: boolean; message: string } | null>(null);
   const [busy, start] = useTransition();
   const save = (event: React.FormEvent) => {
@@ -20,8 +33,23 @@ export function ShopForm({ shop, kinds = [] }: { shop: PosShop; kinds?: PosShopK
     const vat = readVat(form.vat);
     if (!form.name.trim()) return setState({ ok: false, message: "Give your shop's name." });
     if (vat === null) return setState({ ok: false, message: "VAT is a rate from 0% to 50%, such as 7.5." });
+    const bank = [form.bank, form.accountName, form.accountNumber].map(value => value.trim());
+    if (bank.some(Boolean) && !bank.every(Boolean)) return setState({ ok: false, message: "Give the bank, the account name and its number, or leave all three empty." });
     start(async () => {
-      const result = await updateShop(shop.id, { name: form.name, address: form.address || null, phone: form.phone || null, tin: form.tin || null, vat_bps: vat, receipt_footer: form.footer || null, ...(kinds.length ? { kind: form.kind } : {}) });
+      const result = await updateShop(shop.id, {
+        name: form.name,
+        address: form.address || null,
+        phone: form.phone || null,
+        tin: form.tin || null,
+        vat_bps: vat,
+        receipt_footer: form.footer || null,
+        ...(kinds.length ? { kind: form.kind } : {}),
+        email: form.email || null,
+        bank_name: form.bank || null,
+        bank_account_name: form.accountName || null,
+        bank_account_number: form.accountNumber || null,
+        receipt_qr: receiptQr,
+      });
       setState(result.ok ? { ok: true, message: "Saved." } : { ok: false, message: result.message });
       if (result.ok) router.refresh();
     });
@@ -59,8 +87,22 @@ export function ShopForm({ shop, kinds = [] }: { shop: PosShop; kinds?: PosShopK
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {field("vat", "VAT added to sales (%)", { inputMode: "decimal", maxLength: 6 })}
-        {field("footer", "Line at the bottom of receipts", { maxLength: 300, placeholder: "Thank you for shopping with us" })}
+        {field("footer", "Line at the bottom of receipts", { maxLength: 300, placeholder: "Returns within 7 days with this receipt" })}
       </div>
+      {field("email", "Shop email, on invoices", { type: "email", maxLength: 254 })}
+      <fieldset className="grid gap-4 rounded-xl border border-pos-line p-4">
+        <legend className="px-1 text-sm font-semibold text-pos-ink-2">Your bank account, printed on invoices for later payments</legend>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {field("bank", "Bank", { maxLength: 80 })}
+          {field("accountName", "Account name", { maxLength: 120 })}
+          {field("accountNumber", "Account number", { maxLength: 30, inputMode: "numeric" })}
+        </div>
+        <p className="text-xs text-pos-muted">Customers pay into it themselves. Udozo never uses it.</p>
+      </fieldset>
+      <label className="flex items-center gap-2 text-pos-ink">
+        <input type="checkbox" checked={receiptQr} onChange={event => setReceiptQr(event.target.checked)} className="size-5 accent-pos-600" />
+        Print the WhatsApp QR code on receipts, so customers can get a PDF copy
+      </label>
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" disabled={busy} className="flex h-12 items-center rounded-xl bg-pos-600 px-6 font-bold text-white hover:bg-pos-700 disabled:opacity-60">
           Save shop details
