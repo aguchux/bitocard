@@ -10,7 +10,7 @@
         "./assets/*"
       ],
       "@shared/*": [
-        "../../packages/api-client/src/*"
+        "./src/shared/*"
       ]
     },
     "allowImportingTsExtensions": true

@@ -39,3 +39,4 @@ jest.mock('@/lib/api', () => {
 
 // Icons draw nothing in tests (their package is ES modules only).
 jest.mock('lucide-react-native', () => new Proxy({ __esModule: true }, { get: (target, name) => (name === '__esModule' ? true : () => null) }));
+

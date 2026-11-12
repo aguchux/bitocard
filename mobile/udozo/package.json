@@ -64,10 +64,13 @@
     "moduleNameMapper": {
       "^@/assets/(.*)$": "<rootDir>/assets/$1",
       "^@/(.*)$": "<rootDir>/src/$1",
-      "^@shared/(.*)$": "<rootDir>/../../packages/api-client/src/$1"
+      "^@shared/(.*)$": "<rootDir>/src/shared/$1"
     },
     "setupFiles": [
       "<rootDir>/test/screens/setup.ts"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/screens/after-env.ts"
     ]
   }
 }
