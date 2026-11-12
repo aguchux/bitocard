@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { PinBoxes } from "@/components/pin-boxes";
 import { PinPad } from "@/components/pin-pad";
 import { easyPinText, type PosDeviceInfo, type PosInviteInfo, weakPin } from "@/lib/pos";
 import { acceptInvite, changePin, deviceGone, deviceSignIn, linkDevice, lookupInvite, staffSignIn } from "@/lib/staff-actions";
@@ -214,12 +215,16 @@ export function DeviceGone() {
   );
 }
 
-/** The invite page: who invited them, the role and what it allows, then their own 6-digit PIN, twice. */
+/**
+ * The invite, one step at a time: who invited them, the role and what it allows (Accept), then their own 6-digit PIN
+ * (Continue), then the same PIN again (Join the shop).
+ */
 export function AcceptInviteForm() {
   const router = useRouter();
   const token = useRef<string | null>(null);
   const [invite, setInvite] = useState<PosInviteInfo | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [step, setStep] = useState<"welcome" | "pin" | "confirm">("welcome");
   const [pin, setPin] = useState("");
   const [again, setAgain] = useState("");
   const [pending, start] = useTransition();
@@ -247,69 +252,142 @@ export function AcceptInviteForm() {
   if (!invite) {
     return message ? <Problem message={message} /> : <p className="text-pos-ink-2">Opening your invite…</p>;
   }
-  const easy = pin.length === 6 && weakPin(pin);
-  return (
-    <div className="grid gap-5">
-      <div>
-        <h1 className="font-display text-3xl font-bold text-pos-ink">
-          Hi {invite.first_name}, {invite.reset ? "set a new PIN" : `you’re invited to sell at ${invite.shop.name ?? "the shop"}`}
-        </h1>
-        <p className="mt-2 text-pos-ink-2">
-          Role: {invite.role.name} · {invite.tills === "all" ? "Every till" : invite.tills.join(", ")} · Invited by {invite.invited_by}
+  const go = (next: typeof step) => {
+    setMessage(null);
+    setStep(next);
+  };
+  const steps = ["welcome", "pin", "confirm"] as const;
+  const progress = (
+    <ol aria-label="Steps" className="flex gap-2">
+      {steps.map((name, index) => (
+        <li key={name} aria-current={step === name ? "step" : undefined} className={`h-1.5 flex-1 rounded-full ${steps.indexOf(step) >= index ? "bg-pos-600" : "bg-pos-line"}`}>
+          <span className="sr-only">
+            Step {index + 1} of 3{step === name ? " (this step)" : ""}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+  const expires = new Date(invite.expires_at).toLocaleString("en-GB", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+
+  if (step === "welcome") {
+    return (
+      <div className="mx-auto grid w-full max-w-md gap-5">
+        {progress}
+        <div>
+          <h1 className="font-display text-3xl font-bold text-pos-ink">
+            Hi {invite.first_name}, {invite.reset ? "set a new PIN" : `you’re invited to sell at ${invite.shop.name ?? "the shop"}`}
+          </h1>
+          <p className="mt-2 text-pos-ink-2">
+            Role: {invite.role.name} · {invite.tills === "all" ? "Every till" : invite.tills.join(", ")} · Invited by {invite.invited_by}
+          </p>
+        </div>
+        {invite.role.allows.length ? (
+          <section aria-labelledby="can" className="rounded-[20px] bg-white p-5">
+            <h2 id="can" className="font-semibold text-pos-ink">
+              As {invite.role.name.toLowerCase()} you can
+            </h2>
+            <ul className="mt-2 grid gap-1 text-pos-ink-2">
+              {invite.role.allows.map(line => (
+                <li key={line} className="flex gap-2">
+                  <span aria-hidden="true" className="font-bold text-pos-600">
+                    ✓
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        <button type="button" onClick={() => go("pin")} className={primary}>
+          {invite.reset ? "Set my new PIN" : "Accept invite"}
+        </button>
+        <p className="text-sm text-pos-muted">
+          No Udozo account needed. Your PIN works only at this shop{invite.shop.shop_code ? `, with shop code ${invite.shop.shop_code}` : ""}. This invite expires {expires}.
         </p>
       </div>
-      {invite.role.allows.length ? (
-        <section aria-labelledby="can" className="rounded-[20px] bg-white p-5">
-          <h2 id="can" className="font-semibold text-pos-ink">
-            As {invite.role.name.toLowerCase()} you can
-          </h2>
-          <ul className="mt-2 grid gap-1 text-pos-ink-2">
-            {invite.role.allows.map(line => (
-              <li key={line} className="flex gap-2">
-                <span aria-hidden="true" className="font-bold text-pos-600">
-                  ✓
-                </span>
-                {line}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+    );
+  }
+
+  if (step === "pin") {
+    const easy = pin.length === 6 && weakPin(pin);
+    return (
       <form
         onSubmit={event => {
           event.preventDefault();
-          if (pin !== again) {
-            setMessage("The two PINs are not the same.");
-            return;
-          }
-          if (weakPin(pin)) {
-            setMessage(easyPinText);
-            return;
-          }
-          start(async () => {
-            const result = await acceptInvite(token.current ?? "", pin);
-            if (!result.ok) {
-              setMessage(result.message);
-              return;
-            }
-            router.push("/app");
-            router.refresh();
-          });
+          if (weakPin(pin)) return setMessage(easyPinText);
+          setAgain("");
+          go("confirm");
         }}
-        className="grid gap-4 rounded-[20px] bg-white p-5"
+        className="mx-auto grid w-full max-w-md gap-5"
       >
-        <PinPad value={pin} onChange={setPin} label="Create your 6-digit PIN" disabled={pending} />
+        {progress}
+        <div>
+          <h1 className="font-display text-3xl font-bold text-pos-ink">Create your PIN</h1>
+          <p className="mt-2 text-pos-ink-2">Six digits you will sign in with at {invite.shop.name ?? "the shop"}. Keep it to yourself.</p>
+        </div>
+        <div className="rounded-[20px] bg-white p-5">
+          <PinBoxes key="pin" value={pin} onChange={next => {
+              setMessage(null);
+              setPin(next);
+            }} label="Your 6-digit PIN" autoFocus />
+        </div>
         {easy ? <p className="text-sm font-semibold text-pos-warn">{easyPinText}</p> : null}
-        <PinPad value={again} onChange={setAgain} label="Type it again" disabled={pending} />
         <Problem message={message} />
-        <button type="submit" disabled={pending || pin.length !== 6 || again.length !== 6} className={primary}>
-          {pending ? "Joining…" : invite.reset ? "Save my PIN" : "Join the shop"}
+        <button type="submit" disabled={pin.length !== 6} className={primary}>
+          Continue
         </button>
-        <p className="text-sm text-pos-muted">
-          No Udozo account needed. Your PIN works only at this shop{invite.shop.shop_code ? `, with shop code ${invite.shop.shop_code}` : ""}. This invite expires {new Date(invite.expires_at).toLocaleString("en-GB", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.
-        </p>
+        <button type="button" onClick={() => go("welcome")} className="h-12 rounded-xl border border-pos-line font-bold">
+          Back
+        </button>
       </form>
-    </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={event => {
+        event.preventDefault();
+        if (pin !== again) {
+          setAgain("");
+          setMessage("The two PINs are not the same. Type it again, or go back to choose another.");
+          return;
+        }
+        start(async () => {
+          const result = await acceptInvite(token.current ?? "", pin);
+          if (!result.ok) {
+            setMessage(result.message);
+            return;
+          }
+          router.push("/app");
+          router.refresh();
+        });
+      }}
+      className="mx-auto grid w-full max-w-md gap-5"
+    >
+      {progress}
+      <div>
+        <h1 className="font-display text-3xl font-bold text-pos-ink">Confirm your PIN</h1>
+        <p className="mt-2 text-pos-ink-2">Type the same 6 digits again.</p>
+      </div>
+      <div className="rounded-[20px] bg-white p-5">
+        <PinBoxes key="confirm" value={again} onChange={next => {
+            setMessage(null);
+            setAgain(next);
+          }} label="Your PIN again" disabled={pending} autoFocus />
+      </div>
+      <Problem message={message} />
+      <button type="submit" disabled={pending || again.length !== 6} className={primary}>
+        {pending ? "Joining…" : invite.reset ? "Save my PIN" : "Join the shop"}
+      </button>
+      <button type="button" disabled={pending} onClick={() => {
+          setPin("");
+          setAgain("");
+          go("pin");
+        }} className="h-12 rounded-xl border border-pos-line font-bold">
+        Choose another PIN
+      </button>
+    </form>
   );
 }
 

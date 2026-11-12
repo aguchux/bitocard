@@ -147,18 +147,39 @@ describe("the invite page", () => {
     expect(staff.lookupInvite).toHaveBeenCalledWith(`upi_${"a".repeat(43)}`);
     expect(host.textContent).toContain("Hi Kemi, you’re invited to sell at Ada's Gadget Hub");
     expect(host.textContent).toContain("Give discounts up to 5%");
-    const pins = host.querySelectorAll<HTMLInputElement>('input[type="password"]');
-    type(pins[0]!, "123456");
+    // Step 1: accept. No PIN boxes yet, and no number keypad anywhere.
+    expect(host.querySelectorAll('input[type="password"]').length).toBe(0);
+    await act(async () => button(host, "Accept invite").click());
+    // Step 2: six boxes, one digit each; Backspace clears, a pasted PIN fills them all.
+    const boxes = () => [...host.querySelectorAll<HTMLInputElement>('input[type="password"]')];
+    expect(boxes()).toHaveLength(6);
+    expect(button(host, "1")).toBeUndefined();
+    const fill = (digits: string) => [...digits].forEach((digit, index) => type(boxes()[index]!, digit));
+    fill("123456");
+    expect(boxes().map(box => box.value).join("")).toBe("123456");
     expect(host.textContent).toContain("That PIN is easy to guess");
-    type(pins[1]!, "123456");
-    await act(async () => button(host, "Join the shop").click());
+    await act(async () => button(host, "Continue").click());
     expect(host.querySelector("[role=alert]")!.textContent).toMatch(/easy to guess/);
-    expect(staff.acceptInvite).not.toHaveBeenCalled();
-    type(pins[0]!, "246852");
-    type(pins[1]!, "248652");
+    act(() => {
+      boxes()[5]!.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }));
+    });
+    expect(boxes()[5]!.value).toBe("");
+    act(() => {
+      const event = new Event("paste", { bubbles: true, cancelable: true }) as Event & { clipboardData: { getData: () => string } };
+      event.clipboardData = { getData: () => "246852" };
+      boxes()[0]!.dispatchEvent(event);
+    });
+    expect(boxes().map(box => box.value).join("")).toBe("246852");
+    await act(async () => button(host, "Continue").click());
+    // Step 3: confirm. A different PIN clears the boxes and says so.
+    expect(host.textContent).toContain("Confirm your PIN");
+    expect(boxes().every(box => box.value === "")).toBe(true);
+    fill("248652");
     await act(async () => button(host, "Join the shop").click());
-    expect(host.querySelector("[role=alert]")!.textContent).toBe("The two PINs are not the same.");
-    type(pins[1]!, "246852");
+    expect(host.querySelector("[role=alert]")!.textContent).toMatch(/not the same/);
+    expect(staff.acceptInvite).not.toHaveBeenCalled();
+    expect(boxes().every(box => box.value === "")).toBe(true);
+    fill("246852");
     await act(async () => button(host, "Join the shop").click());
     expect(staff.acceptInvite).toHaveBeenCalledWith(`upi_${"a".repeat(43)}`, "246852");
     expect(router.push).toHaveBeenCalledWith("/app");
