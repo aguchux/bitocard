@@ -249,3 +249,19 @@ export async function startVerification(_state: FormState, form: FormData): Prom
   revalidatePath("/account/verification");
   return { notice: result.data.status === "approved" ? "You are verified." : "Your check has started." };
 }
+
+/** What stands in the way of deleting an account (`GET /v1/store/account/delete`). */
+export type DeletionCheck = { can_delete: boolean; password_required: boolean; blockers: { code: string; message: string }[] };
+
+/**
+ * Deletes the account for good (`POST /v1/store/account/delete`): the typed DELETE and, when the account has one, its
+ * password. Then this browser forgets the session and goes home, saying so.
+ */
+export async function deleteAccount(_state: FormState, form: FormData): Promise<FormState> {
+  const password = String(form.get("password") ?? "");
+  const result = await customerApi("POST", "/v1/store/account/delete", { confirm: text(form, "confirm"), ...(password ? { password } : {}) });
+  if (!result.ok) return failed(result);
+  await dropSession();
+  revalidatePath("/", "layout");
+  redirect("/?account=deleted");
+}

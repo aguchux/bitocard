@@ -288,6 +288,8 @@ Everything in phases 1 to 4 is the first release: money and calls are in it.
   `POST …/delete { confirm: "DELETE", password? }` (the password when the account has one; wrong ones count towards
   the lockout). At once: details removed (`customers.deleted_at`, status disabled, the email freed), listings taken
   down, sessions ended, devices and WhatsApp link forgotten, Sign in with Apple revoked; orders and the ledger stay.
+  On udozo.com: Profile > **Delete your account** (`/account/profile/delete`) and the public `/help/delete-account`
+  (the page to give Google Play as the account deletion address; in the sitemap).
 - **Phone push** (`src/notifications/native-push.ts`; Settings > Integrations > **Phone push (FCM and APNs)**:
   `FCM_SERVICE_ACCOUNT`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY`, `APNS_TOPIC`, `APNS_SANDBOX`):
   `POST /v1/store/account/devices/phone { kind: fcm|apns|apns_voip, token, app_version? }` (the token encrypted,

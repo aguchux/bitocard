@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AtSign, Eye, MessageCircle, ShieldCheck } from "lucide-react";
+import { AtSign, Eye, MessageCircle, ShieldCheck, Trash2 } from "lucide-react";
 import { regionWord } from "@bitocard/api-client/classifieds";
 import { CountryForm, NameForm, PasswordForm } from "@/components/account-forms";
 import { AboutForm } from "@/components/account/about-form";
@@ -9,6 +9,7 @@ import { PageTitle } from "@/components/account/nav";
 import { PhoneForm } from "@/components/account/phone-form";
 import { Flag } from "@/components/flag";
 import { requireCustomer, sellReference } from "@/lib/account";
+import { deletionScreen } from "@/lib/account-deletion";
 import { usernameScreen } from "@/lib/username";
 import { channelsFor, whatsappScreen } from "@/lib/whatsapp";
 import { signOut } from "@/lib/account-actions";
@@ -130,6 +131,15 @@ export default async function ProfilePage() {
           Password
         </h2>
         <PasswordForm />
+      </section>
+      <section aria-labelledby="delete" className={card}>
+        <h2 id="delete" className="font-bold">
+          Delete your account
+        </h2>
+        <p className="text-sm text-navy-600">Removes your details and takes your listings down, at once and for good.</p>
+        <Link href={deletionScreen} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-navy-200 px-4 font-semibold text-red-800 hover:border-red-300">
+          <Trash2 className="size-4" aria-hidden="true" /> Delete your account
+        </Link>
       </section>
       <form action={signOut}>
         <button type="submit" className="min-h-11 rounded-xl px-1 font-semibold text-brand-700 hover:underline">
