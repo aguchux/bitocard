@@ -117,7 +117,7 @@ The app calls `api.udozo.com` directly with the customer's session token (`BitoC
    - **Sign in with Apple:** `POST …/apple/native { identity_token, nonce, name? }`. App Store guideline 4.8 requires it once Google or Facebook is offered. Apple may hide the email (a relay address), so the account works with it.
    - **WhatsApp sign-in** works as is: start, then poll `finish`.
 2. **Push to phones.**
-   - Devices get a `kind`: `web` (today) or `fcm` / `apns` (the app). Registration: `POST /v1/store/account/devices { kind, token, app_version, platform }`.
+   - Devices get a `kind`: `web` (today) or `fcm` / `apns` (the app). Registration: `POST /v1/store/account/devices/phone { kind, token, app_version }`.
    - `PushService` gains senders for FCM (HTTP v1, service account) and APNs (token auth, `.p8` key) as integration settings. The same queue, retries, preferences and locked security notices apply.
    - Payloads carry the notice's link as an app path, never codes or anyone's words.
 3. **Calls that ring when the app is closed (a launch requirement).**
@@ -266,10 +266,64 @@ Everything in phases 1 to 4 is the first release: money and calls are in it.
   `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` (from the signing key once EAS makes it). Tests:
   `apps/udozo/test/app-links.test.ts`.
 
-**Still to do in phase 0:** native sign-in (Google, Facebook, Apple), device kinds `fcm`, `apns` and `apns_voip` with
-FCM and APNs senders, VoIP call pushes and app reachability, account deletion, upload checks from the app, `surface:
-app` in the journeys, the theme from `/v1/theme`, the feature flags on `/v1/app/config`, the privacy notice's app
-section, and the first internal EAS build.
+**Phase 0, the rest (12 November 2026):**
+
+- **Native sign-in** (`AppAccountController` in `apps/udozo-api/src/customers/app-account.controller.ts`, on the strict
+  per-address limit; each answers as the web's finish: the customer, a session, `signed_up`):
+  - `POST /v1/store/account/google/native { id_token, nonce, ref? }`: Google's ID token for the app's nonce, its
+    audience the web client (`GOOGLE_CLIENT_ID`, which the app asks Google for as its server client) or one of the
+    app's own (`GOOGLE_APP_CLIENT_IDS`, Settings > Integrations > Google sign-in). `verifyGoogleIdToken` is shared with
+    the web's round trip.
+  - `POST …/facebook/native { access_token }` (checked to be Udozo's app with `debug_token`, then `/me` with
+    `appsecret_proof`) or `{ id_token, nonce }` (Limited Login, for iPhones that decline tracking, against
+    `FACEBOOK_JWKS_URL`). Facebook's email is still confirmed by Udozo's code.
+  - `POST …/apple/native { identity_token, nonce, authorization_code?, first_name?, last_name? }`
+    (`CustomerAppleService`; Settings > Integrations > **Sign in with Apple**: `APPLE_BUNDLE_IDS`, `APPLE_TEAM_ID`,
+    `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`): Apple's keys, the bundle ID as audience, the nonce or its SHA-256; a private
+    relay email works as any other. The authorization code is exchanged for a refresh token kept encrypted
+    (`customers.apple_refresh_token_encrypted`) only to revoke access on deletion.
+  - The same rules as the web: a new identity signs up, never links itself to an account with the same email.
+- **Deleting the account** (`AccountDeletionService`): `GET /v1/store/account/delete` (what stands in the way:
+  money in a live wallet or payout account, open UdozoPay orders, open buy orders, a paid Udozo POS plan) and
+  `POST …/delete { confirm: "DELETE", password? }` (the password when the account has one; wrong ones count towards
+  the lockout). At once: details removed (`customers.deleted_at`, status disabled, the email freed), listings taken
+  down, sessions ended, devices and WhatsApp link forgotten, Sign in with Apple revoked; orders and the ledger stay.
+- **Phone push** (`src/notifications/native-push.ts`; Settings > Integrations > **Phone push (FCM and APNs)**:
+  `FCM_SERVICE_ACCOUNT`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY`, `APNS_TOPIC`, `APNS_SANDBOX`):
+  `POST /v1/store/account/devices/phone { kind: fcm|apns|apns_voip, token, app_version? }` (the token encrypted,
+  found by its SHA-256; `DeviceChannel` gains `fcm`, `apns`, `apns_voip`; `devices.app_version`). Notices go through
+  FCM's HTTP v1 API (a service account's OAuth token) and APNs over HTTP/2 (an ES256 provider token), with the same
+  queue, retries, preferences and dropping of gone tokens as browsers; VoIP tokens never get notices.
+  `GET …/devices/push-settings` adds `phones { android, ios }`.
+- **Calls to a closed app:** a customer with Udozo's app on a phone that can ring (`fcm` or `apns_voip`, opened in
+  the last 30 days, still signed in) counts as reachable for calls and chats' online dot (`PushService.ringable`). A new
+  call rings their phones (`PushService.ring`: a VoIP push to `<topic>.voip` on iPhones, a high-priority FCM data
+  message on Android, carrying the call's id and the caller's public name only); Android phones are told to stop
+  (`call_ended`, `reason: answered|ended`) when the call is answered, cancelled, declined or missed; iPhones read the
+  call's state themselves.
+- **Uploads from the app:** listing photos and video already go to the API (multipart, and the 15-minute video
+  link). Profile photos and covers: `POST /v1/store/account/avatar|banner/uploads/:id/content` (the bytes through the
+  API, as the consoles do), then `POST avatar|banner` as udozo.com does.
+- **Sign-up journeys made in the app:** the app sends `Udozo-App: ios/0.1.0` (or `android/…`) on every call; journeys
+  started from it are surface `app` (migration `20270327100000_mobile_app` widens the check), labelled "Udozo app on
+  iPhone", with the new method and step `apple`. Reports > Sign-up journeys has a **Udozo app** tab.
+- **App config features:** `GET /v1/app/config?…&country=NG` adds `features` (assistant, wanted, reviews, private
+  ratings, seller scores, personalisation, WhatsApp, POS payments) from the market's switches (`appFeatures`); UdozoPay,
+  buy orders, Connect and auctions stay on `GET /v1/classifieds/markets`.
+- **The app:** sends `Udozo-App`, wears the theme Udozo's admins publish (`src/lib/palette.ts`, `useTheme`), and is
+  linked to EAS as **@golojan/udozo** (`extra.eas.projectId` in `app.json`; Android keystore made and kept by EAS).
+- **Privacy notice:** section 4d, Udozo's app (sign-in providers, phone push and calls, permissions, deleting the
+  account in the app), and Google and Apple as push and sign-in providers in section 6.
+
+Tests: `apps/udozo-api/test/app-sign-in.test.mjs` (fake Google, Facebook and Apple issuing real signed tokens),
+`phone-push.test.mjs` (a fake FCM and a fake APNs speaking HTTP/2), `app-config.test.mjs`, `avatars.test.mjs`;
+`mobile/udozo/test` (`npm test`).
+
+**Owner's steps before testers use push, calls and native sign-in:** create the Firebase project and its Android app
+(`com.udozo.app`, whose `google-services.json` the app needs) and paste a service account key; an Apple Developer
+account (needed for any iPhone build), with an APNs key, a Sign in with Apple key and the bundle ID; the app's Google
+client IDs; Facebook Login's Android key hash and iOS bundle ID in the Meta app; and, once EAS has the signing keys,
+`UDOZO_IOS_APP_IDS`, `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` on udozo.com's Vercel project.
 
 ## Testing
 

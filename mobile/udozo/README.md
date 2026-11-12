@@ -19,9 +19,12 @@ npx expo install <pkg>  # always, so versions match the SDK
 
 ## Builds
 
-EAS builds and signs in the cloud (`eas.json`):
+EAS builds and signs in the cloud (`eas.json`), as the project **@golojan/udozo** (its ID in `app.json`). Run from
+this folder with `EAS_NO_VCS=1`, since the monorepo, not this folder, is the git repository (`.easignore` keeps
+`node_modules` out of the upload):
 
-- `npx eas-cli@latest build --profile preview --platform android` makes an APK for internal testers;
+- `EAS_NO_VCS=1 npx eas-cli@latest build --profile preview --platform android` makes an APK for internal testers
+  (EAS keeps the Android signing key);
 - iPhones need an Apple Developer account even for testers (TestFlight or ad hoc);
 - `production` is for the stores, decided last (the plan's store accounts).
 

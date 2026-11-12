@@ -94,11 +94,20 @@
     ],
     "extra": {
       "apiUrl": "https://api.udozo.com",
-      "siteUrl": "https://udozo.com"
+      "siteUrl": "https://udozo.com",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "618f4ba2-0c6d-4c4a-bb97-46e3ddaedde8"
+      }
     },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "owner": "golojan"
   }
 }
