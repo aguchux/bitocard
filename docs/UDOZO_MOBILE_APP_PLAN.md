@@ -327,6 +327,43 @@ account (needed for any iPhone build), with an APNs key, a Sign in with Apple ke
 client IDs; Facebook Login's Android key hash and iOS bundle ID in the Meta app; and, once EAS has the signing keys,
 `UDOZO_IOS_APP_IDS`, `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` on udozo.com's Vercel project.
 
+**Phase 1, browse and talk (12 November 2026):**
+
+- **Screens** (`mobile/udozo/src/app`): the five tabs in `(tabs)` under a root stack, plus the listing
+  (`listing/[ref]`: gallery, price, place and condition, details, description, the seller, the checks before paying,
+  report, Save and Chat with seller in a bar that stays), seller (`seller/[key]`: cover, badges, figures, reviews and
+  Anjio's view in words, listings), brand (`brand/[slug]`), category (`category/[slug]`: banner, subcategories),
+  Search (words with suggestions, sort, condition), Home (the market's home page from `GET /v1/classifieds/home`:
+  listing rails, category tiles, grids, banners; the market chosen once signed out, the account's own signed in; the
+  bell), Chats (Buying and Selling, online dots, unread) and the chat (`chat/[id]`: messages read every 4 seconds,
+  photos sent and shown with the session, offers with Accept, Decline and Withdraw, Make an offer, report, block), Saved,
+  Notifications (read and marked read, Turn on notifications), Me, Settings and Delete my account.
+- **Signing in** (`signin`, `signup`, `verify`): the email first, then the password, or an email with no account goes on
+  to sign up; sign-up as udozo.com's wizard (the emailed code, then name, country fixed, the mobile kept to confirm
+  later, password); Finish your account (the emailed code, About you for social sign-ups, the mobile's code or Confirm it
+  later); Continue with Apple (iPhones), Google and Facebook (only in builds that have their IDs, `app.config.ts`;
+  Facebook's SDK is linked only then, `react-native.config.js`) and WhatsApp (send the code, approve on WhatsApp, the
+  app asks every 3 seconds). Google's library gives no nonce, so the API takes a nonce-less Google token only when it is
+  under 10 minutes old.
+- **Push:** the phone's own FCM or APNs token is registered when the app opens signed in (never asking), the permission
+  asked once after the first chat message or from Notifications; a tapped notification opens its `link` through the
+  app's screens.
+- **Deep links:** `src/lib/links.ts` (`appLink`) turns udozo.com addresses (home links, notices, universal and App
+  Links, `udozo://`) into the app's routes, `+native-intent.tsx` uses it, and pages the app lacks open on udozo.com in the
+  in-app browser.
+- **Shared code:** udozo.com's types and helpers (`packages/api-client/src/classifieds.ts`, `home.ts`, `storefront.ts`)
+  are copied into `src/shared` (`node scripts/sync-shared.mjs`), since EAS uploads only the app's folder;
+  `test/shared.test.ts` fails while a copy is out of date.
+- **Tests:** `npm test` runs the pure helpers under `node --test`, then the screens under Jest (jest-expo and Testing
+  Library: the listing page, sign-in and sign-up, a chat, deleting the account).
+
+**Not in phase 1 (their phases):** posting ads (2), the wallet, UdozoPay and payouts (3), calls and Ask Anjio (4); until
+then Me's My listings, UdozoPay orders and Wallet open udozo.com. Views of listings opened in the app are not counted yet.
+
+**Build settings for phase 1** (EAS environment variables): `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`,
+`GOOGLE_IOS_URL_SCHEME`; `FACEBOOK_APP_ID`, `FACEBOOK_CLIENT_TOKEN`; `GOOGLE_SERVICES_JSON` (a file variable: Firebase's
+`google-services.json`, without which Android gets no push token).
+
 ## Testing
 
 - Unit and component tests with Jest and React Native Testing Library, kept beside each feature as the apps' Vitest tests are.

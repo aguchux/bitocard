@@ -12,7 +12,8 @@ app has its own `package.json` and lockfile, and the websites' builds and CI nev
 npm install
 npx expo start          # the development server (Expo Go, or a development build)
 npm run typecheck       # the app, then its tests
-npm test                # the pure helpers (version maths, the API client) under node --test
+npm test                # the pure helpers under node --test, then the screens under Jest
+node scripts/sync-shared.mjs  # after udozo.com's shared types change (packages/api-client/src)
 npx expo lint
 npx expo install <pkg>  # always, so versions match the SDK
 ```
@@ -40,3 +41,11 @@ The bundle ID and package are `com.udozo.app`, and can change until the store ac
   (`apps/udozo/lib/app-links.ts`) once `UDOZO_IOS_APP_IDS`, `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` are
   set on its Vercel project. `app.json` lists the same paths.
 - **Icons:** written by `python scripts/brand-assets.py` from `assets/udozo/logo.png`; never edit them by hand.
+- **Screens:** `src/app` (expo-router): the tabs in `(tabs)`, the rest stacked over them. udozo.com addresses become the
+  app's screens through `src/lib/links.ts`; anything else opens on udozo.com in the in-app browser.
+- **Shared types:** `src/shared` holds copies of udozo.com's `packages/api-client/src/classifieds.ts`, `home.ts` and
+  `storefront.ts`, imported as `@shared/...`; `test/shared.test.ts` fails when they drift.
+- **Build-time settings** (EAS environment variables, read by `app.config.ts`): `GOOGLE_WEB_CLIENT_ID`,
+  `GOOGLE_IOS_CLIENT_ID` and `GOOGLE_IOS_URL_SCHEME` (Continue with Google); `FACEBOOK_APP_ID` and
+  `FACEBOOK_CLIENT_TOKEN` (Continue with Facebook; its SDK is linked only then, `react-native.config.js`);
+  `GOOGLE_SERVICES_JSON` (Firebase's file, for Android push); `UDOZO_API_URL` (another API, for test builds).
