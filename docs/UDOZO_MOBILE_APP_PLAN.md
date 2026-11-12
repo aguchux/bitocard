@@ -358,11 +358,49 @@ client IDs; Facebook Login's Android key hash and iOS bundle ID in the Meta app;
   Library: the listing page, sign-in and sign-up, a chat, deleting the account).
 
 **Not in phase 1 (their phases):** posting ads (2), the wallet, UdozoPay and payouts (3), calls and Ask Anjio (4); until
-then Me's My listings, UdozoPay orders and Wallet open udozo.com. Views of listings opened in the app are not counted yet.
+then Me's UdozoPay orders and Wallet open udozo.com. Views of listings opened in the app are not counted yet.
 
 **Build settings for phase 1** (EAS environment variables): `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`,
 `GOOGLE_IOS_URL_SCHEME`; `FACEBOOK_APP_ID`, `FACEBOOK_CLIENT_TOKEN`; `GOOGLE_SERVICES_JSON` (a file variable: Firebase's
 `google-services.json`, without which Android gets no push token).
+
+**Phase 2, sell (12 November 2026):**
+
+- **Post an ad** (`src/app/post/[id].tsx`, `id` `new` or a listing): udozo.com's wizard in five steps (what it is, photos,
+  price and details, where it is and delivery, check and post), its rules in `src/lib/listing-form.ts` (`stepProblem`,
+  `stepOf`, `firstIncomplete`, `bodyOf`; tested under `node --test`). Nothing is made until the first step's Next
+  (`POST /v1/classifieds/listings`); every later Next saves (`PATCH`), so leaving keeps a draft, which opens at its first
+  unfinished step. Photos from the camera or the gallery (several at once), scaled to 1600 px JPEG on the phone
+  (`src/lib/picture.ts`, expo-image-manipulator) and sent as udozo.com's are; Make cover and remove. **Fill from photos**
+  and **Suggest a price** where the market's assistant helps sellers, nothing applied until the seller chooses. The
+  category's details as fields, chips or yes and no; the state and area pickers (`src/components/pickers.tsx`); the
+  terms accepted once before posting; a refusal opens the step holding its field. A live ad's edits are saved without
+  posting again. Resale, Udozo POS, Udozo Connect and auctions are left as the listing has them, with **More selling
+  options on udozo.com**.
+- **My listings** (`my-listings`): by state, each with what can be done now (`listingActions`: edit or carry on, see
+  it, mark sold, restock (renewing an ad Anjio took off), renew in the last 3 days or once expired, delete).
+- **Requests** (`requests`): contact requests (Share my contact, Decline) and call backs (Call, I called them,
+  Dismiss), who can see the seller's contact (Stop sharing), and what was answered.
+- **Dashboard** (`dashboard`): 7, 30 or 90 days, each figure with its change in words, a day-by-day bar of one
+  figure, listings at a glance (opening My listings' groups), most viewed and Udozo's message board.
+- **Username** (`username`): availability as typed, suggestions, the 30-day rule; or how many ads to go.
+- The Sell tab is Post an ad, drafts to carry on and the seller's places; Me opens them in the app. Links: `/sell`,
+  `/account/listings(/<id>)`, `/account/requests`, `/account/profile/username` and the app's own `udozo://<route>`.
+
+**Fixes after reviewing phase 1 (12 November 2026):**
+
+- **Calls (API):** a phone makes its owner reachable for calls only once its app answers them
+  (`callsFromAppVersion`, `0.4.0`, phase 4), so phase 1 and 2 apps never leave a caller waiting 45 seconds.
+- **Offline launch:** the account's error shows with Try again (`AccountPending`) instead of spinning; React Query
+  reads again when the app returns to the front and when the connection comes back (`focusManager`, `onlineManager`
+  with NetInfo), and polling stops in the background.
+- **Chat photos** are scaled to 1600 px JPEG before sending (HEIC and 50 MP originals were refused).
+- **WhatsApp sign-in** asks one question at a time and clears a passing error.
+- **Sign-up** shows refusals that belong to no field on the step shown.
+- **A tapped notice** opens once (cleared after handling).
+- **Links:** other apps' returns (Facebook's `fb<id>://`) are left to their SDKs; the app's own routes and a market's
+  home (`/gh`) open as asked.
+- **Search** stops paging at the API's 1,000.
 
 ## Testing
 
