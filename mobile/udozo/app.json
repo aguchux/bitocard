@@ -16,7 +16,8 @@
       ],
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.udozo.app",
@@ -90,7 +91,34 @@
           "imageWidth": 96
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#185174",
+          "defaultChannel": "notices"
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Udozo uses your photos when you add them to an ad or a chat.",
+          "cameraPermission": "Udozo uses the camera when you take photos for an ad or a chat."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+            "node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf",
+            "node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf",
+            "node_modules/@expo-google-fonts/inter/800ExtraBold/Inter_800ExtraBold.ttf"
+          ]
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://api.udozo.com",

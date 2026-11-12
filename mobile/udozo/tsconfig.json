@@ -8,6 +8,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@shared/*": [
+        "../../packages/api-client/src/*"
       ]
     },
     "allowImportingTsExtensions": true

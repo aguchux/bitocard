@@ -1,57 +1,31 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+/** Inter, as udozo.com: the families the app loads in its root layout. */
+export const inter = { regular: 'Inter_400Regular', semibold: 'Inter_600SemiBold', bold: 'Inter_700Bold', extrabold: 'Inter_800ExtraBold' } as const;
+
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?: 'default' | 'title' | 'subtitle' | 'heading' | 'small' | 'smallBold' | 'caption' | 'link' | 'price';
   themeColor?: ThemeColor;
 };
 
+/** Text in the theme's colours; it scales with the phone's text size. */
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
-
-  return <Text style={[{ color: theme[themeColor ?? 'text'] }, styles[type], style]} {...rest} />;
+  const color = theme[themeColor ?? (type === 'link' ? 'link' : type === 'caption' ? 'textSecondary' : 'text')];
+  return <Text style={[{ color }, styles[type], style]} {...rest} />;
 }
 
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
-  },
-  smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
-  },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
-  linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
-  },
-  code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
-  },
+  default: { fontFamily: inter.regular, fontSize: 15, lineHeight: 22 },
+  small: { fontFamily: inter.regular, fontSize: 13, lineHeight: 18 },
+  smallBold: { fontFamily: inter.bold, fontSize: 13, lineHeight: 18 },
+  caption: { fontFamily: inter.regular, fontSize: 12, lineHeight: 16 },
+  title: { fontFamily: inter.extrabold, fontSize: 28, lineHeight: 34 },
+  subtitle: { fontFamily: inter.extrabold, fontSize: 22, lineHeight: 28 },
+  heading: { fontFamily: inter.bold, fontSize: 17, lineHeight: 22 },
+  link: { fontFamily: inter.semibold, fontSize: 15, lineHeight: 22 },
+  price: { fontFamily: inter.extrabold, fontSize: 17, lineHeight: 22 },
 });
