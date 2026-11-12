@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Udozo POS — mobile till</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+:root{--green:#0B7A5A;--green-d:#075C43;--tile:#19A47A;--soft:#E6F3EE;--ink:#10231C;--text:#14201B;--text2:#33413A;--muted:#56635C;--border:#DCE2DE;--page:#F4F6F4;--warn:#8A4B08;--warn-bg:#FDEFD9;--err:#A2251A}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#E3E9E5}
+h1,h2,.num{font-family:'Space Grotesk',sans-serif}
+.board{display:flex;gap:40px;padding:48px 56px;align-items:flex-start}
+.caption{font-size:14px;color:var(--muted);margin:14px 4px 0;font-weight:500}
+.phone{width:390px;height:844px;border-radius:44px;background:#0d1a15;padding:10px;box-shadow:0 24px 60px rgba(16,35,28,.25)}
+.screen{position:relative;width:100%;height:100%;border-radius:36px;background:var(--page);overflow:hidden;display:flex;flex-direction:column}
+.status{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:14px;font-weight:600;flex:none}
+.status .dots{display:flex;gap:5px;align-items:center}
+.status .bar{width:4px;border-radius:1px;background:var(--text)}
+.top{padding:4px 16px 10px;display:flex;align-items:center;gap:10px;flex:none}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--tile);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:18px;flex:none}
+.top .who{flex:1;min-width:0}
+.top .shop{font-weight:700;font-size:15px}
+.top .sub{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--tile)}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center}
+.search{margin:0 16px;display:flex;gap:8px;flex:none}
+.field{flex:1;height:46px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:14px}
+.scan{width:46px;height:46px;border-radius:12px;background:var(--green);display:flex;align-items:center;justify-content:center}
+.chips{display:flex;gap:8px;padding:12px 16px;overflow:hidden;flex:none}
+.chip{height:34px;padding:0 14px;border-radius:17px;border:1px solid var(--border);background:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;white-space:nowrap}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 120px;overflow:hidden}
+.card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:8px;position:relative}
+.card.in{border:2px solid var(--green);padding:7px}
+.art{height:74px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:22px}
+.card .name{font-size:13px;font-weight:600;margin:8px 2px 2px;line-height:1.25;height:32px;overflow:hidden}
+.card .row{display:flex;justify-content:space-between;align-items:center;margin:4px 2px 0}
+.price{font-family:'Space Grotesk';font-weight:700;font-size:15px}
+.stock{font-size:11px;font-weight:600;color:var(--muted);background:#EEF2EF;border-radius:6px;padding:2px 6px}
+.stock.low{color:var(--warn);background:var(--warn-bg)}
+.stock.out{color:var(--err);background:#FBE4E1}
+.qty{position:absolute;top:2px;right:2px;min-width:26px;height:26px;border-radius:13px;background:var(--green);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 7px;border:3px solid #fff}
+.card.dim{opacity:.55}
+.basketbar{position:absolute;left:12px;right:12px;bottom:26px;height:64px;border-radius:18px;background:var(--green);color:#fff;display:flex;align-items:center;padding:0 10px 0 18px;box-shadow:0 10px 24px rgba(11,122,90,.35)}
+.basketbar .count{flex:1}
+.basketbar .count b{display:block;font-size:15px}
+.basketbar .count span{font-size:12px;opacity:.85}
+.basketbar .go{height:44px;border-radius:12px;background:#fff;color:var(--green);font-weight:700;font-size:15px;padding:0 16px;display:flex;align-items:center;gap:6px}
+.fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(rgba(244,246,244,0),var(--page) 45%)}
+.home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--text);opacity:.85}
+.head{padding:4px 16px 12px;display:flex;align-items:center;gap:12px;flex:none}
+.back{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.head h1{font-size:20px;margin:0}
+.head .s{font-size:12px;color:var(--muted)}
+.panel{margin:0 16px 12px;background:#fff;border:1px solid var(--border);border-radius:18px;padding:4px 14px}
+.line{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #EDF1EE}
+.line:last-child{border-bottom:0}
+.line .art{width:44px;height:44px;font-size:14px;flex:none}
+.line .info{flex:1;min-width:0}
+.line .t{font-size:14px;font-weight:600}
+.line .e{font-size:12px;color:var(--muted)}
+.step{display:flex;align-items:center;border:1px solid var(--border);border-radius:10px;height:34px}
+.step span{width:30px;text-align:center;font-weight:700}
+.step b{width:24px;text-align:center;font-size:14px}
+.cust{margin:0 16px 12px;height:46px;border:1.5px dashed #B9CCC3;border-radius:12px;display:flex;align-items:center;gap:8px;padding:0 14px;font-size:14px;color:var(--text2);background:#fff;flex:none}
+.sums{margin:0 16px;font-size:14px;color:var(--text2)}
+.sums div{display:flex;justify-content:space-between;padding:4px 0}
+.sums .total{font-family:'Space Grotesk';font-weight:700;font-size:22px;color:var(--text);padding-top:8px}
+.sums a{color:var(--green);font-weight:600;text-decoration:none}
+.bottom{position:absolute;left:16px;right:16px;bottom:28px;display:flex;gap:10px}
+.btn{height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+.btn.pri{flex:1;background:var(--green);color:#fff}
+.btn.sec{width:110px;background:#fff;border:1px solid var(--border);color:var(--text)}
+.methods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px 12px;flex:none}
+.m{height:62px;border-radius:14px;border:1px solid var(--border);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;font-weight:600}
+.m.on{border:2px solid var(--green);background:var(--soft);color:var(--green-d)}
+.due{margin:0 16px 12px;background:var(--ink);color:#fff;border-radius:18px;padding:16px 18px;flex:none}
+.due .l{font-size:12px;color:#B9CCC3}
+.due .v{font-family:'Space Grotesk';font-weight:700;font-size:30px;margin-top:2px}
+.due .row{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid #2A4A3D;font-size:14px;color:#D6E3DD}
+.due .row b{font-family:'Space Grotesk';font-size:20px;color:#6FE0B8}
+.quick{display:flex;gap:8px;margin:0 16px 12px;flex:none}
+.quick div{flex:1;height:40px;border-radius:10px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.quick .on{border-color:var(--green);color:var(--green-d);background:var(--soft)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px;flex:none}
+.pad div{height:52px;border-radius:12px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-size:22px;font-weight:600}
+.done{display:flex;flex-direction:column;align-items:center;padding:12px 24px 0;flex:none}
+.tick{width:76px;height:76px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center}
+.tick div{width:52px;height:52px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center}
+.done h2{font-size:22px;margin:14px 0 4px}
+.done .amt{font-family:'Space Grotesk';font-weight:700;font-size:36px}
+.done .meta{font-size:13px;color:var(--muted);margin-top:4px;text-align:center}
+.change{margin:16px 16px 14px;border-radius:16px;background:var(--warn-bg);color:var(--warn);display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:600;flex:none}
+.change b{font-family:'Space Grotesk';font-size:24px}
+.label{margin:0 16px 8px;font-size:13px;font-weight:600;color:var(--text2)}
+.share{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px;flex:none}
+.share div{height:74px;border-radius:14px;background:#fff;border:1px solid var(--border);padding:12px;display:flex;flex-direction:column;justify-content:space-between;font-size:14px;font-weight:600}
+.share small{font-size:11px;font-weight:500;color:var(--muted)}
+.share .on{border:2px solid var(--green);background:var(--soft)}
+</style>
+</head>
+<body>
+<div class="board">
+
+<!-- 1. The till -->
+<div>
+<div class="phone"><div class="screen">
+<div class="status"><span>16:08</span><span class="dots"><span class="bar" style="height:6px"></span><span class="bar" style="height:9px"></span><span class="bar" style="height:12px"></span><span class="bar" style="height:12px;opacity:.35"></span>&nbsp;<span style="font-size:13px">4G</span></span></div>
+<div class="top">
+<div class="logo">U</div>
+<div class="who"><div class="shop">Ada's Gadget Hub</div><div class="sub"><span class="dot"></span>Till 1 · Blessing M.</div></div>
+<div class="iconbtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+</div>
+<div class="search">
+<div class="field"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#56635C" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search or type a barcode</div>
+<div class="scan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M8 8v8M12 8v8M16 8v8"/></svg></div>
+</div>
+<div class="chips"><div class="chip on">All</div><div class="chip">Audio</div><div class="chip">Chargers</div><div class="chip">Power</div><div class="chip">Cables</div></div>
+<div class="grid">
+<div class="card in"><div class="qty">1</div><div class="art" style="background:#E3EEFB;color:#1D4E89">WE</div><div class="name">Wireless Earbuds Pro</div><div class="row"><span class="price">₦18,500</span><span class="stock">24</span></div></div>
+<div class="card in"><div class="qty">2</div><div class="art" style="background:#FDEBD6;color:#8A4B08">UF</div><div class="name">USB-C Fast Charger 25W</div><div class="row"><span class="price">₦7,500</span><span class="stock">41</span></div></div>
+<div class="card"><div class="art" style="background:#E6F3EE;color:#075C43">PB</div><div class="name">Power Bank 20,000mAh</div><div class="row"><span class="price">₦21,000</span><span class="stock low">6 left</span></div></div>
+<div class="card"><div class="art" style="background:#EEE7FA;color:#5B3A99">UL</div><div class="name">USB-C to Lightning Cable 1m</div><div class="row"><span class="price">₦3,500</span><span class="stock">88</span></div></div>
+<div class="card in"><div class="qty">1</div><div class="art" style="background:#FBE4E7;color:#9B1D33">TG</div><div class="name">Tempered Glass Protector</div><div class="row"><span class="price">₦2,500</span><span class="stock">120</span></div></div>
+<div class="card dim"><div class="art" style="background:#F3E6E8;color:#A0606B">SP</div><div class="name">Silicone Phone Case</div><div class="row"><span class="price">₦4,000</span><span class="stock out">Out</span></div></div>
+<div class="card"><div class="art" style="background:#E3EEFB;color:#1D4E89">BS</div><div class="name">Bluetooth Speaker Mini</div><div class="row"><span class="price">₦15,000</span><span class="stock">9</span></div></div>
+<div class="card"><div class="art" style="background:#E2F4F6;color:#1B6670">SW</div><div class="name">Smart Watch Band</div><div class="row"><span class="price">₦3,000</span><span class="stock low">3 left</span></div></div>
+</div>
+<div class="fade"></div><div class="basketbar"><div class="count"><b>4 items · ₦38,700</b><span>incl. VAT 7.5%</span></div><div class="go">View basket <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B7A5A" stroke-width="2.5" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg></div></div>
+<div class="home"></div>
+</div></div>
+<div class="caption">1 · The till: tap or scan to add</div>
+</div>
+
+<!-- 2. The basket -->
+<div>
+<div class="phone"><div class="screen">
+<div class="status"><span>16:09</span><span class="dots"><span class="bar" style="height:6px"></span><span class="bar" style="height:9px"></span><span class="bar" style="height:12px"></span><span class="bar" style="height:12px;opacity:.35"></span>&nbsp;<span style="font-size:13px">4G</span></span></div>
+<div class="head"><div class="back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2.5" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg></div><div><h1>Basket</h1><div class="s">4 items · Till 1</div></div></div>
+<div class="cust"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#33413A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Add customer (optional)</div>
+<div class="panel">
+<div class="line"><div class="art" style="background:#E3EEFB;color:#1D4E89">WE</div><div class="info"><div class="t">Wireless Earbuds Pro</div><div class="e">₦18,500 each</div></div><div class="step"><span>−</span><b>1</b><span>+</span></div></div>
+<div class="line"><div class="art" style="background:#FDEBD6;color:#8A4B08">UF</div><div class="info"><div class="t">USB-C Fast Charger 25W</div><div class="e">₦7,500 each</div></div><div class="step"><span>−</span><b>2</b><span>+</span></div></div>
+<div class="line"><div class="art" style="background:#FBE4E7;color:#9B1D33">TG</div><div class="info"><div class="t">Tempered Glass Protector</div><div class="e">₦2,500 each</div></div><div class="step"><span>−</span><b>1</b><span>+</span></div></div>
+</div>
+<div class="sums">
+<div><span>Subtotal</span><span>₦36,000</span></div>
+<div><span>Discount</span><a>Add discount</a></div>
+<div><span>VAT (7.5%)</span><span>₦2,700</span></div>
+<div class="total"><span>Total</span><span>₦38,700</span></div>
+</div>
+<div class="bottom"><div class="btn sec">Park</div><div class="btn pri">Charge ₦38,700</div></div>
+<div class="home"></div>
+</div></div>
+<div class="caption">2 · Basket: change quantities, discount, customer</div>
+</div>
+
+<!-- 3. Payment -->
+<div>
+<div class="phone"><div class="screen">
+<div class="status"><span>16:09</span><span class="dots"><span class="bar" style="height:6px"></span><span class="bar" style="height:9px"></span><span class="bar" style="height:12px"></span><span class="bar" style="height:12px;opacity:.35"></span>&nbsp;<span style="font-size:13px">4G</span></span></div>
+<div class="head"><div class="back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2.5" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg></div><div><h1>Take payment</h1><div class="s">4 items · ₦38,700</div></div></div>
+<div class="methods">
+<div class="m on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#075C43" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>Cash</div>
+<div class="m"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M3 10h18M5 10V20M19 10V20M9 10v10M15 10v10M3 20h18M12 3l9 5H3z"/></svg>Transfer</div>
+<div class="m"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Card</div>
+<div class="m"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M3 12h18"/></svg>Split</div>
+<div class="m"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Other</div>
+<div class="m"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>Pay later</div>
+</div>
+<div class="due"><div class="l">Cash received</div><div class="v">₦40,000</div><div class="row"><span>Change to give</span><b>₦1,300</b></div></div>
+<div class="quick"><div>Exact</div><div class="on">₦40,000</div><div>₦50,000</div></div>
+<div class="pad"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>00</div><div>0</div><div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M21 5H9l-6 7 6 7h12zM17 9l-5 6M12 9l5 6"/></svg></div></div>
+<div class="bottom"><div class="btn pri">Complete sale</div></div>
+<div class="home"></div>
+</div></div>
+<div class="caption">3 · Payment: cash with change worked out</div>
+</div>
+
+<!-- 4. Sale complete -->
+<div>
+<div class="phone"><div class="screen">
+<div class="status"><span>16:10</span><span class="dots"><span class="bar" style="height:6px"></span><span class="bar" style="height:9px"></span><span class="bar" style="height:12px"></span><span class="bar" style="height:12px;opacity:.35"></span>&nbsp;<span style="font-size:13px">4G</span></span></div>
+<div class="done">
+<div class="tick"><div><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div></div>
+<h2>Sale complete</h2>
+<div class="amt">₦38,700</div>
+<div class="meta">POS-10482 · Paid in cash · Till 1</div>
+</div>
+<div class="change"><span>Give change</span><b>₦1,300</b></div>
+<div class="label">Send the receipt</div>
+<div class="share">
+<div class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#075C43" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg><span>QR code<br><small>Scan for a PDF on WhatsApp</small></span></div>
+<div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/></svg><span>WhatsApp<br><small>To their number</small></span></div>
+<div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span>Email<br><small>PDF attached</small></span></div>
+<div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14201B" stroke-width="2" stroke-linecap="round"><path d="M6 9V3h12v6M6 18H4v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-2M6 14h12v7H6z"/></svg><span>Print<br><small>58 or 80 mm printer</small></span></div>
+</div>
+<div class="bottom"><div class="btn pri">New sale</div></div>
+<div class="home"></div>
+</div></div>
+<div class="caption">4 · Sale complete: change and the receipt</div>
+</div>
+
+</div>
+</body>
+</html>
