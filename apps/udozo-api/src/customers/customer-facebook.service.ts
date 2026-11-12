@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
-import { facebookAuthorizationUrl, facebookProfile, FacebookSignInError } from '../auth/facebook.js';
+import { facebookAuthorizationUrl, facebookProfile, facebookProfileFromIdToken, facebookProfileFromToken, FacebookSignInError, type FacebookProfile } from '../auth/facebook.js';
 import { googleNames } from '../auth/names.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Store } from '../generated/prisma/client.js';
@@ -16,6 +16,7 @@ const stateLifetimeMs = 10 * 60 * 1000;
 const failures: Record<string, [HttpStatus, string, string]> = {
   facebook_state_invalid: [HttpStatus.BAD_REQUEST, 'invalid_request_error', 'This Facebook sign-in has expired. Start again.'],
   facebook_failed: [HttpStatus.BAD_GATEWAY, 'api_error', 'Facebook sign-in did not work. Try again.'],
+  facebook_token_invalid: [HttpStatus.BAD_REQUEST, 'invalid_request_error', 'Facebook could not confirm this sign-in. Try again.'],
   facebook_email_missing: [HttpStatus.BAD_REQUEST, 'invalid_request_error', 'Facebook did not share an email address. Allow Udozo to see your email, or use your email instead.'],
   account_exists_sign_in_with_password: [HttpStatus.CONFLICT, 'conflict_error', 'An account already uses this email. Sign in with your password or Google.'],
   account_disabled: [HttpStatus.FORBIDDEN, 'permission_error', 'This account is suspended.'],
@@ -84,6 +85,29 @@ export class CustomerFacebookService {
       if (!(error instanceof FacebookSignInError)) this.logger.error({ err: error }, 'Facebook sign-in failed');
       throw refused(error instanceof FacebookSignInError ? error.code : 'facebook_failed');
     }
+    return this.signIn(store, profile, input.ref);
+  }
+
+  /**
+   * Udozo's app: Facebook's SDK gives the app an access token (checked to be this app's), or on iPhones that decline
+   * tracking a Limited Login token for the app's nonce. Either way the same account rules follow.
+   */
+  async native(store: Store, input: { accessToken?: string; idToken?: string; nonce?: string; ref?: string }) {
+    const { config, appId, appSecret } = this.client();
+    let profile: FacebookProfile;
+    try {
+      profile = input.accessToken
+        ? await facebookProfileFromToken(config, { token: input.accessToken, appId, appSecret })
+        : await facebookProfileFromIdToken(config, { token: input.idToken ?? '', nonce: input.nonce ?? '', appId });
+    } catch (error) {
+      if (!(error instanceof FacebookSignInError)) this.logger.error({ err: error }, 'Facebook sign-in failed');
+      throw refused(error instanceof FacebookSignInError ? error.code : 'facebook_failed');
+    }
+    return this.signIn(store, profile, input.ref);
+  }
+
+  /** The account a checked Facebook identity signs in to, made first when none uses it (shared by the web and the app). */
+  private async signIn(store: Store, profile: FacebookProfile, ref?: string) {
     const email = profile.email!;
 
     let created = false;
@@ -104,7 +128,7 @@ export class CustomerFacebookService {
             emailVerifiedAt: null,
             facebookSubject: profile.id,
             passwordHash: null,
-            signupRef: input.ref ?? null,
+            signupRef: ref ?? null,
           },
         });
         created = true;

@@ -2350,8 +2350,14 @@ model Notification {
 // ---------------------------------------------------------------------------
 
 enum DeviceChannel {
-  /// A browser's Web Push subscription (VAPID, RFC 8030/8291). Native app channels can be added later.
+  /// A browser's Web Push subscription (VAPID, RFC 8030/8291).
   web_push
+  /// Udozo's app on Android: a Firebase Cloud Messaging token (notifications, and data messages that ring for calls).
+  fcm
+  /// Udozo's app on iPhone: an APNs device token, for notifications.
+  apns
+  /// Udozo's app on iPhone: a PushKit VoIP token, used only to ring for calls (Apple requires every VoIP push to report one).
+  apns_voip
 }
 
 /// One signed-in browser or device that receives push notifications, with its own ID. Belongs to a user (admins,
@@ -2368,10 +2374,12 @@ model Device {
   /// The staff session (`sessions`) or, for customers, their storefront session.
   sessionId     String               @map("session_id") @db.Uuid
   channel       DeviceChannel        @default(web_push)
-  /// The push service address (unique per browser subscription).
+  /// The push service address (unique per browser subscription). Phones: `<channel>:<SHA-256 of the token>`.
   endpoint      String               @unique
-  /// The subscription's p256dh and auth keys, encrypted with ENCRYPTION_KEY.
+  /// The subscription's p256dh and auth keys, encrypted with ENCRYPTION_KEY. Phones: the token, encrypted.
   keysEncrypted String               @map("keys_encrypted")
+  /// Phones: the app's version when it registered.
+  appVersion    String?              @map("app_version") @db.VarChar(20)
   /// For people to recognise it, for example "Chrome on Windows".
   label         String
   failures      Int                  @default(0)
@@ -2684,6 +2692,12 @@ model Customer {
   /// Udozo customers who continued with Facebook: the Facebook account's app-scoped id (one account per store). Never
   /// set by matching an email, as for Google.
   facebookSubject           String?                   @map("facebook_subject")
+  /// Udozo customers who signed in with Apple (the app): the Apple account's subject (one account per store), never set
+  /// by matching an email. Its refresh token, encrypted, is kept only to revoke the app's access when the account is deleted.
+  appleSubject              String?                   @map("apple_subject")
+  appleRefreshTokenEncrypted String?                  @map("apple_refresh_token_encrypted")
+  /// The customer deleted their account: personal details removed, the account closed for good (records the law keeps stay).
+  deletedAt                 DateTime?                 @map("deleted_at")
   emailVerifiedAt           DateTime?                 @map("email_verified_at")
   phone                     String?
   phoneVerifiedAt           DateTime?                 @map("phone_verified_at")
@@ -2842,6 +2856,7 @@ model Customer {
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
   @@unique([storeId, facebookSubject])
+  @@unique([storeId, appleSubject])
   @@unique([storeId, phone])
   @@index([signupRef])
   @@index([acquisitionChannel, acquisitionSource])

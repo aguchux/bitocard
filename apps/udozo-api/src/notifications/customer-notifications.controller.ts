@@ -1,14 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import type { Request } from 'express';
 import { Public } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { ProductOnly } from '../products/product.js';
 import { InboxService } from './inbox.service.js';
-import { type PushCaller, PushService } from './push.service.js';
+import { type PhoneChannel, phoneChannels, type PushCaller, PushService } from './push.service.js';
 
 class NotificationsDto {
   @IsOptional()
@@ -37,6 +37,21 @@ class RegisterDeviceDto {
 
   @ValidateNested() @Type(() => PushKeysDto)
   keys: PushKeysDto;
+
+  @IsOptional() @IsString() @MaxLength(80)
+  label?: string;
+}
+
+class RegisterPhoneDto {
+  /** fcm (Android), apns (iPhone notifications) or apns_voip (iPhone calls). */
+  @IsIn(phoneChannels)
+  kind: PhoneChannel;
+
+  @IsString() @Length(20, 4096)
+  token: string;
+
+  @IsOptional() @Matches(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, { message: 'app_version must be three numbers' })
+  app_version?: string;
 
   @IsOptional() @IsString() @MaxLength(80)
   label?: string;
@@ -93,7 +108,7 @@ export class CustomerNotificationsController {
 
   @Get('devices/push-settings')
   settings() {
-    return this.push.settings('bitocard');
+    return this.push.customerSettings();
   }
 
   @Get('devices')
@@ -107,6 +122,13 @@ export class CustomerNotificationsController {
     // udozo.com's server forwards its visitor's browser, for the device's label.
     const agent = req.get('bitocard-client-agent') ?? req.get('user-agent');
     return this.push.register(pushCaller(caller), body, agent);
+  }
+
+  /** Udozo's app on a phone: its push token (FCM, APNs, or the VoIP token that rings for calls), sent each time it opens. */
+  @Post('devices/phone')
+  @SkipIdempotency()
+  registerPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: RegisterPhoneDto) {
+    return this.push.registerPhone(pushCaller(caller), { kind: body.kind, token: body.token, appVersion: body.app_version, label: body.label });
   }
 
   @Post('devices/:id/test')

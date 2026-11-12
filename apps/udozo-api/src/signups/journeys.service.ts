@@ -3,7 +3,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { deviceLabel } from '../notifications/push.service.js';
+import { appLabel, deviceLabel } from '../notifications/push.service.js';
 
 /**
  * Udozo's sign-up journeys (Reports > Sign-up journeys): each person's way through sign-up, from the email they enter
@@ -16,7 +16,8 @@ import { deviceLabel } from '../notifications/push.service.js';
  * Kept 7 days after the account became usable, or 30 days after the last step of one that never did (`purge`, the daily
  * `marketing` job). The privacy notice says so.
  */
-export const signupSurfaces = ['udozo', 'shq'] as const;
+/** udozo.com, Seller HQ, and Udozo's app (its customers' accounts, as udozo.com's: the app says so in `Udozo-App`). */
+export const signupSurfaces = ['udozo', 'shq', 'app'] as const;
 export type SignupSurface = (typeof signupSurfaces)[number];
 
 export const journeySteps = [
@@ -29,6 +30,7 @@ export const journeySteps = [
   'google',
   'facebook',
   'whatsapp',
+  'apple',
   'profile',
   'account_email_verify',
   'account_phone',
@@ -45,9 +47,9 @@ export const milestones = ['email_entered', 'email_verified', 'phone_entered', '
 export type Milestone = (typeof milestones)[number];
 
 /** Steps that may start a journey; the rest only add to an open one. */
-const opening = new Set<JourneyStep>(['signin_lookup', 'email', 'signup', 'google', 'facebook', 'whatsapp']);
+const opening = new Set<JourneyStep>(['signin_lookup', 'email', 'signup', 'google', 'facebook', 'whatsapp', 'apple']);
 /** Steps after which the account may have become usable. */
-const checking = new Set<JourneyStep>(['signup', 'google', 'facebook', 'whatsapp', 'profile', 'account_email_verify', 'account_phone_verify', 'phone_later', 'onboarding', 'signin', 'phone_verify']);
+const checking = new Set<JourneyStep>(['signup', 'google', 'facebook', 'whatsapp', 'apple', 'profile', 'account_email_verify', 'account_phone_verify', 'phone_later', 'onboarding', 'signin', 'phone_verify']);
 
 export const completedRetentionMs = 7 * 24 * 60 * 60 * 1000;
 export const openRetentionMs = 30 * 24 * 60 * 60 * 1000;
@@ -86,6 +88,8 @@ export function deviceOf(headers: Record<string, string | string[] | undefined>)
     const value = headers[name];
     return (Array.isArray(value) ? value[0] : value)?.slice(0, 500) || null;
   };
+  const app = appLabel(pick('udozo-app'));
+  if (app) return app;
   const agent = pick('bitocard-client-agent') ?? pick('user-agent');
   return agent ? deviceLabel(agent).slice(0, 60) : null;
 }
@@ -145,7 +149,7 @@ export class SignupJourneysService {
   private async open(input: JourneyInput, email: string, now: Date): Promise<Journey> {
     try {
       return await this.prisma.signupJourney.create({
-        data: { surface: input.surface, email, method: input.step === 'google' || input.step === 'facebook' || input.step === 'whatsapp' ? input.step : 'email', device: input.device ?? null, startedAt: now, lastEventAt: now },
+        data: { surface: input.surface, email, method: input.step === 'google' || input.step === 'facebook' || input.step === 'whatsapp' || input.step === 'apple' ? input.step : 'email', device: input.device ?? null, startedAt: now, lastEventAt: now },
       });
     } catch (error) {
       // Another step of the same person opened it first.
@@ -205,7 +209,7 @@ export class SignupJourneysService {
   private async checkComplete(journeyId: string, now: Date) {
     const journey = await this.prisma.signupJourney.findUnique({ where: { id: journeyId } });
     if (!journey || journey.completedAt) return;
-    const done = journey.surface === 'udozo' ? await this.customerReady(journey) : await this.resellerReady(journey);
+    const done = journey.surface === 'shq' ? await this.resellerReady(journey) : await this.customerReady(journey);
     if (!done) return;
     await this.prisma.signupJourney.updateMany({
       where: { id: journeyId, completedAt: null },

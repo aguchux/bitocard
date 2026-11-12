@@ -233,7 +233,7 @@ export class SignupInsightsService {
     await this.audit.record({ actorId, action: 'signup_journey.viewed', targetType: 'signup_journey', targetId: journey.id });
     return {
       ...presentJourney(journey, now),
-      account: journey.accountId ? { kind: journey.surface === 'udozo' ? 'customer' : 'user', id: journey.accountId } : null,
+      account: journey.accountId ? { kind: journey.surface === 'shq' ? 'user' : 'customer', id: journey.accountId } : null,
       events: journey.events.map(presentEvent),
     };
   }

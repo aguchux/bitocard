@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
-import { googleAuthorizationUrl, googleClaims, GoogleSignInError } from '../auth/google.service.js';
+import { googleAuthorizationUrl, googleClaims, GoogleSignInError, verifyGoogleIdToken, type GoogleClaims } from '../auth/google.service.js';
 import { googleNames } from '../auth/names.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Store } from '../generated/prisma/client.js';
@@ -94,6 +94,29 @@ export class CustomerGoogleService {
       if (!(error instanceof GoogleSignInError)) this.logger.error({ err: error }, 'Google sign-in failed');
       throw refused(error instanceof GoogleSignInError ? error.code : 'google_failed');
     }
+    return this.signIn(store, claims, input.ref);
+  }
+
+  /**
+   * Udozo's app: Google's SDK gives the app an ID token for the nonce the app made, sent here as it is. It must name one
+   * of Udozo's client IDs (the app's own, or the web one the app asks for as its server client).
+   */
+  async native(store: Store, input: { idToken: string; nonce: string; ref?: string }) {
+    const config = this.integrations.config;
+    const audiences = [config.GOOGLE_CLIENT_ID ?? '', ...(config.GOOGLE_APP_CLIENT_IDS ?? '').split(',').map(item => item.trim())].filter(Boolean);
+    if (!audiences.length) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'google_not_configured', 'Google sign-in is not available yet. Use your email instead.');
+    let claims: GoogleClaims;
+    try {
+      claims = await verifyGoogleIdToken(config, input.idToken, { audiences, nonce: input.nonce });
+    } catch (error) {
+      if (!(error instanceof GoogleSignInError)) this.logger.error({ err: error }, 'Google sign-in failed');
+      throw refused(error instanceof GoogleSignInError ? error.code : 'google_failed');
+    }
+    return this.signIn(store, claims, input.ref);
+  }
+
+  /** The account a checked Google identity signs in to, made first when none uses it (shared by the web and the app). */
+  private async signIn(store: Store, claims: GoogleClaims, ref?: string) {
     const sub = claims.sub!;
     const email = claims.email!.toLowerCase();
 
@@ -106,7 +129,7 @@ export class CustomerGoogleService {
       // Signing in with a Google account no account uses yet signs up: onboarding follows.
       try {
         customer = await this.prisma.customer.create({
-          data: { storeId: store.id, email, ...googleNames(claims, email), emailVerifiedAt: new Date(), googleSubject: sub, passwordHash: null, signupRef: input.ref ?? null },
+          data: { storeId: store.id, email, ...googleNames(claims, email), emailVerifiedAt: new Date(), googleSubject: sub, passwordHash: null, signupRef: ref ?? null },
         });
         created = true;
       } catch (error) {

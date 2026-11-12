@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { waitUntil } from '@vercel/functions';
 import { DiscoveryRecorder } from './discovery/recorder.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
@@ -6,6 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { PushService } from '../notifications/push.service.js';
 import { ContactRequestsService, listingPath } from './contact.service.js';
 import { publicName } from './search.service.js';
 import { onlineAmong } from './presence.js';
@@ -58,6 +60,7 @@ export class CallsService {
     private readonly inbox: InboxService,
     private readonly contacts: ContactRequestsService,
     private readonly discovery: DiscoveryRecorder,
+    private readonly push: PushService,
   ) {}
 
   private turn() {
@@ -70,9 +73,12 @@ export class CallsService {
     return this.turn().configured();
   }
 
-  /** Whether someone had udozo.com open in the last minute. */
+  /**
+   * Whether someone can take a call now: udozo.com open in the last minute, or Udozo's app on a phone that rings even when
+   * closed (opened in the last 30 days, still signed in).
+   */
   async online(customerId: string) {
-    return (await onlineAmong(this.prisma, [customerId])).has(customerId);
+    return (await onlineAmong(this.prisma, [customerId])).has(customerId) || (await this.push.ringable([customerId])).has(customerId);
   }
 
   /** A page says the customer is here (written at most every 15 seconds) and hears of a call ringing for them. */
@@ -139,6 +145,8 @@ export class CallsService {
       body: `About “${call.listing.title ?? 'a listing'}”. Open Udozo to answer.`,
       link: call.callee.id === call.listing.customerId ? '/account/requests' : listingPath(call.listing),
     });
+    // The callee's phones ring too, the app closed or not: after the reply, never failing the call.
+    waitUntil(this.push.ring(call.callee.id, { callId: call.id, caller: publicName(call.caller.name), about: call.listing.title }));
     return { ...this.present(call, customer.id), ice_servers: iceServers };
   }
 
@@ -169,6 +177,8 @@ export class CallsService {
     const now = new Date();
     const claimed = await this.prisma.classifiedCall.updateMany({ where: { id, status: 'ringing' }, data: { status: 'answered', answeredAt: now, calleeSeenAt: now } });
     if (!claimed.count) throw conflict('call_ended', 'The call has ended.');
+    // The callee's other phones stop ringing (the one that answered knows it did).
+    waitUntil(this.push.hangUp(customer.id, id, 'answered'));
     return { ...this.present(await this.prisma.classifiedCall.findUniqueOrThrow({ where: { id }, include: callInclude }), customer.id), ice_servers: iceServers };
   }
 
@@ -178,8 +188,9 @@ export class CallsService {
     const side = call.callerId === customer.id ? 'caller' : 'callee';
     const now = new Date();
     const status = call.status === 'answered' ? 'ended' : side === 'caller' ? 'cancelled' : 'declined';
-    await this.prisma.classifiedCall.updateMany({ where: { id, status: call.status === 'answered' ? 'answered' : 'ringing' }, data: { status, endedAt: now, endedBy: side } });
+    const ended = await this.prisma.classifiedCall.updateMany({ where: { id, status: call.status === 'answered' ? 'answered' : 'ringing' }, data: { status, endedAt: now, endedBy: side } });
     await this.prisma.classifiedCallSignal.deleteMany({ where: { callId: id } });
+    if (ended.count && call.status === 'ringing') waitUntil(this.push.hangUp(call.calleeId, id, 'ended'));
     return this.present(await this.prisma.classifiedCall.findUniqueOrThrow({ where: { id }, include: callInclude }), customer.id);
   }
 
@@ -218,6 +229,7 @@ export class CallsService {
       if (!claimed.count) continue;
       await this.prisma.classifiedCallSignal.deleteMany({ where: { callId: call.id } });
       if (status === 'missed') {
+        waitUntil(this.push.hangUp(call.callee.id, call.id, 'ended'));
         await this.inbox.customer({ customerId: call.callee.id, storeId: call.callee.storeId }, 'customer.classifieds.call_missed', {
           subject: call.id,
           title: `You missed a call from ${publicName(call.caller.name)}`,

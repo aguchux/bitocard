@@ -57,7 +57,7 @@ export default function SignupJourneysPage() {
       />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <Tabs label="Sign-up" value={surface} onChange={value => { setSurface(value); setCountry(""); pick({}); }} variant="pills" items={(["udozo", "shq"] as const).map(value => ({ value, label: surfaceLabels[value] }))} />
+        <Tabs label="Sign-up" value={surface} onChange={value => { setSurface(value); setCountry(""); pick({}); }} variant="pills" items={(["udozo", "app", "shq"] as const).map(value => ({ value, label: surfaceLabels[value] }))} />
         <div className="flex flex-wrap gap-2">
           <label className="sr-only" htmlFor="signup-country">Country</label>
           <Select id="signup-country" value={country} onChange={event => setCountry(event.target.value)} className="w-auto">

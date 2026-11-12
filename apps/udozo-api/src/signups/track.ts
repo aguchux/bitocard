@@ -21,6 +21,10 @@ type Answer = {
 
 type TrackedRequest = Request & { caller?: Caller; customer?: CustomerCaller };
 
+/** udozo.com's steps asked by Udozo's app (it sends `Udozo-App: <platform>/<version>`) are the app's journeys. */
+export const surfaceOf = (surface: SignupSurface, headers: Request['headers']): SignupSurface =>
+  surface === 'udozo' && typeof headers['udozo-app'] === 'string' && /^(ios|android)\/\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(headers['udozo-app']) ? 'app' : surface;
+
 /**
  * Runs on routes marked `@TrackSignup`: after the route answers (or refuses), the step is recorded with the email it was
  * for (the body's, the answer's, or the signed-in person's), the refusal's code, the country and the browser. A
@@ -49,13 +53,13 @@ export class SignupJourneyInterceptor implements NestInterceptor {
     // Sign-in's first step counts only when the email has no account: someone who may sign up next.
     if (step === 'signin_lookup' && (error || answer?.exists !== false)) return;
     // Google: a new account is a sign-up; signing in to an existing one is a sign-in.
-    if ((step === 'google' || step === 'facebook') && answer && !answer.signed_up) step = 'signin';
+    if ((step === 'google' || step === 'facebook' || step === 'apple') && answer && !answer.signed_up) step = 'signin';
     const body = (req.body ?? {}) as Record<string, unknown>;
     const text = (value: unknown) => (typeof value === 'string' ? value : null);
     const identifier = text(body.identifier);
     const email = text(body.email) ?? (identifier?.includes('@') ? identifier : null) ?? answer?.customer?.email ?? answer?.user?.email ?? req.customer?.customer.email ?? (await this.sessionEmail(req));
     await this.journeys.record({
-      surface: meta.surface,
+      surface: surfaceOf(meta.surface, req.headers),
       step,
       email,
       error,

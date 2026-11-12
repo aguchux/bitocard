@@ -1,7 +1,7 @@
 import { bitocardApi } from '../base';
 
 /** Udozo's sign-up journeys (Reports > Sign-up journeys, operations and support): `SignupInsightsService` in Udozo's API. */
-export const signupSurfaces = ['udozo', 'shq'] as const;
+export const signupSurfaces = ['udozo', 'shq', 'app'] as const;
 export const signupMilestones = ['email_entered', 'email_verified', 'phone_entered', 'phone_verified', 'account_created', 'completed'] as const;
 export const signupJourneyStatuses = ['in_progress', 'stuck', 'completed'] as const;
 export const signupSummaryDays = [7, 30, 90, 365] as const;

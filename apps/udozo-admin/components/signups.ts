@@ -2,7 +2,7 @@ import { humanise } from "@bitocard/admin-ui";
 import type { SignupJourneyStatus, SignupMilestone, SignupSurface } from "@bitocard/api-client/admin";
 
 /** Reports > Sign-up journeys: what each step, milestone and refusal means, in words. */
-export const surfaceLabels: Record<SignupSurface, string> = { udozo: "udozo.com", shq: "Seller HQ" };
+export const surfaceLabels: Record<SignupSurface, string> = { udozo: "udozo.com", shq: "Seller HQ", app: "Udozo app" };
 
 export const milestoneLabels: Record<SignupMilestone, string> = {
   email_entered: "Email entered",
@@ -36,6 +36,7 @@ const stepLabels: Record<string, string> = {
   google: "Continued with Google",
   facebook: "Continued with Facebook",
   whatsapp: "Signed up on WhatsApp",
+  apple: "Continued with Apple",
   profile: "Saved name and country",
   account_email_verify: "Confirmed email from the account",
   account_phone: "Added a mobile from the account",
@@ -78,13 +79,18 @@ const codeLabels: Record<string, string> = {
   facebook_failed: "Facebook sign-in failed",
   facebook_state_invalid: "Facebook sign-in timed out",
   facebook_email_missing: "Facebook shared no email",
+  facebook_token_invalid: "Facebook could not confirm the sign-in",
+  google_token_invalid: "Google could not confirm the sign-in",
+  apple_token_invalid: "Apple could not confirm the sign-in",
+  apple_email_missing: "Apple shared no email",
+  apple_failed: "Sign in with Apple failed",
   whatsapp_number_in_use: "WhatsApp number already on an account",
   already_owner: "Already owns a business",
   rate_limited: "Too many attempts",
   api_error: "Something went wrong at Udozo",
 };
 /** How a journey signed up, in words. */
-export const methodLabel = (method: string) => (method === "google" ? "Google" : method === "facebook" ? "Facebook" : method === "whatsapp" ? "WhatsApp" : "Email");
+export const methodLabel = (method: string) => (method === "google" ? "Google" : method === "facebook" ? "Facebook" : method === "whatsapp" ? "WhatsApp" : method === "apple" ? "Apple" : "Email");
 
 export const codeLabel = (code: string | null | undefined) => (code ? (codeLabels[code] ?? humanise(code)) : "—");
 

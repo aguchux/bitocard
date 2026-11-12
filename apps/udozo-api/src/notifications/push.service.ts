@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { waitUntil } from '@vercel/functions';
 import webpush from 'web-push';
+import { sha256 } from '../common/crypto.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -8,6 +9,7 @@ import type { Device, Notification, NotificationAudience, Platform, Prisma } fro
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { inProductWords } from '../products/product.js';
 import { notificationTypes, notificationTypesFor, type NotificationType } from './inbox.js';
+import { ApnsSender, apnsReady, FcmSender, fcmReady, type NativeCall, type NativeResult } from './native-push.js';
 
 /** After the first try: 1 minute, 5 minutes, 30 minutes; then it is given up (a push is only useful while fresh). */
 export const pushRetryMs = [60_000, 5 * 60_000, 30 * 60_000];
@@ -64,6 +66,12 @@ export function deviceLabel(userAgent: string | null | undefined) {
   return os ? `${browser} on ${os}` : browser;
 }
 
+/** "Udozo app on iPhone" from the app's own header (`Udozo-App: ios/1.0.0`), or null when it is not the app. */
+export function appLabel(header: string | null | undefined) {
+  const match = /^(ios|android)\/\d{1,4}\.\d{1,4}\.\d{1,4}$/.exec(header ?? '');
+  return match ? `Udozo app on ${match[1] === 'ios' ? 'iPhone' : 'Android'}` : null;
+}
+
 /** Whose devices and preferences: a user (admins, reseller staff) or a storefront customer. */
 export type PushOwner = { userId: string } | { customerId: string };
 
@@ -79,7 +87,20 @@ const platformOf = (device: { user?: { realm: string } | null }): Platform => (d
 const ownerWhere = (owner: PushOwner) => ('userId' in owner ? { userId: owner.userId } : { customerId: owner.customerId });
 const ownerKey = (row: { userId: string | null; customerId: string | null }) => row.userId ?? `customer:${row.customerId}`;
 
-type SendResult = { ok: true } | { ok: false; gone: boolean; retry: boolean; error: string };
+type SendResult = NativeResult;
+
+/** Udozo's app's channels: Android's FCM token, the iPhone's APNs token, and its VoIP token (calls only). */
+export const phoneChannels = ['fcm', 'apns', 'apns_voip'] as const;
+export type PhoneChannel = (typeof phoneChannels)[number];
+/** The channels that can ring a closed app for a call. */
+const ringingChannels: PhoneChannel[] = ['fcm', 'apns_voip'];
+/** A phone counts as able to ring while the app opened (and re-registered) this recently. */
+export const ringableForMs = 30 * 86_400_000;
+const phoneTokenPattern: Record<PhoneChannel, RegExp> = {
+  fcm: /^[A-Za-z0-9_:.-]{20,4096}$/,
+  apns: /^[0-9a-fA-F]{64,200}$/,
+  apns_voip: /^[0-9a-fA-F]{64,200}$/,
+};
 
 /**
  * Push notifications to registered devices (Web Push). Every in-app notification is also pushed, once, to each of the
@@ -90,6 +111,8 @@ type SendResult = { ok: true } | { ok: false; gone: boolean; retry: boolean; err
 @Injectable()
 export class PushService {
   private readonly logger = new Logger('Push');
+  private readonly fcm = new FcmSender();
+  private readonly apns = new ApnsSender();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -115,10 +138,101 @@ export class PushService {
     return new Encryption(key);
   }
 
+  /** Whether a phone channel's sender is set up (Settings > Integrations > Phone push). */
+  private phoneReady(channel: string) {
+    const config = this.integrations.config;
+    return channel === 'fcm' ? fcmReady(config) : channel === 'apns' || channel === 'apns_voip' ? apnsReady(config) : false;
+  }
+
   /** What a browser needs to subscribe, for the product whose app asks. */
   settings(platform: Platform = 'bitocard') {
     const vapid = this.vapid(platform);
     return { object: 'push_settings' as const, enabled: vapid !== null, public_key: vapid?.publicKey ?? null };
+  }
+
+  /** Udozo's customers: the browser's settings, and which phones Udozo's app can push to. */
+  customerSettings() {
+    const udozo = this.integrations.config.APP_PRODUCT === 'udozo';
+    return { ...this.settings('bitocard'), phones: { android: udozo && this.phoneReady('fcm'), ios: udozo && this.phoneReady('apns') } };
+  }
+
+  /**
+   * Registers Udozo's app on a phone for the signed-in customer: its FCM token (Android), APNs token or VoIP token
+   * (iPhone). The token is kept encrypted, found again by its SHA-256, and moved to whoever signs in on that phone. The app
+   * registers each time it opens, which keeps the phone counted as able to ring for calls.
+   */
+  async registerPhone(caller: PushCaller, input: { kind: PhoneChannel; token: string; appVersion?: string; label?: string | null }) {
+    if (caller.audience !== 'customer' || !caller.storeId || this.integrations.config.APP_PRODUCT !== 'udozo') {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'phones_not_supported', 'Only Udozo’s app registers phones.');
+    }
+    if (!this.phoneReady(input.kind)) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'push_not_configured', 'Push notifications are not switched on yet.');
+    if (!phoneTokenPattern[input.kind].test(input.token)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'push_token_invalid', 'This push token is not valid.', 'token');
+    const endpoint = `${input.kind}:${sha256(input.token)}`;
+    const data = {
+      audience: caller.audience,
+      userId: null,
+      customerId: 'customerId' in caller.owner ? caller.owner.customerId : null,
+      storeId: caller.storeId,
+      sessionId: caller.sessionId,
+      channel: input.kind,
+      keysEncrypted: this.encryption().encrypt(input.token),
+      appVersion: input.appVersion ?? null,
+      label: (input.label?.trim() || (input.kind === 'fcm' ? 'Udozo app on Android' : 'Udozo app on iPhone')).slice(0, 80),
+      failures: 0,
+      lastSeenAt: new Date(),
+    };
+    const device = await this.prisma.device.upsert({ where: { endpoint }, create: { endpoint, ...data }, update: data });
+    const extra = await this.prisma.device.findMany({ where: ownerWhere(caller.owner), orderBy: { lastSeenAt: 'desc' }, skip: maxDevicesPerPerson, select: { id: true } });
+    if (extra.length) await this.prisma.device.deleteMany({ where: { id: { in: extra.map(item => item.id) } } });
+    return this.present(device, caller.sessionId);
+  }
+
+  // -- Calls -----------------------------------------------------------------------------------------------------
+
+  /** The phones that can ring each customer for a call now: the app opened in the last 30 days, still signed in. */
+  private async ringingPhones(customerIds: string[], now = new Date()) {
+    const channels = ringingChannels.filter(channel => this.phoneReady(channel));
+    if (!customerIds.length || !channels.length) return [];
+    const devices = await this.prisma.device.findMany({ where: { customerId: { in: [...new Set(customerIds)] }, channel: { in: channels }, lastSeenAt: { gt: new Date(now.getTime() - ringableForMs) } } });
+    if (!devices.length) return [];
+    const sessions = await this.prisma.customerSession.findMany({ where: { id: { in: devices.map(device => device.sessionId) }, revokedAt: null, expiresAt: { gt: now } }, select: { id: true, customerId: true } });
+    const live = new Map(sessions.map(session => [session.id, session.customerId]));
+    return devices.filter(device => live.get(device.sessionId) === device.customerId);
+  }
+
+  /** Which of these customers Udozo's app can ring now, even with the app closed (calls count them as reachable). */
+  async ringable(customerIds: string[]) {
+    return new Set((await this.ringingPhones(customerIds)).map(device => device.customerId!));
+  }
+
+  /** Rings the callee's phones for a call (a VoIP push on iPhones, a high-priority data message on Android). Never throws. */
+  async ring(customerId: string, call: NativeCall) {
+    try {
+      const phones = await this.ringingPhones([customerId]);
+      const results = await Promise.all(
+        phones.map(async device => {
+          const token = this.encryption().decrypt(device.keysEncrypted);
+          const result = device.channel === 'fcm' ? await this.fcm.ring(this.integrations.config, token, call) : await this.apns.ring(this.integrations.config, token, call);
+          await this.recordResult(device, result);
+          return result.ok;
+        }),
+      );
+      return results.filter(Boolean).length;
+    } catch (error) {
+      this.logger.error({ err: error }, 'Could not ring the callee’s phones');
+      return 0;
+    }
+  }
+
+  /** Stops a call ringing on the callee's Android phones (answered, declined, cancelled or missed). iPhones ask the call's state themselves. Never throws. */
+  async hangUp(customerId: string, callId: string, reason: 'answered' | 'ended' = 'ended') {
+    try {
+      if (!this.phoneReady('fcm')) return;
+      const phones = (await this.ringingPhones([customerId])).filter(device => device.channel === 'fcm');
+      await Promise.all(phones.map(device => this.fcm.hangUp(this.integrations.config, this.encryption().decrypt(device.keysEncrypted), callId, reason)));
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Could not stop the callee’s phones ringing');
+    }
   }
 
   // -- Devices ---------------------------------------------------------------------------------------------------
@@ -185,6 +299,7 @@ export class PushService {
       id: device.id,
       channel: device.channel,
       label: device.label,
+      app_version: device.appVersion,
       /** Registered from the session making this request (this browser). */
       current: device.sessionId === sessionId,
       last_pushed_at: device.lastPushedAt?.toISOString() ?? null,
@@ -258,12 +373,14 @@ export class PushService {
    */
   async enqueue(notifications: Notification[]) {
     try {
-      if ((!this.vapid('bitocard') && !this.vapid('afrippa')) || notifications.length === 0) return;
+      const phones = this.phoneReady('fcm') || this.phoneReady('apns');
+      if ((!this.vapid('bitocard') && !this.vapid('afrippa') && !phones) || notifications.length === 0) return;
       const userIds = [...new Set(notifications.flatMap(row => (row.userId ? [row.userId] : [])))];
       const customerIds = [...new Set(notifications.flatMap(row => (row.customerId ? [row.customerId] : [])))];
       const owners = { OR: [{ userId: { in: userIds } }, { customerId: { in: customerIds } }] };
       const [devices, preferences] = await Promise.all([
-        this.prisma.device.findMany({ where: owners, select: { id: true, userId: true, customerId: true, storeId: true } }),
+        // VoIP tokens are for calls only, as Apple requires.
+        this.prisma.device.findMany({ where: { ...owners, channel: { not: 'apns_voip' } }, select: { id: true, userId: true, customerId: true, storeId: true } }),
         this.prisma.notificationPreference.findMany({ where: owners }),
       ]);
       const pushed = (row: Notification) => {
@@ -321,7 +438,7 @@ export class PushService {
       await this.prisma.device.deleteMany({ where: { id: device.id } });
       return 'failed';
     }
-    if (!this.vapid(platform)) return finish({ status: 'failed', lastError: 'Push is switched off' });
+    if (device.channel === 'web_push' ? !this.vapid(platform) : !this.phoneReady(device.channel)) return finish({ status: 'failed', lastError: 'Push is switched off' });
 
     const result = await this.send(device, platform, {
       id: notification.id,
@@ -376,7 +493,17 @@ export class PushService {
   }
 
   /** Encrypts and sends one push (RFC 8291 aes128gcm, VAPID). Never throws. */
-  private async send(device: Device, platform: Platform, payload: Record<string, unknown> & { severity: string; body: string }): Promise<SendResult> {
+  private async send(device: Device, platform: Platform, payload: Record<string, unknown> & { id: string; type: string; title: string; severity: string; body: string; link: string | null }): Promise<SendResult> {
+    if (device.channel === 'fcm' || device.channel === 'apns') {
+      try {
+        const token = this.encryption().decrypt(device.keysEncrypted);
+        const notice = { id: payload.id, type: payload.type, title: payload.title, body: payload.body, link: payload.link, severity: payload.severity };
+        return device.channel === 'fcm' ? await this.fcm.notify(this.integrations.config, token, notice) : await this.apns.notify(this.integrations.config, token, notice);
+      } catch (error) {
+        return { ok: false, gone: false, retry: true, error: (error as Error).message.slice(0, 300) };
+      }
+    }
+    if (device.channel !== 'web_push') return { ok: false, gone: false, retry: false, error: 'Not for notices' };
     const vapid = this.vapid(platform);
     if (!vapid) return { ok: false, gone: false, retry: false, error: 'Push is switched off' };
     // Checked again before every send, in case the rules tightened since it was registered.

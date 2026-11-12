@@ -18,6 +18,7 @@ import { addLead } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
 import { type ChatReportReason } from './moderation.service.js';
 import { invalid, isOnShop, maxPriceMinor, priceText } from './rules.js';
+import { PushService } from '../notifications/push.service.js';
 import { onlineAmong } from './presence.js';
 import { summary as buyOrderSummary } from './buy-orders/present.js';
 import { publicName } from './search.service.js';
@@ -138,7 +139,14 @@ export class ConversationsService {
     private readonly audit: AuditService,
     private readonly discovery: DiscoveryRecorder,
     private readonly watermarks: WatermarkService,
+    private readonly push: PushService,
   ) {}
+
+  /** Who can take a call now: on udozo.com in the last minute, or with Udozo's app on a phone that rings when closed. */
+  private async reachable(customerIds: string[]) {
+    const [web, phones] = await Promise.all([onlineAmong(this.prisma, customerIds), this.push.ringable(customerIds)]);
+    return new Set([...web, ...phones]);
+  }
 
   /** Told of every text and photo once saved (Udozo on WhatsApp queues them; sending is after the reply); a listener never fails the message. */
   onMessage(listener: (event: ChatMessageEvent) => unknown) {
@@ -181,7 +189,7 @@ export class ConversationsService {
       this.prisma.classifiedConversation.findMany({ where, include: chatInclude, orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }], take: filter.limit ?? 30, skip: filter.offset ?? 0 }),
       this.prisma.classifiedConversation.count({ where }),
     ]);
-    const [unread, online] = await Promise.all([this.unreadIn(customer.id, rows.map(row => row.id)), onlineAmong(this.prisma, rows.map(row => this.otherOf(row, customer.id)))]);
+    const [unread, online] = await Promise.all([this.unreadIn(customer.id, rows.map(row => row.id)), this.reachable(rows.map(row => this.otherOf(row, customer.id)))]);
     return { object: 'list' as const, data: rows.map(row => this.present(row, customer.id, unread.get(row.id) ?? 0, online)), total };
   }
 
@@ -228,7 +236,7 @@ export class ConversationsService {
       await this.prisma.classifiedConversation.update({ where: { id: chat.id }, data: side === 'buyer' ? { buyerReadAt: new Date() } : { sellerReadAt: new Date() } });
     }
     const unread = page.before ? (await this.unreadIn(customer.id, [chat.id])).get(chat.id) ?? 0 : 0;
-    const online = await onlineAmong(this.prisma, [this.otherOf(chat, customer.id)]);
+    const online = await this.reachable([this.otherOf(chat, customer.id)]);
     return { ...this.present(chat, customer.id, unread, online), messages: messages.map(message => this.presentMessage(message, customer.id)), has_more: hasMore };
   }
 

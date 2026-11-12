@@ -116,6 +116,8 @@ export const configSchema = z.object({
   FACEBOOK_REDIRECT_URI: z.string().url().default('https://api.bitocard.com/v1/auth/facebook/callback'),
   FACEBOOK_DIALOG_URL: z.string().url().default('https://www.facebook.com/v23.0/dialog/oauth'),
   FACEBOOK_GRAPH_URL: z.string().url().default('https://graph.facebook.com/v23.0'),
+  /** Facebook Limited Login's keys (iPhones that decline tracking get a signed token instead of an access token). */
+  FACEBOOK_JWKS_URL: z.string().url().default('https://limited.facebook.com/.well-known/oauth/openid/jwks/'),
 
   // Admins: allowed email domains, and the 32-byte base64 key that encrypts authenticator secrets.
   ADMIN_EMAIL_DOMAINS: list.prefault('bitocard.com,golojan.co.uk'),
@@ -321,6 +323,32 @@ export const configSchema = z.object({
   APP_ANDROID_MIN_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
   APP_ANDROID_LATEST_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
   APP_ANDROID_STORE_URL: z.string().url().optional(),
+  /**
+   * The app's own Google client IDs (Android and iOS, separated by commas): native sign-in's ID tokens name one of
+   * them, or the web client (`GOOGLE_CLIENT_ID`) when the app asks Google for it as its server client.
+   */
+  GOOGLE_APP_CLIENT_IDS: z.string().optional(),
+  /**
+   * Sign in with Apple (the app): the bundle IDs Apple's tokens are for, and, to revoke the app's access when an account
+   * is deleted (Apple requires it), the team, the key and its private key (a .p8 from Certificates, Identifiers and Profiles).
+   */
+  APPLE_BUNDLE_IDS: z.string().optional(),
+  APPLE_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
+  APPLE_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
+  APPLE_PRIVATE_KEY: z.string().optional(),
+  APPLE_AUTH_URL: z.string().url().default('https://appleid.apple.com'),
+  /**
+   * Push to the app: Firebase Cloud Messaging for Android (a service account's JSON key, Firebase Messaging) and APNs for
+   * iPhones (a token key, .p8, with its key and team IDs; the topic is the bundle ID, `.voip` added for calls).
+   */
+  FCM_SERVICE_ACCOUNT: z.string().optional(),
+  FCM_API_URL: z.string().url().default('https://fcm.googleapis.com'),
+  APNS_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
+  APNS_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
+  APNS_PRIVATE_KEY: z.string().optional(),
+  APNS_TOPIC: z.string().regex(/^[A-Za-z0-9.-]+$/, 'A bundle ID, for example com.udozo.app').optional(),
+  APNS_SANDBOX: flag.default(false),
+  APNS_API_URL: z.string().url().optional(),
   /** Udozo on WhatsApp (Meta's Cloud API): its number, the system user's token, the app secret and the webhook's verify token. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional(),

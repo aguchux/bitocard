@@ -35,6 +35,13 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   kyc_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/how-to/manage-access/')],
   file_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/')],
   google: [keys('https://console.cloud.google.com/apis/credentials', 'Google Cloud credentials'), docs('https://developers.google.com/identity/protocols/oauth2/web-server')],
+  apple_sign_in: [signUp('https://developer.apple.com/programs/enroll/'), keys('https://developer.apple.com/account/resources/authkeys/list', 'Apple keys'), docs('https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api')],
+  phone_push: [
+    { label: 'Firebase: service accounts', url: 'https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk' },
+    { label: 'FCM docs', url: 'https://firebase.google.com/docs/cloud-messaging/send/v1-api' },
+    { label: 'Apple: keys', url: 'https://developer.apple.com/account/resources/authkeys/list' },
+    { label: 'APNs docs', url: 'https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns' },
+  ],
   facebook: [signUp('https://developers.facebook.com/apps/'), keys('https://developers.facebook.com/apps/', 'Meta apps: App settings > Basic'), docs('https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow')],
   flutterwave: [signUp('https://app.flutterwave.com/register'), keys('https://app.flutterwave.com/dashboard/settings/apis'), docs('https://developer.flutterwave.com/')],
   stripe: [signUp('https://dashboard.stripe.com/register'), keys('https://dashboard.stripe.com/apikeys'), { label: 'Webhooks', url: 'https://dashboard.stripe.com/webhooks' }, docs('https://docs.stripe.com/api/checkout/sessions')],
