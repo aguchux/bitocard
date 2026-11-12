@@ -6,7 +6,7 @@ import { type PosPlan, planFeatures, priceText, sortPlans } from "@/lib/pos";
  * it includes and how to start. Premium is marked as the one most shops choose.
  */
 export function PlanCards({ plans, cta = "/signup" }: { plans: PosPlan[]; cta?: string }) {
-  if (!plans.length) return <p className="text-pos-muted">Plans could not be loaded just now. Try again in a moment.</p>;
+  if (!plans.length) return <p className="text-center text-pos-muted">Plans could not be loaded just now. Try again in a moment.</p>;
   return (
     <div className="grid gap-5 md:grid-cols-3">
       {sortPlans(plans).map(plan => {

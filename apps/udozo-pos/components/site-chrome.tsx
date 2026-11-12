@@ -29,7 +29,7 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
           <PosMark />
         </Link>
         <nav aria-label="Site" className="order-3 flex w-full flex-wrap gap-x-5 gap-y-1 text-[15px] sm:order-none sm:w-auto">
-          <Link href="/#features" className="text-pos-night-text no-underline hover:text-white">
+          <Link href="/features" className="text-pos-night-text no-underline hover:text-white">
             Features
           </Link>
           <Link href="/pricing" className="text-pos-night-text no-underline hover:text-white">
@@ -37,6 +37,9 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
           </Link>
           <Link href="/download" className="text-pos-night-text no-underline hover:text-white">
             Apps
+          </Link>
+          <Link href="/faq" className="text-pos-night-text no-underline hover:text-white">
+            Questions
           </Link>
           <a href={udozoUrl("/")} className="text-pos-night-text no-underline hover:text-white">
             udozo.com
@@ -73,11 +76,17 @@ export function SiteFooter() {
           . © {new Date().getFullYear()} Udozo · A Golojan Ltd venture
         </span>
         <nav aria-label="Legal and help" className="flex flex-wrap gap-x-5 gap-y-2">
+          <Link href="/features" className="text-pos-muted hover:text-pos-700">
+            Features
+          </Link>
           <Link href="/pricing" className="text-pos-muted hover:text-pos-700">
             Pricing
           </Link>
           <Link href="/download" className="text-pos-muted hover:text-pos-700">
             Apps
+          </Link>
+          <Link href="/faq" className="text-pos-muted hover:text-pos-700">
+            Questions
           </Link>
           <a href={udozoUrl("/help/contact")} className="text-pos-muted hover:text-pos-700">
             Contact
