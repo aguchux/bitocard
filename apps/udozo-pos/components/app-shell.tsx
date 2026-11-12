@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { type NavLink, OwnerNav } from "@/components/owner-nav";
+import { OwnerNav } from "@/components/owner-nav";
+import type { NavLink } from "@/lib/nav";
 import { UdozoMark } from "@/components/site-chrome";
 
 type Who = { name: string; role: string; shop: string | null } | null;

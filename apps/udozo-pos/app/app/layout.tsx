@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { OfflineSync } from "@/components/offline-sync";
 import { AppShell } from "@/components/app-shell";
-import { staffLinks } from "@/components/owner-nav";
+import { staffLinks } from "@/lib/nav";
 import { signOut } from "@/lib/pos-actions";
 import { actorKind } from "@/lib/pos-api";
 import { currentOwner, currentPos } from "@/lib/pos-data";

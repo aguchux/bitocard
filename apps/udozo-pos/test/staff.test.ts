@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 const staff = await import("@/lib/staff-actions");
 const actions = await import("@/lib/pos-actions");
 const data = await import("@/lib/pos-data");
-const { staffLinks } = await import("@/components/owner-nav");
+const { staffLinks } = await import("@/lib/nav");
 const { ownerPermissions, weakPin, discountText, accessText, levelText } = await import("@/lib/pos");
 
 const id = "7c6b5a49-3827-4e1d-9c0b-a1b2c3d4e5f6";

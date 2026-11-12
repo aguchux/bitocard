@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { staffLinks } from "@/components/owner-nav";
+import { staffLinks } from "@/lib/nav";
 import { allows, discountText, money, salesQuery, shopToday } from "@/lib/pos";
 import { currentPos, ownerSales } from "@/lib/pos-data";
 
