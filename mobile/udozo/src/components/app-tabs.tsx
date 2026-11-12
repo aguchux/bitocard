@@ -1,15 +1,12 @@
 import { NativeTabs } from 'expo-router/native-tabs';
-import { useColorScheme } from 'react-native';
-
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * The app's five tabs (docs/UDOZO_MOBILE_APP_PLAN.md): Home, Search, Sell, Chats and Me. SF Symbols on iPhones,
  * Material Symbols on Android. Listing, chat, checkout and post-an-ad screens are pushed over them, without the bar.
  */
 export default function AppTabs() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const colors = useTheme();
 
   return (
     <NativeTabs

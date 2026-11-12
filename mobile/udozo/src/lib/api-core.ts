@@ -43,7 +43,13 @@ export type RequestOptions = {
   session?: string | null;
   /** A money step's own key, kept until it succeeds or is refused. */
   idempotencyKey?: string;
+  /** The app says it is the app on every call: `ios/0.1.0` or `android/0.1.0` (the API counts its sign-ups apart). */
+  app?: string;
 };
+
+/** The header the app names itself in, as the API reads it (`Udozo-App`). */
+export const appHeader = 'Udozo-App';
+export const appTag = (platform: 'ios' | 'android', version: string) => `${platform}/${version}`;
 
 /** The URL and fetch options for a call; `newKey` makes an Idempotency-Key when a POST has none. */
 export function buildRequest(baseUrl: string, path: string, options: RequestOptions, newKey: () => string) {
@@ -52,6 +58,7 @@ export function buildRequest(baseUrl: string, path: string, options: RequestOpti
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.session) headers[sessionHeader] = options.session;
+  if (options.app) headers[appHeader] = options.app;
   if (method === 'POST') headers['Idempotency-Key'] = options.idempotencyKey ?? newKey();
   return {
     url: `${baseUrl.replace(/\/+$/, '')}${path}`,

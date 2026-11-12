@@ -6,7 +6,7 @@ import { useColorScheme } from 'react-native';
 
 import AppTabs from '@/components/app-tabs';
 import { UpdateGate } from '@/components/update-gate';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,25 +14,31 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, gcTime: 5 * 60_000 } } });
 
 export default function RootLayout() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
-  const colors = Colors[scheme];
-
   useEffect(() => {
     SplashScreen.hideAsync();
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider
-        value={{
-          ...base,
-          colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.background, text: colors.text, border: colors.line },
-        }}>
-        <UpdateGate>
-          <AppTabs />
-        </UpdateGate>
-      </ThemeProvider>
+      <ThemedApp />
     </QueryClientProvider>
+  );
+}
+
+/** Navigation in Udozo's colours (the admins' published theme on light), then the update check, then the tabs. */
+function ThemedApp() {
+  const dark = useColorScheme() === 'dark';
+  const base = dark ? DarkTheme : DefaultTheme;
+  const colors = useTheme();
+  return (
+    <ThemeProvider
+      value={{
+        ...base,
+        colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.background, text: colors.text, border: colors.line },
+      }}>
+      <UpdateGate>
+        <AppTabs />
+      </UpdateGate>
+    </ThemeProvider>
   );
 }
