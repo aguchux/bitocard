@@ -22,9 +22,9 @@ class GoogleNativeDto {
   @IsString() @Length(20, 4096)
   id_token: string;
 
-  /** The nonce the app gave Google's SDK. */
-  @Matches(/^[\w.-]{16,128}$/, nonce)
-  nonce: string;
+  /** The nonce the app gave Google's SDK; without one (Android's library has none) the token must be under 10 minutes old. */
+  @IsOptional() @Matches(/^[\w.-]{16,128}$/, nonce)
+  nonce?: string;
 
   @IsOptional() @Matches(/^[\w.~-]{1,64}$/, ref)
   ref?: string;

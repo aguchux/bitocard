@@ -132,6 +132,15 @@ describe('Google in the app', () => {
     assert.equal(foreign.json.error.code, 'google_token_invalid');
   });
 
+  test('without a nonce (Android’s library) only a fresh token is taken', async () => {
+    const email = `nn-${randomUUID()}@example.com`;
+    const fresh = await new SignJWT({ email, email_verified: true, given_name: 'Uche' }).setProtectedHeader({ alg: 'RS256', kid: 'g' }).setIssuer('https://accounts.google.com').setAudience(webClient).setSubject(`g-${randomUUID()}`).setIssuedAt().setExpirationTime('1h').sign(googleKeys.privateKey);
+    assert.equal((await app()('POST', '/v1/store/account/google/native', { id_token: fresh })).json.signed_up, true);
+    const now = Math.floor(Date.now() / 1000);
+    const stale = await new SignJWT({ email, email_verified: true }).setProtectedHeader({ alg: 'RS256', kid: 'g' }).setIssuer('https://accounts.google.com').setAudience(webClient).setSubject(`g-${randomUUID()}`).setIssuedAt(now - 1800).setExpirationTime(now + 1800).sign(googleKeys.privateKey);
+    assert.equal((await app()('POST', '/v1/store/account/google/native', { id_token: stale })).json.error.code, 'google_token_invalid');
+  });
+
   test('the app’s sign-ups are the app’s journeys, labelled with the phone', async () => {
     const n = nonce();
     const email = `j-${randomUUID()}@example.com`;

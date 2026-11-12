@@ -101,13 +101,13 @@ export class CustomerGoogleService {
    * Udozo's app: Google's SDK gives the app an ID token for the nonce the app made, sent here as it is. It must name one
    * of Udozo's client IDs (the app's own, or the web one the app asks for as its server client).
    */
-  async native(store: Store, input: { idToken: string; nonce: string; ref?: string }) {
+  async native(store: Store, input: { idToken: string; nonce?: string; ref?: string }) {
     const config = this.integrations.config;
     const audiences = [config.GOOGLE_CLIENT_ID ?? '', ...(config.GOOGLE_APP_CLIENT_IDS ?? '').split(',').map(item => item.trim())].filter(Boolean);
     if (!audiences.length) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'google_not_configured', 'Google sign-in is not available yet. Use your email instead.');
     let claims: GoogleClaims;
     try {
-      claims = await verifyGoogleIdToken(config, input.idToken, { audiences, nonce: input.nonce });
+      claims = await verifyGoogleIdToken(config, input.idToken, { audiences, nonce: input.nonce ?? null });
     } catch (error) {
       if (!(error instanceof GoogleSignInError)) this.logger.error({ err: error }, 'Google sign-in failed');
       throw refused(error instanceof GoogleSignInError ? error.code : 'google_failed');

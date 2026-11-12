@@ -75,9 +75,10 @@ export async function googleClaims(
 /**
  * Checks a Google ID token against Google's published keys: issuer, one of the given audiences (a client ID of the
  * product's), the nonce the round trip or the app made, and a verified email. Shared by the web's round trip and the
- * app's native sign-in, where Google's SDK hands the app the token.
+ * app's native sign-in, where Google's SDK hands the app the token. Android's sign-in library gives no nonce: then
+ * (`nonce: null`) the token must be fresh, issued in the last 10 minutes.
  */
-export async function verifyGoogleIdToken(config: Pick<AppConfig, 'GOOGLE_JWKS_URL'>, idToken: string, input: { audiences: string[]; nonce: string }): Promise<GoogleClaims> {
+export async function verifyGoogleIdToken(config: Pick<AppConfig, 'GOOGLE_JWKS_URL'>, idToken: string, input: { audiences: string[]; nonce: string | null }): Promise<GoogleClaims> {
   let jwks = jwksByUrl.get(config.GOOGLE_JWKS_URL);
   if (!jwks) {
     jwks = createRemoteJWKSet(new URL(config.GOOGLE_JWKS_URL));
@@ -87,11 +88,11 @@ export async function verifyGoogleIdToken(config: Pick<AppConfig, 'GOOGLE_JWKS_U
   if (!audiences.length) throw new GoogleSignInError('google_token_invalid');
   let claims: GoogleClaims;
   try {
-    ({ payload: claims } = await jwtVerify<GoogleClaims>(idToken, jwks, { issuer: googleIssuers, audience: audiences }));
+    ({ payload: claims } = await jwtVerify<GoogleClaims>(idToken, jwks, { issuer: googleIssuers, audience: audiences, ...(input.nonce === null ? { maxTokenAge: '10m' } : {}) }));
   } catch {
     throw new GoogleSignInError('google_token_invalid');
   }
-  if (!input.nonce || claims.nonce !== input.nonce) throw new GoogleSignInError('google_token_invalid');
+  if (input.nonce !== null && (!input.nonce || claims.nonce !== input.nonce)) throw new GoogleSignInError('google_token_invalid');
   if (!claims.sub || !claims.email || claims.email_verified !== true) throw new GoogleSignInError('google_email_unverified');
   return claims;
 }
