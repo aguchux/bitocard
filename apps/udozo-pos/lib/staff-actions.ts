@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { type PermissionSet, type PosDeviceInfo, type PosInviteInfo, type PosInviteSent, type PosLinkCode, type PosRoleView, type PosStaffMember, signInPin, weakPin } from "./pos";
 import { actorKind } from "./pos-api";
 import type { PosResult } from "./pos-actions";
-import { type ApiResult, customerApi, deviceApi, dropDevice, dropStaffSession, hasDevice, keepDevice, keepStaffSession, publicApi, staffApi } from "./session";
+import { type ApiResult, customerApi, deviceApi, dropDevice, dropShopCode, dropStaffSession, hasDevice, keepDevice, keepShopCode, keepStaffSession, publicApi, staffApi } from "./session";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const refused = (message: string, param: string | null = null, code: string | null = "parameter_invalid"): PosResult<never> => ({ ok: false, message, code, param });
@@ -28,7 +28,14 @@ export async function staffSignIn(shopCode: string, phone: string, pin: string, 
   const result = await publicApi<Session>("POST", "/v1/pos/staff/sign-in", { shop_code: code, phone: phone.trim().slice(0, 20), pin, ...(tillId && uuid.test(tillId) ? { till_id: tillId } : {}) });
   if (!result.ok) return answer(result, false);
   await keepStaffSession(result.data.session.token);
+  // The next sign-in on this browser asks only for the phone and PIN.
+  await keepShopCode(code);
   return { ok: true, data: { name: result.data.staff.name } };
+}
+
+/** Change shop: forgets the shop code this browser remembers, so the staff sign-in asks for it again. */
+export async function forgetShopCode() {
+  await dropShopCode();
 }
 
 /** On a linked till: a name tile and PIN. */

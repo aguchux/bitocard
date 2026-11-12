@@ -162,6 +162,27 @@ export async function dropDevice() {
 }
 
 /** Whether this browser is a linked till (it has a device token; the API decides whether it still counts). */
+/**
+ * The shop code staff last signed in with on this browser (a year, host-only, httpOnly), so the staff sign-in asks only
+ * for their phone and PIN. Only the code, never who signed in; Change shop forgets it.
+ */
+export const shopCodeCookie = "udz_pos_shop";
+const shopCodePattern = /^[A-Z]{3}-\d{4}$/;
+
+export async function keepShopCode(code: string) {
+  if (!shopCodePattern.test(code)) return;
+  (await cookies()).set(shopCodeCookie, code, { maxAge: oneYear, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+}
+
+export async function rememberedShopCode(): Promise<string | null> {
+  const code = (await cookies()).get(shopCodeCookie)?.value ?? "";
+  return shopCodePattern.test(code) ? code : null;
+}
+
+export async function dropShopCode() {
+  (await cookies()).delete(shopCodeCookie);
+}
+
 export async function hasDevice() {
   return Boolean((await cookies()).get(deviceCookie)?.value);
 }

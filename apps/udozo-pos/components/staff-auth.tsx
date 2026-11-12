@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { PinBoxes } from "@/components/pin-boxes";
 import { PinPad } from "@/components/pin-pad";
 import { easyPinText, type PosDeviceInfo, type PosInviteInfo, weakPin } from "@/lib/pos";
-import { acceptInvite, changePin, deviceGone, deviceSignIn, linkDevice, lookupInvite, staffSignIn } from "@/lib/staff-actions";
+import { acceptInvite, changePin, deviceGone, deviceSignIn, forgetShopCode, linkDevice, lookupInvite, staffSignIn } from "@/lib/staff-actions";
 import { rememberPin } from "@/lib/offline-store";
 
 const field = "mt-1 h-12 w-full rounded-xl border border-pos-line bg-white px-4 text-base";
@@ -19,10 +19,15 @@ function Problem({ message }: { message: string | null }) {
   ) : null;
 }
 
-/** Staff on the web: the shop code, their phone and their 6-digit PIN (4 for a PIN set before). No Udozo account. */
-export function StaffSignInForm() {
+/**
+ * Staff on the web: the shop code, their phone and their 6-digit PIN (4 for a PIN set before). No Udozo account. Once
+ * someone has signed in on this browser its shop code is remembered (`rememberedCode`), so only the phone and PIN are
+ * asked, with Change shop to type another.
+ */
+export function StaffSignInForm({ rememberedCode = null }: { rememberedCode?: string | null }) {
   const router = useRouter();
-  const [shopCode, setShopCode] = useState("");
+  const [shopCode, setShopCode] = useState(rememberedCode ?? "");
+  const [remembered, setRemembered] = useState(Boolean(rememberedCode));
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -44,10 +49,30 @@ export function StaffSignInForm() {
       }}
       className="mt-4 grid gap-3"
     >
-      <label className="text-sm font-semibold text-pos-ink-2">
-        Shop code
-        <input value={shopCode} onChange={event => setShopCode(event.target.value.toUpperCase())} placeholder="ADA-4821" autoComplete="off" autoCapitalize="characters" maxLength={8} required className={field} />
-      </label>
+      {remembered ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-pos-50 px-4 py-3">
+          <p className="text-sm text-pos-ink-2">
+            Shop <span className="font-display font-bold tracking-wide text-pos-ink">{shopCode}</span>
+          </p>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setRemembered(false);
+              setShopCode("");
+              void forgetShopCode();
+            }}
+            className="text-sm font-semibold text-pos-700 underline-offset-2 hover:underline"
+          >
+            Change shop
+          </button>
+        </div>
+      ) : (
+        <label className="text-sm font-semibold text-pos-ink-2">
+          Shop code
+          <input value={shopCode} onChange={event => setShopCode(event.target.value.toUpperCase())} placeholder="ADA-4821" autoComplete="off" autoCapitalize="characters" maxLength={8} required className={field} />
+        </label>
+      )}
       <label className="text-sm font-semibold text-pos-ink-2">
         Your phone number
         <input type="tel" inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} autoComplete="tel" maxLength={20} required className={field} />

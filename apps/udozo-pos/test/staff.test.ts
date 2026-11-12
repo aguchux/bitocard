@@ -69,6 +69,14 @@ describe("signing staff in", () => {
     expect(cookie.value).toBe("ups_secret");
     expect(cookie.options).toMatchObject({ httpOnly: true, maxAge: 60 * 60 * 12 });
     expect(request.set.some(item => item.name === "udz_pos")).toBe(false);
+    // The browser remembers the shop for a year, so staff are asked only for their phone and PIN next time.
+    expect(request.set.find(item => item.name === "udz_pos_shop")).toMatchObject({ value: "ADA-4821", options: { httpOnly: true, maxAge: 60 * 60 * 24 * 365 } });
+  });
+
+  it("never remembers a shop code a sign-in refused", async () => {
+    reply = () => Response.json({ error: { code: "invalid_credentials", message: "No." } }, { status: 401 });
+    await staff.staffSignIn("ADA-4821", "0803", "482611");
+    expect(request.set.some(item => item.name === "udz_pos_shop")).toBe(false);
   });
 
   it("refuses what is not a shop code or PIN before asking, and words a wrong PIN as the API does", async () => {
@@ -123,7 +131,7 @@ describe("signing staff in", () => {
     expect(sent[0]).toMatchObject({ method: "POST", url: "/v1/pos/staff/sign-out" });
     expect(request.cookies.has("udz_pos_staff")).toBe(false);
     setRequest({}, { udz_pos_staff: "ups_x" });
-    await expect(staff.staffSignOut()).rejects.toMatchObject({ to: "/signin" });
+    await expect(staff.staffSignOut()).rejects.toMatchObject({ to: "/signin?as=staff" });
   });
 });
 

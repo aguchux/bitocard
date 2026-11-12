@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentCustomer } from "@/lib/session";
+import { currentCustomer, rememberedShopCode } from "@/lib/session";
 import { safeNext, signInPath, udozoUrl } from "@/lib/site";
 import { UdozoMark } from "@/components/site-chrome";
 import { SignInTabs } from "@/components/signin-tabs";
@@ -18,6 +18,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const next = safeNext(query.next);
   const ended = query.ended === "1";
   if (await currentCustomer()) redirect(next);
+  // A browser staff have signed in on before remembers its shop: they are asked only for their phone and PIN.
+  const shopCode = await rememberedShopCode();
   return (
     <div className="mx-auto grid max-w-[1100px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 md:py-16">
       <section aria-labelledby="why" className="flex flex-col gap-4">
@@ -40,7 +42,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         </ul>
       </section>
       <SignInTabs
-        initial={ended || query.as === "staff" ? "staff" : "owner"}
+        initial={ended || shopCode || query.as === "staff" ? "staff" : "owner"}
         owner={
           <section aria-labelledby="owner">
             <h2 id="owner" className="font-display text-2xl font-bold text-pos-ink">
@@ -61,9 +63,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
             <h2 id="staff" className="font-display text-2xl font-bold text-pos-ink">
               Staff
             </h2>
-            <p className="mt-2 text-pos-ink-2">Sign in with your shop’s code, your phone number and the 6-digit PIN you set from your invite. No Udozo account needed.</p>
+            <p className="mt-2 text-pos-ink-2">{shopCode ? "Sign in with your phone number and your 6-digit PIN." : "Sign in with your shop’s code, your phone number and the 6-digit PIN you set from your invite. This browser remembers the code after."} No Udozo account needed.</p>
             {ended ? <p className="mt-3 rounded-xl bg-pos-warn-bg p-3 text-sm font-semibold text-pos-warn">You were signed out. Sign in again to carry on.</p> : null}
-            <StaffSignInForm />
+            <StaffSignInForm rememberedCode={shopCode} />
             <p className="mt-3 text-sm text-pos-muted">
               Setting up a shop’s till? <Link href="/link">Link this device</Link> with the code from the shop owner.
             </p>

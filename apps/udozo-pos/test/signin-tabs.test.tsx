@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 afterEach(cleanup);
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
-vi.mock("@/lib/staff-actions", () => ({ staffSignIn: vi.fn() }));
+const forgetShopCode = vi.fn();
+vi.mock("@/lib/staff-actions", () => ({ staffSignIn: vi.fn(), forgetShopCode: () => forgetShopCode() }));
 vi.mock("@/lib/offline-store", () => ({ rememberPin: vi.fn() }));
 
 const { SignInTabs } = await import("@/components/signin-tabs");
@@ -31,5 +32,14 @@ describe("sign-in tabs", () => {
     render(<StaffSignInForm />);
     expect(screen.getAllByLabelText(/Your PIN, digit/)).toHaveLength(6);
     expect(screen.queryByRole("button", { name: "5" })).toBeNull();
+  });
+
+  it("asks only for the phone and PIN once the browser remembers the shop, with Change shop", () => {
+    render(<StaffSignInForm rememberedCode="ADA-4821" />);
+    expect(screen.getByText("ADA-4821")).toBeTruthy();
+    expect(screen.queryByLabelText("Shop code")).toBeNull();
+    act(() => fireEvent.click(screen.getByRole("button", { name: "Change shop" })));
+    expect(forgetShopCode).toHaveBeenCalled();
+    expect(screen.getByLabelText("Shop code")).toBeTruthy();
   });
 });
