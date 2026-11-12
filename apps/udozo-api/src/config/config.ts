@@ -311,6 +311,16 @@ export const configSchema = z.object({
   CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
   CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
   CLOUDFLARE_TURN_API_URL: z.string().url().default('https://rtc.live.cloudflare.com'),
+  /**
+   * Udozo's mobile app (docs/UDOZO_MOBILE_APP_PLAN.md): the lowest version each platform may still use (older apps are
+   * asked to update), the newest released (older ones are offered it) and the store pages. Empty: nobody is asked.
+   */
+  APP_IOS_MIN_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_IOS_LATEST_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_IOS_STORE_URL: z.string().url().optional(),
+  APP_ANDROID_MIN_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_ANDROID_LATEST_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_ANDROID_STORE_URL: z.string().url().optional(),
   /** Udozo on WhatsApp (Meta's Cloud API): its number, the system user's token, the app secret and the webhook's verify token. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional(),

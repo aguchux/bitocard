@@ -172,6 +172,12 @@ const integrationKeyList = [
   'CLOUDFLARE_TURN_KEY_ID',
   'CLOUDFLARE_TURN_API_TOKEN',
   'CLOUDFLARE_TURN_API_URL',
+  'APP_IOS_MIN_VERSION',
+  'APP_IOS_LATEST_VERSION',
+  'APP_IOS_STORE_URL',
+  'APP_ANDROID_MIN_VERSION',
+  'APP_ANDROID_LATEST_VERSION',
+  'APP_ANDROID_STORE_URL',
   'WHATSAPP_PHONE_NUMBER_ID',
   'WHATSAPP_BUSINESS_ACCOUNT_ID',
   'WHATSAPP_NUMBER',
@@ -640,6 +646,20 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('CLOUDFLARE_TURN_KEY_ID', 'TURN key ID', { required: true, help: 'Cloudflare dashboard > Realtime > TURN Server > Create TURN key: its Turn Token ID.' }),
       secret('CLOUDFLARE_TURN_API_TOKEN', 'TURN key API token', { help: 'Shown once when the TURN key is created (the key’s API token, not an account API token).' }),
       field('CLOUDFLARE_TURN_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://rtc.live.cloudflare.com' }),
+    ],
+  },
+  {
+    id: 'mobile_app',
+    name: 'Mobile app',
+    description:
+      'Udozo’s iPhone and Android app asks GET /v1/app/config when it opens. Below the lowest version it shows Update the app and nothing else; below the newest it offers the update. Leave a version empty to ask nobody. The store pages are where Update opens.',
+    fields: [
+      field('APP_IOS_MIN_VERSION', 'iPhone: lowest version allowed', { required: false, help: 'Three numbers, for example 1.0.0. Raise it only when older apps can no longer work, as everyone below it is stopped.' }),
+      field('APP_IOS_LATEST_VERSION', 'iPhone: newest version', { required: false, help: 'The version live on the App Store. Older apps offer the update without stopping.' }),
+      field('APP_IOS_STORE_URL', 'App Store page', { kind: 'url', required: false, help: 'App Store Connect > your app > App Information: the App Store link.' }),
+      field('APP_ANDROID_MIN_VERSION', 'Android: lowest version allowed', { required: false, help: 'Three numbers, for example 1.0.0.' }),
+      field('APP_ANDROID_LATEST_VERSION', 'Android: newest version', { required: false, help: 'The version live on Google Play.' }),
+      field('APP_ANDROID_STORE_URL', 'Google Play page', { kind: 'url', required: false, help: 'https://play.google.com/store/apps/details?id= and the app’s package name.' }),
     ],
   },
   {

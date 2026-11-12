@@ -42,6 +42,10 @@ SECOND_BRAND = {"afrippa": [ROOT / "apps" / "verify" / "public" / "afrippa"], "u
 # Microsoft Store package (MSIX) shows in msix/Assets.
 DESKTOP = {"udozo": [ROOT / "apps" / "udozo-pos-windows"]}
 
+# Phone apps of a brand (Expo, docs/UDOZO_MOBILE_APP_PLAN.md): the store icon, Android's adaptive icon layers and the
+# splash picture in assets/images.
+MOBILE = {"udozo": [ROOT / "mobile" / "udozo"]}
+
 WHITE = np.array([255, 255, 255])
 
 
@@ -206,6 +210,25 @@ def write_desktop(folder, dark: Image.Image):
     print(f"Wrote the desktop icons and Store tiles to {folder.relative_to(ROOT)}")
 
 
+def write_mobile(folder, dark: Image.Image, white: Image.Image):
+    """An Expo app's icons: the 1024 px store icon (opaque, as Apple requires), Android's adaptive layers (the white
+    mark inside the 66% safe zone over the brand's colour, and the same as the monochrome layer) and the splash
+    picture (the white mark, on the splash's brand colour), plus the mark the app draws (mark.png, mark-light.png)."""
+    images = folder / "assets" / "images"
+    images.mkdir(parents=True, exist_ok=True)
+    pixels = np.array(dark)
+    brand = tuple(int(v) for v in np.median(pixels[pixels[..., 3] > 200][:, :3], axis=0))
+    fitted(dark, 1024, 0.78, (255, 255, 255, 255)).convert("RGB").save(images / "icon.png", optimize=True)
+    fitted(white, 1024, 0.5).save(images / "android-icon-foreground.png", optimize=True)
+    fitted(white, 1024, 0.5).save(images / "android-icon-monochrome.png", optimize=True)
+    Image.new("RGB", (1024, 1024), brand).save(images / "android-icon-background.png", optimize=True)
+    fitted(white, 512, 0.9).save(images / "splash-icon.png", optimize=True)
+    # The mark drawn inside the app (beside the name on light screens, and in white on dark ones).
+    fitted(dark, 256, 1).save(images / "mark.png", optimize=True)
+    fitted(white, 256, 1).save(images / "mark-light.png", optimize=True)
+    print(f"Wrote the phone app's icons to {folder.relative_to(ROOT)} (brand colour #{''.join(f'{v:02x}' for v in brand)})")
+
+
 def main():
     for brand, source, apps in BRANDS:
         write_brand(brand, source, apps)
@@ -236,6 +259,8 @@ def write_brand(brand, source, apps):
     write_icons(dark, white, apps)
     for folder in DESKTOP.get(brand, []):
         write_desktop(folder, dark)
+    for folder in MOBILE.get(brand, []):
+        write_mobile(folder, dark, white)
 
 
 if __name__ == "__main__":

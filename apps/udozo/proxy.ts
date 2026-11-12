@@ -147,4 +147,4 @@ function trackLanding(request: NextRequest, response: NextResponse, event?: Next
 // photos need the store named, and `/store/…` is never served on udozo.com itself. Seller pages' share images
 // (`/seller-card/<handle>.jpg`) and brand pages' (`/brand-card/<cc>-<slug>.jpg`) too: they are udozo.com's only, so on a
 // store they go to its folder, where nothing answers.
-export const config = { matcher: ["/((?!_next/|flags/|sw\.js|favicon\.ico|icon|apple-icon|.*\.(?:png|svg|webp|jpg|ico|json)$).*)", "/img/:path*", "/seller-card/:path*", "/brand-card/:path*", "/store/:path*"] };
+export const config = { matcher: ["/((?!_next/|\.well-known/|flags/|sw\.js|favicon\.ico|icon|apple-icon|.*\.(?:png|svg|webp|jpg|ico|json)$).*)", "/img/:path*", "/seller-card/:path*", "/brand-card/:path*", "/store/:path*"] };

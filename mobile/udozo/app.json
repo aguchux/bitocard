@@ -1,0 +1,104 @@
+{
+  "expo": {
+    "name": "Udozo",
+    "slug": "udozo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "udozo",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.udozo.app",
+      "supportsTablet": false,
+      "associatedDomains": [
+        "applinks:udozo.com",
+        "webcredentials:udozo.com"
+      ],
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.udozo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#185174",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPattern": "/.*/l/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPattern": "/.*/seller/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPattern": "/.*/brand/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPattern": "/.*/c/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPrefix": "/account/"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPrefix": "/i/"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "pathPrefix": "/pay/"
+            },
+            {
+              "scheme": "https",
+              "host": "udozo.com",
+              "path": "/signin/whatsapp"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#185174",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiUrl": "https://api.udozo.com",
+      "siteUrl": "https://udozo.com"
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

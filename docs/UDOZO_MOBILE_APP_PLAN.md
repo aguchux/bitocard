@@ -22,8 +22,8 @@ Udozo's marketplace as an iOS and Android app for buyers and sellers. It runs on
 
 ## Product decisions (confirmed by the owner, 12 November 2026)
 
-1. **Expo (React Native) with TypeScript, one codebase for iOS and Android**, as `apps/udozo-mobile` (`@udozo/mobile`) in this monorepo.
-   - It shares the types and pure helpers of `@bitocard/api-client/classifieds` (conditions, money, `sellerPath`, `brandPath`, category matching) and Udozo's words.
+1. **Expo (React Native) with TypeScript, one codebase for iOS and Android**, in this repository at `mobile/udozo`, outside the npm workspaces: Expo's SDK needs a newer React than the websites, so the app has its own `package.json` and lockfile, and the websites' builds and CI never install it.
+   - It copies the few pure helpers it needs from `@bitocard/api-client/classifieds` (conditions, money, `sellerPath`, `brandPath`, category matching) and Udozo's words, until the websites move to the same React and it can share them.
    - Builds and store uploads go through EAS Build and EAS Submit. JavaScript-only fixes ship through EAS Update, never anything that changes permissions or native code.
    - Not native Swift and Kotlin: that would be two codebases for one team. Not a wrapped website: it would bring no camera flow, calls or push worth having.
 2. **Android first in testing, both stores at launch.**
@@ -182,7 +182,7 @@ The app calls `api.udozo.com` directly with the customer's session token (`BitoC
 Everything in phases 1 to 4 is the first release: money and calls are in it.
 
 0. **API work** (above), and the app's foundations:
-   - `apps/udozo-mobile` with Expo, expo-router, the shared types, the theme from `/v1/theme`;
+   - `mobile/udozo` with Expo, expo-router, copies of the shared helpers, the theme from `/v1/theme`;
    - app names and icons from `scripts/brand-assets.py`;
    - EAS builds for internal testers;
    - the privacy notice's app section.
@@ -237,6 +237,39 @@ Everything in phases 1 to 4 is the first release: money and calls are in it.
 - Android testers install EAS builds directly (APKs), with no Play account.
 - iPhones need an Apple Developer account even for testing (TestFlight or ad hoc). Opening Apple's account early, before the store listing, lets iPhone testing start with Android. Otherwise iPhone testing waits for phase 6.
 - PushKit and CallKit can only be tested on a real iPhone with that account.
+
+## Build progress
+
+**Phase 0, first slice (12 November 2026):**
+
+- **The app's foundations** (`mobile/udozo`, Expo SDK 58, expo-router): Udozo's name, `com.udozo.app` on both
+  platforms (changeable until the store accounts exist), the `udozo` scheme, Udozo's light and dark colours
+  (`src/constants/theme.ts`), the five tabs as native tabs (SF Symbols and Material Symbols), each holding a short
+  placeholder until its phase. Also:
+  - the API client (`src/lib/api-core.ts`: the session header, an Idempotency-Key on every POST, a money step's own key
+    kept, the API's error shape, the app's own words for no network or an unreadable answer);
+  - the session in the secure store (`src/lib/session.ts`, this device only, while unlocked);
+  - TanStack Query;
+  - the update gate (`UpdateGate`, from `GET /v1/app/config`);
+  - EAS profiles (`preview`: an internal APK; `production`);
+  - icons and the splash from `scripts/brand-assets.py` (`MOBILE`).
+  Tests: `npm test` (version maths and the API client under `node --test`), `npm run typecheck`, `npx expo lint`,
+  `npx expo-doctor`.
+- **App version gate** (API): `GET /v1/app/config?platform=ios|android&version=x.y.z` (`apps/udozo-api/src/app-config/`,
+  public, Udozo's only, a minute in caches) answers `update` (`required`, `available`, `none`), the minimum and latest
+  versions, the store link, the site and the legal pages. Admins set them in Settings > Integrations > **Mobile app**
+  (`APP_IOS_MIN_VERSION`, `APP_IOS_LATEST_VERSION`, `APP_ANDROID_MIN_VERSION`, `APP_ANDROID_LATEST_VERSION`,
+  `APP_IOS_STORE_URL`, `APP_ANDROID_STORE_URL`). Tests: `apps/udozo-api/test/app-config.test.mjs`.
+- **Deep links** (udozo.com): `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`
+  (`apps/udozo/lib/app-links.ts`), only on udozo.com itself (never a store's domain; the proxy leaves `.well-known`
+  alone), 404 until the environment names the app: `UDOZO_IOS_APP_IDS` (`TEAMID.com.udozo.app`),
+  `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` (from the signing key once EAS makes it). Tests:
+  `apps/udozo/test/app-links.test.ts`.
+
+**Still to do in phase 0:** native sign-in (Google, Facebook, Apple), device kinds `fcm`, `apns` and `apns_voip` with
+FCM and APNs senders, VoIP call pushes and app reachability, account deletion, upload checks from the app, `surface:
+app` in the journeys, the theme from `/v1/theme`, the feature flags on `/v1/app/config`, the privacy notice's app
+section, and the first internal EAS build.
 
 ## Testing
 
