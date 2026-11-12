@@ -53,7 +53,7 @@ export async function changePin(currentPin: string, newPin: string): Promise<Pos
 export async function staffSignOut() {
   await staffApi("POST", "/v1/pos/staff/sign-out");
   await dropStaffSession();
-  redirect((await hasDevice()) ? "/signin/till" : "/signin");
+  redirect((await hasDevice()) ? "/signin/till" : "/signin?as=staff");
 }
 
 // ---- Invites ----

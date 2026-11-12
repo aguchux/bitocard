@@ -52,7 +52,7 @@ export function StaffSignInForm() {
         Your phone number
         <input type="tel" inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} autoComplete="tel" maxLength={20} required className={field} />
       </label>
-      <PinPad value={pin} onChange={setPin} label="Your PIN" disabled={pending} />
+      <PinBoxes value={pin} onChange={setPin} label="Your PIN" disabled={pending} />
       <Problem message={message} />
       <button type="submit" disabled={pending || (pin.length !== 6 && pin.length !== 4)} className={primary}>
         {pending ? "Signing in…" : "Sign in"}
