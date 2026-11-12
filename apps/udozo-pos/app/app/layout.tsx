@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { OfflineSync } from "@/components/offline-sync";
-import { OwnerNav, staffLinks } from "@/components/owner-nav";
-import { PosMark } from "@/components/site-chrome";
+import { AppShell } from "@/components/app-shell";
+import { staffLinks } from "@/components/owner-nav";
 import { signOut } from "@/lib/pos-actions";
 import { actorKind } from "@/lib/pos-api";
 import { currentOwner, currentPos } from "@/lib/pos-data";
@@ -15,7 +14,7 @@ export const metadata: Metadata = { title: "Your shop", robots: { index: false, 
 
 /**
  * The POS behind sign-in: the owner with their Udozo account (else Continue with Udozo, and sign-up until they have a
- * shop), or a member of staff with their PIN, each on the POS's dark header with the places they may use.
+ * shop), or a member of staff with their PIN, each in the POS's Windows-style shell (title bar, navigation pane) with the places they may use.
  */
 export default async function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const staff = (await actorKind()) === "staff";
@@ -32,41 +31,18 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   if (staff && pos.ok && pos.data.pinChangeRequired) redirect("/signin/pin");
   const linked = await hasDevice();
   const onDevice = staff && linked;
+  const who = pos.ok ? { name: pos.data.name, role: pos.data.role, shop: pos.data.shops.length > 1 ? `${pos.data.shops.length} shops` : (pos.data.shops[0]?.name ?? null) } : null;
   return (
-    <>
-      <header className="bg-pos-night text-white">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-          <Link href="/app" className="mr-auto rounded-lg no-underline" aria-label="Your shop">
-            <PosMark />
-          </Link>
-          {pos.ok ? (
-            <span className="hidden text-sm text-pos-night-muted sm:inline">
-              {pos.data.name} · {pos.data.role}
-            </span>
-          ) : null}
-          <form action={staff ? staffSignOut : signOut}>
-            <button type="submit" className="h-11 rounded-[10px] border border-pos-night-line px-4 text-sm font-semibold text-white hover:bg-pos-night-2">
-              {onDevice ? "Switch user" : "Sign out"}
-            </button>
-          </form>
-          <div className="w-full">
-            <OwnerNav links={staff && pos.ok ? staffLinks(pos.data.permissions) : undefined} />
-          </div>
-        </div>
-      </header>
+    <AppShell links={staff && pos.ok ? staffLinks(pos.data.permissions) : undefined} who={who} signOut={staff ? staffSignOut : signOut} signOutLabel={onDevice ? "Switch user" : "Sign out"}>
       {linked ? <OfflineSync /> : null}
-      <main className="flex-1 bg-pos-page">
-        <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6">
-          {pos.ok ? (
-            children
-          ) : (
-            <section role="alert" className="rounded-[20px] bg-white p-6">
-              <h1 className="font-display text-2xl font-bold text-pos-ink">Your shop could not be opened</h1>
-              <p className="mt-2 text-pos-ink-2">{pos.message}</p>
-            </section>
-          )}
-        </div>
-      </main>
-    </>
+      {pos.ok ? (
+        children
+      ) : (
+        <section role="alert" className="rounded-[20px] bg-white p-6">
+          <h1 className="font-display text-2xl font-bold text-pos-ink">Your shop could not be opened</h1>
+          <p className="mt-2 text-pos-ink-2">{pos.message}</p>
+        </section>
+      )}
+    </AppShell>
   );
 }
