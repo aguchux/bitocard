@@ -1,9 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { IsIn, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 import { Public } from '../auth/caller.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { AvatarsService } from '../media/avatars.service.js';
 import { ProductOnly } from '../products/product.js';
 import { TrackSignup } from '../signups/track.js';
 import { AccountDeletionService } from './account-deletion.service.js';
@@ -91,6 +93,7 @@ export class AppAccountController {
     private readonly facebook: CustomerFacebookService,
     private readonly apple: CustomerAppleService,
     private readonly deletion: AccountDeletionService,
+    private readonly avatars: AvatarsService,
   ) {}
 
   @SkipIdempotency()
@@ -122,6 +125,18 @@ export class AppAccountController {
       lastName: body.last_name,
       ref: body.ref,
     });
+  }
+
+  /**
+   * The app sends a profile photo's or cover's bytes through the API (after `avatar/uploads` or `banner/uploads`), as the
+   * consoles do, so it never talks to storage; then `POST avatar` or `banner` with its id, as udozo.com does.
+   */
+  @UseGuards(CustomerGuard)
+  @SkipIdempotency()
+  @Post(['avatar/uploads/:id/content', 'banner/uploads/:id/content'])
+  @HttpCode(HttpStatus.OK)
+  pictureContent(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.avatars.receive({ kind: 'customer', id: caller.customer.id }, id, req.body, req.headers['content-type']);
   }
 
   /** What stands in the way of deleting the account (money, open orders), shown before asking. */

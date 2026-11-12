@@ -70,6 +70,8 @@ describe('GET /v1/app/config', () => {
       store_url: 'https://apps.apple.com/app/id000000000',
       site_url: 'https://udozo.com',
       legal: { terms: 'https://udozo.com/legal/terms', privacy: 'https://udozo.com/legal/privacy' },
+      country: null,
+      features: null,
     });
   });
 
@@ -83,6 +85,19 @@ describe('GET /v1/app/config', () => {
     assert.equal(body.update, 'available');
     assert.equal(body.min_version, null);
     assert.equal(body.store_url, null);
+  });
+
+  test("with the shopper's market, its features follow the market's switches", async () => {
+    const { PrismaService } = await import('../dist/database/prisma.service.js');
+    const prisma = server.app.get(PrismaService);
+    assert.equal((await read('platform=android&version=1.0.0')).body.features, null, 'none without a market');
+    await prisma.featureSwitch.create({ data: { key: 'classifieds_wanted', countryCode: 'NG', enabled: true } });
+    const { body } = await read('platform=android&version=1.0.0&country=NG');
+    assert.equal(body.country, 'NG');
+    assert.equal(body.features.wanted, true);
+    assert.deepEqual(Object.keys(body.features).sort(), ['assistant', 'personalisation', 'pos_payments', 'private_ratings', 'reviews', 'seller_scores', 'wanted', 'whatsapp']);
+    assert.equal((await read('platform=android&version=1.0.0&country=GH')).body.features.wanted, false);
+    assert.equal((await read('platform=android&version=1.0.0&country=ng')).status, 400);
   });
 
   test('a platform or version it does not know is refused', async () => {

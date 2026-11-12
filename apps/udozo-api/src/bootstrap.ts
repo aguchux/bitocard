@@ -36,7 +36,7 @@ const orderRoomJson = json({
  * the same, and Udozo's people's profile photos), read as raw bytes up to 6 MB whatever its type, before Nest's parsers.
  */
 export const isMediaContent = (url: string | undefined) =>
-  /^\/v1\/(?:(?:afrippa\/)?admin\/)?(?:media\/[^/?#]+|auth\/avatar\/uploads\/[^/?#]+)\/content(?:[?#]|$)/.test(url ?? '');
+  /^\/v1\/(?:(?:afrippa\/)?admin\/)?(?:media\/[^/?#]+|auth\/avatar\/uploads\/[^/?#]+|store\/account\/(?:avatar|banner)\/uploads\/[^/?#]+)\/content(?:[?#]|$)/.test(url ?? '');
 const mediaContent = raw({ type: () => true, limit: '6mb' });
 
 /** A file of a till's unsent sales (Udozo POS), uploaded by its owner: up to 4 MB of JSON, Vercel's limit being 4.5 MB. */

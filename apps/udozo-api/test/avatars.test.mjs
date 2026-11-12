@@ -98,7 +98,14 @@ function storeServer() {
     if (json?.session?.token) token = json.session.token;
     return { status: res.status, json };
   };
-  return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body), del: path => request('DELETE', path) };
+  return {
+    get: path => request('GET', path),
+    post: (path, body = {}) => request('POST', path, body),
+    del: path => request('DELETE', path),
+    get token() {
+      return token;
+    },
+  };
 }
 
 let counter = 0;
@@ -203,6 +210,23 @@ describe('profile photos', () => {
     const set = await admin.post('/v1/admin/auth/avatar', { media_id: created.json.id });
     assert.equal(set.status, 200, JSON.stringify(set.json));
     assert.equal((await admin.get('/v1/admin/auth/session')).json.admin.avatar_url, set.json.avatar_url);
+  });
+
+  test("Udozo's app sends a customer's photo and cover through the API, never to storage; only their own uploads", async () => {
+    const seller = await customer('Ifeoma Nwosu');
+    const other = await customer('Tunde Bakare');
+    const send = (who, path, bytes) =>
+      fetch(`${server.base}${path}`, { method: 'POST', headers: { 'bitocard-customer-session': who.token, 'content-type': 'image/png', 'idempotency-key': `c-${Math.random()}` }, body: bytes }).then(async res => ({ status: res.status, json: await res.json() }));
+    for (const which of ['avatar', 'banner']) {
+      const bytes = which === 'avatar' ? png(256, 256) : png(1600, 400);
+      const created = await seller.post(`/v1/store/account/${which}/uploads`, { filename: 'me.png', content_type: 'image/png', size: bytes.length });
+      assert.equal((await send(other, `/v1/store/account/${which}/uploads/${created.json.id}/content`, bytes)).status, 404, "never someone else's");
+      const sent = await send(seller, `/v1/store/account/${which}/uploads/${created.json.id}/content`, bytes);
+      assert.deepEqual([sent.status, sent.json.received], [200, true], JSON.stringify(sent.json));
+      const set = await seller.post(`/v1/store/account/${which}`, { media_id: created.json.id });
+      assert.equal(set.status, 200, JSON.stringify(set.json));
+      assert.equal((await seller.get('/v1/store/account')).json[`${which}_url`], set.json[`${which}_url`]);
+    }
   });
 
   test('a customer puts a cover across their seller page: 4:1, at least 600 by 150, replaced and removed like their photo', async () => {
