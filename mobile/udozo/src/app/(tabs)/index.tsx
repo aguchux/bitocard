@@ -1,9 +1,9 @@
 import type { ClassifiedHome } from '@shared/home';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Bell, ChevronDown, Search } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,7 +22,12 @@ import { useMarket } from '@/lib/market';
  */
 export default function HomeScreen() {
   const theme = useTheme();
-  const { country, markets } = useMarket();
+  const { country, markets, fixed, choose } = useMarket();
+  // A link to another market's home (`udozo.com/gh`) opens it, unless the account's own market is fixed.
+  const asked = useLocalSearchParams<{ country?: string }>().country?.toUpperCase();
+  useEffect(() => {
+    if (asked && !fixed && asked !== country && markets.some(market => market.country === asked)) void choose(asked);
+  }, [asked, fixed, country, markets, choose]);
   const home = useQuery({ queryKey: ['home', country], enabled: Boolean(country), queryFn: () => api<ClassifiedHome>(`/v1/classifieds/home?page=${country}`) });
   const rows = home.data?.rows ?? (home.data ? [{ id: 'all', hidden: false, title: '', subtitle: '', viewAll: null, view_all_href: null, background: 'none' as const, image: null, width: 'contained' as const, spacing: 'normal' as const, blocks: home.data.sections }] : []);
   return (

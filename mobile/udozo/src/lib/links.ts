@@ -8,6 +8,14 @@ export type AppLink = { route: string } | { web: string };
 
 const site = 'https://udozo.com';
 const ownHosts = new Set(['udozo.com', 'www.udozo.com']);
+/** The app's own screens, reachable by `udozo://<route>` links. */
+const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings']);
+
+/** A link the phone hands the app that is not Udozo's (another app's sign-in return, such as Facebook's `fb<id>://`). */
+export function foreignScheme(href: string) {
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href)?.[1]?.toLowerCase();
+  return Boolean(scheme) && !['http', 'https', 'udozo'].includes(scheme!);
+}
 
 const query = (values: Record<string, string | null | undefined>) => {
   const pairs = Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1]));
@@ -29,7 +37,13 @@ export function appLink(href: string): AppLink {
   const [first, second, third, fourth] = parts;
 
   if (!first) return { route: '/' };
+  // The app's own routes (`udozo://listing/77`): udozo.com has no pages by these names, so they are only ever the app's.
+  if (appRoutes.has(first)) return { route: `${url.pathname}${url.search}` };
+  if (first === 'sell') return { route: '/post/new' };
   if (first === 'account') {
+    if (second === 'listings') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/post/${third}` : `/my-listings${query({ status: url.searchParams.get('status') })}` };
+    if (second === 'requests') return { route: '/requests' };
+    if (second === 'profile' && third === 'username') return { route: '/username' };
     if (second === 'messages') return { route: third ? `/chat/${third}` : '/chats' };
     if (second === 'notifications') return { route: '/notifications' };
     if (second === 'favourites') return { route: '/saved' };

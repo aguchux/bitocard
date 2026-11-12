@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AccountPending } from '@/components/account-pending';
 import { SignedOut } from '@/components/signed-out';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Chip, Empty, Failed, Loading } from '@/components/ui';
@@ -28,6 +29,11 @@ export default function ChatsScreen() {
     queryFn: () => api<ShopConversations>(`/v1/classifieds/conversations?limit=50${role === 'all' ? '' : `&role=${role}`}`),
     refetchInterval: 15_000,
   });
+  if (customer === undefined) return (
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
+      <AccountPending />
+    </SafeAreaView>
+  );
   if (customer === null) return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       <SignedOut title="Chats" body="Sign in to chat with buyers and sellers. Your number stays private." />

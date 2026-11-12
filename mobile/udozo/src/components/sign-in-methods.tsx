@@ -88,6 +88,12 @@ function WhatsappSignIn({ intent, refCode, onBack }: { intent: 'signin' | 'signu
   const [state, setState] = useState<'waiting' | 'declined' | 'expired'>('waiting');
   const [error, setError] = useState<unknown>(null);
   const done = useRef(false);
+  const asking = useRef(false);
+  // The latest finish, read by the timer: a new function each render must not restart the polling.
+  const finishRef = useRef(finish);
+  useEffect(() => {
+    finishRef.current = finish;
+  }, [finish]);
 
   useEffect(() => {
     if (!country) return;
@@ -97,20 +103,25 @@ function WhatsappSignIn({ intent, refCode, onBack }: { intent: 'signin' | 'signu
   useEffect(() => {
     if (!started || state !== 'waiting') return;
     const timer = setInterval(async () => {
-      if (done.current) return;
+      // One question at a time: the API approves once, so an overlapping one would answer that the sign-in is over.
+      if (done.current || asking.current) return;
+      asking.current = true;
       try {
         const reply = await api<Status>('/v1/store/account/whatsapp-sign-in/finish', { body: { token: started.token } });
+        setError(null);
         if (reply.status === 'approved') {
           done.current = true;
           clearInterval(timer);
-          await finish(reply);
+          await finishRef.current(reply);
         } else if (reply.status !== 'waiting') setState(reply.status);
       } catch (problem) {
         setError(problem);
+      } finally {
+        asking.current = false;
       }
     }, 3000);
     return () => clearInterval(timer);
-  }, [started, state, finish]);
+  }, [started, state]);
 
   return (
     <View style={{ gap: Spacing.three }}>

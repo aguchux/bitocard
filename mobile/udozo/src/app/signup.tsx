@@ -53,6 +53,9 @@ export default function SignUpScreen() {
       if (error instanceof ApiError && error.code === 'signup_token_invalid') setStep('email');
     },
   });
+  // The fields the details step shows a refusal under; anything else (an email taken meanwhile, a bad invite) is said above
+  // the button, never hidden.
+  const detailFields = ['first_name', 'last_name', 'country', 'phone', 'password'];
   const taken = sendCode.error instanceof ApiError && (sendCode.error.code === 'email_taken' || sendCode.error.code === 'email_in_use');
 
   return (
@@ -63,7 +66,7 @@ export default function SignUpScreen() {
       {step === 'email' ? (
         <>
           <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
-          <FormError error={sendCode.error} />
+          <FormError error={sendCode.error ?? (create.error instanceof ApiError && create.error.code === 'signup_token_invalid' ? create.error : null)} />
           {taken ? <Button tone="secondary" title="Sign in instead" onPress={() => router.replace('/signin')} /> : null}
           <Button title="Email me a code" disabled={!email.includes('@')} loading={sendCode.isPending} onPress={() => sendCode.mutate()} />
         </>
@@ -82,7 +85,7 @@ export default function SignUpScreen() {
           <CountryPicker value={country} onChange={setCountry} error={fieldError(create.error, 'country')} />
           <Field label="Mobile number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" error={fieldError(create.error, 'phone')} hint="A mobile from your country. You can confirm it later." />
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" error={fieldError(create.error, 'password')} hint="At least 10 characters." />
-          <FormError error={create.error instanceof ApiError && create.error.param ? null : create.error} />
+          <FormError error={create.error instanceof ApiError && create.error.param && detailFields.includes(create.error.param) ? null : create.error} />
           <ThemedText type="small" themeColor="textSecondary">
             By creating an account you accept Udozo&apos;s terms of use and privacy notice.
           </ThemedText>

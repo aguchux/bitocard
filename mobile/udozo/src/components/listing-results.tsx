@@ -19,9 +19,16 @@ export function useListings(params: SearchParams | null) {
     enabled: Boolean(params?.country),
     initialPageParam: 0,
     queryFn: ({ pageParam }) => api<ShopSearch>(`/v1/classifieds/listings?${searchQuery(params!, pageParam)}`),
-    getNextPageParam: last => (last.offset + last.data.length < last.total ? last.offset + last.data.length : undefined),
+    // The API pages no further than an offset of 1,000 (`maxOffset`): beyond it, refine the search instead.
+    getNextPageParam: last => {
+      const next = last.offset + last.data.length;
+      return next < last.total && next <= maxSearchOffset ? next : undefined;
+    },
   });
 }
+
+/** The furthest offset the search API pages to (its `maxOffset`). */
+export const maxSearchOffset = 1000;
 
 /** Listings two to a row, loading more at the end; the header scrolls with them. */
 export function ListingResults({ params, header, empty }: { params: SearchParams | null; header?: ReactElement; empty?: { title: string; body?: string } }) {

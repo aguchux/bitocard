@@ -18,6 +18,9 @@ type AccountState = {
   signOut: () => Promise<void>;
   /** The session is gone (deleted account): forget it here without asking the API. */
   forget: () => Promise<void>;
+  /** Reading the account failed (no internet, the API down) and nothing is cached: say so, with `retry`. */
+  error: unknown;
+  retry: () => void;
 };
 
 const AccountContext = createContext<AccountState | null>(null);
@@ -80,9 +83,12 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, [queries]);
 
   const customer = hasSession === undefined ? undefined : hasSession ? (account.data === undefined ? undefined : account.data) : null;
+  const error = customer === undefined && account.isError ? account.error : null;
+  const { refetch } = account;
+  const retry = useCallback(() => void refetch(), [refetch]);
   const value = useMemo<AccountState>(
-    () => ({ customer, pending: Boolean(customer && confirmationPending(customer)), signedIn, refresh, signOut, forget }),
-    [customer, signedIn, refresh, signOut, forget],
+    () => ({ customer, pending: Boolean(customer && confirmationPending(customer)), signedIn, refresh, signOut, forget, error, retry }),
+    [customer, signedIn, refresh, signOut, forget, error, retry],
   );
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;
 }

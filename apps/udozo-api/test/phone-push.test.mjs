@@ -166,11 +166,14 @@ describe('Calls to a closed app', () => {
 
     // Not on udozo.com and no app: offline.
     assert.equal((await buyer.post(`/v1/classifieds/listings/${draft.id}/calls`)).json.error.code, 'seller_offline');
-    await seller.post('/v1/store/account/devices/phone', { kind: 'apns_voip', token: voipToken.replace(/b/g, 'd') });
+    // An app too old to answer calls registers push but never makes them reachable.
+    await seller.post('/v1/store/account/devices/phone', { kind: 'apns_voip', token: voipToken.replace(/b/g, 'e'), app_version: '0.1.0' });
+    assert.equal((await buyer.get(`/v1/classifieds/listings/${draft.id}/viewer`)).json.seller_online, false);
+    await seller.post('/v1/store/account/devices/phone', { kind: 'apns_voip', token: voipToken.replace(/b/g, 'd'), app_version: '0.4.0' });
     // A second phone of theirs, on Android.
     const sellerAndroid = phone('android');
     await sellerAndroid.post('/v1/store/account/signin', { email: (await prisma.customer.findUniqueOrThrow({ where: { id: seller.id } })).email, password: 'correct horse battery' });
-    await sellerAndroid.post('/v1/store/account/devices/phone', { kind: 'fcm', token: `${fcmToken}-chidi` });
+    await sellerAndroid.post('/v1/store/account/devices/phone', { kind: 'fcm', token: `${fcmToken}-chidi`, app_version: '0.4.0' });
     assert.equal((await buyer.get(`/v1/classifieds/listings/${draft.id}/viewer`)).json.seller_online, true);
 
     const apnsBefore = apnsCalls.length;

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { waitUntil } from '@vercel/functions';
 import webpush from 'web-push';
+import { compareVersions } from '../app-config/versions.js';
 import { sha256 } from '../common/crypto.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -96,6 +97,11 @@ export type PhoneChannel = (typeof phoneChannels)[number];
 const ringingChannels: PhoneChannel[] = ['fcm', 'apns_voip'];
 /** A phone counts as able to ring while the app opened (and re-registered) this recently. */
 export const ringableForMs = 30 * 86_400_000;
+/**
+ * The first version of Udozo's app that answers calls (its phase 4). An older app registers push but has nothing to
+ * ring, so its phone never makes its owner reachable: callers would wait 45 seconds for a call nobody can answer.
+ */
+export const callsFromAppVersion = '0.4.0';
 const phoneTokenPattern: Record<PhoneChannel, RegExp> = {
   fcm: /^[A-Za-z0-9_:.-]{20,4096}$/,
   apns: /^[0-9a-fA-F]{64,200}$/,
@@ -194,10 +200,11 @@ export class PushService {
     const channels = ringingChannels.filter(channel => this.phoneReady(channel));
     if (!customerIds.length || !channels.length) return [];
     const devices = await this.prisma.device.findMany({ where: { customerId: { in: [...new Set(customerIds)] }, channel: { in: channels }, lastSeenAt: { gt: new Date(now.getTime() - ringableForMs) } } });
-    if (!devices.length) return [];
-    const sessions = await this.prisma.customerSession.findMany({ where: { id: { in: devices.map(device => device.sessionId) }, revokedAt: null, expiresAt: { gt: now } }, select: { id: true, customerId: true } });
+    const answering = devices.filter(device => device.appVersion && compareVersions(device.appVersion, callsFromAppVersion) >= 0);
+    if (!answering.length) return [];
+    const sessions = await this.prisma.customerSession.findMany({ where: { id: { in: answering.map(device => device.sessionId) }, revokedAt: null, expiresAt: { gt: now } }, select: { id: true, customerId: true } });
     const live = new Map(sessions.map(session => [session.id, session.customerId]));
-    return devices.filter(device => live.get(device.sessionId) === device.customerId);
+    return answering.filter(device => live.get(device.sessionId) === device.customerId);
   }
 
   /** Which of these customers Udozo's app can ring now, even with the app closed (calls count them as reachable). */

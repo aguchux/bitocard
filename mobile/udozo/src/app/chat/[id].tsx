@@ -14,6 +14,7 @@ import { Button, Chip, Failed, Field, FormError, Loading, Sheet } from '@/compon
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api, apiUpload, privateImage } from '@/lib/api';
+import { preparePhoto } from '@/lib/picture';
 import { photoUrl } from '@/lib/navigate';
 import { registerPush } from '@/lib/push';
 import { useSession } from '@/lib/session';
@@ -54,11 +55,13 @@ export default function ChatScreen() {
   });
   const photo = useMutation({
     mutationFn: async () => {
-      const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+      const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (picked.canceled || !picked.assets[0]) return null;
       const asset = picked.assets[0];
+      // Scaled to 1600 px and saved as JPEG first: the API takes JPEG or PNG up to 4 MB, and phones save HEIC and 50 MP.
+      const uri = await preparePhoto({ uri: asset.uri, width: asset.width, height: asset.height });
       const form = new FormData();
-      form.append('file', { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
+      form.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as unknown as Blob);
       return apiUpload(`/v1/classifieds/conversations/${id}/photos`, form);
     },
     onSuccess: refresh,

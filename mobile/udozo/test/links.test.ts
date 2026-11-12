@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { appLink, listingUrl } from '../src/lib/links.ts';
+import { appLink, foreignScheme, listingUrl } from '../src/lib/links.ts';
 
 test('market pages become the app’s screens', () => {
   assert.deepEqual(appLink('/ng/l/1234-iphone-13-pro'), { route: '/listing/1234?country=NG' });
@@ -35,4 +35,18 @@ test('what the app does not have yet, or other sites, open in the browser', () =
 test('the app’s own scheme reads like udozo.com', () => {
   assert.deepEqual(appLink('udozo://ng/l/77-chair'), { route: '/listing/77?country=NG' });
   assert.equal(listingUrl('NG', 77, 'chair'), 'https://udozo.com/ng/l/77-chair');
+});
+
+test('selling places, the app’s own routes, and other apps’ links', () => {
+  assert.deepEqual(appLink('/sell'), { route: '/post/new' });
+  assert.deepEqual(appLink('/account/listings?status=draft'), { route: '/my-listings?status=draft' });
+  assert.deepEqual(appLink('/account/listings/0d3f8a5e-1111-4222-8333-944455556666'), { route: '/post/0d3f8a5e-1111-4222-8333-944455556666' });
+  assert.deepEqual(appLink('/account/requests'), { route: '/requests' });
+  assert.deepEqual(appLink('/account/profile/username'), { route: '/username' });
+  assert.deepEqual(appLink('udozo://listing/77?country=NG'), { route: '/listing/77?country=NG' });
+  assert.deepEqual(appLink('udozo://my-listings'), { route: '/my-listings' });
+  assert.equal(foreignScheme('fb1234567890://authorize?code=abc'), true);
+  assert.equal(foreignScheme('udozo://ng/l/77'), false);
+  assert.equal(foreignScheme('https://udozo.com/ng'), false);
+  assert.equal(foreignScheme('/ng/l/77'), false);
 });
