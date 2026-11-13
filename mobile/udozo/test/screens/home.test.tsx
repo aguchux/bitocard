@@ -78,3 +78,29 @@ test('without columns Home is as before, with the page’s own hero', async () =
   expect(screen.queryByTestId('hero-reel')).toBeNull();
   expect(screen.queryByTestId('home-band')).toBeNull();
 });
+
+const profile = { object: 'shop_assistant', assistant: { id: 'b1', name: 'Anjio', avatar_url: null, label: 'AI assistant', language: 'en', greeting: 'Hi', roles: ['browse'], suggestions: [] }, languages: [] };
+
+test('Ask sits on the right of the search box where the market has an assistant, and asks what is typed', async () => {
+  answers({ ...routes({ object: 'list', data: [] }), 'GET /v1/app/config': { features: { assistant: true } }, 'GET /v1/classifieds/assistant': profile });
+  await renderScreen(<HomeScreen />);
+  const ask = await screen.findByRole('button', { name: 'Ask Anjio' });
+  expect(screen.getByText('Anjio')).toBeTruthy();
+  expect(screen.queryByText('Ask Anjio')).toBeNull();
+
+  await fireEvent.changeText(screen.getByLabelText('Search Udozo'), 'solar inverter');
+  await fireEvent.press(screen.getByRole('button', { name: 'Ask Anjio: solar inverter' }));
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/assistant', params: { country: 'NG', question: 'solar inverter' } });
+  expect(ask).toBeTruthy();
+
+  await fireEvent(screen.getByLabelText('Search Udozo'), 'submitEditing');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/search', params: { q: 'solar inverter' } });
+});
+
+test('no Ask where the market has no assistant', async () => {
+  answers(routes({ object: 'list', data: [] }));
+  await renderScreen(<HomeScreen />);
+  expect(await screen.findByLabelText('Search Udozo')).toBeTruthy();
+  await screen.findByLabelText('The page’s own hero');
+  expect(screen.queryByRole('button', { name: /^Ask/ })).toBeNull();
+});

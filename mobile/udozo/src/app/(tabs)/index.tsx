@@ -6,7 +6,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { Bell, ChevronDown, Search, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeroReel } from '@/components/hero-reel';
@@ -77,23 +77,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
         <View style={styles.content}>
-          <Pressable
-            accessibilityRole="search"
-            accessibilityLabel="Search Udozo"
-            onPress={() => router.push('/search')}
-            style={[styles.search, { borderColor: theme.line, backgroundColor: theme.backgroundElement }]}>
-            <Search size={18} color={theme.textSecondary} />
-            <ThemedText themeColor="textSecondary">What are you looking for?</ThemedText>
-          </Pressable>
-          {assistant?.assistant ? (
-            <Button
-              tone="secondary"
-              title={`Ask ${assistant.assistant.name}`}
-              icon={<Sparkles size={18} color={theme.primary} />}
-              onPress={() => router.push({ pathname: '/assistant', params: { country: country! } })}
-              style={{ marginHorizontal: Spacing.three }}
-            />
-          ) : null}
+          <SearchRow country={country} assistantName={assistant?.assistant?.name ?? null} />
           {!country && !markets.length ? (
             <Loading />
           ) : home.isPending ? (
@@ -108,6 +92,49 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
       {reel ? <View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, backgroundColor: theme.primary }]} /> : null}
+    </View>
+  );
+}
+
+/**
+ * The search box, and on its right Ask (where the market's assistant answers), which opens Ask Anjio with whatever is
+ * typed. Searching opens the Search tab with the words.
+ */
+function SearchRow({ country, assistantName }: { country: string | null; assistantName: string | null }) {
+  const theme = useTheme();
+  const [typed, setTyped] = useState('');
+  const words = typed.trim();
+  const search = () => router.push(words ? { pathname: '/search', params: { q: words } } : '/search');
+  const ask = () => router.push({ pathname: '/assistant', params: { country: country!, ...(words ? { question: words } : {}) } });
+  // The assistant's name when it is short, else Ask: the box keeps most of the row.
+  const label = assistantName && assistantName.length <= 8 ? assistantName : 'Ask';
+  return (
+    <View style={styles.searchRow}>
+      <View style={[styles.search, { borderColor: theme.line, backgroundColor: theme.backgroundElement }]}>
+        <Search size={18} color={theme.textSecondary} />
+        <TextInput
+          accessibilityLabel="Search Udozo"
+          placeholder="What are you looking for?"
+          placeholderTextColor={theme.textSecondary}
+          value={typed}
+          onChangeText={setTyped}
+          onSubmitEditing={search}
+          returnKeyType="search"
+          style={[styles.searchInput, { color: theme.text }]}
+        />
+      </View>
+      {assistantName && country ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={words ? `Ask ${assistantName}: ${words}` : `Ask ${assistantName}`}
+          onPress={ask}
+          style={({ pressed }) => [styles.ask, { backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 }]}>
+          <Sparkles size={18} color="#fff" />
+          <ThemedText type="smallBold" numberOfLines={1} style={{ color: '#fff' }}>
+            {label}
+          </ThemedText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -181,7 +208,10 @@ const styles = StyleSheet.create({
   market: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing.two },
   bell: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dot: { position: 'absolute', top: 10, right: 10, width: 9, height: 9, borderRadius: 5 },
-  search: { marginHorizontal: Spacing.three, minHeight: 48, borderWidth: 1, borderRadius: Radius.medium, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three },
+  searchRow: { marginHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  search: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: Radius.medium, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingLeft: Spacing.three },
+  searchInput: { flex: 1, minHeight: 46, fontFamily: inter.regular, fontSize: 16, paddingRight: Spacing.three },
+  ask: { minHeight: 48, minWidth: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: Spacing.three, borderRadius: Radius.medium },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { padding: Spacing.four, gap: Spacing.two, borderTopLeftRadius: Radius.large, borderTopRightRadius: Radius.large },
 });
