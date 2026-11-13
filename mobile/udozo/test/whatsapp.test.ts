@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { linkHref, whatsappErrorText, whatsappHref } from '../src/lib/whatsapp.ts';
+import { linkHref, startChatHref, whatsappErrorText, whatsappFeatures, whatsappHref } from '../src/lib/whatsapp.ts';
 
 test('wa.me links carry only the digits and the message', () => {
   assert.equal(whatsappHref('+234 800 000 0000', 'LINK AB12'), 'https://wa.me/2348000000000?text=LINK%20AB12');
@@ -21,4 +21,13 @@ test('refusals are put in words', () => {
   assert.equal(whatsappErrorText('whatsapp_unavailable', 'x'), 'Udozo is not on WhatsApp in your country yet.');
   assert.match(whatsappErrorText('link_code_limit', 'x'), /several codes/);
   assert.equal(whatsappErrorText('other', 'As it was.'), 'As it was.');
+});
+
+test("the pull-up's chat and features open Udozo's number with their word", () => {
+  assert.equal(startChatHref('+234 800 000 0000'), 'https://wa.me/2348000000000?text=Hi');
+  assert.equal(startChatHref(null), null);
+  assert.deepEqual(
+    whatsappFeatures.map(feature => feature.word),
+    ['FIND', 'SELL', 'WANT', 'CHATS', 'Hi', 'HELP'],
+  );
 });

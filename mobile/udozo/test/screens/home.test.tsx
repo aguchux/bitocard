@@ -1,10 +1,12 @@
-// Home: udozo.com's hero reel at the top in place of the page's own hero (and the page as before without it).
-import { fireEvent, screen } from '@testing-library/react-native';
+// Home: udozo.com's hero reel at the top in place of the page's own hero (and the page as before without it), Ask
+// beside the search box, and the WhatsApp pull-up where Udozo is on WhatsApp in the market.
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { Linking } from 'react-native';
 
 import HomeScreen from '@/app/(tabs)/index';
 
-import { answers, renderScreen } from './helpers';
+import { answers, mockedApi, renderScreen } from './helpers';
 
 const mockAccount: { customer: unknown; pending: boolean } = { customer: null, pending: false };
 jest.mock('@/lib/account', () => ({ useAccount: () => mockAccount }));
@@ -43,6 +45,7 @@ const routes = (heroSlides: unknown) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockAccount.customer = null;
+  jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 });
 
 test('the reel opens Home in place of the page’s own hero, its banners linked and Ad marked', async () => {
@@ -103,4 +106,47 @@ test('no Ask where the market has no assistant', async () => {
   expect(await screen.findByLabelText('Search Udozo')).toBeTruthy();
   await screen.findByLabelText('The page’s own hero');
   expect(screen.queryByRole('button', { name: /^Ask/ })).toBeNull();
+});
+
+const channels = (available: boolean) => ({ object: 'classified_channels', country: 'NG', whatsapp: { available, number: available ? '+2348000000000' : null }, wanted: true });
+
+test('the WhatsApp pull-up opens on a tap: a chat with Udozo, signing in or up with WhatsApp, and the features', async () => {
+  answers({ ...routes({ object: 'list', data: [] }), 'GET /v1/classifieds/channels': channels(true) });
+  await renderScreen(<HomeScreen />);
+  await fireEvent.press(await screen.findByRole('button', { name: 'Udozo on WhatsApp' }));
+  expect(await screen.findByText('Find, sell and chat without the app.')).toBeTruthy();
+  expect(screen.getByText(/Udozo never asks for your codes or passwords/)).toBeTruthy();
+  expect(screen.queryByText('Connect your WhatsApp')).toBeNull();
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Start a chat with Udozo' }));
+  expect(Linking.openURL).toHaveBeenCalledWith('https://wa.me/2348000000000?text=Hi');
+  await fireEvent.press(screen.getByRole('button', { name: 'Post a request, sends WANT' }));
+  expect(Linking.openURL).toHaveBeenCalledWith('https://wa.me/2348000000000?text=WANT');
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Sign in with WhatsApp' }));
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/signin', params: { method: 'whatsapp' } });
+  expect(screen.queryByText('Find, sell and chat without the app.')).toBeNull();
+});
+
+test('signed in it offers Connect your WhatsApp, and the backdrop closes it', async () => {
+  mockAccount.customer = { id: 'c1', country: 'NG' };
+  answers({ ...routes({ object: 'list', data: [] }), 'GET /v1/classifieds/channels': channels(true), 'GET /v1/store/account/notifications/unread-count': { count: 0 } });
+  await renderScreen(<HomeScreen />);
+  await fireEvent.press(await screen.findByRole('button', { name: 'Udozo on WhatsApp' }));
+  expect(screen.queryByText('Sign in with WhatsApp')).toBeNull();
+  await fireEvent.press(screen.getAllByRole('button', { name: 'Close' })[0]!);
+  expect(screen.queryByText('Find, sell and chat without the app.')).toBeNull();
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Udozo on WhatsApp' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Connect your WhatsApp' }));
+  expect(router.push).toHaveBeenCalledWith('/whatsapp');
+});
+
+test('no pull-up where Udozo is not on WhatsApp in the market', async () => {
+  answers({ ...routes({ object: 'list', data: [] }), 'GET /v1/classifieds/channels': channels(false) });
+  await renderScreen(<HomeScreen />);
+  await screen.findByLabelText('The page’s own hero');
+  await waitFor(() => expect(mockedApi).toHaveBeenCalledWith('/v1/classifieds/channels?country=NG'));
+  await act(async () => undefined);
+  expect(screen.queryByRole('button', { name: 'Udozo on WhatsApp' })).toBeNull();
 });

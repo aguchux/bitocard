@@ -29,13 +29,14 @@ export function useFinishSignIn() {
  * Continue with Apple (first on iPhones, as Apple asks), Google, Facebook (in builds that have their IDs) and WhatsApp.
  * Each signs in, or makes the account when none uses that identity (never taking over an account with its email).
  */
-export function SignInMethods({ intent, refCode }: { intent: 'signin' | 'signup'; refCode?: string }) {
+export function SignInMethods({ intent, refCode, startWith }: { intent: 'signin' | 'signup'; refCode?: string; startWith?: 'whatsapp' }) {
   const theme = useTheme();
   const finish = useFinishSignIn();
   const [apple, setApple] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [whatsapp, setWhatsapp] = useState(false);
+  // Home's WhatsApp pull-up opens sign-in or sign-up straight at WhatsApp (`method=whatsapp`).
+  const [whatsapp, setWhatsapp] = useState(startWith === 'whatsapp');
 
   useEffect(() => {
     appleAvailable().then(setApple, () => setApple(false));

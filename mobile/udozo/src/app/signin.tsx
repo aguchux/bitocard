@@ -16,7 +16,7 @@ import type { SessionReply } from '@/lib/types';
  * Facebook says so), then the password. Or Apple, Google, Facebook or WhatsApp.
  */
 export default function SignInScreen() {
-  const { ref } = useLocalSearchParams<{ ref?: string }>();
+  const { ref, method } = useLocalSearchParams<{ ref?: string; method?: string }>();
   const finish = useFinishSignIn();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,7 +61,7 @@ export default function SignInScreen() {
         <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
           or
         </ThemedText>
-        <SignInMethods intent="signin" refCode={ref} />
+        <SignInMethods intent="signin" refCode={ref} startWith={method === 'whatsapp' ? 'whatsapp' : undefined} />
       </View>
       <Button tone="ghost" title="New to Udozo? Create an account" onPress={() => router.replace({ pathname: '/signup', params: { ref } })} />
     </Page>

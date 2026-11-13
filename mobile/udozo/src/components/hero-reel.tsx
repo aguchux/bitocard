@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { inter, ThemedText } from '@/components/themed-text';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { collageOf, columnWidth, filledSlides, reelAdvance, reelSettle, type ShownSlide, type ShownTile } from '@/lib/hero';
 import { openLink, photoUrl } from '@/lib/navigate';
 
@@ -11,24 +12,6 @@ const gap = 6;
 /** How long the reel stands on a column before moving on, and how long it waits after a touch before going on. */
 const stepMs = 4000;
 const resumeMs = 2000;
-
-/** Whether the phone asks for reduced motion (then the reel never moves on its own). */
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled().then(
-      value => alive && setReduced(value),
-      () => alive && setReduced(false),
-    );
-    const listener = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
-    return () => {
-      alive = false;
-      listener.remove();
-    };
-  }, []);
-  return reduced;
-}
 
 /**
  * udozo.com's hero reel at the top of Home (`HeroReel` there): columns three rows high, each one banner, a third over

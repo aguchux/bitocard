@@ -600,6 +600,29 @@ Views of listings opened in the app are not counted yet.
   Similar listings rails, and Report. It draws from the listing alone, the viewer filling it in once it comes
   (`test/screens/listing.test.tsx`, `test/listing-page.test.ts`).
 
+**Home (13 November 2026, the owner's request):**
+
+- **The hero reel** at the top of Home (`HeroReel` in `src/components/hero-reel.tsx`, rules in `src/lib/hero.ts`,
+  types `ShopHeroSlide` in `@shared/classifieds`): where the market has columns (`GET /v1/classifieds/hero-slides`),
+  a band in the theme's colour runs from the very top of the screen, under the status bar (its text light while Home
+  is focused, a strip of the colour kept behind it as the page scrolls), holding the header (in white, the light mark)
+  and udozo.com's columns, with the search box just beneath. Each column is three rows high (full, a third over two
+  thirds either way, three thirds), each banner its image or a collage of its photos under its words, Ad only where
+  marked, opening its link through `openLink`. It moves a column every 4 seconds, looping through repeated copies
+  (hidden from screen readers), stops while touched and goes on 2 seconds after, and never moves by itself for reduced
+  motion. It replaces the page's own hero; without columns Home is as before (`test/hero.test.ts`,
+  `test/screens/home.test.tsx`).
+- **Ask inline:** the search box takes words (searching on the keyboard's Search), and on its right a compact Ask
+  button (the sparkle and the assistant's name, else Ask; 48 points) opens the assistant with what is typed, only
+  where the market's assistant answers; the separate button below is gone.
+- **The WhatsApp pull-up** (`WhatsappPullUp` in `src/components/whatsapp-pull-up.tsx`): where Udozo is on WhatsApp in
+  the market (`GET /v1/classifieds/channels`), a small WhatsApp-green handle on the right edge just above the tab bar,
+  dragged up or tapped into a sheet: Start a chat with Udozo, Sign up or Sign in with WhatsApp (opening sign-in or
+  sign-up straight at WhatsApp, `method=whatsapp`) or, signed in, Connect your WhatsApp, then udozo.com's features
+  (`whatsappFeatures` in `src/lib/whatsapp.ts`), each opening the chat with its word, and the safety note. It closes on
+  a drag down, the backdrop, its close button or Back, and nothing slides for reduced motion
+  (`src/hooks/use-reduced-motion.ts`).
+
 ## Testing
 
 - Unit and component tests with Jest and React Native Testing Library, kept beside each feature as the apps' Vitest tests are.

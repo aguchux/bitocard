@@ -21,7 +21,7 @@ type Step = 'email' | 'code' | 'details';
  * text) and the password. Or Apple, Google, Facebook or WhatsApp.
  */
 export default function SignUpScreen() {
-  const params = useLocalSearchParams<{ email?: string; ref?: string }>();
+  const params = useLocalSearchParams<{ email?: string; ref?: string; method?: string }>();
   const market = useMarket();
   const finish = useFinishSignIn();
   const [step, setStep] = useState<Step>('email');
@@ -101,7 +101,7 @@ export default function SignUpScreen() {
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
             or
           </ThemedText>
-          <SignInMethods intent="signup" refCode={params.ref} />
+          <SignInMethods intent="signup" refCode={params.ref} startWith={params.method === 'whatsapp' ? 'whatsapp' : undefined} />
           <Button tone="ghost" title="Already have an account? Sign in" onPress={() => router.replace('/signin')} />
         </View>
       ) : null}

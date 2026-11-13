@@ -52,3 +52,22 @@ export function whatsappErrorText(code: string, message: string) {
       return message || 'That did not work. Try again in a moment.';
   }
 }
+
+/** Udozo's number with "Hi", as udozo.com's WhatsApp tab's Start a chat with Udozo (its menu answers it). */
+export const startChatHref = (number: string | null | undefined) => whatsappHref(number, 'Hi');
+
+/** What Udozo does on WhatsApp (udozo.com's `whatsappFeatures`), each opening the chat with the word that starts it. */
+export const whatsappFeatures = [
+  { word: 'FIND', title: 'Find something', detail: 'Send what you are looking for and tap a listing to see its photo, price and place.', icon: 'find' },
+  { word: 'SELL', title: 'Sell something', detail: 'Post an ad step by step: title, category, price, place and photos, all in the chat.', icon: 'sell' },
+  { word: 'WANT', title: 'Post a request', detail: 'Say what you need and sellers with a match answer you with their listing.', icon: 'want' },
+  { word: 'CHATS', title: 'Chat with sellers', detail: 'Messages go through Udozo, so nobody sees your number. Reply to a message to answer it.', icon: 'chats' },
+  { word: 'Hi', title: "Ask Udozo's assistant", detail: 'Questions about buying, selling, prices and staying safe, answered by AI where it is on. It can make mistakes.', icon: 'assistant' },
+  { word: 'HELP', title: 'Help', detail: 'MENU shows the menu, CANCEL stops what you are doing, STOP means no more messages.', icon: 'help' },
+] as const;
+
+/** The safety note under them. */
+export const whatsappSafety = 'Udozo never asks for your codes or passwords on WhatsApp. See the item before you pay, or use UdozoPay.';
+
+/** WhatsApp's own green, for the pull-up's handle and header. */
+export const whatsappGreen = '#25D366';
