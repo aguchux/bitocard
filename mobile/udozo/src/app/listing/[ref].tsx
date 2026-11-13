@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuctionPanel } from '@/components/auction-panel';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -64,6 +65,9 @@ export default function ListingScreen() {
           <Gallery photos={data.photos} title={data.title} />
           <View style={styles.column}>
             <Summary data={data} />
+            {data.sale_method === 'auction' && (viewer.data?.auction ?? data.auction) ? (
+              <AuctionPanel listingId={data.id} auction={(viewer.data?.auction ?? data.auction)!} currency={data.price.currency} />
+            ) : null}
             {data.features.length ? (
               <Card>
                 <ThemedText type="heading">Details</ThemedText>

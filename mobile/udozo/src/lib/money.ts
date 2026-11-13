@@ -114,7 +114,7 @@ export const orderOpen = (status: ShopOrder['status']) => ['requested', 'locked'
 /**
  * The listing's Buy with UdozoPay button, from what the buyer already has with it (udozo.com's `buyButton`): carry on
  * their order, or start one where UdozoPay is open and there is a price and stock. None for the seller, a sold or
- * reserved item, or an auction (bid on udozo.com).
+ * reserved item, or an auction (bid on its page; the win makes the order).
  */
 export function buyAction(
   listing: Pick<ShopListingPage, 'status' | 'reserved' | 'price'> & Partial<Pick<ShopListingPage, 'in_stock' | 'sale_method'>>,
@@ -188,7 +188,7 @@ export const checkoutUnavailable: Record<string, string> = {
   price_required: 'This listing has no price: agree one by offer in the chat first, then buy at that price.',
   offer_not_accepted: 'Use an offer the seller accepted in the last 7 days.',
   listing_reserved: 'Someone has already paid for this with UdozoPay.',
-  auction_not_won: 'This is sold by auction: bid on it on udozo.com, and pay if your bid wins.',
+  auction_not_won: 'This is sold by auction: bid on it on its page, and pay if your bid wins.',
   out_of_stock: 'This is out of stock: the seller has none to sell right now. Chat with them to ask when more come in.',
   safe_pay_limited: 'This seller cannot take UdozoPay orders right now. You can still chat with them.',
   own_listing: 'This is your own listing.',
