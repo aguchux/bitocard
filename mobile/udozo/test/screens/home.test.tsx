@@ -61,7 +61,8 @@ test('the reel opens Home in place of the page’s own hero, its banners linked 
   await renderScreen(<HomeScreen />);
   expect(await screen.findByTestId('hero-slide-a')).toBeTruthy();
   expect(screen.getByTestId('hero-slide-b')).toBeTruthy();
-  expect(screen.getByTestId('home-band')).toBeTruthy();
+  // The reel sits on the page's own background, never a band of colour, so it blends with what follows.
+  expect(screen.getByTestId('home-band')).toHaveStyle({ backgroundColor: '#ffffff' });
   // The columns repeat to loop; only the first copy is read out.
   expect(screen.getAllByLabelText('Phones for less')).toHaveLength(1);
   expect(screen.getAllByLabelText('Phones for less', { includeHiddenElements: true }).length).toBeGreaterThan(1);

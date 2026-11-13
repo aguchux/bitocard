@@ -2,10 +2,9 @@ import type { ShopHeroSlide } from '@shared/classifieds';
 import type { ClassifiedHome } from '@shared/home';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Bell, ChevronDown, Search, Sparkles } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,10 +25,10 @@ import { useMarket } from '@/lib/market';
  * Home: Udozo's mark, the market (chosen once when signed out; the account's own when signed in), the bell, the search
  * box and Ask Anjio (where the market's assistant answers), then the market's home page as its admins laid it out.
  *
- * Where the market has hero reel columns (`GET /v1/classifieds/hero-slides`), Home opens with udozo.com's reel: a band
- * in the theme's colour from the very top of the screen, under the status bar (its text turned light while Home is
- * shown), holding the header and the reel, with the search box just beneath it; a strip of the same colour stays
- * behind the status bar as the page scrolls. The reel then takes the place of the page's own hero. Without columns,
+ * Where the market has hero reel columns (`GET /v1/classifieds/hero-slides`), Home opens with udozo.com's reel: from
+ * the very top of the screen, under the status bar, on the page's own background so it blends with what follows, the
+ * header then the reel, with the search box just beneath it; a strip of the background stays behind the status bar as
+ * the page scrolls. The reel then takes the place of the page's own hero. Without columns,
  * Home is as before. Where Udozo is on WhatsApp in the market, its pull-up waits above the tab bar (`WhatsappPullUp`).
  */
 export default function HomeScreen() {
@@ -47,13 +46,6 @@ export default function HomeScreen() {
   const reel = slides.length > 0;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  useFocusEffect(
-    useCallback(() => {
-      if (!reel) return;
-      setStatusBarStyle('light');
-      return () => setStatusBarStyle('auto');
-    }, [reel]),
-  );
   const rows = home.data?.rows ?? (home.data ? [{ id: 'all', hidden: false, title: '', subtitle: '', viewAll: null, view_all_href: null, background: 'none' as const, image: null, width: 'contained' as const, spacing: 'normal' as const, blocks: home.data.sections }] : []);
   return (
     <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: reel ? 0 : insets.top }}>
@@ -67,13 +59,13 @@ export default function HomeScreen() {
               void home.refetch();
               void hero.refetch();
             }}
-            tintColor={reel ? '#fff' : theme.primary}
+            tintColor={theme.primary}
             progressViewOffset={reel ? insets.top : 0}
           />
         }>
         {reel ? (
-          <View testID="home-band" style={{ backgroundColor: theme.primary, paddingTop: insets.top, paddingBottom: 6 }}>
-            <Header onBand />
+          <View testID="home-band" style={{ backgroundColor: theme.background, paddingTop: insets.top, paddingBottom: 6 }}>
+            <Header overReel />
             <HeroReel slides={slides} height={width < 600 ? 300 : 420} />
           </View>
         ) : null}
@@ -92,7 +84,7 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
-      {reel ? <View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, backgroundColor: theme.primary }]} /> : null}
+      {reel ? <View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, backgroundColor: theme.background }]} /> : null}
       <WhatsappPullUp country={country} />
     </View>
   );
@@ -141,8 +133,8 @@ function SearchRow({ country, assistantName }: { country: string | null; assista
   );
 }
 
-/** The header: on the reel's band (`onBand`) in white with Udozo's light mark, else in the theme's colours. */
-function Header({ onBand }: { onBand?: boolean }) {
+/** The header, in the theme's colours; above the reel (`overReel`) without its bottom line, so the reel follows on. */
+function Header({ overReel }: { overReel?: boolean }) {
   const theme = useTheme();
   const { customer } = useAccount();
   const { country, markets, fixed, choose } = useMarket();
@@ -155,11 +147,11 @@ function Header({ onBand }: { onBand?: boolean }) {
   });
   const market = markets.find(item => item.country === country);
   const count = unread.data?.count ?? 0;
-  const ink = onBand ? '#fff' : theme.text;
+  const ink = theme.text;
   return (
-    <View style={[styles.header, onBand ? styles.bandHeader : { borderColor: theme.line }]}>
-      <Image source={onBand ? require('@/assets/images/mark-light.png') : require('@/assets/images/mark.png')} style={styles.mark} accessibilityLabel="Udozo" />
-      <ThemedText style={{ fontFamily: inter.extrabold, fontSize: 20, color: onBand ? '#fff' : theme.primary }}>Udozo</ThemedText>
+    <View style={[styles.header, overReel ? styles.bandHeader : { borderColor: theme.line }]}>
+      <Image source={require('@/assets/images/mark.png')} style={styles.mark} accessibilityLabel="Udozo" />
+      <ThemedText style={{ fontFamily: inter.extrabold, fontSize: 20, color: theme.primary }}>Udozo</ThemedText>
       <View style={{ flex: 1 }} />
       {market ? (
         <Pressable
@@ -168,7 +160,7 @@ function Header({ onBand }: { onBand?: boolean }) {
           disabled={fixed}
           onPress={() => setPicking(true)}
           style={styles.market}>
-          <ThemedText type="smallBold" style={onBand ? { color: '#fff' } : undefined}>
+          <ThemedText type="smallBold">
             {market.name}
           </ThemedText>
           {fixed ? null : <ChevronDown size={16} color={ink} />}
