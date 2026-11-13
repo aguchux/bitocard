@@ -43,6 +43,10 @@ The bundle ID and package are `com.udozo.app`, and can change until the store ac
 - **Icons:** written by `python scripts/brand-assets.py` from `assets/udozo/logo.png`; never edit them by hand.
 - **Screens:** `src/app` (expo-router): the tabs in `(tabs)`, the rest stacked over them. udozo.com addresses become the
   app's screens through `src/lib/links.ts`; anything else opens on udozo.com in the in-app browser.
+- **Selling and buying:** wholly in the app: Post an ad (with a video and the brand and model pickers), auctions,
+  UdozoPay orders with their Connect returns, auction claims and resale threads, buy orders and My Resellers. The rules
+  each screen follows are in `src/lib` (`listing-form.ts`, `auctions.ts`, `order-extras.ts`, `buy-orders.ts`,
+  `resellers.ts`, `money.ts`), kept free of React Native and tested under `node --test`.
 - **Shared types:** `src/shared` holds copies of udozo.com's `packages/api-client/src/classifieds.ts`, `home.ts` and
   `storefront.ts`, imported as `@shared/...`; `test/shared.test.ts` fails when they drift.
 - **Build-time settings** (EAS environment variables, read by `app.config.ts`): `GOOGLE_WEB_CLIENT_ID`,

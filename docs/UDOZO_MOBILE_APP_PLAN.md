@@ -406,8 +406,8 @@ Views of listings opened in the app are not counted yet.
   payout account), declines, enters the buyer's code at a meet-up, photographs it (two photos at least) and marks it
   sent (a courier and tracking, or dropped at the Connect Centre) and delivered; the buyer pays, shows the release code
   (never in a screenshot on Android, expo-screen-capture), pays storage owed at a centre, confirms a delivery, opens a
-  dispute and writes in it; either cancels before the hand-over. Returns, auctions and resale orders link to udozo.com
-  for the rest.
+  dispute and writes in it; either cancels before the hand-over. Returns, auction claims and resale orders are in the
+  app too (below).
 - **Payouts** (`payouts`): ready and held, bank accounts (the country's banks, the number; the bank names the holder),
   Pay to my bank, payouts with sandbox simulate; a refusal for the identity check opens it.
 - **Identity check** (`identity`): Udozo Verify in an in-app browser with consent, read again on return.
@@ -415,7 +415,7 @@ Views of listings opened in the app are not counted yet.
   expo-camera's QR reader, which opens only a Udozo till's code): the shop, the basket, the amount and time left, Pay
   (the exact amount shown) or Not my basket.
 - Links: `/account/wallet`, `/account/payouts`, `/account/udozopay`, `/account/verification`, `/account/orders(/<id>)`,
-  `/pay/<token>`. Buy orders stay on udozo.com for now.
+  `/pay/<token>`; since 13 November 2026 also `/account/buy-orders(/<id>)` and `/account/resellers(/<id>)`.
 
 **Selling wholly in the app (13 November 2026, the owner's request: sellers never sent to udozo.com):**
 
@@ -436,26 +436,48 @@ Views of listings opened in the app are not counted yet.
 
   Each field is sent only where it is offered or the listing already has it.
 - **The market's own photo limits.** `GET /v1/classifieds/markets` now answers `min_photos` and `max_photos` (Limits and words). The app asks for that many, and so does udozo.com's Post an ad, which before assumed 4.
-- **Still to build for selling (next agent):**
-  1. **Video on the photos step** (`maxVideoBytes` is ready in `listing-form.ts`):
-     - get a link with `POST /v1/classifieds/listings/:id/video-upload`, which answers `{ path }`;
-     - send it with `POST <api><path>`, multipart `file`, no session needed (the link is the credential); it answers 202 `{ id }`;
-     - poll the listing until `video.status` is `ready` or `failed`;
-     - remove it with `DELETE /v1/classifieds/listings/:id/media/:videoId`;
-     - pick it with expo-image-picker (`mediaTypes: ['videos']`), at most 50 MB.
-
-     It is optional and never holds the step back.
-  2. **Brand and model pickers** for the `brand` and `model` features (`brandFeatureKey`, `modelFeatureKey`), which are typed as text today:
-     - `GET /v1/classifieds/brands?category=&q=&country=&limit=`;
-     - `GET /v1/classifieds/models?category=&brand=&q=&limit=30`;
-     - `GET /v1/classifieds/models/detect?title=&category=` for "From your title".
-
-     A brand or model the list lacks is kept as typed. udozo.com's `BrandField` and `ModelField` are the reference.
-  3. **Other seller places that still open udozo.com:**
-     - an order's Connect returns, auction claims and resale orders (the order screen's "More about this order on udozo.com");
-     - My Resellers (B2B: notes, deals, stopping a reseller);
-     - buy orders;
-     - bidding on auctions as a buyer.
+- **Finished in the app (13 November 2026, the owner's request), so nothing a seller or buyer does opens udozo.com:**
+  - **A video on the photos step** (optional): picked from the library (`pickVideo` in `src/lib/picture.ts`: MP4, MOV or
+    WebM, at most 50 MB and 60 seconds, checked first by `videoProblem` in `listing-form.ts`), sent to
+    `POST /v1/classifieds/listings/:id/video` (multipart `file`, the session route; the 15-minute link udozo.com's
+    browser uses is not needed) through XMLHttpRequest with its progress (`apiUploadWithProgress` in `src/lib/api.ts`:
+    "Sending video (40%)", Stop sending it). While it is `processing` the listing is read again every 4 seconds; ready
+    shows its poster, failed its `failure_reason`, Remove deletes it (`DELETE …/media/:id`). Next waits only while the
+    file is still sending; posting never waits for a video being prepared. `video_exists`, `file_invalid` and
+    `file_too_large` are worded by `videoRefusal`.
+  - **Brand and model pickers** (`BrandPicker`, `ModelPicker` on the shared `RemotePicker` in
+    `src/components/pickers.tsx`, with `BrandLogo`): the category's brands with their logos
+    (`GET /v1/classifieds/brands`), the brand's models (`GET /v1/classifieds/models`, any brand's with none chosen),
+    asked 200 ms after typing stops, and Use "…" when nothing listed is what was typed (letters and digits only,
+    `brandMatchKey`). udozo.com's rules, in `listing-form.ts`: the model row straight after the brand
+    (`withModelNext`), a new brand clearing a model chosen for the old one but never one typed
+    (`modelAfterBrandChange`), a model chosen with no brand filling it in (`withModel`), and **From your title**
+    (`GET /v1/classifieds/models/detect`, 500 ms after the title changes, while the brand or model is empty;
+    `titleOffer`), a banner with Use this and dismiss.
+  - **Bidding on auctions** (`AuctionPanel` in `src/components/auction-panel.tsx`, rules in `src/lib/auctions.ts`):
+    the lot from the viewer, else the listing; the price to beat, bids, the reserve, the end, the latest bids; a bid
+    of at least `next_bid`, its amount confirmed with Face ID or the fingerprint and sent with a kept Idempotency-Key
+    (`POST /v1/classifieds/listings/:id/bids`); refusals in words (`bidRefusal`). The winner of a seller's lot opens
+    the UdozoPay order the win made (`to_pay.order_id`, paid there; the plan said checkout, but the order already
+    exists); Udozo's own lots are paid from the wallet (`POST /v1/classifieds/auctions/:ref/pay`) and their
+    collection code shown.
+  - **An order's extras** (`src/components/order-extras.tsx`, words in `src/lib/order-extras.ts`): a Connect return
+    (accept, the return code, sending it on to a centre near the seller with its shipping confirmed, cancelling that),
+    the claim to what a Udozo auction left over, and resale orders: the supplier's price less the reseller's discount
+    (`sellerLines`), the buyer's details, the order and trade threads (the buyer's at
+    `/v1/store/resale/orders/:id/messages`), and Report this store for the buyer. The "More about this order on
+    udozo.com" link is gone.
+  - **Buy orders** (`buy-orders`, `buy-order/[id]`, rules in `src/lib/buy-orders.ts`): Buying and Selling with what
+    waits, each order's next step and the steps the API offers, each asked first (a counter's price, a reason where
+    one is asked); **Buy this** on a listing (`BuyOrderPanel`); My listings' Mark sold asks **Who bought it?** when the
+    listing has accepted buy orders. Reached from Me and Sell; `/account/buy-orders(/<id>)` open in the app.
+  - **My Resellers** (`resellers`, `reseller/[id]`, deal and note bodies in `src/lib/resellers.ts`): shown in Sell
+    once resellers carry the seller's listings; Accept resale orders automatically; each reseller's stores, notes to
+    approve as written, refuse or withdraw, deals to offer, withdraw or end, the chat (every 4 seconds while open),
+    Stop them or let them again, and Report a store. `/account/resellers(/<id>)` open in the app.
+  - Money in the rules kept free of React Native is written by `src/lib/format.ts` (`shopMoney`'s words).
+- **Still to build (next agent):** a lot's move to a Connect Centre near its buyer (udozo.com's `LotShipping`) is not
+  in the app yet; nor is the video recorded with the camera (the library only). Then phase 4.
 - **Phase 4 (calls and Anjio) is not started.** What it needs:
   - **Calls in the app:** `react-native-webrtc`, relay only, through Cloudflare TURN.
     - Routes: `POST /v1/classifieds/listings/:id/calls`, `POST /v1/classifieds/conversations/:id/calls`, `…/calls/:id/answer|end`, `POST …/calls/:id/signals`, `GET …/calls/:id?after=` (poll every second while connecting, 3 once connected), and presence `POST /v1/classifieds/presence`.
