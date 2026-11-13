@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { useDialog, useToast } from '@/components/feedback';
 import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Chip, Empty, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
@@ -36,6 +37,8 @@ const dateText = (iso: string | null | undefined) => (iso ? new Date(iso).toLoca
 export default function MyListingsScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
+  const ask = useDialog();
+  const toast = useToast();
   const params = useLocalSearchParams<{ status?: string }>();
   const [status, setStatus] = useState<ShopListingStatus>((listingGroups.find(group => group.status === params.status)?.status as ShopListingStatus) ?? 'active');
   const [restocking, setRestocking] = useState<ShopMyListing | null>(null);
@@ -54,8 +57,11 @@ export default function MyListingsScreen() {
       if (action === 'delete') return api(`/v1/classifieds/listings/${listing.id}`, { method: 'DELETE' });
       return api(`/v1/classifieds/listings/${listing.id}/${action}`, { body: {} });
     },
-    onSuccess: done,
-    onError: error => Alert.alert('That did not work', (error as Error).message),
+    onSuccess: (_, { action }) => {
+      done();
+      toast({ message: action === 'sold' ? 'Marked sold' : action === 'delete' ? 'Ad deleted' : 'Ad renewed', tone: 'success' });
+    },
+    onError: error => toast({ message: (error as Error).message, tone: 'error' }),
   });
   const restock = useMutation({
     mutationFn: async ({ listing, stock }: { listing: ShopMyListing; stock: number }) => {
@@ -63,9 +69,10 @@ export default function MyListingsScreen() {
       // An ad Anjio took off for being out of stock comes back once it has stock.
       return changed.status === 'expired' ? api<ShopMyListing>(`/v1/classifieds/listings/${listing.id}/renew`, { body: {} }) : changed;
     },
-    onSuccess: () => {
+    onSuccess: changed => {
       setRestocking(null);
       done();
+      toast({ message: changed.stock ? `${changed.stock} in stock` : 'Out of stock', tone: 'success' });
     },
   });
 
@@ -75,6 +82,7 @@ export default function MyListingsScreen() {
       setSoldTo(null);
       queries.invalidateQueries({ queryKey: ['buy-orders'] });
       done();
+      toast({ message: 'Marked sold', tone: 'success' });
     },
   });
   /** Sold to a buyer whose buy order was accepted? Marked sold to them, so the sale is recorded with them. */
@@ -83,18 +91,18 @@ export default function MyListingsScreen() {
     if (accepted.data.length) {
       sellTo.reset();
       setSoldTo({ listing, orders: accepted.data });
-    } else confirm(listing, 'sold');
+    } else void confirm(listing, 'sold');
   };
 
-  const confirm = (listing: ShopMyListing, action: 'sold' | 'delete') =>
-    Alert.alert(
-      action === 'sold' ? 'Mark it sold?' : 'Delete this ad?',
-      action === 'sold' ? 'It comes off Udozo, and buyers who saved it are told it sold.' : 'It comes off Udozo for good. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: action === 'sold' ? 'Mark sold' : 'Delete', style: action === 'delete' ? 'destructive' : 'default', onPress: () => act.mutate({ listing, action }) },
-      ],
-    );
+  const confirm = async (listing: ShopMyListing, action: 'sold' | 'delete') => {
+    const sold = action === 'sold';
+    const answer = await ask({
+      title: sold ? 'Mark it sold?' : 'Delete this ad?',
+      body: sold ? 'It comes off Udozo, and buyers who saved it are told it sold.' : 'It comes off Udozo for good. This cannot be undone.',
+      actions: [{ key: action, label: sold ? 'Mark sold' : 'Delete', tone: sold ? 'primary' : 'danger' }],
+    });
+    if (answer === action) act.mutate({ listing, action });
+  };
 
   const items = paged.items;
   return (
@@ -155,7 +163,7 @@ export default function MyListingsScreen() {
                   />
                 ) : null}
                 {actions.includes('renew') ? <Button title="Renew" tone="ghost" onPress={() => act.mutate({ listing: item, action: 'renew' })} /> : null}
-                {actions.includes('delete') ? <Button title="Delete" tone="ghost" onPress={() => confirm(item, 'delete')} /> : null}
+                {actions.includes('delete') ? <Button title="Delete" tone="ghost" onPress={() => void confirm(item, 'delete')} /> : null}
               </View>
             </View>
           );
@@ -191,7 +199,7 @@ export default function MyListingsScreen() {
           onPress={() => {
             const stock = Number(units);
             if (restocking && Number.isInteger(stock) && stock >= 0 && stock <= 100000) restock.mutate({ listing: restocking, stock });
-            else Alert.alert('Give a whole number', 'Such as 1, or 0 when none are left.');
+            else toast({ message: 'Give a whole number, such as 1, or 0 when none are left.', tone: 'error' });
           }}
         />
       </Sheet>

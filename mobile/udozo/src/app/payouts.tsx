@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Landmark, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AccountPending } from '@/components/account-pending';
+import { useDialog, useToast } from '@/components/feedback';
 import { ConfirmSheet } from '@/components/money';
 import { SignedOut } from '@/components/signed-out';
 import { inter, ThemedText } from '@/components/themed-text';
@@ -32,6 +33,8 @@ const payoutWords: Record<StoreCustomerPayout['status'], string> = { pending: 'O
 export default function PayoutsScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
+  const ask = useDialog();
+  const toast = useToast();
   const { customer } = useAccount();
   const [adding, setAdding] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -39,7 +42,18 @@ export default function PayoutsScreen() {
   const accounts = useQuery({ queryKey: ['cash', 'accounts'], enabled: Boolean(customer), queryFn: () => api<{ data: StoreCustomerBankAccount[] }>('/v1/store/cash/bank-accounts') });
   const payouts = useQuery({ queryKey: ['cash', 'payouts'], enabled: Boolean(customer), queryFn: () => api<{ data: StoreCustomerPayout[] }>('/v1/store/cash/payouts') });
   const refresh = () => queries.invalidateQueries({ queryKey: ['cash'] });
-  const remove = useMutation({ mutationFn: (id: string) => api(`/v1/store/cash/bank-accounts/${id}`, { method: 'DELETE' }), onSuccess: refresh });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/v1/store/cash/bank-accounts/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      refresh();
+      toast({ message: 'Account removed', tone: 'success' });
+    },
+    onError: error => toast({ message: (error as Error).message, tone: 'error' }),
+  });
+  const removeAccount = async (account: StoreCustomerBankAccount) => {
+    const answer = await ask({ title: 'Remove this account?', body: `${account.bank_name} ending ${account.account_number_last4}`, dismiss: 'Keep it', actions: [{ key: 'remove', label: 'Remove', tone: 'danger' }] });
+    if (answer === 'remove') remove.mutate(account.id);
+  };
   const simulate = useMutation({ mutationFn: ({ id, outcome }: { id: string; outcome: 'paid' | 'failed' }) => api(`/v1/store/cash/payouts/${id}/simulate`, { body: { outcome } }), onSuccess: refresh });
 
   if (customer === undefined) return <AccountPending />;
@@ -95,7 +109,7 @@ export default function PayoutsScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Remove ${account.bank_name} ending ${account.account_number_last4}`}
             hitSlop={10}
-            onPress={() => Alert.alert('Remove this account?', `${account.bank_name} ending ${account.account_number_last4}`, [{ text: 'Keep it', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(account.id) }])}>
+            onPress={() => void removeAccount(account)}>
             <Trash2 size={20} color={theme.danger} />
           </Pressable>
         </View>
@@ -129,6 +143,7 @@ export default function PayoutsScreen() {
 /** A bank account to be paid into: the bank from the country's list, then the number; the bank names its holder. */
 function AddAccount({ visible, onClose, onAdded }: { visible: boolean; onClose: () => void; onAdded: () => void }) {
   const theme = useTheme();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [bank, setBank] = useState<Bank | null>(null);
   const [number, setNumber] = useState('');
@@ -140,7 +155,7 @@ function AddAccount({ visible, onClose, onAdded }: { visible: boolean; onClose: 
   const add = useMutation({
     mutationFn: () => api<StoreCustomerBankAccount>('/v1/store/cash/bank-accounts', { body: { bank_code: bank!.code, account_number: number } }),
     onSuccess: added => {
-      Alert.alert('Account added', `${added.bank_name} ending ${added.account_number_last4}, ${added.account_name}.${added.ready ? '' : ' You can be paid into it in 24 hours.'}`);
+      toast({ message: `Account added: ${added.bank_name} ending ${added.account_number_last4}, ${added.account_name}.${added.ready ? '' : ' You can be paid into it in 24 hours.'}`, tone: 'success' });
       setBank(null);
       setNumber('');
       onAdded();
@@ -186,6 +201,7 @@ function PayOut({ visible, cash, accounts, onClose, onPaid }: { visible: boolean
   const [amount, setAmount] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const toast = useToast();
   const key = useMoneyKey();
   const account = accounts.find(item => item.id === chosen) ?? accounts[0];
   const minor = toMinor(amount) ?? cash.available;
@@ -196,7 +212,8 @@ function PayOut({ visible, cash, accounts, onClose, onPaid }: { visible: boolean
       setConfirming(false);
       onClose();
       onPaid();
-      Alert.alert(payout.status === 'failed' ? 'The bank refused it' : 'On its way', payout.status === 'failed' ? `${payout.failure_reason ?? 'Try another account'}. The money is back in your balance.` : `${shopMoney(payout.amount, payout.currency)} is on its way to your bank.`);
+      if (payout.status === 'failed') toast({ message: `The bank refused it: ${payout.failure_reason ?? 'try another account'}. The money is back in your balance.`, tone: 'error' });
+      else toast({ message: `On its way: ${shopMoney(payout.amount, payout.currency)} to your bank.`, tone: 'success' });
     },
     onError: error => key.settle(error),
   });

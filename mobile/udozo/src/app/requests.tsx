@@ -1,7 +1,8 @@
 import type { ShopContactRequest, ShopContactShare } from '@shared/classifieds';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
+import { useDialog, useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Empty, Failed, Loading } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -30,6 +31,8 @@ const statusWords: Record<ShopContactRequest['status'], string> = {
 export default function RequestsScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
+  const dialog = useDialog();
+  const toast = useToast();
   const requests = useQuery({ queryKey: ['requests'], queryFn: () => api<Requests>('/v1/classifieds/me/contact-requests?limit=100') });
   const shares = useQuery({ queryKey: ['contact-shares'], queryFn: () => api<{ data: ShopContactShare[] }>('/v1/classifieds/me/contact-shares') });
   const refresh = () => {
@@ -38,12 +41,20 @@ export default function RequestsScreen() {
   };
   const answer = useMutation({
     mutationFn: ({ id, action }: { id: string; action: Answer }) => api(`/v1/classifieds/contact-requests/${id}/${action}`, { body: {} }),
-    onSuccess: refresh,
-    onError: error => Alert.alert('That did not work', (error as Error).message),
+    onSuccess: (_, { action }) => {
+      refresh();
+      const done: Record<Answer, string> = { accept: 'Contact shared', decline: 'Request declined', done: 'Marked called', dismiss: 'Call back dismissed' };
+      toast({ message: done[action], tone: 'success' });
+    },
+    onError: error => toast({ message: (error as Error).message, tone: 'error' }),
   });
   const stop = useMutation({
     mutationFn: (buyer: string) => api(`/v1/classifieds/me/contact-shares/${buyer}`, { method: 'DELETE' }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      toast({ message: 'Stopped sharing your contact', tone: 'success' });
+    },
+    onError: error => toast({ message: (error as Error).message, tone: 'error' }),
   });
   const ask = (request: ShopContactRequest, action: Answer) => {
     const words: Record<Answer, [string, string, string]> = {
@@ -53,10 +64,9 @@ export default function RequestsScreen() {
       dismiss: ['Dismiss the call back?', 'They are not told why.', 'Dismiss'],
     };
     const [title, body, button] = words[action];
-    Alert.alert(title, body, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: button, style: action === 'decline' || action === 'dismiss' ? 'destructive' : 'default', onPress: () => answer.mutate({ id: request.id, action }) },
-    ]);
+    void dialog({ title, body, actions: [{ key: action, label: button, tone: action === 'decline' || action === 'dismiss' ? 'danger' : 'primary' }] }).then(chosen => {
+      if (chosen === action) answer.mutate({ id: request.id, action });
+    });
   };
 
   if (requests.isPending) return <Loading />;

@@ -659,6 +659,16 @@ Views of listings opened in the app are not counted yet.
   and name open their page (username, else handle), as the contact row's Seller page does; in a chat the other
   person's name in the header opens theirs, the conversations API now giving `with.handle` and `with.username`
   (`test/screens/listing.test.tsx`, the API's `test/classifieds-conversations.test.mjs`).
+- **Udozo's own dialog and toasts, never the phone's alerts** (13 November 2026, the owner's request;
+  `FeedbackProvider`, `useDialog` and `useToast` in `src/components/feedback.tsx`, rules in `src/lib/feedback.ts`):
+  questions are a rounded card in the theme's colours centred over a dimmed backdrop, the title a header, the way out
+  first then the actions stacked full width (danger red, money green), closed by Cancel, the backdrop or Back, a short
+  fade and scale (none for reduced motion); outcomes are toasts at the top under the notch (success, error or info,
+  each with its icon), hiding after 3.5 seconds (6 with an action), queued, tapped away, read out by screen readers. A
+  toast shown with a sheet or the dialog open draws inside it (`ToastHost`, the newest host drawing). Every
+  `Alert.alert` became one or the other (`test/no-alerts.test.ts` refuses them), Call seller while the seller is away
+  offers Chat with seller and Request call back, and saving, copying, blocking, offers, removals and payouts say so
+  (`test/feedback.test.ts`, `test/screens/feedback.test.tsx`).
 
 ## Testing
 

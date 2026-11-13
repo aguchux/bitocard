@@ -53,7 +53,9 @@ export function ContactRow({ data, viewer, onChat }: { data: ShopListingPage; vi
     cells.push(<Action key="chat" label={chatOpen ? 'Open chat' : 'Chat'} icon={<MessageCircle size={18} color={theme.onPrimary} />} primary onPress={signedIn ? onChat : signIn} />);
   }
   if (offers.allowed && offers.call && (!signedIn || (calls && listingCallButton(viewer, calls.busy).show))) {
-    cells.push(signedIn ? <CallSellerButton key="call" listingId={data.id} viewer={viewer} wide /> : <Action key="call" label="Call" icon={<PhoneCall size={18} color={theme.text} />} onPress={signIn} />);
+    // While the seller is away, its dialog offers what else this listing takes: the chat, a call back.
+    const askCallback = offers.callback && callback !== 'pending' ? () => setAsking('callback') : undefined;
+    cells.push(signedIn ? <CallSellerButton key="call" listingId={data.id} viewer={viewer} wide onChat={offers.chat ? onChat : undefined} onCallback={askCallback} /> : <Action key="call" label="Call" icon={<PhoneCall size={18} color={theme.text} />} onPress={signIn} />);
   }
   if (offers.allowed && offers.callback) {
     cells.push(

@@ -1,8 +1,8 @@
 // Calls: the call panel, Call seller on a listing, Call in a chat, and a call ringing for the customer while the app is
 // open. The phone's call screen and WebRTC are stand-ins (setup.ts); the API answers as udozo-api's calls do.
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Alert, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 import RNCallKeep from 'react-native-callkeep';
 
 import ListingScreen from '@/app/listing/[ref]';
@@ -148,9 +148,8 @@ test('Call seller rings the seller through the relay and shows the call; cancell
   view.unmount();
 });
 
-test('Call seller is greyed while the seller is away, and says why', async () => {
+test('Call seller is greyed while the seller is away, and says why in Udozo’s dialog, offering the chat instead', async () => {
   (useLocalSearchParams as jest.Mock).mockReturnValue({ ref: '77', country: 'NG' });
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   answers({
     'POST /v1/classifieds/presence': presence(),
     'GET /v1/classifieds/listings/77': listing,
@@ -164,14 +163,38 @@ test('Call seller is greyed while the seller is away, and says why', async () =>
   const button = await screen.findByLabelText('Call seller');
   expect(button.props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(button);
-  expect(alert).toHaveBeenCalledWith('Call seller', expect.stringMatching(/not on Udozo right now/));
+  const dialog = within(screen.getByTestId('dialog'));
+  expect(dialog.getByRole('header', { name: 'Call seller' })).toBeTruthy();
+  expect(dialog.getByText(/not on Udozo right now/)).toBeTruthy();
+  // The listing takes chats: Chat with seller opens Message the seller.
+  await fireEvent.press(dialog.getByRole('button', { name: 'Chat with seller' }));
+  expect(await screen.findByText('Message the seller')).toBeTruthy();
   // The contact row's Call says why in its label too.
   expect(screen.getByLabelText(/^Call seller\. The seller is not on Udozo right now/)).toBeTruthy();
   view.unmount();
 });
 
+test('the contact row’s Call seller, while the seller is away, offers a call back too', async () => {
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ ref: '77', country: 'NG' });
+  answers({
+    'POST /v1/classifieds/presence': presence(),
+    'GET /v1/classifieds/listings/77': listing,
+    [`GET /v1/classifieds/listings/${listingId}/viewer`]: { ...viewer, seller_online: false, callback: { available: true, request: null } },
+  });
+  const view = await renderScreen(
+    <CallProvider>
+      <ListingScreen />
+    </CallProvider>,
+  );
+  await fireEvent.press(await screen.findByLabelText(/^Call seller\. The seller is not on Udozo right now/));
+  const dialog = within(screen.getByTestId('dialog'));
+  expect(dialog.getByRole('button', { name: 'Chat with seller' })).toBeTruthy();
+  await fireEvent.press(dialog.getByRole('button', { name: 'Request call back' }));
+  expect(await screen.findByText('Ask for a call back')).toBeTruthy();
+  view.unmount();
+});
+
 test('Call in a chat is greyed while they are away, and says why', async () => {
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   answers({
     'POST /v1/classifieds/presence': presence(),
     'POST /v1/classifieds/conversations/chat-1/calls': () => {
@@ -186,7 +209,10 @@ test('Call in a chat is greyed while they are away, and says why', async () => {
     </CallProvider>,
   );
   await fireEvent.press(await screen.findByLabelText('Call Bola A.'));
-  expect(alert).toHaveBeenCalledWith('Call Bola A.', 'Bola A. is not on Udozo right now. Write to them here instead.');
+  expect(screen.getByRole('header', { name: 'Call Bola A.' })).toBeTruthy();
+  expect(screen.getByText('Bola A. is not on Udozo right now. Write to them here instead.')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'OK' }));
+  expect(screen.queryByRole('header', { name: 'Call Bola A.' })).toBeNull();
   away.unmount();
 });
 

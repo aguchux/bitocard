@@ -21,10 +21,11 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Camera, Film, Images, Sparkles, Star, Trash2, Video, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccountPending } from '@/components/account-pending';
+import { useDialog, useToast } from '@/components/feedback';
 import { BrandLogo, BrandPicker, CategoryPicker, ModelPicker, PickerRow, PlacePicker } from '@/components/pickers';
 import { SignedOut } from '@/components/signed-out';
 import { ThemedText } from '@/components/themed-text';
@@ -95,6 +96,8 @@ export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const queries = useQueryClient();
+  const ask = useDialog();
+  const toast = useToast();
   const { customer, pending } = useAccount();
   const { country, markets } = useMarket();
   const market = markets.find(item => item.country === country);
@@ -268,16 +271,18 @@ export default function PostScreen() {
     if (saved) setStep(current => Math.min(lastStep, current + 1));
   };
 
+  /** The camera or photos were turned off for Udozo: say so, offering the phone's settings. */
+  const askForSettings = async (title: string, body: string) => {
+    if ((await ask({ title, body, dismiss: 'Not now', actions: [{ key: 'settings', label: 'Open settings' }] })) === 'settings') await Linking.openSettings();
+  };
+
   const addPhotos = async (from: 'camera' | 'library') => {
     const id = listingId ?? (await save());
     if (!id) return;
     const room = mostPhotos - photos.length - uploading;
     const { photos: picked, refused } = await pickPhotos(from, room).catch(() => ({ photos: [], refused: false }));
     if (refused) {
-      Alert.alert(from === 'camera' ? 'Camera turned off' : 'Photos turned off', `Allow Udozo to use your ${from === 'camera' ? 'camera' : 'photos'} in your phone's settings.`, [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Open settings', onPress: () => Linking.openSettings() },
-      ]);
+      await askForSettings(from === 'camera' ? 'Camera turned off' : 'Photos turned off', `Allow Udozo to use your ${from === 'camera' ? 'camera' : 'photos'} in your phone's settings.`);
       return;
     }
     setUploading(count => count + picked.length);
@@ -300,10 +305,7 @@ export default function PostScreen() {
     setVideoError(null);
     const { video, problem: refusal, refused } = await pickVideo(from).catch(() => ({ video: null, problem: undefined, refused: false }));
     if (refused) {
-      Alert.alert('Camera turned off', "Allow Udozo to use your camera in your phone's settings.", [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Open settings', onPress: () => Linking.openSettings() },
-      ]);
+      await askForSettings('Camera turned off', "Allow Udozo to use your camera in your phone's settings.");
       return;
     }
     if (refusal) setVideoError(refusal);
@@ -355,15 +357,20 @@ export default function PostScreen() {
       const answer = await api<ShopSuggestion>('/v1/classifieds/assistant/suggestions', { body: { kind: 'draft', listing_id: listingId } });
       const offered = answer.kind === 'draft' ? answer.suggestion : null;
       if (!offered) {
-        Alert.alert(`${helper ?? 'Anjio'} could not tell`, 'Fill the details in yourself, or add clearer photos and try again.');
+        toast({ message: `${helper ?? 'Anjio'} could not tell. Fill the details in yourself, or add clearer photos and try again.`, tone: 'info' });
         return;
       }
       const lines = [offered.title, offered.category?.name, offered.condition ? conditionLabels[offered.condition] : null, offered.features.length ? `${offered.features.length} details` : null].filter(Boolean).join(' · ');
-      Alert.alert(`${helper ?? 'Anjio'} suggests`, lines || 'A description', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Fill the empty fields', onPress: () => change(applyDraftSuggestion(draft, offered)) },
-        { text: 'Use all of it', onPress: () => change(applyDraftSuggestion(draft, offered, true)) },
-      ]);
+      setSuggesting(null);
+      const choice = await ask({
+        title: `${helper ?? 'Anjio'} suggests`,
+        body: lines || 'A description',
+        actions: [
+          { key: 'empty', label: 'Fill the empty fields' },
+          { key: 'all', label: 'Use all of it', tone: 'secondary' },
+        ],
+      });
+      if (choice) change(applyDraftSuggestion(draft, offered, choice === 'all'));
     } catch (caught) {
       setError(caught);
     } finally {
@@ -382,10 +389,9 @@ export default function PostScreen() {
       if (!range) setPriceHint(answer.kind === 'price' ? answer.note : 'Not enough similar listings to suggest a price yet.');
       else {
         setPriceHint(`Similar ones sell for ${shopMoney(range.low, range.currency)} to ${shopMoney(range.high, range.currency)} (${range.count} listings).`);
-        Alert.alert('Use the middle price?', shopMoney(range.median, range.currency), [
-          { text: 'No', style: 'cancel' },
-          { text: 'Use it', onPress: () => change({ price: String(range.median / 100), priceKind: draft.priceKind === 'on_request' ? 'negotiable' : draft.priceKind }) },
-        ]);
+        setSuggesting(null);
+        const use = await ask({ title: 'Use the middle price?', body: shopMoney(range.median, range.currency), dismiss: 'No', actions: [{ key: 'use', label: 'Use it' }] });
+        if (use) change({ price: String(range.median / 100), priceKind: draft.priceKind === 'on_request' ? 'negotiable' : draft.priceKind });
       }
     } catch (caught) {
       setError(caught);

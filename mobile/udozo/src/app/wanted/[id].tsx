@@ -2,8 +2,9 @@ import { shopPriceText } from '@shared/classifieds';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LayoutList } from 'lucide-react-native';
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
+import { useDialog, useToast } from '@/components/feedback';
 import { ListingCard } from '@/components/listing-card';
 import { MenuRow } from '@/components/menu-row';
 import { ThemedText } from '@/components/themed-text';
@@ -21,13 +22,16 @@ import { wantedWhen, type WantedForSeller, type WantedMine, type WantedRequest, 
 export default function WantedRequestScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
+  const dialog = useDialog();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const request = useQuery({ queryKey: ['wanted', 'one', id], queryFn: () => api<WantedView>(`/v1/classifieds/wanted/${id}`) });
   const close = useMutation({
     mutationFn: (fulfilled: boolean) => api<WantedRequest>(`/v1/classifieds/wanted/${id}/close`, { body: { fulfilled } }),
-    onSuccess: () => {
+    onSuccess: (_, fulfilled) => {
       void request.refetch();
       queries.invalidateQueries({ queryKey: ['wanted'] });
+      toast({ message: fulfilled ? 'Glad you found it. Your request is closed.' : 'Request closed', tone: 'success' });
     },
   });
   const respond = useMutation({
@@ -43,11 +47,14 @@ export default function WantedRequestScreen() {
   const data = request.data;
   const facts = [data.category.name, data.place ?? 'Anywhere', data.budget.text ? `Up to ${data.budget.text}` : null, data.condition_text].filter(Boolean).join(' · ');
 
-  const ask = (fulfilled: boolean) =>
-    Alert.alert(fulfilled ? 'Did you find it?' : 'Close this request?', fulfilled ? 'Your request closes and sellers stop being told about it.' : 'Sellers stop being told about it. You can post another any time.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: fulfilled ? 'I found it' : 'Close request', style: fulfilled ? 'default' : 'destructive', onPress: () => close.mutate(fulfilled) },
-    ]);
+  const ask = async (fulfilled: boolean) => {
+    const answer = await dialog({
+      title: fulfilled ? 'Did you find it?' : 'Close this request?',
+      body: fulfilled ? 'Your request closes and sellers stop being told about it.' : 'Sellers stop being told about it. You can post another any time.',
+      actions: [{ key: 'close', label: fulfilled ? 'I found it' : 'Close request', tone: fulfilled ? 'primary' : 'danger' }],
+    });
+    if (answer === 'close') close.mutate(fulfilled);
+  };
 
   return (
     <ScrollView
@@ -68,8 +75,8 @@ export default function WantedRequestScreen() {
       {data.mine && data.status === 'open' ? (
         <View style={{ gap: Spacing.two }}>
           {close.error ? <FormError error={close.error} /> : null}
-          <Button tone="money" title="I found it" loading={close.isPending && close.variables === true} onPress={() => ask(true)} />
-          <Button tone="secondary" title="Close request" loading={close.isPending && close.variables === false} onPress={() => ask(false)} />
+          <Button tone="money" title="I found it" loading={close.isPending && close.variables === true} onPress={() => void ask(true)} />
+          <Button tone="secondary" title="Close request" loading={close.isPending && close.variables === false} onPress={() => void ask(false)} />
         </View>
       ) : null}
     </ScrollView>

@@ -11,6 +11,7 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { AccountPending } from '@/components/account-pending';
 import { ListFooter, usePagedList } from '@/components/paged-list';
 import { SignedOut } from '@/components/signed-out';
+import { useToast } from '@/components/feedback';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, Empty, Failed, Field, FormError, Loading, Page, Sheet, fieldError } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -223,6 +224,7 @@ function AccountNumber({ account, needsBvn, sandbox, opening, setOpening, onChan
   const theme = useTheme();
   const [bvn, setBvn] = useState('');
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   const open = useMutation({
     mutationFn: () => api('/v1/store/wallet/reserved-accounts', { body: needsBvn ? { bvn: bvn.trim() } : {} }),
     onSuccess: () => {
@@ -277,6 +279,7 @@ function AccountNumber({ account, needsBvn, sandbox, opening, setOpening, onChan
         onPress={async () => {
           await Clipboard.setStringAsync(account.account_number);
           setCopied(true);
+          toast({ message: 'Account number copied', tone: 'success' });
         }}
       />
       {sandbox ? <Button title={`Simulate a transfer of ${shopMoney(500_000, account.currency)}`} tone="ghost" loading={deposit.isPending} onPress={() => deposit.mutate()} /> : null}

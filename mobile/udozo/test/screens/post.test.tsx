@@ -1,8 +1,8 @@
 // Post an ad and My listings: the first step makes the draft, a saved draft opens where it stopped, posting accepts the
 // terms first, and a live ad is marked sold or restocked.
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Alert } from 'react-native';
+import { Linking } from 'react-native';
 
 import MyListingsScreen from '@/app/my-listings';
 import PostScreen from '@/app/post/[id]';
@@ -139,7 +139,6 @@ test('a refusal from the API opens the step holding its field', async () => {
 
 test('My listings marks a live ad sold after asking, and restocks one', async () => {
   (useLocalSearchParams as jest.Mock).mockReturnValue({});
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation((title, message, buttons) => buttons?.at(-1)?.onPress?.());
   const calls: string[] = [];
   answers({
     'GET /v1/classifieds/me/listings': { object: 'list', data: [listing({ status: 'active', stock: 2 })], has_more: false },
@@ -151,14 +150,16 @@ test('My listings marks a live ad sold after asking, and restocks one', async ()
   expect(screen.getByText(/Live · 2 in stock · 12 views · 3 leads/)).toBeTruthy();
 
   await fireEvent.press(screen.getByText('Mark sold'));
-  expect(alert.mock.calls[0][0]).toBe('Mark it sold?');
+  const dialog = within(screen.getByTestId('dialog'));
+  expect(dialog.getByRole('header', { name: 'Mark it sold?' })).toBeTruthy();
+  await fireEvent.press(dialog.getByRole('button', { name: 'Mark sold' }));
   await waitFor(() => expect(calls).toEqual(['sold']));
+  expect(await screen.findByRole('alert', { name: 'Marked sold' })).toBeTruthy();
 
   await fireEvent.press(screen.getByText('Restock'));
   await fireEvent.changeText(screen.getByLabelText('In stock'), '5');
   await fireEvent.press(screen.getByText('Save'));
   await waitFor(() => expect(calls).toEqual(['sold', 'stock {"stock":5}']));
-  alert.mockRestore();
 });
 
 test('the photos step sends a video with its progress, never holds the ad back while it is prepared, and words a refusal', async () => {
@@ -213,11 +214,14 @@ test('Record a video records with the camera and sends it through the same path,
     'GET /v1/classifieds/terms': { version: '2026-11-10', path: '/legal/terms', accepted: true, previous_version: null },
     'GET /v1/classifieds/me/listings/l1': () => listing({ title: 'iPhone', photos: [], video: null }),
   });
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  const settings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
   (pickVideo as jest.Mock).mockResolvedValueOnce({ video: null, refused: true });
   await renderScreen(<PostScreen />);
   await fireEvent.press(await screen.findByText('Record a video'));
-  await waitFor(() => expect(alert).toHaveBeenCalledWith('Camera turned off', expect.any(String), expect.any(Array)));
+  const dialog = within(await screen.findByTestId('dialog'));
+  expect(dialog.getByRole('header', { name: 'Camera turned off' })).toBeTruthy();
+  await fireEvent.press(dialog.getByRole('button', { name: 'Open settings' }));
+  await waitFor(() => expect(settings).toHaveBeenCalled());
   expect(uploadListingVideo).not.toHaveBeenCalled();
 
   (pickVideo as jest.Mock).mockResolvedValueOnce({ video: { uri: 'file:///rec.mov', name: 'rec.mov', type: 'video/quicktime' } });
@@ -225,7 +229,7 @@ test('Record a video records with the camera and sends it through the same path,
   await fireEvent.press(screen.getByText('Record a video'));
   expect(pickVideo).toHaveBeenLastCalledWith('camera');
   await waitFor(() => expect(uploadListingVideo).toHaveBeenCalledWith('l1', expect.objectContaining({ type: 'video/quicktime' }), expect.any(Function)));
-  alert.mockRestore();
+  settings.mockRestore();
 });
 
 test('brand and model come from their lists, a typed one is kept, and the title offers both', async () => {

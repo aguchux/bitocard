@@ -2,8 +2,9 @@ import { usernamePattern, type UsernameAvailability, type UsernameStatus } from 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
+import { useDialog, useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, Failed, Field, FormError, Loading, Page, fieldError } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -25,6 +26,8 @@ const reasons: Record<NonNullable<UsernameAvailability['reason']>, string> = {
 export default function UsernameScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
+  const ask = useDialog();
+  const toast = useToast();
   const status = useQuery({ queryKey: ['username'], queryFn: () => api<UsernameStatus>('/v1/store/account/username') });
   const [now] = useState(() => Date.now());
   const [typed, setTyped] = useState('');
@@ -46,7 +49,9 @@ export default function UsernameScreen() {
     onSuccess: saved => {
       queries.setQueryData(['username'], saved);
       queries.invalidateQueries({ queryKey: ['account'] });
-      Alert.alert('Saved', `Your seller page now goes by @${saved.username}.`, [{ text: 'OK', onPress: () => router.back() }]);
+      // Back to where they came from, with the toast (drawn at the root) still showing there.
+      toast({ message: `Saved. Your seller page now goes by @${saved.username}.`, tone: 'success' });
+      router.back();
     },
   });
 
@@ -70,10 +75,11 @@ export default function UsernameScreen() {
   const typedProblem = wanted && !usernamePattern.test(wanted) ? reasons.invalid : null;
   const submit = () => {
     if (data.username) {
-      Alert.alert('Change your username?', `Your old address keeps working for 90 days, then anyone may take it. You can change it again in 30 days.`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Change it', onPress: () => save.mutate(wanted) },
-      ]);
+      void ask({
+        title: 'Change your username?',
+        body: 'Your old address keeps working for 90 days, then anyone may take it. You can change it again in 30 days.',
+        actions: [{ key: 'change', label: 'Change it' }],
+      }).then(answer => answer === 'change' && save.mutate(wanted));
     } else save.mutate(wanted);
   };
   return (

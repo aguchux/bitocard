@@ -1,8 +1,7 @@
 // Sell's two cards (Post an ad, then Request an ad where wanted requests are open), posting a request, its refusals in
 // words, the reader's requests and closing one.
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Alert } from 'react-native';
 
 import SellScreen from '@/app/(tabs)/sell';
 import WantedRequestScreen from '@/app/wanted/[id]';
@@ -170,16 +169,17 @@ test('a request shows the sellers’ answers, and I found it closes it', async (
     }),
     [`POST /v1/classifieds/wanted/${id}/close`]: close,
   });
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation((title, message, buttons) => buttons?.at(-1)?.onPress?.());
   await renderScreen(<WantedRequestScreen />);
   expect(await screen.findByText('Bola A.')).toBeTruthy();
   expect(screen.getByText('Clean, one owner')).toBeTruthy();
   await fireEvent.press(screen.getByRole('button', { name: 'Open the chat' }));
   expect(router.push).toHaveBeenCalledWith({ pathname: '/chat/[id]', params: { id: 'conv-1' } });
   await fireEvent.press(screen.getByRole('button', { name: 'I found it' }));
-  expect(alert).toHaveBeenCalledWith('Did you find it?', expect.any(String), expect.any(Array));
+  const dialog = within(screen.getByTestId('dialog'));
+  expect(dialog.getByRole('header', { name: 'Did you find it?' })).toBeTruthy();
+  await fireEvent.press(dialog.getByRole('button', { name: 'I found it' }));
   await waitFor(() => expect(close).toHaveBeenCalledWith({ fulfilled: true }));
+  expect(await screen.findByRole('alert', { name: 'Glad you found it. Your request is closed.' })).toBeTruthy();
   await waitFor(() => expect(screen.queryByRole('button', { name: 'I found it' })).toBeNull());
   expect(screen.getByText('WR-000012 · Found it')).toBeTruthy();
-  alert.mockRestore();
 });

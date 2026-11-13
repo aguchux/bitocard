@@ -10,6 +10,7 @@ import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChatCallButton } from '@/components/calls/call-button';
+import { useToast } from '@/components/feedback';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Chip, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -226,11 +227,24 @@ function ChatMenu({ chat, menu, setMenu, onChange }: { chat: ShopChat; menu: 'no
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState<ShopChatReportReason | null>(null);
   const [details, setDetails] = useState('');
+  const toast = useToast();
   const close = () => setMenu('none');
-  const block = useMutation({ mutationFn: () => api(`/v1/classifieds/conversations/${chat.id}/${chat.blocked.by_me ? 'unblock' : 'block'}`, { body: {} }), onSuccess: () => (onChange(), close()) });
+  const block = useMutation({
+    mutationFn: () => api(`/v1/classifieds/conversations/${chat.id}/${chat.blocked.by_me ? 'unblock' : 'block'}`, { body: {} }),
+    onSuccess: () => {
+      toast({ message: chat.blocked.by_me ? `${chat.with.name} is unblocked` : `${chat.with.name} is blocked`, tone: 'success' });
+      onChange();
+      close();
+    },
+  });
   const offer = useMutation({
     mutationFn: () => api(`/v1/classifieds/conversations/${chat.id}/offers`, { body: { price: Math.round(Number(amount.replace(/[^\d.]/g, '')) * 100) } }),
-    onSuccess: () => (onChange(), setAmount(''), close()),
+    onSuccess: () => {
+      toast({ message: 'Offer sent', tone: 'success' });
+      onChange();
+      setAmount('');
+      close();
+    },
   });
   const report = useMutation({ mutationFn: () => api(`/v1/classifieds/conversations/${chat.id}/report`, { body: { reason, details: details.trim() || undefined } }) });
   const assistant = useShopAssistant(chat.listing.country);

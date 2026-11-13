@@ -7,6 +7,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CallSellerButton } from '@/components/calls/call-button';
+import { useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Field, FormError, Sheet } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -24,6 +25,7 @@ import { useMarket } from '@/lib/market';
 export function ActionBar({ data, viewer, country, asking, setAsking }: { data: ShopListingPage; viewer: ShopViewer | null; country: string; asking: boolean; setAsking: (open: boolean) => void }) {
   const theme = useTheme();
   const queries = useQueryClient();
+  const toast = useToast();
   const { customer } = useAccount();
   const market = useMarket();
   const [body, setBody] = useState(`Hello, is “${data.title}” still available?`);
@@ -32,7 +34,9 @@ export function ActionBar({ data, viewer, country, asking, setAsking }: { data: 
     onSuccess: () => {
       queries.invalidateQueries({ queryKey: ['viewer', data.id] });
       queries.invalidateQueries({ queryKey: ['favourites'] });
+      toast(viewer?.favourite ? { message: 'Removed from saved', tone: 'info' } : { message: 'Saved', tone: 'success', action: { label: 'See saved', onPress: () => router.push('/saved') } });
     },
+    onError: error => toast({ message: (error as Error).message, tone: 'error' }),
   });
   const start = useMutation({
     mutationFn: () => api<{ id: string }>('/v1/classifieds/conversations', { body: { listing_id: data.id, body: body.trim() } }),
@@ -62,6 +66,7 @@ export function ActionBar({ data, viewer, country, asking, setAsking }: { data: 
   const chatOpen = viewer?.conversation_id;
   const canChat = data.contact.chat && data.status === 'active';
   const buy = buyAction(data, viewer, Boolean(market.markets.find(item => item.country === country)?.safe_pay));
+  const openChat = () => (!customer ? signIn() : chatOpen ? router.push({ pathname: '/chat/[id]', params: { id: chatOpen } }) : setAsking(true));
   const onBuy = () => {
     if (!customer || !buy) return signIn();
     if (buy.kind === 'order') router.push({ pathname: '/order/[id]', params: { id: buy.id } });
@@ -78,13 +83,13 @@ export function ActionBar({ data, viewer, country, asking, setAsking }: { data: 
         style={[styles.save, { borderColor: theme.line }]}>
         <Heart size={22} color={viewer?.favourite ? theme.danger : theme.text} fill={viewer?.favourite ? theme.danger : 'none'} />
       </Pressable>
-      {canChat || chatOpen ? <CallSellerButton listingId={data.id} viewer={viewer} /> : null}
+      {canChat || chatOpen ? <CallSellerButton listingId={data.id} viewer={viewer} onChat={openChat} /> : null}
       {canChat || chatOpen ? (
         <Button
           style={{ flex: 1 }}
           title={chatOpen ? 'Open chat' : 'Chat with seller'}
           icon={<MessageCircle size={18} color={theme.onPrimary} />}
-          onPress={() => (!customer ? signIn() : chatOpen ? router.push({ pathname: '/chat/[id]', params: { id: chatOpen } }) : setAsking(true))}
+          onPress={openChat}
         />
       ) : data.status !== 'sold' && viewer?.calls ? (
         <CallSellerButton listingId={data.id} viewer={viewer} wide />

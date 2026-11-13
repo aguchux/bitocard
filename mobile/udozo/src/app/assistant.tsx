@@ -9,6 +9,7 @@ import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnswerText } from '@/components/answer-text';
+import { useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Empty, Field, Loading } from '@/components/ui';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -364,6 +365,7 @@ function ListingRow({ item }: { item: ShopListingCard }) {
 /** A first message to the seller: the buyer edits and sends it themselves, in the chat they came from, or copies it. */
 function DraftCard({ card, usable, onDraft }: { card: Extract<ShopAssistantCard, { type: 'message_draft' }>; usable: boolean; onDraft: (listingId: string, text: string) => void }) {
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   return (
     <Card>
       <ThemedText type="caption">{`A first message to the seller of ${card.title}. Edit it and send it yourself.`}</ThemedText>
@@ -373,7 +375,12 @@ function DraftCard({ card, usable, onDraft }: { card: Extract<ShopAssistantCard,
         <Button
           title={copied ? 'Copied' : 'Copy'}
           tone="secondary"
-          onPress={() => void Clipboard.setStringAsync(card.text).then(() => setCopied(true))}
+          onPress={() =>
+            void Clipboard.setStringAsync(card.text).then(() => {
+              setCopied(true);
+              toast({ message: 'Message copied', tone: 'success' });
+            })
+          }
           style={{ flex: 1 }}
         />
       </View>
