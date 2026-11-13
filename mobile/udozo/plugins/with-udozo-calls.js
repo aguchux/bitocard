@@ -173,6 +173,8 @@ function withIosCalls(config) {
 const callKeepServices = ['io.wazo.callkeep.RNCallKeepBackgroundMessagingService', 'io.wazo.callkeep.VoiceConnectionService'];
 const unused = ['android.permission.CALL_PHONE', 'android.permission.READ_PHONE_NUMBERS', 'android.permission.READ_PHONE_STATE', 'android.permission.SYSTEM_ALERT_WINDOW'];
 
+const webrtcRules = '# Udozo calls: WebRTC\n-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**';
+
 function withAndroidCalls(config) {
   config = AndroidConfig.Permissions.withPermissions(config, [
     'android.permission.MANAGE_OWN_CALLS',
@@ -190,6 +192,17 @@ function withAndroidCalls(config) {
     permissions: (android.permissions ?? []).filter(name => !unused.includes(name)),
     blockedPermissions: [...new Set([...(android.blockedPermissions ?? []), ...unused])],
   };
+  // WebRTC's Java classes are reached from native code, so release shrinking (R8) must keep them, and its optional
+  // decoders (Dav1d) are not shipped: without these rules the release build fails on the missing classes.
+  config = withDangerousMod(config, [
+    'android',
+    async mod => {
+      const file = path.join(mod.modRequest.platformProjectRoot, 'app', 'proguard-rules.pro');
+      const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+      if (!current.includes(webrtcRules)) fs.writeFileSync(file, `${current.trimEnd()}\n\n${webrtcRules}\n`);
+      return mod;
+    },
+  ]);
   // CallKeep's services as this app needs them. This runs before CallKeep's own plugin writes the manifest, which adds a
   // service only when it is missing, so these are the ones kept: the ConnectionService labelled Udozo with both service
   // types, and the headless messaging service not exported (only the app itself starts it).
@@ -220,3 +233,4 @@ function withUdozoCalls(config) {
 module.exports = withUdozoCalls;
 module.exports.appDelegateWithCalls = appDelegateWithCalls;
 module.exports.writeCallPush = writeCallPush;
+module.exports.webrtcRules = webrtcRules;

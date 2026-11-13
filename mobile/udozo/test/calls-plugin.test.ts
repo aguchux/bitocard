@@ -57,3 +57,9 @@ test('UdozoCallPush is written beside the AppDelegate and imported in the bridgi
   assert.match(fs.readFileSync(path.join(folder, 'UdozoCallPush.h'), 'utf8'), /NS_SWIFT_NAME\(receive\(_:type:completion:\)\)/);
   fs.rmSync(folder, { recursive: true, force: true });
 });
+
+test('release shrinking keeps WebRTC and does not stop on its optional decoders', () => {
+  const rules = (require('../plugins/with-udozo-calls.js') as { webrtcRules: string }).webrtcRules;
+  assert.match(rules, /-keep class org\.webrtc\.\*\* \{ \*; \}/);
+  assert.match(rules, /-dontwarn org\.webrtc\.\*\*/);
+});
