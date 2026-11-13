@@ -25,6 +25,7 @@ import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ConfirmSheet, HeldNote, MoneyLines, TermsSheet, type Line } from '@/components/money';
+import { AuctionClaim, BuyerDetails, ConnectReturn, OrderThread, ReportStore } from '@/components/order-extras';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, Failed, Field, FormError, Loading, Sheet, fieldError } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -32,6 +33,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api, ApiError, apiUpload } from '@/lib/api';
 import { confirmOnPhone, useMoneyKey } from '@/lib/biometrics';
 import { orderActions, orderNext, orderOpen, walletShort, type OrderAction } from '@/lib/money';
+import { sellerLines } from '@/lib/order-extras';
 import { pickPhotos, preparePhoto } from '@/lib/picture';
 
 type Confirming = 'pay' | 'accept' | 'decline' | 'cancel' | 'received' | 'delivered' | 'pay_storage' | null;
@@ -98,14 +100,15 @@ export default function OrderScreen() {
   const has = (action: OrderAction) => actions.includes(action);
   const total = data.total ?? data.price;
   const connectFee = data.connect?.connect_fee ?? 0;
-  const lines: Line[] = [{ label: 'Item price', amount: data.price }];
-  if (data.delivery_fee) lines.push({ label: data.fulfilment === 'connect' ? 'Shipping to the centre' : 'Delivery', amount: data.delivery_fee });
+  let lines: Line[] = [{ label: data.quantity > 1 ? `Item × ${data.quantity}` : 'Item price', amount: data.price }];
   if (buyer) {
+    if (data.delivery_fee) lines.push({ label: data.fulfilment === 'connect' ? 'Shipping to the centre' : 'Delivery', amount: data.delivery_fee });
     if (connectFee) lines.push({ label: `${connectName} fee`, amount: connectFee });
     lines.push({ label: `${payName} fee`, amount: data.buyer_fee ?? 0 }, { label: 'Total', amount: total, strong: true });
   } else {
-    lines.push({ label: `${payName} fee`, amount: -(data.seller_fee ?? 0) }, { label: 'You receive', amount: data.payout ?? 0, strong: true });
+    lines = sellerLines(data, `${payName} fee`);
   }
+  const resale = data.kind === 'resale';
   const sheet = (name: Exclude<Confirming, null>) => () => {
     step.reset();
     setConfirming(name);
@@ -121,6 +124,7 @@ export default function OrderScreen() {
               {data.listing.title ?? 'Your order'}
             </ThemedText>
             <ThemedText type="caption">{`${buyer ? 'From' : 'To'} ${data.with.name}${data.quantity > 1 ? ` · ${data.quantity} of them` : ''}`}</ThemedText>
+            {resale && !buyer && data.store ? <ThemedText type="caption">{`Resale through ${data.store.name}`}</ThemedText> : null}
           </View>
         </Pressable>
 
@@ -132,7 +136,11 @@ export default function OrderScreen() {
           {data.end_reason ? <ThemedText type="caption">{data.end_reason}</ThemedText> : null}
         </View>
 
+        {resale && buyer && data.supplier ? <ThemedText type="small">{`Sold by ${data.with.name}; supplied by ${data.supplier.name}, who hands it over or ships it.`}</ThemedText> : null}
+        {!buyer && data.buyer_details ? <BuyerDetails details={data.buyer_details} /> : null}
         {data.connect ? <CentreCard order={data} /> : null}
+        {data.connect?.return ? <ConnectReturn order={data} item={data.connect.return} onChange={refresh} /> : null}
+        {!buyer && data.connect?.auction ? <AuctionClaim order={data} auction={data.connect.auction} onChange={refresh} /> : null}
         {data.fulfilment === 'delivery' && data.delivery_address ? (
           <Card>
             <ThemedText type="smallBold">Delivering to</ThemedText>
@@ -161,9 +169,8 @@ export default function OrderScreen() {
         {has('received') ? <Button title="It arrived: release the payment" tone="money" onPress={sheet('received')} /> : null}
         {has('dispute') || data.dispute ? <DisputePanel order={data} canOpen={has('dispute') && !data.dispute} onChange={refresh} /> : null}
         {has('cancel') ? <Button title={data.status === 'requested' && buyer ? 'Cancel the request' : 'Cancel the order'} tone="ghost" onPress={sheet('cancel')} /> : null}
-        {data.connect?.return || data.connect?.auction || data.kind === 'resale' ? (
-          <Button tone="ghost" title="More about this order on udozo.com" onPress={() => WebBrowser.openBrowserAsync(`https://udozo.com/account/orders/${data.id}`).catch(() => undefined)} />
-        ) : null}
+        {resale ? <OrderThread order={data} /> : null}
+        {resale && buyer && data.store ? <ReportStore target={{ kind: 'order', orderId: data.id, storeName: data.store.name }} /> : null}
         <HeldNote />
       </ScrollView>
 
