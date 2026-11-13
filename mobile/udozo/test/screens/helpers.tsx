@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
+import { FeedbackProvider } from '@/components/feedback';
 import { api } from '@/lib/api';
 import { ApiError } from '@/lib/api-core';
 
@@ -23,5 +24,9 @@ export const refused = (status: number, code: string, message: string, param?: s
 
 export async function renderScreen(element: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
-  return await render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
+  return await render(
+    <QueryClientProvider client={client}>
+      <FeedbackProvider>{element}</FeedbackProvider>
+    </QueryClientProvider>,
+  );
 }

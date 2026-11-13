@@ -6,6 +6,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, Sc
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { inter, ThemedText } from '@/components/themed-text';
+import { ToastHost } from '@/components/toast-host';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
@@ -99,7 +100,7 @@ export function Page({ children, edges = ['top'], scroll = true, padded = true }
 export function Sheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const theme = useTheme();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal testID="sheet" visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} />
         <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: theme.background }]}>
@@ -108,6 +109,8 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
           </ThemedText>
           {children}
         </SafeAreaView>
+        {/* A toast shown while the sheet is open (its own window on Android) draws here, above it. */}
+        <ToastHost />
       </KeyboardAvoidingView>
     </Modal>
   );

@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { AppState, Platform, useColorScheme } from 'react-native';
 
 import { CallProvider } from '@/components/calls/call-provider';
+import { FeedbackProvider } from '@/components/feedback';
 import { UpdateGate } from '@/components/update-gate';
 import { inter } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -47,7 +48,10 @@ export default function RootLayout() {
       <AccountProvider>
         <MarketProvider>
           <CallProvider>
-            <ThemedApp />
+            {/* Udozo's own dialog and toasts, never the phone's alerts. */}
+            <FeedbackProvider>
+              <ThemedApp />
+            </FeedbackProvider>
           </CallProvider>
         </MarketProvider>
       </AccountProvider>
