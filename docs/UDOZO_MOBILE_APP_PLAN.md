@@ -476,9 +476,35 @@ Views of listings opened in the app are not counted yet.
     approve as written, refuse or withdraw, deals to offer, withdraw or end, the chat (every 4 seconds while open),
     Stop them or let them again, and Report a store. `/account/resellers(/<id>)` open in the app.
   - Money in the rules kept free of React Native is written by `src/lib/format.ts` (`shopMoney`'s words).
-- **Still to build (next agent):** a lot's move to a Connect Centre near its buyer (udozo.com's `LotShipping`) is not
-  in the app yet; nor is the video recorded with the camera (the library only). Then phase 4.
-- **Phase 4 (calls and Anjio) is not started.** What it needs:
+- **Built since (13 November 2026):**
+  - **Record a video** on Post an ad's photos step, beside Choose a video (`pickVideo('camera')` in
+    `src/lib/picture.ts`: the camera's permission, at most 60 seconds at medium quality), through the same checks and
+    upload as a chosen one; the camera and microphone texts are in `app.json` (expo-image-picker's and expo-camera's
+    plugins).
+  - **A won Udozo lot sent to a Connect Centre near its buyer** (`LotShipping` in `src/components/lot-shipping.tsx`, on
+    the auction panel while the lot is not collected; words in `lotTransferWords`, `lotShipRefusal` in
+    `src/lib/auctions.ts`): `GET /v1/classifieds/auctions/:ref/ship-options`, the centre chosen, the total (shipping and
+    the Connect fee) confirmed with Face ID or the fingerprint and sent as `expected_total` with a kept
+    Idempotency-Key (`POST …/ship`), where the move stands, and Stop sending it (`POST …/ship/cancel`).
+  - **Ask Anjio** (`src/app/assistant.tsx`, `src/lib/assistant.ts`): from Home (under the search box), Search (Ask,
+    with what was typed), a listing (Ask Anjio about this listing) and a chat's menu, only where the market's assistant
+    answers buyers (`useShopAssistant`: `features.assistant` from `/v1/app/config?country=`, then its profile). Answers
+    stream through `expo/fetch` (React Native's own fetch cannot read a body as it arrives) and
+    `parseAssistantEvents`; their few HTML tags are read by `answerBlocks` (`src/lib/answer-html.ts`, udozo.com's
+    `parseAnswer` rules) and drawn as text (`AnswerText`), never in a web view, links through `openLink`. Cards:
+    listings that open in the app, the UdozoPay total, price ranges, checklists, orders, a drafted first message
+    (**Use in the chat** where the assistant was opened from that listing or its chat: `putDraft` and
+    `useAssistantDraft` in `src/lib/assistant-draft.ts` hand it to the screen behind, which puts it in its message
+    box; else Copy), Talk to a person. Thumbs, Report this answer, the market's languages (remembered on the phone),
+    suggested questions. A visitor's `bav_` token is kept in the secure store and sent as
+    `BitoCard-Assistant-Visitor` while signed out (`headers` on `RequestOptions` in `api-core.ts`).
+  - **Connecting WhatsApp** (`src/app/whatsapp.tsx`, `src/lib/whatsapp.ts`; Settings > WhatsApp where
+    `GET /v1/classifieds/channels?country=` says Udozo is on it there): Connect (`POST /v1/store/account/whatsapp/link`)
+    opens WhatsApp with `LINK <code>` ready to send, I sent it reads `GET /v1/store/account/whatsapp` again; once
+    connected, Chats and Notices on WhatsApp (`PATCH … { chats | alerts }`), Let buyers WhatsApp me directly
+    (`{ direct }`, asked first) and Disconnect (`DELETE`, asked first). `/account/profile/whatsapp` opens it.
+- **Still to build (next agent):** calls (below), then the 0.4.0 release.
+- **Phase 4: Ask Anjio and the WhatsApp screen are built (above); calls are not started.** What calls need:
   - **Calls in the app:** `react-native-webrtc`, relay only, through Cloudflare TURN.
     - Routes: `POST /v1/classifieds/listings/:id/calls`, `POST /v1/classifieds/conversations/:id/calls`, `…/calls/:id/answer|end`, `POST …/calls/:id/signals`, `GET …/calls/:id?after=` (poll every second while connecting, 3 once connected), and presence `POST /v1/classifieds/presence`.
     - udozo.com's `lib/call-engine.ts` is the reference.
@@ -488,15 +514,6 @@ Views of listings opened in the app are not counted yet.
     - handle FCM data `call` and `call_ended`;
     - these need a development build with their config plugins, and real phones to test.
   - **Then release 0.4.0:** bump the app version to 0.4.0 (`callsFromAppVersion` in the API), and only once calls are answered in the app.
-  - **Ask Anjio:**
-    - `/v1/classifieds/assistant`: `threads`, `threads/:id/messages` with `Accept: text/event-stream`;
-    - React Native's fetch does not stream, so use `expo/fetch` or XHR progress;
-    - parse with `parseAssistantEvents` in `src/shared/classifieds.ts`;
-    - cards, rating, report, and Talk to a person.
-  - **WhatsApp connect screen:**
-    - link with `POST /v1/store/account/whatsapp/link`;
-    - turn on direct contact with `PATCH /v1/store/account/whatsapp { direct }`;
-    - read `GET /v1/classifieds/channels?country=`.
 
 **Fixes after reviewing phase 1 (12 November 2026):**
 

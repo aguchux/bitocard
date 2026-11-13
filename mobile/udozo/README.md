@@ -43,10 +43,15 @@ The bundle ID and package are `com.udozo.app`, and can change until the store ac
 - **Icons:** written by `python scripts/brand-assets.py` from `assets/udozo/logo.png`; never edit them by hand.
 - **Screens:** `src/app` (expo-router): the tabs in `(tabs)`, the rest stacked over them. udozo.com addresses become the
   app's screens through `src/lib/links.ts`; anything else opens on udozo.com in the in-app browser.
-- **Selling and buying:** wholly in the app: Post an ad (with a video and the brand and model pickers), auctions,
-  UdozoPay orders with their Connect returns, auction claims and resale threads, buy orders and My Resellers. The rules
-  each screen follows are in `src/lib` (`listing-form.ts`, `auctions.ts`, `order-extras.ts`, `buy-orders.ts`,
-  `resellers.ts`, `money.ts`), kept free of React Native and tested under `node --test`.
+- **Selling and buying:** wholly in the app: Post an ad (with a video, chosen or recorded, and the brand and model
+  pickers), auctions (and a won Udozo lot sent to a Connect Centre), UdozoPay orders with their Connect returns,
+  auction claims and resale threads, buy orders and My Resellers. The rules each screen follows are in `src/lib`
+  (`listing-form.ts`, `auctions.ts`, `order-extras.ts`, `buy-orders.ts`, `resellers.ts`, `money.ts`), kept free of React
+  Native and tested under `node --test`.
+- **Ask Anjio:** `src/app/assistant.tsx`; answers stream through `expo/fetch` (React Native's own fetch cannot read a
+  body as it arrives) and their few HTML tags are drawn as text by `src/lib/answer-html.ts`, never in a web view.
+- **WhatsApp:** Settings > WhatsApp (`src/app/whatsapp.tsx`) connects the customer's number with `LINK <code>`.
+- **Calls** are still to build (the plan's phase 4).
 - **Shared types:** `src/shared` holds copies of udozo.com's `packages/api-client/src/classifieds.ts`, `home.ts` and
   `storefront.ts`, imported as `@shared/...`; `test/shared.test.ts` fails when they drift.
 - **Build-time settings** (EAS environment variables, read by `app.config.ts`): `GOOGLE_WEB_CLIENT_ID`,
