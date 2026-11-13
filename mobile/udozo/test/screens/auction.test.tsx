@@ -126,3 +126,40 @@ test('a lot of Udozo is paid from the wallet', async () => {
   await fireEvent.press(await screen.findByText('Pay from my wallet'));
   await waitFor(() => expect(paid).toEqual(['pay']));
 });
+
+test('a won lot of Udozo is sent to a Connect Centre near the buyer, its total confirmed, and the move can be stopped', async () => {
+  const centre = { id: '22222222-2222-4222-8222-222222222222', name: 'Ikeja Connect', area: 'Ikeja', state: 'Lagos', address: '5 Allen Avenue', landmark: null, hours: '9 to 6', phone: '+2348000000000' };
+  const won = { highest: 13_000_000, leading: true, to_pay: null, won: true, seller: false, collected: false };
+  let transfer: unknown = null;
+  const lot = () => auction({ kind: 'abandoned', status: 'sold', warehouse: { name: 'Udozo Lagos', address: '1 Road', hours: '9 to 5', state: 'Lagos' }, viewer: { ...won, transfer } });
+  const sent: unknown[] = [];
+  const stopped: string[] = [];
+  answers({
+    'GET /v1/classifieds/listings/77': () => listing(lot()),
+    [`GET /v1/classifieds/listings/${id}/viewer`]: () => viewerOf(lot()),
+    'GET /v1/classifieds/auctions/000012/ship-options': { object: 'list', currency: 'NGN', shipping: 300_000, fee: 50_000, total: 350_000, data: [{ centre }] },
+    'POST /v1/classifieds/auctions/000012/ship': (body: unknown) => {
+      sent.push(body);
+      transfer = { object: 'connect_transfer', number: 'TF-000004', status: 'paid', shipping: 300_000, fee: 50_000, to: centre, courier: null, tracking_number: null };
+      return { number: 'TF-000004', status: 'paid' };
+    },
+    'POST /v1/classifieds/auctions/000012/ship/cancel': () => (stopped.push('cancel'), (transfer = null), { status: 'cancelled' }),
+  });
+  await renderScreen(<ListingScreen />);
+  await fireEvent.press(await screen.findByText('Have it sent to a Connect Centre near me'));
+  await fireEvent.press(await screen.findByText('Lagos: Ikeja Connect, Ikeja'));
+  expect(screen.getByText('Shipping ₦3,000 and the centre\'s Connect fee ₦500.')).toBeTruthy();
+  await fireEvent.press(screen.getByText('Pay ₦3,500 and send it'));
+  expect(await screen.findByText('Send it to Ikeja Connect?')).toBeTruthy();
+  await fireEvent.press(screen.getByText('Pay and send it'));
+  await waitFor(() => expect(sent).toEqual([{ centre_id: centre.id, expected_total: 350_000 }]));
+  expect(LocalAuthentication.authenticateAsync).toHaveBeenCalledWith(expect.objectContaining({ promptMessage: 'Pay ₦3,500 to send it' }));
+  const call = mockedApi.mock.calls.find(([path]) => String(path).endsWith('/ship'));
+  expect(call?.[1]).toMatchObject({ idempotencyKey: expect.any(String) });
+
+  expect(await screen.findByText(/TF-000004: Udozo is sending it from its warehouse to Ikeja Connect/)).toBeTruthy();
+  await fireEvent.press(screen.getByText('Stop sending it'));
+  expect(await screen.findByText('Stop sending it?')).toBeTruthy();
+  await fireEvent.press(screen.getAllByText('Stop sending it').at(-1)!);
+  await waitFor(() => expect(stopped).toEqual(['cancel']));
+});

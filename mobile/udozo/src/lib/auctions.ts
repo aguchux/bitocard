@@ -3,7 +3,7 @@
  * listing page has them (apps/udozo/components/listing-auction.tsx, lib/auctions.ts). Kept free of React Native so they
  * run under `node --test`; the API checks every bid again.
  */
-import type { ShopListingAuction } from '../shared/classifieds';
+import type { ShopListingAuction, ShopLotTransfer } from '../shared/classifieds';
 
 import { money } from './format.ts';
 
@@ -59,5 +59,21 @@ export function bidRefusal(code: string, message: string) {
   if (code === 'auction_not_live') return 'Bidding is not open on this auction now.';
   if (code === 'phone_required') return 'Confirm your mobile number to bid.';
   if (code === 'own_item') return 'You cannot bid on your own listing.';
+  return message;
+}
+
+/** Where a won lot's move from Udozo's warehouse to a Connect Centre stands, in one sentence (udozo.com's `lotTransferWords`). */
+export function lotTransferWords(move: Pick<ShopLotTransfer, 'status' | 'to' | 'courier' | 'tracking_number'>) {
+  const to = `${move.to.name}, ${move.to.address}, ${move.to.state}`;
+  if (move.status === 'paid') return `Udozo is sending it from its warehouse to ${to}. We tell you when it arrives.`;
+  if (move.status === 'sent') return `On its way to ${to}${move.courier ? ` with ${move.courier}${move.tracking_number ? ` (tracking ${move.tracking_number})` : ''}` : ''}.`;
+  if (move.status === 'arrived') return `It is at ${to} (${move.to.hours}, ${move.to.phone}). Collect it there with your collection code.`;
+  return `Collected at ${move.to.name}.`;
+}
+
+/** The API's refusals of a lot's move, in words (else its own message). */
+export function lotShipRefusal(code: string, message: string) {
+  if (code === 'price_changed') return `${message} Look at the new total and try again.`;
+  if (code === 'transfer_not_waiting') return 'Udozo has already sent it, so it can no longer be stopped.';
   return message;
 }

@@ -5,6 +5,7 @@ import { Gavel } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { LotShipping } from '@/components/lot-shipping';
 import { ConfirmSheet } from '@/components/money';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Card, Field } from '@/components/ui';
@@ -20,7 +21,8 @@ import { fromMinor, toMinor } from '@/lib/listing-form';
  * A listing sold by auction, on its page (udozo.com's `AuctionPanel`): the price to beat, how many bids and when it
  * ends, the reserve's state, the latest bids, and bidding (signed in with a confirmed mobile, at least the next step,
  * its amount confirmed with Face ID or the fingerprint: a bid cannot be taken back). A seller's winner pays the UdozoPay
- * order the win made; a lot of Udozo's is paid here from the wallet and collected at Udozo's warehouse with a code.
+ * order the win made; a lot of Udozo's is paid here from the wallet and collected at Udozo's warehouse with a code, or
+ * sent on to a Connect Centre near the buyer (`LotShipping`).
  */
 export function AuctionPanel({ listingId, auction, currency }: { listingId: string; auction: ShopListingAuction; currency: string }) {
   const theme = useTheme();
@@ -124,6 +126,7 @@ export function AuctionPanel({ listingId, auction, currency }: { listingId: stri
           <Button title="Show my collection code" tone="secondary" loading={busy} onPress={() => void showCode()} />
         )
       ) : null}
+      {udozos && viewer?.won && viewer.collected === false && code !== 'collected' ? <LotShipping lotRef={auction.ref} transfer={viewer.transfer ?? null} onChange={() => void refresh()} /> : null}
       {udozos && auction.warehouse ? (
         <ThemedText type="small" themeColor="textSecondary">
           {`Sold by Udozo as seen, from a shipment nobody collected: Udozo has not tested it. Collected at ${auction.warehouse.name}, ${auction.warehouse.address}, ${auction.warehouse.state}${auction.warehouse.hours ? ` (${auction.warehouse.hours})` : ''}.`}

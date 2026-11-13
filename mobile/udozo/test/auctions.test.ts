@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { auctionNote, auctionState, bidProblem, bidRefusal, timeLeft } from '../src/lib/auctions.ts';
+import { auctionNote, auctionState, bidProblem, bidRefusal, lotShipRefusal, lotTransferWords, timeLeft } from '../src/lib/auctions.ts';
 
 const now = Date.parse('2026-11-13T12:00:00Z');
 
@@ -32,4 +32,13 @@ test('a bid must be readable and at least the next step; refusals are worded', (
   assert.equal(bidRefusal('own_item', 'x'), 'You cannot bid on your own listing.');
   assert.equal(bidRefusal('phone_required', 'x'), 'Confirm your mobile number to bid.');
   assert.equal(bidRefusal('something_else', 'Said by the API.'), 'Said by the API.');
+});
+
+test("a won lot's move to a Connect Centre is put in one sentence, and its refusals in words", () => {
+  const to = { name: 'Ikeja Connect', address: '5 Allen Avenue', state: 'Lagos', hours: '9 to 6', phone: '+2348000000000' } as never;
+  assert.equal(lotTransferWords({ status: 'paid', to, courier: null, tracking_number: null }), 'Udozo is sending it from its warehouse to Ikeja Connect, 5 Allen Avenue, Lagos. We tell you when it arrives.');
+  assert.equal(lotTransferWords({ status: 'sent', to, courier: 'GIG', tracking_number: 'T1' }), 'On its way to Ikeja Connect, 5 Allen Avenue, Lagos with GIG (tracking T1).');
+  assert.match(lotTransferWords({ status: 'arrived', to, courier: null, tracking_number: null }), /Collect it there with your collection code/);
+  assert.equal(lotShipRefusal('price_changed', 'Sending it to a Connect Centre costs ₦3,600 now.'), 'Sending it to a Connect Centre costs ₦3,600 now. Look at the new total and try again.');
+  assert.equal(lotShipRefusal('other', 'As it was.'), 'As it was.');
 });
