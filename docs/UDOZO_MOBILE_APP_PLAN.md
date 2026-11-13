@@ -669,6 +669,18 @@ Views of listings opened in the app are not counted yet.
   `Alert.alert` became one or the other (`test/no-alerts.test.ts` refuses them), Call seller while the seller is away
   offers Chat with seller and Request call back, and saving, copying, blocking, offers, removals and payouts say so
   (`test/feedback.test.ts`, `test/screens/feedback.test.tsx`).
+- **The seller's page opens with its banner** (13 November 2026, the owner's request; `src/app/seller/[key].tsx`): no
+  header title; a full-bleed banner from the top of the screen under a light status bar (`setStatusBarStyle` while
+  focused), their cover with a dark fade, else a gradient in the theme's colours (accent, primary, a darker primary;
+  drawn with `react-native-svg`, already installed, so no new native module), their photo in a white ring, the name
+  once, large and white, `@username`, since when and the badges as translucent chips at its foot; then the figures,
+  reviews, Anjio's view and their listings. Back, **Chat with seller** and **Call seller** float over it in translucent
+  dark circles (44 points), so they stay in reach as the page scrolls. Both are about a listing, as udozo.com's
+  Contact panel is (`useSellerContact` in `src/components/seller-contact.tsx`, from the profile's `contact_listings`):
+  one goes straight on, several open **About which listing?** (photo and price from the seller's listings already
+  loaded); then the listing's viewer opens its chat or the message box (`MessageSheet`, shared with the listing's bar),
+  or rings the seller, or says why not in Udozo's dialog (`whyNot`). Hidden where no listing takes them; signed out
+  they ask to sign in; on one's own page **Edit profile** instead (`test/screens/seller.test.tsx`).
 
 ## Testing
 

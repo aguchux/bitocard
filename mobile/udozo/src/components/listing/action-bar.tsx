@@ -9,7 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CallSellerButton } from '@/components/calls/call-button';
 import { useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Field, FormError, Sheet } from '@/components/ui';
+import { MessageSheet } from '@/components/listing/message-sheet';
+import { Button } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
@@ -37,14 +38,6 @@ export function ActionBar({ data, viewer, country, asking, setAsking }: { data: 
       toast(viewer?.favourite ? { message: 'Removed from saved', tone: 'info' } : { message: 'Saved', tone: 'success', action: { label: 'See saved', onPress: () => router.push('/saved') } });
     },
     onError: error => toast({ message: (error as Error).message, tone: 'error' }),
-  });
-  const start = useMutation({
-    mutationFn: () => api<{ id: string }>('/v1/classifieds/conversations', { body: { listing_id: data.id, body: body.trim() } }),
-    onSuccess: chat => {
-      setAsking(false);
-      queries.invalidateQueries({ queryKey: ['viewer', data.id] });
-      router.push({ pathname: '/chat/[id]', params: { id: chat.id } });
-    },
   });
   const signIn = () => router.push('/signin');
   // A first message Anjio drafted from this listing: into the open chat, else into Message the seller.
@@ -98,12 +91,7 @@ export function ActionBar({ data, viewer, country, asking, setAsking }: { data: 
           {data.status === 'sold' ? 'This item has been sold.' : 'The seller takes calls only. Ask them to call you back on udozo.com.'}
         </ThemedText>
       )}
-      <Sheet visible={asking} onClose={() => setAsking(false)} title="Message the seller">
-        <FormError error={start.error} />
-        <Field label="Your message" value={body} onChangeText={setBody} multiline maxLength={1000} style={{ minHeight: 96, textAlignVertical: 'top', paddingTop: Spacing.two }} />
-        <ThemedText type="caption">Keep chats on Udozo. Never share codes or pay before you see the item.</ThemedText>
-        <Button title="Send" loading={start.isPending} disabled={!body.trim()} onPress={() => start.mutate()} />
-      </Sheet>
+      <MessageSheet listingId={data.id} visible={asking} onClose={() => setAsking(false)} body={body} setBody={setBody} />
     </SafeAreaView>
   );
 }

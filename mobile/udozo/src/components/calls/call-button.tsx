@@ -45,7 +45,7 @@ export function ChatCallButton({ chat }: { chat: Pick<ShopConversation, 'id' | '
 }
 
 /** Why the call cannot be made now, with the other ways in touch the listing allows (each then done), else Close. */
-async function whyNot(ask: (options: DialogOptions) => Promise<string | null>, title: string, state: CallButton, instead: { chat?: () => void; callback?: () => void }) {
+export async function whyNot(ask: (options: DialogOptions) => Promise<string | null>, title: string, state: CallButton, instead: { chat?: () => void; callback?: () => void }) {
   const actions = [instead.chat ? { key: 'chat', label: 'Chat with seller' } : null, instead.callback ? { key: 'callback', label: 'Request call back', tone: 'secondary' as const } : null].filter(action => action !== null);
   const answer = await ask(actions.length ? { title, body: state.hint, actions, dismiss: 'Close' } : infoDialog(title, state.hint));
   if (answer === 'chat') instead.chat?.();
