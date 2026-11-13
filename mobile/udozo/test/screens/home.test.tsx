@@ -1,5 +1,5 @@
 // Home: udozo.com's hero reel at the top in place of the page's own hero (and the page as before without it), Ask
-// beside the search box, and the WhatsApp pull-up where Udozo is on WhatsApp in the market.
+// beside the search box, and WhatsApp's mark in the header (pulling up its tray) where Udozo is on WhatsApp in the market.
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { Linking } from 'react-native';
@@ -111,10 +111,13 @@ test('no Ask where the market has no assistant', async () => {
 
 const channels = (available: boolean) => ({ object: 'classified_channels', country: 'NG', whatsapp: { available, number: available ? '+2348000000000' : null }, wanted: true });
 
-test('the WhatsApp pull-up opens on a tap: a chat with Udozo, signing in or up with WhatsApp, and the features', async () => {
+test('WhatsApp’s mark in the header, beside the bell, pulls up the tray: a chat with Udozo, signing in or up with WhatsApp, and the features', async () => {
   answers({ ...routes({ object: 'list', data: [] }), 'GET /v1/classifieds/channels': channels(true) });
   await renderScreen(<HomeScreen />);
-  await fireEvent.press(await screen.findByRole('button', { name: 'Udozo on WhatsApp' }));
+  // One way in, in the header: no floating handle by the tab bar any more.
+  expect(await screen.findAllByRole('button', { name: 'Udozo on WhatsApp' })).toHaveLength(1);
+  expect(screen.queryByText('WhatsApp')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Udozo on WhatsApp' }));
   expect(await screen.findByText('Find, sell and chat without the app.')).toBeTruthy();
   expect(screen.getByText(/Udozo never asks for your codes or passwords/)).toBeTruthy();
   expect(screen.queryByText('Connect your WhatsApp')).toBeNull();
@@ -143,7 +146,7 @@ test('signed in it offers Connect your WhatsApp, and the backdrop closes it', as
   expect(router.push).toHaveBeenCalledWith('/whatsapp');
 });
 
-test('no pull-up where Udozo is not on WhatsApp in the market', async () => {
+test('no WhatsApp mark where Udozo is not on WhatsApp in the market', async () => {
   answers({ ...routes({ object: 'list', data: [] }), 'GET /v1/classifieds/channels': channels(false) });
   await renderScreen(<HomeScreen />);
   await screen.findByLabelText('The page’s own hero');

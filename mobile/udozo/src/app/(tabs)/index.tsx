@@ -12,7 +12,7 @@ import { HeroReel } from '@/components/hero-reel';
 import { HomeRows } from '@/components/home-blocks';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Empty, Failed, Loading } from '@/components/ui';
-import { WhatsappPullUp } from '@/components/whatsapp-pull-up';
+import { WhatsappButton } from '@/components/whatsapp-button';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
@@ -29,7 +29,7 @@ import { useMarket } from '@/lib/market';
  * the very top of the screen, under the status bar, on the page's own background so it blends with what follows, the
  * header then the reel, with the search box just beneath it; a strip of the background stays behind the status bar as
  * the page scrolls. The reel then takes the place of the page's own hero. Without columns,
- * Home is as before. Where Udozo is on WhatsApp in the market, its pull-up waits above the tab bar (`WhatsappPullUp`).
+ * Home is as before. Where Udozo is on WhatsApp in the market, WhatsApp's mark beside the bell pulls up what Udozo does there (`WhatsappButton`).
  */
 export default function HomeScreen() {
   const theme = useTheme();
@@ -85,7 +85,6 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
       {reel ? <View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, backgroundColor: theme.background }]} /> : null}
-      <WhatsappPullUp country={country} />
     </View>
   );
 }
@@ -166,6 +165,7 @@ function Header({ overReel }: { overReel?: boolean }) {
           {fixed ? null : <ChevronDown size={16} color={ink} />}
         </Pressable>
       ) : null}
+      <WhatsappButton country={country} />
       {customer ? (
         <Pressable accessibilityRole="button" accessibilityLabel={count ? `Notifications, ${count} unread` : 'Notifications'} onPress={() => router.push('/notifications')} style={styles.bell}>
           <Bell size={22} color={ink} />

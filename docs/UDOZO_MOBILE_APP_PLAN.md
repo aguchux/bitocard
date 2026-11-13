@@ -615,9 +615,10 @@ Views of listings opened in the app are not counted yet.
 - **Ask inline:** the search box takes words (searching on the keyboard's Search), and on its right a compact Ask
   button (the sparkle and the assistant's name, else Ask; 48 points) opens the assistant with what is typed, only
   where the market's assistant answers; the separate button below is gone.
-- **The WhatsApp pull-up** (`WhatsappPullUp` in `src/components/whatsapp-pull-up.tsx`): where Udozo is on WhatsApp in
-  the market (`GET /v1/classifieds/channels`), a small WhatsApp-green handle on the right edge just above the tab bar,
-  dragged up or tapped into a sheet: Start a chat with Udozo, Sign up or Sign in with WhatsApp (opening sign-in or
+- **WhatsApp in the header** (`WhatsappButton` in `src/components/whatsapp-button.tsx`; at first a handle floating above
+  the tab bar, moved to the header at the owner's request): where Udozo is on WhatsApp in the market
+  (`GET /v1/classifieds/channels`), WhatsApp's own mark (`WhatsappMark`, `src/components/whatsapp-mark.tsx`) beside the
+  bell, which pulls up a sheet: Start a chat with Udozo, Sign up or Sign in with WhatsApp (opening sign-in or
   sign-up straight at WhatsApp, `method=whatsapp`) or, signed in, Connect your WhatsApp, then udozo.com's features
   (`whatsappFeatures` in `src/lib/whatsapp.ts`), each opening the chat with its word, and the safety note. It closes on
   a drag down, the backdrop, its close button or Back, and nothing slides for reduced motion
