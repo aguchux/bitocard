@@ -140,7 +140,9 @@
         {
           "microphonePermission": "Udozo uses the microphone for calls with buyers and sellers, and for the sound of a video you record for an ad."
         }
-      ]
+      ],
+      "@config-plugins/react-native-callkeep",
+      "./plugins/with-udozo-calls.js"
     ],
     "extra": {
       "apiUrl": "https://api.udozo.com",
