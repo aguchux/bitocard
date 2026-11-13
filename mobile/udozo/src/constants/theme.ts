@@ -29,5 +29,4 @@ export const Spacing = {
 
 export const Radius = { small: 6, medium: 12, large: 20, round: 999 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;

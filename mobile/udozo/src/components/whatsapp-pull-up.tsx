@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { ChevronUp, HelpCircle, LogIn, Megaphone, MessageCircle, Search, ShieldCheck, Sparkles, Tag, UserPlus, X } from 'lucide-react-native';
 import { type ReactNode, useMemo, useState } from 'react';
-import { Animated, Linking, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, Linking, Modal, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { inter, ThemedText } from '@/components/themed-text';
-import { BottomTabInset, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
@@ -40,7 +40,6 @@ const closePull = 90;
 export function WhatsappPullUp({ country }: { country: string | null }) {
   const theme = useTheme();
   const { customer } = useAccount();
-  const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
   const channels = useQuery({
@@ -93,8 +92,9 @@ export function WhatsappPullUp({ country }: { country: string | null }) {
     const href = text === 'Hi' ? startChatHref(number) : whatsappHref(number, text);
     if (href) Linking.openURL(href).catch(() => undefined);
   };
-  // Above the tab bar: Android lays Home out above it; on iPhones the bar floats over the screen's foot.
-  const bottom = Spacing.three + (Platform.OS === 'ios' ? BottomTabInset + insets.bottom : 0);
+  // Above the tab bar: Home is laid out above it on both platforms (the bar reports its height to the navigator), and
+  // the handle keeps to the right edge, clear of the raised Sell circle in the middle.
+  const bottom = Spacing.three;
 
   return (
     <>

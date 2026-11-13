@@ -38,6 +38,12 @@ jest.mock('expo-router', () => {
   return { router, Stack, useFocusEffect, useLocalSearchParams: jest.fn(() => ({})), Link: ({ children }: { children: unknown }) => React.createElement(React.Fragment, null, children) };
 });
 
+// The JavaScript tabs: the bar reports its height to nobody in tests.
+jest.mock('expo-router/js-tabs', () => {
+  const React = require('react');
+  return { BottomTabBarHeightCallbackContext: React.createContext(undefined), useBottomTabBarHeight: () => 0 };
+});
+
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
 jest.mock('expo-apple-authentication', () => ({ isAvailableAsync: jest.fn(async () => false), AppleAuthenticationButton: () => null, AppleAuthenticationButtonType: {}, AppleAuthenticationButtonStyle: {}, AppleAuthenticationScope: {} }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })) }));

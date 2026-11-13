@@ -1,39 +1,25 @@
-import { NativeTabs } from 'expo-router/native-tabs';
+import { Tabs } from 'expo-router/js-tabs';
+
+import { UdozoTabBar } from '@/components/tab-bar';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * The app's five tabs (docs/UDOZO_MOBILE_APP_PLAN.md): Home, Search, Sell, Chats and Me. SF Symbols on iPhones,
- * Material Symbols on Android. Listing, chat, checkout and post-an-ad screens are pushed over them, without the bar.
+ * The app's five tabs (docs/UDOZO_MOBILE_APP_PLAN.md): Home, Search, Sell, Chats and Me. Expo Router's JavaScript tabs
+ * with Udozo's own bar (`UdozoTabBar`), since the phones' own tab bars cannot draw the raised Sell circle. Listing,
+ * chat, checkout and post-an-ad screens are pushed over them, without the bar.
  */
 export default function AppTabs() {
   const colors = useTheme();
 
   return (
-    <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      iconColor={{ default: colors.textSecondary, selected: colors.primary }}
-      labelStyle={{ default: { color: colors.textSecondary }, selected: { color: colors.primary } }}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="search">
-        <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="sell">
-        <NativeTabs.Trigger.Label>Sell</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'plus.circle', selected: 'plus.circle.fill' }} md="add_circle" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="chats">
-        <NativeTabs.Trigger.Label>Chats</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} md="chat" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="me">
-        <NativeTabs.Trigger.Label>Me</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} md="account_circle" />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Tabs
+      tabBar={props => <UdozoTabBar {...props} />}
+      screenOptions={{ headerShown: false, tabBarHideOnKeyboard: true, sceneStyle: { backgroundColor: colors.background } }}>
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="search" options={{ title: 'Search' }} />
+      <Tabs.Screen name="sell" options={{ title: 'Sell' }} />
+      <Tabs.Screen name="chats" options={{ title: 'Chats' }} />
+      <Tabs.Screen name="me" options={{ title: 'Me' }} />
+    </Tabs>
   );
 }
