@@ -105,7 +105,7 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={message => message.id}
           contentContainerStyle={styles.messages}
-          renderItem={({ item }) => <Bubble message={item} session={session} chatId={data.id} onChange={refresh} />}
+          renderItem={({ item }) => <Bubble message={item} session={session} chatId={data.id} buyer={data.role === 'buyer' ? { listingId: data.listing.id, title: data.listing.title } : null} onChange={refresh} />}
         />
         {blocked ? (
           <ThemedText type="small" themeColor="textSecondary" style={styles.blocked}>
@@ -142,7 +142,7 @@ export default function ChatScreen() {
   );
 }
 
-function Bubble({ message, session, chatId, onChange }: { message: ShopMessage; session: string | null; chatId: string; onChange: () => void }) {
+function Bubble({ message, session, chatId, buyer, onChange }: { message: ShopMessage; session: string | null; chatId: string; buyer: { listingId: string; title: string | null } | null; onChange: () => void }) {
   const theme = useTheme();
   if (message.from === 'bitocard' || message.kind === 'system') {
     return (
@@ -163,7 +163,7 @@ function Bubble({ message, session, chatId, onChange }: { message: ShopMessage; 
           accessibilityLabel="Photo"
         />
       ) : null}
-      {message.offer ? <OfferCard offer={message.offer} chatId={chatId} onChange={onChange} mine={mine} /> : null}
+      {message.offer ? <OfferCard offer={message.offer} chatId={chatId} buyer={buyer} onChange={onChange} mine={mine} /> : null}
       {message.body && message.kind !== 'offer' ? <ThemedText style={{ color: mine ? theme.onPrimary : theme.text }}>{message.body}</ThemedText> : null}
       <ThemedText type="caption" style={{ color: mine ? theme.onPrimary : theme.textSecondary, alignSelf: 'flex-end' }}>
         {time}
@@ -172,7 +172,8 @@ function Bubble({ message, session, chatId, onChange }: { message: ShopMessage; 
   );
 }
 
-function OfferCard({ offer, mine, onChange }: { offer: ShopOffer; chatId: string; mine: boolean; onChange: () => void }) {
+/** An offer in the chat; once the seller accepts the buyer's, the buyer buys at its price with UdozoPay. */
+function OfferCard({ offer, mine, buyer, onChange }: { offer: ShopOffer; chatId: string; mine: boolean; buyer: { listingId: string; title: string | null } | null; onChange: () => void }) {
   const theme = useTheme();
   const act = useMutation({ mutationFn: (step: 'accept' | 'decline' | 'withdraw') => api(`/v1/classifieds/offers/${offer.id}/${step}`, { body: {} }), onSuccess: onChange });
   const ink = mine ? theme.onPrimary : theme.text;
@@ -193,6 +194,9 @@ function OfferCard({ offer, mine, onChange }: { offer: ShopOffer; chatId: string
         </View>
       ) : null}
       {offer.status === 'open' && offer.made_by === 'me' ? <Button title="Withdraw" tone="secondary" onPress={() => act.mutate('withdraw')} loading={act.isPending} /> : null}
+      {offer.status === 'accepted' && buyer ? (
+        <Button title="Buy at this price with UdozoPay" tone="money" onPress={() => router.push({ pathname: '/checkout/[id]', params: { id: buyer.listingId, offer: offer.id, title: buyer.title ?? '' } })} />
+      ) : null}
       <FormError error={act.error} />
     </View>
   );

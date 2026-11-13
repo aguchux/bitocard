@@ -86,6 +86,14 @@ function ThemedApp() {
           <Stack.Screen name="requests" options={{ title: 'Requests' }} />
           <Stack.Screen name="dashboard" options={{ title: 'Dashboard' }} />
           <Stack.Screen name="username" options={{ title: 'Username' }} />
+          <Stack.Screen name="wallet" options={{ title: 'Wallet' }} />
+          <Stack.Screen name="payouts" options={{ title: 'Payouts' }} />
+          <Stack.Screen name="identity" options={{ title: 'Identity check' }} />
+          <Stack.Screen name="orders" options={{ title: 'UdozoPay orders' }} />
+          <Stack.Screen name="order/[id]" options={{ title: 'Order' }} />
+          <Stack.Screen name="checkout/[id]" options={{ title: 'Buy with UdozoPay' }} />
+          <Stack.Screen name="pay/[token]" options={{ title: 'Pay the shop' }} />
+          <Stack.Screen name="scan" options={{ title: 'Scan to pay', presentation: 'modal' }} />
         </Stack>
       </UpdateGate>
     </ThemeProvider>

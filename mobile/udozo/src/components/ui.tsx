@@ -10,9 +10,9 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 
-type Tone = 'primary' | 'secondary' | 'danger' | 'ghost';
+type Tone = 'primary' | 'secondary' | 'danger' | 'ghost' | 'money';
 
-/** A button, at least 48 px tall: primary (the theme's), secondary (outlined), danger (red) or ghost (a link). */
+/** A button, at least 48 px tall: primary (the theme's), secondary (outlined), danger (red), money (green: pay, accept, release) or ghost (a link). */
 export function Button({ title, onPress, tone = 'primary', loading, disabled, icon, style, accessibilityLabel }: {
   title: string;
   onPress?: PressableProps['onPress'];
@@ -24,8 +24,8 @@ export function Button({ title, onPress, tone = 'primary', loading, disabled, ic
   accessibilityLabel?: string;
 }) {
   const theme = useTheme();
-  const fill = tone === 'primary' ? theme.primary : tone === 'danger' ? theme.danger : 'transparent';
-  const ink = tone === 'primary' || tone === 'danger' ? theme.onPrimary : tone === 'ghost' ? theme.link : theme.text;
+  const fill = tone === 'primary' ? theme.primary : tone === 'danger' ? theme.danger : tone === 'money' ? theme.success : 'transparent';
+  const ink = tone === 'primary' || tone === 'danger' || tone === 'money' ? theme.onPrimary : tone === 'ghost' ? theme.link : theme.text;
   const off = disabled || loading;
   return (
     <Pressable

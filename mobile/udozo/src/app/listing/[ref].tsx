@@ -24,14 +24,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 import { listingUrl } from '@/lib/links';
+import { buyAction } from '@/lib/money';
 import { photoUrl } from '@/lib/navigate';
 import { useMarket } from '@/lib/market';
 import { reportReasons } from '@/lib/words';
 
 /**
  * A listing: its photos, price, title, place and condition, what the seller wrote, its features, the seller, the checks
- * to make before paying, then Save and Chat with seller in a bar that stays. Signed out, both ask to sign in first.
- * Calls and UdozoPay join this bar in their phases.
+ * to make before paying, then Save, Chat with seller and Buy with UdozoPay (or carry on the buyer's order) in a bar that
+ * stays. Signed out, each asks to sign in first. Calls join this bar in phase 4.
  */
 export default function ListingScreen() {
   const theme = useTheme();
@@ -105,7 +106,7 @@ export default function ListingScreen() {
             {customer && !viewer.data?.own ? <ReportListing listingId={data.id} /> : null}
           </View>
         </ScrollView>
-        <ActionBar data={data} viewer={viewer.data ?? null} />
+        <ActionBar data={data} viewer={viewer.data ?? null} country={country} />
       </View>
     </>
   );
@@ -234,10 +235,11 @@ function SellerCard({ data }: { data: ShopListingPage }) {
 }
 
 /** Save and Chat with seller, always in reach; the seller's own listing says so instead. */
-function ActionBar({ data, viewer }: { data: ShopListingPage; viewer: ShopViewer | null }) {
+function ActionBar({ data, viewer, country }: { data: ShopListingPage; viewer: ShopViewer | null; country: string }) {
   const theme = useTheme();
   const queries = useQueryClient();
   const { customer } = useAccount();
+  const market = useMarket();
   const [asking, setAsking] = useState(false);
   const [body, setBody] = useState(`Hello, is “${data.title}” still available?`);
   const save = useMutation({
@@ -266,8 +268,15 @@ function ActionBar({ data, viewer }: { data: ShopListingPage; viewer: ShopViewer
   }
   const chatOpen = viewer?.conversation_id;
   const canChat = data.contact.chat && data.status === 'active';
+  const buy = buyAction(data, viewer, Boolean(market.markets.find(item => item.country === country)?.safe_pay));
+  const onBuy = () => {
+    if (!customer || !buy) return signIn();
+    if (buy.kind === 'order') router.push({ pathname: '/order/[id]', params: { id: buy.id } });
+    else router.push({ pathname: '/checkout/[id]', params: { id: data.id, title: data.title } });
+  };
   return (
     <SafeAreaView edges={['bottom']} style={[styles.bar, { borderColor: theme.line, backgroundColor: theme.background }]}>
+      {buy ? <Button style={{ flex: 1 }} tone="money" title={buy.label} icon={<ShieldCheck size={18} color={theme.onPrimary} />} onPress={onBuy} /> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={viewer?.favourite ? 'Saved. Remove from saved' : 'Save'}

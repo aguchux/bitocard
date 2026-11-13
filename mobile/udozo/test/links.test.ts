@@ -25,7 +25,7 @@ test('account places, invites and sign-in', () => {
 });
 
 test('what the app does not have yet, or other sites, open in the browser', () => {
-  assert.deepEqual(appLink('/account/orders/abc'), { web: 'https://udozo.com/account/orders/abc' });
+  assert.deepEqual(appLink('/account/purchases/abc'), { web: 'https://udozo.com/account/purchases/abc' });
   assert.deepEqual(appLink('/ng/wanted/new'), { web: 'https://udozo.com/ng/wanted/new' });
   assert.deepEqual(appLink('https://example.com/ng/l/1'), { web: 'https://example.com/ng/l/1' });
   assert.deepEqual(appLink('javascript:alert(1)'), { web: 'javascript:alert(1)' });
@@ -49,4 +49,16 @@ test('selling places, the app’s own routes, and other apps’ links', () => {
   assert.equal(foreignScheme('udozo://ng/l/77'), false);
   assert.equal(foreignScheme('https://udozo.com/ng'), false);
   assert.equal(foreignScheme('/ng/l/77'), false);
+});
+
+test('money places open in the app: the wallet, payouts, the identity check, orders and a shop till’s payment', () => {
+  const order = '0b8e3c1e-1d2a-4c5b-9f00-123456789abc';
+  assert.deepEqual(appLink('/account/wallet?wallet=USD'), { route: '/wallet?wallet=USD' });
+  assert.deepEqual(appLink('/account/payouts'), { route: '/payouts' });
+  assert.deepEqual(appLink('/account/udozopay'), { route: '/payouts' });
+  assert.deepEqual(appLink('/account/verification'), { route: '/identity' });
+  assert.deepEqual(appLink('/account/orders'), { route: '/orders' });
+  assert.deepEqual(appLink(`/account/orders/${order}`), { route: `/order/${order}` });
+  assert.deepEqual(appLink(`https://udozo.com/pay/pw_${'b'.repeat(32)}`), { route: `/pay/pw_${'b'.repeat(32)}` });
+  assert.deepEqual(appLink('/ng/l/77-chair/buy'), { route: '/listing/77?country=NG' });
 });

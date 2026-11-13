@@ -9,7 +9,7 @@ export type AppLink = { route: string } | { web: string };
 const site = 'https://udozo.com';
 const ownHosts = new Set(['udozo.com', 'www.udozo.com']);
 /** The app's own screens, reachable by `udozo://<route>` links. */
-const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings']);
+const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings', 'wallet', 'payouts', 'identity', 'orders', 'order', 'checkout', 'pay', 'scan']);
 
 /** A link the phone hands the app that is not Udozo's (another app's sign-in return, such as Facebook's `fb<id>://`). */
 export function foreignScheme(href: string) {
@@ -37,12 +37,17 @@ export function appLink(href: string): AppLink {
   const [first, second, third, fourth] = parts;
 
   if (!first) return { route: '/' };
-  // The app's own routes (`udozo://listing/77`): udozo.com has no pages by these names, so they are only ever the app's.
+  // The app's own routes (`udozo://listing/77`): udozo.com has no pages by these names, so they are only ever the app's;
+  // its one page of the same name, a shop till's `/pay/<token>`, is the app's screen for it.
   if (appRoutes.has(first)) return { route: `${url.pathname}${url.search}` };
   if (first === 'sell') return { route: '/post/new' };
   if (first === 'account') {
     if (second === 'listings') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/post/${third}` : `/my-listings${query({ status: url.searchParams.get('status') })}` };
     if (second === 'requests') return { route: '/requests' };
+    if (second === 'wallet') return { route: `/wallet${query({ wallet: url.searchParams.get('wallet') })}` };
+    if (second === 'payouts' || second === 'udozopay') return { route: '/payouts' };
+    if (second === 'verification') return { route: '/identity' };
+    if (second === 'orders') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/order/${third}` : '/orders' };
     if (second === 'profile' && third === 'username') return { route: '/username' };
     if (second === 'messages') return { route: third ? `/chat/${third}` : '/chats' };
     if (second === 'notifications') return { route: '/notifications' };

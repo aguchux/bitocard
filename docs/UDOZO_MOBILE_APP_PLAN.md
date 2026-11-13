@@ -357,8 +357,8 @@ client IDs; Facebook Login's Android key hash and iOS bundle ID in the Meta app;
 - **Tests:** `npm test` runs the pure helpers under `node --test`, then the screens under Jest (jest-expo and Testing
   Library: the listing page, sign-in and sign-up, a chat, deleting the account).
 
-**Not in phase 1 (their phases):** posting ads (2), the wallet, UdozoPay and payouts (3), calls and Ask Anjio (4); until
-then Me's UdozoPay orders and Wallet open udozo.com. Views of listings opened in the app are not counted yet.
+**Not in phase 1 (their phases):** posting ads (2), the wallet, UdozoPay and payouts (3), calls and Ask Anjio (4).
+Views of listings opened in the app are not counted yet.
 
 **Build settings for phase 1** (EAS environment variables): `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`,
 `GOOGLE_IOS_URL_SCHEME`; `FACEBOOK_APP_ID`, `FACEBOOK_CLIENT_TOKEN`; `GOOGLE_SERVICES_JSON` (a file variable: Firebase's
@@ -386,6 +386,36 @@ then Me's UdozoPay orders and Wallet open udozo.com. Views of listings opened in
 - **Username** (`username`): availability as typed, suggestions, the 30-day rule; or how many ads to go.
 - The Sell tab is Post an ad, drafts to carry on and the seller's places; Me opens them in the app. Links: `/sell`,
   `/account/listings(/<id>)`, `/account/requests`, `/account/profile/username` and the app's own `udozo://<route>`.
+
+**Phase 3, money (13 November 2026):**
+
+- **Every money step** (paying an order, paying storage, releasing a delivery, paying a shop's till, paying out, showing
+  a release code) opens a sheet naming the amount, then Face ID, the fingerprint or the phone's PIN
+  (`confirmOnPhone` in `src/lib/biometrics.ts`, expo-local-authentication; a phone with no lock asks nothing more, the
+  sheet being the confirmation). Its Idempotency-Key (`useMoneyKey`) is kept after no answer or a 5xx and made again
+  after a refusal (`keepKey`), so a retried tap never pays twice. The rules are in `src/lib/money.ts` (udozo.com's
+  `orderActions` and `orderNext`, checkout charges and body, the Buy button, the till link), tested under `node --test`.
+- **Wallet** (`wallet`): both wallets, Add funds on the gateway's page in an in-app browser (returning to
+  `udozo.com/account/wallet`), the top-up then read until it is added or not, with Cancel; the customer's own account
+  number with Copy (the BVN in Nigeria); what moved. Sandbox builds simulate top-ups and transfers.
+- **Buy with UdozoPay** (`checkout/[id]`, from the listing's bar or an accepted offer in a chat): meet-up, delivery
+  (in the seller's state or elsewhere, the address) or a Connect Centre (the state, then the centre, its shipping, the
+  Connect fee and the free time), every charge, the wallet, then the request; the terms asked for when the API wants
+  them, then sent again.
+- **Orders** (`orders`, `order/[id]`): buying and selling; on each, the seller accepts (after the identity check and a
+  payout account), declines, enters the buyer's code at a meet-up, photographs it (two photos at least) and marks it
+  sent (a courier and tracking, or dropped at the Connect Centre) and delivered; the buyer pays, shows the release code
+  (never in a screenshot on Android, expo-screen-capture), pays storage owed at a centre, confirms a delivery, opens a
+  dispute and writes in it; either cancels before the hand-over. Returns, auctions and resale orders link to udozo.com
+  for the rest.
+- **Payouts** (`payouts`): ready and held, bank accounts (the country's banks, the number; the bank names the holder),
+  Pay to my bank, payouts with sandbox simulate; a refusal for the identity check opens it.
+- **Identity check** (`identity`): Udozo Verify in an in-app browser with consent, read again on return.
+- **Paying a shop's till** (`pay/[token]`, from `udozo.com/pay/<token>` links and **Scan to pay at a shop**, `scan`,
+  expo-camera's QR reader, which opens only a Udozo till's code): the shop, the basket, the amount and time left, Pay
+  (the exact amount shown) or Not my basket.
+- Links: `/account/wallet`, `/account/payouts`, `/account/udozopay`, `/account/verification`, `/account/orders(/<id>)`,
+  `/pay/<token>`. Buy orders stay on udozo.com for now.
 
 **Fixes after reviewing phase 1 (12 November 2026):**
 

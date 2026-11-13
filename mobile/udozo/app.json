@@ -109,6 +109,21 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Udozo uses the camera to take photos for an ad or a chat, and to scan a shop's code to pay.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Udozo asks for Face ID before you pay, pay out or show a release code."
+        }
+      ],
+      [
         "expo-font",
         {
           "fonts": [

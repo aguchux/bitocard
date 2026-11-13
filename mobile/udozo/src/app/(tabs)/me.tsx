@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { AtSign, BarChart3, Bell, Heart, LayoutList, Package, PhoneCall, Settings, Wallet } from 'lucide-react-native';
+import { AtSign, Banknote, BarChart3, Bell, Heart, LayoutList, Package, PhoneCall, ScanLine, Settings, ShieldCheck, Wallet } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AccountPending } from '@/components/account-pending';
@@ -14,11 +13,9 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 
-const web = (path: string) => () => WebBrowser.openBrowserAsync(`https://udozo.com${path}`).catch(() => undefined);
-
 /**
- * Me: who is signed in, a reminder to finish the account, then their places. The wallet and orders open on udozo.com
- * until phase 3 brings them into the app.
+ * Me: who is signed in, a reminder to finish the account, then their places: the wallet, UdozoPay orders, payouts,
+ * Scan to pay at a shop and the identity check (phase 3) beside the selling places.
  */
 export default function MeScreen() {
   const theme = useTheme();
@@ -56,8 +53,11 @@ export default function MeScreen() {
         <MenuRow icon={<PhoneCall size={20} color={theme.primary} />} title="Requests" onPress={() => router.push('/requests')} />
         <MenuRow icon={<BarChart3 size={20} color={theme.primary} />} title="Dashboard" onPress={() => router.push('/dashboard')} />
         <MenuRow icon={<AtSign size={20} color={theme.primary} />} title="Username" detail={customer.username ? `@${customer.username}` : undefined} onPress={() => router.push('/username')} />
-        <MenuRow icon={<Package size={20} color={theme.primary} />} title="UdozoPay orders" external onPress={web('/account/orders')} />
-        <MenuRow icon={<Wallet size={20} color={theme.primary} />} title="Wallet" external onPress={web('/account/wallet')} />
+        <MenuRow icon={<Wallet size={20} color={theme.primary} />} title="Wallet" onPress={() => router.push('/wallet')} />
+        <MenuRow icon={<Package size={20} color={theme.primary} />} title="UdozoPay orders" onPress={() => router.push('/orders')} />
+        <MenuRow icon={<ScanLine size={20} color={theme.primary} />} title="Scan to pay at a shop" onPress={() => router.push('/scan')} />
+        <MenuRow icon={<Banknote size={20} color={theme.primary} />} title="Payouts" detail="Money from your sales" onPress={() => router.push('/payouts')} />
+        <MenuRow icon={<ShieldCheck size={20} color={theme.primary} />} title="Identity check" onPress={() => router.push('/identity')} />
         <MenuRow icon={<Settings size={20} color={theme.primary} />} title="Settings" onPress={() => router.push('/settings')} />
       </View>
     </Page>

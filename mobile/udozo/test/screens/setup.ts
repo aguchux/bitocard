@@ -34,9 +34,23 @@ jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn(async (
 
 jest.mock('@/lib/api', () => {
   const core = jest.requireActual('@/lib/api-core');
-  return { api: jest.fn(), apiUpload: jest.fn(), privateImage: (path: string) => ({ uri: path }), ApiError: core.ApiError, newIdempotencyKey: () => 'key' };
+  return { api: jest.fn(), apiUpload: jest.fn(), privateImage: (path: string) => ({ uri: path }), ApiError: core.ApiError, newIdempotencyKey: (() => {
+    let made = 0;
+    return () => `key-${++made}`;
+  })() };
 });
 
 // Icons draw nothing in tests (their package is ES modules only).
 jest.mock('lucide-react-native', () => new Proxy({ __esModule: true }, { get: (target, name) => (name === '__esModule' ? true : () => null) }));
 
+
+// Money steps: Face ID or the fingerprint says yes unless a test says otherwise.
+jest.mock('expo-local-authentication', () => ({
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+  hasHardwareAsync: jest.fn(async () => true),
+  getEnrolledLevelAsync: jest.fn(async () => 3),
+  authenticateAsync: jest.fn(async () => ({ success: true })),
+}));
+jest.mock('expo-screen-capture', () => ({ usePreventScreenCapture: jest.fn() }));
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));
+jest.mock('expo-camera', () => ({ CameraView: () => null, useCameraPermissions: jest.fn(() => [{ granted: true, canAskAgain: true }, jest.fn()]) }));
