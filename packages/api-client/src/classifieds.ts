@@ -493,7 +493,8 @@ export type ShopConversation = {
   role: 'buyer' | 'seller';
   listing: { id: string; ref: number; title: string | null; slug: string | null; status: string; country: string; price: ShopPrice; cover_url: string | null };
   /** Their public name, and (Udozo) whether they have Udozo open now. */
-  with: { name: string; online?: boolean };
+  /** Their seller page: `username` once chosen, else `handle` (Udozo). */
+  with: { name: string; online?: boolean; handle?: string; username?: string | null };
   last_message: { kind: string; body: string; from: 'me' | 'them' | 'bitocard'; created_at: string } | null;
   unread: number;
   open_offer: ShopOffer | null;

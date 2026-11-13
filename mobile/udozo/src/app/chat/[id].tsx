@@ -18,7 +18,7 @@ import { api, apiUpload, privateImage } from '@/lib/api';
 import { useShopAssistant } from '@/lib/assistant';
 import { useAssistantDraft } from '@/lib/assistant-draft';
 import { preparePhoto } from '@/lib/picture';
-import { photoUrl } from '@/lib/navigate';
+import { openSeller, photoUrl } from '@/lib/navigate';
 import { registerPush } from '@/lib/push';
 import { useSession } from '@/lib/session';
 import { reportReasons } from '@/lib/words';
@@ -83,6 +83,17 @@ export default function ChatScreen() {
       <Stack.Screen
         options={{
           title: data.with.name,
+          // Their name opens their seller page, where they have one.
+          headerTitle:
+            data.with.username || data.with.handle
+              ? () => (
+                  <Pressable accessibilityRole="link" accessibilityLabel={`${data.with.name}. Open their seller page`} hitSlop={8} onPress={() => openSeller(data.with)}>
+                    <ThemedText type="heading" numberOfLines={1}>
+                      {data.with.name}
+                    </ThemedText>
+                  </Pressable>
+                )
+              : undefined,
           headerRight: () => (
             <View style={styles.header}>
               <ChatCallButton chat={data} />

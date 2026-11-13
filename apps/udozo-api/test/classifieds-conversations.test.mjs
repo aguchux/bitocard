@@ -118,6 +118,9 @@ describe('chats', () => {
     const chat = started.json;
     assert.equal(chat.role, 'buyer');
     assert.equal(chat.with.name, 'Chinedu O.', 'never a full name');
+    // Their seller page, as listing cards name it: the handle until they choose a username.
+    assert.equal(chat.with.handle, (await seller.get('/v1/store/account')).json.seller_handle);
+    assert.equal(chat.with.username, null);
     assert.deepEqual(chat.messages.map(message => message.from), ['bitocard', 'me']);
     assert.match(chat.messages[0].body, /never pay in advance/);
     const body = chat.messages[1].body;
@@ -133,6 +136,7 @@ describe('chats', () => {
     assert.equal(selling.json.total, 1);
     assert.equal(selling.json.data[0].unread, 2);
     assert.equal(selling.json.data[0].with.name, 'Kemi A.');
+    assert.equal(selling.json.data[0].with.handle, (await buyer.get('/v1/store/account')).json.seller_handle);
     assert.equal((await seller.get('/v1/classifieds/conversations/unread')).json.unread, 2);
     assert.equal((await buyer.get('/v1/classifieds/conversations?role=selling')).json.total, 0);
     assert.equal(await notices(seller.id, 'customer.classifieds.message'), 1, 'one notice per chat every 10 minutes');

@@ -15,6 +15,7 @@ import { useAccount } from '@/lib/account';
 import { api, ApiError, newIdempotencyKey } from '@/lib/api';
 import { listingCallButton } from '@/lib/calls';
 import { contactOptions, requestState } from '@/lib/listing-page';
+import { openSeller } from '@/lib/navigate';
 
 type Kind = 'callback' | 'contact';
 
@@ -32,8 +33,7 @@ export function ContactRow({ data, viewer, onChat }: { data: ShopListingPage; vi
   const calls = useCalls();
   const signedIn = Boolean(customer);
   const signIn = () => router.push('/signin');
-  const key = data.seller.username || data.seller.handle;
-  const sellerPage = key ? () => router.push({ pathname: '/seller/[key]', params: { key } }) : null;
+  const sellerPage = data.seller.username || data.seller.handle ? () => openSeller(data.seller) : null;
 
   if (viewer?.own) {
     return (

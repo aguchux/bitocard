@@ -10,4 +10,12 @@ export function openLink(href: string) {
   else WebBrowser.openBrowserAsync(link.web).catch(() => undefined);
 }
 
+/** Opens a person's seller page (their username once chosen, else their handle), where they have one: false otherwise. */
+export function openSeller(seller: { handle?: string | null; username?: string | null } | null | undefined) {
+  const key = seller?.username || seller?.handle;
+  if (!key) return false;
+  router.push({ pathname: '/seller/[key]', params: { key } });
+  return true;
+}
+
 export { photoUrl } from '@/lib/photo';

@@ -116,6 +116,20 @@ test('the summary chips open the place, the category and the brand', async () =>
   expect(router.push).toHaveBeenLastCalledWith({ pathname: '/brand/[slug]', params: { slug: 'apple', country: 'NG' } });
 });
 
+test('the seller’s photo and name open their page', async () => {
+  answers({ 'GET /v1/classifieds/listings/77': listing });
+  await renderScreen(<ListingScreen />);
+  await fireEvent.press(await screen.findByLabelText('Chidi O.. Open their seller page'));
+  expect(router.push).toHaveBeenLastCalledWith({ pathname: '/seller/[key]', params: { key: 'chidi' } });
+});
+
+test('a seller without a username opens by their handle', async () => {
+  answers({ 'GET /v1/classifieds/listings/77': { ...listing, seller: { ...listing.seller, username: null } } });
+  await renderScreen(<ListingScreen />);
+  await fireEvent.press(await screen.findByTestId('seller-card-head'));
+  expect(router.push).toHaveBeenLastCalledWith({ pathname: '/seller/[key]', params: { key: 'abc123' } });
+});
+
 test('the summary and contact row draw while the viewer cannot be read', async () => {
   mockAccount.customer = { id: 'c1', name: 'Ada Obi' };
   answers({ 'GET /v1/classifieds/listings/77': listing });

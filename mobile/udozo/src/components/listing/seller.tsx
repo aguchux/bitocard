@@ -1,23 +1,32 @@
 import { badgeLabels, reviewRatingLabels, reviewSourceLabels, type ShopListingPage, type ShopReview } from '@shared/classifieds';
-import { router } from 'expo-router';
 import { BadgeCheck, ChevronRight, ThumbsDown, ThumbsUp } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { openSeller } from '@/lib/navigate';
 
-/** The seller: their photo (with a green dot while they are on Udozo), name, since when, badges, replies and reviews, and their page. */
+/**
+ * The seller: their photo (with a green dot while they are on Udozo), name, since when, badges, replies and reviews, and
+ * their page, which the photo and name open too.
+ */
 export function SellerCard({ data, online }: { data: ShopListingPage; online: boolean }) {
   const theme = useTheme();
   const seller = data.seller;
   const key = seller.username || seller.handle;
   const since = new Date(seller.member_since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  const open = () => key && router.push({ pathname: '/seller/[key]', params: { key } });
+  const open = () => openSeller(seller);
   return (
     <Card>
-      <View style={styles.inline}>
+      <Pressable
+        testID="seller-card-head"
+        accessibilityRole={key ? 'link' : undefined}
+        accessibilityLabel={key ? `${seller.name}. Open their seller page` : undefined}
+        disabled={!key}
+        onPress={open}
+        style={({ pressed }) => [styles.inline, { opacity: pressed ? 0.8 : 1 }]}>
         <View>
           <Avatar name={seller.name} url={seller.avatar_url} size={48} />
           {online ? <View style={[styles.online, { backgroundColor: theme.success, borderColor: theme.background }]} accessibilityLabel="On Udozo now" /> : null}
@@ -26,7 +35,8 @@ export function SellerCard({ data, online }: { data: ShopListingPage; online: bo
           <ThemedText type="heading">{seller.name}</ThemedText>
           <ThemedText type="caption">{`On Udozo since ${since} · ${seller.active_listings} for sale`}</ThemedText>
         </View>
-      </View>
+        {key ? <ChevronRight size={18} color={theme.textSecondary} /> : null}
+      </Pressable>
       {seller.badges.length ? (
         <View style={[styles.inline, { flexWrap: 'wrap' }]}>
           {seller.badges.map(badge => (

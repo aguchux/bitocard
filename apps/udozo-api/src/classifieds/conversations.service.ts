@@ -100,7 +100,7 @@ const listingSummary = {
   },
 } satisfies Prisma.ClassifiedListingDefaultArgs;
 
-const person = { select: { id: true, name: true, email: true, storeId: true, emailVerifiedAt: true } } satisfies Prisma.CustomerDefaultArgs;
+const person = { select: { id: true, name: true, email: true, storeId: true, emailVerifiedAt: true, sellerHandle: true, username: true } } satisfies Prisma.CustomerDefaultArgs;
 
 const chatInclude = {
   listing: listingSummary,
@@ -673,8 +673,9 @@ export class ConversationsService {
       role: side,
       listing: this.presentListing(chat.listing),
       // Whether they have Udozo open now, and whether a call can be made from this chat (never where either side
-      // blocked the other; a buyer never calls a seller who takes messages only).
-      with: { name: publicName(them.name), online: online.has(them.id) },
+      // blocked the other; a buyer never calls a seller who takes messages only). Their seller page by its username, else
+      // its handle (as every listing card already names it).
+      with: { name: publicName(them.name), online: online.has(them.id), handle: them.sellerHandle, username: them.username },
       can_call: callsConfigured(this.integrations.config) && !chat.buyerBlockedAt && !chat.sellerBlockedAt && (side === 'seller' || chat.listing.contact !== 'chat'),
       last_message: last ? { kind: last.kind, body: last.kind === 'photo' && !last.body ? 'Photo' : last.body.slice(0, 140), from: last.senderId === null ? 'bitocard' : last.senderId === viewerId ? 'me' : 'them', created_at: last.createdAt.toISOString() } : null,
       unread,
