@@ -17,7 +17,10 @@ import { openLink, photoUrl } from '@/lib/navigate';
  * hero is left out too, as udozo.com does.
  */
 export function HomeRows({ rows, withoutHero }: { rows: ResolvedHomeRow[]; withoutHero?: boolean }) {
-  const visible = (block: ResolvedHomeSection) => shown(block) && !(withoutHero && block.type === 'home_hero');
+  // One row of category tiles on a phone: the first the page has (its spotlights), never a second of listing photos.
+  const firstCategories = rows.flatMap(row => (row.hidden ? [] : row.blocks)).find(block => categoryBlocks.has(block.type) && shown(block))?.id;
+  const visible = (block: ResolvedHomeSection) =>
+    shown(block) && !(withoutHero && block.type === 'home_hero') && !(categoryBlocks.has(block.type) && block.id !== firstCategories);
   return (
     <View style={{ gap: Spacing.four }}>
       {rows
@@ -34,6 +37,7 @@ export function HomeRows({ rows, withoutHero }: { rows: ResolvedHomeRow[]; witho
   );
 }
 
+const categoryBlocks = new Set(['category_masonry', 'category_spotlights']);
 const listingBlocks = new Set(['deals_rail', 'sponsored_rail', 'top_selling_rail', 'listing_group', 'listing_marquee']);
 const shown = (block: ResolvedHomeSection) => {
   if (block.hidden) return false;
