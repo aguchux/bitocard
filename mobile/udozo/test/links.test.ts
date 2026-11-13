@@ -43,6 +43,7 @@ test('selling places, the app’s own routes, and other apps’ links', () => {
   assert.deepEqual(appLink('/account/listings/0d3f8a5e-1111-4222-8333-944455556666'), { route: '/post/0d3f8a5e-1111-4222-8333-944455556666' });
   assert.deepEqual(appLink('/account/requests'), { route: '/requests' });
   assert.deepEqual(appLink('/account/profile/username'), { route: '/username' });
+  assert.deepEqual(appLink('/account/profile/whatsapp'), { route: '/whatsapp' });
   assert.deepEqual(appLink('udozo://listing/77?country=NG'), { route: '/listing/77?country=NG' });
   assert.deepEqual(appLink('udozo://my-listings'), { route: '/my-listings' });
   assert.equal(foreignScheme('fb1234567890://authorize?code=abc'), true);

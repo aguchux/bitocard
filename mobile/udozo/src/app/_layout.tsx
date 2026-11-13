@@ -81,6 +81,7 @@ function ThemedApp() {
           <Stack.Screen name="saved" options={{ title: 'Saved' }} />
           <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="whatsapp" options={{ title: 'WhatsApp' }} />
           <Stack.Screen name="delete-account" options={{ title: 'Delete your account' }} />
           <Stack.Screen name="post/[id]" options={{ title: 'Post an ad' }} />
           <Stack.Screen name="my-listings" options={{ title: 'My listings' }} />
