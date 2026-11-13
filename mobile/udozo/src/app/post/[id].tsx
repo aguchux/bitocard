@@ -11,6 +11,8 @@ import {
   type ShopSuggestion,
   type ShopTopCategory,
   type ShopAssistantProfile,
+  type ShopPosStatus,
+  type ShopResaleAvailability,
 } from '@shared/classifieds';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
@@ -32,6 +34,7 @@ import { useAccount } from '@/lib/account';
 import { api, ApiError } from '@/lib/api';
 import {
   applyDraftSuggestion,
+  auctionLengths,
   bodyOf,
   draftOf,
   emptyDraft,
@@ -39,6 +42,7 @@ import {
   lastStep,
   maxPhotos,
   minPhotos,
+  offersFor,
   photoCounts,
   postSteps,
   stepOf,
@@ -69,9 +73,13 @@ const contacts: { key: ShopContact; label: string }[] = [
 ];
 type Terms = { version: string; path: string; accepted: boolean; previous_version: string | null };
 
+/** A Udozo Connect Centre a listing can ship to (`GET /v1/connect/centres?country=`). */
+type Centre = { id: string; number: string; name: string; state: { id: string; name: string; slug: string }; area: { name: string } };
+
 /**
  * Post an ad, one step a screen (udozo.com's wizard): what it is, photos (camera or library, Fill from photos), price and
- * details, where it is and delivery, then a check and Post. Nothing exists until the first step is saved; after that
+ * details (or selling by auction), where to sell (Udozo, resellers' stores, the seller's own shop through Udozo POS),
+ * where it is and delivery (with Udozo Connect shipping), then a check and Post. Nothing exists until the first step is saved; after that
  * every Next saves, so leaving keeps a draft to carry on. `id` is `new` or the listing's id (a draft, or a live ad
  * edited).
  */
@@ -81,7 +89,10 @@ export default function PostScreen() {
   const queries = useQueryClient();
   const { customer, pending } = useAccount();
   const { country, markets } = useMarket();
-  const currency = markets.find(market => market.country === country)?.currency ?? customer?.currency ?? 'NGN';
+  const market = markets.find(item => item.country === country);
+  const currency = market?.currency ?? customer?.currency ?? 'NGN';
+  const leastPhotos = market?.min_photos ?? minPhotos;
+  const mostPhotos = market?.max_photos ?? maxPhotos;
 
   const [listingId, setListingId] = useState<string | null>(id && id !== 'new' ? id : null);
   const [draft, setDraft] = useState<ListingDraft | null>(id && id !== 'new' ? null : emptyDraft);
@@ -105,20 +116,37 @@ export default function PostScreen() {
     queryFn: () => api<ShopAssistantProfile>(`/v1/classifieds/assistant?country=${country}&surface=sell`),
   });
   const terms = useQuery({ queryKey: ['shop-terms'], enabled: Boolean(customer), queryFn: () => api<Terms>('/v1/classifieds/terms') });
+  const resaleOpen = useQuery({ queryKey: ['me', 'resale'], enabled: Boolean(customer), retry: false, queryFn: () => api<ShopResaleAvailability>('/v1/classifieds/me/resale') });
+  const posStatus = useQuery({ queryKey: ['me', 'pos'], enabled: Boolean(customer), retry: false, queryFn: () => api<ShopPosStatus>('/v1/classifieds/me/pos') });
+  const shopCategories = useQuery({ queryKey: ['me', 'shop-categories'], enabled: Boolean(customer), retry: false, queryFn: () => api<{ data: ShopTopCategory[] }>('/v1/classifieds/me/shop-categories') });
+  const centres = useQuery({
+    queryKey: ['connect-centres', country],
+    enabled: Boolean(country && market?.connect_shipping),
+    staleTime: 10 * 60_000,
+    queryFn: () => api<{ data: Centre[] }>(`/v1/connect/centres?country=${country}`),
+  });
   const helper = assistant.data?.assistant?.roles.includes('sell') ? assistant.data.assistant.name : null;
+
+  const categories = useMemo(
+    () => [...(tree.data?.data ?? []), ...(shopCategories.data?.data ?? []).map(top => ({ ...top, name: `${top.name} (at your shop only)` }))],
+    [tree.data, shopCategories.data],
+  );
+  const posRoom = Boolean(posStatus.data?.account && (posStatus.data.products.limit === null || posStatus.data.products.used < posStatus.data.products.limit));
+  const offersOf = (form: ListingDraft) => {
+    let shopOnly = false;
+    for (const top of categories) if (top.shop_only && top.children.some(child => child.id === form.categoryId)) shopOnly = true;
+    return offersFor({ resale: Boolean(resaleOpen.data?.open), pos: posRoom, connect: Boolean(market?.connect_shipping), auctions: Boolean(market?.auctions), shopOnly }, form);
+  };
 
   // A saved listing opens at its first unfinished step, once (set while rendering, as React suggests for derived state).
   if (!draft && listing.data) {
     const made = draftOf(listing.data);
     setDraft(made);
-    setStep(firstIncomplete(made, photoCounts(listing.data.photos)));
+    setStep(firstIncomplete(made, photoCounts(listing.data.photos), { minPhotos: leastPhotos, offers: offersOf(made) }));
   }
 
-  const categories = useMemo(() => tree.data?.data ?? [], [tree.data]);
-  const subcategory = useMemo(() => {
-    for (const top of categories) for (const child of top.children) if (child.id === draft?.categoryId) return { top, child };
-    return null;
-  }, [categories, draft?.categoryId]);
+  let subcategory: { top: ShopTopCategory; child: ShopTopCategory['children'][number] } | null = null;
+  for (const top of categories) for (const child of top.children) if (child.id === draft?.categoryId) subcategory = { top, child };
   const features: (ShopFeature & { filter: boolean })[] = subcategory?.child.features ?? [];
   const types = Object.fromEntries(features.map(feature => [feature.key, feature]));
   const photos = listing.data?.photos ?? [];
@@ -143,6 +171,8 @@ export default function PostScreen() {
     );
   }
   if (!draft || (listingId && listing.isPending)) return <Loading />;
+  const offers = offersOf(draft);
+  const auction = offers.auctions && draft.saleMethod === 'auction';
 
   const change = (patch: Partial<ListingDraft>) => {
     setDraft(current => ({ ...(current ?? emptyDraft), ...patch }));
@@ -152,7 +182,7 @@ export default function PostScreen() {
 
   /** Saves the form: makes the draft the first time, then changes it. Returns the listing's id, or null when refused. */
   const save = async (): Promise<string | null> => {
-    const made = bodyOf(draft, types);
+    const made = bodyOf(draft, types, offers);
     if ('problem' in made) {
       setError(localError(made.problem.message, made.problem.param, 'parameter_invalid'));
       return null;
@@ -174,7 +204,7 @@ export default function PostScreen() {
   };
 
   const next = async () => {
-    const problem = stepProblem(step, draft, counts);
+    const problem = stepProblem(step, draft, counts, { minPhotos: leastPhotos, offers });
     if (problem) {
       setError(localError(problem.message, problem.param, 'parameter_invalid'));
       return;
@@ -188,7 +218,7 @@ export default function PostScreen() {
   const addPhotos = async (from: 'camera' | 'library') => {
     const id = listingId ?? (await save());
     if (!id) return;
-    const room = maxPhotos - photos.length - uploading;
+    const room = mostPhotos - photos.length - uploading;
     const { photos: picked, refused } = await pickPhotos(from, room).catch(() => ({ photos: [], refused: false }));
     if (refused) {
       Alert.alert(from === 'camera' ? 'Camera turned off' : 'Photos turned off', `Allow Udozo to use your ${from === 'camera' ? 'camera' : 'photos'} in your phone's settings.`, [
@@ -357,7 +387,9 @@ export default function PostScreen() {
 
           {step === 1 ? (
             <>
-              <ThemedText themeColor="textSecondary">{`Add at least ${minPhotos} clear photos, up to ${maxPhotos}. The first is the cover.`}</ThemedText>
+              <ThemedText themeColor="textSecondary">
+                {offers.shopOnly ? 'Photos are optional: it is sold only at your shop.' : `Add at least ${leastPhotos} clear photos, up to ${mostPhotos}. The first is the cover.`}
+              </ThemedText>
               <View style={styles.grid}>
                 {photos.map((photo, index) => (
                   <View key={photo.id} style={[styles.tile, { borderColor: photo.status === 'failed' ? theme.danger : theme.line }]}>
@@ -385,7 +417,7 @@ export default function PostScreen() {
                   </View>
                 ))}
               </View>
-              {photos.length + uploading < maxPhotos ? (
+              {photos.length + uploading < mostPhotos ? (
                 <View style={{ flexDirection: 'row', gap: Spacing.two }}>
                   <Button title="Take photos" icon={<Camera size={18} color={theme.onPrimary} />} onPress={() => void addPhotos('camera')} style={{ flex: 1 }} />
                   <Button title="From gallery" tone="secondary" icon={<Images size={18} color={theme.text} />} onPress={() => void addPhotos('library')} style={{ flex: 1 }} />
@@ -406,13 +438,46 @@ export default function PostScreen() {
 
           {step === 2 ? (
             <>
-              <View style={styles.chips}>
+              {offers.auctions && !offers.shopOnly ? (
+                <>
+                  <ThemedText type="smallBold">How do you want to sell it?</ThemedText>
+                  <View style={styles.chips}>
+                    <Chip label="At a price" selected={!auction} onPress={() => change({ saleMethod: 'fixed' })} />
+                    <Chip label="By auction" selected={auction} onPress={() => change({ saleMethod: 'auction', priceKind: 'fixed', auctionDays: draft.auctionDays ?? 7 })} />
+                  </View>
+                  {auction ? (
+                    <ThemedText type="caption">
+                      People bid until it ends; the highest bid at or above your reserve wins and pays with UdozoPay. One item, sold on Udozo only.
+                    </ThemedText>
+                  ) : null}
+                </>
+              ) : null}
+              <View style={[styles.chips, auction && { display: 'none' }]}>
                 {priceKinds.map(kind => (
                   <Chip key={kind.key} label={kind.label} selected={draft.priceKind === kind.key} onPress={() => change({ priceKind: kind.key })} />
                 ))}
               </View>
-              {draft.priceKind !== 'on_request' ? (
-                <Field label={`Price (${currency})`} value={draft.price} onChangeText={text => change({ price: text })} keyboardType="decimal-pad" placeholder="Such as 450,000" error={problem('price')} />
+              {draft.priceKind !== 'on_request' || auction ? (
+                <Field label={`${auction ? 'Starting price' : 'Price'} (${currency})`} value={draft.price} onChangeText={text => change({ price: text })} keyboardType="decimal-pad" placeholder="Such as 450,000" error={problem('price')} />
+              ) : null}
+              {auction ? (
+                <>
+                  <Field
+                    label={`Reserve (${currency}), optional`}
+                    value={draft.auctionReserve}
+                    onChangeText={text => change({ auctionReserve: text })}
+                    keyboardType="decimal-pad"
+                    hint="The least you will take, kept from bidders. At least the starting price."
+                    error={problem('auction_reserve')}
+                  />
+                  <ThemedText type="smallBold">How long it runs</ThemedText>
+                  <View style={styles.chips}>
+                    {auctionLengths.map(days => (
+                      <Chip key={days} label={`${days} ${days === 1 ? 'day' : 'days'}`} selected={draft.auctionDays === days} onPress={() => change({ auctionDays: days })} />
+                    ))}
+                  </View>
+                  {problem('auction_days') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('auction_days')}</ThemedText> : null}
+                </>
               ) : null}
               <Button title="Suggest a price" tone="ghost" loading={suggesting === 'price'} onPress={() => void suggestPrice()} />
               {priceHint ? <ThemedText type="small" themeColor="textSecondary">{priceHint}</ThemedText> : null}
@@ -436,11 +501,15 @@ export default function PostScreen() {
                 style={{ minHeight: 120, textAlignVertical: 'top', paddingTop: Spacing.two }}
                 error={problem('description')}
               />
-              <Field label="How many do you have?" value={draft.stock} onChangeText={text => change({ stock: text })} keyboardType="number-pad" hint="Buyers cannot buy it when none are left." error={problem('stock')} />
             </>
           ) : null}
 
-          {step === 3 && country ? (
+          {step === 3 ? (
+            <WhereToSell draft={draft} change={change} offers={offers} auction={auction} resale={resaleOpen.data ?? null} pos={posStatus.data ?? null} problem={problem} />
+          ) : null}
+
+          {step === 4 && offers.shopOnly ? <ThemedText themeColor="textSecondary">Sold only at your shop, so there is nothing to set here.</ThemedText> : null}
+          {step === 4 && country && !offers.shopOnly ? (
             <>
               <PickerRow label="Where is it?" value={area && state ? `${area.name}, ${state.name}` : null} placeholder="Choose the area" onPress={() => setPicker('place')} error={problem('area_id')} />
               <ThemedText type="smallBold">Delivery</ThemedText>
@@ -459,6 +528,7 @@ export default function PostScreen() {
               ) : null}
               <Chip label="Buyers can collect it in person" selected={draft.pickup} onPress={() => change({ pickup: !draft.pickup })} />
               {problem('pickup') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('pickup')}</ThemedText> : null}
+              {offers.connect ? <ConnectShipping draft={draft} change={change} centres={centres.data?.data ?? []} currency={currency} problem={problem} /> : null}
               <ThemedText type="smallBold">How buyers reach you</ThemedText>
               <View style={styles.chips}>
                 {contacts.map(item => (
@@ -476,7 +546,19 @@ export default function PostScreen() {
               <Summary label="Photos" value={`${counts.ready} photos`} onChange={() => setStep(1)} />
               <Summary label="Price" value={draft.priceKind === 'on_request' ? 'Contact for price' : `${currency} ${draft.price}${draft.priceKind === 'negotiable' ? ', negotiable' : ''}`} onChange={() => setStep(2)} />
               <Summary label="Condition" value={draft.condition ? conditionLabels[draft.condition] : '—'} onChange={() => setStep(2)} />
-              <Summary label="Where" value={area && state ? `${area.name}, ${state.name}` : '—'} onChange={() => setStep(3)} />
+              <Summary
+                label="Sold on"
+                value={
+                  offers.shopOnly
+                    ? 'Your shop only'
+                    : auction
+                      ? `Udozo, by auction for ${draft.auctionDays ?? '?'} days`
+                      : [draft.onShop ? 'Udozo' : null, offers.resale && draft.resale ? 'resellers' : null, offers.pos && draft.pos ? 'your shop' : null].filter(Boolean).join(', ')
+                }
+                onChange={() => setStep(auction ? 2 : 3)}
+              />
+              {!offers.shopOnly ? <Summary label="Where" value={area && state ? `${area.name}, ${state.name}` : '—'} onChange={() => setStep(4)} /> : null}
+              {offers.connect && draft.connect ? <Summary label="Udozo Connect" value={`Ships to ${Object.keys(draft.connectStates).length} states`} onChange={() => setStep(4)} /> : null}
               {terms.data && !terms.data.accepted ? (
                 <Card>
                   <ThemedText type="small">{terms.data.previous_version ? 'Udozo’s terms have changed since you last accepted them.' : 'Posting needs Udozo’s terms accepted once.'}</ThemedText>
@@ -484,13 +566,10 @@ export default function PostScreen() {
                   <Button title="Read the terms" tone="ghost" onPress={() => WebBrowser.openBrowserAsync(`https://udozo.com${terms.data!.path}`)} />
                 </Card>
               ) : null}
-              {listingId ? (
-                <Button title="More selling options on udozo.com" tone="ghost" onPress={() => WebBrowser.openBrowserAsync(`https://udozo.com/account/listings/${listingId}`)} />
-              ) : null}
             </>
           ) : null}
 
-          {error && !(error instanceof ApiError && error.param && ['title', 'category_id', 'price', 'condition', 'area_id', 'photos', 'pickup', 'stock', 'delivery_fee_state', 'delivery_fee_nationwide', 'description'].includes(error.param)) ? <FormError error={error} /> : null}
+          {error && !(error instanceof ApiError && error.param && ['title', 'category_id', 'price', 'condition', 'area_id', 'photos', 'pickup', 'stock', 'delivery_fee_state', 'delivery_fee_nationwide', 'description', 'auction_reserve', 'auction_days', 'on_shop', 'barcode', 'reorder_level', 'connect_states', 'connect_centres'].includes(error.param)) ? <FormError error={error} /> : null}
         </View>
       </ScrollView>
       <View style={[styles.bar, { borderColor: theme.line, backgroundColor: theme.background }]}>
@@ -515,6 +594,158 @@ export default function PostScreen() {
         />
       ) : null}
     </SafeAreaView>
+  );
+}
+
+/** The resellers' discount and markup limit offered as steps within Udozo's limits, in basis points. */
+const bpsSteps = (from: number, to: number, step: number) => {
+  const values: number[] = [];
+  for (let value = from; value <= to; value += step) values.push(value);
+  return values;
+};
+const percent = (bps: number) => `${bps / 100}%`;
+
+/**
+ * Where to sell (udozo.com's step 4): how many there are (one stock for every channel), on Udozo itself, through
+ * resellers' stores (the discount they earn and how far above the price they may sell, inside Udozo's limits), and at
+ * the seller's own shop through Udozo POS (with its barcode and reorder level). An auction sells one item on Udozo only.
+ */
+function WhereToSell({ draft, change, offers, auction, resale, pos, problem }: {
+  draft: ListingDraft;
+  change: (patch: Partial<ListingDraft>) => void;
+  offers: ReturnType<typeof offersFor>;
+  auction: boolean;
+  resale: ShopResaleAvailability | null;
+  pos: ShopPosStatus | null;
+  problem: (param: string) => string | null;
+}) {
+  const theme = useTheme();
+  if (offers.shopOnly) {
+    return (
+      <>
+        <ThemedText themeColor="textSecondary">This category is sold only at your shop with Udozo POS, never on Udozo itself.</ThemedText>
+        <Field label="How many do you have?" value={draft.stock} onChangeText={text => change({ stock: text })} keyboardType="number-pad" error={problem('stock')} />
+        <PosFields draft={draft} change={change} problem={problem} />
+      </>
+    );
+  }
+  if (auction) return <ThemedText themeColor="textSecondary">By auction it is sold on Udozo only, one item, to the winning bid. Choose At a price on the previous step to sell more than one or through resellers.</ThemedText>;
+  const limits = resale ?? { discount_min_bps: 500, discount_max_bps: 5000, markup_max_bps: 3000 };
+  return (
+    <>
+      <Field label="How many do you have?" value={draft.stock} onChangeText={text => change({ stock: text })} keyboardType="number-pad" hint="One stock for every place it sells. Buyers cannot buy it when none are left." error={problem('stock')} />
+      <Chip label="Sell it on Udozo" selected={draft.onShop} onPress={() => change({ onShop: !draft.onShop })} />
+      {offers.resale ? (
+        <Card>
+          <Chip label="Let resellers sell it in their stores" selected={draft.resale} onPress={() => change({ resale: !draft.resale })} />
+          {resale && !resale.ready && !resale.checks_waived ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {`Before resellers can sell it: ${[resale.identity_required !== false && !resale.identity_checked ? 'pass the identity check' : null, !resale.payout_account ? 'add a payout account' : null].filter(Boolean).join(' and ') || 'finish setting up UdozoPay'}.`}
+            </ThemedText>
+          ) : null}
+          {draft.resale ? (
+            <>
+              <ThemedText type="smallBold">Their discount: what they earn from your price</ThemedText>
+              <View style={styles.chips}>
+                {bpsSteps(limits.discount_min_bps, limits.discount_max_bps, 500).map(bps => (
+                  <Chip key={bps} label={percent(bps)} selected={draft.discountBps === bps} onPress={() => change({ discountBps: bps })} />
+                ))}
+              </View>
+              <ThemedText type="smallBold">How far above your price they may sell</ThemedText>
+              <View style={styles.chips}>
+                {bpsSteps(0, limits.markup_max_bps, 500).map(bps => (
+                  <Chip key={bps} label={percent(bps)} selected={draft.markupMaxBps === bps} onPress={() => change({ markupMaxBps: bps })} />
+                ))}
+              </View>
+              <ThemedText type="caption">Their stores name you as the seller, and they can never change what you wrote.</ThemedText>
+            </>
+          ) : null}
+          {problem('resale') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('resale')}</ThemedText> : null}
+        </Card>
+      ) : null}
+      {offers.pos ? (
+        <Card>
+          <Chip label="Sell it at my shop with Udozo POS" selected={draft.pos} onPress={() => change({ pos: !draft.pos })} />
+          {pos?.products.limit !== null && pos?.products.limit !== undefined ? <ThemedText type="caption">{`${pos.products.used} of ${pos.products.limit} products on ${pos.plan?.name ?? 'your plan'}.`}</ThemedText> : null}
+          {draft.pos ? <PosFields draft={draft} change={change} problem={problem} /> : null}
+        </Card>
+      ) : null}
+      {problem('on_shop') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('on_shop')}</ThemedText> : null}
+    </>
+  );
+}
+
+function PosFields({ draft, change, problem }: { draft: ListingDraft; change: (patch: Partial<ListingDraft>) => void; problem: (param: string) => string | null }) {
+  return (
+    <>
+      <Field label="Barcode, optional" value={draft.barcode} onChangeText={text => change({ barcode: text.replace(/\s/g, '') })} keyboardType="number-pad" hint="The till finds it when the barcode is scanned." error={problem('barcode')} />
+      <Field label="Reorder level, optional" value={draft.reorderLevel} onChangeText={text => change({ reorderLevel: text })} keyboardType="number-pad" hint="Udozo POS says to restock when it falls to this." error={problem('reorder_level')} />
+    </>
+  );
+}
+
+/**
+ * Shipping through Udozo Connect (udozo.com's Ship through Udozo Connect): the states it ships to, each with the
+ * seller's own shipping charge (0 for free), and every open Connect Centre there or only chosen ones.
+ */
+function ConnectShipping({ draft, change, centres, currency, problem }: {
+  draft: ListingDraft;
+  change: (patch: Partial<ListingDraft>) => void;
+  centres: Centre[];
+  currency: string;
+  problem: (param: string) => string | null;
+}) {
+  const theme = useTheme();
+  const states = useMemo(() => {
+    const seen = new Map<string, Centre['state']>();
+    for (const centre of centres) seen.set(centre.state.id, centre.state);
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [centres]);
+  const toggleState = (id: string) => {
+    const next = { ...draft.connectStates };
+    if (id in next) delete next[id];
+    else next[id] = '0';
+    change({ connectStates: next, connectCentres: draft.connectCentres.filter(centre => centres.find(item => item.id === centre)?.state.id !== id || id in next) });
+  };
+  return (
+    <Card>
+      <Chip label="Ship it through Udozo Connect" selected={draft.connect} onPress={() => change({ connect: !draft.connect })} />
+      <ThemedText type="caption">Buyers collect it at a Connect Centre and pay with UdozoPay. You get it to the centre yourself or by courier.</ThemedText>
+      {draft.connect ? (
+        <>
+          {!states.length ? <ThemedText type="small">No Connect Centres are open in your country yet.</ThemedText> : null}
+          {states.map(state => (
+            <View key={state.id} style={{ gap: Spacing.one }}>
+              <Chip label={state.name} selected={state.id in draft.connectStates} onPress={() => toggleState(state.id)} />
+              {state.id in draft.connectStates ? (
+                <Field
+                  label={`Shipping to ${state.name} (${currency})`}
+                  value={draft.connectStates[state.id]!}
+                  onChangeText={text => change({ connectStates: { ...draft.connectStates, [state.id]: text } })}
+                  keyboardType="decimal-pad"
+                  hint="0 for free. All of it is yours."
+                />
+              ) : null}
+            </View>
+          ))}
+          {problem('connect_states') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('connect_states')}</ThemedText> : null}
+          <Chip label="Every Connect Centre in those states" selected={draft.connectAllCentres} onPress={() => change({ connectAllCentres: !draft.connectAllCentres })} />
+          {!draft.connectAllCentres
+            ? centres
+                .filter(centre => centre.state.id in draft.connectStates)
+                .map(centre => (
+                  <Chip
+                    key={centre.id}
+                    label={`${centre.name}, ${centre.area.name}`}
+                    selected={draft.connectCentres.includes(centre.id)}
+                    onPress={() => change({ connectCentres: draft.connectCentres.includes(centre.id) ? draft.connectCentres.filter(item => item !== centre.id) : [...draft.connectCentres, centre.id] })}
+                  />
+                ))
+            : null}
+          {problem('connect_centres') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('connect_centres')}</ThemedText> : null}
+        </>
+      ) : null}
+    </Card>
   );
 }
 

@@ -417,6 +417,65 @@ Views of listings opened in the app are not counted yet.
 - Links: `/account/wallet`, `/account/payouts`, `/account/udozopay`, `/account/verification`, `/account/orders(/<id>)`,
   `/pay/<token>`. Buy orders stay on udozo.com for now.
 
+**Selling wholly in the app (13 November 2026, the owner's request: sellers never sent to udozo.com):**
+
+- **Built.** Post an ad has udozo.com's six steps:
+  - what it is;
+  - photos and video;
+  - price and details, including **selling by auction**: starting price, optional reserve, 1, 3, 5, 7 or 10 days;
+  - **where to sell**: stock, on Udozo, resellers' stores with the discount and markup limit inside Udozo's limits, and the seller's shop through Udozo POS with barcode and reorder level; a shop-only category needs no photos, condition or area;
+  - where it is and delivery, including **shipping through Udozo Connect**: the states with the seller's charge each, then every centre there or chosen ones;
+  - check and post.
+
+  The "More selling options on udozo.com" link is gone. The rules are in `src/lib/listing-form.ts` (`SellOffers`, `offersFor`, `bodyOf(draft, types, offers)`, `stepProblem(step, draft, photos, { minPhotos, offers })`). What is offered comes from:
+  - `GET /v1/classifieds/me/resale`;
+  - `GET /v1/classifieds/me/pos`;
+  - `GET /v1/classifieds/me/shop-categories`;
+  - the market's `connect_shipping` and `auctions`;
+  - `GET /v1/connect/centres?country=`.
+
+  Each field is sent only where it is offered or the listing already has it.
+- **The market's own photo limits.** `GET /v1/classifieds/markets` now answers `min_photos` and `max_photos` (Limits and words). The app asks for that many, and so does udozo.com's Post an ad, which before assumed 4.
+- **Still to build for selling (next agent):**
+  1. **Video on the photos step** (`maxVideoBytes` is ready in `listing-form.ts`):
+     - get a link with `POST /v1/classifieds/listings/:id/video-upload`, which answers `{ path }`;
+     - send it with `POST <api><path>`, multipart `file`, no session needed (the link is the credential); it answers 202 `{ id }`;
+     - poll the listing until `video.status` is `ready` or `failed`;
+     - remove it with `DELETE /v1/classifieds/listings/:id/media/:videoId`;
+     - pick it with expo-image-picker (`mediaTypes: ['videos']`), at most 50 MB.
+
+     It is optional and never holds the step back.
+  2. **Brand and model pickers** for the `brand` and `model` features (`brandFeatureKey`, `modelFeatureKey`), which are typed as text today:
+     - `GET /v1/classifieds/brands?category=&q=&country=&limit=`;
+     - `GET /v1/classifieds/models?category=&brand=&q=&limit=30`;
+     - `GET /v1/classifieds/models/detect?title=&category=` for "From your title".
+
+     A brand or model the list lacks is kept as typed. udozo.com's `BrandField` and `ModelField` are the reference.
+  3. **Other seller places that still open udozo.com:**
+     - an order's Connect returns, auction claims and resale orders (the order screen's "More about this order on udozo.com");
+     - My Resellers (B2B: notes, deals, stopping a reseller);
+     - buy orders;
+     - bidding on auctions as a buyer.
+- **Phase 4 (calls and Anjio) is not started.** What it needs:
+  - **Calls in the app:** `react-native-webrtc`, relay only, through Cloudflare TURN.
+    - Routes: `POST /v1/classifieds/listings/:id/calls`, `POST /v1/classifieds/conversations/:id/calls`, `…/calls/:id/answer|end`, `POST …/calls/:id/signals`, `GET …/calls/:id?after=` (poll every second while connecting, 3 once connected), and presence `POST /v1/classifieds/presence`.
+    - udozo.com's `lib/call-engine.ts` is the reference.
+  - **Calls with the app closed:**
+    - `react-native-callkeep` for CallKit and ConnectionService, and `react-native-voip-push-notification` for PushKit;
+    - register the VoIP token with `POST /v1/store/account/devices/phone { kind: 'apns_voip' }`;
+    - handle FCM data `call` and `call_ended`;
+    - these need a development build with their config plugins, and real phones to test.
+  - **Then release 0.4.0:** bump the app version to 0.4.0 (`callsFromAppVersion` in the API), and only once calls are answered in the app.
+  - **Ask Anjio:**
+    - `/v1/classifieds/assistant`: `threads`, `threads/:id/messages` with `Accept: text/event-stream`;
+    - React Native's fetch does not stream, so use `expo/fetch` or XHR progress;
+    - parse with `parseAssistantEvents` in `src/shared/classifieds.ts`;
+    - cards, rating, report, and Talk to a person.
+  - **WhatsApp connect screen:**
+    - link with `POST /v1/store/account/whatsapp/link`;
+    - turn on direct contact with `PATCH /v1/store/account/whatsapp { direct }`;
+    - read `GET /v1/classifieds/channels?country=`.
+
 **Fixes after reviewing phase 1 (12 November 2026):**
 
 - **Calls (API):** a phone makes its owner reachable for calls only once its app answers them

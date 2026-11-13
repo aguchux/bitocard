@@ -33,7 +33,8 @@ test('the body carries the price in minor units, free delivery as 0, and only fi
     { key: 'storage', value: 128 },
     { key: 'unlocked', value: true },
   ]);
-  assert.equal('on_shop' in made.body, false, 'where it is sold is left as it is');
+  assert.equal(made.body.on_shop, true);
+  for (const key of ['resale', 'pos_enabled', 'connect', 'sale_method']) assert.equal(key in made.body, false, `${key} is sent only where it is offered`);
 });
 
 test('contact for price sends no price, and a bad amount names its field', () => {
@@ -51,18 +52,22 @@ test('each step names what it still needs', () => {
   assert.equal(stepProblem(1, emptyDraft, { ready: 3, uploading: 0, failed: 0 })?.message, 'Add at least 4 photos.');
   assert.equal(stepProblem(1, emptyDraft, { ready: 4, uploading: 1, failed: 0 })?.param, 'photos');
   assert.equal(stepProblem(2, { ...emptyDraft, priceKind: 'on_request' }, ready)?.param, 'condition');
-  assert.equal(stepProblem(3, { ...emptyDraft, areaId: 'a1', pickup: false, delivery: 'none' }, ready)?.param, 'pickup');
+  assert.equal(stepProblem(4, { ...emptyDraft, areaId: 'a1', pickup: false, delivery: 'none' }, ready)?.param, 'pickup');
   const done = { ...emptyDraft, title: 'iPhone 13', categoryId: 'c1', price: '1', condition: 'new' as const, areaId: 'a1' };
-  assert.equal(firstIncomplete(done, ready), 4);
+  assert.equal(firstIncomplete(done, ready), 5);
   assert.equal(firstIncomplete(done, { ready: 2, uploading: 0, failed: 0 }), 1);
 });
 
 test("the API's refusals open the step holding the field", () => {
-  assert.equal(stepOf('terms'), 4);
+  assert.equal(stepOf('terms'), 5);
   assert.equal(stepOf('features[2].value'), 2);
-  assert.equal(stepOf('delivery_fee_state'), 3);
+  assert.equal(stepOf('auction_reserve'), 2);
+  assert.equal(stepOf('resale_discount_bps'), 3);
+  assert.equal(stepOf('pos_enabled'), 3);
+  assert.equal(stepOf('delivery_fee_state'), 4);
+  assert.equal(stepOf('connect_states[0].shipping'), 4);
   assert.equal(stepOf('photos'), 1);
-  assert.equal(stepOf('resale_discount_bps'), null);
+  assert.equal(stepOf('anything_else'), null);
 });
 
 test('Fill from photos fills only what is empty, unless asked to replace it all', () => {
@@ -87,4 +92,52 @@ test('photos are counted by state, and each listing offers what can be done now'
   const now = Date.parse('2026-11-12T00:00:00Z');
   assert.ok(listingActions({ status: 'active', stock: 1, expired_reason: null, expires_at: '2026-11-14T00:00:00Z' }, now).includes('renew'));
   assert.ok(!listingActions({ status: 'active', stock: 1, expired_reason: null, expires_at: '2026-11-30T00:00:00Z' }, now).includes('renew'));
+});
+
+const all = { resale: true, pos: true, connect: true, auctions: true, shopOnly: false };
+
+test('the market’s own photo minimum, and none for a shop-only listing', () => {
+  assert.equal(stepProblem(1, emptyDraft, { ready: 5, uploading: 0, failed: 0 }, { minPhotos: 6 })?.message, 'Add at least 6 photos.');
+  assert.equal(stepProblem(1, emptyDraft, { ready: 0, uploading: 0, failed: 0 }, { offers: { ...all, shopOnly: true } }), null);
+});
+
+test('an auction sends its starting price, reserve and length, and is sold on Udozo only', () => {
+  const draft = { ...emptyDraft, saleMethod: 'auction' as const, priceKind: 'negotiable' as const, price: '100,000', auctionReserve: '150,000', auctionDays: 5, resale: true, pos: true };
+  const made = bodyOf(draft, {}, all);
+  assert.ok('body' in made);
+  assert.equal(made.body.sale_method, 'auction');
+  assert.equal(made.body.price_kind, 'fixed');
+  assert.equal(made.body.auction_reserve, 15_000_000);
+  assert.equal(made.body.auction_days, 5);
+  assert.equal(made.body.resale, false);
+  assert.equal(made.body.pos_enabled, false);
+  assert.equal(stepProblem(2, { ...draft, auctionDays: null }, ready, { offers: all })?.param, 'auction_days');
+  assert.equal(stepProblem(3, { ...draft, onShop: false }, ready, { offers: all }), null);
+});
+
+test('where to sell: resale terms, Udozo POS and at least one place', () => {
+  const draft = { ...emptyDraft, resale: true, discountBps: 1000, markupMaxBps: 1500, pos: true, barcode: ' 5012345678900 ', reorderLevel: '3' };
+  const made = bodyOf(draft, {}, all);
+  assert.ok('body' in made);
+  assert.deepEqual([made.body.resale, made.body.resale_discount_bps, made.body.resale_markup_max_bps], [true, 1000, 1500]);
+  assert.deepEqual([made.body.pos_enabled, made.body.barcode, made.body.reorder_level], [true, '5012345678900', 3]);
+  assert.equal(stepProblem(3, { ...emptyDraft, onShop: false }, ready, { offers: all })?.param, 'on_shop');
+  const shopOnly = bodyOf(draft, {}, { ...all, shopOnly: true });
+  assert.ok('body' in shopOnly);
+  assert.equal('on_shop' in shopOnly.body, false, 'a shop-only category is placed by the API');
+  assert.equal('pos_enabled' in shopOnly.body, false);
+});
+
+test('Udozo Connect sends its states with charges, and every centre or the chosen ones', () => {
+  const draft = { ...emptyDraft, price: '10,000', connect: true, connectStates: { s1: '2,500', s2: '0' }, connectAllCentres: false, connectCentres: ['cc1'] };
+  const made = bodyOf(draft, {}, all);
+  assert.ok('body' in made);
+  assert.deepEqual(made.body.connect_states, [{ state_id: 's1', shipping: 250_000 }, { state_id: 's2', shipping: 0 }]);
+  assert.deepEqual(made.body.connect_centres, ['cc1']);
+  const every = bodyOf({ ...draft, connectAllCentres: true }, {}, all);
+  assert.ok('body' in every && every.body.connect_centres === null);
+  assert.equal(stepProblem(4, { ...draft, areaId: 'a1', connectStates: {} }, ready, { offers: all })?.param, 'connect_states');
+  assert.equal(stepProblem(4, { ...draft, areaId: 'a1', pickup: false, delivery: 'none' }, ready, { offers: all }), null, 'Connect is a way to hand it over');
+  const off = bodyOf({ ...draft, connect: false }, {}, all);
+  assert.ok('body' in off && off.body.connect === false && !('connect_states' in off.body));
 });

@@ -96,6 +96,9 @@ describe('Shipping listings through Udozo Connect', () => {
     assert.equal((await owner.patch(`/v1/classifieds/listings/${listing.id}`, { connect: false })).status, 200);
     const markets = (await storeServer().get('/v1/classifieds/markets')).json.data;
     assert.equal(markets.find(row => row.country === 'NG').connect_shipping, false);
+    // Each market says its photo limits, so the apps ask for the right number before posting.
+    assert.equal(markets.find(row => row.country === 'NG').min_photos, 4);
+    assert.equal(markets.find(row => row.country === 'NG').max_photos, 12);
   });
 
   test('a seller ticks states with their own charges; buyers see the states an open centre takes it to', async () => {

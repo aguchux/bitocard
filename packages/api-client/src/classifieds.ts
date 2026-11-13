@@ -36,7 +36,7 @@ export type ShopPlace = { slug: string; name: string; state: { slug: string; nam
  * `safe_pay`: open there (its switch on and both fees set); a buyer's own wallet is checked when they ask.
  * `install_prompt`: the site asks visitors there to install it as an app (an admin switch).
  */
-export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean; /** Sellers ship through Udozo Connect there. */ connect_shipping?: boolean; /** Sellers may sell by auction there. */ auctions?: boolean };
+export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean; buy_orders?: boolean; /** Sellers ship through Udozo Connect there. */ connect_shipping?: boolean; /** Sellers may sell by auction there. */ auctions?: boolean; /** The least and most photos a listing takes there. */ min_photos?: number; max_photos?: number };
 
 /** How a listing is sold: at its price, or by auction (its price the starting price). */
 export type ShopSaleMethod = 'fixed' | 'auction';

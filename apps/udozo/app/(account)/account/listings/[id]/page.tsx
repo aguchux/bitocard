@@ -74,7 +74,7 @@ export default async function ListingPage({ params }: Props) {
           </Link>
         </div>
       ) : (
-        <ListingForm listing={listing.data} categories={[...reference.categories, ...shopOnly]} states={reference.states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} resale={resale} pos={pos} connect={connect} auctions={Boolean(market.auctions)} />
+        <ListingForm listing={listing.data} categories={[...reference.categories, ...shopOnly]} states={reference.states} currency={market.currency} country={market.country} phoneConfirmed={customer.phone_verified} minPhotos={market.min_photos ?? 4} assistant={assistant} resale={resale} pos={pos} connect={connect} auctions={Boolean(market.auctions)} />
       )}
     </div>
   );

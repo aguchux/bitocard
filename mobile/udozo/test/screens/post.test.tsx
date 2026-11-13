@@ -91,7 +91,7 @@ test('the first step says what is missing, then makes the draft and moves to pho
   await fireEvent.press(screen.getByText('Next'));
   await waitFor(() => expect(created).toHaveLength(1));
   expect(created[0]).toMatchObject({ title: 'iPhone 13 128GB', category_id: 'c-phones', price_kind: 'fixed', price: null, pickup: true, contact: 'both', stock: 1 });
-  expect(await screen.findByText('Step 2 of 5')).toBeTruthy();
+  expect(await screen.findByText('Step 2 of 6')).toBeTruthy();
   expect(screen.getByText('Add at least 4 clear photos, up to 12. The first is the cover.')).toBeTruthy();
 });
 
@@ -132,7 +132,7 @@ test('a refusal from the API opens the step holding its field', async () => {
   await renderScreen(<PostScreen />);
   await fireEvent.press(await screen.findByText('Post my ad'));
   expect(await screen.findByText('Add at least 5 photos.')).toBeTruthy();
-  expect(screen.getByText('Step 2 of 5')).toBeTruthy();
+  expect(screen.getByText('Step 2 of 6')).toBeTruthy();
 });
 
 test('My listings marks a live ad sold after asking, and restocks one', async () => {

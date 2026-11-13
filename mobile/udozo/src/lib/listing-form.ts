@@ -1,25 +1,39 @@
 /**
  * Post an ad in the app: the ad as the form holds it, its steps and what each still needs, and the body the API takes
- * (`POST /v1/classifieds/listings`, `PATCH …/:id`). The same rules as udozo.com's wizard (apps/udozo/lib/post-steps.ts)
- * and the API's `requireComplete`, asked early so the seller puts each right on its own step.
- *
- * Resale, Udozo POS, Udozo Connect and auctions are left as the listing has them: the app never sends them, and the
- * last step links to udozo.com for those.
+ * (`POST /v1/classifieds/listings`, `PATCH …/:id`). The same six steps and rules as udozo.com's wizard
+ * (apps/udozo/lib/post-steps.ts) and the API's `requireComplete`, asked early so the seller puts each right on its own
+ * step: selling at a price or by auction, where it sells (Udozo, resellers' stores, the seller's own shop through Udozo
+ * POS) and shipping through Udozo Connect, so a seller never needs the website.
  */
 import type { ShopCondition, ShopContact, ShopDelivery, ShopFeature, ShopMyListing, ShopPriceKind } from '../shared/classifieds';
 
 export const postSteps = [
   { key: 'basics', title: 'What are you selling?' },
-  { key: 'photos', title: 'Photos' },
+  { key: 'photos', title: 'Photos and video' },
   { key: 'details', title: 'Price and details' },
+  { key: 'where', title: 'Where to sell' },
   { key: 'place', title: 'Where it is and delivery' },
   { key: 'post', title: 'Check and post' },
 ] as const;
 export const lastStep = postSteps.length - 1;
 
-/** The market's least number of photos (the API's default; it names a market's own when it refuses). */
+/** The least and most photos where the market does not say (the API's defaults; markets carry their own, `min_photos`). */
 export const minPhotos = 4;
 export const maxPhotos = 12;
+
+/** How long an auction can run, in days (the API's `auctionLengths`). */
+export const auctionLengths = [1, 3, 5, 7, 10] as const;
+
+/** The largest video a listing takes (the API's `maxVideoBytes`). */
+export const maxVideoBytes = 50 * 1024 * 1024;
+
+/**
+ * What the seller can choose in this market and account, from the API: resale (open, with Udozo's limits), Udozo POS
+ * (an account with room), Udozo Connect (open in the market), auctions, and whether the category is sold at the
+ * seller's shop only. What the listing already has always counts as offered (`offersFor`), so it can be kept or undone.
+ */
+export type SellOffers = { resale: boolean; pos: boolean; connect: boolean; auctions: boolean; shopOnly: boolean };
+export const noOffers: SellOffers = { resale: false, pos: false, connect: false, auctions: false, shopOnly: false };
 
 export type FeatureValue = string | number | boolean | null;
 
@@ -41,6 +55,24 @@ export type ListingDraft = {
   feeState: string;
   feeNationwide: string;
   contact: ShopContact;
+  /** Sold at its price, or by auction (the price is then the starting price). */
+  saleMethod: 'fixed' | 'auction';
+  /** As typed; empty for no reserve. */
+  auctionReserve: string;
+  auctionDays: number | null;
+  /** Where it sells: Udozo itself, resellers' stores (discount and markup limit in basis points), the seller's shop. */
+  onShop: boolean;
+  resale: boolean;
+  discountBps: number;
+  markupMaxBps: number;
+  pos: boolean;
+  barcode: string;
+  reorderLevel: string;
+  /** Shipping through Udozo Connect: the states it ships to with the charge typed for each, and which centres. */
+  connect: boolean;
+  connectStates: Record<string, string>;
+  connectAllCentres: boolean;
+  connectCentres: string[];
 };
 
 export const emptyDraft: ListingDraft = {
@@ -59,6 +91,20 @@ export const emptyDraft: ListingDraft = {
   feeState: '',
   feeNationwide: '',
   contact: 'both',
+  saleMethod: 'fixed',
+  auctionReserve: '',
+  auctionDays: null,
+  onShop: true,
+  resale: false,
+  discountBps: 500,
+  markupMaxBps: 2000,
+  pos: false,
+  barcode: '',
+  reorderLevel: '',
+  connect: false,
+  connectStates: {},
+  connectAllCentres: true,
+  connectCentres: [],
 };
 
 /** Typed money ("520,000", "1500.50") in minor units; null when it is not an amount above nothing. */
@@ -95,6 +141,31 @@ export function draftOf(listing: ShopMyListing): ListingDraft {
     feeState: fromMinor(listing.delivery_fees.within_state),
     feeNationwide: fromMinor(listing.delivery_fees.nationwide),
     contact: listing.contact,
+    saleMethod: listing.sale_method ?? 'fixed',
+    auctionReserve: fromMinor(listing.auction_reserve ?? null),
+    auctionDays: listing.auction_days ?? null,
+    onShop: listing.on_shop,
+    resale: listing.resale.enabled,
+    discountBps: listing.resale.discount_bps ?? emptyDraft.discountBps,
+    markupMaxBps: listing.resale.markup_max_bps ?? emptyDraft.markupMaxBps,
+    pos: listing.pos_enabled ?? false,
+    barcode: listing.barcode ?? '',
+    reorderLevel: listing.reorder_level === null || listing.reorder_level === undefined ? '' : String(listing.reorder_level),
+    connect: listing.connect?.enabled ?? false,
+    connectStates: Object.fromEntries((listing.connect?.states ?? []).map(item => [item.state.id, item.shipping ? fromMinor(item.shipping) : '0'])),
+    connectAllCentres: listing.connect?.all_centres ?? true,
+    connectCentres: (listing.connect?.centres ?? []).map(centre => centre.id),
+  };
+}
+
+/** What the listing already has counts as offered: a seller can always keep, change or turn off what it has. */
+export function offersFor(offers: SellOffers, draft: Pick<ListingDraft, 'resale' | 'pos' | 'connect' | 'saleMethod'>): SellOffers {
+  return {
+    resale: offers.resale || draft.resale,
+    pos: offers.pos || draft.pos || offers.shopOnly,
+    connect: offers.connect || draft.connect,
+    auctions: offers.auctions || draft.saleMethod === 'auction',
+    shopOnly: offers.shopOnly,
   };
 }
 
@@ -116,19 +187,20 @@ export type Problem = { message: string; param: string };
  * twice changes nothing; empty fields clear theirs. `features` are only those with a value, checked against the
  * category's registry entries (`types`).
  */
-export function bodyOf(draft: ListingDraft, types: Record<string, Pick<ShopFeature, 'data_type'>> = {}): { body: Record<string, unknown> } | { problem: Problem } {
+export function bodyOf(draft: ListingDraft, types: Record<string, Pick<ShopFeature, 'data_type'>> = {}, offers: SellOffers = noOffers): { body: Record<string, unknown> } | { problem: Problem } {
+  const auction = offers.auctions && draft.saleMethod === 'auction';
   const body: Record<string, unknown> = {
     title: draft.title.trim() || null,
     description: draft.description.trim() || null,
     category_id: draft.categoryId,
     area_id: draft.areaId,
-    price_kind: draft.priceKind,
+    price_kind: auction ? 'fixed' : draft.priceKind,
     condition: draft.condition,
     delivery: draft.delivery,
     pickup: draft.pickup,
     contact: draft.contact,
   };
-  if (draft.priceKind === 'on_request' || !draft.price.trim()) body.price = null;
+  if ((draft.priceKind === 'on_request' && !auction) || !draft.price.trim()) body.price = null;
   else {
     const minor = toMinor(draft.price);
     if (minor === null) return { problem: { message: 'Give the price as an amount, such as 520,000.', param: 'price' } };
@@ -152,11 +224,62 @@ export function bodyOf(draft: ListingDraft, types: Record<string, Pick<ShopFeatu
   body.features = Object.entries(draft.features)
     .map(([key, value]) => ({ key, value: types[key] ? featureValue(types[key], value) : value }))
     .filter(item => item.value !== null && item.value !== '');
+
+  // Selling by auction: one item, the price its starting price, an optional reserve and a length.
+  if (offers.auctions) {
+    body.sale_method = auction ? 'auction' : 'fixed';
+    if (auction) {
+      const reserve = draft.auctionReserve.trim();
+      const minor = reserve ? toMinor(reserve) : null;
+      if (reserve && minor === null) return { problem: { message: 'Give the reserve as an amount, or leave it empty.', param: 'auction_reserve' } };
+      body.auction_reserve = minor;
+      body.auction_days = draft.auctionDays;
+    }
+  }
+  // Where it sells. A shop-only category sells only at the seller's shop: the API places it there itself.
+  if (!offers.shopOnly) {
+    body.on_shop = draft.onShop;
+    if (offers.resale) {
+      body.resale = !auction && draft.resale;
+      body.resale_discount_bps = draft.discountBps;
+      body.resale_markup_max_bps = draft.markupMaxBps;
+    }
+  }
+  if (offers.pos) {
+    if (!offers.shopOnly) body.pos_enabled = !auction && draft.pos;
+    body.barcode = draft.barcode.trim() || null;
+    const level = draft.reorderLevel.trim();
+    if (level && !/^\d{1,6}$/.test(level)) return { problem: { message: 'Give the reorder level as a whole number, or leave it empty.', param: 'reorder_level' } };
+    body.reorder_level = level ? Number(level) : null;
+  }
+  // Shipping through Udozo Connect: the states with their charges, and every centre there or the chosen ones.
+  if (offers.connect) {
+    body.connect = draft.connect;
+    if (draft.connect) {
+      const states: { state_id: string; shipping: number }[] = [];
+      for (const [stateId, typed] of Object.entries(draft.connectStates)) {
+        const clean = typed.trim();
+        const minor = !clean || clean === '0' ? 0 : toMinor(clean);
+        if (minor === null) return { problem: { message: 'Give each shipping charge as an amount, or 0 for free.', param: 'connect_states' } };
+        states.push({ state_id: stateId, shipping: minor });
+      }
+      body.connect_states = states;
+      body.connect_centres = draft.connectAllCentres ? null : draft.connectCentres;
+    }
+  }
   return { body };
 }
 
 /** What a step still needs before the next one, naming the field (null when it is complete). */
-export function stepProblem(step: number, draft: ListingDraft, photos: { ready: number; uploading: number; failed: number }): Problem | null {
+export function stepProblem(
+  step: number,
+  draft: ListingDraft,
+  photos: { ready: number; uploading: number; failed: number },
+  rules: { minPhotos?: number; offers?: SellOffers } = {},
+): Problem | null {
+  const least = rules.minPhotos ?? minPhotos;
+  const offers = rules.offers ?? noOffers;
+  const auction = offers.auctions && draft.saleMethod === 'auction';
   switch (step) {
     case 0:
       if (draft.title.trim().length < 5) return { message: 'Give your ad a title of at least 5 characters.', param: 'title' };
@@ -165,15 +288,32 @@ export function stepProblem(step: number, draft: ListingDraft, photos: { ready: 
     case 1:
       if (photos.uploading > 0) return { message: 'Wait for your photos to finish uploading.', param: 'photos' };
       if (photos.failed > 0) return { message: 'Remove the photo that could not be used, or add it again.', param: 'photos' };
-      if (photos.ready < minPhotos) return { message: `Add at least ${minPhotos} photos.`, param: 'photos' };
+      // Sold only at the seller's own shop, it is never shown publicly, so it needs no photos.
+      if (!offers.shopOnly && photos.ready < least) return { message: `Add at least ${least} photos.`, param: 'photos' };
       return null;
     case 2:
+      if (auction) {
+        if (!toMinor(draft.price)) return { message: 'Enter the starting price: bidding starts there.', param: 'price' };
+        if (!draft.auctionDays) return { message: 'Choose how long the auction runs.', param: 'auction_days' };
+      }
+      if (offers.shopOnly) return draft.priceKind === 'on_request' || !toMinor(draft.price) ? { message: 'Enter the price your till sells it at.', param: 'price' } : null;
       if (draft.priceKind !== 'on_request' && !toMinor(draft.price)) return { message: 'Enter the price, or choose Contact for price.', param: 'price' };
       if (!draft.condition) return { message: 'Choose its condition.', param: 'condition' };
       return null;
     case 3:
+      if (offers.shopOnly || auction) return null;
+      if (!draft.onShop && !(offers.resale && draft.resale) && !(offers.pos && draft.pos)) return { message: 'Choose at least one place to sell it.', param: 'on_shop' };
+      if (offers.resale && draft.resale && draft.priceKind === 'on_request') return { message: 'Resellers sell at a price: give one, or stop them reselling it.', param: 'resale' };
+      return null;
+    case 4:
+      if (offers.shopOnly) return null;
       if (!draft.areaId) return { message: 'Choose where it is: the area it is in.', param: 'area_id' };
-      if (draft.delivery === 'none' && !draft.pickup) return { message: 'Choose delivery, collection in person, or both.', param: 'pickup' };
+      if (draft.delivery === 'none' && !draft.pickup && !(offers.connect && draft.connect)) return { message: 'Choose delivery, collection in person, Udozo Connect, or more than one.', param: 'pickup' };
+      if (offers.connect && draft.connect) {
+        if (!Object.keys(draft.connectStates).length) return { message: 'Choose the states it ships to through Udozo Connect.', param: 'connect_states' };
+        if (!draft.connectAllCentres && !draft.connectCentres.length) return { message: 'Choose the Connect Centres it ships to, or every centre there.', param: 'connect_centres' };
+        if (draft.priceKind === 'on_request' && !auction) return { message: 'Shipped items are paid with UdozoPay, so they need a price.', param: 'connect' };
+      }
       return null;
     default:
       return null;
@@ -186,14 +326,15 @@ export function stepOf(param: string | null | undefined): number | null {
   if (param === 'terms') return lastStep;
   if (param === 'title' || param === 'category_id') return 0;
   if (param === 'photos' || param === 'video' || param.startsWith('media')) return 1;
-  if (['price', 'price_kind', 'condition', 'description', 'stock'].includes(param) || param.startsWith('features')) return 2;
-  if (param === 'area_id' || param === 'pickup' || param === 'contact' || param.startsWith('delivery')) return 3;
+  if (['price', 'price_kind', 'condition', 'description', 'sale_method', 'safe_pay'].includes(param) || param.startsWith('auction') || param.startsWith('features')) return 2;
+  if (['on_shop', 'stock', 'pos_enabled', 'barcode', 'reorder_level'].includes(param) || param.startsWith('resale')) return 3;
+  if (param === 'area_id' || param === 'pickup' || param === 'contact' || param.startsWith('delivery') || param.startsWith('connect')) return 4;
   return null;
 }
 
 /** The first step still missing something, where a saved draft carries on (the last step when none is). */
-export function firstIncomplete(draft: ListingDraft, photos: { ready: number; uploading: number; failed: number }) {
-  for (let step = 0; step < lastStep; step++) if (stepProblem(step, draft, photos)) return step;
+export function firstIncomplete(draft: ListingDraft, photos: { ready: number; uploading: number; failed: number }, rules: { minPhotos?: number; offers?: SellOffers } = {}) {
+  for (let step = 0; step < lastStep; step++) if (stepProblem(step, draft, photos, rules)) return step;
   return lastStep;
 }
 
