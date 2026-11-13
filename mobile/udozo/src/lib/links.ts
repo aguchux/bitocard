@@ -72,10 +72,13 @@ export function appLink(href: string): AppLink {
     if (second === 'brand' && third) return { route: `/brand/${third}${query({ country })}` };
     if (second === 'c' && third) return { route: `/category/${third}${query({ country })}` };
     if (second === 'search') {
-      return { route: `/search${query({ country, q: url.searchParams.get('q'), category: url.searchParams.get('category') })}` };
+      const sale = url.searchParams.get('sale');
+      return { route: `/search${query({ country, q: url.searchParams.get('q'), category: url.searchParams.get('category'), sale: sale === 'auction' ? sale : null })}` };
     }
+    // The market's auctions: the search, listings sold by auction only.
+    if (second === 'auctions' && !third) return { route: `/search${query({ country, sale: 'auction' })}` };
     if (second === 'wanted' && third === 'new') return { route: '/wanted/new' };
-    // A seller's review page, auctions, places: udozo.com for now.
+    // A seller's review page, an old auction lot's page, places: udozo.com for now.
     void fourth;
     return web;
   }

@@ -7,6 +7,7 @@ import { searchQuery } from '../src/lib/search-query.ts';
 
 test('only what is set, conditions repeated', () => {
   assert.equal(searchQuery({ country: 'NG' }, 0), 'country=NG&offset=0&limit=24');
+  assert.equal(searchQuery({ country: 'NG', sale: 'auction' }, 0), 'country=NG&offset=0&limit=24&sale=auction');
   assert.equal(
     searchQuery({ country: 'NG', q: 'iphone 13', category: 'mobile-phones', condition: ['new', 'used'], sort: 'price_asc' }, 24),
     'country=NG&offset=24&limit=24&q=iphone+13&category=mobile-phones&sort=price_asc&condition=new&condition=used',

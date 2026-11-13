@@ -86,7 +86,7 @@ export default function HomeScreen() {
           ) : home.isError ? (
             <Failed error={home.error} retry={() => home.refetch()} />
           ) : rows.length ? (
-            <HomeRows rows={rows} withoutHero={reel} />
+            <HomeRows rows={rows} withoutHero={reel} auctions={markets.find(market => market.country === country)?.auctions ? country : null} />
           ) : (
             <Empty title="Nothing for sale here yet" body="Be the first to sell on Udozo in your market." />
           )}

@@ -1,12 +1,14 @@
 import type { HomeCard, ResolvedHomeRow, ResolvedHomeSection } from '@shared/home';
 import { Image } from 'expo-image';
-import { ChevronRight, LayoutGrid } from 'lucide-react-native';
+import { ChevronRight, Gavel, LayoutGrid, ShieldCheck, Sparkles, Tag } from 'lucide-react-native';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { ListingRail } from '@/components/listing-rail';
+import { SellCarousel } from '@/components/sell-carousel';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { bannerCards, bannerIcon, type BannerCard } from '@/lib/home-banners';
 import { openLink, photoUrl } from '@/lib/navigate';
 
 /**
@@ -14,13 +16,15 @@ import { openLink, photoUrl } from '@/lib/navigate';
  * then its blocks one under another. Listing blocks slide sideways (by hand: nothing moves by itself), categories are
  * tiles, banners and grids open what they link to through the app's own screens. Blocks a phone has no place for yet
  * (stores, countries, the trust bar, For you) are left out. While the hero reel shows above them (`withoutHero`), the page's own
- * hero is left out too, as udozo.com does.
+ * hero is left out too, as udozo.com does. Banners slide in one row of cards; where the market sells by auction
+ * (`auctions`, its country), the page's first banner block ends with Udozo's auctions.
  */
-export function HomeRows({ rows, withoutHero }: { rows: ResolvedHomeRow[]; withoutHero?: boolean }) {
+export function HomeRows({ rows, withoutHero, auctions }: { rows: ResolvedHomeRow[]; withoutHero?: boolean; auctions?: string | null }) {
   // One row of category tiles on a phone: the first the page has (its spotlights), never a second of listing photos.
   const firstCategories = rows.flatMap(row => (row.hidden ? [] : row.blocks)).find(block => categoryBlocks.has(block.type) && shown(block))?.id;
   const visible = (block: ResolvedHomeSection) =>
     shown(block) && !(withoutHero && block.type === 'home_hero') && !(categoryBlocks.has(block.type) && block.id !== firstCategories);
+  const firstBanner = rows.flatMap(row => (row.hidden ? [] : row.blocks)).find(block => block.type === 'banner' && visible(block))?.id;
   return (
     <View style={{ gap: Spacing.four }}>
       {rows
@@ -29,7 +33,7 @@ export function HomeRows({ rows, withoutHero }: { rows: ResolvedHomeRow[]; witho
           <View key={row.id} style={{ gap: Spacing.two }}>
             {row.title ? <Heading title={row.title} href={row.view_all_href} /> : null}
             {row.blocks.filter(visible).map(block => (
-              <Block key={block.id} block={block} titled={!row.title} rowHref={row.view_all_href} rowTitle={row.title} />
+              <Block key={block.id} block={block} titled={!row.title} rowHref={row.view_all_href} rowTitle={row.title} auctions={block.id === firstBanner ? (auctions ?? null) : null} />
             ))}
           </View>
         ))}
@@ -64,7 +68,7 @@ function Heading({ title, href }: { title: string; href?: string | null }) {
   );
 }
 
-function Block({ block, titled, rowHref, rowTitle }: { block: ResolvedHomeSection; titled: boolean; rowHref?: string | null; rowTitle?: string | null }) {
+function Block({ block, titled, rowHref, rowTitle, auctions }: { block: ResolvedHomeSection; titled: boolean; rowHref?: string | null; rowTitle?: string | null; auctions: string | null }) {
   const title = 'title' in block && typeof block.title === 'string' && titled ? block.title : null;
   switch (block.type) {
     case 'deals_rail':
@@ -105,13 +109,7 @@ function Block({ block, titled, rowHref, rowTitle }: { block: ResolvedHomeSectio
         </View>
       );
     case 'banner':
-      return (
-        <View style={styles.side}>
-          {block.data.items.map((item, index) => (
-            <Banner key={index} title={item.title} body={item.body} image={item.image} href={item.href} />
-          ))}
-        </View>
-      );
+      return <Banners cards={bannerCards(block.data.items, auctions)} testID={`banners-${block.id}`} />;
     case 'category_banner': {
       const category = block.data.category!;
       return (
@@ -164,8 +162,38 @@ function PhotoTile({ title, image, href }: { title: string; image: string | null
   );
 }
 
+/** A banner block's cards: one alone, or two and more in one row sliding a card at a time, the next peeping in. */
+function Banners({ cards, testID }: { cards: BannerCard[]; testID: string }) {
+  const drawn = cards.map((card, index) => <Banner key={`${card.href}-${index}`} title={card.title} body={card.body} image={card.image} href={card.href} />);
+  return <View style={styles.side}>{drawn.length > 1 ? <SellCarousel cards={drawn} labels={cards.map(card => card.title)} testID={testID} /> : drawn}</View>;
+}
+
+const bannerIcons = { sell: Tag, pay: ShieldCheck, auctions: Gavel, other: Sparkles };
+
 function Banner({ title, body, image, href, wide }: { title: string; body?: string; image: string | null; href: string; wide?: boolean }) {
   const theme = useTheme();
+  if (!image) {
+    // No picture: a clean card in Udozo's colour with an icon for where it goes, never an empty band above the words.
+    const Icon = bannerIcons[bannerIcon(href)];
+    return (
+      <Pressable accessibilityRole="link" accessibilityLabel={[title, body].filter(Boolean).join('. ')} onPress={() => openLink(href)} style={[styles.banner, styles.plain, wide && styles.wide, { backgroundColor: theme.primary }]}>
+        <View style={styles.bannerIcon}>
+          <Icon color="#fff" size={26} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <ThemedText style={{ color: '#fff', fontFamily: inter.extrabold, fontSize: 18 }} numberOfLines={2}>
+            {title}
+          </ThemedText>
+          {body ? (
+            <ThemedText type="small" style={{ color: '#fff' }} numberOfLines={2}>
+              {body}
+            </ThemedText>
+          ) : null}
+        </View>
+        <ChevronRight color="#fff" size={20} />
+      </Pressable>
+    );
+  }
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={[title, body].filter(Boolean).join('. ')} onPress={() => openLink(href)} style={[styles.banner, wide && styles.wide, { backgroundColor: theme.primary }]}>
       {image ? <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors /> : null}
@@ -197,6 +225,8 @@ const styles = StyleSheet.create({
   tileLabel: { padding: Spacing.two, backgroundColor: 'rgba(16,33,46,0.55)' },
   banner: { minHeight: 120, borderRadius: Radius.medium, overflow: 'hidden', justifyContent: 'flex-end' },
   wide: { width: 340, marginLeft: Spacing.three },
+  plain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: Spacing.three, padding: Spacing.three },
+  bannerIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   bannerText: { padding: Spacing.three, gap: 2, backgroundColor: 'rgba(16,33,46,0.45)', paddingRight: Spacing.five },
   chevron: { position: 'absolute', right: Spacing.three, bottom: Spacing.three },
 });

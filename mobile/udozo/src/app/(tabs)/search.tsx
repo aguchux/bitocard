@@ -1,7 +1,7 @@
 import { conditionLabels, sortLabels, type ShopCondition, type ShopSort, type ShopSuggestions } from '@shared/classifieds';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { MapPin, Search, Sparkles, X } from 'lucide-react-native';
+import { Gavel, MapPin, Search, Sparkles, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,11 +21,12 @@ const conditions: ShopCondition[] = ['new', 'used', 'untested', 'parts'];
 /**
  * Search: the words (with suggestions as they are typed), how to sort, the condition, then the market's listings two to
  * a row; Ask (where the market's assistant answers) asks Anjio what was typed. A link may carry the words, a category,
- * a place (a listing's area and state, local first: `area`, `state`, its name `place`) or another market (`/search?country=&q=&category=`).
+ * a place (a listing's area and state, local first: `area`, `state`, its name `place`), another market
+ * (`/search?country=&q=&category=`) or only auctions (`sale=auction`, udozo.com's `/<cc>/auctions`).
  */
 export default function SearchScreen() {
   const theme = useTheme();
-  const params = useLocalSearchParams<{ q?: string; category?: string; country?: string; area?: string; state?: string; place?: string }>();
+  const params = useLocalSearchParams<{ q?: string; category?: string; country?: string; area?: string; state?: string; place?: string; sale?: string }>();
   const market = useMarket();
   const country = (params.country ?? market.country ?? '').toUpperCase();
   const [typed, setTyped] = useState(params.q ?? '');
@@ -51,7 +52,8 @@ export default function SearchScreen() {
 
   const area = params.area || undefined;
   const state = params.state || undefined;
-  const search = useMemo(() => (country ? { country, q: q || undefined, category: params.category, area, state, sort, condition } : null), [country, q, params.category, area, state, sort, condition]);
+  const sale = params.sale === 'auction' ? ('auction' as const) : undefined;
+  const search = useMemo(() => (country ? { country, q: q || undefined, category: params.category, area, state, sort, condition, sale } : null), [country, q, params.category, area, state, sort, condition, sale]);
   const submit = (words = typed) => {
     setQ(words.trim());
     setTyped(words);
@@ -143,10 +145,21 @@ export default function SearchScreen() {
                 </Pressable>
               </View>
             ) : null}
+            {sale ? (
+              <View style={styles.place}>
+                <Gavel size={16} color={theme.textSecondary} />
+                <ThemedText type="smallBold" style={{ flex: 1 }}>
+                  Auctions only
+                </ThemedText>
+                <Pressable accessibilityRole="button" accessibilityLabel="Show every listing" hitSlop={10} onPress={() => router.setParams({ sale: '' })}>
+                  <X size={18} color={theme.textSecondary} />
+                </Pressable>
+              </View>
+            ) : null}
             {q ? <ThemedText type="small" themeColor="textSecondary" style={{ fontFamily: inter.semibold }}>{`Results for “${q}”`}</ThemedText> : null}
           </View>
         }
-        empty={{ title: q ? `Nothing for “${q}” yet` : 'Nothing here yet', body: 'Try fewer words, or another condition.' }}
+        empty={sale && !q ? { title: 'No auctions right now', body: 'Listings sold by auction show here while bidding is open.' } : { title: q ? `Nothing for “${q}” yet` : 'Nothing here yet', body: 'Try fewer words, or another condition.' }}
       />
     </SafeAreaView>
   );

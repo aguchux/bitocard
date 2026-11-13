@@ -11,6 +11,8 @@ test('market pages become the app’s screens', () => {
   assert.deepEqual(appLink('/ng/c/mobile-phones'), { route: '/category/mobile-phones?country=NG' });
   assert.deepEqual(appLink('/ng/search?q=iphone 13&category=mobile-phones'), { route: '/search?country=NG&q=iphone%2013&category=mobile-phones' });
   assert.deepEqual(appLink('/ke'), { route: '/?country=KE' });
+  assert.deepEqual(appLink('/ng/auctions'), { route: '/search?country=NG&sale=auction' });
+  assert.deepEqual(appLink('/ng/search?sale=auction&q=sofa'), { route: '/search?country=NG&q=sofa&sale=auction' });
   assert.deepEqual(appLink('https://www.udozo.com/'), { route: '/' });
 });
 

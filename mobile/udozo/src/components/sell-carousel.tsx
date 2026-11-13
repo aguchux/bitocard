@@ -10,9 +10,10 @@ const gap = Spacing.three;
 /**
  * Cards side by side, swiped left and right a card at a time: each about 85% of the screen's width, so the next one
  * peeks in from the edge, with a dot per card below (each a button to its card). The first card shows by default;
- * nothing slides for reduced motion. `edge` is the page's own side padding, which the row runs into.
+ * nothing slides for reduced motion. `edge` is the page's own side padding, which the row runs into. Sell's two ways to
+ * sell and Home's banners use it.
  */
-export function SellCarousel({ cards, labels, edge = Spacing.three }: { cards: ReactNode[]; labels: string[]; edge?: number }) {
+export function SellCarousel({ cards, labels, edge = Spacing.three, testID = 'sell-carousel' }: { cards: ReactNode[]; labels: string[]; edge?: number; testID?: string }) {
   const theme = useTheme();
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
@@ -30,7 +31,7 @@ export function SellCarousel({ cards, labels, edge = Spacing.three }: { cards: R
     <View style={{ gap: Spacing.two }}>
       <ScrollView
         ref={row}
-        testID="sell-carousel"
+        testID={testID}
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={step}
@@ -42,7 +43,7 @@ export function SellCarousel({ cards, labels, edge = Spacing.three }: { cards: R
         style={{ marginHorizontal: -edge }}
         contentContainerStyle={{ paddingHorizontal: edge, gap }}>
         {cards.map((card, index) => (
-          <View key={labels[index] ?? index} style={{ width: cardWidth }}>
+          <View key={`${index}-${labels[index] ?? ''}`} style={{ width: cardWidth }}>
             {card}
           </View>
         ))}
