@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { AtSign, Banknote, BarChart3, Bell, HandCoins, Heart, LayoutList, Package, PhoneCall, ScanLine, Settings, ShieldCheck, Wallet } from 'lucide-react-native';
+import { AtSign, Banknote, BarChart3, Bell, HandCoins, Heart, LayoutList, Megaphone, Package, PhoneCall, ScanLine, Settings, ShieldCheck, Wallet } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AccountPending } from '@/components/account-pending';
@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Page } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useWantedOpen } from '@/hooks/use-wanted';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 
@@ -20,6 +21,7 @@ import { api } from '@/lib/api';
 export default function MeScreen() {
   const theme = useTheme();
   const { customer, pending } = useAccount();
+  const wanted = useWantedOpen(customer?.country);
   const unread = useQuery({ queryKey: ['notices', 'unread'], enabled: Boolean(customer), queryFn: () => api<{ count: number }>('/v1/store/account/notifications/unread-count') });
   if (customer === undefined) return <AccountPending />;
   if (customer === null) {
@@ -56,6 +58,7 @@ export default function MeScreen() {
         <MenuRow icon={<Wallet size={20} color={theme.primary} />} title="Wallet" onPress={() => router.push('/wallet')} />
         <MenuRow icon={<Package size={20} color={theme.primary} />} title="UdozoPay orders" onPress={() => router.push('/orders')} />
         <MenuRow icon={<HandCoins size={20} color={theme.primary} />} title="Buy orders" detail="Buying and selling in person" onPress={() => router.push('/buy-orders')} />
+        {wanted ? <MenuRow icon={<Megaphone size={20} color={theme.primary} />} title="Wanted requests" detail="What you asked sellers for" onPress={() => router.push('/wanted')} /> : null}
         <MenuRow icon={<ScanLine size={20} color={theme.primary} />} title="Scan to pay at a shop" onPress={() => router.push('/scan')} />
         <MenuRow icon={<Banknote size={20} color={theme.primary} />} title="Payouts" detail="Money from your sales" onPress={() => router.push('/payouts')} />
         <MenuRow icon={<ShieldCheck size={20} color={theme.primary} />} title="Identity check" onPress={() => router.push('/identity')} />

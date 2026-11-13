@@ -9,7 +9,7 @@ export type AppLink = { route: string } | { web: string };
 const site = 'https://udozo.com';
 const ownHosts = new Set(['udozo.com', 'www.udozo.com']);
 /** The app's own screens, reachable by `udozo://<route>` links. */
-const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings', 'wallet', 'payouts', 'identity', 'orders', 'order', 'checkout', 'pay', 'scan', 'buy-orders', 'buy-order', 'resellers', 'reseller', 'assistant', 'whatsapp']);
+const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings', 'wallet', 'payouts', 'identity', 'orders', 'order', 'checkout', 'pay', 'scan', 'buy-orders', 'buy-order', 'resellers', 'reseller', 'assistant', 'whatsapp', 'wanted']);
 
 /** A link the phone hands the app that is not Udozo's (another app's sign-in return, such as Facebook's `fb<id>://`). */
 export function foreignScheme(href: string) {
@@ -49,6 +49,7 @@ export function appLink(href: string): AppLink {
     if (second === 'verification') return { route: '/identity' };
     if (second === 'resellers') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/reseller/${third}` : '/resellers' };
     if (second === 'buy-orders') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/buy-order/${third}` : '/buy-orders' };
+    if (second === 'wanted') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/wanted/${third}` : '/wanted' };
     if (second === 'orders') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/order/${third}` : '/orders' };
     if (second === 'profile' && third === 'username') return { route: '/username' };
     if (second === 'profile' && third === 'whatsapp') return { route: '/whatsapp' };
@@ -73,7 +74,8 @@ export function appLink(href: string): AppLink {
     if (second === 'search') {
       return { route: `/search${query({ country, q: url.searchParams.get('q'), category: url.searchParams.get('category') })}` };
     }
-    // A seller's review page, wanted requests, auctions, places: udozo.com for now.
+    if (second === 'wanted' && third === 'new') return { route: '/wanted/new' };
+    // A seller's review page, auctions, places: udozo.com for now.
     void fourth;
     return web;
   }

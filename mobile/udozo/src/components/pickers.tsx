@@ -100,8 +100,11 @@ export function CategoryPicker({ visible, onClose, categories, selected, onChoos
   );
 }
 
-/** Choosing where the item is: the state (region, county…), then an area of it. */
-export function PlacePicker({ visible, onClose, country, states, stateId, areaId, onChoose }: {
+/**
+ * Choosing where the item is: the state (region, county…), then an area of it; with `onChooseState`, "Anywhere in" the
+ * state may be chosen too (a wanted request's place).
+ */
+export function PlacePicker({ visible, onClose, country, states, stateId, areaId, onChoose, onChooseState }: {
   visible: boolean;
   onClose: () => void;
   country: string;
@@ -109,6 +112,7 @@ export function PlacePicker({ visible, onClose, country, states, stateId, areaId
   stateId: string | null;
   areaId: string | null;
   onChoose: (state: ShopState, area: ShopArea) => void;
+  onChooseState?: (state: ShopState) => void;
 }) {
   const [typed, setTyped] = useState('');
   const [open, setOpen] = useState<string | null>(stateId);
@@ -122,6 +126,17 @@ export function PlacePicker({ visible, onClose, country, states, stateId, areaId
       <SearchBox value={typed} onChange={setTyped} placeholder={state ? 'Search areas' : `Search ${plural}`} />
       <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
         {state ? <Option title={`Another ${word}`} onPress={() => { setOpen(null); setTyped(''); }} /> : null}
+        {state && onChooseState ? (
+          <Option
+            title={`Anywhere in ${state.name}`}
+            selected={state.id === stateId && !areaId}
+            onPress={() => {
+              onChooseState(state);
+              setTyped('');
+              onClose();
+            }}
+          />
+        ) : null}
         {state
           ? (list as ShopArea[]).map(area => (
               <Option

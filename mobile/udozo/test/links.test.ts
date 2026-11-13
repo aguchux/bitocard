@@ -26,7 +26,6 @@ test('account places, invites and sign-in', () => {
 
 test('what the app does not have yet, or other sites, open in the browser', () => {
   assert.deepEqual(appLink('/account/purchases/abc'), { web: 'https://udozo.com/account/purchases/abc' });
-  assert.deepEqual(appLink('/ng/wanted/new'), { web: 'https://udozo.com/ng/wanted/new' });
   assert.deepEqual(appLink('https://example.com/ng/l/1'), { web: 'https://example.com/ng/l/1' });
   assert.deepEqual(appLink('javascript:alert(1)'), { web: 'javascript:alert(1)' });
   assert.deepEqual(appLink('/ng/l/not-a-number'), { web: 'https://udozo.com/ng/l/not-a-number' });
@@ -75,4 +74,12 @@ test('My Resellers opens in the app', () => {
   const id = '3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b';
   assert.deepEqual(appLink('/account/resellers'), { route: '/resellers' });
   assert.deepEqual(appLink(`/account/resellers/${id}`), { route: `/reseller/${id}` });
+});
+
+test('wanted requests open the app’s own screens', () => {
+  assert.deepEqual(appLink('/ng/wanted/new'), { route: '/wanted/new' });
+  assert.deepEqual(appLink('/account/wanted'), { route: '/wanted' });
+  assert.deepEqual(appLink('/account/wanted/0b6c7c9e-1d2a-4f3b-9a8e-123456789abc'), { route: '/wanted/0b6c7c9e-1d2a-4f3b-9a8e-123456789abc' });
+  assert.deepEqual(appLink('/account/wanted/not-an-id'), { route: '/wanted' });
+  assert.deepEqual(appLink('udozo://wanted/new'), { route: '/wanted/new' });
 });

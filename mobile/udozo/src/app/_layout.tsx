@@ -100,6 +100,9 @@ function ThemedApp() {
           <Stack.Screen name="checkout/[id]" options={{ title: 'Buy with UdozoPay' }} />
           <Stack.Screen name="buy-orders" options={{ title: 'Buy orders' }} />
           <Stack.Screen name="buy-order/[id]" options={{ title: 'Buy order' }} />
+          <Stack.Screen name="wanted/index" options={{ title: 'Wanted requests' }} />
+          <Stack.Screen name="wanted/new" options={{ title: 'Post a request' }} />
+          <Stack.Screen name="wanted/[id]" options={{ title: 'Wanted request' }} />
           <Stack.Screen name="resellers" options={{ title: 'My Resellers' }} />
           <Stack.Screen name="reseller/[id]" options={{ title: 'Reseller' }} />
           <Stack.Screen name="pay/[token]" options={{ title: 'Pay the shop' }} />

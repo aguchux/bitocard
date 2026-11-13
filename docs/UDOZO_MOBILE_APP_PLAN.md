@@ -623,6 +623,26 @@ Views of listings opened in the app are not counted yet.
   a drag down, the backdrop, its close button or Back, and nothing slides for reduced motion
   (`src/hooks/use-reduced-motion.ts`).
 
+**Tabs and Sell (13 November 2026, the owner's request after testing on Android):**
+
+- **The tab bar is the app's own** (`UdozoTabBar` in `src/components/tab-bar.tsx`): the native tabs cannot draw a
+  button of their own, so the tabs are Expo Router's JavaScript tabs (`expo-router/js-tabs`, bundled with Expo
+  Router) with Udozo's bar: Home, Search, Chats and Me as icons with their labels, and Sell in the middle as a raised
+  circle in the theme's colour with a white plus. Each tab has the tab role, its label and selected state, at least
+  48 points; badges where a tab sets one; the gesture bar kept clear; the bar's height reported to the navigator
+  (screens sit above it, Home's WhatsApp handle just above it); hidden while the keyboard is up on Android
+  (`test/screens/tab-bar.test.tsx`).
+- **Post an ad and Request an ad** (`SellCarousel` in `src/components/sell-carousel.tsx`): where wanted requests are
+  open in the market (`wanted` on `GET /v1/classifieds/channels`, `useWantedOpen`), Sell's top is two cards side by
+  side, Post an ad first and Request an ad peeking in from the right, swiped a card at a time with a dot each below;
+  elsewhere Post an ad alone. **Wanted requests** as udozo.com's: Post a request (`src/app/wanted/new.tsx`: what, the
+  category, anywhere, a state or an area, the most they would pay in major units sent in minor units, the condition and
+  details; refusals in words; then what may fit and the request), My wanted requests (`src/app/wanted/index.tsx`:
+  Requests I made and Requests for you) and each request (`src/app/wanted/[id].tsx`: the buyer's answers from sellers
+  with their chats, I found it and Close request; a seller answers with one of their listings). Rows on Sell and Me;
+  `/<cc>/wanted/new`, `/account/wanted(/<id>)` open them. Rules in `src/lib/wanted.ts` (`test/wanted.test.ts`,
+  `test/links.test.ts`, `test/screens/wanted.test.tsx`).
+
 ## Testing
 
 - Unit and component tests with Jest and React Native Testing Library, kept beside each feature as the apps' Vitest tests are.
