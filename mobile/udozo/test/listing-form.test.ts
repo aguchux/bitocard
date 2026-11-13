@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { applyDraftSuggestion, bodyOf, emptyDraft, firstIncomplete, fromMinor, listingActions, maxVideoBytes, photoCounts, stepOf, stepProblem, toMinor, videoProblem, videoRefusal } from '../src/lib/listing-form.ts';
+import { applyDraftSuggestion, bodyOf, brandMatchKey, modelAfterBrandChange, titleOffer, withModel, withModelNext, emptyDraft, firstIncomplete, fromMinor, listingActions, maxVideoBytes, photoCounts, stepOf, stepProblem, toMinor, videoProblem, videoRefusal } from '../src/lib/listing-form.ts';
 
 const ready = { ready: 4, uploading: 0, failed: 0 };
 
@@ -151,4 +151,27 @@ test('a video is checked before it is sent, and the API’s refusals are worded'
   assert.match(videoRefusal('video_exists', 'x'), /already has a video/);
   assert.match(videoRefusal('file_invalid', 'x'), /MP4, MOV or WebM/);
   assert.equal(videoRefusal('listing_closed', 'This ad is closed.'), 'This ad is closed.');
+});
+
+test('brand and model follow udozo.com’s rules', () => {
+  assert.equal(brandMatchKey('Mercedes-Benz'), brandMatchKey('mercedes benz'));
+  assert.deepEqual(withModelNext([{ key: 'brand' }, { key: 'storage' }, { key: 'model' }]).map(item => item.key), ['brand', 'model', 'storage']);
+  assert.deepEqual(withModelNext([{ key: 'storage' }, { key: 'model' }]).map(item => item.key), ['storage', 'model']);
+
+  // A model chosen for Samsung goes when the brand becomes Apple; one typed stays.
+  assert.deepEqual(modelAfterBrandChange({ brand: 'Samsung', model: 'Galaxy S23' }, 'Apple', 'Samsung'), { features: { brand: 'Apple', model: null }, modelBrand: null });
+  assert.deepEqual(modelAfterBrandChange({ brand: 'Samsung', model: 'My own' }, 'Apple', null), { features: { brand: 'Apple', model: 'My own' }, modelBrand: null });
+  assert.deepEqual(modelAfterBrandChange({ model: 'Galaxy S23' }, 'samsung', 'Samsung').modelBrand, 'Samsung');
+
+  const samsung = { object: 'classified_brand' as const, slug: 'samsung', name: 'Samsung', logo_url: null, color: null };
+  assert.deepEqual(withModel({}, { name: 'Galaxy S23', brand: samsung }), { model: 'Galaxy S23', brand: 'Samsung' });
+  assert.deepEqual(withModel({ brand: 'Apple' }, { name: 'Galaxy S23', brand: samsung }), { brand: 'Apple', model: 'Galaxy S23' });
+
+  const match = { object: 'classified_model_match' as const, brand: samsung, model: 'Galaxy S23' };
+  const asks = { asksBrand: true, asksModel: true };
+  assert.equal(titleOffer(match, { brand: '', model: '', ...asks })?.text, 'Samsung Galaxy S23');
+  assert.equal(titleOffer(match, { brand: 'samsung', model: '', ...asks })?.text, 'samsung Galaxy S23');
+  assert.equal(titleOffer(match, { brand: 'Apple', model: '', ...asks }), null);
+  assert.equal(titleOffer(match, { brand: 'Samsung', model: 'Galaxy S23', ...asks }), null);
+  assert.equal(titleOffer(null, { brand: '', model: '', ...asks }), null);
 });

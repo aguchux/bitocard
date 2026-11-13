@@ -13,18 +13,19 @@ import {
   type ShopAssistantProfile,
   type ShopPosStatus,
   type ShopResaleAvailability,
+  type ShopModelMatch,
 } from '@shared/classifieds';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Camera, Film, Images, Sparkles, Star, Trash2 } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { Camera, Film, Images, Sparkles, Star, Trash2, X } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccountPending } from '@/components/account-pending';
-import { CategoryPicker, PickerRow, PlacePicker } from '@/components/pickers';
+import { BrandLogo, BrandPicker, CategoryPicker, ModelPicker, PickerRow, PlacePicker } from '@/components/pickers';
 import { SignedOut } from '@/components/signed-out';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, Field, FormError, Loading, fieldError } from '@/components/ui';
@@ -36,6 +37,12 @@ import {
   applyDraftSuggestion,
   auctionLengths,
   bodyOf,
+  brandFeatureKey,
+  modelAfterBrandChange,
+  modelFeatureKey,
+  titleOffer,
+  withModel,
+  withModelNext,
   draftOf,
   emptyDraft,
   firstIncomplete,
@@ -101,7 +108,7 @@ export default function PostScreen() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(0);
-  const [picker, setPicker] = useState<'category' | 'place' | null>(null);
+  const [picker, setPicker] = useState<'category' | 'place' | 'brand' | 'model' | null>(null);
   const [posted, setPosted] = useState<ShopMyListing | null>(null);
   const [suggesting, setSuggesting] = useState<'draft' | 'price' | null>(null);
   const [priceHint, setPriceHint] = useState<string | null>(null);
@@ -110,6 +117,10 @@ export default function PostScreen() {
   const [videoSend, setVideoSend] = useState<number | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const stopVideo = useRef<(() => void) | null>(null);
+  /** The brand a model was chosen for (null when the seller typed it), and a title offer they turned down. */
+  const [modelBrand, setModelBrand] = useState<string | null>(null);
+  const [declined, setDeclined] = useState<string | null>(null);
+  const [titleWords, setTitleWords] = useState('');
 
   const listing = useQuery({
     queryKey: ['my-listing', listingId],
@@ -158,12 +169,32 @@ export default function PostScreen() {
 
   let subcategory: { top: ShopTopCategory; child: ShopTopCategory['children'][number] } | null = null;
   for (const top of categories) for (const child of top.children) if (child.id === draft?.categoryId) subcategory = { top, child };
-  const features: (ShopFeature & { filter: boolean })[] = subcategory?.child.features ?? [];
+  const features: (ShopFeature & { filter: boolean })[] = withModelNext(subcategory?.child.features ?? []);
   const types = Object.fromEntries(features.map(feature => [feature.key, feature]));
   const photos = listing.data?.photos ?? [];
   const counts = photoCounts(photos, uploading);
   const state = places.data?.data.find(item => item.id === draft?.stateId);
   const area = state?.areas.find(item => item.id === draft?.areaId);
+  const textOf = (key: string) => (typeof draft?.features[key] === 'string' ? (draft.features[key] as string).trim() : '');
+  const brand = textOf(brandFeatureKey);
+  const model = textOf(modelFeatureKey);
+  const asksBrand = features.some(feature => feature.key === brandFeatureKey);
+  const asksModel = features.some(feature => feature.key === modelFeatureKey);
+
+  // From your title: what the title names, asked 500 ms after it changes, while the brand or model is still empty.
+  const typedTitle = draft?.title.trim() ?? '';
+  useEffect(() => {
+    const wait = setTimeout(() => setTitleWords(typedTitle), 500);
+    return () => clearTimeout(wait);
+  }, [typedTitle]);
+  const wanted = Boolean(draft?.categoryId && (asksBrand || asksModel) && (!brand || !model) && titleWords.length >= 3);
+  const detected = useQuery({
+    queryKey: ['model-detect', draft?.categoryId, titleWords],
+    enabled: wanted,
+    staleTime: 60_000,
+    queryFn: () => api<ShopModelMatch>(`/v1/classifieds/models/detect?category=${draft!.categoryId}&title=${encodeURIComponent(titleWords.slice(0, 120))}`),
+  });
+  const offer = wanted ? titleOffer(detected.data ?? null, { brand, model, asksBrand, asksModel }) : null;
 
   if (customer === undefined) return <AccountPending />;
   if (customer === null) {
@@ -190,6 +221,17 @@ export default function PostScreen() {
     setError(null);
   };
   const setFeature = (key: string, value: FeatureValue) => change({ features: { ...draft.features, [key]: value } });
+  /** A brand chosen or typed: a model chosen for another brand goes, one the seller typed stays. */
+  const setBrand = (name: string) => {
+    const next = modelAfterBrandChange(draft.features, name, modelBrand);
+    setModelBrand(next.modelBrand);
+    change({ features: next.features });
+  };
+  const takeOffer = () => {
+    if (!offer) return;
+    if (offer.model) setModelBrand(offer.brand?.name ?? brand);
+    change({ features: { ...draft.features, ...(offer.brand ? { [brandFeatureKey]: offer.brand.name } : {}), ...(offer.model ? { [modelFeatureKey]: offer.model } : {}) } });
+  };
 
   /** Saves the form: makes the draft the first time, then changes it. Returns the listing's id, or null when refused. */
   const save = async (): Promise<string | null> => {
@@ -530,8 +572,26 @@ export default function PostScreen() {
                 ))}
               </View>
               {problem('condition') ? <ThemedText type="small" style={{ color: theme.danger }}>{problem('condition')}</ThemedText> : null}
+              {offer && offer.text !== declined ? (
+                <View style={[styles.offer, { backgroundColor: theme.backgroundElement }]}>
+                  {offer.brand ? <BrandLogo brand={offer.brand} /> : null}
+                  <ThemedText type="small" style={{ flex: 1 }}>
+                    {`From your title: ${offer.text}`}
+                  </ThemedText>
+                  <Button title="Use this" tone="secondary" onPress={takeOffer} />
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Not ${offer.text}`} hitSlop={8} onPress={() => setDeclined(offer.text)}>
+                    <X size={18} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+              ) : null}
               {features.map(feature => (
-                <FeatureField key={feature.key} feature={feature} value={draft.features[feature.key] ?? null} onChange={value => setFeature(feature.key, value)} />
+                <FeatureField
+                  key={feature.key}
+                  feature={feature}
+                  value={draft.features[feature.key] ?? null}
+                  onChange={value => setFeature(feature.key, value)}
+                  onPick={feature.key === brandFeatureKey ? () => setPicker('brand') : feature.key === modelFeatureKey ? () => setPicker('model') : undefined}
+                />
               ))}
               <Field
                 label="Description"
@@ -624,6 +684,22 @@ export default function PostScreen() {
       </View>
 
       <CategoryPicker visible={picker === 'category'} onClose={() => setPicker(null)} categories={categories} selected={draft.categoryId} onChoose={categoryId => change({ categoryId, features: categoryId === draft.categoryId ? draft.features : {} })} />
+      <BrandPicker visible={picker === 'brand'} onClose={() => setPicker(null)} categoryId={draft.categoryId} country={country} value={brand} onPick={picked => setBrand(picked.name)} onUse={setBrand} />
+      <ModelPicker
+        visible={picker === 'model'}
+        onClose={() => setPicker(null)}
+        categoryId={draft.categoryId}
+        brand={brand}
+        value={model}
+        onPick={picked => {
+          setModelBrand(picked.brand?.name ?? brand);
+          change({ features: withModel(draft.features, picked) });
+        }}
+        onUse={typed => {
+          setModelBrand(null);
+          setFeature(modelFeatureKey, typed);
+        }}
+      />
       {country && places.data ? (
         <PlacePicker
           visible={picker === 'place'}
@@ -791,9 +867,13 @@ function ConnectShipping({ draft, change, centres, currency, problem }: {
   );
 }
 
-/** One of the category's details: text or a number typed, a choice, or yes or no. */
-function FeatureField({ feature, value, onChange }: { feature: ShopFeature; value: FeatureValue; onChange: (value: FeatureValue) => void }) {
+/** One of the category's details: text or a number typed, a choice, yes or no, or the brand and model from their lists. */
+function FeatureField({ feature, value, onChange, onPick }: { feature: ShopFeature; value: FeatureValue; onChange: (value: FeatureValue) => void; onPick?: () => void }) {
   const label = feature.unit ? `${feature.name} (${feature.unit})` : feature.name;
+  if (onPick && feature.data_type !== 'boolean' && feature.data_type !== 'number') {
+    const text = value === null ? '' : String(value).trim();
+    return <PickerRow label={label} value={text || null} placeholder="Choose or type it" onPress={onPick} />;
+  }
   if (feature.data_type === 'boolean') {
     return (
       <View style={{ gap: Spacing.one }}>
@@ -899,6 +979,7 @@ const styles = StyleSheet.create({
   tile: { width: '31%', aspectRatio: 1, borderRadius: Radius.medium, borderWidth: 1, overflow: 'hidden' },
   badge: { position: 'absolute', left: 4, top: 4, paddingHorizontal: 6, borderRadius: 6, overflow: 'hidden' },
   tileActions: { position: 'absolute', right: 4, bottom: 4, flexDirection: 'row', gap: 6 },
+  offer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Radius.medium, padding: Spacing.two },
   poster: { width: 56, height: 56, borderRadius: Radius.small },
   round: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   summary: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.one },

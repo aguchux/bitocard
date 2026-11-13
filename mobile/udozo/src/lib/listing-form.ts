@@ -5,7 +5,7 @@
  * step: selling at a price or by auction, where it sells (Udozo, resellers' stores, the seller's own shop through Udozo
  * POS) and shipping through Udozo Connect, so a seller never needs the website.
  */
-import type { ShopCondition, ShopContact, ShopDelivery, ShopFeature, ShopMyListing, ShopPriceKind } from '../shared/classifieds';
+import type { ShopBrand, ShopCondition, ShopContact, ShopDelivery, ShopFeature, ShopModelMatch, ShopMyListing, ShopPriceKind } from '../shared/classifieds';
 
 export const postSteps = [
   { key: 'basics', title: 'What are you selling?' },
@@ -411,4 +411,57 @@ export function listingActions(listing: Pick<ShopMyListing, 'status' | 'stock' |
   if ((listing.status === 'expired' && listing.expired_reason !== 'out_of_stock') || renewDue) actions.push('renew');
   if (listing.status !== 'removed') actions.push('delete');
   return actions;
+}
+
+// ---- Brand and model (udozo.com's FeaturesField) ----
+
+/** The registry's brand and model features (`brandFeatureKey`, `modelFeatureKey`; a value import would pull the shared file in under `node --test`). */
+export const brandFeatureKey = 'brand';
+export const modelFeatureKey = 'model';
+
+/** Letters and digits only, as the API matches brands and models ("mercedes benz" is Mercedes-Benz). */
+export const brandMatchKey = (name: string) =>
+  name
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+/** The category's features in the order the form asks them: the model straight after the brand. */
+export function withModelNext<T extends { key: string }>(features: T[]): T[] {
+  const brand = features.findIndex(item => item.key === brandFeatureKey);
+  const model = features.find(item => item.key === modelFeatureKey);
+  if (brand < 0 || !model) return features;
+  const rest = features.filter(item => item.key !== modelFeatureKey);
+  return [...rest.slice(0, rest.indexOf(features[brand]) + 1), model, ...rest.slice(rest.indexOf(features[brand]) + 1)];
+}
+
+/**
+ * A new brand typed or chosen: a model chosen from the old brand's list is cleared (it is that brand's), one the seller
+ * typed is left alone. `modelBrand` is the brand the model was chosen for, or null when it was typed.
+ */
+export function modelAfterBrandChange(features: Record<string, FeatureValue>, brand: string, modelBrand: string | null): { features: Record<string, FeatureValue>; modelBrand: string | null } {
+  const stale = modelBrand !== null && brandMatchKey(brand) !== brandMatchKey(modelBrand);
+  const next: Record<string, FeatureValue> = { ...features, [brandFeatureKey]: brand };
+  if (stale) next[modelFeatureKey] = null;
+  return { features: next, modelBrand: stale ? null : modelBrand };
+}
+
+/** A model chosen from the list: it is kept, and with no brand yet its own brand fills the brand in. */
+export function withModel(features: Record<string, FeatureValue>, model: { name: string; brand?: { name: string } | null }): Record<string, FeatureValue> {
+  const brand = typeof features[brandFeatureKey] === 'string' ? (features[brandFeatureKey] as string).trim() : '';
+  return { ...features, [modelFeatureKey]: model.name, ...(model.brand && !brand ? { [brandFeatureKey]: model.brand.name } : {}) };
+}
+
+/**
+ * What "From your title" offers: the brand while the brand is empty, the model while the model is empty (only one of
+ * the brand already chosen, or the one offered with it), and the words shown. Null when there is nothing to offer.
+ */
+export function titleOffer(match: ShopModelMatch | null, current: { brand: string; model: string; asksBrand: boolean; asksModel: boolean }): { brand: ShopBrand | null; model: string | null; text: string } | null {
+  if (!match) return null;
+  const brand = match.brand && current.asksBrand && !current.brand.trim() ? match.brand : null;
+  const sameBrand = !current.brand.trim() || !match.brand || brandMatchKey(current.brand) === brandMatchKey(match.brand.name);
+  const model = match.model && current.asksModel && !current.model.trim() && sameBrand ? match.model : null;
+  if (!brand && !model) return null;
+  return { brand, model, text: [brand?.name ?? (model ? current.brand.trim() : ''), model].filter(Boolean).join(' ') };
 }

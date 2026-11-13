@@ -204,3 +204,50 @@ test('the photos step sends a video with its progress, never holds the ad back w
   await fireEvent.press(await screen.findByText('Add a video'));
   expect(await screen.findByText('This ad already has a video. Remove it first, then add another.')).toBeTruthy();
 });
+
+test('brand and model come from their lists, a typed one is kept, and the title offers both', async () => {
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'l1' });
+  const withBrand = {
+    data: [
+      {
+        ...categories.data[0],
+        children: [{ ...categories.data[0].children[0], features: [{ key: 'model', name: 'Model', data_type: 'text', unit: null, choices: [], placeholder: null, filter: true }, { key: 'brand', name: 'Brand', data_type: 'text', unit: null, choices: [], placeholder: null, filter: true }] }],
+      },
+    ],
+  };
+  const samsung = { object: 'classified_brand', slug: 'samsung', name: 'Samsung', logo_url: null, color: null };
+  const apple = { object: 'classified_brand', slug: 'apple', name: 'Apple', logo_url: null, color: null };
+  const saved: unknown[] = [];
+  answers({
+    ...base,
+    'GET /v1/classifieds/categories': withBrand,
+    'GET /v1/classifieds/terms': { version: '2026-11-10', path: '/legal/terms', accepted: true, previous_version: null },
+    'GET /v1/classifieds/me/listings/l1': listing({ title: 'Samsung Galaxy S23 Ultra', condition: null }),
+    'GET /v1/classifieds/models/detect': { object: 'classified_model_match', brand: samsung, model: 'Galaxy S23 Ultra' },
+    'GET /v1/classifieds/brands': { data: [apple, samsung] },
+    'GET /v1/classifieds/models': { data: [{ object: 'classified_model', name: 'iPhone 15', brand: apple }] },
+    'PATCH /v1/classifieds/listings/l1': (body: unknown) => (saved.push(body), listing()),
+  });
+  await renderScreen(<PostScreen />);
+  expect(await screen.findByText('Step 3 of 6')).toBeTruthy();
+  // The model sits straight after the brand, whatever order the category lists them in.
+  const rows = screen.getAllByLabelText(/^(Brand|Model): /).map(row => row.props.accessibilityLabel);
+  expect(rows).toEqual(['Brand: Choose or type it', 'Model: Choose or type it']);
+
+  await fireEvent.press(await screen.findByText('Use this', {}, { timeout: 3000 }));
+  expect(screen.getByLabelText('Brand: Samsung')).toBeTruthy();
+  expect(screen.getByLabelText('Model: Galaxy S23 Ultra')).toBeTruthy();
+
+  // Another brand from the list clears the model taken for Samsung.
+  await fireEvent.press(screen.getByLabelText('Brand: Samsung'));
+  await fireEvent.press(await screen.findByText('Apple'));
+  expect(screen.getByLabelText('Brand: Apple')).toBeTruthy();
+  expect(screen.getByLabelText('Model: Choose or type it')).toBeTruthy();
+
+  // A model the list lacks is kept as typed.
+  await fireEvent.press(screen.getByLabelText('Model: Choose or type it'));
+  expect(await screen.findByText('iPhone 15')).toBeTruthy();
+  await fireEvent.changeText(screen.getByLabelText('Choose or type it'), 'iPhone 15 Pro Max Gold');
+  await fireEvent.press(await screen.findByText('Use “iPhone 15 Pro Max Gold”'));
+  expect(screen.getByLabelText('Model: iPhone 15 Pro Max Gold')).toBeTruthy();
+});
