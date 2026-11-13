@@ -24,8 +24,33 @@ export const maxPhotos = 12;
 /** How long an auction can run, in days (the API's `auctionLengths`). */
 export const auctionLengths = [1, 3, 5, 7, 10] as const;
 
-/** The largest video a listing takes (the API's `maxVideoBytes`). */
+/** The largest video a listing takes (the API's `maxVideoBytes`), and the longest (`maxVideoSeconds`). */
 export const maxVideoBytes = 50 * 1024 * 1024;
+export const maxVideoSeconds = 60;
+
+/** The video kinds a listing takes, by type and by the file's ending (some phones give no type). */
+const videoTypes: Record<string, string> = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+
+/**
+ * A picked video's type as the API takes it, or why it cannot be sent: MP4, MOV or WebM, at most 50 MB and 60 seconds.
+ * The size and length are checked only where the phone says them; the API checks everything again.
+ */
+export function videoProblem(video: { name?: string | null; type?: string | null; size?: number | null; durationMs?: number | null }): { type: string } | { problem: string } {
+  const ending = /\.([a-z0-9]+)$/i.exec(video.name ?? '')?.[1]?.toLowerCase();
+  const type = video.type && Object.values(videoTypes).includes(video.type) ? video.type : ending ? videoTypes[ending] : undefined;
+  if (!type) return { problem: 'Choose an MP4, MOV or WebM video.' };
+  if (video.size && video.size > maxVideoBytes) return { problem: 'Videos can be at most 50 MB. Choose a shorter one.' };
+  if (video.durationMs && video.durationMs > (maxVideoSeconds + 0.5) * 1000) return { problem: `Videos can be at most ${maxVideoSeconds} seconds long.` };
+  return { type };
+}
+
+/** The API's refusals of a video, in words the seller can act on. */
+export function videoRefusal(code: string, message: string) {
+  if (code === 'video_exists') return 'This ad already has a video. Remove it first, then add another.';
+  if (code === 'file_invalid') return 'That file is not a video Udozo can use. Choose an MP4, MOV or WebM video.';
+  if (code === 'file_too_large') return 'Videos can be at most 50 MB. Choose a shorter one.';
+  return message;
+}
 
 /**
  * What the seller can choose in this market and account, from the API: resale (open, with Udozo's limits), Udozo POS

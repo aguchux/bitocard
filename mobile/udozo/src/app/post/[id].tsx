@@ -18,8 +18,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Camera, Images, Sparkles, Star, Trash2 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { Camera, Film, Images, Sparkles, Star, Trash2 } from 'lucide-react-native';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -47,11 +47,12 @@ import {
   postSteps,
   stepOf,
   stepProblem,
+  videoRefusal,
   type FeatureValue,
   type ListingDraft,
 } from '@/lib/listing-form';
 import { useMarket } from '@/lib/market';
-import { pickPhotos, uploadListingPhoto } from '@/lib/picture';
+import { pickPhotos, pickVideo, uploadListingPhoto, uploadListingVideo } from '@/lib/picture';
 
 /** A refusal the form found itself, shaped as the API's so it shows under its field. */
 const localError = (message: string, param: string, code = 'parameter_invalid') => new ApiError(400, { type: 'invalid_request_error', code, message, param });
@@ -105,8 +106,18 @@ export default function PostScreen() {
   const [suggesting, setSuggesting] = useState<'draft' | 'price' | null>(null);
   const [priceHint, setPriceHint] = useState<string | null>(null);
   const [termsTicked, setTermsTicked] = useState(false);
+  /** The video while it is sent (how much has gone), and why the last one could not be sent. */
+  const [videoSend, setVideoSend] = useState<number | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const stopVideo = useRef<(() => void) | null>(null);
 
-  const listing = useQuery({ queryKey: ['my-listing', listingId], enabled: Boolean(listingId), queryFn: () => api<ShopMyListing>(`/v1/classifieds/me/listings/${listingId}`) });
+  const listing = useQuery({
+    queryKey: ['my-listing', listingId],
+    enabled: Boolean(listingId),
+    queryFn: () => api<ShopMyListing>(`/v1/classifieds/me/listings/${listingId}`),
+    // While the video is being prepared, look again now and then (udozo.com does the same).
+    refetchInterval: query => (query.state.data?.video?.status === 'processing' ? 4000 : false),
+  });
   const tree = useQuery({ queryKey: ['categories', country], enabled: Boolean(country), staleTime: 10 * 60_000, queryFn: () => api<{ data: ShopTopCategory[] }>(`/v1/classifieds/categories?country=${country}`) });
   const places = useQuery({ queryKey: ['areas', country], enabled: Boolean(country), staleTime: 10 * 60_000, queryFn: () => api<{ data: ShopState[] }>(`/v1/classifieds/areas?country=${country}`) });
   const assistant = useQuery({
@@ -239,6 +250,34 @@ export default function PostScreen() {
       }
     }
   };
+
+  /** The video, optional: sent with its progress, then prepared by Udozo while the seller carries on. */
+  const addVideo = async () => {
+    const id = listingId ?? (await save());
+    if (!id) return;
+    setVideoError(null);
+    const { video, problem: refusal } = await pickVideo().catch(() => ({ video: null, problem: undefined }));
+    if (refusal) setVideoError(refusal);
+    if (!video) return;
+    setVideoSend(0);
+    const sending = uploadListingVideo(id, video, setVideoSend);
+    let stopped = false;
+    stopVideo.current = () => {
+      stopped = true;
+      sending.abort();
+    };
+    try {
+      await sending.done;
+    } catch (caught) {
+      if (!stopped) setVideoError(caught instanceof ApiError ? videoRefusal(caught.code, caught.message) : 'The video could not be sent. Try again.');
+    } finally {
+      stopVideo.current = null;
+      setVideoSend(null);
+      await queries.invalidateQueries({ queryKey: ['my-listing', id] });
+    }
+  };
+  /** Stops sending the video: the ad carries on without it. */
+  const cancelVideo = () => stopVideo.current?.();
 
   const removePhoto = async (mediaId: string) => {
     if (!listingId) return;
@@ -433,6 +472,9 @@ export default function PostScreen() {
                 </Card>
               ) : null}
               {problem('photos') ? <ThemedText style={{ color: theme.danger }}>{problem('photos')}</ThemedText> : null}
+              {!offers.shopOnly ? (
+                <VideoRow video={listing.data?.video ?? null} sending={videoSend} error={videoError} onAdd={() => void addVideo()} onStop={cancelVideo} onRemove={id => void removePhoto(id)} />
+              ) : null}
             </>
           ) : null}
 
@@ -575,7 +617,7 @@ export default function PostScreen() {
       <View style={[styles.bar, { borderColor: theme.line, backgroundColor: theme.background }]}>
         {step > 0 ? <Button title="Back" tone="secondary" onPress={() => { setError(null); setStep(step - 1); }} style={{ flex: 1 }} /> : null}
         {step < lastStep ? (
-          <Button title="Next" loading={busy} disabled={counts.uploading > 0 && step === 1} onPress={() => void next()} style={{ flex: 2 }} />
+          <Button title="Next" loading={busy} disabled={(counts.uploading > 0 || videoSend !== null) && step === 1} onPress={() => void next()} style={{ flex: 2 }} />
         ) : (
           <Button title={listing.data?.status === 'active' || listing.data?.status === 'pending_review' ? 'Save changes' : 'Post my ad'} loading={busy} onPress={() => void post()} style={{ flex: 2 }} />
         )}
@@ -786,6 +828,56 @@ function FeatureField({ feature, value, onChange }: { feature: ShopFeature; valu
   );
 }
 
+/**
+ * The ad's video (optional, as on udozo.com): Add a video, then sending with how much has gone, prepared by Udozo, ready
+ * with its poster, or why it could not be used; Remove takes it off. One still being prepared never holds the ad back.
+ */
+function VideoRow({ video, sending, error, onAdd, onStop, onRemove }: {
+  video: ShopMyListing['video'];
+  sending: number | null;
+  error: string | null;
+  onAdd: () => void;
+  onStop: () => void;
+  onRemove: (id: string) => void;
+}) {
+  const theme = useTheme();
+  const state =
+    sending !== null
+      ? `Sending video (${sending}%)`
+      : video?.status === 'processing'
+        ? 'Udozo is preparing your video. Carry on: it joins the ad once it is ready.'
+        : video?.status === 'ready'
+          ? `Your video is ready${video.duration_ms ? ` (${Math.round(video.duration_ms / 1000)} seconds)` : ''}.`
+          : video?.status === 'failed'
+            ? `Your video could not be used${video.failure_reason ? `: ${video.failure_reason}` : '.'} Remove it and try another.`
+            : 'Up to 60 seconds and 50 MB. Show it working or from every side.';
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+        {video?.status === 'ready' && video.poster_url ? (
+          <Image source={{ uri: video.poster_url }} style={styles.poster} contentFit="cover" accessibilityLabel="Your video" />
+        ) : (
+          <Film size={22} color={theme.textSecondary} />
+        )}
+        <View style={{ flex: 1 }}>
+          <ThemedText type="smallBold">{video ? 'Video' : 'Add a video (optional)'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={video?.status === 'failed' ? { color: theme.danger } : undefined}>
+            {state}
+          </ThemedText>
+        </View>
+      </View>
+      {error ? <ThemedText type="small" style={{ color: theme.danger }}>{error}</ThemedText> : null}
+      {sending !== null ? (
+        <Button title="Stop sending it" tone="secondary" onPress={onStop} />
+      ) : video ? (
+        <Button title="Remove the video" tone="secondary" icon={<Trash2 size={18} color={theme.text} />} onPress={() => onRemove(video.id)} />
+      ) : (
+        <Button title="Add a video" tone="secondary" icon={<Film size={18} color={theme.text} />} onPress={onAdd} />
+      )}
+    </Card>
+  );
+}
+
 function Summary({ label, value, onChange }: { label: string; value: string; onChange: () => void }) {
   const theme = useTheme();
   return (
@@ -807,6 +899,7 @@ const styles = StyleSheet.create({
   tile: { width: '31%', aspectRatio: 1, borderRadius: Radius.medium, borderWidth: 1, overflow: 'hidden' },
   badge: { position: 'absolute', left: 4, top: 4, paddingHorizontal: 6, borderRadius: 6, overflow: 'hidden' },
   tileActions: { position: 'absolute', right: 4, bottom: 4, flexDirection: 'row', gap: 6 },
+  poster: { width: 56, height: 56, borderRadius: Radius.small },
   round: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   summary: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.one },
   bar: { flexDirection: 'row', gap: Spacing.two, padding: Spacing.three, borderTopWidth: StyleSheet.hairlineWidth },

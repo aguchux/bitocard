@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { applyDraftSuggestion, bodyOf, emptyDraft, firstIncomplete, fromMinor, listingActions, photoCounts, stepOf, stepProblem, toMinor } from '../src/lib/listing-form.ts';
+import { applyDraftSuggestion, bodyOf, emptyDraft, firstIncomplete, fromMinor, listingActions, maxVideoBytes, photoCounts, stepOf, stepProblem, toMinor, videoProblem, videoRefusal } from '../src/lib/listing-form.ts';
 
 const ready = { ready: 4, uploading: 0, failed: 0 };
 
@@ -140,4 +140,15 @@ test('Udozo Connect sends its states with charges, and every centre or the chose
   assert.equal(stepProblem(4, { ...draft, areaId: 'a1', pickup: false, delivery: 'none' }, ready, { offers: all }), null, 'Connect is a way to hand it over');
   const off = bodyOf({ ...draft, connect: false }, {}, all);
   assert.ok('body' in off && off.body.connect === false && !('connect_states' in off.body));
+});
+
+test('a video is checked before it is sent, and the API’s refusals are worded', () => {
+  assert.deepEqual(videoProblem({ name: 'clip.MOV', type: null, size: 10_000_000, durationMs: 30_000 }), { type: 'video/quicktime' });
+  assert.deepEqual(videoProblem({ name: 'a', type: 'video/mp4' }), { type: 'video/mp4' });
+  assert.deepEqual(videoProblem({ name: 'clip.avi', type: 'video/x-msvideo' }), { problem: 'Choose an MP4, MOV or WebM video.' });
+  assert.ok('problem' in videoProblem({ name: 'big.mp4', size: maxVideoBytes + 1 }));
+  assert.deepEqual(videoProblem({ name: 'long.webm', durationMs: 75_000 }), { problem: 'Videos can be at most 60 seconds long.' });
+  assert.match(videoRefusal('video_exists', 'x'), /already has a video/);
+  assert.match(videoRefusal('file_invalid', 'x'), /MP4, MOV or WebM/);
+  assert.equal(videoRefusal('listing_closed', 'This ad is closed.'), 'This ad is closed.');
 });

@@ -1,14 +1,16 @@
 // Post an ad and My listings: the first step makes the draft, a saved draft opens where it stopped, posting accepts the
 // terms first, and a live ad is marked sold or restocked.
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Alert } from 'react-native';
 
 import MyListingsScreen from '@/app/my-listings';
 import PostScreen from '@/app/post/[id]';
+import { pickVideo, uploadListingVideo } from '@/lib/picture';
 
 import { answers, refused, renderScreen } from './helpers';
 
+jest.mock('@/lib/picture', () => ({ ...jest.requireActual('@/lib/picture'), pickVideo: jest.fn(), uploadListingVideo: jest.fn() }));
 jest.mock('expo-image-manipulator', () => ({ ImageManipulator: { manipulate: jest.fn() }, SaveFormat: { JPEG: 'jpeg' } }));
 jest.mock('@/lib/account', () => ({ useAccount: () => ({ customer: { id: 'c1', country: 'NG', currency: 'NGN' }, pending: false, error: null, retry: jest.fn() }) }));
 jest.mock('@/lib/market', () => ({ useMarket: () => ({ country: 'NG', markets: [{ country: 'NG', currency: 'NGN' }], fixed: true, choose: jest.fn() }) }));
@@ -157,4 +159,48 @@ test('My listings marks a live ad sold after asking, and restocks one', async ()
   await fireEvent.press(screen.getByText('Save'));
   await waitFor(() => expect(calls).toEqual(['sold', 'stock {"stock":5}']));
   alert.mockRestore();
+});
+
+test('the photos step sends a video with its progress, never holds the ad back while it is prepared, and words a refusal', async () => {
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'l1' });
+  let video: unknown = null;
+  answers({
+    ...base,
+    'GET /v1/classifieds/terms': { version: '2026-11-10', path: '/legal/terms', accepted: true, previous_version: null },
+    'GET /v1/classifieds/me/listings/l1': () => listing({ title: 'iPhone', photos: [], video }),
+  });
+  let progress: (percent: number) => void = () => undefined;
+  let finish: () => void = () => undefined;
+  (pickVideo as jest.Mock).mockResolvedValue({ video: { uri: 'file:///clip.mp4', name: 'clip.mp4', type: 'video/mp4' } });
+  (uploadListingVideo as jest.Mock).mockImplementation((id: string, picked: unknown, onProgress: (percent: number) => void) => {
+    progress = onProgress;
+    return { done: new Promise<void>(resolve => (finish = resolve)), abort: jest.fn() };
+  });
+  await renderScreen(<PostScreen />);
+  expect(await screen.findByText('Add a video (optional)')).toBeTruthy();
+
+  await fireEvent.press(screen.getByText('Add a video'));
+  await waitFor(() => expect(uploadListingVideo).toHaveBeenCalledWith('l1', expect.objectContaining({ type: 'video/mp4' }), expect.any(Function)));
+  await act(async () => progress(40));
+  expect(screen.getByText('Sending video (40%)')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Next' }).props.accessibilityState.disabled).toBe(true);
+
+  video = { id: 'v1', url: null, poster_url: null, duration_ms: null, status: 'processing', failure_reason: null };
+  await act(async () => finish());
+  expect(await screen.findByText('Udozo is preparing your video. Carry on: it joins the ad once it is ready.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Next' }).props.accessibilityState.disabled).toBe(false);
+
+  // Removed, then another refused by the API: the seller is told why in words.
+  const removed: string[] = [];
+  answers({
+    ...base,
+    'GET /v1/classifieds/terms': { version: '2026-11-10', path: '/legal/terms', accepted: true, previous_version: null },
+    'GET /v1/classifieds/me/listings/l1': () => listing({ title: 'iPhone', photos: [], video: removed.length ? null : video }),
+    'DELETE /v1/classifieds/listings/l1/media/v1': () => (removed.push('v1'), null),
+  });
+  await fireEvent.press(screen.getByText('Remove the video'));
+  await waitFor(() => expect(removed).toEqual(['v1']));
+  (uploadListingVideo as jest.Mock).mockReturnValue({ done: Promise.reject(refused(409, 'video_exists', 'This listing already has a video. Remove it first.')), abort: jest.fn() });
+  await fireEvent.press(await screen.findByText('Add a video'));
+  expect(await screen.findByText('This ad already has a video. Remove it first, then add another.')).toBeTruthy();
 });

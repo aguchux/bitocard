@@ -1,7 +1,8 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
-import { apiUpload } from '@/lib/api';
+import { apiUpload, apiUploadWithProgress } from '@/lib/api';
+import { videoProblem } from '@/lib/listing-form';
 
 /** The longest side a listing photo is sent at, as udozo.com scales them in the browser: sharp, and well under 4 MB. */
 export const photoEdge = 1600;
@@ -40,4 +41,27 @@ export async function uploadListingPhoto(listingId: string, photo: PickedPhoto) 
   const form = new FormData();
   form.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as unknown as Blob);
   return apiUpload(`/v1/classifieds/listings/${listingId}/photos`, form);
+}
+
+export type PickedVideo = { uri: string; name: string; type: string };
+
+/**
+ * A video from the library for a listing (the system picker needs no permission), or none when the seller cancels. A
+ * file Udozo would refuse (not MP4, MOV or WebM, over 50 MB or 60 seconds) comes back as `problem`, before anything is sent.
+ */
+export async function pickVideo(): Promise<{ video: PickedVideo | null; problem?: string }> {
+  const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, videoMaxDuration: 60 });
+  const asset = picked.canceled ? null : picked.assets[0];
+  if (!asset) return { video: null };
+  const name = asset.fileName ?? asset.uri.split('/').pop() ?? 'video.mp4';
+  const checked = videoProblem({ name, type: asset.mimeType, size: asset.fileSize, durationMs: asset.duration });
+  if ('problem' in checked) return { video: null, problem: checked.problem };
+  return { video: { uri: asset.uri, name, type: checked.type } };
+}
+
+/** Sends the listing's video (multipart `file`); the API answers 202 with it, still being prepared. */
+export function uploadListingVideo(listingId: string, video: PickedVideo, onProgress: (percent: number) => void) {
+  const form = new FormData();
+  form.append('file', { uri: video.uri, name: video.name, type: video.type } as unknown as Blob);
+  return apiUploadWithProgress<{ id: string; status: string }>(`/v1/classifieds/listings/${listingId}/video`, form, onProgress);
 }

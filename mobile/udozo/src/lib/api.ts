@@ -31,6 +31,36 @@ export async function apiUpload<T>(path: string, form: FormData) {
   return readResponse<T>(response);
 }
 
+/**
+ * A large file sent as multipart with its progress (a listing's video): as `apiUpload`, through XMLHttpRequest, which
+ * says how much has gone (`onProgress`, 0 to 100). `abort` stops it; a stopped or failed send is `network_error`.
+ */
+export function apiUploadWithProgress<T>(path: string, form: FormData, onProgress: (percent: number) => void) {
+  const request = new XMLHttpRequest();
+  const done = (async () => {
+    const session = await readSession();
+    return new Promise<T>((resolve, reject) => {
+      request.open('POST', `${apiUrl}${path}`);
+      request.setRequestHeader('Accept', 'application/json');
+      request.setRequestHeader('Udozo-App', app);
+      request.setRequestHeader('Idempotency-Key', newIdempotencyKey());
+      if (session) request.setRequestHeader('BitoCard-Customer-Session', session);
+      request.upload.onprogress = event => {
+        if (event.lengthComputable && event.total > 0) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      };
+      request.onerror = () => reject(networkError());
+      request.onabort = () => reject(networkError());
+      request.onload = () => {
+        const text = request.responseText;
+        const response = { status: request.status, ok: request.status >= 200 && request.status < 300, json: async () => JSON.parse(text) } as Response;
+        readResponse<T>(response).then(resolve, reject);
+      };
+      request.send(form);
+    });
+  })();
+  return { done, abort: () => request.abort() };
+}
+
 /** An image the API serves only to the signed-in customer (a chat's photos): its address with the session to send. */
 export function privateImage(path: string, session: string | null) {
   return { uri: `${apiUrl}${path}`, headers: session ? { 'BitoCard-Customer-Session': session, 'Udozo-App': app } : undefined };
