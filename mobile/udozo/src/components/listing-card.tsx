@@ -11,8 +11,12 @@ import { photoUrl } from '@/lib/navigate';
 
 type Card = Omit<ShopListingCard, 'price'> & { price?: ShopListingCard['price']; sponsored?: true; was_price?: number | null };
 
-/** A listing as a card: its photo, price (never across countries), title and area; Sponsored ones say so in words. */
-export function ListingCard({ listing, width }: { listing: Card; width?: number }) {
+/**
+ * A listing as a card: its photo, price (never across countries), title and area; Sponsored ones say so in words. It
+ * sizes to its content: a rail gives it a `width`, and only a grid's row lets it `fill` its column (flex there alone:
+ * in a sideways list flex stretched each card down past the screen).
+ */
+export function ListingCard({ listing, width, fill }: { listing: Card; width?: number; fill?: boolean }) {
   const theme = useTheme();
   const price = listing.price ? shopPriceText(listing.price) : null;
   const sold = listing.in_stock === false;
@@ -22,7 +26,7 @@ export function ListingCard({ listing, width }: { listing: Card; width?: number 
       accessibilityRole="link"
       accessibilityLabel={label}
       onPress={() => router.push({ pathname: '/listing/[ref]', params: { ref: String(listing.ref), country: listing.country } })}
-      style={({ pressed }) => [styles.card, { width, borderColor: theme.line, backgroundColor: theme.background, opacity: pressed ? 0.9 : 1 }]}>
+      style={({ pressed }) => [styles.card, fill ? styles.fill : { width }, { borderColor: theme.line, backgroundColor: theme.background, opacity: pressed ? 0.9 : 1 }]}>
       <View style={[styles.photo, { backgroundColor: theme.backgroundElement }]}>
         {listing.cover ? <Image source={{ uri: photoUrl(listing.cover.url, 480)! }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} accessibilityIgnoresInvertColors /> : null}
         {listing.sponsored ? (
@@ -52,7 +56,8 @@ export function ListingCard({ listing, width }: { listing: Card; width?: number 
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: Radius.medium, overflow: 'hidden', flex: 1 },
+  card: { borderWidth: 1, borderRadius: Radius.medium, overflow: 'hidden' },
+  fill: { flex: 1 },
   photo: { aspectRatio: 1, width: '100%' },
   badge: { position: 'absolute', top: Spacing.two, left: Spacing.two, borderRadius: Radius.small, paddingHorizontal: 6, paddingVertical: 2 },
   body: { padding: Spacing.two, gap: 2 },

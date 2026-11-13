@@ -43,7 +43,7 @@ export function ListingResults({ params, header, empty }: { params: SearchParams
       columnWrapperStyle={styles.row}
       contentContainerStyle={styles.list}
       ListHeaderComponent={header}
-      renderItem={({ item }) => <ListingCard listing={item} />}
+      renderItem={({ item }) => <ListingCard listing={item} fill />}
       onEndReachedThreshold={0.6}
       onEndReached={() => results.hasNextPage && !results.isFetchingNextPage && results.fetchNextPage()}
       refreshControl={<RefreshControl refreshing={results.isRefetching && !results.isFetchingNextPage} onRefresh={() => void results.refetch()} tintColor={theme.primary} />}

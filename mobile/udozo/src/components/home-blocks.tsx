@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { ChevronRight, LayoutGrid } from 'lucide-react-native';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
-import { ListingCard } from '@/components/listing-card';
+import { ListingRail } from '@/components/listing-rail';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -70,14 +70,7 @@ function Block({ block, titled }: { block: ResolvedHomeSection; titled: boolean 
       return (
         <View style={{ gap: Spacing.two }}>
           {title ? <Heading title={block.type === 'top_selling_rail' ? (data.heading ?? title) : title} href={data.view_all_href} /> : null}
-          <FlatList
-            horizontal
-            data={data.items}
-            keyExtractor={item => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.rail}
-            renderItem={({ item }) => <ListingCard listing={item} width={160} />}
-          />
+          <ListingRail items={data.items} testID={`rail-${block.id}`} />
         </View>
       );
     }
@@ -185,7 +178,7 @@ function Banner({ title, body, image, href, wide }: { title: string; body?: stri
 const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.three, gap: Spacing.two },
   seeAll: { minHeight: 44, justifyContent: 'center' },
-  rail: { paddingHorizontal: Spacing.three, gap: Spacing.three },
+  rail: { paddingHorizontal: Spacing.three, gap: Spacing.three, alignItems: 'flex-start' },
   side: { paddingHorizontal: Spacing.three, gap: Spacing.three },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three, paddingHorizontal: Spacing.three },
   category: { width: 88, alignItems: 'center', gap: Spacing.one },
