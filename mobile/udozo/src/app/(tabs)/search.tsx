@@ -1,7 +1,7 @@
 import { conditionLabels, sortLabels, type ShopCondition, type ShopSort, type ShopSuggestions } from '@shared/classifieds';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Search, Sparkles, X } from 'lucide-react-native';
+import { MapPin, Search, Sparkles, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,11 +20,12 @@ const conditions: ShopCondition[] = ['new', 'used', 'untested', 'parts'];
 
 /**
  * Search: the words (with suggestions as they are typed), how to sort, the condition, then the market's listings two to
- * a row; Ask (where the market's assistant answers) asks Anjio what was typed. A link may carry the words, a category or another market (`/search?country=&q=&category=`).
+ * a row; Ask (where the market's assistant answers) asks Anjio what was typed. A link may carry the words, a category,
+ * a place (a listing's area and state, local first: `area`, `state`, its name `place`) or another market (`/search?country=&q=&category=`).
  */
 export default function SearchScreen() {
   const theme = useTheme();
-  const params = useLocalSearchParams<{ q?: string; category?: string; country?: string }>();
+  const params = useLocalSearchParams<{ q?: string; category?: string; country?: string; area?: string; state?: string; place?: string }>();
   const market = useMarket();
   const country = (params.country ?? market.country ?? '').toUpperCase();
   const [typed, setTyped] = useState(params.q ?? '');
@@ -48,7 +49,9 @@ export default function SearchScreen() {
     queryFn: () => api<ShopSuggestions>(`/v1/classifieds/search/suggest?country=${country}&q=${encodeURIComponent(typed.trim())}`),
   });
 
-  const search = useMemo(() => (country ? { country, q: q || undefined, category: params.category, sort, condition } : null), [country, q, params.category, sort, condition]);
+  const area = params.area || undefined;
+  const state = params.state || undefined;
+  const search = useMemo(() => (country ? { country, q: q || undefined, category: params.category, area, state, sort, condition } : null), [country, q, params.category, area, state, sort, condition]);
   const submit = (words = typed) => {
     setQ(words.trim());
     setTyped(words);
@@ -131,6 +134,15 @@ export default function SearchScreen() {
                 />
               ))}
             </ScrollView>
+            {area || state ? (
+              <View style={styles.place}>
+                <MapPin size={16} color={theme.textSecondary} />
+                <ThemedText type="smallBold" style={{ flex: 1 }}>{`Near ${params.place || area || state}`}</ThemedText>
+                <Pressable accessibilityRole="button" accessibilityLabel="Search everywhere" hitSlop={10} onPress={() => router.setParams({ area: '', state: '', place: '' })}>
+                  <X size={18} color={theme.textSecondary} />
+                </Pressable>
+              </View>
+            ) : null}
             {q ? <ThemedText type="small" themeColor="textSecondary" style={{ fontFamily: inter.semibold }}>{`Results for “${q}”`}</ThemedText> : null}
           </View>
         }
@@ -146,5 +158,6 @@ const styles = StyleSheet.create({
   suggestions: { marginHorizontal: Spacing.three, borderWidth: 1, borderRadius: Radius.medium, marginBottom: Spacing.two },
   suggestion: { minHeight: 44, justifyContent: 'center', paddingHorizontal: Spacing.three },
   chips: { gap: Spacing.two },
+  place: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 36 },
   ask: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
 });

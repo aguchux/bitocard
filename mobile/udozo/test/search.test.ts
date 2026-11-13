@@ -13,6 +13,10 @@ test('only what is set, conditions repeated', () => {
   );
 });
 
+test('a place searches its area, local first, in its state', () => {
+  assert.equal(searchQuery({ country: 'NG', category: 'mobile-phones', area: 'ikeja', state: 'lagos' }, 0), 'country=NG&offset=0&limit=24&category=mobile-phones&area=ikeja&state=lagos');
+});
+
 test('photos at the width needed, only on Udozo’s photo route', () => {
   assert.equal(photoUrl('https://udozo.com/img/abc.jpg?m=3', 960), 'https://udozo.com/img/abc.jpg?m=3&w=960');
   assert.equal(photoUrl('https://udozo.com/img/abc.jpg?m=3&w=1600', 480), 'https://udozo.com/img/abc.jpg?m=3&w=480');

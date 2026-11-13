@@ -581,6 +581,25 @@ Views of listings opened in the app are not counted yet.
   home (`/gh`) open as asked.
 - **Search** stops paging at the API's 1,000.
 
+**Fixes after the owner tried the app on a phone (13 November 2026):**
+
+- **Rail cards stretched out of view:** `ListingCard` had `flex: 1` for the two-column grid, so in Home's sideways
+  rails each card grew down past the bottom of the screen. The card now sizes to its content: a rail gives it a
+  width (`ListingRail` in `src/components/listing-rail.tsx`, its row lined up at the top), and only the grid lets it
+  `fill` its column (`test/screens/listing-rail.test.tsx`).
+- **A full listing page:** a listing opened to a square photo as wide as the screen with the bar over the rest, so
+  little but the photo and Chat showed above the fold, and the page had no ways to contact the seller but the bar.
+  It is now udozo.com's listing page (`src/app/listing/[ref].tsx`, pieces in `src/components/listing/`, rules in
+  `src/lib/listing-page.ts`): a 4:3 gallery never taller than 60% of the screen with dots, opening full screen
+  (swiped; pinched on iPhones), and its video; the price, title and stock line; chips to the condition, the place (a
+  search there: `area`, `state` on the search), the category and the brand; the contact row (Chat, Call greyed with
+  why, Request call back with Cancel, Request contact, then the shared phone and email to tap, the seller's page;
+  signed out each signs in first; the seller's own says so with Edit); then key details, the description, delivery
+  and pickup (the charges from the UdozoPay quote, Udozo Connect's states), UdozoPay's promise, the seller with the
+  online dot and See all their listings, reviews of this item, the checks before paying, More from this seller and
+  Similar listings rails, and Report. It draws from the listing alone, the viewer filling it in once it comes
+  (`test/screens/listing.test.tsx`, `test/listing-page.test.ts`).
+
 ## Testing
 
 - Unit and component tests with Jest and React Native Testing Library, kept beside each feature as the apps' Vitest tests are.

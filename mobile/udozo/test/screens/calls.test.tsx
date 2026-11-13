@@ -136,7 +136,8 @@ test('Call seller rings the seller through the relay and shows the call; cancell
       <ListingScreen />
     </CallProvider>,
   );
-  await fireEvent.press(await screen.findByLabelText('Call seller'));
+  // The contact row's Call and the bar's: either rings the seller.
+  await fireEvent.press((await screen.findAllByLabelText('Call seller'))[0]);
   expect(await screen.findByText('Ringing…')).toBeTruthy();
   expect(posted).toEqual(['start']);
   expect(RNCallKeep.startCall).toHaveBeenCalledWith(callId, 'Udozo', 'Chidi O.', 'generic', false);
@@ -164,6 +165,8 @@ test('Call seller is greyed while the seller is away, and says why', async () =>
   expect(button.props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(button);
   expect(alert).toHaveBeenCalledWith('Call seller', expect.stringMatching(/not on Udozo right now/));
+  // The contact row's Call says why in its label too.
+  expect(screen.getByLabelText(/^Call seller\. The seller is not on Udozo right now/)).toBeTruthy();
   view.unmount();
 });
 
