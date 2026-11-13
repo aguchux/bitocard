@@ -305,3 +305,12 @@ test('an answered call quiet for 30 seconds (Udozo unreachable) has dropped', as
   assert.equal(h.engine.current.phase, 'ended');
   assert.equal(h.engine.current.message, 'The call dropped.');
 });
+
+test('the app is at least the version the API rings phones from (callsFromAppVersion in apps/udozo-api)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { compareVersions } = await import('../src/lib/version.ts');
+  const app = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8')) as { expo: { version: string } };
+  const api = readFileSync(new URL('../../../apps/udozo-api/src/notifications/push.service.ts', import.meta.url), 'utf8').match(/callsFromAppVersion = '([\d.]+)'/)?.[1];
+  assert.ok(api, 'callsFromAppVersion in the API');
+  assert.ok(compareVersions(app.expo.version, api) >= 0, `app.json's ${app.expo.version} is below ${api}`);
+});
