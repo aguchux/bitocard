@@ -1,26 +1,28 @@
-import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Chip, Empty, Failed, Loading } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api } from '@/lib/api';
 import { wantedWhen, type WantedForYou, type WantedList, type WantedRequest } from '@/lib/wanted';
 
 /**
  * Wanted requests (udozo.com's /account/wanted): the requests the reader made, each with how long it has and how many
- * sellers answered, and requests sent to them as a seller who may have it. Post a request at the top.
+ * sellers answered, and requests sent to them as a seller who may have it; more load as they scroll. Post a request at
+ * the top.
  */
 export default function WantedScreen() {
   const theme = useTheme();
   const [tab, setTab] = useState<'mine' | 'for-you'>('mine');
-  const list = useQuery({
-    queryKey: ['wanted', tab],
-    queryFn: () => api<WantedList<WantedRequest | WantedForYou>>(tab === 'mine' ? '/v1/classifieds/me/wanted?limit=50' : '/v1/classifieds/me/wanted-for-you?limit=50'),
+  const paged = usePagedList<WantedRequest | WantedForYou, WantedList<WantedRequest | WantedForYou>>({
+    queryKey: ['wanted', 'list', tab],
+    path: tab === 'mine' ? '/v1/classifieds/me/wanted' : '/v1/classifieds/me/wanted-for-you',
+    paging: 'offset',
   });
+  const list = paged.list;
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={styles.chips}>
@@ -29,14 +31,14 @@ export default function WantedScreen() {
       </View>
       {list.isPending ? (
         <Loading />
-      ) : list.isError ? (
+      ) : list.isLoadingError ? (
         <Failed error={list.error} retry={() => void list.refetch()} />
       ) : (
         <FlatList
-          data={list.data.data}
+          data={paged.items}
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}
-          refreshControl={<RefreshControl refreshing={list.isRefetching} onRefresh={() => void list.refetch()} tintColor={theme.primary} />}
+          {...pagedListProps(paged, theme.primary)}
           ListHeaderComponent={tab === 'mine' ? <Button title="Post a request" onPress={() => router.push('/wanted/new')} style={{ marginBottom: Spacing.two }} /> : undefined}
           ListEmptyComponent={
             <Empty

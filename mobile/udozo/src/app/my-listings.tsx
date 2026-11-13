@@ -1,10 +1,11 @@
 import { shopMoney, shopPriceText, type ShopBuyOrder, type ShopListingStatus, type ShopMyListing, type ShopMyListings } from '@shared/classifieds';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Chip, Empty, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -29,7 +30,8 @@ const dateText = (iso: string | null | undefined) => (iso ? new Date(iso).toLoca
 
 /**
  * The seller's listings by state (Live, In review, Drafts, Needs changes, Expired, Sold), each with what can be done to
- * it now: edit, see it, mark it sold, restock, renew or delete. Restocking an ad Anjio took off renews it too.
+ * it now: edit, see it, mark it sold, restock, renew or delete; more load as they scroll. Restocking an ad Anjio took
+ * off renews it too.
  */
 export default function MyListingsScreen() {
   const theme = useTheme();
@@ -40,7 +42,8 @@ export default function MyListingsScreen() {
   const [units, setUnits] = useState('1');
   /** Mark sold on a listing with accepted buy orders: who bought it. */
   const [soldTo, setSoldTo] = useState<{ listing: ShopMyListing; orders: ShopBuyOrder[] } | null>(null);
-  const list = useQuery({ queryKey: ['my-listings', status], queryFn: () => api<ShopMyListings>(`/v1/classifieds/me/listings?status=${status}&limit=100`) });
+  const paged = usePagedList<ShopMyListing, ShopMyListings>({ queryKey: ['my-listings', 'list', status], path: `/v1/classifieds/me/listings?status=${status}`, paging: 'cursor' });
+  const list = paged.list;
 
   const done = () => {
     queries.invalidateQueries({ queryKey: ['my-listings'] });
@@ -93,7 +96,7 @@ export default function MyListingsScreen() {
       ],
     );
 
-  const items = list.data?.data ?? [];
+  const items = paged.items;
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} style={{ flexGrow: 0 }}>
@@ -105,7 +108,7 @@ export default function MyListingsScreen() {
         data={items}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={list.isRefetching} onRefresh={() => void list.refetch()} tintColor={theme.primary} />}
+        {...pagedListProps(paged, theme.primary)}
         renderItem={({ item }) => {
           const actions = listingActions(item);
           const cover = photoUrl(item.photos.find(photo => photo.status === 'ready')?.url, 480);

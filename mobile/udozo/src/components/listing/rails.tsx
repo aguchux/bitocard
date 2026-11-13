@@ -46,7 +46,7 @@ function Rail({ title, params, exclude, testID, onSeeAll }: { title: string; par
           </Pressable>
         ) : null}
       </View>
-      <ListingRail items={items} testID={testID} />
+      <ListingRail items={items} testID={testID} seeAll={onSeeAll ? { label: title, onPress: onSeeAll } : undefined} />
     </View>
   );
 }

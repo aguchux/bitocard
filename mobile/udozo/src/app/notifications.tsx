@@ -1,10 +1,11 @@
 import { postedAgo } from '@shared/classifieds';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Card, Empty, Failed, FormError, Loading } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -15,13 +16,14 @@ import { registerPush } from '@/lib/push';
 import type { Notice, Notices } from '@/lib/types';
 
 /**
- * The customer's notifications, newest first: opening one marks it read and goes where it is about. Above them, while
- * the phone does not allow notifications, a card to turn them on.
+ * The customer's notifications, newest first, older ones loading as they scroll: opening one marks it read and goes
+ * where it is about. Above them, while the phone does not allow notifications, a card to turn them on.
  */
 export default function NotificationsScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
-  const notices = useQuery({ queryKey: ['notices'], queryFn: () => api<Notices>('/v1/store/account/notifications?limit=50') });
+  const paged = usePagedList<Notice, Notices>({ queryKey: ['notices', 'list'], path: '/v1/store/account/notifications', paging: 'cursor' });
+  const notices = paged.list;
   const refresh = () => {
     queries.invalidateQueries({ queryKey: ['notices'] });
   };
@@ -35,13 +37,13 @@ export default function NotificationsScreen() {
   });
   return (
     <>
-      <Stack.Screen options={{ headerRight: () => (notices.data?.unread_count ? <Button tone="ghost" title="Mark all read" onPress={() => readAll.mutate()} /> : null) }} />
+      <Stack.Screen options={{ headerRight: () => (paged.first?.unread_count ? <Button tone="ghost" title="Mark all read" onPress={() => readAll.mutate()} /> : null) }} />
       <FlatList
-        data={notices.data?.data ?? []}
+        data={paged.items}
         keyExtractor={notice => notice.id}
         contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}
         ListHeaderComponent={<PushCard />}
-        refreshControl={<RefreshControl refreshing={notices.isRefetching} onRefresh={() => void notices.refetch()} tintColor={theme.primary} />}
+        {...pagedListProps(paged, theme.primary)}
         renderItem={({ item }) => (
           <Pressable
             accessibilityRole="button"

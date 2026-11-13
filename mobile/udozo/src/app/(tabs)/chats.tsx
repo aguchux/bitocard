@@ -1,34 +1,35 @@
-import { postedAgo, type ShopConversations } from '@shared/classifieds';
-import { useQuery } from '@tanstack/react-query';
+import { postedAgo, type ShopConversation, type ShopConversations } from '@shared/classifieds';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccountPending } from '@/components/account-pending';
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { SignedOut } from '@/components/signed-out';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Chip, Empty, Failed, Loading } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
-import { api } from '@/lib/api';
 import { photoUrl } from '@/lib/navigate';
 
 type Role = 'all' | 'buying' | 'selling';
 
-/** The customer's chats, newest first, Buying and Selling apart; read again every 15 seconds while open. */
+/** The customer's chats, newest first, Buying and Selling apart, older ones as they scroll; read again every 15 seconds while open. */
 export default function ChatsScreen() {
   const theme = useTheme();
   const { customer } = useAccount();
   const [role, setRole] = useState<Role>('all');
-  const chats = useQuery({
-    queryKey: ['chats', role],
+  const paged = usePagedList<ShopConversation, ShopConversations>({
+    queryKey: ['chats', 'list', role],
     enabled: Boolean(customer),
-    queryFn: () => api<ShopConversations>(`/v1/classifieds/conversations?limit=50${role === 'all' ? '' : `&role=${role}`}`),
+    path: `/v1/classifieds/conversations${role === 'all' ? '' : `?role=${role}`}`,
+    paging: 'offset',
     refetchInterval: 15_000,
   });
+  const chats = paged.list;
   if (customer === undefined) return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       <AccountPending />
@@ -52,9 +53,9 @@ export default function ChatsScreen() {
         </View>
       </View>
       <FlatList
-        data={chats.data?.data ?? []}
+        data={paged.items}
         keyExtractor={chat => chat.id}
-        refreshControl={<RefreshControl refreshing={chats.isRefetching} onRefresh={() => void chats.refetch()} tintColor={theme.primary} />}
+        {...pagedListProps(paged, theme.primary)}
         ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.line, marginLeft: 80 }} />}
         renderItem={({ item }) => {
           const last = item.last_message;

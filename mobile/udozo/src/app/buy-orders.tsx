@@ -1,45 +1,48 @@
-import { buyOrderLabels, shopMoney, type ShopBuyOrders } from '@shared/classifieds';
-import { useQuery } from '@tanstack/react-query';
+import { buyOrderLabels, shopMoney, type ShopBuyOrder, type ShopBuyOrders } from '@shared/classifieds';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { ThemedText } from '@/components/themed-text';
 import { Chip, Empty, Failed, Loading } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api } from '@/lib/api';
 import { buyOrderNext } from '@/lib/buy-orders';
+import { pagedItems } from '@/lib/paging';
 
 /**
  * Buy orders (udozo.com's /account/buy-orders): what the reader asked to buy and what buyers asked of them, those waiting
- * on the reader first, each with what happens next. Payment is between buyer and seller when they meet.
+ * on the reader first, each with what happens next; more load as they scroll (full pages, as the API gives no total).
+ * Payment is between buyer and seller when they meet.
  */
 export default function BuyOrdersScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ role?: string }>();
   const [role, setRole] = useState<'buying' | 'selling'>(params.role === 'selling' ? 'selling' : 'buying');
-  const orders = useQuery({ queryKey: ['buy-orders', role], queryFn: () => api<ShopBuyOrders>(`/v1/classifieds/me/buy-orders?role=${role}&limit=50`) });
+  const paged = usePagedList<ShopBuyOrder, ShopBuyOrders>({ queryKey: ['buy-orders', 'list', role], path: `/v1/classifieds/me/buy-orders?role=${role}`, paging: 'full' });
+  const orders = paged.list;
   const waiting = (actions: string[]) => actions.length > 0;
-  const sorted = [...(orders.data?.data ?? [])].sort((a, b) => Number(waiting(b.actions)) - Number(waiting(a.actions)));
+  // Those waiting on the reader first within each page, so a page loading later never moves rows already seen.
+  const sorted = pagedItems(orders.data?.pages.map(page => ({ ...page, data: [...page.data].sort((a, b) => Number(waiting(b.actions)) - Number(waiting(a.actions))) })));
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={styles.chips}>
         <Chip label="Buying" selected={role === 'buying'} onPress={() => setRole('buying')} />
         <Chip label="Selling" selected={role === 'selling'} onPress={() => setRole('selling')} />
       </View>
-      {orders.data?.waiting ? <ThemedText type="smallBold" style={styles.waiting}>{`${orders.data.waiting} waiting for you`}</ThemedText> : null}
+      {paged.first?.waiting ? <ThemedText type="smallBold" style={styles.waiting}>{`${paged.first.waiting} waiting for you`}</ThemedText> : null}
       {orders.isPending ? (
         <Loading />
-      ) : orders.isError ? (
+      ) : orders.isLoadingError ? (
         <Failed error={orders.error} retry={() => void orders.refetch()} />
       ) : (
         <FlatList
           data={sorted}
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}
-          refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={() => void orders.refetch()} tintColor={theme.primary} />}
+          {...pagedListProps(paged, theme.primary)}
           ListEmptyComponent={
             <Empty
               title={role === 'buying' ? 'No buy orders yet' : 'No buy orders for your listings yet'}

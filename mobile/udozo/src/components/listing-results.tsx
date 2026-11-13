@@ -1,9 +1,10 @@
 import type { ShopSearch } from '@shared/classifieds';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 
 import { ListingCard } from '@/components/listing-card';
+import { ListFooter } from '@/components/paged-list';
 import { Empty, Failed, Loading } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -45,7 +46,7 @@ export function ListingResults({ params, header, empty }: { params: SearchParams
       ListHeaderComponent={header}
       renderItem={({ item }) => <ListingCard listing={item} fill />}
       onEndReachedThreshold={0.6}
-      onEndReached={() => results.hasNextPage && !results.isFetchingNextPage && results.fetchNextPage()}
+      onEndReached={() => results.hasNextPage && !results.isFetchingNextPage && !results.isFetchNextPageError && results.fetchNextPage()}
       refreshControl={<RefreshControl refreshing={results.isRefetching && !results.isFetchingNextPage} onRefresh={() => void results.refetch()} tintColor={theme.primary} />}
       ListEmptyComponent={
         results.isPending && params ? (
@@ -56,7 +57,7 @@ export function ListingResults({ params, header, empty }: { params: SearchParams
           <Empty title={empty?.title ?? 'Nothing here yet'} body={empty?.body} />
         )
       }
-      ListFooterComponent={results.isFetchingNextPage ? <Loading label="Loading more" /> : <View style={{ height: Spacing.six }} />}
+      ListFooterComponent={<ListFooter list={results} />}
     />
   );
 }

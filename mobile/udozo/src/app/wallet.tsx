@@ -6,9 +6,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Banknote, Copy, Landmark } from 'lucide-react-native';
 import { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { AccountPending } from '@/components/account-pending';
+import { ListFooter, usePagedList } from '@/components/paged-list';
 import { SignedOut } from '@/components/signed-out';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, Empty, Failed, Field, FormError, Loading, Page, Sheet, fieldError } from '@/components/ui';
@@ -27,7 +28,7 @@ const returnUrl = (currency: string) => `https://udozo.com/account/wallet?wallet
  * card, bank app or mobile money on the gateway's own page in an in-app browser, the customer's own account number
  * to transfer into (with the BVN in Nigeria, passed to the bank and never kept), and what moved. Sandbox builds
  * finish top-ups and transfers with Simulate. The balance is spent on Udozo and never withdrawn: sales are paid out
- * from Payouts.
+ * from Payouts. What moved loads more as the customer scrolls.
  */
 export default function WalletScreen() {
   const theme = useTheme();
@@ -39,7 +40,8 @@ export default function WalletScreen() {
   const [opening, setOpening] = useState(false);
   const [topUpId, setTopUpId] = useState<string | null>(null);
   const wallet = useQuery({ queryKey: ['wallet', currency ?? 'primary'], enabled: Boolean(customer), queryFn: () => api<StoreWallet>(`/v1/store/wallet${currency ? `?currency=${currency}` : ''}`) });
-  const history = useQuery({ queryKey: ['wallet', 'transactions'], enabled: Boolean(customer), queryFn: () => api<{ data: StoreWalletTransaction[]; has_more: boolean }>('/v1/store/wallet/transactions?limit=20') });
+  const paged = usePagedList<StoreWalletTransaction, { data: StoreWalletTransaction[]; has_more: boolean }>({ queryKey: ['wallet', 'transactions'], enabled: Boolean(customer), path: '/v1/store/wallet/transactions', paging: 'cursor', limit: 25 });
+  const history = paged.list;
   const refresh = () => {
     queries.invalidateQueries({ queryKey: ['wallet'] });
   };
@@ -57,50 +59,64 @@ export default function WalletScreen() {
   const data = wallet.data;
   const account = data.reserved_accounts[0];
   return (
-    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.page} refreshControl={<RefreshControl refreshing={wallet.isRefetching} onRefresh={refresh} tintColor={theme.primary} />}>
-      {data.mode === 'test' ? <ThemedText type="caption">Sandbox: no real money moves.</ThemedText> : null}
-      {data.wallets.length > 1 ? (
-        <View style={styles.chips}>
-          {data.wallets.map(item => (
-            <Chip key={item.currency} label={item.currency} selected={item.currency === data.currency} onPress={() => setCurrency(item.currency)} />
-          ))}
-        </View>
-      ) : null}
-      <Card style={{ backgroundColor: theme.backgroundElement }}>
-        <ThemedText type="caption">{`Your ${data.currency} wallet`}</ThemedText>
-        <ThemedText style={{ fontFamily: inter.extrabold, fontSize: 32, lineHeight: 40 }} accessibilityLabel={`Balance ${shopMoney(data.balance, data.currency)}`}>
-          {shopMoney(data.balance, data.currency)}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Spent on Udozo: UdozoPay orders and paying shops. Money from your own sales is in Payouts.
-        </ThemedText>
-        <Button title="Add funds" tone="money" disabled={!data.top_up_methods.length} onPress={() => setAdding(true)} />
-        {!data.top_up_methods.length ? <ThemedText type="caption">Adding funds by card is not open in your country yet.</ThemedText> : null}
-      </Card>
+    <>
+      <FlatList
+        style={{ backgroundColor: theme.background }}
+        contentContainerStyle={styles.page}
+        data={paged.items}
+        keyExtractor={item => item.id}
+        onEndReachedThreshold={0.6}
+        onEndReached={paged.loadMore}
+        refreshControl={<RefreshControl refreshing={wallet.isRefetching || (history.isRefetching && !history.isFetchingNextPage)} onRefresh={refresh} tintColor={theme.primary} />}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            {data.mode === 'test' ? <ThemedText type="caption">Sandbox: no real money moves.</ThemedText> : null}
+            {data.wallets.length > 1 ? (
+              <View style={styles.chips}>
+                {data.wallets.map(item => (
+                  <Chip key={item.currency} label={item.currency} selected={item.currency === data.currency} onPress={() => setCurrency(item.currency)} />
+                ))}
+              </View>
+            ) : null}
+            <Card style={{ backgroundColor: theme.backgroundElement }}>
+              <ThemedText type="caption">{`Your ${data.currency} wallet`}</ThemedText>
+              <ThemedText style={{ fontFamily: inter.extrabold, fontSize: 32, lineHeight: 40 }} accessibilityLabel={`Balance ${shopMoney(data.balance, data.currency)}`}>
+                {shopMoney(data.balance, data.currency)}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Spent on Udozo: UdozoPay orders and paying shops. Money from your own sales is in Payouts.
+              </ThemedText>
+              <Button title="Add funds" tone="money" disabled={!data.top_up_methods.length} onPress={() => setAdding(true)} />
+              {!data.top_up_methods.length ? <ThemedText type="caption">Adding funds by card is not open in your country yet.</ThemedText> : null}
+            </Card>
 
-      {topUpId ? <TopUpStatus id={topUpId} onDone={() => { setTopUpId(null); refresh(); }} /> : null}
+            {topUpId ? <TopUpStatus id={topUpId} onDone={() => { setTopUpId(null); refresh(); }} /> : null}
 
-      {data.reserved_accounts_available ? <AccountNumber account={account} needsBvn={data.reserved_account_needs_bvn} sandbox={data.mode === 'test'} opening={opening} setOpening={setOpening} onChange={refresh} /> : null}
+            {data.reserved_accounts_available ? <AccountNumber account={account} needsBvn={data.reserved_account_needs_bvn} sandbox={data.mode === 'test'} opening={opening} setOpening={setOpening} onChange={refresh} /> : null}
 
-      <Button tone="secondary" title="Payouts: money from my sales" icon={<Banknote size={18} color={theme.text} />} onPress={() => router.push('/payouts')} />
+            <Button tone="secondary" title="Payouts: money from my sales" icon={<Banknote size={18} color={theme.text} />} onPress={() => router.push('/payouts')} />
 
-      <ThemedText type="heading" accessibilityRole="header">
-        What moved
-      </ThemedText>
-      {history.isError ? <Failed error={history.error} retry={() => void history.refetch()} /> : null}
-      {history.data && !history.data.data.length ? <Empty title="Nothing yet" body="Funds you add and what you pay show here." /> : null}
-      {history.data?.data.map(item => (
-        <View key={item.id} style={[styles.row, { borderColor: theme.line }]}>
-          <View style={{ flex: 1 }}>
-            <ThemedText>{item.description}</ThemedText>
-            <ThemedText type="caption">{postedAgo(item.created_at)}</ThemedText>
+            <ThemedText type="heading" accessibilityRole="header">
+              What moved
+            </ThemedText>
+            {history.isError && !paged.items.length ? <Failed error={history.error} retry={() => void history.refetch()} /> : null}
           </View>
-          <ThemedText style={{ fontFamily: inter.bold, color: item.amount > 0 ? theme.success : theme.text }}>{`${item.amount > 0 ? '+' : '−'}${shopMoney(Math.abs(item.amount), item.currency)}`}</ThemedText>
-        </View>
-      ))}
+        }
+        ListEmptyComponent={history.isSuccess ? <Empty title="Nothing yet" body="Funds you add and what you pay show here." /> : undefined}
+        renderItem={({ item }) => (
+          <View style={[styles.row, { borderColor: theme.line }]}>
+            <View style={{ flex: 1 }}>
+              <ThemedText>{item.description}</ThemedText>
+              <ThemedText type="caption">{postedAgo(item.created_at)}</ThemedText>
+            </View>
+            <ThemedText style={{ fontFamily: inter.bold, color: item.amount > 0 ? theme.success : theme.text }}>{`${item.amount > 0 ? '+' : '−'}${shopMoney(Math.abs(item.amount), item.currency)}`}</ThemedText>
+          </View>
+        )}
+        ListFooterComponent={<ListFooter list={history} />}
+      />
 
       <AddFunds visible={adding} wallet={data} onClose={() => setAdding(false)} onStarted={id => { setAdding(false); setTopUpId(id); }} />
-    </ScrollView>
+    </>
   );
 }
 
@@ -269,7 +285,8 @@ function AccountNumber({ account, needsBvn, sandbox, opening, setOpening, onChan
 }
 
 const styles = StyleSheet.create({
-  page: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.six },
+  page: { padding: Spacing.three, paddingBottom: Spacing.six },
+  header: { gap: Spacing.three, paddingBottom: Spacing.two },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   inline: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: Spacing.two },

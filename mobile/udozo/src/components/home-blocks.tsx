@@ -29,7 +29,7 @@ export function HomeRows({ rows, withoutHero }: { rows: ResolvedHomeRow[]; witho
           <View key={row.id} style={{ gap: Spacing.two }}>
             {row.title ? <Heading title={row.title} href={row.view_all_href} /> : null}
             {row.blocks.filter(visible).map(block => (
-              <Block key={block.id} block={block} titled={!row.title} />
+              <Block key={block.id} block={block} titled={!row.title} rowHref={row.view_all_href} rowTitle={row.title} />
             ))}
           </View>
         ))}
@@ -64,7 +64,7 @@ function Heading({ title, href }: { title: string; href?: string | null }) {
   );
 }
 
-function Block({ block, titled }: { block: ResolvedHomeSection; titled: boolean }) {
+function Block({ block, titled, rowHref, rowTitle }: { block: ResolvedHomeSection; titled: boolean; rowHref?: string | null; rowTitle?: string | null }) {
   const title = 'title' in block && typeof block.title === 'string' && titled ? block.title : null;
   switch (block.type) {
     case 'deals_rail':
@@ -73,10 +73,13 @@ function Block({ block, titled }: { block: ResolvedHomeSection; titled: boolean 
     case 'listing_group':
     case 'listing_marquee': {
       const data = block.data as { items: HomeCard[]; view_all_href?: string | null; heading?: string };
+      const heading = title ? (block.type === 'top_selling_rail' ? (data.heading ?? title) : title) : null;
+      // The rail's last card opens where its heading's See all does: the block's own, else its row's.
+      const more = data.view_all_href ?? rowHref ?? null;
       return (
         <View style={{ gap: Spacing.two }}>
-          {title ? <Heading title={block.type === 'top_selling_rail' ? (data.heading ?? title) : title} href={data.view_all_href} /> : null}
-          <ListingRail items={data.items} testID={`rail-${block.id}`} />
+          {heading ? <Heading title={heading} href={data.view_all_href} /> : null}
+          <ListingRail items={data.items} testID={`rail-${block.id}`} seeAll={more ? { label: heading ?? rowTitle ?? 'listings', onPress: () => openLink(more) } : undefined} />
         </View>
       );
     }

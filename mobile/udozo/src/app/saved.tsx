@@ -1,19 +1,19 @@
-import { shopMoney, type ShopFavourites } from '@shared/classifieds';
-import { useQuery } from '@tanstack/react-query';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { shopMoney, type ShopFavourite, type ShopFavourites } from '@shared/classifieds';
+import { FlatList, StyleSheet, View } from 'react-native';
 
 import { ListingCard } from '@/components/listing-card';
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { ThemedText } from '@/components/themed-text';
 import { Empty, Failed, Loading } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api } from '@/lib/api';
 
-/** Listings the customer saved, two to a row, each saying when its price fell or it sold. */
+/** Listings the customer saved, two to a row, each saying when its price fell or it sold; more load as they scroll. */
 export default function SavedScreen() {
   const theme = useTheme();
-  const saved = useQuery({ queryKey: ['favourites'], queryFn: () => api<ShopFavourites>('/v1/classifieds/favourites?limit=100') });
-  const items = (saved.data?.data ?? []).filter(item => item.listing);
+  const paged = usePagedList<ShopFavourite, ShopFavourites>({ queryKey: ['favourites', 'list'], path: '/v1/classifieds/favourites', paging: 'offset', keyOf: item => item.listing_id });
+  const saved = paged.list;
+  const items = paged.items.filter(item => item.listing);
   return (
     <FlatList
       data={items}
@@ -21,7 +21,7 @@ export default function SavedScreen() {
       numColumns={2}
       columnWrapperStyle={{ gap: Spacing.three }}
       contentContainerStyle={styles.list}
-      refreshControl={<RefreshControl refreshing={saved.isRefetching} onRefresh={() => void saved.refetch()} tintColor={theme.primary} />}
+      {...pagedListProps(paged, theme.primary)}
       renderItem={({ item }) => (
         <View style={{ flex: 1, gap: 4 }}>
           <ListingCard listing={item.listing!} />

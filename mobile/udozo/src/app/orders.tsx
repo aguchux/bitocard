@@ -1,24 +1,29 @@
-import { buyerOrderLabels, sellerOrderLabels, shopMoney, type ShopOrders } from '@shared/classifieds';
-import { useQuery } from '@tanstack/react-query';
+import { buyerOrderLabels, sellerOrderLabels, shopMoney, type ShopOrder, type ShopOrders } from '@shared/classifieds';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { pagedListProps, usePagedList } from '@/components/paged-list';
 import { ThemedText } from '@/components/themed-text';
 import { Chip, Empty, Failed, Loading } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api } from '@/lib/api';
 import { orderNext, orderOpen } from '@/lib/money';
+import { pagedItems } from '@/lib/paging';
 
-/** UdozoPay orders (udozo.com's /account/orders): buying or selling, those still going first, each with what to do next. */
+/**
+ * UdozoPay orders (udozo.com's /account/orders): buying or selling, those still going first, each with what to do
+ * next; more load as they scroll.
+ */
 export default function OrdersScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ role?: string }>();
   const [role, setRole] = useState<'buying' | 'selling'>(params.role === 'selling' ? 'selling' : 'buying');
-  const orders = useQuery({ queryKey: ['orders', role], queryFn: () => api<ShopOrders>(`/v1/classifieds/orders?role=${role}&limit=50`) });
-  const sorted = [...(orders.data?.data ?? [])].sort((a, b) => Number(orderOpen(b.status)) - Number(orderOpen(a.status)));
+  const paged = usePagedList<ShopOrder, ShopOrders>({ queryKey: ['orders', 'list', role], path: `/v1/classifieds/orders?role=${role}`, paging: 'offset' });
+  const orders = paged.list;
+  // Those still going first within each page, so a page loading later never moves rows already seen.
+  const sorted = pagedItems(orders.data?.pages.map(page => ({ ...page, data: [...page.data].sort((a, b) => Number(orderOpen(b.status)) - Number(orderOpen(a.status))) })));
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={styles.chips}>
@@ -27,14 +32,14 @@ export default function OrdersScreen() {
       </View>
       {orders.isPending ? (
         <Loading />
-      ) : orders.isError ? (
+      ) : orders.isLoadingError ? (
         <Failed error={orders.error} retry={() => void orders.refetch()} />
       ) : (
         <FlatList
           data={sorted}
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}
-          refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={() => void orders.refetch()} tintColor={theme.primary} />}
+          {...pagedListProps(paged, theme.primary)}
           ListEmptyComponent={<Empty title={role === 'buying' ? 'No UdozoPay orders yet' : 'No UdozoPay sales yet'} body={role === 'buying' ? 'Buy with UdozoPay on a listing: Udozo holds your money until you have the item.' : 'When a buyer pays with UdozoPay for something you sell, it shows here.'} />}
           renderItem={({ item }) => {
             const total = item.role === 'buyer' ? (item.total ?? item.price) : (item.payout ?? item.price);
