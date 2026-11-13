@@ -62,3 +62,10 @@ test('money places open in the app: the wallet, payouts, the identity check, ord
   assert.deepEqual(appLink(`https://udozo.com/pay/pw_${'b'.repeat(32)}`), { route: `/pay/pw_${'b'.repeat(32)}` });
   assert.deepEqual(appLink('/ng/l/77-chair/buy'), { route: '/listing/77?country=NG' });
 });
+
+test('buy orders open in the app', () => {
+  const id = '3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b';
+  assert.deepEqual(appLink('/account/buy-orders'), { route: '/buy-orders' });
+  assert.deepEqual(appLink(`https://udozo.com/account/buy-orders/${id}`), { route: `/buy-order/${id}` });
+  assert.deepEqual(appLink(`udozo://buy-order/${id}`), { route: `/buy-order/${id}` });
+});

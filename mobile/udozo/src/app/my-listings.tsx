@@ -1,4 +1,4 @@
-import { shopPriceText, type ShopListingStatus, type ShopMyListing, type ShopMyListings } from '@shared/classifieds';
+import { shopMoney, shopPriceText, type ShopBuyOrder, type ShopListingStatus, type ShopMyListing, type ShopMyListings } from '@shared/classifieds';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -10,6 +10,7 @@ import { Button, Chip, Empty, Failed, Field, FormError, Loading, Sheet } from '@
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
+import { buyOrderPath } from '@/lib/buy-orders';
 import { listingActions, listingGroups } from '@/lib/listing-form';
 import { openLink } from '@/lib/navigate';
 import { photoUrl } from '@/lib/photo';
@@ -37,6 +38,8 @@ export default function MyListingsScreen() {
   const [status, setStatus] = useState<ShopListingStatus>((listingGroups.find(group => group.status === params.status)?.status as ShopListingStatus) ?? 'active');
   const [restocking, setRestocking] = useState<ShopMyListing | null>(null);
   const [units, setUnits] = useState('1');
+  /** Mark sold on a listing with accepted buy orders: who bought it. */
+  const [soldTo, setSoldTo] = useState<{ listing: ShopMyListing; orders: ShopBuyOrder[] } | null>(null);
   const list = useQuery({ queryKey: ['my-listings', status], queryFn: () => api<ShopMyListings>(`/v1/classifieds/me/listings?status=${status}&limit=100`) });
 
   const done = () => {
@@ -62,6 +65,23 @@ export default function MyListingsScreen() {
       done();
     },
   });
+
+  const sellTo = useMutation({
+    mutationFn: ({ listing, order }: { listing: ShopMyListing; order: ShopBuyOrder | null }) => (order ? api(buyOrderPath(order.id, 'complete'), { body: {} }) : api(`/v1/classifieds/listings/${listing.id}/sold`, { body: {} })),
+    onSuccess: () => {
+      setSoldTo(null);
+      queries.invalidateQueries({ queryKey: ['buy-orders'] });
+      done();
+    },
+  });
+  /** Sold to a buyer whose buy order was accepted? Marked sold to them, so the sale is recorded with them. */
+  const markSold = async (listing: ShopMyListing) => {
+    const accepted = await api<{ data: ShopBuyOrder[] }>(`/v1/classifieds/me/listings/${listing.id}/buy-orders`).catch(() => ({ data: [] as ShopBuyOrder[] }));
+    if (accepted.data.length) {
+      sellTo.reset();
+      setSoldTo({ listing, orders: accepted.data });
+    } else confirm(listing, 'sold');
+  };
 
   const confirm = (listing: ShopMyListing, action: 'sold' | 'delete') =>
     Alert.alert(
@@ -120,7 +140,7 @@ export default function MyListingsScreen() {
               <View style={styles.actions}>
                 {actions.includes('edit') ? <Button title={item.status === 'draft' ? 'Carry on' : 'Edit'} tone="secondary" onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } })} /> : null}
                 {actions.includes('view') && item.url ? <Button title="See it" tone="ghost" onPress={() => openLink(item.url!)} /> : null}
-                {actions.includes('sold') ? <Button title="Mark sold" tone="ghost" onPress={() => confirm(item, 'sold')} /> : null}
+                {actions.includes('sold') ? <Button title="Mark sold" tone="ghost" onPress={() => void markSold(item)} /> : null}
                 {actions.includes('restock') ? (
                   <Button
                     title="Restock"
@@ -151,6 +171,14 @@ export default function MyListingsScreen() {
           )
         }
       />
+      <Sheet visible={Boolean(soldTo)} onClose={() => setSoldTo(null)} title="Who bought it?">
+        <ThemedText type="small">Mark it sold to the buyer, only once they have paid you and have it. The sale is recorded with them.</ThemedText>
+        {soldTo?.orders.map(order => (
+          <Button key={order.id} title={`Sold to ${order.with.name} · ${shopMoney(order.price, order.currency)}`} tone="money" loading={sellTo.isPending && sellTo.variables?.order?.id === order.id} onPress={() => sellTo.mutate({ listing: soldTo.listing, order })} />
+        ))}
+        <Button title="Sold to someone else" tone="secondary" disabled={sellTo.isPending} onPress={() => soldTo && sellTo.mutate({ listing: soldTo.listing, order: null })} />
+        <FormError error={sellTo.error} />
+      </Sheet>
       <Sheet visible={Boolean(restocking)} onClose={() => setRestocking(null)} title="How many do you have now?">
         <Field label="In stock" value={units} onChangeText={setUnits} keyboardType="number-pad" />
         <FormError error={restock.error} />

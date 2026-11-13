@@ -6,16 +6,7 @@
  */
 import type { ShopConnectAuction, ShopConnectReturn, ShopOrder, ShopReturnTransfer } from '../shared/classifieds';
 
-/** Money as `shopMoney` writes it (the shared file is not loaded under `node --test`). */
-function money(minor: number, currency: string) {
-  const value = minor / 100;
-  const digits = Number.isInteger(value) ? 0 : 2;
-  try {
-    return new Intl.NumberFormat('en-GB', { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: digits, maximumFractionDigits: 2 }).format(value);
-  } catch {
-    return `${currency} ${value.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: 2 })}`;
-  }
-}
+import { money } from './format.ts';
 
 export const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 

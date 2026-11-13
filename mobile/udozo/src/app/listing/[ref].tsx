@@ -18,6 +18,7 @@ import { FlatList, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuctionPanel } from '@/components/auction-panel';
+import { BuyOrderPanel } from '@/components/buy-order-panel';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -68,6 +69,7 @@ export default function ListingScreen() {
             {data.sale_method === 'auction' && (viewer.data?.auction ?? data.auction) ? (
               <AuctionPanel listingId={data.id} auction={(viewer.data?.auction ?? data.auction)!} currency={data.price.currency} />
             ) : null}
+            {data.sale_method !== 'auction' ? <BuyOrderPanel data={data} viewer={viewer.data ?? null} offered={customer ? Boolean(viewer.data?.buy_orders) : Boolean(market.markets.find(item => item.country === country)?.buy_orders)} /> : null}
             {data.features.length ? (
               <Card>
                 <ThemedText type="heading">Details</ThemedText>

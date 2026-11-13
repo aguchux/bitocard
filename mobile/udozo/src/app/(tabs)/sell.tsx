@@ -1,7 +1,7 @@
 import { shopPriceText, type ShopMyListings } from '@shared/classifieds';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BarChart3, Camera, LayoutList, PhoneCall } from 'lucide-react-native';
+import { BarChart3, Camera, HandCoins, LayoutList, PhoneCall } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AccountPending } from '@/components/account-pending';
@@ -75,6 +75,7 @@ export default function SellScreen() {
       <View>
         <MenuRow icon={<LayoutList size={20} color={theme.primary} />} title="My listings" onPress={() => router.push('/my-listings')} />
         <MenuRow icon={<PhoneCall size={20} color={theme.primary} />} title="Requests" detail="Contact requests and call backs" count={requests.data?.pending} onPress={() => router.push('/requests')} />
+        <MenuRow icon={<HandCoins size={20} color={theme.primary} />} title="Buy orders" detail="Buyers asking to buy" onPress={() => router.push({ pathname: '/buy-orders', params: { role: 'selling' } })} />
         <MenuRow icon={<BarChart3 size={20} color={theme.primary} />} title="Dashboard" detail="Views, leads and sales" onPress={() => router.push('/dashboard')} />
       </View>
     </Page>
