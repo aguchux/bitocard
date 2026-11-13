@@ -69,3 +69,9 @@ test('buy orders open in the app', () => {
   assert.deepEqual(appLink(`https://udozo.com/account/buy-orders/${id}`), { route: `/buy-order/${id}` });
   assert.deepEqual(appLink(`udozo://buy-order/${id}`), { route: `/buy-order/${id}` });
 });
+
+test('My Resellers opens in the app', () => {
+  const id = '3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b';
+  assert.deepEqual(appLink('/account/resellers'), { route: '/resellers' });
+  assert.deepEqual(appLink(`/account/resellers/${id}`), { route: `/reseller/${id}` });
+});

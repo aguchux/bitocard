@@ -1,7 +1,7 @@
-import { shopPriceText, type ShopMyListings } from '@shared/classifieds';
+import { shopPriceText, type ShopMyListings, type ShopReseller } from '@shared/classifieds';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BarChart3, Camera, HandCoins, LayoutList, PhoneCall } from 'lucide-react-native';
+import { BarChart3, Camera, HandCoins, LayoutList, PhoneCall, Store } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AccountPending } from '@/components/account-pending';
@@ -15,7 +15,7 @@ import { api } from '@/lib/api';
 
 /**
  * Sell: Post an ad from the camera, the drafts to carry on, and the seller's places (My listings, Requests with what
- * waits, Dashboard).
+ * waits, buy orders, Dashboard, and My Resellers once resellers carry their listings).
  */
 export default function SellScreen() {
   const theme = useTheme();
@@ -23,6 +23,8 @@ export default function SellScreen() {
   const signedIn = Boolean(customer) && !pending;
   const drafts = useQuery({ queryKey: ['my-listings', 'draft'], enabled: signedIn, queryFn: () => api<ShopMyListings>('/v1/classifieds/me/listings?status=draft&limit=100') });
   const requests = useQuery({ queryKey: ['requests'], enabled: signedIn, queryFn: () => api<{ pending: number }>('/v1/classifieds/me/contact-requests?limit=100') });
+  const resellers = useQuery({ queryKey: ['resellers'], enabled: signedIn, retry: false, queryFn: () => api<{ data: ShopReseller[] }>('/v1/classifieds/me/resellers') });
+  const resellerWaiting = (resellers.data?.data ?? []).reduce((sum, item) => sum + item.notes_pending + item.unread, 0);
 
   if (customer === undefined) return <AccountPending />;
   if (customer === null) {
@@ -77,6 +79,9 @@ export default function SellScreen() {
         <MenuRow icon={<PhoneCall size={20} color={theme.primary} />} title="Requests" detail="Contact requests and call backs" count={requests.data?.pending} onPress={() => router.push('/requests')} />
         <MenuRow icon={<HandCoins size={20} color={theme.primary} />} title="Buy orders" detail="Buyers asking to buy" onPress={() => router.push({ pathname: '/buy-orders', params: { role: 'selling' } })} />
         <MenuRow icon={<BarChart3 size={20} color={theme.primary} />} title="Dashboard" detail="Views, leads and sales" onPress={() => router.push('/dashboard')} />
+        {resellers.data?.data.length ? (
+          <MenuRow icon={<Store size={20} color={theme.primary} />} title="My Resellers" detail="Stores selling your listings" count={resellerWaiting || undefined} onPress={() => router.push('/resellers')} />
+        ) : null}
       </View>
     </Page>
   );

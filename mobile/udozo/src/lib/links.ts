@@ -9,7 +9,7 @@ export type AppLink = { route: string } | { web: string };
 const site = 'https://udozo.com';
 const ownHosts = new Set(['udozo.com', 'www.udozo.com']);
 /** The app's own screens, reachable by `udozo://<route>` links. */
-const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings', 'wallet', 'payouts', 'identity', 'orders', 'order', 'checkout', 'pay', 'scan', 'buy-orders', 'buy-order']);
+const appRoutes = new Set(['listing', 'chat', 'chats', 'seller', 'brand', 'category', 'search', 'notifications', 'saved', 'me', 'post', 'my-listings', 'requests', 'dashboard', 'username', 'settings', 'wallet', 'payouts', 'identity', 'orders', 'order', 'checkout', 'pay', 'scan', 'buy-orders', 'buy-order', 'resellers', 'reseller']);
 
 /** A link the phone hands the app that is not Udozo's (another app's sign-in return, such as Facebook's `fb<id>://`). */
 export function foreignScheme(href: string) {
@@ -47,6 +47,7 @@ export function appLink(href: string): AppLink {
     if (second === 'wallet') return { route: `/wallet${query({ wallet: url.searchParams.get('wallet') })}` };
     if (second === 'payouts' || second === 'udozopay') return { route: '/payouts' };
     if (second === 'verification') return { route: '/identity' };
+    if (second === 'resellers') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/reseller/${third}` : '/resellers' };
     if (second === 'buy-orders') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/buy-order/${third}` : '/buy-orders' };
     if (second === 'orders') return { route: third && /^[0-9a-f-]{36}$/i.test(third) ? `/order/${third}` : '/orders' };
     if (second === 'profile' && third === 'username') return { route: '/username' };
