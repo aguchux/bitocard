@@ -7,6 +7,27 @@ import SellerScreen from '@/app/seller/[key]';
 
 import { answers, mockedApi, renderScreen } from './helpers';
 
+// The banner's gradients, as drawn: each stop's props and each drawing's size.
+const mockSvg: { stops: Record<string, unknown>[]; sizes: { width: unknown; height: unknown }[] } = { stops: [], sizes: [] };
+jest.mock('react-native-svg', () => {
+  const draw = ({ children }: { children?: unknown }) => children ?? null;
+  return {
+    __esModule: true,
+    default: (props: { width: unknown; height: unknown; children?: unknown }) => {
+      mockSvg.sizes.push({ width: props.width, height: props.height });
+      return props.children ?? null;
+    },
+    Defs: draw,
+    LinearGradient: draw,
+    Rect: () => null,
+    Stop: (props: Record<string, unknown>) => {
+      mockSvg.stops.push(props);
+      return null;
+    },
+    Path: () => null,
+  };
+});
+
 const mockAccount = { customer: null as unknown, pending: false };
 jest.mock('@/lib/account', () => ({ useAccount: () => mockAccount }));
 const mockCalls = { busy: false, start: jest.fn() };
@@ -142,4 +163,15 @@ test('their own page offers Edit profile instead of Chat and Call', async () => 
   expect(await screen.findByLabelText('Edit profile')).toBeTruthy();
   expect(screen.queryByLabelText('Chat with seller')).toBeNull();
   expect(screen.queryByLabelText('Call seller')).toBeNull();
+});
+
+test('the cover’s fade is see-through and drawn over the whole banner, never a black block', async () => {
+  serve(profile({ banner_url: 'https://cdn.udozo.com/cover.jpg' }));
+  await renderScreen(<SellerScreen />);
+  fireEvent(await screen.findByTestId('seller-banner'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 412, height: 300 } } });
+  await waitFor(() => expect(mockSvg.stops.length).toBeGreaterThan(0));
+  // Opacity in stopOpacity, never an rgba colour (which Android draws opaque), and sized to the banner as measured.
+  for (const stop of mockSvg.stops) expect(String(stop.stopColor)).not.toMatch(/rgba/);
+  expect(mockSvg.stops.some(stop => stop.stopOpacity === 0)).toBe(true);
+  expect(mockSvg.sizes).toContainEqual({ width: 412, height: 300 });
 });

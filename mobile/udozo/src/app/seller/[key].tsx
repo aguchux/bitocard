@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { ArrowLeft, BadgeCheck, MessageCircle, Pencil, PhoneCall } from 'lucide-react-native';
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -111,17 +111,23 @@ export default function SellerScreen() {
 function Banner({ data, top }: { data: ShopSellerProfile; top: number }) {
   const theme = useTheme();
   const since = new Date(data.member_since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  // The fades are drawn at the banner's measured size: an SVG sized by percentages is not always laid out over the whole
+  // of it on Android.
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
-    <View style={[styles.banner, { height: top + bannerHeight, backgroundColor: theme.primary }]}>
+    <View
+      testID="seller-banner"
+      onLayout={event => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+      style={[styles.banner, { height: top + bannerHeight, backgroundColor: theme.primary }]}>
       {data.banner_url ? (
         <>
           <Image source={{ uri: data.banner_url }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
-          <Fade id="cover" stops={[['rgba(0,0,0,0.35)', 0], ['rgba(0,0,0,0)', 0.3], ['rgba(0,0,0,0.15)', 0.5], ['rgba(0,0,0,0.75)', 1]]} />
+          {size ? <Fade id="cover" size={size} stops={[['#000000', 0.35, 0], ['#000000', 0, 0.3], ['#000000', 0.15, 0.5], ['#000000', 0.75, 1]]} /> : null}
         </>
       ) : (
         <>
-          <Fade id="theme" diagonal stops={[[theme.accent, 0], [theme.primary, 0.55], [shade(theme.primary, 0.55), 1]]} />
-          <Fade id="foot" stops={[['rgba(0,0,0,0)', 0.5], ['rgba(0,0,0,0.3)', 1]]} />
+          {size ? <Fade id="theme" size={size} diagonal stops={[[theme.accent, 1, 0], [theme.primary, 1, 0.55], [shade(theme.primary, 0.55), 1, 1]]} /> : null}
+          {size ? <Fade id="foot" size={size} stops={[['#000000', 0, 0.5], ['#000000', 0.3, 1]]} /> : null}
         </>
       )}
       <View style={styles.who}>
@@ -147,18 +153,21 @@ function Banner({ data, top }: { data: ShopSellerProfile; top: number }) {
   );
 }
 
-/** A gradient over the whole banner: top to bottom, or corner to corner. */
-function Fade({ id, stops, diagonal }: { id: string; stops: [string, number][]; diagonal?: boolean }) {
+/**
+ * A gradient over the whole banner, top to bottom or corner to corner: each stop a colour, its opacity and where it
+ * sits. Opacity goes in `stopOpacity`, never as an rgba colour, which Android draws opaque (a black block over the cover).
+ */
+function Fade({ id, stops, diagonal, size }: { id: string; stops: [string, number, number][]; diagonal?: boolean; size: { width: number; height: number } }) {
   return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none">
+    <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} pointerEvents="none">
       <Defs>
         <LinearGradient id={id} x1="0" y1="0" x2={diagonal ? '1' : '0'} y2="1">
-          {stops.map(([color, offset]) => (
-            <Stop key={offset} offset={offset} stopColor={color} />
+          {stops.map(([color, opacity, offset]) => (
+            <Stop key={offset} offset={offset} stopColor={color} stopOpacity={opacity} />
           ))}
         </LinearGradient>
       </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+      <Rect x={0} y={0} width={size.width} height={size.height} fill={`url(#${id})`} />
     </Svg>
   );
 }
