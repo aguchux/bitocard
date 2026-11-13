@@ -30,9 +30,10 @@ export default function BrandScreen() {
             <Failed error={brand.error} retry={() => void brand.refetch()} />
           ) : data ? (
             <View style={styles.head}>
-              <View style={[styles.logo, { backgroundColor: data.color ?? theme.primary }]}>
+              {/* A logo is drawn in the brand's own colour, so it sits on white; initials sit on that colour. */}
+              <View testID="brand-logo" style={[styles.logo, { backgroundColor: data.logo_url ? '#fff' : (data.color ?? theme.primary), borderColor: theme.line }]}>
                 {data.logo_url ? (
-                  <Image source={{ uri: data.logo_url }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel={`${data.name} logo`} />
+                  <Image source={{ uri: data.logo_url }} style={styles.logoImage} contentFit="contain" accessibilityLabel={`${data.name} logo`} />
                 ) : (
                   <ThemedText style={{ color: '#fff', fontFamily: inter.extrabold }}>{brandInitials(data.name)}</ThemedText>
                 )}
@@ -56,5 +57,6 @@ export default function BrandScreen() {
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center', paddingVertical: Spacing.three },
-  logo: { width: 64, height: 64, borderRadius: Radius.medium, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  logo: { width: 64, height: 64, borderRadius: Radius.medium, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  logoImage: { width: 48, height: 48 },
 });

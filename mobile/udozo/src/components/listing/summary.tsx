@@ -4,6 +4,7 @@ import { ChevronRight, LayoutGrid, MapPin, PackageCheck, PackageX, Tag } from 'l
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { BrandLogo } from '@/components/pickers';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,7 +50,7 @@ export function ListingSummary({ data, country }: { data: ShopListingPage; count
           onPress={() => router.push({ pathname: '/category/[slug]', params: { slug: data.category.slug, country } })}
         />
         {data.brand ? (
-          <SummaryChip label={data.brand.name} hint="Open the brand's page" onPress={() => router.push({ pathname: '/brand/[slug]', params: { slug: data.brand!.slug, country } })} />
+          <SummaryChip label={data.brand.name} icon={<BrandLogo brand={data.brand} size={20} />} hint="Open the brand's page" onPress={() => router.push({ pathname: '/brand/[slug]', params: { slug: data.brand!.slug, country } })} />
         ) : null}
       </View>
       <ThemedText type="caption">{[postedAgo(data.published_at), data.sku ? `Ad ${data.sku}` : null].filter(Boolean).join(' · ')}</ThemedText>
