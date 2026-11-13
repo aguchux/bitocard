@@ -1,12 +1,15 @@
+import type { ShopHeroSlide } from '@shared/classifieds';
 import type { ClassifiedHome } from '@shared/home';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { Bell, ChevronDown, Search, Sparkles } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HeroReel } from '@/components/hero-reel';
 import { HomeRows } from '@/components/home-blocks';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Empty, Failed, Loading } from '@/components/ui';
@@ -15,11 +18,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 import { useShopAssistant } from '@/lib/assistant';
+import { shownSlides } from '@/lib/hero';
 import { useMarket } from '@/lib/market';
 
 /**
  * Home: Udozo's mark, the market (chosen once when signed out; the account's own when signed in), the bell, the search
  * box and Ask Anjio (where the market's assistant answers), then the market's home page as its admins laid it out.
+ *
+ * Where the market has hero reel columns (`GET /v1/classifieds/hero-slides`), Home opens with udozo.com's reel: a band
+ * in the theme's colour from the very top of the screen, under the status bar (its text turned light while Home is
+ * shown), holding the header and the reel, with the search box just beneath it; a strip of the same colour stays
+ * behind the status bar as the page scrolls. The reel then takes the place of the page's own hero. Without columns,
+ * Home is as before.
  */
 export default function HomeScreen() {
   const theme = useTheme();
@@ -31,47 +41,79 @@ export default function HomeScreen() {
   }, [asked, fixed, country, markets, choose]);
   const assistant = useShopAssistant(country);
   const home = useQuery({ queryKey: ['home', country], enabled: Boolean(country), queryFn: () => api<ClassifiedHome>(`/v1/classifieds/home?page=${country}`) });
+  const hero = useQuery({ queryKey: ['hero', country], enabled: Boolean(country), staleTime: 60_000, queryFn: () => api<{ data: ShopHeroSlide[] }>(`/v1/classifieds/hero-slides?page=${country}`) });
+  const slides = useMemo(() => shownSlides(hero.data?.data), [hero.data]);
+  const reel = slides.length > 0;
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  useFocusEffect(
+    useCallback(() => {
+      if (!reel) return;
+      setStatusBarStyle('light');
+      return () => setStatusBarStyle('auto');
+    }, [reel]),
+  );
   const rows = home.data?.rows ?? (home.data ? [{ id: 'all', hidden: false, title: '', subtitle: '', viewAll: null, view_all_href: null, background: 'none' as const, image: null, width: 'contained' as const, spacing: 'normal' as const, blocks: home.data.sections }] : []);
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
-      <Header />
+    <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: reel ? 0 : insets.top }}>
+      {reel ? null : <Header />}
       <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={home.isRefetching} onRefresh={() => void home.refetch()} tintColor={theme.primary} />}>
-        <Pressable
-          accessibilityRole="search"
-          accessibilityLabel="Search Udozo"
-          onPress={() => router.push('/search')}
-          style={[styles.search, { borderColor: theme.line, backgroundColor: theme.backgroundElement }]}>
-          <Search size={18} color={theme.textSecondary} />
-          <ThemedText themeColor="textSecondary">What are you looking for?</ThemedText>
-        </Pressable>
-        {assistant?.assistant ? (
-          <Button
-            tone="secondary"
-            title={`Ask ${assistant.assistant.name}`}
-            icon={<Sparkles size={18} color={theme.primary} />}
-            onPress={() => router.push({ pathname: '/assistant', params: { country: country! } })}
-            style={{ marginHorizontal: Spacing.three }}
+        contentContainerStyle={{ paddingBottom: Spacing.six }}
+        refreshControl={
+          <RefreshControl
+            refreshing={home.isRefetching}
+            onRefresh={() => {
+              void home.refetch();
+              void hero.refetch();
+            }}
+            tintColor={reel ? '#fff' : theme.primary}
+            progressViewOffset={reel ? insets.top : 0}
           />
+        }>
+        {reel ? (
+          <View testID="home-band" style={{ backgroundColor: theme.primary, paddingTop: insets.top, paddingBottom: 6 }}>
+            <Header onBand />
+            <HeroReel slides={slides} height={width < 600 ? 300 : 420} />
+          </View>
         ) : null}
-        {!country && !markets.length ? (
-          <Loading />
-        ) : home.isPending ? (
-          <Loading />
-        ) : home.isError ? (
-          <Failed error={home.error} retry={() => home.refetch()} />
-        ) : rows.length ? (
-          <HomeRows rows={rows} />
-        ) : (
-          <Empty title="Nothing for sale here yet" body="Be the first to sell on Udozo in your market." />
-        )}
+        <View style={styles.content}>
+          <Pressable
+            accessibilityRole="search"
+            accessibilityLabel="Search Udozo"
+            onPress={() => router.push('/search')}
+            style={[styles.search, { borderColor: theme.line, backgroundColor: theme.backgroundElement }]}>
+            <Search size={18} color={theme.textSecondary} />
+            <ThemedText themeColor="textSecondary">What are you looking for?</ThemedText>
+          </Pressable>
+          {assistant?.assistant ? (
+            <Button
+              tone="secondary"
+              title={`Ask ${assistant.assistant.name}`}
+              icon={<Sparkles size={18} color={theme.primary} />}
+              onPress={() => router.push({ pathname: '/assistant', params: { country: country! } })}
+              style={{ marginHorizontal: Spacing.three }}
+            />
+          ) : null}
+          {!country && !markets.length ? (
+            <Loading />
+          ) : home.isPending ? (
+            <Loading />
+          ) : home.isError ? (
+            <Failed error={home.error} retry={() => home.refetch()} />
+          ) : rows.length ? (
+            <HomeRows rows={rows} withoutHero={reel} />
+          ) : (
+            <Empty title="Nothing for sale here yet" body="Be the first to sell on Udozo in your market." />
+          )}
+        </View>
       </ScrollView>
-    </SafeAreaView>
+      {reel ? <View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, backgroundColor: theme.primary }]} /> : null}
+    </View>
   );
 }
 
-function Header() {
+/** The header: on the reel's band (`onBand`) in white with Udozo's light mark, else in the theme's colours. */
+function Header({ onBand }: { onBand?: boolean }) {
   const theme = useTheme();
   const { customer } = useAccount();
   const { country, markets, fixed, choose } = useMarket();
@@ -84,10 +126,11 @@ function Header() {
   });
   const market = markets.find(item => item.country === country);
   const count = unread.data?.count ?? 0;
+  const ink = onBand ? '#fff' : theme.text;
   return (
-    <View style={[styles.header, { borderColor: theme.line }]}>
-      <Image source={require('@/assets/images/mark.png')} style={styles.mark} accessibilityLabel="Udozo" />
-      <ThemedText style={{ fontFamily: inter.extrabold, fontSize: 20, color: theme.primary }}>Udozo</ThemedText>
+    <View style={[styles.header, onBand ? styles.bandHeader : { borderColor: theme.line }]}>
+      <Image source={onBand ? require('@/assets/images/mark-light.png') : require('@/assets/images/mark.png')} style={styles.mark} accessibilityLabel="Udozo" />
+      <ThemedText style={{ fontFamily: inter.extrabold, fontSize: 20, color: onBand ? '#fff' : theme.primary }}>Udozo</ThemedText>
       <View style={{ flex: 1 }} />
       {market ? (
         <Pressable
@@ -96,13 +139,15 @@ function Header() {
           disabled={fixed}
           onPress={() => setPicking(true)}
           style={styles.market}>
-          <ThemedText type="smallBold">{market.name}</ThemedText>
-          {fixed ? null : <ChevronDown size={16} color={theme.text} />}
+          <ThemedText type="smallBold" style={onBand ? { color: '#fff' } : undefined}>
+            {market.name}
+          </ThemedText>
+          {fixed ? null : <ChevronDown size={16} color={ink} />}
         </Pressable>
       ) : null}
       {customer ? (
         <Pressable accessibilityRole="button" accessibilityLabel={count ? `Notifications, ${count} unread` : 'Notifications'} onPress={() => router.push('/notifications')} style={styles.bell}>
-          <Bell size={22} color={theme.text} />
+          <Bell size={22} color={ink} />
           {count ? <View style={[styles.dot, { backgroundColor: theme.danger }]} /> : null}
         </Pressable>
       ) : null}
@@ -128,8 +173,10 @@ function Header() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingTop: Spacing.three, paddingBottom: Spacing.six, gap: Spacing.four, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  content: { paddingTop: Spacing.three, gap: Spacing.four, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderBottomWidth: StyleSheet.hairlineWidth },
+  bandHeader: { borderBottomWidth: 0 },
+  statusStrip: { position: 'absolute', top: 0, left: 0, right: 0 },
   mark: { width: 28, height: 28 },
   market: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing.two },
   bell: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

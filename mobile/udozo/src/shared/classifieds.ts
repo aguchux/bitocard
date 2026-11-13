@@ -1600,3 +1600,16 @@ export type ShopMyScores = {
   summary_reported: boolean;
   how_it_works: string;
 };
+
+/** How a hero reel column is split, top to bottom, in thirds of its height (the API's `heroLayouts`). */
+export type ShopHeroLayout = 'full' | 'third_two_thirds' | 'two_thirds_third' | 'thirds';
+
+/**
+ * A banner of the hero reel: its image, or (none uploaded) `photos` of what it links to (a category's, brand's or
+ * seller's live listings, or a listing's own), drawn as a collage under its words. `href` is a page of udozo.com or an
+ * https address, null when its target is gone; `ad` labels it Ad.
+ */
+export type ShopHeroTile = { id: string; image_url: string | null; photos: string[]; alt: string; href: string | null; ad: boolean };
+
+/** A column of the hero reel (`GET /v1/classifieds/hero-slides?page=global|<CC>`, `{ data: ShopHeroSlide[] }`). */
+export type ShopHeroSlide = { object: 'hero_slide'; id: string; layout: ShopHeroLayout; tiles: ShopHeroTile[] };

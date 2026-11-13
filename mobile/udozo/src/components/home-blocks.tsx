@@ -13,17 +13,19 @@ import { openLink, photoUrl } from '@/lib/navigate';
  * The market's home page as udozo.com draws it (`GET /v1/classifieds/home`), on a phone: each row's heading and See all,
  * then its blocks one under another. Listing blocks slide sideways (by hand: nothing moves by itself), categories are
  * tiles, banners and grids open what they link to through the app's own screens. Blocks a phone has no place for yet
- * (stores, countries, the trust bar, For you) are left out.
+ * (stores, countries, the trust bar, For you) are left out. While the hero reel shows above them (`withoutHero`), the page's own
+ * hero is left out too, as udozo.com does.
  */
-export function HomeRows({ rows }: { rows: ResolvedHomeRow[] }) {
+export function HomeRows({ rows, withoutHero }: { rows: ResolvedHomeRow[]; withoutHero?: boolean }) {
+  const visible = (block: ResolvedHomeSection) => shown(block) && !(withoutHero && block.type === 'home_hero');
   return (
     <View style={{ gap: Spacing.four }}>
       {rows
-        .filter(row => !row.hidden && row.blocks.some(shown))
+        .filter(row => !row.hidden && row.blocks.some(visible))
         .map(row => (
           <View key={row.id} style={{ gap: Spacing.two }}>
             {row.title ? <Heading title={row.title} href={row.view_all_href} /> : null}
-            {row.blocks.filter(shown).map(block => (
+            {row.blocks.filter(visible).map(block => (
               <Block key={block.id} block={block} titled={!row.title} />
             ))}
           </View>

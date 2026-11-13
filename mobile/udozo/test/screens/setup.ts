@@ -33,7 +33,9 @@ jest.mock('expo-router', () => {
   const React = require('react');
   const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true), setParams: jest.fn() };
   const Stack = Object.assign(({ children }: { children?: unknown }) => children ?? null, { Screen: () => null });
-  return { router, Stack, useLocalSearchParams: jest.fn(() => ({})), Link: ({ children }: { children: unknown }) => React.createElement(React.Fragment, null, children) };
+  // A focused screen's effect runs once it is drawn, as on a phone.
+  const useFocusEffect = (effect: () => void | (() => void)) => React.useEffect(effect, [effect]);
+  return { router, Stack, useFocusEffect, useLocalSearchParams: jest.fn(() => ({})), Link: ({ children }: { children: unknown }) => React.createElement(React.Fragment, null, children) };
 });
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
