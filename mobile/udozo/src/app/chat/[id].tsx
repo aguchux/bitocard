@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ChatCallButton } from '@/components/calls/call-button';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Button, Chip, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -83,9 +84,12 @@ export default function ChatScreen() {
         options={{
           title: data.with.name,
           headerRight: () => (
-            <Pressable accessibilityRole="button" accessibilityLabel="More" hitSlop={10} onPress={() => setMenu('menu')}>
-              <EllipsisVertical size={22} color={theme.primary} />
-            </Pressable>
+            <View style={styles.header}>
+              <ChatCallButton chat={data} />
+              <Pressable accessibilityRole="button" accessibilityLabel="More" hitSlop={10} onPress={() => setMenu('menu')}>
+                <EllipsisVertical size={22} color={theme.primary} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -268,6 +272,7 @@ function ChatMenu({ chat, menu, setMenu, onChange }: { chat: ShopChat; menu: 'no
 }
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four },
   strip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, padding: Spacing.three, borderBottomWidth: StyleSheet.hairlineWidth },
   thumb: { width: 44, height: 44, borderRadius: Radius.small, overflow: 'hidden' },
   messages: { padding: Spacing.three, gap: Spacing.two },

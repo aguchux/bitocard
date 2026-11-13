@@ -11,9 +11,17 @@ jest.mock('expo-secure-store', () => {
 });
 
 jest.mock('expo-notifications', () => ({
-  AndroidImportance: { DEFAULT: 3 },
+  AndroidImportance: { DEFAULT: 3, MAX: 5 },
+  AndroidNotificationVisibility: { PUBLIC: 1 },
+  AndroidNotificationPriority: { MAX: 'max' },
+  BackgroundNotificationTaskResult: { NewData: 0, NoData: 1, Failed: 2 },
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   setNotificationHandler: jest.fn(),
   setNotificationChannelAsync: jest.fn(async () => null),
+  setNotificationCategoryAsync: jest.fn(async () => null),
+  scheduleNotificationAsync: jest.fn(async () => 'notice'),
+  dismissNotificationAsync: jest.fn(async () => undefined),
+  registerTaskAsync: jest.fn(async () => null),
   getPermissionsAsync: jest.fn(async () => ({ status: 'undetermined' })),
   requestPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
   getDevicePushTokenAsync: jest.fn(async () => ({ type: 'android', data: 'fcm-test-token-0000000000' })),
@@ -54,3 +62,59 @@ jest.mock('expo-local-authentication', () => ({
 jest.mock('expo-screen-capture', () => ({ usePreventScreenCapture: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));
 jest.mock('expo-camera', () => ({ CameraView: () => null, useCameraPermissions: jest.fn(() => [{ granted: true, canAskAgain: true }, jest.fn()]) }));
+
+// Calls: the phone's call screen, WebRTC and PushKit are stand-ins (the tests that need calls also set their native
+// modules, which `callsSupported` looks for); the ring tones play nothing.
+jest.mock('expo-task-manager', () => ({ defineTask: jest.fn() }));
+jest.mock('expo-audio', () => ({ createAudioPlayer: jest.fn(() => ({ loop: false, play: jest.fn(), remove: jest.fn() })) }));
+jest.mock('react-native-webrtc', () => {
+  const track = { enabled: true, stop: jest.fn() };
+  const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+  class RTCPeerConnection {
+    static made: unknown[] = [];
+    connectionState = 'new';
+    config: unknown;
+    constructor(config: unknown) {
+      this.config = config;
+      RTCPeerConnection.made.push(this);
+    }
+    addTrack = jest.fn();
+    addEventListener = jest.fn();
+    createOffer = jest.fn(async () => ({ type: 'offer', sdp: 'offer-sdp' }));
+    createAnswer = jest.fn(async () => ({ type: 'answer', sdp: 'answer-sdp' }));
+    setLocalDescription = jest.fn(async () => undefined);
+    setRemoteDescription = jest.fn(async () => undefined);
+    addIceCandidate = jest.fn(async () => undefined);
+    close = jest.fn();
+  }
+  return {
+    RTCPeerConnection,
+    mediaDevices: { getUserMedia: jest.fn(async () => stream) },
+    permissions: { request: jest.fn(async () => true) },
+    RTCAudioSession: { audioSessionDidActivate: jest.fn(), audioSessionDidDeactivate: jest.fn() },
+  };
+});
+jest.mock('react-native-callkeep', () => ({
+  __esModule: true,
+  default: {
+    setup: jest.fn(async () => true),
+    setAvailable: jest.fn(),
+    displayIncomingCall: jest.fn(),
+    answerIncomingCall: jest.fn(),
+    startCall: jest.fn(),
+    reportConnectedOutgoingCallWithUUID: jest.fn(),
+    reportEndCallWithUUID: jest.fn(),
+    setCurrentCallActive: jest.fn(),
+    setMutedCall: jest.fn(),
+    toggleAudioRouteSpeaker: jest.fn(),
+    setAudioRoute: jest.fn(async () => undefined),
+    getAudioRoutes: jest.fn(async () => []),
+    getInitialEvents: jest.fn(async () => []),
+    clearInitialEvents: jest.fn(),
+    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  },
+}));
+jest.mock('react-native-voip-push-notification', () => ({
+  __esModule: true,
+  default: { addEventListener: jest.fn(), registerVoipToken: jest.fn(), RNVoipPushRemoteNotificationsRegisteredEvent: 'register', RNVoipPushRemoteNotificationReceivedEvent: 'notification' },
+}));

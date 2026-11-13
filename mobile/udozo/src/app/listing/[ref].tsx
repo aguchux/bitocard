@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuctionPanel } from '@/components/auction-panel';
 import { BuyOrderPanel } from '@/components/buy-order-panel';
+import { CallSellerButton } from '@/components/calls/call-button';
 import { inter, ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Failed, Field, FormError, Loading, Sheet } from '@/components/ui';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -36,7 +37,7 @@ import { reportReasons } from '@/lib/words';
 /**
  * A listing: its photos, price, title, place and condition, what the seller wrote, its features, the seller, the checks
  * to make before paying, then Save, Chat with seller and Buy with UdozoPay (or carry on the buyer's order) in a bar that
- * stays. Signed out, each asks to sign in first. Calls join this bar in phase 4.
+ * stays, with Call seller where the seller takes calls. Signed out, each asks to sign in first.
  */
 export default function ListingScreen() {
   const theme = useTheme();
@@ -317,6 +318,7 @@ function ActionBar({ data, viewer, country }: { data: ShopListingPage; viewer: S
         style={[styles.save, { borderColor: theme.line }]}>
         <Heart size={22} color={viewer?.favourite ? theme.danger : theme.text} fill={viewer?.favourite ? theme.danger : 'none'} />
       </Pressable>
+      {canChat || chatOpen ? <CallSellerButton listingId={data.id} viewer={viewer} /> : null}
       {canChat || chatOpen ? (
         <Button
           style={{ flex: 1 }}
@@ -324,9 +326,11 @@ function ActionBar({ data, viewer, country }: { data: ShopListingPage; viewer: S
           icon={<MessageCircle size={18} color={theme.onPrimary} />}
           onPress={() => (!customer ? signIn() : chatOpen ? router.push({ pathname: '/chat/[id]', params: { id: chatOpen } }) : setAsking(true))}
         />
+      ) : data.status !== 'sold' && viewer?.calls ? (
+        <CallSellerButton listingId={data.id} viewer={viewer} wide />
       ) : (
         <ThemedText type="small" themeColor="textSecondary" style={{ flex: 1 }}>
-          {data.status === 'sold' ? 'This item has been sold.' : 'The seller takes calls only. Calls in the app are coming.'}
+          {data.status === 'sold' ? 'This item has been sold.' : 'The seller takes calls only. Ask them to call you back on udozo.com.'}
         </ThemedText>
       )}
       <Sheet visible={asking} onClose={() => setAsking(false)} title="Message the seller">

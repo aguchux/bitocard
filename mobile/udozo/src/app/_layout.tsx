@@ -7,10 +7,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { AppState, Platform, useColorScheme } from 'react-native';
 
+import { CallProvider } from '@/components/calls/call-provider';
 import { UpdateGate } from '@/components/update-gate';
 import { inter } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { AccountProvider, useAccount } from '@/lib/account';
+import { handleCallResponse } from '@/lib/call-task';
 import { MarketProvider } from '@/lib/market';
 import { openLink } from '@/lib/navigate';
 import { noticeLink, registerPush } from '@/lib/push';
@@ -44,7 +46,9 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
         <MarketProvider>
-          <ThemedApp />
+          <CallProvider>
+            <ThemedApp />
+          </CallProvider>
         </MarketProvider>
       </AccountProvider>
     </QueryClientProvider>
@@ -125,9 +129,12 @@ function usePushWiring() {
       if (opened.has(id)) return;
       opened.add(id);
       Notifications.clearLastNotificationResponse();
-      const link = noticeLink(response);
-      // After the first frame, so the stack it pushes onto is there.
-      if (link) setTimeout(() => openLink(link), 0);
+      // A call's notice (Android): Answer goes to the call panel, Decline ends the call.
+      void handleCallResponse(response).then(handled => {
+        const link = handled ? null : noticeLink(response);
+        // After the first frame, so the stack it pushes onto is there.
+        if (link) setTimeout(() => openLink(link), 0);
+      });
     };
     open(Notifications.getLastNotificationResponse());
     const subscription = Notifications.addNotificationResponseReceivedListener(open);

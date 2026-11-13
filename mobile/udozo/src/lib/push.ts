@@ -3,6 +3,7 @@ import { AndroidImportance } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { api } from '@/lib/api';
+import { callPush } from '@/lib/calls';
 import { appVersion } from '@/lib/config';
 
 /**
@@ -12,8 +13,12 @@ import { appVersion } from '@/lib/config';
  * and Settings), never at launch.
  */
 
+// A call's push with the app open shows nothing: the call panel already rings (src/components/calls).
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
+  handleNotification: async notification => {
+    const call = callPush(notification.request.content.data) ?? callPush((notification.request.trigger as { remoteMessage?: { data?: unknown } } | null)?.remoteMessage?.data);
+    return call ? { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false } : { shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false };
+  },
 });
 
 export async function registerPush({ ask }: { ask: boolean }) {
