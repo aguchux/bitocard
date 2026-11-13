@@ -14,6 +14,8 @@ import { Button, Chip, Failed, Field, FormError, Loading, Sheet } from '@/compon
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api, apiUpload, privateImage } from '@/lib/api';
+import { useShopAssistant } from '@/lib/assistant';
+import { useAssistantDraft } from '@/lib/assistant-draft';
 import { preparePhoto } from '@/lib/picture';
 import { photoUrl } from '@/lib/navigate';
 import { registerPush } from '@/lib/push';
@@ -31,9 +33,10 @@ const pushAskedKey = 'udozo.push_asked';
 export default function ChatScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const session = useSession();
-  const [text, setText] = useState('');
+  // A first message Anjio drafted is put in the box for the buyer to read and send themselves.
+  const [text, setText] = useState(draft ?? '');
   const [menu, setMenu] = useState<'none' | 'menu' | 'offer' | 'report'>('none');
   const chat = useQuery({ queryKey: ['chat', id], enabled: Boolean(id), queryFn: () => api<ShopChat>(`/v1/classifieds/conversations/${id}?limit=60`), refetchInterval: 4000 });
   const refresh = () => {
@@ -66,6 +69,8 @@ export default function ChatScreen() {
     },
     onSuccess: refresh,
   });
+
+  useAssistantDraft('chat', chat.data?.listing.id, setText);
 
   if (chat.isPending) return <Loading />;
   if (chat.isError) return <Failed error={chat.error} retry={() => void chat.refetch()} />;
@@ -213,11 +218,22 @@ function ChatMenu({ chat, menu, setMenu, onChange }: { chat: ShopChat; menu: 'no
     onSuccess: () => (onChange(), setAmount(''), close()),
   });
   const report = useMutation({ mutationFn: () => api(`/v1/classifieds/conversations/${chat.id}/report`, { body: { reason, details: details.trim() || undefined } }) });
+  const assistant = useShopAssistant(chat.listing.country);
   const canOffer = chat.role === 'buyer' && !chat.open_offer && chat.listing.status === 'active' && chat.listing.price.kind !== 'on_request' && !chat.blocked.by_them && !chat.blocked.by_me;
   return (
     <>
       <Sheet visible={menu === 'menu'} onClose={close} title="This chat">
         {canOffer ? <Button tone="secondary" title="Make an offer" onPress={() => setMenu('offer')} /> : null}
+        {assistant?.assistant ? (
+          <Button
+            tone="secondary"
+            title={`Ask ${assistant.assistant.name}`}
+            onPress={() => {
+              close();
+              router.push({ pathname: '/assistant', params: { country: chat.listing.country, listing: chat.listing.id, conversation: chat.id, title: chat.listing.title } });
+            }}
+          />
+        ) : null}
         <Button tone="secondary" title="Report this chat" onPress={() => setMenu('report')} />
         <Button tone={chat.blocked.by_me ? 'secondary' : 'danger'} title={chat.blocked.by_me ? 'Unblock' : 'Block'} loading={block.isPending} onPress={() => block.mutate()} />
         <FormError error={block.error} />

@@ -1,7 +1,7 @@
 import { conditionLabels, sortLabels, type ShopCondition, type ShopSort, type ShopSuggestions } from '@shared/classifieds';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Search, X } from 'lucide-react-native';
+import { Search, Sparkles, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { Chip } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
+import { useShopAssistant } from '@/lib/assistant';
 import { useMarket } from '@/lib/market';
 
 const sorts: ShopSort[] = ['relevant', 'newest', 'price_asc', 'price_desc'];
@@ -19,7 +20,7 @@ const conditions: ShopCondition[] = ['new', 'used', 'untested', 'parts'];
 
 /**
  * Search: the words (with suggestions as they are typed), how to sort, the condition, then the market's listings two to
- * a row. A link may carry the words, a category or another market (`/search?country=&q=&category=`).
+ * a row; Ask (where the market's assistant answers) asks Anjio what was typed. A link may carry the words, a category or another market (`/search?country=&q=&category=`).
  */
 export default function SearchScreen() {
   const theme = useTheme();
@@ -31,6 +32,7 @@ export default function SearchScreen() {
   const [sort, setSort] = useState<ShopSort>('relevant');
   const [condition, setCondition] = useState<ShopCondition[]>([]);
   const [focused, setFocused] = useState(false);
+  const assistant = useShopAssistant(country);
 
   // A link with other words (a suggestion, a notice) starts that search.
   const [given, setGiven] = useState(params.q);
@@ -72,6 +74,17 @@ export default function SearchScreen() {
         {typed ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Clear" hitSlop={10} onPress={() => submit('')}>
             <X size={18} color={theme.textSecondary} />
+          </Pressable>
+        ) : null}
+        {assistant?.assistant ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Ask ${assistant.assistant.name}`}
+            hitSlop={10}
+            onPress={() => router.push({ pathname: '/assistant', params: { country, ...(typed.trim() ? { question: typed.trim() } : {}) } })}
+            style={styles.ask}>
+            <Sparkles size={16} color={theme.primary} />
+            <ThemedText type="smallBold" style={{ color: theme.primary }}>Ask</ThemedText>
           </Pressable>
         ) : null}
       </View>
@@ -133,4 +146,5 @@ const styles = StyleSheet.create({
   suggestions: { marginHorizontal: Spacing.three, borderWidth: 1, borderRadius: Radius.medium, marginBottom: Spacing.two },
   suggestion: { minHeight: 44, justifyContent: 'center', paddingHorizontal: Spacing.three },
   chips: { gap: Spacing.two },
+  ask: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
 });

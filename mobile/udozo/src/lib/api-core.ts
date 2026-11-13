@@ -45,6 +45,8 @@ export type RequestOptions = {
   idempotencyKey?: string;
   /** The app says it is the app on every call: `ios/0.1.0` or `android/0.1.0` (the API counts its sign-ups apart). */
   app?: string;
+  /** Any other headers the call needs (a visitor's assistant token). */
+  headers?: Record<string, string>;
 };
 
 /** The header the app names itself in, as the API reads it (`Udozo-App`). */
@@ -59,6 +61,7 @@ export function buildRequest(baseUrl: string, path: string, options: RequestOpti
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.session) headers[sessionHeader] = options.session;
   if (options.app) headers[appHeader] = options.app;
+  if (options.headers) Object.assign(headers, options.headers);
   if (method === 'POST') headers['Idempotency-Key'] = options.idempotencyKey ?? newKey();
   return {
     url: `${baseUrl.replace(/\/+$/, '')}${path}`,

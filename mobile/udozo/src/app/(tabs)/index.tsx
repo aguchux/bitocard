@@ -2,7 +2,7 @@ import type { ClassifiedHome } from '@shared/home';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Bell, ChevronDown, Search } from 'lucide-react-native';
+import { Bell, ChevronDown, Search, Sparkles } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,11 +14,12 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
+import { useShopAssistant } from '@/lib/assistant';
 import { useMarket } from '@/lib/market';
 
 /**
  * Home: Udozo's mark, the market (chosen once when signed out; the account's own when signed in), the bell, the search
- * box, then the market's home page as its admins laid it out.
+ * box and Ask Anjio (where the market's assistant answers), then the market's home page as its admins laid it out.
  */
 export default function HomeScreen() {
   const theme = useTheme();
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (asked && !fixed && asked !== country && markets.some(market => market.country === asked)) void choose(asked);
   }, [asked, fixed, country, markets, choose]);
+  const assistant = useShopAssistant(country);
   const home = useQuery({ queryKey: ['home', country], enabled: Boolean(country), queryFn: () => api<ClassifiedHome>(`/v1/classifieds/home?page=${country}`) });
   const rows = home.data?.rows ?? (home.data ? [{ id: 'all', hidden: false, title: '', subtitle: '', viewAll: null, view_all_href: null, background: 'none' as const, image: null, width: 'contained' as const, spacing: 'normal' as const, blocks: home.data.sections }] : []);
   return (
@@ -44,6 +46,15 @@ export default function HomeScreen() {
           <Search size={18} color={theme.textSecondary} />
           <ThemedText themeColor="textSecondary">What are you looking for?</ThemedText>
         </Pressable>
+        {assistant?.assistant ? (
+          <Button
+            tone="secondary"
+            title={`Ask ${assistant.assistant.name}`}
+            icon={<Sparkles size={18} color={theme.primary} />}
+            onPress={() => router.push({ pathname: '/assistant', params: { country: country! } })}
+            style={{ marginHorizontal: Spacing.three }}
+          />
+        ) : null}
         {!country && !markets.length ? (
           <Loading />
         ) : home.isPending ? (

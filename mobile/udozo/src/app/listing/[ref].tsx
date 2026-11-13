@@ -12,7 +12,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { BadgeCheck, Flag, Heart, MapPin, MessageCircle, Share2, ShieldCheck } from 'lucide-react-native';
+import { BadgeCheck, Flag, Heart, MapPin, MessageCircle, Share2, ShieldCheck, Sparkles } from 'lucide-react-native';
 import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +25,8 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
+import { useShopAssistant } from '@/lib/assistant';
+import { useAssistantDraft } from '@/lib/assistant-draft';
 import { listingUrl } from '@/lib/links';
 import { buyAction } from '@/lib/money';
 import { photoUrl } from '@/lib/navigate';
@@ -94,6 +96,7 @@ export default function ListingScreen() {
                 <Description text={data.description} />
               </Card>
             ) : null}
+            <AskAbout data={data} country={country} />
             <SellerCard data={data} />
             {data.category.safety_checklist.length ? (
               <Card style={{ backgroundColor: theme.backgroundElement }}>
@@ -204,6 +207,21 @@ function Description({ text }: { text: string }) {
   );
 }
 
+/** Ask Anjio about this listing, where the market's assistant answers. */
+function AskAbout({ data, country }: { data: ShopListingPage; country: string }) {
+  const theme = useTheme();
+  const assistant = useShopAssistant(country);
+  if (!assistant?.assistant || data.status !== 'active') return null;
+  return (
+    <Button
+      tone="secondary"
+      title={`Ask ${assistant.assistant.name} about this listing`}
+      icon={<Sparkles size={18} color={theme.primary} />}
+      onPress={() => router.push({ pathname: '/assistant', params: { country, listing: data.id, title: data.title } })}
+    />
+  );
+}
+
 function SellerCard({ data }: { data: ShopListingPage }) {
   const theme = useTheme();
   const seller = data.seller;
@@ -264,6 +282,14 @@ function ActionBar({ data, viewer, country }: { data: ShopListingPage; viewer: S
     },
   });
   const signIn = () => router.push('/signin');
+  // A first message Anjio drafted from this listing: into the open chat, else into Message the seller.
+  useAssistantDraft('listing', data.id, text => {
+    if (viewer?.conversation_id) router.push({ pathname: '/chat/[id]', params: { id: viewer.conversation_id, draft: text } });
+    else {
+      setBody(text);
+      setAsking(true);
+    }
+  });
 
   if (viewer?.own) {
     return (

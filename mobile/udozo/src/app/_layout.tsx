@@ -77,6 +77,7 @@ function ThemedApp() {
           <Stack.Screen name="verify" options={{ title: 'Finish your account', gestureEnabled: false }} />
           <Stack.Screen name="listing/[ref]" options={{ title: '' }} />
           <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+          <Stack.Screen name="assistant" options={{ title: 'Ask Anjio' }} />
           <Stack.Screen name="saved" options={{ title: 'Saved' }} />
           <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
