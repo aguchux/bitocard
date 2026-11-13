@@ -642,6 +642,22 @@ Views of listings opened in the app are not counted yet.
   with their chats, I found it and Close request; a seller answers with one of their listings). Rows on Sell and Me;
   `/<cc>/wanted/new`, `/account/wanted(/<id>)` open them. Rules in `src/lib/wanted.ts` (`test/wanted.test.ts`,
   `test/links.test.ts`, `test/screens/wanted.test.tsx`).
+- **Lists load more as they near the end** (`usePagedList` and `ListFooter` in `src/components/paged-list.tsx`, rules in
+  `src/lib/paging.ts`): saved, chats, notifications, My listings, UdozoPay orders, buy orders, wanted requests and the
+  wallet's transactions page with the API's own paging (offset with `total`; offset by full pages for buy orders, which
+  give no total; `starting_after` with `has_more`), as search, category, brand and seller listings already did; a
+  spinner under the list while a page loads, Try again when one fails, pull to refresh kept. Requests, contact shares,
+  resellers, a reseller's chat and payouts stay single lists: their APIs do not page. Home's and the listing page's rails
+  end with a See all card opening where the heading's See all goes (`test/paging.test.ts`, `test/screens/paging.test.tsx`).
+- **Home's banners in one sliding row, with Auctions** (`src/lib/home-banners.ts`, `SellCarousel`): a banner block of
+  two cards or more slides a card at a time, the next peeping in, a dot each; where the market sells by auction
+  (`auctions` on `GET /v1/classifieds/markets`) the first banner block ends with Bid on auctions, opening `/<cc>/auctions`,
+  the search with `sale=auction` (Auctions only, cleared with its X). A banner without a picture is a card in Udozo's
+  colour with an icon for where it goes (`test/home-banners.test.ts`, `test/screens/home-blocks.test.tsx`).
+- **The seller's page from the listing and a chat** (`openSeller` in `src/lib/navigate.ts`): the seller card's photo
+  and name open their page (username, else handle), as the contact row's Seller page does; in a chat the other
+  person's name in the header opens theirs, the conversations API now giving `with.handle` and `with.username`
+  (`test/screens/listing.test.tsx`, the API's `test/classifieds-conversations.test.mjs`).
 
 ## Testing
 
