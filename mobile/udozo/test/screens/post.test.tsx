@@ -179,7 +179,8 @@ test('the photos step sends a video with its progress, never holds the ad back w
   await renderScreen(<PostScreen />);
   expect(await screen.findByText('Add a video (optional)')).toBeTruthy();
 
-  await fireEvent.press(screen.getByText('Add a video'));
+  await fireEvent.press(screen.getByText('Choose a video'));
+  expect(pickVideo).toHaveBeenCalledWith('library');
   await waitFor(() => expect(uploadListingVideo).toHaveBeenCalledWith('l1', expect.objectContaining({ type: 'video/mp4' }), expect.any(Function)));
   await act(async () => progress(40));
   expect(screen.getByText('Sending video (40%)')).toBeTruthy();
@@ -201,8 +202,30 @@ test('the photos step sends a video with its progress, never holds the ad back w
   await fireEvent.press(screen.getByText('Remove the video'));
   await waitFor(() => expect(removed).toEqual(['v1']));
   (uploadListingVideo as jest.Mock).mockReturnValue({ done: Promise.reject(refused(409, 'video_exists', 'This listing already has a video. Remove it first.')), abort: jest.fn() });
-  await fireEvent.press(await screen.findByText('Add a video'));
+  await fireEvent.press(await screen.findByText('Choose a video'));
   expect(await screen.findByText('This ad already has a video. Remove it first, then add another.')).toBeTruthy();
+});
+
+test('Record a video records with the camera and sends it through the same path, or says how to allow the camera', async () => {
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'l1' });
+  answers({
+    ...base,
+    'GET /v1/classifieds/terms': { version: '2026-11-10', path: '/legal/terms', accepted: true, previous_version: null },
+    'GET /v1/classifieds/me/listings/l1': () => listing({ title: 'iPhone', photos: [], video: null }),
+  });
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  (pickVideo as jest.Mock).mockResolvedValueOnce({ video: null, refused: true });
+  await renderScreen(<PostScreen />);
+  await fireEvent.press(await screen.findByText('Record a video'));
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Camera turned off', expect.any(String), expect.any(Array)));
+  expect(uploadListingVideo).not.toHaveBeenCalled();
+
+  (pickVideo as jest.Mock).mockResolvedValueOnce({ video: { uri: 'file:///rec.mov', name: 'rec.mov', type: 'video/quicktime' } });
+  (uploadListingVideo as jest.Mock).mockReturnValue({ done: Promise.resolve(), abort: jest.fn() });
+  await fireEvent.press(screen.getByText('Record a video'));
+  expect(pickVideo).toHaveBeenLastCalledWith('camera');
+  await waitFor(() => expect(uploadListingVideo).toHaveBeenCalledWith('l1', expect.objectContaining({ type: 'video/quicktime' }), expect.any(Function)));
+  alert.mockRestore();
 });
 
 test('brand and model come from their lists, a typed one is kept, and the title offers both', async () => {

@@ -105,14 +105,15 @@
         "expo-image-picker",
         {
           "photosPermission": "Udozo uses your photos when you add them to an ad or a chat.",
-          "cameraPermission": "Udozo uses the camera when you take photos for an ad or a chat."
+          "cameraPermission": "Udozo uses the camera when you take photos or record a video for an ad or a chat.",
+          "microphonePermission": "Udozo uses the microphone for the sound of a video you record for an ad."
         }
       ],
       [
         "expo-camera",
         {
           "cameraPermission": "Udozo uses the camera to take photos for an ad or a chat, and to scan a shop's code to pay.",
-          "microphonePermission": false,
+          "microphonePermission": "Udozo uses the microphone for the sound of a video you record for an ad.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }

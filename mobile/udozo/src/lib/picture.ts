@@ -46,11 +46,21 @@ export async function uploadListingPhoto(listingId: string, photo: PickedPhoto) 
 export type PickedVideo = { uri: string; name: string; type: string };
 
 /**
- * A video from the library for a listing (the system picker needs no permission), or none when the seller cancels. A
- * file Udozo would refuse (not MP4, MOV or WebM, over 50 MB or 60 seconds) comes back as `problem`, before anything is sent.
+ * A video for a listing, chosen from the library (the system picker needs no permission) or recorded with the camera (60
+ * seconds at most, asking for the camera first), or none when the seller cancels. `refused` says the camera was turned
+ * down. A file Udozo would refuse (not MP4, MOV or WebM, over 50 MB or 60 seconds) comes back as `problem`, before
+ * anything is sent.
  */
-export async function pickVideo(): Promise<{ video: PickedVideo | null; problem?: string }> {
-  const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, videoMaxDuration: 60 });
+export async function pickVideo(from: 'library' | 'camera' = 'library'): Promise<{ video: PickedVideo | null; problem?: string; refused?: boolean }> {
+  let picked: ImagePicker.ImagePickerResult;
+  if (from === 'camera') {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return { video: null, refused: true };
+    // Medium quality keeps a minute of video well under the 50 MB Udozo takes.
+    picked = await ImagePicker.launchCameraAsync({ mediaTypes: ['videos'], videoMaxDuration: 60, videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium });
+  } else {
+    picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, videoMaxDuration: 60 });
+  }
   const asset = picked.canceled ? null : picked.assets[0];
   if (!asset) return { video: null };
   const name = asset.fileName ?? asset.uri.split('/').pop() ?? 'video.mp4';

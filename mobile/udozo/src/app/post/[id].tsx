@@ -19,7 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Camera, Film, Images, Sparkles, Star, Trash2, X } from 'lucide-react-native';
+import { Camera, Film, Images, Sparkles, Star, Trash2, Video, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -294,11 +294,18 @@ export default function PostScreen() {
   };
 
   /** The video, optional: sent with its progress, then prepared by Udozo while the seller carries on. */
-  const addVideo = async () => {
+  const addVideo = async (from: 'library' | 'camera') => {
     const id = listingId ?? (await save());
     if (!id) return;
     setVideoError(null);
-    const { video, problem: refusal } = await pickVideo().catch(() => ({ video: null, problem: undefined }));
+    const { video, problem: refusal, refused } = await pickVideo(from).catch(() => ({ video: null, problem: undefined, refused: false }));
+    if (refused) {
+      Alert.alert('Camera turned off', "Allow Udozo to use your camera in your phone's settings.", [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open settings', onPress: () => Linking.openSettings() },
+      ]);
+      return;
+    }
     if (refusal) setVideoError(refusal);
     if (!video) return;
     setVideoSend(0);
@@ -515,7 +522,7 @@ export default function PostScreen() {
               ) : null}
               {problem('photos') ? <ThemedText style={{ color: theme.danger }}>{problem('photos')}</ThemedText> : null}
               {!offers.shopOnly ? (
-                <VideoRow video={listing.data?.video ?? null} sending={videoSend} error={videoError} onAdd={() => void addVideo()} onStop={cancelVideo} onRemove={id => void removePhoto(id)} />
+                <VideoRow video={listing.data?.video ?? null} sending={videoSend} error={videoError} onAdd={from => void addVideo(from)} onStop={cancelVideo} onRemove={id => void removePhoto(id)} />
               ) : null}
             </>
           ) : null}
@@ -909,14 +916,14 @@ function FeatureField({ feature, value, onChange, onPick }: { feature: ShopFeatu
 }
 
 /**
- * The ad's video (optional, as on udozo.com): Add a video, then sending with how much has gone, prepared by Udozo, ready
+ * The ad's video (optional, as on udozo.com): Choose a video or Record a video, then sending with how much has gone, prepared by Udozo, ready
  * with its poster, or why it could not be used; Remove takes it off. One still being prepared never holds the ad back.
  */
 function VideoRow({ video, sending, error, onAdd, onStop, onRemove }: {
   video: ShopMyListing['video'];
   sending: number | null;
   error: string | null;
-  onAdd: () => void;
+  onAdd: (from: 'library' | 'camera') => void;
   onStop: () => void;
   onRemove: (id: string) => void;
 }) {
@@ -952,7 +959,10 @@ function VideoRow({ video, sending, error, onAdd, onStop, onRemove }: {
       ) : video ? (
         <Button title="Remove the video" tone="secondary" icon={<Trash2 size={18} color={theme.text} />} onPress={() => onRemove(video.id)} />
       ) : (
-        <Button title="Add a video" tone="secondary" icon={<Film size={18} color={theme.text} />} onPress={onAdd} />
+        <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+          <Button title="Choose a video" tone="secondary" icon={<Film size={18} color={theme.text} />} onPress={() => onAdd('library')} style={{ flex: 1 }} />
+          <Button title="Record a video" tone="secondary" icon={<Video size={18} color={theme.text} />} onPress={() => onAdd('camera')} style={{ flex: 1 }} />
+        </View>
       )}
     </Card>
   );
