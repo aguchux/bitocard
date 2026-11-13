@@ -51,7 +51,15 @@ The bundle ID and package are `com.udozo.app`, and can change until the store ac
 - **Ask Anjio:** `src/app/assistant.tsx`; answers stream through `expo/fetch` (React Native's own fetch cannot read a
   body as it arrives) and their few HTML tags are drawn as text by `src/lib/answer-html.ts`, never in a web view.
 - **WhatsApp:** Settings > WhatsApp (`src/app/whatsapp.tsx`) connects the customer's number with `LINK <code>`.
-- **Calls** are still to build (the plan's phase 4).
+- **Calls** (0.4.0, the version the API rings phones from): Call seller on a listing and Call in a chat ring the
+  other side through Cloudflare's relay only (react-native-webrtc). The engine and its rules are `src/lib/call-engine.ts`
+  and `src/lib/calls.ts` (free of React Native, under `node --test`), the panel and presence `src/components/calls`,
+  the phone's own call screen `src/lib/call-system.ts` (react-native-callkeep: CallKit, Android's ConnectionService
+  self-managed). With the app closed, iPhones ring from a VoIP push reported to CallKit natively
+  (`plugins/with-udozo-calls.js` adds PushKit to the AppDelegate), Android from Firebase's data message through
+  expo-notifications' background task (`src/lib/call-task.ts`, defined in `index.ts`, the app's entry). Calls need
+  a development build: Expo Go has none of these native modules, and the app offers no calls there. What real phones
+  must still prove is in the plan's Build progress. Ring tones: `python scripts/call-tones.py`.
 - **Shared types:** `src/shared` holds copies of udozo.com's `packages/api-client/src/classifieds.ts`, `home.ts` and
   `storefront.ts`, imported as `@shared/...`; `test/shared.test.ts` fails when they drift.
 - **Build-time settings** (EAS environment variables, read by `app.config.ts`): `GOOGLE_WEB_CLIENT_ID`,

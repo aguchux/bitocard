@@ -503,17 +503,68 @@ Views of listings opened in the app are not counted yet.
     opens WhatsApp with `LINK <code>` ready to send, I sent it reads `GET /v1/store/account/whatsapp` again; once
     connected, Chats and Notices on WhatsApp (`PATCH … { chats | alerts }`), Let buyers WhatsApp me directly
     (`{ direct }`, asked first) and Disconnect (`DELETE`, asked first). `/account/profile/whatsapp` opens it.
-- **Still to build (next agent):** calls (below), then the 0.4.0 release.
-- **Phase 4: Ask Anjio and the WhatsApp screen are built (above); calls are not started.** What calls need:
-  - **Calls in the app:** `react-native-webrtc`, relay only, through Cloudflare TURN.
-    - Routes: `POST /v1/classifieds/listings/:id/calls`, `POST /v1/classifieds/conversations/:id/calls`, `…/calls/:id/answer|end`, `POST …/calls/:id/signals`, `GET …/calls/:id?after=` (poll every second while connecting, 3 once connected), and presence `POST /v1/classifieds/presence`.
-    - udozo.com's `lib/call-engine.ts` is the reference.
-  - **Calls with the app closed:**
-    - `react-native-callkeep` for CallKit and ConnectionService, and `react-native-voip-push-notification` for PushKit;
-    - register the VoIP token with `POST /v1/store/account/devices/phone { kind: 'apns_voip' }`;
-    - handle FCM data `call` and `call_ended`;
-    - these need a development build with their config plugins, and real phones to test.
-  - **Then release 0.4.0:** bump the app version to 0.4.0 (`callsFromAppVersion` in the API), and only once calls are answered in the app.
+- **Phase 4 is built: calls, and the app is 0.4.0** (13 November 2026), the version the API rings phones from
+  (`callsFromAppVersion`; `test/calls.test.ts` checks `app.json` against it).
+  - **Packages** (each with `npx expo install`): `react-native-webrtc` 155.0.1 and `@config-plugins/react-native-webrtc`
+    15.0.2, `react-native-callkeep` 4.6.1 and `@config-plugins/react-native-callkeep` 14.0.2,
+    `react-native-voip-push-notification` 3.3.3 (no config plugin exists: `plugins/with-udozo-calls.js` does its
+    part), `expo-task-manager` 58.0.14 and `expo-audio` 58.0.12. The plugins' own tables stop at SDK 56: they resolve
+    and run on 58 (`npx expo config --type introspect`), but nothing has been built with them yet.
+  - **The engine** (`src/lib/call-engine.ts`, rules in `src/lib/calls.ts`, both free of React Native and tested
+    under `node --test` with fakes): udozo.com's `CallEngine`, audio only, `iceTransportPolicy: 'relay'` with the
+    call's own ICE servers, offer, answer and candidates through `POST …/calls/:id/signals`, `GET …/calls/:id?after=`
+    every second while ringing or connecting, every 3 once connected, every 2 while ringing here; a call still
+    ringing 5 seconds past `ring_until` (45 seconds) ends as missed, an answered one the API has not answered for 30
+    seconds as dropped (both also when Udozo cannot be reached); `answerById` reads a call a push woke the app for,
+    then answers it.
+  - **On screen** (`src/components/calls/`): `CallProvider` in the root layout, for signed-in, finished accounts in a
+    build with the native modules (`callsSupported`; Expo Go has none), says the customer is here every 5 seconds
+    while the app is in front (`POST /v1/classifieds/presence`) and rings `CallPanel`, full screen: the other side's
+    public name and initials, the listing, the state or the timer, Answer and Decline, Mute, Speaker and End, and the
+    microphone step (asked on calling or answering; refused, Open settings, then Try again). Tones are WAVs written
+    by `scripts/call-tones.py` (udozo.com's two tones, a 425 Hz ring back), played with expo-audio, Android vibrating
+    too. **Call seller** sits in the listing's action bar where the viewer says `calls` (the whole bar for a
+    calls-only listing), **Call** in a chat's header where `can_call`; while the other side is away, or a call goes
+    on, each is greyed and pressing it says why; the API's refusals end the call with their own words.
+  - **The phone's call screen** (`src/lib/call-system.ts`): every call goes through react-native-callkeep (CallKit;
+    Android's ConnectionService in self-managed mode, so nobody enables a phone account and no phone permission is
+    asked): outgoing calls with `startCall`, answered ones with `answerIncomingCall`, mute and the speaker through it
+    (Android `toggleAudioRouteSpeaker`; iPhones `setAudioRoute`), and the iPhone's audio session handed to WebRTC on
+    `didActivateAudioSession`. An answer or hang-up there reaches the engine, also after a cold start
+    (`getInitialEvents`).
+  - **With the app closed, iPhones:** `plugins/with-udozo-calls.js` writes `UdozoCallPush` (Objective-C) beside the
+    Swift AppDelegate, imports it in the bridging header and makes the AppDelegate the PushKit delegate: it registers
+    at launch (CallKit's options first), hands the token to react-native-voip-push-notification (sent as `apns_voip`
+    by `registerVoipPush`) and reports every VoIP push to CallKit before returning, with the API's `call_id` as the
+    call's UUID and "caller · about" as its name (a push without a valid id is reported, then ended, as Apple
+    requires); a call still ringing after 50 seconds is ended there as unanswered, since the app may not run to hear
+    the caller hang up. `voip` and `audio` background modes.
+  - **With the app closed, Android:** FCM's data message `call` runs expo-notifications' background task
+    (`src/lib/call-task.ts`, defined when the bundle loads, so `index.ts` is now the app's entry, before
+    `expo-router/entry`): with the app not in front it shows the call through ConnectionService and posts an
+    incoming call notice on the `calls` channel (highest importance) with **Decline** (ends the call without opening
+    the app) and **Answer** (opens it; the call panel answers). `call_ended` stops both. The plugin labels CallKeep's
+    service Udozo with `phoneCall|microphone`, keeps its messaging service unexported, adds `MANAGE_OWN_CALLS` and the
+    foreground service permissions, and removes `CALL_PHONE`, `READ_PHONE_NUMBERS`, `READ_PHONE_STATE` and
+    `SYSTEM_ALERT_WINDOW`. With the app open, call pushes show no banner (`setNotificationHandler`).
+  - **Tests:** `test/calls.test.ts` (the rules, the push fields, the engine with fakes: ringing out, connecting
+    through the relay, the callee answering the offer, answering from a push, the 45 and 30 second limits),
+    `test/calls-plugin.test.ts` (the AppDelegate and `UdozoCallPush`, idempotent), `test/screens/calls.test.tsx`
+    (the panel, Call seller, the chat's Call, a call ringing while the app is open).
+  - **What only real phones can show** (a development build; nothing here has been built or run on a device):
+    - iPhone: the Swift and Objective-C glue compiles (written against SDK 58's AppDelegate template, never built on
+      a Mac); a VoIP push on a locked phone rings CallKit, and the app's JavaScript runs to answer when the call is
+      taken on the lock screen (under SDK 58's scene life cycle React Native starts with a scene, so this may wait
+      until the phone is unlocked: if so, start React Native from the PushKit delegate); WebRTC's audio with
+      CallKit's session (the speaker, Bluetooth, a cellular call arriving); the ring back played with expo-audio
+      while the microphone is open; a call declined with the app closed reaches the API only when the app next runs
+      (until then the caller sees it missed).
+    - Android: the data message reaching the background task with the app swiped away and in Doze; the notice
+      sounding and showing on the lock screen (it is not a full-screen intent, so a locked phone shows a heads-up
+      notice, not a call screen; a full-screen incoming call needs native code); answering from the notice on a cold
+      start; Android 14's foreground service with `phoneCall|microphone`; the speaker route; low-end phones on 3G.
+    - Both: the first call asks for the microphone, which cannot be allowed from the lock screen, so a customer who
+      never called from the app answers into the microphone step.
 
 **Fixes after reviewing phase 1 (12 November 2026):**
 
