@@ -1,6 +1,6 @@
 import { Gift, type LucideIcon } from "lucide-react";
 import type { ProductCategory, StoreNavigationGroup } from "@bitocard/api-client/storefront";
-import { categoryTheme, groupIcon } from "./theme";
+import { groupIcon, themeOf } from "./theme";
 
 /**
  * Category and menu-group icons, the same everywhere in the store: the icon an admin uploaded (Storefront > Categories)
@@ -24,7 +24,7 @@ function Tile({ src, Icon, className, ink, tile }: { src?: string | null; Icon: 
 
 /** A category's icon. `ink` colours the built-in icon and `tile` its background (the category's own colours by default). */
 export function CategoryIcon({ category, iconUrl, className = "size-8", ink, tile }: { category: ProductCategory; iconUrl?: string | null; className?: string; ink?: string; tile?: string }) {
-  const theme = categoryTheme[category];
+  const theme = themeOf(category);
   return <Tile src={iconUrl} Icon={theme.icon} className={className} ink={ink ?? theme.ink} tile={tile ?? theme.tile} />;
 }
 

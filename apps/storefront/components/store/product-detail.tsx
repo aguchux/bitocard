@@ -6,7 +6,7 @@ import { BuyForm } from "@/components/store/buy-form";
 import { walletFor } from "@/lib/wallet";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
-import { categoryTheme } from "@/components/store/theme";
+import { themeOf } from "@/components/store/theme";
 import { storeNavigation } from "@/lib/navigation";
 import { query, storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
@@ -42,7 +42,7 @@ export async function productMetadata(key: string, base: string): Promise<Metada
  */
 export async function ProductDetail({ product, inApp = false }: { product: StoreProductDetail; inApp?: boolean }) {
   const base = inApp ? "/account/p" : "/p";
-  const theme = categoryTheme[product.category];
+  const theme = themeOf(product.category);
   const [navigation, customer, market, { store }] = await Promise.all([storeNavigation(), currentCustomer(), currentMarket(), currentStore()]);
   const art = categoryArt(navigation.groups);
   const values = product.denominations ?? [];

@@ -15,6 +15,14 @@ export const categoryTheme: Record<ProductCategory, { icon: LucideIcon; tile: st
   mobile_money: { icon: HandCoins, tile: "bg-lime-50", ink: "text-lime-700", card: "from-lime-500 to-green-600" },
 };
 
+/**
+ * A category's theme, never undefined: a category the store does not know (one the API still sends after the store
+ * dropped it, or one added to the API first) takes the gift cards' look instead of crashing the page.
+ */
+export function themeOf(category: string) {
+  return (categoryTheme as Record<string, (typeof categoryTheme)[ProductCategory] | undefined>)[category] ?? categoryTheme.gift_cards;
+}
+
 /** The menu groups' icons (the hero chips). */
 export const groupIcon: Record<string, LucideIcon> = {
   "gift-cards": Gift,

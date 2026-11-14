@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { formatFace, type StoreBrand, type StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { BrandImage } from "./brand-image";
-import { categoryTheme } from "./theme";
+import { categoryTheme, themeOf } from "./theme";
 
 /** A product's page: `/p/<key>` in the store, `/account/p/<key>` inside the customer's account app. */
 export const productHref = (product: Pick<StoreProduct, "key">, base = "/p") => `${base}/${encodeURIComponent(product.key)}`;
@@ -38,7 +38,7 @@ function Initials({ brand }: { brand: StoreBrand }) {
  * or its bundled icons; a failed image falls back the same way.
  */
 export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand; product?: StoreProduct; className?: string }) {
-  const theme = product ? categoryTheme[product.category] : categoryTheme.gift_cards;
+  const theme = product ? themeOf(product.category) : categoryTheme.gift_cards;
   const plate = (
     <div
       className={`flex h-full w-full items-center justify-center bg-gradient-to-br p-4 ${brand.color ? "" : theme.card} ${className}`}
