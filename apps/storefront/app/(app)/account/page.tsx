@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
+import { GiftCardActions, giftCardGroup } from "@/components/app/gift-card-actions";
 import { SpinDialog } from "@/components/app/spin-dialog";
 import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
@@ -85,6 +86,8 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
           <SpinDialog rewards={rewards} open={spin === "1"} />
         </section>
       ) : null}
+
+      <GiftCardActions group={navigation.groups.find(group => group.key === giftCardGroup)} />
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />
