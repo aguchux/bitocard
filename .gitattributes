@@ -1,3 +1,4 @@
 # Run on Linux (the droplet, CI): always LF, whatever the checkout.
 deploy/** text eol=lf
 *.sh text eol=lf
+docker/local/* text eol=lf
