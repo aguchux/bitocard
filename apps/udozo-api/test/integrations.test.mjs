@@ -37,10 +37,10 @@ describe('integration settings', () => {
       json.data.filter(item => item.section === 'platform').map(item => item.id),
       ['general', 'email', 'sms', 'sms_africas_talking', 'web_push', 'file_storage', 'kyc_storage', 'google', 'facebook', 'flutterwave', 'monnify', 'stripe', 'paystack', 'checkout', 'exchange_rates', 'anthropic', 'openai', 'deepseek', 'support_ai', 'github', 'domains', 'store_hosts', 'calls', 'mobile_app', 'apple_sign_in', 'phone_push', 'whatsapp', 'didit'],
     );
-    // Every supplier in the registry has a group (Flutterwave virtual cards use the Flutterwave keys; BitoCard's own stock needs none).
+    // Every supplier in the registry has a group (BitoCard's own stock needs none).
     const registry = await prisma.supplier.findMany({ select: { code: true } });
     const suppliers = json.data.filter(item => item.section === 'suppliers');
-    assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'flutterwave_cards' && code !== 'stock')));
+    assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'stock')));
     assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['africas_talking', 'pawapay', 'reloadly', 'remita', 'vpnresellers', 'vtpass', 'zendit']);
     const sms = json.data.find(item => item.id === 'sms');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').source, 'environment');
@@ -156,25 +156,25 @@ describe('integration settings', () => {
   });
 
   test('suppliers without an adapter yet: credentials are saved encrypted, write-only, for the adapter to read later', async () => {
-    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'onafriq');
-    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'ONAFRIQ_CLIENT_SECRET').source], ['not_connected', false, 'unset']);
+    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'pax8');
+    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'PAX8_CLIENT_SECRET').source], ['not_connected', false, 'unset']);
 
-    const key = 'onafriq-live-secret-abcd1234';
-    const saved = await update('onafriq', { ONAFRIQ_CLIENT_ID: 'onafriq-client', ONAFRIQ_CLIENT_SECRET: key, ONAFRIQ_API_URL: 'https://sandbox.onafriq.example' });
+    const key = 'pax8-live-secret-abcd1234';
+    const saved = await update('pax8', { PAX8_CLIENT_ID: 'pax8-client', PAX8_CLIENT_SECRET: key, PAX8_API_URL: 'https://sandbox.pax8.example' });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
     assert.equal(saved.json.status, 'connected');
-    assert.deepEqual([fieldOf(saved.json, 'ONAFRIQ_CLIENT_SECRET').hint, fieldOf(saved.json, 'ONAFRIQ_CLIENT_SECRET').value], ['…1234', null]);
-    assert.equal(fieldOf(saved.json, 'ONAFRIQ_API_URL').value, 'https://sandbox.onafriq.example');
+    assert.deepEqual([fieldOf(saved.json, 'PAX8_CLIENT_SECRET').hint, fieldOf(saved.json, 'PAX8_CLIENT_SECRET').value], ['…1234', null]);
+    assert.equal(fieldOf(saved.json, 'PAX8_API_URL').value, 'https://sandbox.pax8.example');
     assert.ok(!JSON.stringify(saved.json).includes(key));
-    assert.deepEqual(integrations.supplier('onafriq'), { CLIENT_ID: 'onafriq-client', CLIENT_SECRET: key, API_URL: 'https://sandbox.onafriq.example' });
-    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { platform_key: { platform: 'bitocard', key: 'ONAFRIQ_CLIENT_SECRET' } } });
+    assert.deepEqual(integrations.supplier('pax8'), { CLIENT_ID: 'pax8-client', CLIENT_SECRET: key, API_URL: 'https://sandbox.pax8.example' });
+    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { platform_key: { platform: 'bitocard', key: 'PAX8_CLIENT_SECRET' } } });
     assert.ok(row.encrypted && !row.value.includes(key));
 
-    assert.equal((await update('onafriq', { ONAFRIQ_API_URL: 'not a url' })).json.error.param, 'values.ONAFRIQ_API_URL');
-    assert.equal((await update('onafriq', { MAPLERAD_SECRET_KEY: 'x' })).status, 400, 'another supplier’s field');
-    const cleared = await update('onafriq', { ONAFRIQ_CLIENT_SECRET: null });
-    assert.equal(fieldOf(cleared.json, 'ONAFRIQ_CLIENT_SECRET').source, 'unset');
-    assert.equal(integrations.supplier('onafriq').CLIENT_SECRET, undefined);
+    assert.equal((await update('pax8', { PAX8_API_URL: 'not a url' })).json.error.param, 'values.PAX8_API_URL');
+    assert.equal((await update('pax8', { PRESTMIT_API_KEY: 'x' })).status, 400, 'another supplier’s field');
+    const cleared = await update('pax8', { PAX8_CLIENT_SECRET: null });
+    assert.equal(fieldOf(cleared.json, 'PAX8_CLIENT_SECRET').source, 'unset');
+    assert.equal(integrations.supplier('pax8').CLIENT_SECRET, undefined);
   });
 });
 
@@ -201,7 +201,7 @@ describe('every integration explains itself', () => {
   test('the admin app gets each integration’s links', async () => {
     const list = (await admin.get('/v1/admin/integrations')).json.data;
     assert.ok(list.find(item => item.id === 'email').links.some(link => link.url === 'https://resend.com/api-keys'));
-    assert.ok(list.find(item => item.id === 'onafriq').links.length > 0, 'suppliers whose adapter is not built too');
+    assert.ok(list.find(item => item.id === 'pax8').links.length > 0, 'suppliers whose adapter is not built too');
     assert.deepEqual(list.find(item => item.id === 'general').links, []);
   });
 });

@@ -40,7 +40,7 @@ describe('admin management', () => {
     const { json } = await admin.get('/v1/admin/countries');
     const ng = json.data.find(c => c.code === 'NG');
     assert.deepEqual([ng.markup_cap_percent, ng.payout_hold_days, ng.min_withdrawal_minor, ng.reserved_accounts], [100, 15, 1500000, true]);
-    assert.equal(ng.categories.length, 10, 'every category, on or off');
+    assert.equal(ng.categories.length, 9, 'every category, on or off');
     assert.deepEqual([ng.categories.find(c => c.category === 'mobile_money')?.enabled, ng.categories.find(c => c.category === 'mobile_money')?.customer_verification], [false, true], 'mobile money: off, customers verify');
   });
 
@@ -69,11 +69,11 @@ describe('admin management', () => {
   });
 
   test('categories can be switched on and need verification set per country', async () => {
-    const updated = await admin.put('/v1/admin/countries/KE/categories/virtual_cards', { enabled: true });
+    const updated = await admin.put('/v1/admin/countries/KE/categories/rdp', { enabled: true });
     assert.equal(updated.status, 200);
-    assert.equal(updated.json.categories.find(c => c.category === 'virtual_cards').enabled, true);
+    assert.equal(updated.json.categories.find(c => c.category === 'rdp').enabled, true);
     const pub = await client(server.base).get('/v1/countries/KE');
-    assert.ok(pub.json.categories.some(c => c.category === 'virtual_cards'));
+    assert.ok(pub.json.categories.some(c => c.category === 'rdp'));
   });
 
   test('unknown categories and invalid values are refused', async () => {

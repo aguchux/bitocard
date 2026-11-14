@@ -14,13 +14,12 @@
 - **Product catalogue**
   - Digital gift cards, mobile airtime and data bundles.
   - Supported utility bills and TV subscriptions.
-  - Virtual payment cards, subject to supplier access and market eligibility.
   - Products, denominations, currencies, payment methods and exchange options vary by country.
   - Physical goods and integrations with stores such as Jumia and Konga are deferred.
 
 - **Supplier aggregation and routing**
   - Initial planned sources: Reloadly, Prestmit and Cardtonic.
-  - TV, utilities and virtual-card suppliers are under evaluation; no additional supplier is confirmed by this brief.
+  - TV and utilities suppliers are under evaluation; no additional supplier is confirmed by this brief.
   - Resellers see one BitoCard catalogue, price and order status. Supplier identities, credentials, costs and routing decisions remain internal.
   - Normalize equivalent supplier products into BitoCard product IDs while preserving country, denomination and service restrictions.
   - Select eligible purchase sources by availability, net margin, total costs and fulfilment reliability.

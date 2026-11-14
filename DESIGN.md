@@ -34,7 +34,7 @@ Store neutrals are Tailwind slate: borders `slate-100`/`slate-200`, secondary te
 
 **Status** (one colour per word, everywhere, via `statusTones` in `packages/admin-ui/src/ui/status.tsx`): green (`emerald-50` / `emerald-700`) for completed, paid, active; amber (`amber-50` / `amber-700`) for pending and in review; blue (`blue-50` / `blue-700`) for processing; red (`red-50` / `red-700`) for failed and declined; grey slate for draft and expired; pink (`brand-50` / `brand-700`) for refunded. Badges are pills with a 6px dot. Sandbox mode is always amber.
 
-**Category identity** (`components/store/theme.tsx`): gift cards pink, airtime blue, data emerald, bills amber, pay-TV violet, software orange, virtual cards sky, mobile money lime. Each shows as a `-50` tile with a `-600` icon, and as a `from-500 to-600/700` gradient behind a brand without card art. These colours label categories; they never mark an action.
+**Category identity** (`components/store/theme.tsx`): gift cards pink, airtime blue, data emerald, bills amber, pay-TV violet, software orange, mobile money lime. Each shows as a `-50` tile with a `-600` icon, and as a `from-500 to-600/700` gradient behind a brand without card art. These colours label categories; they never mark an action.
 
 ### Type
 

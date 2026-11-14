@@ -91,7 +91,6 @@ const categoryNames: Record<string, string> = {
   software: 'Software',
   vpn: 'VPN',
   rdp: 'RDP',
-  virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
 };
 export const categoryName = (category: string) => categoryNames[category] ?? humanise(category);

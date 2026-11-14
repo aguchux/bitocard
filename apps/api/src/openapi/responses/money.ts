@@ -28,7 +28,7 @@ const transactionTypes = [
   'conversion',
 ] as const;
 
-const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'software', 'vpn', 'rdp', 'virtual_cards', 'mobile_money'] as const;
+const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'software', 'vpn', 'rdp', 'mobile_money'] as const;
 const feeKinds = ['supplier_order', 'gateway_payment'] as const;
 
 const currency = str('ISO 4217 currency of the amounts: the wallet\'s, your country\'s currency (for example `NGN`, `GHS` or `KES`) or `USD`.');

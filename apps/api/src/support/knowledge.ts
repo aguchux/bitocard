@@ -159,7 +159,6 @@ const deliveryText: Record<string, string> = {
   software: 'Software: the licence key is on the order page, hidden until Reveal.',
   vpn: 'VPN access: the username and password are on the order page; access lasts 30 days and never renews automatically.',
   rdp: 'RDP: the server sign-in details are on the order page.',
-  virtual_cards: 'Virtual cards: shown securely on the order page.',
   mobile_money: 'Mobile money: sent to the mobile money wallet of the number given.',
 };
 

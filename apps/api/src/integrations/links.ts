@@ -69,8 +69,6 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   deepseek: [signUp('https://platform.deepseek.com/'), keys('https://platform.deepseek.com/api_keys', 'API keys'), docs('https://api-docs.deepseek.com/')],
   remita: [signUp('https://connect.remita.net/auth/register'), keys('https://connect.remita.net', 'RemitaConnect API keys'), docs('https://api.remita.net/')],
   africas_talking: [signUp('https://account.africastalking.com/auth/register'), keys('https://account.africastalking.com/apps', 'Apps and API keys'), docs('https://developers.africastalking.com/docs/airtime/sending'), { label: 'Mobile data docs', url: 'https://developers.africastalking.com/docs/data/overview' }],
-  maplerad: [site('https://maplerad.com/'), docs('https://maplerad.dev/')],
-  onafriq: [site('https://onafriq.com/')],
   cellulant: [site('https://www.cellulant.io/'), { label: 'Developer portal', url: 'https://dev-portal.tingg.africa/' }],
   techlink_gh: [site('https://business.techlinkgh.com/')],
   kingflexy_gh: [site('https://kingflexygh.com/')],

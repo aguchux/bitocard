@@ -8,7 +8,7 @@ import type { IntegrationKind } from './definitions.js';
  *
  * The fields follow each supplier's published authentication scheme as far as it is known; confirm them against the
  * credentials the supplier actually issues (and adjust here) before building its adapter. Reloadly and VTpass have
- * their own groups in `definitions.ts`, as do Zendit, pawaPay, Africa's Talking and Remita. Flutterwave virtual cards use the Flutterwave group's keys.
+ * their own groups in `definitions.ts`, as do Zendit, pawaPay, Africa's Talking and Remita.
  */
 export type SupplierCredentialField = { suffix: string; label: string; secret: boolean; kind: IntegrationKind; required: boolean; help?: string };
 export type SupplierCredentialGroup = { code: string; name: string; description: string; fields: SupplierCredentialField[] };
@@ -49,9 +49,6 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   // Gift card trading.
   { code: 'prestmit', name: 'Prestmit', description: 'Gift card sales and trades.', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Prestmit API base address')] },
   { code: 'cardtonic', name: 'Cardtonic', description: 'Gift card sales and trades.', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Cardtonic API base address')] },
-  // Virtual cards.
-  { code: 'maplerad', name: 'Maplerad', description: 'Virtual cards (Nigeria).', fields: [secret('SECRET_KEY', 'Secret key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Sandbox: https://sandbox.api.maplerad.com/v1')] },
-  { code: 'onafriq', name: 'Onafriq', description: 'Virtual cards, pan-African expansion.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), address('Onafriq API base address (sandbox or live)')] },
   // Wider Africa bills.
   { code: 'cellulant', name: 'Cellulant / Tingg', description: 'Bills and pay-TV across Africa.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), optional('SERVICE_CODE', 'Service code'), address('Tingg API base address (sandbox or live)')] },
   // Backups.
@@ -60,5 +57,5 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   { code: 'tupay', name: 'Tupay', description: 'Kenya pay-TV (backup).', fields: [key('API key'), address('Tupay API base address')] },
 ];
 
-/** `NEXWAY_SECRET_KEY`, `MAPLERAD_SECRET_KEY`: the supplier code in capitals, then the field. */
+/** `NEXWAY_SECRET_KEY`, `PAX8_CLIENT_SECRET`: the supplier code in capitals, then the field. */
 export const supplierCredentialKey = (code: string, suffix: string) => `${code.toUpperCase()}_${suffix}`;

@@ -37,10 +37,10 @@ describe('integration settings', () => {
       json.data.filter(item => item.section === 'platform').map(item => item.id),
       ['general', 'email', 'sms', 'sms_africas_talking', 'web_push', 'file_storage', 'kyc_storage', 'google', 'flutterwave', 'monnify', 'stripe', 'paystack', 'checkout', 'exchange_rates', 'anthropic', 'openai', 'deepseek', 'support_ai', 'github', 'domains', 'store_hosts', 'didit'],
     );
-    // Every supplier in the registry has a group (Flutterwave virtual cards use the Flutterwave keys; BitoCard's own stock needs none).
+    // Every supplier in the registry has a group (BitoCard's own stock needs none).
     const registry = await prisma.supplier.findMany({ select: { code: true } });
     const suppliers = json.data.filter(item => item.section === 'suppliers');
-    assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'flutterwave_cards' && code !== 'stock')));
+    assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'stock')));
     assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['africas_talking', 'pawapay', 'reloadly', 'remita', 'vpnresellers', 'vtpass', 'zendit']);
     const sms = json.data.find(item => item.id === 'sms');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').source, 'environment');

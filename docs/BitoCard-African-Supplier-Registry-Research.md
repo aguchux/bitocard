@@ -56,9 +56,6 @@ Supplier names and terms are internal. Do not expose suppliers, costs, credentia
 | `td_synnex` | Software and cloud subscriptions | Existing BitoCard plan lists as alternative distributor; product access is marketplace/partner-led. | **Partner-gated candidate.** Confirm markets served, API programme, eligible legal entity and downstream reseller permissions. |
 | `pax8` | Business software subscriptions | Existing plan lists for later expansion. | **Partner-gated candidate.** Confirm African reseller onboarding and territory coverage; do not assume the US/Europe marketplace extends to Africa. |
 | `also_cloud` | Business software subscriptions | Existing plan lists as mainly Europe. | **Low priority for Africa until territory confirmed.** Confirm eligible countries, marketplace/catalogue and partner API access. |
-| `flutterwave_cards` | Virtual payment cards (planned) | Existing plan lists Flutterwave cards for Nigeria pilot; this is a regulated financial product, not a standard gift-card supply API. | **Commercial/regulatory gate.** Confirm issuing/processor programme, business model, eligible reseller entity/countries, KYC/AML, cardholder terms, funding and API scopes before listing. |
-| `maplerad` | Virtual payment cards (planned) | Existing plan lists Maplerad as Nigeria alternative. | **Commercial/regulatory gate.** Confirm product issuance and reseller/distribution access, operating countries, programme manager, KYC, FX/fees and scheme requirements. |
-| `onafriq` | Virtual cards and cross-border financial services (planned) | Existing plan lists Onafriq as pan-African expansion candidate. | **Commercial/regulatory gate.** Confirm actual card programme/API access in each market; regional payment network presence does not prove virtual-card issuance/resale eligibility. |
 
 ### Platform vendors that are not automatically product suppliers
 
@@ -102,7 +99,6 @@ This matrix is a **candidate map** for sales and due diligence. It is not a live
 | Electricity, water and TV | DT One and Reloadly biller catalogue (only where the live feed returns exact biller) | Country APIs: VTpass/Quickteller (NG); Korba/Techlink/KiNG FLEXY/expressPay (GH); iPay/eLipa/Tupay (KE); discover partners for other countries | Exact service code, prepaid/postpaid, meter/account validation, presentment, token/receipt, asynchronous status, reversals. |
 | Gift cards | Reloadly; DT One for purchase inventory | Prestmit/Cardtonic as buy/sell trading candidates, after account and market qualification | Country of redemption, brand, denomination, currency, delivery type, purchase versus sell workflows. |
 | Software/licences | Nexway; Ingram Micro; TD SYNNEX; Pax8; ALSO | Start with a distributor offering an African partner territory and approved digital catalogue | Reseller authorization, EULA territory, tax, key delivery, seat assignment, renewal/cancellation, transfer restrictions. |
-| Virtual payment cards | Flutterwave, Maplerad, Onafriq (planned leads only) | Country-specific regulated programme onboarding | Issuer/program manager, KYC/AML, cardholder terms, scheme approvals, funding, customer support, licensing. Keep separate from gift cards. |
 
 ## Country coverage data sources and refresh rules
 
@@ -150,7 +146,7 @@ For each provider and each product family:
 2. **Add a pan-African digital value alternative:** qualify DT One with dynamic market feeds and comparable product mappings.
 3. **Add regional network candidates:** eLipa and Africa's Talking per documented market/service; distinguish their API product types carefully.
 4. **Fill remaining countries' bill gaps:** request local licensed aggregator introductions for the 18 non-pilot markets; verify utility/telecom biller relationships directly.
-5. **Then extend non-utility verticals:** authorized software distributors; regulated virtual-card issuing programmes.
+5. **Then extend non-utility verticals:** authorized software distributors.
 
 ## Official research sources
 
@@ -173,7 +169,6 @@ All links accessed on 4 October 2026. Country feeds, access requirements and inv
 
 ### Gift card and payment leads
 - [Prestmit API documentation](https://documentation.prestmit.io/docs/getting-started); [Cardtonic Developer API](https://cardtonic.com/developer).
-- [Flutterwave virtual-card API](https://developer.flutterwave.com/v2.0/reference/create-a-virtual-card); [Maplerad Issuing API](https://maplerad.dev/docs/issuing); [Onafriq Card Issuing API](https://developers.onafriq.com/docs/card-issuance/o4s4drespbv5l-overview). These APIs are documented; programme access, market eligibility and regulatory approval remain gates.
 
 ## Open actions for BitoCard
 

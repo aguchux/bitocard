@@ -31256,7 +31256,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual_cards",
               "mobile_money"
             ],
             "description": "Set for a whole category; leave out (with no product) for everything."
@@ -34382,7 +34381,6 @@
                     "software",
                     "vpn",
                     "rdp",
-                    "virtual_cards",
                     "mobile_money"
                   ]
                 },
@@ -34805,7 +34803,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual_cards",
               "mobile_money"
             ]
           },
@@ -35053,7 +35050,6 @@
                         "software",
                         "vpn",
                         "rdp",
-                        "virtual_cards",
                         "mobile_money"
                       ]
                     },
@@ -35359,7 +35355,6 @@
                   "software",
                   "vpn",
                   "rdp",
-                  "virtual_cards",
                   "mobile_money"
                 ]
               }
@@ -36780,7 +36775,6 @@
                   "software",
                   "vpn",
                   "rdp",
-                  "virtual_cards",
                   "mobile_money"
                 ]
               },
@@ -37031,7 +37025,6 @@
                   "software",
                   "vpn",
                   "rdp",
-                  "virtual_cards",
                   "mobile_money"
                 ]
               },
@@ -39579,7 +39572,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual_cards",
               "mobile_money"
             ]
           },
@@ -39735,7 +39727,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual_cards",
               "mobile_money"
             ]
           },
@@ -39927,7 +39918,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual_cards",
               "mobile_money"
             ]
           },
@@ -39947,7 +39937,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual-cards",
               null
             ],
             "description": "The menu group it belongs to."
@@ -40005,7 +39994,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual_cards",
               "mobile_money"
             ]
           },
@@ -40025,7 +40013,6 @@
               "software",
               "vpn",
               "rdp",
-              "virtual-cards",
               null
             ],
             "description": "The menu group it belongs to."
@@ -40089,8 +40076,7 @@
               "bills",
               "software",
               "vpn",
-              "rdp",
-              "virtual-cards"
+              "rdp"
             ]
           },
           "label": {
@@ -40419,7 +40405,6 @@
                         "software",
                         "vpn",
                         "rdp",
-                        "virtual_cards",
                         "mobile_money"
                       ]
                     },
@@ -40524,7 +40509,6 @@
                           "software",
                           "vpn",
                           "rdp",
-                          "virtual_cards",
                           "mobile_money"
                         ]
                       },
@@ -40644,7 +40628,6 @@
                           "software",
                           "vpn",
                           "rdp",
-                          "virtual_cards",
                           "mobile_money"
                         ]
                       },
@@ -41049,7 +41032,6 @@
                                   "software",
                                   "vpn",
                                   "rdp",
-                                  "virtual_cards",
                                   "mobile_money"
                                 ]
                               },
@@ -41847,7 +41829,6 @@
                 "software",
                 "vpn",
                 "rdp",
-                "virtual_cards",
                 "mobile_money"
               ]
             },

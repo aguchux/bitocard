@@ -11,7 +11,6 @@ export const categoryTheme: Record<ProductCategory, { icon: LucideIcon; tile: st
   software: { icon: Laptop, tile: "bg-orange-50", ink: "text-orange-600", card: "from-orange-400 to-amber-600" },
   rdp: { icon: MonitorSmartphone, tile: "bg-slate-100", ink: "text-slate-700", card: "from-slate-600 to-slate-800" },
   vpn: { icon: ShieldCheck, tile: "bg-teal-50", ink: "text-teal-600", card: "from-teal-500 to-emerald-600" },
-  virtual_cards: { icon: CreditCard, tile: "bg-sky-50", ink: "text-sky-600", card: "from-sky-500 to-cyan-600" },
   mobile_money: { icon: HandCoins, tile: "bg-lime-50", ink: "text-lime-700", card: "from-lime-500 to-green-600" },
 };
 
@@ -31,7 +30,6 @@ export const groupIcon: Record<string, LucideIcon> = {
   software: Laptop,
   vpn: ShieldCheck,
   rdp: MonitorSmartphone,
-  "virtual-cards": CreditCard,
 };
 
 export const groupInk: Record<string, string> = {
@@ -41,7 +39,6 @@ export const groupInk: Record<string, string> = {
   software: "text-amber-400",
   vpn: "text-teal-300",
   rdp: "text-slate-300",
-  "virtual-cards": "text-cyan-400",
 };
 
 export const trustIcon: Record<TrustIcon, LucideIcon> = {

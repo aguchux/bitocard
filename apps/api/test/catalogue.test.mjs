@@ -42,9 +42,9 @@ const byKey = async (browser, key, headers) => {
 };
 
 describe('supplier registry and sync', () => {
-  test('all 25 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
+  test('all 22 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
     const { data } = (await admin.get('/v1/admin/suppliers')).json;
-    assert.equal(data.length, 25);
+    assert.equal(data.length, 22);
     assert.ok(!data.some(s => ['didww', 'esim_access', 'telnyx', 'airalo'].includes(s.code)), 'eSIM and number suppliers are gone');
     assert.equal(data.find(s => s.code === 'zendit').enabled, false, 'Zendit starts switched off');
     assert.deepEqual(data.filter(s => s.enabled).map(s => s.code).sort(), ['reloadly', 'vtpass']);

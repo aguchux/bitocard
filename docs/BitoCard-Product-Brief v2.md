@@ -18,7 +18,6 @@
   - Digital gift cards, mobile airtime and data bundles.
   - Supported utility bills, electricity payments and TV/pay-TV subscriptions.
   - Digital software, antivirus licences and Windows licences; retail/ESD, OEM and business subscriptions are distinct product types.
-  - Virtual payment cards, subject to supplier access and market eligibility.
   - Products, denominations, currencies, payment methods and exchange options vary by country.
   - Physical goods and integrations with stores such as Jumia and Konga are deferred.
 
@@ -114,12 +113,11 @@
   - Prevent duplicate allocation of one-time licence keys.
   - Keep subscription renewal/cancellation commitments tied to the original purchase and supplier.
 
-- **TV, utilities and virtual cards**
+- **TV and utilities**
   - Validate relevant identifiers such as meter, smartcard or customer numbers where supplier APIs support validation.
   - Show the biller, package, country, total payable amount and any fees before confirmation.
   - Deliver bill receipts, electricity tokens and subscription confirmation where applicable.
-  - For virtual payment cards, define issuance, funding, fees, limits and verification according to the selected issuing partner.
-  - Separate these services from ordinary gift-card delivery because their lifecycle and verification requirements differ.
+  - Separate these services from ordinary gift-card delivery because their lifecycle differs.
 
 - **Commercial model**
   - BitoCard earns a margin between supplier acquisition cost and its reseller wholesale price.

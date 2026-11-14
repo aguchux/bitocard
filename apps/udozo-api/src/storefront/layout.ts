@@ -14,7 +14,6 @@ export const categoryLabels: Record<ProductCategory, string> = {
   software: 'Software',
   vpn: 'VPN',
   rdp: 'RDP',
-  virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
 };
 
@@ -26,7 +25,6 @@ export const navigationGroups: Array<{ key: string; label: string; categories: P
   { key: 'software', label: 'Software', categories: ['software'] },
   { key: 'vpn', label: 'VPN', categories: ['vpn'] },
   { key: 'rdp', label: 'RDP', categories: ['rdp'] },
-  { key: 'virtual-cards', label: 'Virtual cards', categories: ['virtual_cards'] },
 ];
 
 /** Words people search with that mean a category. */
@@ -39,7 +37,6 @@ export const categorySynonyms: Record<ProductCategory, string[]> = {
   software: ['software', 'licence', 'license', 'antivirus', 'windows', 'office', 'key'],
   vpn: ['vpn', 'virtual private network', 'privacy', 'secure browsing', 'proxy'],
   rdp: ['rdp', 'remote desktop', 'vps', 'windows server', 'server'],
-  virtual_cards: ['virtual card', 'card', 'debit card', 'dollar card'],
   mobile_money: ['mobile money', 'momo', 'm-pesa', 'mpesa', 'wallet', 'send money', 'cash in'],
 };
 

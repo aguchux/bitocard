@@ -71,7 +71,7 @@ describe("quick links", () => {
   test("bitocard.com shows every quick link; a reseller's store only what it sells ", () => {
     expect(quickLinksFor([], null)).toEqual(["/catalogs/rdp", "/catalogs/vpn"]);
     expect(quickLinksFor([group("gift_cards", true)], "gift_cards")).toEqual([]);
-    expect(quickLinksFor([group("rdp", false), group("vpn", true), group("virtual_cards", true)], "all_in_one")).toEqual(["/catalogs/vpn"]);
+    expect(quickLinksFor([group("rdp", false), group("vpn", true), group("software", true)], "all_in_one")).toEqual(["/catalogs/vpn"]);
     // A Resale shop (Udozo's now) sells nothing of BitoCard's catalogue: no quick links, never its listings.
     expect(quickLinksFor([], "resale_shop")).toEqual([]);
   });

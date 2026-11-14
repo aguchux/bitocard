@@ -42,9 +42,9 @@ const byKey = async (browser, key, headers) => {
 };
 
 describe('supplier registry and sync', () => {
-  test('all 25 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
+  test('all 22 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
     const { data } = (await admin.get('/v1/admin/suppliers')).json;
-    assert.equal(data.length, 25);
+    assert.equal(data.length, 22);
     assert.equal(data.find(s => s.code === 'zendit').enabled, false, 'Zendit starts switched off');
     assert.deepEqual(data.filter(s => s.enabled).map(s => s.code).sort(), ['reloadly', 'vtpass']);
     const reloadlyRecord = data.find(s => s.code === 'reloadly');
@@ -175,7 +175,7 @@ describe('catalogue', () => {
     const { browser } = await resellerClient(server);
     assert.deepEqual((await browser.get('/v1/catalogue/products?category=pay_tv')).json.data.map(p => p.brand).sort(), ['dstv', 'dstv', 'gotv']);
     assert.deepEqual((await browser.get('/v1/catalogue/products?q=steam')).json.data.map(p => p.name), ['Steam Global']);
-    assert.equal((await browser.get('/v1/catalogue/products?category=virtual_cards')).json.data.length, 0);
+    assert.equal((await browser.get('/v1/catalogue/products?category=rdp')).json.data.length, 0);
   });
 
   test('a Ghanaian reseller sees gift cards in cedis, but not Nigerian airtime', async () => {

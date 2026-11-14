@@ -5,7 +5,6 @@ import {
   BadgePercent,
   Bell,
   Code2,
-  CreditCard,
   Gamepad2,
   Gift,
   Globe2,
@@ -80,7 +79,6 @@ const CatalogueArt = () => (
         [ShieldCheck, "VPN"],
         [Gamepad2, "Gaming"],
         [KeyRound, "Software"],
-        [CreditCard, "Cards"],
       ].map(([Icon, label]) => {
         const Glyph = Icon as typeof Gift;
         return (
