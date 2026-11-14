@@ -7,7 +7,7 @@ import { ChatWidget } from "@/components/app/chat-widget";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
-import { countryStoreFor, currentMarket, marketIsGlobal } from "@/lib/market";
+import { countryStoreFor, countryStoreUrl, currentMarket, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
 import { storeShell } from "@/lib/store-theme";
@@ -65,7 +65,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   // not just for one visit.
   if (!store && !global) {
     const subdomain = countryStoreFor(countries, customer?.country);
-    if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
+    if (subdomain) redirect(countryStoreUrl(subdomain));
   }
   // A reseller's store wears its template's variant and colour theme; a market's own country store wears BitoCard's own.
   return (

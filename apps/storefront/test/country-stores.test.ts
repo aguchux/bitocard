@@ -11,7 +11,7 @@ const revalidatePath = vi.fn();
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock("next/cache", () => ({ revalidatePath: (path: string, type?: string) => revalidatePath(path, type) }));
 
-const { countryStoreFor } = await import("@/lib/market");
+const { countryStoreFor, countryStoreUrl } = await import("@/lib/market");
 const { chooseMarket } = await import("@/app/(store)/market-action");
 const { onResellerStore } = await import("@/lib/store");
 
@@ -22,6 +22,7 @@ const countries = [
 
 beforeEach(() => {
   vi.stubEnv("API_URL", "http://api.test");
+  vi.stubEnv("STOREFRONT_URL", "https://bitocard.com");
   redirect.mockClear();
   revalidatePath.mockClear();
 });
@@ -38,6 +39,15 @@ describe("countryStoreFor", () => {
     expect(countryStoreFor(countries, "KE")).toBeNull();
     expect(countryStoreFor(countries, null)).toBeNull();
     expect(countryStoreFor(countries, undefined)).toBeNull();
+  });
+});
+
+describe("countryStoreUrl", () => {
+  test("on the site's own domain: bitocard.com live, localhost on a local copy, never the live site from local", () => {
+    vi.stubEnv("STOREFRONT_URL", "https://bitocard.com");
+    expect(countryStoreUrl("ng")).toBe("https://ng.bitocard.com");
+    vi.stubEnv("STOREFRONT_URL", "http://localhost:3000");
+    expect(countryStoreUrl("ng")).toBe("http://ng.localhost:3000");
   });
 });
 

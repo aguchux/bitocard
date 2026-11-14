@@ -14,7 +14,7 @@ import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
-import { countryStoreFor, marketIsGlobal } from "@/lib/market";
+import { countryStoreFor, countryStoreUrl, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
 import { storeShell } from "@/lib/store-theme";
@@ -66,7 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // unless they explicitly chose to stay global, a standing choice that carries over into their account too.
   if (!store && !(await marketIsGlobal())) {
     const subdomain = countryStoreFor(navigation.countries, customer.country);
-    if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
+    if (subdomain) redirect(countryStoreUrl(subdomain));
   }
   // What the desktop sub rails list: the catalogue's groups on sale (as the Catalog page's chips) and the customer's wallets.
   const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency };

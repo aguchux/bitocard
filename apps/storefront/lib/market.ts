@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { appUrl } from "@bitocard/ui/site";
 import { currentCustomer } from "./customer";
 import { currentStore, storeSubdomain } from "./store";
 
@@ -45,6 +46,15 @@ export async function marketIsGlobal() {
 export function countryStoreFor(countries: ReadonlyArray<{ code: string; store_subdomain: string | null }>, code: string | null | undefined) {
   if (!code) return null;
   return countries.find(country => country.code === code)?.store_subdomain ?? null;
+}
+
+/**
+ * A country store's address, built from this site's configured address (`STOREFRONT_URL`, else bitocard.com on Vercel,
+ * else localhost), as `siteOrigin` builds a store's: `https://ng.bitocard.com` live, `http://ng.localhost:3000` locally.
+ */
+export function countryStoreUrl(subdomain: string) {
+  const base = new URL(appUrl("storefront"));
+  return `${base.protocol}//${subdomain}.${base.host}`;
 }
 
 const add = (path: string, name: string, value: string) => `${path}${path.includes("?") ? "&" : "?"}${name}=${encodeURIComponent(value)}`;
