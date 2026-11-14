@@ -1,15 +1,13 @@
 import { badgeLabels, type ShopPublicScores, type ShopSellerProfile } from '@shared/classifieds';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, BadgeCheck, MessageCircle, Pencil, PhoneCall } from 'lucide-react-native';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { ListingResults, useListings } from '@/components/listing-results';
+import { BannerChip, bannerStyles, BannerTitle, FloatingBar, PageBanner, RoundButton, useLightStatusBar } from '@/components/page-banner';
 import { useSellerContact } from '@/components/seller-contact';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Failed, Loading } from '@/components/ui';
@@ -17,9 +15,6 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { openLink } from '@/lib/navigate';
-
-/** The banner's height below the status bar: the cover, the seller's photo, name and chips at its foot. */
-const bannerHeight = 236;
 
 /**
  * A seller's page: a full-bleed banner from the top of the screen (their cover with a dark fade, else a gradient in the
@@ -40,13 +35,7 @@ export default function SellerScreen() {
   const cards = useMemo(() => listings.data?.pages.flatMap(page => page.data) ?? [], [listings.data]);
   const contact = useSellerContact(data, cards);
 
-  // White status bar text over the banner while this page shows, the phone's own again on leaving.
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('light');
-      return () => setStatusBarStyle('auto');
-    }, []),
-  );
+  useLightStatusBar();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -79,29 +68,34 @@ export default function SellerScreen() {
         }
         empty={{ title: 'Nothing for sale right now' }}
       />
-      <View pointerEvents="box-none" style={[styles.topBar, { top: insets.top + Spacing.one }]}>
-        <Round label="Back" onPress={() => router.back()}>
-          <ArrowLeft size={22} color="#ffffff" />
-        </Round>
-        <View style={styles.actions}>
-          {contact.chat ? (
-            <Round label="Chat with seller" onPress={contact.chat}>
-              <MessageCircle size={21} color="#ffffff" />
-            </Round>
-          ) : null}
-          {contact.call ? (
-            <Round label="Call seller" onPress={contact.call}>
-              <PhoneCall size={20} color="#ffffff" />
-            </Round>
-          ) : null}
-          {contact.own ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => openLink('/account/profile')} style={styles.edit}>
-              <Pencil size={16} color="#ffffff" />
-              <ThemedText type="smallBold" style={{ color: '#ffffff' }}>Edit profile</ThemedText>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
+      <FloatingBar
+        top={insets.top}
+        left={
+          <RoundButton label="Back" onPress={() => router.back()}>
+            <ArrowLeft size={22} color="#ffffff" />
+          </RoundButton>
+        }
+        right={
+          <>
+            {contact.chat ? (
+              <RoundButton label="Chat with seller" onPress={contact.chat}>
+                <MessageCircle size={21} color="#ffffff" />
+              </RoundButton>
+            ) : null}
+            {contact.call ? (
+              <RoundButton label="Call seller" onPress={contact.call}>
+                <PhoneCall size={20} color="#ffffff" />
+              </RoundButton>
+            ) : null}
+            {contact.own ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => openLink('/account/profile')} style={bannerStyles.pill}>
+                <Pencil size={16} color="#ffffff" />
+                <ThemedText type="smallBold" style={{ color: '#ffffff' }}>Edit profile</ThemedText>
+              </Pressable>
+            ) : null}
+          </>
+        }
+      />
       {contact.ui}
     </View>
   );
@@ -109,93 +103,27 @@ export default function SellerScreen() {
 
 /** The top of the page, edge to edge under the status bar: the cover or the theme's gradient, the seller at its foot. */
 function Banner({ data, top }: { data: ShopSellerProfile; top: number }) {
-  const theme = useTheme();
   const since = new Date(data.member_since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  // The fades are drawn at the banner's measured size: an SVG sized by percentages is not always laid out over the whole
-  // of it on Android.
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
-    <View
-      testID="seller-banner"
-      onLayout={event => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
-      style={[styles.banner, { height: top + bannerHeight, backgroundColor: theme.primary }]}>
-      {data.banner_url ? (
-        <>
-          <Image source={{ uri: data.banner_url }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
-          {size ? <Fade id="cover" size={size} stops={[['#000000', 0.35, 0], ['#000000', 0, 0.3], ['#000000', 0.15, 0.5], ['#000000', 0.75, 1]]} /> : null}
-        </>
-      ) : (
-        <>
-          {size ? <Fade id="theme" size={size} diagonal stops={[[theme.accent, 1, 0], [theme.primary, 1, 0.55], [shade(theme.primary, 0.55), 1, 1]]} /> : null}
-          {size ? <Fade id="foot" size={size} stops={[['#000000', 0, 0.5], ['#000000', 0.3, 1]]} /> : null}
-        </>
-      )}
-      <View style={styles.who}>
+    <PageBanner testID="seller-banner" top={top} image={data.banner_url}>
+      <View style={bannerStyles.who}>
         <View style={styles.ring}>
           <Avatar name={data.name} url={data.avatar_url} size={72} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <ThemedText type="title" accessibilityRole="header" numberOfLines={2} style={styles.name}>
-            {data.name}
-          </ThemedText>
-          {data.username ? <ThemedText type="smallBold" style={styles.light}>@{data.username}</ThemedText> : null}
+          <BannerTitle>{data.name}</BannerTitle>
+          {data.username ? <ThemedText type="smallBold" style={bannerStyles.light}>@{data.username}</ThemedText> : null}
         </View>
       </View>
-      <View style={styles.chips}>
-        <Chip>{`On Udozo since ${since}`}</Chip>
+      <View style={bannerStyles.chips}>
+        <BannerChip>{`On Udozo since ${since}`}</BannerChip>
         {data.badges.map(badge => (
-          <Chip key={badge} icon={<BadgeCheck size={13} color="#ffffff" />}>
+          <BannerChip key={badge} icon={<BadgeCheck size={13} color="#ffffff" />}>
             {badgeLabels[badge]}
-          </Chip>
+          </BannerChip>
         ))}
       </View>
-    </View>
-  );
-}
-
-/**
- * A gradient over the whole banner, top to bottom or corner to corner: each stop a colour, its opacity and where it
- * sits. Opacity goes in `stopOpacity`, never as an rgba colour, which Android draws opaque (a black block over the cover).
- */
-function Fade({ id, stops, diagonal, size }: { id: string; stops: [string, number, number][]; diagonal?: boolean; size: { width: number; height: number } }) {
-  return (
-    <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} pointerEvents="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2={diagonal ? '1' : '0'} y2="1">
-          {stops.map(([color, opacity, offset]) => (
-            <Stop key={offset} offset={offset} stopColor={color} stopOpacity={opacity} />
-          ))}
-        </LinearGradient>
-      </Defs>
-      <Rect x={0} y={0} width={size.width} height={size.height} fill={`url(#${id})`} />
-    </Svg>
-  );
-}
-
-/** A `#rrggbb` colour darkened towards black by `amount` (0 to 1); anything else unchanged. */
-function shade(hex: string, amount: number) {
-  const match = /^#([0-9a-f]{6})$/i.exec(hex);
-  if (!match) return hex;
-  const value = parseInt(match[1], 16);
-  const part = (shift: number) => Math.round(((value >> shift) & 255) * (1 - amount)).toString(16).padStart(2, '0');
-  return `#${part(16)}${part(8)}${part(0)}`;
-}
-
-function Chip({ children, icon }: { children: string; icon?: ReactNode }) {
-  return (
-    <View style={styles.chip}>
-      {icon}
-      <ThemedText type="caption" style={styles.light}>{children}</ThemedText>
-    </View>
-  );
-}
-
-/** A white icon in a translucent dark circle, 44 points: readable over the banner and over the listings alike. */
-function Round({ label, onPress, children }: { label: string; onPress: () => void; children: ReactNode }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.round}>
-      {children}
-    </Pressable>
+    </PageBanner>
   );
 }
 
@@ -229,18 +157,7 @@ function Figure({ value, label }: { value: number | string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  // The list has side padding: the banner reaches past it to the screen's edges.
-  banner: { marginHorizontal: -Spacing.three, overflow: 'hidden', justifyContent: 'flex-end', paddingHorizontal: Spacing.three, paddingBottom: Spacing.three, gap: Spacing.two },
-  who: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   ring: { borderWidth: 3, borderColor: '#ffffff', borderRadius: 999 },
-  name: { color: '#ffffff', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
-  light: { color: '#ffffff' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one + 2 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: Radius.round, paddingHorizontal: Spacing.two + 2, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.2)' },
-  topBar: { position: 'absolute', left: Spacing.two, right: Spacing.two, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  actions: { flexDirection: 'row', gap: Spacing.two },
-  round: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.38)' },
-  edit: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, minHeight: 44, borderRadius: 22, paddingHorizontal: Spacing.three, backgroundColor: 'rgba(0,0,0,0.38)' },
   figures: { flexDirection: 'row', borderWidth: 1, borderRadius: Radius.medium, paddingVertical: Spacing.three },
   figure: { flex: 1, alignItems: 'center' },
   anjio: { borderRadius: Radius.medium, padding: Spacing.three, gap: 4 },
