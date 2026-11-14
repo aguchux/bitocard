@@ -10,7 +10,6 @@ import type {
   AdminStepUp,
   AuditEntry,
   Country,
-  FeatureRule,
   IdentityProvider,
   TwoStepMethod,
   Integration,
@@ -32,7 +31,6 @@ import type {
   PricingRuleInput,
   AdminPricePreview,
   AdminPricePreviewArgs,
-  ProductFeature,
   ProductCategory,
   ResellerDetail,
   ResellerStatus,
@@ -218,7 +216,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     }),
     resolveOrder: build.mutation<
       AdminOrderDetail,
-      { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number' | 'esim' | 'vpn_account'; code?: string; pin?: string; serial?: string }> }
+      { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'vpn_account'; code?: string; pin?: string; serial?: string }> }
     >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/orders/${id}/resolve`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity', 'Fee'],
@@ -233,7 +231,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     suppliers: build.query<List<Supplier>, void>({ query: () => '/v1/admin/suppliers', providesTags: [{ type: 'Supplier', id: 'LIST' }] }),
     supplier: build.query<Supplier, string>({ query: code => `/v1/admin/suppliers/${code}`, providesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }] }),
     /** Shown at once in the list and on the supplier; the saved supplier replaces both, so neither is refetched. */
-    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null; feature_rules: Partial<Record<ProductFeature, FeatureRule>>; customer_verification: boolean }>>({
+    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null; customer_verification: boolean }>>({
       query: ({ code, ...body }) => ({ url: `/v1/admin/suppliers/${code}`, method: 'PATCH', body }),
       async onQueryStarted({ code, resale_approved, ...change }, { dispatch, queryFulfilled }) {
         const apply = (supplier: Supplier) => {

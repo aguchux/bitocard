@@ -11,14 +11,14 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 const title = "BitoCard – Gift cards, airtime, data, bills and more";
-const description = "Shop digital gift cards, top up mobile airtime and data, pay bills and TV, and explore eSIMs and software, delivered digitally. Or open your own reseller store.";
+const description = "Shop digital gift cards, top up mobile airtime and data, pay bills and TV, and explore software and VPN, delivered digitally. Or open your own reseller store.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(3000),
   title: { default: title, template: "%s | BitoCard" },
   description,
   applicationName: brand.name,
-  keywords: ["gift cards", "buy gift cards online", "airtime top up", "mobile data", "pay bills online", "eSIM", "digital store", "gift card reseller", "BitoCard"],
+  keywords: ["gift cards", "buy gift cards online", "airtime top up", "mobile data", "pay bills online", "software licences", "digital store", "gift card reseller", "BitoCard"],
   category: "shopping",
   alternates: { canonical: "/" },
   openGraph: { type: "website", url: "/", siteName: brand.name, title, description, locale: "en_GB" },

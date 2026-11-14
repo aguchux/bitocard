@@ -16,8 +16,8 @@ export type AccountSection = {
 
 /**
  * The Account tab's screens, in menu order: each its own route, listed as rows on `/account/profile` and as underlined
- * tabs at the top of every screen. The identity check keeps its own address (`/account/verification`), which checkout, the
- * crypto pages and the identity partners' return links already use.
+ * tabs at the top of every screen. The identity check keeps its own address (`/account/verification`), which checkout and the
+ * identity partners' return links already use.
  */
 export const accountSections: AccountSection[] = [
   { key: "profile", href: "/account/profile/details", label: "Profile", note: "Your name, email and country", icon: UserRound },

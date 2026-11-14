@@ -5,7 +5,6 @@ import { formatFace, type StorePaymentMethods, type StoreProductDetail } from "@
 import { BuyForm } from "@/components/store/buy-form";
 import { walletFor } from "@/lib/wallet";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
-import { FeatureIcons } from "@/components/store/features";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
 import { categoryTheme } from "@/components/store/theme";
 import { storeNavigation } from "@/lib/navigation";
@@ -101,19 +100,6 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
             {product.brand.company ? ` · ${product.brand.company}` : ""}
           </p>
           {product.description ? <p className="mt-4 text-lg text-slate-700">{product.description}</p> : null}
-          {product.features?.length ? (
-            <section aria-labelledby="features" className="mt-6">
-              <h2 id="features" className="font-display text-lg font-bold">
-                What this {product.category === "virtual_numbers" ? "number" : "product"} can do
-              </h2>
-              <div className="mt-3">
-                <FeatureIcons features={product.features} />
-              </div>
-              {product.features.includes("app_codes") ? (
-                <p className="mt-3 text-sm text-slate-500">Receives SMS codes from apps and services. Some apps do not accept virtual numbers, so check before you rely on one.</p>
-              ) : null}
-            </section>
-          ) : null}
 
           {/* Signed in, the buy form lists the values itself. */}
           {customer ? null : (

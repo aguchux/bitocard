@@ -48,7 +48,7 @@ class AdminOrderFilterDto extends PageDto {
 }
 
 class DeliveryDto {
-  @IsIn(['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number', 'esim', 'vpn_account']) kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number' | 'esim' | 'vpn_account';
+  @IsIn(['gift_card', 'licence_key', 'token', 'confirmation', 'vpn_account']) kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'vpn_account';
   @IsOptional() @IsString() @Length(1, 200) code?: string;
   @IsOptional() @IsString() @Length(1, 100) pin?: string;
   @IsOptional() @IsString() @Length(1, 100) serial?: string;

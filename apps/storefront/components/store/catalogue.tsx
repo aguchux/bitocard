@@ -1,17 +1,15 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
-import { productFeatureLabels, type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
+import { type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
 import { query, storeApi } from "@/lib/api";
 import { inMarket } from "@/lib/market";
-import { featureIcon, filterFeatures, isFeature } from "./features";
 import { ProductCard } from "./product-card";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 import { SubmitOnChange } from "./submit-on-change";
 
 export const pageSize = 24;
 
-/** `features`: comma-separated product features every product must have (numbers that receive SMS, for example). */
-export type CatalogueParams = { q?: string; country?: string; brand?: string; tag?: string; sort?: string; features?: string; page?: string };
+export type CatalogueParams = { q?: string; country?: string; brand?: string; tag?: string; sort?: string; page?: string };
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -20,17 +18,12 @@ export function readParams(search: Record<string, string | string[] | undefined>
   const country = one(search.country)?.toLowerCase();
   const sort = one(search.sort);
   const page = one(search.page);
-  const features = (one(search.features) ?? "")
-    .split(",")
-    .map(item => item.trim().toLowerCase())
-    .filter(isFeature);
   return {
     q: one(search.q)?.trim().slice(0, 100) || undefined,
     country: country && /^([a-z]{2}|global)$/.test(country) ? country : undefined,
     brand: one(search.brand)?.slice(0, 80) || undefined,
     tag: one(search.tag)?.toLowerCase().slice(0, 40) || undefined,
     sort: sort === "name" || sort === "new" ? sort : undefined,
-    features: features.length ? [...new Set(features)].join(",") : undefined,
     page: page && /^\d{1,3}$/.test(page) && Number(page) > 1 ? page : undefined,
   };
 }
@@ -39,7 +32,7 @@ export function readParams(search: Record<string, string | string[] | undefined>
 export async function loadCatalogue(base: { category?: string; group?: string }, params: CatalogueParams) {
   const page = Number(params.page ?? 1);
   const result = await storeApi<StoreList<StoreProduct>>(
-    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, features: params.features, limit: pageSize, offset: (page - 1) * pageSize })}`),
+    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, limit: pageSize, offset: (page - 1) * pageSize })}`),
   );
   return { page, result };
 }
@@ -66,7 +59,6 @@ function Filters({ path, params, countries, compact = false }: { path: string; p
       {params.q ? <input type="hidden" name="q" value={params.q} /> : null}
       {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
       {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
-      {params.features ? <input type="hidden" name="features" value={params.features} /> : null}
       <label className="min-w-0 text-sm">
         <span className={label}>Country</span>
         <select name="country" defaultValue={params.country ?? ""} className={`${field} px-3`}>
@@ -91,34 +83,6 @@ function Filters({ path, params, countries, compact = false }: { path: string; p
         Apply
       </button>
     </form>
-  );
-}
-
-/** Number filters: each chip switches one feature on or off (products must have every chosen feature). */
-function FeatureFilters({ path, params }: { path: string; params: CatalogueParams }) {
-  const chosen = new Set((params.features ?? "").split(",").filter(Boolean));
-  return (
-    <ul aria-label="Filter by what it can do" className={`mt-4 ${chipRow}`}>
-      {filterFeatures.map(feature => {
-        const Icon = featureIcon[feature];
-        const on = chosen.has(feature);
-        const next = new Set(chosen);
-        if (on) next.delete(feature);
-        else next.add(feature);
-        return (
-          <li key={feature} className="shrink-0">
-            <Link
-              href={hrefWith(path, params, { features: next.size ? [...next].join(",") : undefined })}
-              aria-current={on ? "true" : undefined}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold whitespace-nowrap transition ${on ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-navy-900"}`}
-            >
-              <Icon className="size-4" aria-hidden="true" />
-              {productFeatureLabels[feature]}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 
@@ -248,9 +212,6 @@ export function CatalogueView({
         <div className="mt-3 lg:hidden">
           <Filters path={path} params={params} countries={countries} compact />
         </div>
-        {path === "/catalogs/virtual_numbers" || params.features ? (
-          <FeatureFilters path={path} params={params} />
-        ) : null}
         {chips.length ? (
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Active filters">
             {chips.map(chip => (
@@ -273,8 +234,7 @@ export function CatalogueView({
             {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
             {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
             {params.sort ? <input type="hidden" name="sort" value={params.sort} /> : null}
-            {params.features ? <input type="hidden" name="features" value={params.features} /> : null}
-            <label htmlFor="catalogue-search" className="sr-only">{`Search ${title.toLowerCase()}`}</label>
+                  <label htmlFor="catalogue-search" className="sr-only">{`Search ${title.toLowerCase()}`}</label>
             <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
               id="catalogue-search"

@@ -6,8 +6,6 @@ import { CheckoutModule } from '../checkout/checkout.module.js';
 import { CryptoModule } from '../crypto/crypto.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { FxModule } from '../fx/fx.module.js';
-import { NumbersModule } from '../numbers/numbers.module.js';
-import { EsimsModule } from '../esims/esims.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { PayoutsModule } from '../payouts/payouts.module.js';
@@ -23,5 +21,5 @@ import { PosModule } from '../pos/pos.module.js';
 import { ResaleModule } from '../resale/resale.module.js';
 import { MarketingModule } from '../marketing/marketing.controller.js';
 
-@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, SellerScoresModule, ResaleModule, MarketingModule, WhatsappModule, PosModule], controllers: [CronController] })
+@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, SellerScoresModule, ResaleModule, MarketingModule, WhatsappModule, PosModule], controllers: [CronController] })
 export class CronModule {}

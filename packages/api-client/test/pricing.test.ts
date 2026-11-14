@@ -37,9 +37,9 @@ describe('admin pricing', () => {
   test('previews a product under a trial rule and saves rules by scope', async () => {
     const store = makeStore();
     await store.dispatch(adminApi.endpoints.adminPricePreview.initiate({ product_id: 'p1', country: 'NG', kind: 'discount', reseller_discount_bps: 150 }));
-    await store.dispatch(adminApi.endpoints.setPricingRule.initiate({ supplier_code: 'didww', kind: 'fixed', fixed_price: 500, fixed_currency: 'USD' }));
+    await store.dispatch(adminApi.endpoints.setPricingRule.initiate({ supplier_code: 'zendit', kind: 'fixed', fixed_price: 500, fixed_currency: 'USD' }));
     expect(calls[0].url).toBe('http://api.test/v1/admin/pricing-rules/preview?product_id=p1&country=NG&kind=discount&reseller_discount_bps=150');
     expect(calls[1]).toMatchObject({ method: 'PUT', url: 'http://api.test/v1/admin/pricing-rules' });
-    expect(JSON.parse(calls[1].body ?? '{}')).toEqual({ supplier_code: 'didww', kind: 'fixed', fixed_price: 500, fixed_currency: 'USD' });
+    expect(JSON.parse(calls[1].body ?? '{}')).toEqual({ supplier_code: 'zendit', kind: 'fixed', fixed_price: 500, fixed_currency: 'USD' });
   });
 });

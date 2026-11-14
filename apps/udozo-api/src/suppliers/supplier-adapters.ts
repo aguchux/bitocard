@@ -5,8 +5,6 @@ import { inSandbox, urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { StubAdapter, type SupplierAdapter } from './adapter.js';
 import { AfricasTalkingAdapter } from './africas-talking.adapter.js';
-import { DidwwAdapter } from './didww.adapter.js';
-import { EsimAccessAdapter } from './esim-access.adapter.js';
 import { ReloadlyAdapter } from './reloadly.adapter.js';
 import { StockAdapter } from './stock.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
@@ -45,13 +43,6 @@ export class SupplierAdapters {
       const adapters: SupplierAdapter[] = [
         reloadly(config, live('reloadly') ? { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET } : {}),
         new VtpassAdapter(live('vtpass') ? { apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY } : {}, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE, config.VTPASS_COMMISSIONS),
-        new DidwwAdapter({
-          apiKey: live('didww') ? config.DIDWW_API_KEY : undefined,
-          baseUrl: config.DIDWW_API_URL,
-          countries: config.DIDWW_COUNTRIES,
-          callbackBase: config.DIDWW_CALLBACK_URL,
-          sms: live('didww') ? { url: config.DIDWW_SMS_URL, username: config.DIDWW_SMS_USERNAME, password: config.DIDWW_SMS_PASSWORD } : undefined,
-        }),
         new ZenditAdapter({ apiKey: live('zendit') ? config.ZENDIT_API_KEY : undefined, baseUrl: config.ZENDIT_API_URL }),
         new PawapayAdapter({ apiToken: live('pawapay') ? config.PAWAPAY_API_TOKEN : undefined, baseUrl: config.PAWAPAY_API_URL, feePercent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
         new AfricasTalkingAdapter({
@@ -65,7 +56,6 @@ export class SupplierAdapters {
           dataPlans: config.AFRICAS_TALKING_DATA_PLANS,
         }),
         new RemitaAdapter({ secretKey: live('remita') ? config.REMITA_SECRET_KEY : undefined, baseUrl: config.REMITA_API_URL, contactPhone: config.REMITA_CONTACT_PHONE }),
-        new EsimAccessAdapter({ accessCode: config.ESIM_ACCESS_ACCESS_CODE, secretKey: config.ESIM_ACCESS_SECRET_KEY, baseUrl: config.ESIM_ACCESS_API_URL }),
         new VpnresellersAdapter((() => {
           const credentials = integrations.supplier('vpnresellers');
           return {
@@ -84,16 +74,14 @@ export class SupplierAdapters {
   /**
    * An adapter on a reseller's own supplier account (their credentials, BitoCard's live addresses), for that
    * reseller's own orders only. Null for a supplier that cannot be connected this way. Live only: the sandbox never
-   * calls suppliers. The connection names the account's own notification address (DIDWW callbacks).
+   * calls suppliers.
    */
-  forAccount(code: string, credentials: Record<string, string>, connectionId?: string): SupplierAdapter | null {
+  forAccount(code: string, credentials: Record<string, string>): SupplierAdapter | null {
     // Always the providers' live addresses, whatever BitoCard's own Sandbox switches say.
     const config = urlsFor(this.integrations.config, 'live');
     if (code === 'reloadly') return reloadly(config, { clientId: credentials.client_id, clientSecret: credentials.client_secret });
     if (code === 'vtpass') return new VtpassAdapter({ apiKey: credentials.api_key, publicKey: credentials.public_key, secretKey: credentials.secret_key }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE, credentials.commissions);
-    if (code === 'didww') return new DidwwAdapter({ apiKey: credentials.api_key, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL, connectionId });
     if (code === 'zendit') return new ZenditAdapter({ apiKey: credentials.api_key, baseUrl: config.ZENDIT_API_URL });
-    if (code === 'esim_access') return new EsimAccessAdapter({ accessCode: credentials.access_code, secretKey: credentials.secret_key, baseUrl: config.ESIM_ACCESS_API_URL });
     if (code === 'remita') return new RemitaAdapter({ secretKey: credentials.secret_key, baseUrl: config.REMITA_API_URL, contactPhone: config.REMITA_CONTACT_PHONE });
     if (code === 'pawapay') return new PawapayAdapter({ apiToken: credentials.api_token, baseUrl: config.PAWAPAY_API_URL, feePercent: credentials.payout_fee_percent });
     if (code === 'africas_talking') {

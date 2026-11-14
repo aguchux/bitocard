@@ -41,7 +41,7 @@ describe('integration settings', () => {
     const registry = await prisma.supplier.findMany({ select: { code: true } });
     const suppliers = json.data.filter(item => item.section === 'suppliers');
     assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'flutterwave_cards' && code !== 'stock')));
-    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['africas_talking', 'didww', 'esim_access', 'pawapay', 'reloadly', 'remita', 'vpnresellers', 'vtpass', 'zendit']);
+    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['africas_talking', 'pawapay', 'reloadly', 'remita', 'vpnresellers', 'vtpass', 'zendit']);
     const sms = json.data.find(item => item.id === 'sms');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').source, 'environment');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').value, 'EnvSender');
@@ -156,48 +156,27 @@ describe('integration settings', () => {
   });
 
   test('suppliers without an adapter yet: credentials are saved encrypted, write-only, for the adapter to read later', async () => {
-    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'airalo');
-    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'AIRALO_CLIENT_SECRET').source], ['not_connected', false, 'unset']);
+    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'pax8');
+    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'PAX8_CLIENT_SECRET').source], ['not_connected', false, 'unset']);
 
-    const key = 'airalo-live-secret-abcd1234';
-    const saved = await update('airalo', { AIRALO_CLIENT_ID: 'airalo-client', AIRALO_CLIENT_SECRET: key, AIRALO_API_URL: 'https://sandbox-partners-api.airalo.com' });
+    const key = 'pax8-live-secret-abcd1234';
+    const saved = await update('pax8', { PAX8_CLIENT_ID: 'pax8-client', PAX8_CLIENT_SECRET: key, PAX8_API_URL: 'https://api.pax8.com' });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
     assert.equal(saved.json.status, 'connected');
-    assert.deepEqual([fieldOf(saved.json, 'AIRALO_CLIENT_SECRET').hint, fieldOf(saved.json, 'AIRALO_CLIENT_SECRET').value], ['…1234', null]);
-    assert.equal(fieldOf(saved.json, 'AIRALO_API_URL').value, 'https://sandbox-partners-api.airalo.com');
+    assert.deepEqual([fieldOf(saved.json, 'PAX8_CLIENT_SECRET').hint, fieldOf(saved.json, 'PAX8_CLIENT_SECRET').value], ['…1234', null]);
+    assert.equal(fieldOf(saved.json, 'PAX8_API_URL').value, 'https://api.pax8.com');
     assert.ok(!JSON.stringify(saved.json).includes(key));
-    assert.deepEqual(integrations.supplier('airalo'), { CLIENT_ID: 'airalo-client', CLIENT_SECRET: key, API_URL: 'https://sandbox-partners-api.airalo.com' });
-    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { platform_key: { platform: 'bitocard', key: 'AIRALO_CLIENT_SECRET' } } });
+    assert.deepEqual(integrations.supplier('pax8'), { CLIENT_ID: 'pax8-client', CLIENT_SECRET: key, API_URL: 'https://api.pax8.com' });
+    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { platform_key: { platform: 'bitocard', key: 'PAX8_CLIENT_SECRET' } } });
     assert.ok(row.encrypted && !row.value.includes(key));
 
-    assert.equal((await update('airalo', { AIRALO_API_URL: 'not a url' })).json.error.param, 'values.AIRALO_API_URL');
-    assert.equal((await update('airalo', { TWILIO_AUTH_TOKEN: 'x' })).status, 400, 'another supplier’s field');
-    const cleared = await update('airalo', { AIRALO_CLIENT_SECRET: null });
-    assert.equal(fieldOf(cleared.json, 'AIRALO_CLIENT_SECRET').source, 'unset');
-    assert.equal(integrations.supplier('airalo').CLIENT_SECRET, undefined);
+    assert.equal((await update('pax8', { PAX8_API_URL: 'not a url' })).json.error.param, 'values.PAX8_API_URL');
+    assert.equal((await update('pax8', { NEXWAY_SECRET_KEY: 'x' })).status, 400, 'another supplier’s field');
+    const cleared = await update('pax8', { PAX8_CLIENT_SECRET: null });
+    assert.equal(fieldOf(cleared.json, 'PAX8_CLIENT_SECRET').source, 'unset');
+    assert.equal(integrations.supplier('pax8').CLIENT_SECRET, undefined);
   });
 
-  test('DIDWW has a built adapter: its settings are integration keys with environment fallback', async () => {
-    const didww = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
-    assert.deepEqual([didww.section, didww.adapter_ready], ['suppliers', true]);
-    assert.deepEqual(didww.fields.map(item => item.key), [
-      'DIDWW_API_KEY',
-      'DIDWW_SANDBOX',
-      'DIDWW_API_URL',
-      'DIDWW_COUNTRIES',
-      'DIDWW_CALLBACK_URL',
-      'DIDWW_SMS_WEBHOOK_TOKEN',
-      'DIDWW_SMS_USERNAME',
-      'DIDWW_SMS_PASSWORD',
-      'DIDWW_SMS_URL',
-      'DIDWW_SMS_MAX_PRICE_CENTS',
-    ]);
-    // The SMS settings are optional: numbers work without SMS.
-    assert.deepEqual(didww.fields.filter(item => item.required).map(item => item.key), ['DIDWW_API_KEY']);
-    const saved = await update('didww', { DIDWW_COUNTRIES: 'GB, US,CA' });
-    assert.equal(saved.status, 200, JSON.stringify(saved.json));
-    assert.deepEqual(integrations.config.DIDWW_COUNTRIES, ['GB', 'US', 'CA']);
-  });
 });
 
 describe('every integration explains itself', () => {
@@ -223,7 +202,7 @@ describe('every integration explains itself', () => {
   test('the admin app gets each integration’s links', async () => {
     const list = (await admin.get('/v1/admin/integrations')).json.data;
     assert.ok(list.find(item => item.id === 'email').links.some(link => link.url === 'https://resend.com/api-keys'));
-    assert.ok(list.find(item => item.id === 'telnyx').links.length > 0, 'suppliers whose adapter is not built too');
+    assert.ok(list.find(item => item.id === 'nexway').links.length > 0, 'suppliers whose adapter is not built too');
     assert.deepEqual(list.find(item => item.id === 'general').links, []);
   });
 });

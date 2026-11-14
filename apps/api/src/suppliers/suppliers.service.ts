@@ -5,7 +5,6 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Product, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
 import { PricingService, worldwideCategories } from '../catalogue/pricing.service.js';
-import { featureRuleValues, type FeatureRule, isProductFeature, type ProductFeature, readFeatureRules } from '../catalogue/features.js';
 import type { CatalogueItem, CatalogueScope, SupplierAdapter } from './adapter.js';
 import { stockSupplier } from './stock.adapter.js';
 import { StorefrontService } from '../storefront/storefront.service.js';
@@ -57,7 +56,6 @@ export function productData(item: CatalogueItem) {
     description: item.description ?? null,
     redeemInstructions: item.redeemInstructions ?? null,
     logoUrl: item.logoUrl ?? null,
-    features: item.features ?? [],
   };
 }
 
@@ -75,8 +73,7 @@ function productChanged(product: Product, data: ReturnType<typeof productData>) 
     product.recipientType !== data.recipientType ||
     product.description !== data.description ||
     product.redeemInstructions !== data.redeemInstructions ||
-    product.logoUrl !== data.logoUrl ||
-    product.features.join(',') !== data.features.join(',')
+    product.logoUrl !== data.logoUrl
   );
 }
 
@@ -121,20 +118,11 @@ export type SupplierUpdate = Partial<{
   requires_ip_allowlist: boolean | null;
   notes: string | null;
   logo_url: string | null;
-  /** The whole set of feature rules ({ feature: required | allowed | excluded }); features left out are allowed. */
-  feature_rules: Record<string, string>;
   customer_verification: boolean;
 }>;
 
 /** Admin view of a supplier. Never returned by reseller endpoints. */
-/** Each gated feature's rule (allowed unless set), or null for suppliers whose products have no features to gate. */
-function presentFeatureRules(supplier: Supplier, adapter: Pick<SupplierAdapter, 'gatedFeatures'>) {
-  if (!adapter.gatedFeatures?.length) return null;
-  const rules = readFeatureRules(supplier.featureRules);
-  return Object.fromEntries(adapter.gatedFeatures.map(feature => [feature, rules[feature] ?? 'allowed'])) as Record<ProductFeature, FeatureRule>;
-}
-
-export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[] }, adapter: Pick<SupplierAdapter, 'configured' | 'gatedFeatures'>, sandbox = false) {
+export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[] }, adapter: Pick<SupplierAdapter, 'configured'>, sandbox = false) {
   const configured = adapter.configured();
   return {
     object: 'supplier' as const,
@@ -159,7 +147,6 @@ export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[
     },
     requires_ip_allowlist: supplier.requiresIpAllowlist,
     notes: supplier.notes,
-    feature_rules: presentFeatureRules(supplier, adapter),
     /** bitocard.com customers buying its products are asked for the identity check where the market requires it. */
     customer_verification: supplier.customerVerification,
     markets: supplier.markets?.map(m => ({ country: m.countryCode, category: m.category, enabled: m.enabled })),
@@ -208,7 +195,6 @@ export class SuppliersService {
     const before = await this.prisma.supplier.findUnique({ where: { code } });
     if (!before) throw notFound('supplier');
     const big = (value: number | null | undefined) => (value === undefined ? undefined : value === null ? null : BigInt(value));
-    const featureRules = input.feature_rules === undefined ? undefined : this.featureRules(code, input.feature_rules);
     const after = await this.prisma.supplier.update({
       where: { code },
       data: {
@@ -224,31 +210,11 @@ export class SuppliersService {
         requiresIpAllowlist: input.requires_ip_allowlist,
         notes: input.notes,
         logoUrl: input.logo_url,
-        featureRules,
         customerVerification: input.customer_verification,
       },
     });
     await this.audit.record({ actorId, action: 'supplier.updated', targetType: 'supplier', targetId: code, before, after });
     return this.get(code);
-  }
-
-  /** Checks an admin's feature rules against what the supplier's adapter can gate; `allowed` is not stored. */
-  private featureRules(code: string, input: Record<string, string>) {
-    const gated = new Set<string>(this.adapters.get(code).gatedFeatures ?? []);
-    if (gated.size === 0) {
-      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'This supplier has no product features to set rules for.', 'feature_rules');
-    }
-    const rules: Record<string, FeatureRule> = {};
-    for (const [feature, rule] of Object.entries(input)) {
-      if (!isProductFeature(feature) || !gated.has(feature)) {
-        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', `Unknown feature: ${feature}.`, `feature_rules.${feature}`);
-      }
-      if (!(featureRuleValues as readonly string[]).includes(rule)) {
-        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A feature rule is required, allowed or excluded.', `feature_rules.${feature}`);
-      }
-      if (rule !== 'allowed') rules[feature] = rule as FeatureRule;
-    }
-    return rules;
   }
 
   /** Switches a supplier on or off for a category in a market. */
@@ -266,16 +232,15 @@ export class SuppliersService {
     return this.get(code);
   }
 
-  /** What to sync for a supplier: each enabled market, with worldwide categories (gift cards, numbers) fetched once. */
+  /** What to sync for a supplier: each enabled market, with worldwide categories (gift cards, software) fetched once. */
   private async scopes(code: string): Promise<CatalogueScope[]> {
     const adapter = this.adapters.get(code);
     const markets = await this.prisma.supplierMarket.findMany({ where: { supplierCode: code, enabled: true } });
-    const features = adapter.gatedFeatures?.length ? readFeatureRules((await this.prisma.supplier.findUnique({ where: { code } }))?.featureRules) : undefined;
     const scopes = new Map<string, CatalogueScope>();
     for (const market of markets) {
       if (!adapter.syncs.includes(market.category)) continue;
       const country = worldwideCategories.has(market.category) ? null : market.countryCode;
-      scopes.set(`${market.category}:${country}`, { category: market.category, country, ...(features ? { features } : {}) });
+      scopes.set(`${market.category}:${country}`, { category: market.category, country });
     }
     return [...scopes.values()];
   }
@@ -351,7 +316,7 @@ export class SuppliersService {
 
   /**
    * Saves a supplier's catalogue in batches (a few queries per 500 offers, not several per offer, so catalogues of
-   * thousands, such as DIDWW's numbers, sync well inside the function time limit). Only what changed is written;
+   * thousands sync well inside the function time limit). Only what changed is written;
    * offers still listed but unchanged are marked seen in one statement. Admin settings (discount, priority) are kept.
    */
   private async saveOffers(supplierCode: string, items: CatalogueItem[]) {

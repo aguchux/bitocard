@@ -79,7 +79,7 @@ class StoreFieldsDto {
   @IsOptional() @IsString() @Length(2, 40)
   theme?: string;
 
-  @ApiPropertyOptional({ description: 'Single product stores: the product key it sells (one you have listed).', example: 'esim:WW:global:10gb-30d' })
+  @ApiPropertyOptional({ description: 'Single product stores: the product key it sells (one you have listed).', example: 'gift_cards:US:amazon:usd' })
   @IsOptional() @ValidateIf((_object, value) => value !== null) @IsString() @Length(3, 200)
   focus?: string | null;
 }

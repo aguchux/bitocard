@@ -53,7 +53,7 @@ describe("store header", () => {
     const html = renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: "NG", signedIn: true, store: null }));
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)</g)].map(match => [match[1]!.replaceAll("&amp;", "&"), match[2]]);
     const quick = links.filter(([href]) => href!.startsWith("/catalogs/"));
-    expect(quick.map(([, label]) => label)).toEqual(["Virtual numbers", "RDP", "VPN"]);
+    expect(quick.map(([, label]) => label)).toEqual(["RDP", "VPN"]);
     expect(html).not.toContain(">Shop<");
     expect(html).not.toContain("shop.bitocard.com");
     expect(html).not.toContain("/listings");

@@ -38,7 +38,6 @@
     { "slug": "tinder", "name": "Tinder", "company": "Match Group", "slugs": ["tinder"], "color": "#FE3C72", "aliases": ["tinder gold", "tinder plus"], "tags": ["entertainment"], "logo": null, "card": null },
     { "slug": "uber", "name": "Uber", "company": "Uber Technologies", "slugs": ["uber"], "color": "#000000", "aliases": ["uber rides"], "tags": ["travel", "food"], "logo": null, "card": null, "icon": "gift-cards/uber.svg", "art": "uber.png" },
     { "slug": "airbnb", "name": "Airbnb", "company": "Airbnb, Inc.", "slugs": ["airbnb"], "color": "#FF5A5F", "aliases": [], "tags": ["travel"], "logo": null, "card": null, "icon": "gift-cards/airbnb.svg", "art": "airbnb.png" },
-    { "slug": "airalo", "name": "Airalo", "company": "Airalo", "slugs": ["airalo"], "color": "#FF4F5A", "aliases": ["esim"], "tags": ["travel"], "logo": null, "card": null, "icon": "suppliers/airalo.svg" },
     { "slug": "flixbus", "name": "FlixBus", "company": "Flix SE", "slugs": ["flixbus"], "color": "#73D700", "aliases": ["flix"], "tags": ["travel"], "logo": null, "card": null },
     { "slug": "ebay", "name": "eBay", "company": "eBay Inc.", "slugs": ["ebay"], "color": "#E53238", "aliases": [], "tags": ["shopping"], "logo": null, "card": null, "icon": "gift-cards/ebay.svg" },
     { "slug": "walmart", "name": "Walmart", "company": "Walmart Inc.", "slugs": ["walmart"], "color": "#0071CE", "aliases": [], "tags": ["shopping"], "logo": null, "card": null },

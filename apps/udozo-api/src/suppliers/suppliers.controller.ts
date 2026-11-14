@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import type { ConfirmMethod } from '../auth/confirm-methods.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
@@ -30,8 +30,6 @@ class UpdateSupplierDto {
   @IsOptional() @ValidateIf(nullable) @IsBoolean() requires_ip_allowlist?: boolean | null;
   @IsOptional() @ValidateIf(nullable) @IsString() @Length(0, 2000) notes?: string | null;
   @IsOptional() @ValidateIf(nullable) @Matches(httpsUrl, { message: 'logo_url must be an https:// address' }) @Length(0, 1000) logo_url?: string | null;
-  /** { feature: required | allowed | excluded }, checked against the supplier's gated features. */
-  @IsOptional() @IsObject() feature_rules?: Record<string, string>;
   /** bitocard.com customers buying products routed here are asked for the identity check where the market requires it. */
   @IsOptional() @IsBoolean() customer_verification?: boolean;
 }

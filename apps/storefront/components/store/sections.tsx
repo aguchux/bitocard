@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, CreditCard, Gift, Globe2, Signal, Smartphone } from "lucide-react";
+import { ArrowRight, Check, CreditCard, Gift, Globe2, Smartphone } from "lucide-react";
 import type { ResolvedSection, StoreBrand, StoreCountry, StoreDesign, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { densityGap } from "@/lib/store-theme";
 import { brand as site } from "@bitocard/ui/site";
@@ -260,7 +260,7 @@ function PromoArt({ illustration }: { illustration: Extract<ResolvedSection, { t
       </div>
     );
   }
-  const Icon = illustration === "esim" ? Signal : illustration === "gift" ? Gift : Globe2;
+  const Icon = illustration === "gift" ? Gift : Globe2;
   return (
     <div aria-hidden="true" className="mx-auto grid h-28 w-24 shrink-0 rotate-6 place-items-center rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-xl">
       <Icon className="size-12" />

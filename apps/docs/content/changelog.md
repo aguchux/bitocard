@@ -12,6 +12,10 @@ The API is versioned in its path (`/v1`). Within a version:
 
 Webhook payloads carry their own `api_version`; see [Webhooks → Versioning](/guides/webhooks#versioning).
 
+## November 2026
+
+- **eSIMs and virtual numbers removed.** BitoCard no longer sells eSIMs or virtual phone numbers. The `esim` and `virtual_numbers` categories and their products are gone from the catalogue, the Numbers and eSIMs endpoints (`/v1/numbers…`, `/v1/esims…`) answer as unknown routes, and the `number.renewed`, `number.expired`, `number.deleted`, `number.sms_received` and `esim.updated` events are no longer sent. Orders no longer deliver `virtual_number` or `esim`. Past orders of them have been removed.
+
 ## October 2026
 
 - **Resale moves to Udozo.** BitoCard Shop and reselling its listings are leaving BitoCard for their own product, Udozo, with its own API. The Resale endpoints (`/v1/resale…`, never opened to live sales) are no longer part of BitoCard's API and answer as unknown routes.

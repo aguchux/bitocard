@@ -23,8 +23,6 @@ export type EditorSources = {
   image: { realm: MediaRealm; purpose: MediaPurpose };
   /** The categories the page sells (a store's template); every category when not given. */
   categories?: ProductCategory[];
-  /** Coins the crypto sections can offer (codes). */
-  coins?: string[];
   /** BitoCard Shop categories a Resale shop's listing sections can show (slug and name). */
   resaleCategories?: Array<{ slug: string; name: string }>;
 };
@@ -58,7 +56,6 @@ export const themes: Array<{ value: PromoTheme; label: string; swatch: string }>
 export const illustrations: Array<{ value: PromoIllustration; label: string }> = [
   { value: "none", label: "None" },
   { value: "store", label: "Store" },
-  { value: "esim", label: "eSIM" },
   { value: "gift", label: "Gift" },
   { value: "globe", label: "Globe" },
 ];

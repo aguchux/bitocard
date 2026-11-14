@@ -2,7 +2,6 @@ import type { AppConfig } from '../config/config.js';
 import { isTestKey, type Environment } from '../integrations/endpoints.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
 import { africasTalkingCheck } from '../suppliers/africas-talking.adapter.js';
-import { EsimAccessAdapter } from '../suppliers/esim-access.adapter.js';
 import { RemitaAdapter } from '../suppliers/remita.adapter.js';
 
 export type ConnectableKind = 'supplier' | 'payment_gateway';
@@ -18,7 +17,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL' | 'PAYSTACK_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL' | 'PAYSTACK_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -29,10 +28,10 @@ export type ConnectableIntegration = {
   fields: ConnectableField[];
   /**
    * Suppliers that notify order updates: each live connection gets its own address (`/v1/webhooks/<id>/<connection>`).
-   * `manual`: the reseller enters it in the supplier's dashboard and saves the signature secret (`secretField`);
-   * `automatic`: BitoCard gives it to the supplier on every order. Without it, own orders rely on scheduled checks.
+   * `manual`: the reseller enters it in the supplier's dashboard and saves the signature secret (`secretField`).
+   * Without it, own orders rely on scheduled checks.
    */
-  notifications?: { setup: 'manual'; secretField: string } | { setup: 'automatic' };
+  notifications?: { setup: 'manual'; secretField: string };
   /**
    * A harmless call proving the credentials work (a token, a balance), at the live or sandbox addresses given. Throws a
    * ProviderError: `definite` when the provider refused the credentials, otherwise it could not be reached.
@@ -97,20 +96,6 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     fromSettings: config => ({ api_key: config.VTPASS_API_KEY, public_key: config.VTPASS_PUBLIC_KEY, secret_key: config.VTPASS_SECRET_KEY, commissions: config.VTPASS_COMMISSIONS }),
   },
   {
-    id: 'didww',
-    kind: 'supplier',
-    name: 'DIDWW',
-    description: 'Virtual phone numbers from your own DIDWW account.',
-    fields: [secret('api_key', 'API key')],
-    notifications: { setup: 'automatic' },
-    check: async (values, urls) => {
-      await providerRequest('didww', `${urls.DIDWW_API_URL}/balance`, {
-        headers: { 'api-key': values.api_key, accept: 'application/vnd.api+json', 'x-didww-api-version': '2022-05-10' },
-      });
-    },
-    fromSettings: config => ({ api_key: config.DIDWW_API_KEY }),
-  },
-  {
     id: 'zendit',
     kind: 'supplier',
     name: 'Zendit',
@@ -170,21 +155,6 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       data_product: config.AFRICAS_TALKING_DATA_PRODUCT,
       data_plans: config.AFRICAS_TALKING_DATA_PLANS,
     }),
-  },
-  {
-    id: 'esim_access',
-    kind: 'supplier',
-    name: 'eSIM Access',
-    description: 'eSIM data packages paid from your own eSIM Access balance.',
-    fields: [
-      field('access_code', 'Access code', { help: 'eSIM Access console > Developer: the AccessCode.' }),
-      secret('secret_key', 'Secret key', { help: 'eSIM Access console > Developer: the SecretKey, which signs every request.' }),
-    ],
-    // eSIM Access has no sandbox: both environments check the live account's balance.
-    check: async (values, urls) => {
-      await new EsimAccessAdapter({ accessCode: values.access_code, secretKey: values.secret_key, baseUrl: urls.ESIM_ACCESS_API_URL }).balance();
-    },
-    fromSettings: config => ({ access_code: config.ESIM_ACCESS_ACCESS_CODE, secret_key: config.ESIM_ACCESS_SECRET_KEY }),
   },
   {
     id: 'flutterwave',

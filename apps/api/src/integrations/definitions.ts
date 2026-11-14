@@ -19,7 +19,7 @@ import { supplierCredentialGroups, supplierCredentialKey } from './supplier-cred
 export type IntegrationKind = 'text' | 'url' | 'email' | 'number' | 'flag';
 
 export type IntegrationField = {
-  /** The environment variable it replaces (platform settings), or the supplier credential's name (`TELNYX_API_KEY`). */
+  /** The environment variable it replaces (platform settings), or the supplier credential's name (`NEXWAY_API_KEY`). */
   key: string;
   label: string;
   /** Write-only: encrypted at rest and never returned (the API shows only the last four characters). */
@@ -102,16 +102,6 @@ const integrationKeyList = [
   'VTPASS_SANDBOX',
   'VTPASS_CONTACT_PHONE',
   'VTPASS_COMMISSIONS',
-  'DIDWW_API_KEY',
-  'DIDWW_API_URL',
-  'DIDWW_SANDBOX',
-  'DIDWW_COUNTRIES',
-  'DIDWW_CALLBACK_URL',
-  'DIDWW_SMS_WEBHOOK_TOKEN',
-  'DIDWW_SMS_USERNAME',
-  'DIDWW_SMS_PASSWORD',
-  'DIDWW_SMS_URL',
-  'DIDWW_SMS_MAX_PRICE_CENTS',
   'ZENDIT_API_KEY',
   'ZENDIT_API_URL',
   'ZENDIT_SANDBOX',
@@ -146,10 +136,6 @@ const integrationKeyList = [
   'REMITA_SANDBOX',
   'REMITA_API_URL',
   'REMITA_CONTACT_PHONE',
-  'ESIM_ACCESS_ACCESS_CODE',
-  'ESIM_ACCESS_SECRET_KEY',
-  'ESIM_ACCESS_API_URL',
-  'ESIM_ACCESS_WEBHOOK_TOKEN',
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_API_URL',
   'ANTHROPIC_PRICES',
@@ -411,27 +397,6 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     ],
   },
   {
-    id: 'didww',
-    name: 'DIDWW',
-    description: 'Virtual phone numbers (voice and SMS). Without an API key it serves only the sandbox, never live orders.',
-    webhookPath: '/v1/webhooks/didww',
-    fields: [
-      secret('DIDWW_API_KEY', 'API key', { help: 'DIDWW dashboard > API. Also verifies DIDWW’s order callbacks.' }),
-      field('DIDWW_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: DIDWW’s sandbox (https://sandbox-api.didww.com/v3) with a sandbox key, for Test connection only; DIDWW is not synced or used for live orders. Off: live.' }),
-      field('DIDWW_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
-      field('DIDWW_COUNTRIES', 'Number countries', { help: 'ISO codes of the countries whose numbers are synced, separated by commas, for example GB,US.' }),
-      field('DIDWW_CALLBACK_URL', 'API public address', { kind: 'url', help: 'Order callbacks go to this address plus /v1/webhooks/didww. Default: https://api.bitocard.com' }),
-      secret('DIDWW_SMS_WEBHOOK_TOKEN', 'Incoming SMS token', {
-        required: false,
-        help: 'At least 16 characters. In DIDWW’s panel, create an HTTP IN SMS trunk posting JSON to <API public address>/v1/webhooks/didww-sms?token=<this token> (body in the API guide), and assign it to each number.',
-      }),
-      field('DIDWW_SMS_USERNAME', 'Outgoing SMS username', { help: 'DIDWW panel > SMS trunks > your HTTP OUT trunk. Its callback address: <API public address>/v1/webhooks/didww-sms-status?token=<Incoming SMS token>.' }),
-      secret('DIDWW_SMS_PASSWORD', 'Outgoing SMS password', { required: false, help: 'The HTTP OUT trunk’s password.' }),
-      field('DIDWW_SMS_URL', 'Outgoing SMS address', { kind: 'url', help: 'Default: https://sms-out.didww.com' }),
-      field('DIDWW_SMS_MAX_PRICE_CENTS', 'Most an SMS part may cost (US cents)', { kind: 'number', help: 'Held from the wallet before each SMS is sent; the real price is charged once DIDWW reports it. Default: 10.' }),
-    ],
-  },
-  {
     id: 'zendit',
     name: 'Zendit',
     description: 'Gift cards worldwide, and mobile airtime, bundles and data by country. Without an API key it serves only the sandbox, never live orders.',
@@ -507,22 +472,6 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('REMITA_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Remita’s demo gateway (api-demo.systemspecsng.com) with the test key, for Test connection only; Remita is not synced or used for live orders. Off: live (api-gateway.remita.net).' }),
       field('REMITA_CONTACT_PHONE', 'Contact phone', { required: false, help: 'Sent with electricity and TV payments when the customer gave no phone number, for example 08011111111.' }),
       field('REMITA_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
-    ],
-  },
-  {
-    id: 'esim_access',
-    name: 'eSIM Access',
-    description:
-      'eSIM data packages for travellers, ordered on demand from BitoCard’s prepaid eSIM Access balance: every fixed package (country, regional and global). eSIM Access has no sandbox: BitoCard’s sandbox orders are simulated, and without both keys it serves only the sandbox.',
-    webhookPath: '/v1/webhooks/esim-access?token=<webhook token>',
-    fields: [
-      field('ESIM_ACCESS_ACCESS_CODE', 'Access code', { required: true, help: 'eSIM Access console > Developer: the AccessCode (sent with every request).' }),
-      secret('ESIM_ACCESS_SECRET_KEY', 'Secret key', { help: 'eSIM Access console > Developer: the SecretKey, which signs every request. Never sent.' }),
-      field('ESIM_ACCESS_API_URL', 'API address', { kind: 'url', help: 'Default: https://api.esimaccess.com' }),
-      secret('ESIM_ACCESS_WEBHOOK_TOKEN', 'Webhook token', {
-        required: false,
-        help: 'Choose a long random value (at least 16 characters). In the eSIM Access console (Developer > Webhook), set https://api.bitocard.com/v1/webhooks/esim-access?token= followed by this value: eSIMs are then delivered as soon as they are ready. Without it, orders are still checked on schedule.',
-      }),
     ],
   },
   {
@@ -620,7 +569,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access', 'africas_talking', 'remita']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'zendit', 'pawapay', 'africas_talking', 'remita']);
 /** Credential groups whose adapter transport is implemented. They stay unavailable until their Supplier row and markets are enabled. */
 const builtCredentialSuppliers = new Set(['vpnresellers']);
 

@@ -238,7 +238,7 @@ export class CatalogueController {
   @ApiOperation({
     summary: 'Preview your price and profit',
     description:
-      'What one sale of a product earns you: BitoCard’s price, your customer’s price and your profit, under the product’s scheme. `discount` products (airtime, data, bills, gift cards…) sell at face value at most: you earn your discount from BitoCard and may give part of it to your customer (`customer_discount_bps`). `markup` products (numbers, software…) are priced up from BitoCard’s price with your markup or a fixed price. Try settings with the query (nothing is saved); save them with `PUT /v1/pricing/markups`.',
+      'What one sale of a product earns you: BitoCard’s price, your customer’s price and your profit, under the product’s scheme. `discount` products (airtime, data, bills, gift cards…) sell at face value at most: you earn your discount from BitoCard and may give part of it to your customer (`customer_discount_bps`). `markup` products (software, mobile money…) are priced up from BitoCard’s price with your markup or a fixed price. Try settings with the query (nothing is saved); save them with `PUT /v1/pricing/markups`.',
   })
   @Get('products/:id/price-preview')
   async preview(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Query() query: PricePreviewDto) {

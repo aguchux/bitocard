@@ -11,11 +11,9 @@ export const categoryLabels: Record<ProductCategory, string> = {
   data: 'Data',
   bills: 'Bills',
   pay_tv: 'Pay-TV',
-  esim: 'eSIMs',
   software: 'Software',
   vpn: 'VPN',
   rdp: 'RDP',
-  virtual_numbers: 'Virtual numbers',
   virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
 };
@@ -23,9 +21,8 @@ export const categoryLabels: Record<ProductCategory, string> = {
 /** The storefront's main menu: each group links to its categories (and lists their top brands). */
 export const navigationGroups: Array<{ key: string; label: string; categories: ProductCategory[] }> = [
   { key: 'gift-cards', label: 'Gift cards', categories: ['gift_cards'] },
-  { key: 'mobile', label: 'Mobile', categories: ['airtime', 'data', 'mobile_money', 'virtual_numbers'] },
+  { key: 'mobile', label: 'Mobile', categories: ['airtime', 'data', 'mobile_money'] },
   { key: 'bills', label: 'Bills', categories: ['bills', 'pay_tv'] },
-  { key: 'esims', label: 'eSIMs', categories: ['esim'] },
   { key: 'software', label: 'Software', categories: ['software'] },
   { key: 'vpn', label: 'VPN', categories: ['vpn'] },
   { key: 'rdp', label: 'RDP', categories: ['rdp'] },
@@ -39,11 +36,9 @@ export const categorySynonyms: Record<ProductCategory, string[]> = {
   data: ['data', 'bundle', 'internet', 'mobile data'],
   bills: ['bills', 'bill', 'electricity', 'power', 'water', 'utility', 'utilities', 'meter'],
   pay_tv: ['tv', 'pay-tv', 'pay tv', 'cable', 'subscription', 'satellite'],
-  esim: ['esim', 'e-sim', 'travel data', 'roaming', 'travel'],
   software: ['software', 'licence', 'license', 'antivirus', 'windows', 'office', 'key'],
   vpn: ['vpn', 'virtual private network', 'privacy', 'secure browsing', 'proxy'],
   rdp: ['rdp', 'remote desktop', 'vps', 'windows server', 'server'],
-  virtual_numbers: ['virtual number', 'phone number', 'number', 'sms', 'did'],
   virtual_cards: ['virtual card', 'card', 'debit card', 'dollar card'],
   mobile_money: ['mobile money', 'momo', 'm-pesa', 'mpesa', 'wallet', 'send money', 'cash in'],
 };
@@ -55,7 +50,7 @@ const href = z
   .string()
   .trim()
   .max(500)
-  .refine(value => value.startsWith('/') ? !value.startsWith('//') : /^https:\/\/[^\s]+$/.test(value), 'Use a path such as /catalogs/esim or an https:// address.');
+  .refine(value => value.startsWith('/') ? !value.startsWith('//') : /^https:\/\/[^\s]+$/.test(value), 'Use a path such as /catalogs/gift_cards or an https:// address.');
 const imageUrl = z.string().trim().max(1000).regex(/^https:\/\/[^\s]+$/, 'Use an https:// image address.');
 const text = (max: number) => z.string().trim().max(max);
 
@@ -147,7 +142,7 @@ const promo = z.object({
   /** The card's colours. */
   theme: z.enum(['pink', 'sky', 'navy', 'light', 'sunset']).default('pink'),
   /** A drawn illustration when there is no image. */
-  illustration: z.enum(['store', 'esim', 'gift', 'globe', 'none']).default('none'),
+  illustration: z.enum(['store', 'gift', 'globe', 'none']).default('none'),
 });
 
 export const sectionIcons = ['lock', 'bolt', 'card', 'globe', 'shield', 'support', 'gift', 'phone', 'coin', 'chart', 'clock', 'star'] as const;
@@ -333,12 +328,12 @@ export function defaultHome(shqSignupUrl = '/resellers'): Sections {
       id: id(),
       type: 'promo',
       span: { lg: 4, md: 3 },
-      title: 'Stay connected anywhere',
-      subtitle: 'eSIM travel data',
-      body: 'Data for your next trip, ready before you land.',
-      cta: { label: 'Browse eSIMs', href: '/catalogs/esim' },
+      title: 'Gifts for everyone',
+      subtitle: 'Gift cards from the brands they love',
+      body: 'Delivered by email in minutes, ready to give.',
+      cta: { label: 'Browse gift cards', href: '/catalogs/gift_cards' },
       theme: 'sky',
-      illustration: 'esim',
+      illustration: 'gift',
     },
     { id: id(), type: 'category_grid', span: { lg: 12, md: 6 }, title: 'Shop by category', subtitle: 'Everything digital, in one place.' },
     { id: id(), type: 'product_rail', span: { lg: 12, md: 6 }, title: 'Top selling', subtitle: 'What customers buy most this month.', source: 'top_selling', limit: 8, viewAllHref: '/catalogs' },

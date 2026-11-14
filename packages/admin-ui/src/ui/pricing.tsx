@@ -26,8 +26,8 @@ export function PricingSchemes({ audience }: { audience: 'admin' | 'reseller' })
       : 'Products with a face value: airtime, data, bills, pay-TV and most gift cards. Customers never pay more than face value. BitoCard sells to you below face value; that discount is your profit. You can give part of it to your customers.';
   const markup =
     audience === 'admin'
-      ? 'Products without a face value, such as phone numbers, software or mobile money, and anything the supplier sells at or above face value. BitoCard adds a markup to the supplier’s cost, or sets a fixed price.'
-      : 'Products without a face value, such as phone numbers and software. You add a markup to BitoCard’s price, or set a fixed price per product.';
+      ? 'Products without a face value, such as software, VPN or mobile money, and anything the supplier sells at or above face value. BitoCard adds a markup to the supplier’s cost, or sets a fixed price.'
+      : 'Products without a face value, such as software and VPN. You add a markup to BitoCard’s price, or set a fixed price per product.';
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Scheme icon={<BadgePercent className="size-5" aria-hidden />} title="Discount products" tone="green">

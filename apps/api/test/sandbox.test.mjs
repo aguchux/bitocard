@@ -46,7 +46,7 @@ const card = async id => (await admin.get('/v1/admin/integrations')).json.data.f
 
 describe('addresses', () => {
   test('each integration’s address follows its Sandbox switch; an address set to anything else overrides both', () => {
-    const defaults = { PAWAPAY_API_URL: 'https://api.pawapay.io', VTPASS_API_URL: 'https://vtpass.com/api', DIDWW_API_URL: 'https://api.didww.com/v3' };
+    const defaults = { PAWAPAY_API_URL: 'https://api.pawapay.io', VTPASS_API_URL: 'https://vtpass.com/api' };
     assert.equal(providerUrl(defaults, 'pawapay', 'live'), 'https://api.pawapay.io');
     assert.equal(providerUrl(defaults, 'pawapay', 'sandbox'), 'https://api.sandbox.pawapay.io');
     assert.equal(providerUrl(defaults, 'vtpass', 'sandbox'), 'https://sandbox.vtpass.com/api');
@@ -54,7 +54,7 @@ describe('addresses', () => {
     assert.equal(providerUrl({ MONNIFY_API_URL: 'https://api.monnify.com' }, 'monnify', 'sandbox'), 'https://sandbox.monnify.com');
     assert.equal(providerUrl({ PAWAPAY_API_URL: 'https://pawapay.example' }, 'pawapay', 'sandbox'), 'https://pawapay.example', 'an override wins');
     const sandbox = urlsFor({ ...defaults, RELOADLY_TOPUPS_URL: undefined }, 'sandbox');
-    assert.deepEqual([sandbox.RELOADLY_TOPUPS_URL, sandbox.RELOADLY_GIFTCARDS_URL, sandbox.DIDWW_API_URL], ['https://topups-sandbox.reloadly.com', 'https://giftcards-sandbox.reloadly.com', 'https://sandbox-api.didww.com/v3']);
+    assert.deepEqual([sandbox.RELOADLY_TOPUPS_URL, sandbox.RELOADLY_GIFTCARDS_URL, sandbox.VTPASS_API_URL], ['https://topups-sandbox.reloadly.com', 'https://giftcards-sandbox.reloadly.com', 'https://sandbox.vtpass.com/api']);
     assert.deepEqual([inSandbox({ ZENDIT_SANDBOX: true }, 'zendit'), inSandbox({ ZENDIT_SANDBOX: false }, 'zendit'), inSandbox({}, 'email')], [true, false, false]);
   });
 });
@@ -65,10 +65,10 @@ describe('Sandbox switch and Test connection', () => {
     assert.deepEqual([pawapay.sandbox, pawapay.testable, pawapay.reseller_access], [false, true, { available: true, enabled: false }]);
     const email = await card('email');
     assert.deepEqual([email.sandbox, email.testable, email.reseller_access.available], [null, false, false]);
-    const telnyx = await card('telnyx');
-    assert.deepEqual([telnyx.sandbox, telnyx.testable, telnyx.reseller_access.available], [false, false, false], 'a stub keeps its switch for later');
-    assert.equal((await update('telnyx', { TELNYX_SANDBOX: true })).json.sandbox, true);
-    const untestable = await admin.post('/v1/admin/integrations/telnyx/test');
+    const nexway = await card('nexway');
+    assert.deepEqual([nexway.sandbox, nexway.testable, nexway.reseller_access.available], [false, false, false], 'a stub keeps its switch for later');
+    assert.equal((await update('nexway', { NEXWAY_SANDBOX: true })).json.sandbox, true);
+    const untestable = await admin.post('/v1/admin/integrations/nexway/test');
     assert.deepEqual([untestable.status, untestable.json.error.code], [400, 'integration_not_testable']);
   });
 

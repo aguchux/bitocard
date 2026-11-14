@@ -42,7 +42,7 @@ describe('each product sets its own integrations', () => {
     const ids = list => new Set(list.map(item => item.id));
     assert.equal(bitocardList.some(item => item.section === 'blockchain'), false);
     for (const id of ['crypto_keys', 'crypto_signer', 'crypto_prices', 'chainalysis', 'alchemy']) assert.ok(ids(afrippaList).has(id), id);
-    for (const id of ['stripe', 'paystack', 'reloadly', 'domains', 'store_hosts', 'general', 'telnyx']) assert.equal(ids(afrippaList).has(id), false, id);
+    for (const id of ['stripe', 'paystack', 'reloadly', 'domains', 'store_hosts', 'general', 'nexway']) assert.equal(ids(afrippaList).has(id), false, id);
     for (const id of ['email', 'sms', 'google', 'anthropic', 'openai', 'file_storage', 'kyc_storage', 'web_push', 'github']) {
       assert.ok(ids(afrippaList).has(id) && ids(bitocardList).has(id), `${id} is both's`);
     }

@@ -29,7 +29,7 @@ type Decimal = Prisma.Decimal;
 /** Categories sold at a face value in local currency, where resellers earn a markup or a discount. */
 export const faceValueCategories = new Set<ProductCategory>(['airtime', 'data', 'pay_tv', 'bills']);
 /** Categories bought for use anywhere, so any market can sell them without the international plan feature. */
-export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers']);
+export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'software', 'vpn', 'rdp']);
 /** The country of products usable anywhere, such as BitoCard's own software licences (ISO's user-assigned "WW"). */
 export const worldwideCountry = 'WW';
 
@@ -286,25 +286,6 @@ export class PricingService {
   /** False for another country's product from a supplier whose stock serves only its own country (Africa's Talking). */
   private servesHere(ctx: PricingContext, product: Product, supplierCode: string) {
     return product.country === ctx.country.code || !this.adapters.get(supplierCode).domesticOnly;
-  }
-
-  /**
-   * What the reseller pays BitoCard for a supplier cost outside an order (a number's renewal, an SMS): converted to
-   * the reseller currency the conservative way, plus BitoCard's margin for the product (never below cost).
-   */
-  /**
-   * The reseller's price for something extra on a product (an eSIM top-up): their markup for the product on BitoCard's
-   * wholesale, within the Markup Protection cap. Their fixed price is for the product itself, so it never applies.
-   */
-  resellerPrice(ctx: PricingContext, product: Product, wholesale: bigint) {
-    return addBps(wholesale, Math.min(this.terms(ctx, product).markupBps, ctx.capBps, maxResellerMarkupBps));
-  }
-
-  async wholesaleFor(ctx: PricingContext, product: Product, supplierCost: bigint, costCurrency: string, supplierCode: string | null = null) {
-    const { amount: cost } = await this.convert(ctx, supplierCost, costCurrency);
-    const rule = this.rule(ctx, product, supplierCode, { skipFixed: true });
-    const wholesale = rule.kind === 'markup' || rule.kind === 'auto' ? addBps(cost, rule.marginBps) : cost;
-    return { cost, wholesale: wholesale < cost ? cost : wholesale, currency: ctx.currency };
   }
 
   /**

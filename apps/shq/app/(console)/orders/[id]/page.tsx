@@ -27,13 +27,12 @@ import { bitocardApi } from "@bitocard/api-client";
 import { type OrderDelivery, type OrderDetail, useOrderReceiptQuery, useReplaceOrderAccessMutation, useResellerOrderQuery, useSimulateOrderMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
-import { EsimsCard } from "@/components/esims";
 import { VpnCard } from "@/components/vpn";
 
 /** How often a processing order is checked while its page is open. */
 const orderPollMs = 5000;
 
-const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number", esim: "eSIM", vpn_account: "VPN access" };
+const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", vpn_account: "VPN access" };
 
 /** A secret (code, PIN, token): masked until revealed, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {
@@ -68,22 +67,15 @@ function Secret({ label, value }: { label: string; value: string }) {
 
 function Delivery({ delivery, index, count }: { delivery: OrderDelivery; index: number; count: number }) {
   const title = `${deliveryNames[delivery.kind]}${count > 1 ? ` ${index + 1}` : ""}`;
-  const number = delivery.kind === "virtual_number" ? (delivery.details.number ?? delivery.serial) : null;
   const vpn = delivery.kind === "vpn_account";
-  const details = Object.entries(delivery.details).filter(([key]) => !(delivery.kind === "virtual_number" && key === "number") && key !== "credential_version");
+  const details = Object.entries(delivery.details).filter(([key]) => key !== "credential_version");
   return (
     <li className="space-y-3 rounded-xl border border-line p-4">
       <p className="font-semibold">{title}</p>
-      {number ? (
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-subtle">Number</p>
-          <p className="font-mono text-base font-semibold">{number}</p>
-        </div>
-      ) : null}
       {vpn && delivery.serial ? <Secret label="Username" value={delivery.serial} /> : null}
       {delivery.code ? <Secret label={delivery.kind === "token" ? "Token" : vpn ? "Password" : "Code"} value={delivery.code} /> : null}
       {delivery.pin ? <Secret label="PIN" value={delivery.pin} /> : null}
-      {delivery.serial && !number && !vpn ? (
+      {delivery.serial && !vpn ? (
         <p className="text-sm">
           <span className="text-muted">Serial </span>
           <span className="font-mono">{delivery.serial}</span>
@@ -409,7 +401,6 @@ export default function OrderPage() {
             </div>
           </Card>
 
-          {order.product.category === "esim" && order.status !== "processing" ? <EsimsCard orderId={order.id} canManage={can(membership, "admin", "support")} /> : null}
           {order.deliveries.some(delivery => delivery.kind === "vpn_account") ? <VpnCard orderId={order.id} canManage={can(membership, "admin", "support")} /> : null}
 
           <AccessCard order={order} canReplace={can(membership, "admin", "developer")} />

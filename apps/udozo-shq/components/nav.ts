@@ -36,7 +36,7 @@ import {
 
 /**
  * Udozo's Seller HQ (shq.udozo.com): resale, stores, wallet and the rest. BitoCard's own SHQ screens that Udozo does not
- * have (its catalogue and pricing, its orders, numbers, eSIMs, VPN, disputes, own integrations and platform fees) are
+ * have (its catalogue and pricing, its orders, VPN, disputes, own integrations and platform fees) are
  * never listed here.
  */
 export type ShqSection = "home" | "resale" | "store" | "wallet" | "reports" | "support" | "developers" | "team" | "settings";

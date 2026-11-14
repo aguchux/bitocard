@@ -24,7 +24,7 @@ describe("proxy", () => {
   test("runs on pages, never on files, _next or prefetches", () => {
     const [rule] = config.matcher;
     const source = new RegExp(`^${rule.source}$`);
-    for (const path of ["/", "/catalogs/gift_cards", "/account/orders/abc", "/p/gift_cards:US:amazon:usd", "/p/esim:WW:global:1.5gb-7d"]) expect(source.test(path)).toBe(true);
+    for (const path of ["/", "/catalogs/gift_cards", "/account/orders/abc", "/p/gift_cards:US:amazon:usd", "/p/software:WW:microsoft:office-12m"]) expect(source.test(path)).toBe(true);
     for (const path of ["/_next/static/chunk.js", "/flags/ng.svg", "/brand-cards/amazon.webp", "/push-sw.js", "/favicon.ico"]) expect(source.test(path)).toBe(false);
     expect(rule.missing).toContainEqual({ type: "header", key: "next-router-prefetch" });
   });

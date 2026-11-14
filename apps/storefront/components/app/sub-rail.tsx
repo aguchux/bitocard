@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { subMenuFor, type SubMenuContext } from "./sub-menus";
 
 /**
- * Desktop only: a tab's own places (Catalog's groups, Orders' filters, the wallets, Crypto's Wallets, Market…, Account's
+ * Desktop only: a tab's own places (Catalog's groups, Orders' filters, the wallets, Account's
  * Profile, Security…) as a second rail beside the app's rail, sticky below the header like it. The tab's name heads it
  * and leads back to the tab. Phones and tablets keep the underlined tabs on the page instead.
  */

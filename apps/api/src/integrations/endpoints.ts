@@ -19,7 +19,6 @@ const addresses: Record<string, Address[]> = {
     { key: 'RELOADLY_TOPUPS_URL', live: 'https://topups.reloadly.com', sandbox: 'https://topups-sandbox.reloadly.com' },
   ],
   vtpass: [{ key: 'VTPASS_API_URL', live: 'https://vtpass.com/api', sandbox: 'https://sandbox.vtpass.com/api' }],
-  didww: [{ key: 'DIDWW_API_URL', live: 'https://api.didww.com/v3', sandbox: 'https://sandbox-api.didww.com/v3' }],
   zendit: [{ key: 'ZENDIT_API_URL', live: 'https://api.zendit.io/v1', sandbox: 'https://test-api.zendit.io/v1' }],
   pawapay: [{ key: 'PAWAPAY_API_URL', live: 'https://api.pawapay.io', sandbox: 'https://api.sandbox.pawapay.io' }],
   remita: [{ key: 'REMITA_API_URL', live: 'https://api-gateway.remita.net', sandbox: 'https://api-demo.systemspecsng.com/services/connect-gateway' }],
@@ -40,7 +39,6 @@ const addresses: Record<string, Address[]> = {
 export const sandboxSwitches = {
   reloadly: 'RELOADLY_SANDBOX',
   vtpass: 'VTPASS_SANDBOX',
-  didww: 'DIDWW_SANDBOX',
   zendit: 'ZENDIT_SANDBOX',
   pawapay: 'PAWAPAY_SANDBOX',
   remita: 'REMITA_SANDBOX',

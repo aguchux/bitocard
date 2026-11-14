@@ -2,9 +2,6 @@
  * Response shapes of the admin API (`/v1/admin/...`). Admin endpoints are left out of the public OpenAPI document,
  * so these mirror the API presenters by hand; the API tests pin the presenters. Money is in integer minor units.
  */
-import type { ProductFeature } from '../storefront';
-
-export type { ProductFeature };
 export type Mode = 'test' | 'live';
 export type List<T> = { object: 'list'; data: T[]; has_more?: boolean };
 
@@ -12,7 +9,7 @@ export type List<T> = { object: 'list'; data: T[]; has_more?: boolean };
 export type TaxRate = { object: 'tax_rate'; country: string; name: string; rate_bps: number; prices_include_tax: boolean; confirmed: boolean; updated_at: string };
 export type Page = { limit?: number; starting_after?: string };
 
-export const productCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
+export const productCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'software', 'vpn', 'rdp', 'virtual_cards', 'mobile_money'] as const;
 export type ProductCategory = (typeof productCategories)[number];
 
 export const adminRoles = ['super_admin', 'operations', 'finance', 'support'] as const;
@@ -252,7 +249,6 @@ export type AdminOrderDetail = Order & {
 
 // -- Catalogue and suppliers --------------------------------------------------------------------------------------
 
-export type FeatureRule = 'required' | 'allowed' | 'excluded';
 export type SupplierStatus = 'mvp_live' | 'mvp_qualify' | 'pilot' | 'later' | 'backup';
 export type Supplier = {
   object: 'supplier';
@@ -278,11 +274,6 @@ export type Supplier = {
   };
   requires_ip_allowlist: boolean | null;
   notes: string | null;
-  /**
-   * The admin's rule for each feature of the supplier's products (DIDWW's numbers): products must have it, may have it
-   * or must not have it. Null for suppliers without features to set.
-   */
-  feature_rules: Record<ProductFeature, FeatureRule> | null;
   /** bitocard.com customers buying its products are asked for the identity check where the market requires it. */
   customer_verification: boolean;
   markets?: Array<{ country: string; category: ProductCategory; enabled: boolean }>;

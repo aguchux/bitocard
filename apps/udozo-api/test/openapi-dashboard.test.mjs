@@ -22,7 +22,7 @@ before(async () => {
   server = await startApp({
     env: {
       ...reloadly.env,
-      DIDWW_CALLBACK_URL: 'https://api.test.example',
+      API_PUBLIC_URL: 'https://api.test.example',
       WEBHOOK_ALLOW_PRIVATE_URLS: 'on',
       WEB_PUSH_PUBLIC_KEY: vapid.publicKey,
       WEB_PUSH_PRIVATE_KEY: vapid.privateKey,

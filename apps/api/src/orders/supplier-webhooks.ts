@@ -16,9 +16,7 @@ import { IntegrationsService } from '../integrations/integrations.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { connectable } from '../reseller-integrations/connectable.js';
 import { ResellerIntegrationsService } from '../reseller-integrations/reseller-integrations.service.js';
-import { didwwNotice, didwwSignatureValid } from '../suppliers/didww.webhooks.js';
 import { reloadlyNotice, reloadlySignatureValid } from '../suppliers/reloadly.webhooks.js';
-import { esimAccessNotice, type EsimNotice, esimAccessWebhookValid } from '../suppliers/esim-access.adapter.js';
 import { pawapayCallbackValid, pawapayNotice } from '../suppliers/pawapay.adapter.js';
 import { africasTalkingCallbackValid, africasTalkingNotice } from '../suppliers/africas-talking.adapter.js';
 import { zenditNotice, zenditWebhookHeader, zenditWebhookValid } from '../suppliers/zendit.adapter.js';
@@ -37,7 +35,7 @@ const keepOthersMs = 365 * 24 * 3600_000;
 const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'signature_invalid', 'Webhook signature is missing or wrong.');
 
 /**
- * Supplier notifications (Reloadly, DIDWW, Zendit and pawaPay), to BitoCard's own accounts and to resellers' own connections (each live
+ * Supplier notifications (Reloadly, Zendit, pawaPay and others), to BitoCard's own accounts and to resellers' own connections (each live
  * connection has its own address, checked with that reseller's own secret, and can only name that reseller's own
  * orders through that connection). Nothing is lost: each one is verified and stored (encrypted) before it is
  * acknowledged; a supplier's retry of the same delivery is stored once. Processing happens after the reply (suppliers
@@ -118,40 +116,6 @@ export class SupplierWebhooksService {
     return this.store('africas_talking', rawBody, africasTalkingNotice(rawBody));
   }
 
-  /**
-   * eSIM Access: authenticated by the token in the webhook address (eSIM Access signs nothing). Only ORDER_STATUS names
-   * an order to re-check; the other kinds (SM-DP+ events, usage, the setup health check) are acknowledged and dropped,
-   * never stored, as they come in large numbers and BitoCard does not act on them yet.
-   */
-  /** Who handles notifications about one eSIM (status, data use, expiry): `EsimsService`, registered when it starts. */
-  private esimListener?: (supplierCode: string, notice: EsimNotice) => Promise<unknown>;
-
-  onEsimNotice(listener: (supplierCode: string, notice: EsimNotice) => Promise<unknown>) {
-    this.esimListener = listener;
-  }
-
-  /**
-   * eSIM Access: `ORDER_STATUS` names an order to re-check and is stored like any order notification. Notifications
-   * about one eSIM (status, data use, expiry) are applied at once by `EsimsService` (they repeat harmlessly and are not
-   * stored); the setup health check needs nothing.
-   */
-  async receiveEsimAccess(rawBody: Buffer | undefined, token: string | undefined) {
-    if (!rawBody || !esimAccessWebhookValid(this.integrations.config.ESIM_ACCESS_WEBHOOK_TOKEN, token)) throw untrusted();
-    let payload: unknown = null;
-    try {
-      payload = JSON.parse(rawBody.toString('utf8'));
-    } catch {
-      // Stored all the same, as for the others.
-    }
-    const notice = esimAccessNotice(payload);
-    if (notice.esim) {
-      await this.esimListener?.('esim_access', notice.esim).catch(error => this.logger.error({ err: error }, 'eSIM notification not applied'));
-      return { received: true };
-    }
-    if (payload !== null && !notice.orderUpdate) return { received: true };
-    return this.store('esim_access', rawBody, notice);
-  }
-
   /** Reloadly, to a reseller's own connection: signed with the webhook secret they saved on it. */
   async receiveOwnReloadly(connectionId: string, rawBody: Buffer | undefined, signature: string | undefined, timestamp: string | undefined) {
     const connection = await this.connections.forNotification(connectionId, 'reloadly');
@@ -163,25 +127,6 @@ export class SupplierWebhooksService {
       // Stored all the same, as for BitoCard's own account.
     }
     return this.store('reloadly', rawBody!, reloadlyNotice(payload), connection.id);
-  }
-
-  /**
-   * DIDWW order callbacks: form fields (`id`, `type`, `status`) signed with the API key over the address DIDWW called,
-   * which is our callback base plus the path and query received (the query names our reference).
-   */
-  async receiveDidww(pathAndQuery: string, fields: unknown, rawBody: Buffer | undefined, signature: string | undefined, connectionId?: string) {
-    const params: Record<string, string> = {};
-    for (const [key, value] of Object.entries(fields && typeof fields === 'object' ? fields : {})) if (typeof value === 'string') params[key] = value;
-    const url = `${this.integrations.config.DIDWW_CALLBACK_URL.replace(/\/+$/, '')}${pathAndQuery}`;
-    // A reseller's own connection signs with their own API key.
-    const connection = connectionId ? await this.connections.forNotification(connectionId, 'didww') : null;
-    if (connectionId && !connection) throw untrusted();
-    const apiKey = connection ? connection.credentials.api_key : this.integrations.config.DIDWW_API_KEY;
-    if (!didwwSignatureValid(apiKey, url, params, signature)) throw untrusted();
-    const reference = new URL(url).searchParams.get('reference') ?? undefined;
-    // The query is part of what is stored (and of the body hash): it is what names the order.
-    const stored = Buffer.concat([Buffer.from(`${pathAndQuery}\n`), rawBody ?? Buffer.from(new URLSearchParams(params).toString())]);
-    return this.store('didww', stored, didwwNotice(params, reference), connection?.id);
   }
 
   /**
@@ -427,30 +372,11 @@ export class SupplierWebhooksController {
     return this.webhooks.receiveAfricasTalking(req.rawBody, token);
   }
 
-  @Post('esim-access')
-  @HttpCode(HttpStatus.OK)
-  esimAccess(@Req() req: Request & { rawBody?: Buffer }, @Query('token') token?: string) {
-    return this.webhooks.receiveEsimAccess(req.rawBody, token);
-  }
-
-  @Post('didww')
-  @HttpCode(HttpStatus.OK)
-  didww(@Req() req: Request & { rawBody?: Buffer }) {
-    return this.webhooks.receiveDidww(req.originalUrl, req.body, req.rawBody, req.get('x-didww-signature'));
-  }
-
   /** A reseller's own Reloadly account (the address shown on their connection). */
   @Post('reloadly/:connection')
   @HttpCode(HttpStatus.OK)
   ownReloadly(@Req() req: Request & { rawBody?: Buffer }, @Param('connection') connection: string) {
     return this.webhooks.receiveOwnReloadly(connection, req.rawBody, req.get('x-reloadly-signature'), req.get('x-reloadly-request-timestamp'));
-  }
-
-  /** A reseller's own DIDWW account (set on each of their orders). */
-  @Post('didww/:connection')
-  @HttpCode(HttpStatus.OK)
-  ownDidww(@Req() req: Request & { rawBody?: Buffer }, @Param('connection') connection: string) {
-    return this.webhooks.receiveDidww(req.originalUrl, req.body, req.rawBody, req.get('x-didww-signature'), connection);
   }
 }
 

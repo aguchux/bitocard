@@ -31,7 +31,7 @@ test("Udozo's plans have no BitoCard features or limits, and say Udozo", () => {
 
 test('Udozo sends and lists none of BitoCard’s own notices', () => {
   const udozo = notificationTypesFor('udozo');
-  for (const type of ['startup_allowance.granted', 'connection.approved', 'number.expiring', 'chargeback.opened', 'fee.refunded', 'admin.order.needs_review', 'admin.vpn.attention', 'admin.crypto.withdrawal_review', 'customer.esim.low_data', 'customer.p2p.order_opened']) {
+  for (const type of ['startup_allowance.granted', 'connection.approved', 'chargeback.opened', 'fee.refunded', 'admin.order.needs_review', 'admin.vpn.attention', 'admin.crypto.withdrawal_review', 'customer.p2p.order_opened']) {
     assert.ok(!udozo.includes(type), type);
     assert.ok(notificationTypesFor('bitocard').includes(type), `${type} stays BitoCard's`);
   }
@@ -41,7 +41,7 @@ test('Udozo sends and lists none of BitoCard’s own notices', () => {
 test("Udozo's integrations are the platform services and pawaPay, never BitoCard's suppliers or Afrippa's addresses", () => {
   const groups = groupsForProduct('bitocard', 'udozo');
   const ids = groups.map(group => group.id);
-  for (const id of ['reloadly', 'vtpass', 'didww', 'zendit', 'remita', 'esim_access', 'africas_talking', 'vpnresellers', 'telnyx']) assert.ok(!ids.includes(id), id);
+  for (const id of ['reloadly', 'vtpass', 'zendit', 'remita', 'africas_talking', 'vpnresellers', 'nexway']) assert.ok(!ids.includes(id), id);
   for (const id of ['email', 'flutterwave', 'paystack', 'stripe', 'pawapay', 'file_storage', 'domains', 'store_hosts', 'anthropic', 'openai', 'deepseek', 'support_ai']) assert.ok(ids.includes(id), id);
   // Its AI runs Udozo's assistants: Claude, OpenAI and DeepSeek, and the models offered; never stores' bots or allowances.
   const ai = groups.filter(group => ['anthropic', 'openai', 'deepseek', 'support_ai'].includes(group.id));

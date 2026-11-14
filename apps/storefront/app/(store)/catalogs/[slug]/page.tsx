@@ -6,7 +6,7 @@ import { storeNavigation } from "@/lib/navigation";
 
 const isCategory = (slug: string): slug is ProductCategory => slug in categoryLabels;
 
-/** A category (/catalogs/esim) or a menu group (/catalogs/mobile). */
+/** A category (/catalogs/software) or a menu group (/catalogs/mobile). */
 async function resolve(slug: string) {
   if (isCategory(slug)) return { base: { category: slug }, title: categoryLabels[slug], active: slug };
   const { groups } = await storeNavigation();

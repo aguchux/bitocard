@@ -11,7 +11,6 @@ const bitocardOnly = [
   "/orders",
   "/catalogue",
   "/integrations",
-  "/numbers",
   "/disputes",
   "/exchange",
   "/wallet/fees",

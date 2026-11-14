@@ -17,11 +17,8 @@
 - **Product catalogue**
   - Digital gift cards, mobile airtime and data bundles.
   - Supported utility bills, electricity payments and TV/pay-TV subscriptions.
-  - Travel and regional eSIM data packages, including eligible top-ups.
   - Digital software, antivirus licences and Windows licences; retail/ESD, OEM and business subscriptions are distinct product types.
   - Virtual payment cards, subject to supplier access and market eligibility.
-  - SMS-capable virtual numbers and supported voice-number services, subject to inventory, capabilities and supplier agreements.
-  - Virtual-number coverage is intended to include Africa, Asia and Europe where supported; no universal coverage is assumed.
   - Products, denominations, currencies, payment methods and exchange options vary by country.
   - Physical goods and integrations with stores such as Jumia and Konga are deferred.
 
@@ -105,16 +102,6 @@
   - Flutterwave and alternative reserved-account/MFB providers are evaluation options, not confirmed permanent-account coverage for every country.
 
 
-- **eSIM offering**
-  - Sell eligible country, regional and global data packages through reseller storefronts.
-  - Show destination coverage, supported networks where provided, data allowance, validity, activation rules and device compatibility before purchase.
-  - Deliver installation instructions and supplier-issued QR/activation details securely after fulfilment.
-  - Show order status and available usage/expiry data where the provider API exposes them.
-  - Offer top-ups only where supported for the purchased eSIM; show whether a new eSIM is required.
-  - Prefer pay-per-order or low-deposit commercial arrangements to reduce initial capital needs.
-  - Supplier evaluation shortlist: eSIM Access, eSimerge, eSIM Go and Airalo Partners.
-  - Compare current deposit requirements, API access, destination costs, resale-price restrictions, refunds and support; none is appointed by this brief.
-
 - **Software and licence offering**
   - Sell eligible downloadable software, antivirus/security products and Windows licences.
   - Evaluate Nexway Connect for digital software fulfilment; Ingram Micro and TD SYNNEX for software distribution; ALSO and Pax8 for recurring business subscriptions.
@@ -127,12 +114,10 @@
   - Prevent duplicate allocation of one-time licence keys.
   - Keep subscription renewal/cancellation commitments tied to the original purchase and supplier.
 
-- **TV, utilities, virtual numbers and virtual cards**
+- **TV, utilities and virtual cards**
   - Validate relevant identifiers such as meter, smartcard or customer numbers where supplier APIs support validation.
   - Show the biller, package, country, total payable amount and any fees before confirmation.
   - Deliver bill receipts, electricity tokens and subscription confirmation where applicable.
-  - For virtual numbers, disclose supported SMS/voice capabilities, rental period, renewal charges and intended usage restrictions.
-  - Manage virtual-number provisioning, message access, expiry and renewal within supplier-supported capabilities.
   - For virtual payment cards, define issuance, funding, fees, limits and verification according to the selected issuing partner.
   - Separate these services from ordinary gift-card delivery because their lifecycle and verification requirements differ.
 
@@ -199,7 +184,7 @@
 - **Phased delivery and deferred scope**
   - Phase 1: own-brand pilot, initial gift-card/top-up catalogue, prefunded wallets, order tracking and administration.
   - Phase 2: independent reseller onboarding, branded storefronts, pricing, reporting and domain services.
-  - Phase 3: gift-card selling/trading and additional categories, including eSIMs and software, as their integrations become ready.
+  - Phase 3: gift-card selling/trading and additional categories, including software, as their integrations become ready.
   - Launch incentives become available only after recovery, settlement and anti-abuse controls are tested.
   - Phase 4: public reseller API and broader country/category coverage.
   - Physical-goods marketplace integrations, including Jumia/Konga-style catalogues, remain deferred.

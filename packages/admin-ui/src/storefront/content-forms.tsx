@@ -44,7 +44,7 @@ export function PromoForm({ section, onChange }: FormProps<PromoSection>) {
           <Input id={`${id}-cta-label`} value={cta.label} maxLength={40} onChange={event => setCta({ ...cta, label: event.target.value })} placeholder="Start selling" />
         </Field>
         <Field label="Button link" htmlFor={`${id}-cta-href`} error={cta.label.trim() && !cta.href.trim() ? "Add a link for the button." : undefined} hint="A path or an https:// address.">
-          <Input id={`${id}-cta-href`} value={cta.href} maxLength={500} onChange={event => setCta({ ...cta, href: event.target.value })} placeholder="/catalogs/esim" />
+          <Input id={`${id}-cta-href`} value={cta.href} maxLength={500} onChange={event => setCta({ ...cta, href: event.target.value })} placeholder="/catalogs/software" />
         </Field>
       </div>
       <ImageField

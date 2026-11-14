@@ -194,7 +194,7 @@ export function ProductRailForm({ section, onChange }: FormProps<ProductRailSect
         </Select>
       </Field>
       <SwitchRow label="Filter chips" hint="All, the visitor's country, Global and brand tags." checked={section.filters} onChange={filters => onChange({ ...section, filters })} />
-      <Field label="“View all” link" htmlFor={`${id}-href`} hint="A path such as /catalogs/esim or an https:// address. Optional.">
+      <Field label="“View all” link" htmlFor={`${id}-href`} hint="A path such as /catalogs/software or an https:// address. Optional.">
         <Input id={`${id}-href`} value={section.viewAllHref ?? ""} maxLength={500} onChange={event => onChange({ ...section, viewAllHref: optional(event.target.value) })} placeholder="/catalogs" />
       </Field>
     </>

@@ -40,7 +40,7 @@ describe("Udozo's Seller HQ endpoints", () => {
     expect(first('GET', '/v1/theme')).toBeTruthy();
   });
 
-  test("Udozo's webhook events and key scopes are its own: resale, never BitoCard's orders, numbers or eSIMs", () => {
+  test("Udozo's webhook events and key scopes are its own: resale, never BitoCard's orders", () => {
     expect(udozoWebhookEventTypes).toContain('resale_order.created');
     expect(udozoWebhookEventTypes.every(type => /^(resale_order|top_up|payout|support_ticket)\./.test(type))).toBe(true);
     expect(udozoApiKeyScopes).toContain('resale:write');

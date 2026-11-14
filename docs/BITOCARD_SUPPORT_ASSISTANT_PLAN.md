@@ -116,7 +116,7 @@ Live chat and support tickets on every store, answered by people and, where the 
 
 - **The store:** name, address and domains, country, currency, and its template and what it sells (categories and menu groups).
 - **Products:** listed products, most popular first (at most 150), with brands, face values or ranges. It says prices are shown at checkout.
-- **Delivery:** how each category is delivered (codes on the order page with Reveal, electricity tokens, eSIM install steps, VPN sign-in details, number renewals and their 15-day rule).
+- **Delivery:** how each category is delivered (codes on the order page with Reveal, electricity tokens, VPN sign-in details).
 - **Policies and accounts:**
   - refunds per product type, from our terms;
   - payment methods and wallets in the market (spend only, top-ups, account numbers);
@@ -234,7 +234,7 @@ Who we are, what we sell and who we serve, in two or three sentences.
 How prices are shown, payment methods, the store wallet and top-ups.
 
 # Delivery
-How each product arrives (codes on the order page, tokens, eSIM install), and typical times.
+How each product arrives (codes on the order page, tokens), and typical times.
 
 # Refunds and problems
 What can be refunded and when, and how to report a problem with an order.

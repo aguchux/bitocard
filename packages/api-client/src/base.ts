@@ -189,7 +189,6 @@ export const tagTypes = [
   // Reseller (SHQ)
   'Account',
   'Wallet',
-  'Esim',
   'Vpn',
   'TopUp',
   'ReservedAccount',
@@ -217,7 +216,6 @@ export const tagTypes = [
   'SupportAi',
   'SupportBot',
   'Stock',
-  'Number',
   'Crypto',
   'P2p',
   // Both apps

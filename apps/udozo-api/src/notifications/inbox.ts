@@ -82,10 +82,6 @@ export const notificationTypes = {
   'order.needs_review': { realm: 'reseller', roles: ['admin', 'support'], severity: 'warning', label: 'Order outcome unclear' },
   'top_up.credited': { realm: 'reseller', roles: ['finance'], severity: 'success', label: 'Wallet topped up' },
   'store.checkout_refused': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Store order turned away' },
-  'number.expiring': { realm: 'reseller', roles: ['admin', 'support', 'finance'], severity: 'warning', label: 'Virtual number expiring' },
-  'number.renewal_failed': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Virtual number not renewed' },
-  'number.expired': { realm: 'reseller', roles: ['admin', 'support', 'finance'], severity: 'critical', label: 'Virtual number paused' },
-  'number.deleted': { realm: 'reseller', roles: ['admin', 'support'], severity: 'warning', label: 'Virtual number deleted' },
   'payout.paid': { realm: 'reseller', roles: ['finance'], severity: 'success', label: 'Withdrawal paid' },
   'payout.failed': { realm: 'reseller', roles: ['finance'], severity: 'critical', label: 'Withdrawal failed' },
   'bank_account.added': { realm: 'reseller', roles: ['finance'], severity: 'info', label: 'Payout bank account added' },
@@ -183,7 +179,6 @@ export const notificationTypes = {
   'admin.fx.paused': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Conversions paused' },
   'admin.vpn.attention': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'VPN account needs attention' },
   'admin.vpn.credit_low': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'VPN supplier credit low' },
-  'admin.esim.top_up_unclear': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'eSIM top-up unconfirmed' },
   'admin.crypto.withdrawal_review': { realm: 'afrippa_admin', roles: ['operations', 'finance'], severity: 'warning', label: 'Crypto withdrawal to approve' },
   'admin.crypto.withdrawal_stuck': { realm: 'afrippa_admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Crypto withdrawal unconfirmed' },
   'admin.crypto.address_flagged': { realm: 'afrippa_admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Withdrawal address on a sanctions list' },
@@ -210,7 +205,6 @@ export const notificationTypes = {
   'customer.support.chat_replied': { realm: 'customer', severity: 'info', label: 'Reply in chat', push: true },
   'customer.order.refunded': { realm: 'customer', severity: 'info', label: 'Order refunded', push: true },
   'customer.wallet.credited': { realm: 'customer', severity: 'success', label: 'Money added to your wallet', push: true },
-  'customer.esim.low_data': { realm: 'customer', severity: 'warning', label: 'eSIM data running low', push: true },
   'customer.classifieds.listing_live': { realm: 'customer', severity: 'success', label: 'Your BitoCard Shop ad is live', push: true },
   'customer.classifieds.listing_rejected': { realm: 'customer', severity: 'warning', label: 'Your BitoCard Shop ad needs changes', push: true },
   'customer.classifieds.listing_removed': { realm: 'customer', severity: 'warning', label: 'Your BitoCard Shop ad was removed', push: true },
@@ -290,7 +284,6 @@ export const notificationTypes = {
   'customer.resale.message': { realm: 'customer', severity: 'info', label: 'New message from a reseller', push: true },
   'customer.resale.note_pending': { realm: 'customer', severity: 'info', label: 'A reseller’s note needs your approval', push: true },
   'customer.resale.deal_answered': { realm: 'customer', severity: 'info', label: 'A reseller answered your deal', push: true },
-  'customer.esim.expiring': { realm: 'customer', severity: 'warning', label: 'eSIM about to expire', push: true },
   'customer.gift_card_sale.accepted': { realm: 'customer', severity: 'success', label: 'Gift card sale accepted', push: true },
   'customer.gift_card_sale.declined': { realm: 'customer', severity: 'warning', label: 'Gift card sale declined', push: true },
   'customer.p2p.order_opened': { realm: 'customer', severity: 'info', label: 'New order on your ad', push: true },
@@ -326,21 +319,20 @@ export type NotificationType = keyof typeof notificationTypes;
 
 /**
  * BitoCard's own notices, which Udozo never sends, lists or lets anyone set a preference for: digital-product orders,
- * suppliers and resellers' own integrations, virtual numbers, eSIMs, VPN, gift card sales, catalogue disputes,
+ * suppliers and resellers' own integrations, VPN, gift card sales, catalogue disputes,
  * chargebacks, the startup allowance, BitoCard's fees, store support assistants, reserved accounts, crypto and P2P.
  */
 const bitocardNotificationTypes: ReadonlySet<string> = new Set([
-  'connection.approved', 'connection.rejected', 'connection.suspended', 'connection.reinstated', 'connection.sync_failed',
-  'supplier_notification.failed', 'order.needs_review', 'store.checkout_refused', 'number.expiring', 'number.renewal_failed',
-  'number.expired', 'number.deleted', 'dispute.opened', 'dispute.updated', 'support.bot_paused', 'support.knowledge_stale',
-  'chargeback.opened', 'chargeback.closed', 'kyc.customer_submitted', 'startup_allowance.granted', 'startup_allowance.revoked',
+  'connection.approved', 'connection.rejected', 'connection.suspended', 'connection.reinstated',
+  'connection.sync_failed', 'supplier_notification.failed', 'order.needs_review', 'store.checkout_refused',
+  'dispute.opened', 'dispute.updated', 'support.bot_paused', 'support.knowledge_stale', 'chargeback.opened',
+  'chargeback.closed', 'kyc.customer_submitted', 'startup_allowance.granted', 'startup_allowance.revoked',
   'fee.refunded', 'admin.connection.review', 'admin.order.needs_review', 'admin.supplier_notification.failed',
   'admin.checkout.refund_stuck', 'admin.order.cost_mismatch', 'admin.dispute.escalated', 'admin.dispute.updated',
-  'admin.chargeback.opened', 'admin.reserved_account.unmatched_deposit', 'admin.tax.rate_unconfirmed', 'admin.vpn.attention',
-  'admin.vpn.credit_low', 'admin.esim.top_up_unclear', 'admin.supplier.funded', 'customer.order.completed',
-  'customer.order.failed', 'customer.order.refunded', 'customer.dispute.updated', 'customer.esim.low_data',
-  'customer.esim.expiring', 'customer.gift_card_sale.accepted', 'customer.gift_card_sale.declined',
-  'customer.security.payment_method_added', 'customer.security.new_device',
+  'admin.chargeback.opened', 'admin.reserved_account.unmatched_deposit', 'admin.tax.rate_unconfirmed',
+  'admin.vpn.attention', 'admin.vpn.credit_low', 'admin.supplier.funded', 'customer.order.completed',
+  'customer.order.failed', 'customer.order.refunded', 'customer.dispute.updated', 'customer.gift_card_sale.accepted',
+  'customer.gift_card_sale.declined', 'customer.security.payment_method_added', 'customer.security.new_device',
 ]);
 const bitocardNotificationPrefixes = ['admin.crypto.', 'admin.afrippa.', 'customer.crypto.', 'customer.p2p.'];
 

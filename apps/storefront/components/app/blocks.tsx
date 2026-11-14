@@ -35,20 +35,12 @@ export function StatCard({ icon: Icon, label, value, note, tone }: { icon: Lucid
   );
 }
 
-/**
- * A menu group's solid icon (as in the mockups): filled in the group's colour with white detail; line-only icons
- * (the signal bars) are drawn thick instead.
- */
+/** A menu group's solid icon (as in the mockups): filled in the group's colour with white detail. */
 function SolidGroupIcon({ group, tint }: { group: StoreNavigationGroup; tint: ReturnType<typeof groupTint> }) {
   const Icon = groupIcon[group.key] ?? Gift;
-  const lineOnly = group.key === "esims";
   return (
     <span className={`grid size-14 shrink-0 place-items-center rounded-2xl md:size-12 lg:size-16 ${tint.tile} ${tint.ink}`}>
-      {lineOnly ? (
-        <Icon className="size-9 md:size-8 lg:size-10" strokeWidth={3} aria-hidden="true" />
-      ) : (
-        <Icon className="size-9 md:size-8 lg:size-10" fill="currentColor" stroke="white" strokeWidth={1.75} aria-hidden="true" />
-      )}
+      <Icon className="size-9 md:size-8 lg:size-10" fill="currentColor" stroke="white" strokeWidth={1.75} aria-hidden="true" />
     </span>
   );
 }

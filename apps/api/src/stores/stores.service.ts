@@ -358,8 +358,6 @@ export class StoresService {
           description: template.description,
           categories: template.categories,
           single_product: template.single,
-          // Kept in the response, always false: the crypto desk left BitoCard with crypto (docs/CRYPTO_SPINOFF_PLAN.md).
-          crypto: false,
           resale: Boolean(template.resale),
           sections: template.sections,
           ...(await this.templateAvailability(resellerId, template)),

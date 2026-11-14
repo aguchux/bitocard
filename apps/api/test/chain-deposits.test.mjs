@@ -613,9 +613,9 @@ describe('providers on the wrong network', () => {
 });
 test('request logs never carry query values (webhook tokens, preview links)', async () => {
   const { loggerParams, redactUrl } = await import('../dist/common/request/logging.js');
-  assert.equal(redactUrl('/v1/webhooks/didww-sms?token=secret&x=1'), '/v1/webhooks/didww-sms?token=[redacted]&x=[redacted]');
+  assert.equal(redactUrl('/v1/webhooks/pawapay?token=secret&x=1'), '/v1/webhooks/pawapay?token=[redacted]&x=[redacted]');
   assert.equal(redactUrl('/v1/health'), '/v1/health');
-  const serialised = loggerParams({ LOG_LEVEL: 'info' }).pinoHttp.serializers.req({ method: 'POST', url: '/v1/webhooks/esim-access?token=abc', query: { token: 'abc' } });
-  assert.deepEqual([serialised.url, serialised.query, serialised.method], ['/v1/webhooks/esim-access?token=[redacted]', { token: '[redacted]' }, 'POST']);
+  const serialised = loggerParams({ LOG_LEVEL: 'info' }).pinoHttp.serializers.req({ method: 'POST', url: '/v1/webhooks/africas-talking?token=abc', query: { token: 'abc' } });
+  assert.deepEqual([serialised.url, serialised.query, serialised.method], ['/v1/webhooks/africas-talking?token=[redacted]', { token: '[redacted]' }, 'POST']);
   assert.ok(!JSON.stringify(serialised).includes('abc'));
 });

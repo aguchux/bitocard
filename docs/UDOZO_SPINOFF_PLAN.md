@@ -113,7 +113,7 @@ The shared foundations come with it, in Udozo's own database:
    Code that names BitoCard today reads it instead: `sessionPolicy`, `apiKeyPattern` in `auth.guard.ts`, email templates, `ShopEmails`, the `HandoffService` targets, and `SHOP_URL`, which becomes the product's own site.
 2. **Modules per product** (`app.module.ts`):
    - **BitoCard** mounts everything except `ClassifiedsModule` and `ResaleModule`. Its `/v1/classifieds*`, `/v1/resale*`, `/v1/store/resale*` and `/v1/store/cash` then answer as unknown routes.
-   - **Udozo** mounts the shared foundations plus classifieds and resale. It mounts none of: suppliers, the catalogue, orders, eSIMs, numbers, VPN, Spin and win, crypto or Afrippa.
+   - **Udozo** mounts the shared foundations plus classifieds and resale. It mounts none of: suppliers, the catalogue, orders, VPN, Spin and win, crypto or Afrippa.
    - A shared module that imports a BitoCard-only one is split or given a hook, as `StorefrontService.useResale` already is. For example, `ResaleModule` reaches the catalogue through `StorefrontModule`.
 3. **Product-scoped pieces:**
    - **Jobs:** `cron.json` jobs say which products they run for, and each instance's scheduler runs its own.
@@ -137,7 +137,7 @@ The shared foundations come with it, in Udozo's own database:
   - `ProductRoutesGuard`, the first global guard, answers the other product's routes as unknown routes. `PRODUCT_ROUTES=all` (tests and local development; refused in production) serves every route.
   - **Why not unmount modules:** `CheckoutModule` imports the catalogue and orders, so unmounting would pull in BitoCard's whole commerce. Splitting the modules can come later; the guard already keeps each instance to its own surface.
 - **Udozo's:** classifieds, shop assistants, resale, Safe pay payouts (`/v1/store/cash`, `/v1/admin/crypto/payouts`) and the resale reports.
-- **BitoCard's:** Afrippa and crypto; catalogue, quotes, pricing, suppliers, stock; orders, numbers, eSIMs, VPN; Spin and win; order disputes; checkout and the storefront catalogue; country stores; resellers' own integrations and platform fees; customers' checks by reference.
+- **BitoCard's:** Afrippa and crypto; catalogue, quotes, pricing, suppliers, stock; orders, VPN; Spin and win; order disputes; checkout and the storefront catalogue; country stores; resellers' own integrations and platform fees; customers' checks by reference.
 - **Names per product** (`src/products/product.ts`, `productOf(config)`): session cookies (`udz_session`, `udz_admin_session`), API keys (`udz_test_…`; a key of the other product's shape is refused unread), the webhook signature header (`Udozo-Signature`), and the admins' authenticator and emails (`Udozo Admin`).
 - **Jobs:** `cron.json` names the owner of product jobs (`src/products/jobs.ts`, `jobOwners`). Each scheduler runs its own and the shared ones, and the API refuses the other product's (404).
 - **OpenAPI:** each instance describes only its own routes. BitoCard's `openapi.json` lost the Resale endpoints, and the docs' Resale section went with them (changelog entry).

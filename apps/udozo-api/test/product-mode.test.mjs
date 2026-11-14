@@ -262,8 +262,11 @@ describe('product seed', () => {
     const query = sql => db.query(sql);
     assert.deepEqual(await seedProduct(query, 'bitocard'), [], "BitoCard's database needs nothing");
     const first = await seedProduct(query, 'udozo');
-    // Enterprise is created hidden already; the rest change rows on a fresh database.
-    assert.ok(first.filter(seed => seed.name !== 'Enterprise hidden').every(seed => seed.rows >= 1), JSON.stringify(first));
+    // Enterprise is created hidden already, and the crypto clean-up removes only what is there; the rest change rows.
+    assert.ok(first.filter(seed => seed.name !== 'Enterprise hidden' && !seed.name.startsWith('no ')).every(seed => seed.rows >= 1), JSON.stringify(first));
+    // Afrippa never runs on Udozo: the coins and networks migrations seed for it are gone.
+    assert.equal((await db.query(`SELECT count(*)::int AS n FROM "crypto_assets"`)).rows[0].n, 0);
+    assert.equal((await db.query(`SELECT count(*)::int AS n FROM "crypto_networks"`)).rows[0].n, 0);
     const store = (await db.query(`SELECT "name" FROM "stores" WHERE "id" = '00000000-0000-4000-8000-0000000000b2'`)).rows[0];
     assert.equal(store.name, 'Udozo');
     assert.equal((await db.query(`SELECT count(*)::int AS n FROM "resellers" WHERE "house" = true AND "name" = 'BitoCard'`)).rows[0].n, 0);

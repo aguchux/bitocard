@@ -406,7 +406,7 @@ export class ResellerIntegrationsService {
 
   /** BitoCard's public API address, where suppliers send notifications. */
   private get apiBase() {
-    return this.integrations.config.DIDWW_CALLBACK_URL;
+    return this.integrations.config.API_PUBLIC_URL;
   }
 
   private async runCheck(integration: ConnectableIntegration, values: Record<string, string>, environment: Environment) {
@@ -505,7 +505,7 @@ function notificationSetup(integration: ConnectableIntegration, connection: Rese
   return {
     url: `${apiBase.replace(/\/+$/, '')}/v1/webhooks/${integration.id}/${connection.id}`,
     setup: integration.notifications.setup,
-    ready: integration.notifications.setup === 'automatic' || Boolean(hints[integration.notifications.secretField]),
+    ready: Boolean(hints[integration.notifications.secretField]),
   };
 }
 

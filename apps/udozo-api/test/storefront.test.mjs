@@ -35,7 +35,7 @@ after(async () => {
 
 const productKey = async brand => (await prisma.product.findFirstOrThrow({ where: { brand } })).key;
 /** Nothing a visitor sees may name BitoCard's suppliers. */
-const noSuppliers = json => assert.ok(!/reloadly|vtpass|didww/i.test(JSON.stringify(json)), 'supplier named in a public response');
+const noSuppliers = json => assert.ok(!/reloadly|vtpass|zendit/i.test(JSON.stringify(json)), 'supplier named in a public response');
 
 describe('the public catalogue', () => {
   test('lists what is on sale with face values, filters and paging, and never names suppliers', async () => {
@@ -52,7 +52,7 @@ describe('the public catalogue', () => {
     const airtime = await visitor.get('/v1/store/products?category=airtime');
     assert.ok(airtime.json.data.length >= 2 && airtime.json.data.every(item => item.category === 'airtime'));
     const mobile = await visitor.get('/v1/store/products?group=mobile');
-    assert.ok(mobile.json.data.every(item => ['airtime', 'data', 'virtual_numbers'].includes(item.category)));
+    assert.ok(mobile.json.data.every(item => ['airtime', 'data', 'mobile_money'].includes(item.category)));
     assert.ok(mobile.json.data.some(item => item.category === 'data'));
     const nigeria = await visitor.get('/v1/store/products?country=ng');
     assert.ok(nigeria.json.data.every(item => item.country === 'NG'));
@@ -125,7 +125,7 @@ describe('the public catalogue', () => {
     const navigation = (await visitor.get('/v1/store/navigation')).json;
     assert.deepEqual(
       navigation.groups.map(group => group.key),
-      ['gift-cards', 'mobile', 'bills', 'esims', 'software', 'vpn', 'rdp', 'virtual-cards'],
+      ['gift-cards', 'mobile', 'bills', 'software', 'vpn', 'rdp', 'virtual-cards'],
       'the menus never come and go',
     );
     const mobile = navigation.groups.find(group => group.key === 'mobile');

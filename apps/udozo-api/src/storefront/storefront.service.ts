@@ -45,8 +45,6 @@ export type StoreProductFilter = {
   tag?: string;
   q?: string;
   sort?: 'popular' | 'name' | 'new';
-  /** Products that can do all of these (`src/catalogue/features.ts`). */
-  features?: string[];
   limit?: number;
   offset?: number;
 };
@@ -160,7 +158,7 @@ export class StorefrontService {
   /**
    * Runs `work` for a shopper who chose a market (bitocard.com asks on the first visit and remembers it): other
    * countries' local products (their airtime, data, bills, pay-TV, mobile money) are left out, while products usable
-   * anywhere (gift cards, eSIMs, software, numbers) stay. `global` or nothing shows the whole store.
+   * anywhere (gift cards, software) stay. `global` or nothing shows the whole store.
    */
   async inMarket<T>(market: string | undefined, work: () => Promise<T>, currency?: string) {
     const code = market && market.toLowerCase() !== 'global' ? market.toUpperCase() : null;
@@ -310,7 +308,7 @@ export class StorefrontService {
       category_label: categoryLabels[product.category],
       country: product.country,
       country_name: countryName(product.country),
-      /** Usable in any country (gift cards, eSIMs, software, numbers) rather than one market's services. */
+      /** Usable in any country (gift cards, software) rather than one market's services. */
       global: worldwideCategories.has(product.category),
       face_currency: product.faceCurrency,
       denomination_type: product.denominationType,
@@ -322,8 +320,6 @@ export class StorefrontService {
       description: product.description,
       /** The admin's product image, else the brand's logo from BitoCard's own files: never the supplier's (it would name them). */
       logo_url: product.imageUrl ?? this.presentBrand(product.brand, brand).logo_url,
-      /** What it can do (calls, SMS, app codes on numbers), for icons and filters. */
-      features: product.features,
       brand: this.presentBrand(product.brand, brand),
     };
   }
@@ -406,7 +402,6 @@ export class StorefrontService {
     if (filter.country === 'global') and.push({ category: { in: [...worldwideCategories] } });
     else if (filter.country) and.push({ country: filter.country.toUpperCase() });
     if (filter.brand) and.push({ brand: filter.brand });
-    if (filter.features?.length) and.push({ features: { hasEvery: filter.features } });
     return and.length ? { AND: and } : {};
   }
 

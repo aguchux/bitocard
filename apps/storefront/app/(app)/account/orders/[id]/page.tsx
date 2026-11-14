@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, ExternalLink, KeyRound, LifeBuoy, MessageSquareWarning } from "lucide-react";
-import { formatFace, formatPrice, type StoreCheckout, type StoreEsim, type StoreVpn } from "@bitocard/api-client/storefront";
-import { EsimCard } from "@/components/store/esim-card";
-import { EsimManage } from "@/components/store/esim-manage";
+import { formatFace, formatPrice, type StoreCheckout, type StoreVpn } from "@bitocard/api-client/storefront";
 import { CopyValue, VpnAccess } from "@/components/store/vpn-access";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
@@ -14,7 +12,7 @@ import { canDispute } from "@/lib/disputes";
 
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false } };
 
-const detailLabels: Record<string, string> = { duration: "Licence term", expires_at: "Expires", redemption_url: "Redeem at", number: "Number" };
+const detailLabels: Record<string, string> = { duration: "Licence term", expires_at: "Expires", redemption_url: "Redeem at" };
 
 /** One order: its status, the codes once delivered, and the payment page while it is waiting for payment. */
 export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cancel_error?: string }> }) {
@@ -26,12 +24,6 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const order = result.data;
   const waiting = order.status === "awaiting_payment" || order.status === "paid" || order.status === "refund_pending";
   const deliveries = order.order?.deliveries ?? [];
-  const esims = deliveries.length > 0 && deliveries.every(delivery => delivery.kind === "esim");
-  // eSIMs after delivery: status, data use, top-ups and cancelling (also once refunded, to show they were cancelled).
-  const tracked =
-    order.product.category === "esim" && (order.status === "completed" || order.status === "refunded")
-      ? await customerApi<{ data: StoreEsim[] }>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}/esims`)
-      : null;
   const vpnOrder = deliveries.some(delivery => delivery.kind === "vpn_account");
   const vpn = vpnOrder ? await customerApi<{ vpn_subscription: StoreVpn | null }>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}/vpn`) : null;
 
@@ -121,18 +113,14 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       {deliveries.length ? (
         <section aria-labelledby="codes" className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 id="codes" className="font-display flex items-center gap-2 text-xl font-bold">
-            <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {vpnOrder ? "VPN sign-in" : esims ? (deliveries.length > 1 ? "eSIMs" : "eSIM") : deliveries.length > 1 ? "codes" : "code"}
+            <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {vpnOrder ? "VPN sign-in" : deliveries.length > 1 ? "codes" : "code"}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {vpnOrder ? "Your username and password for the VPN app. Keep them private: anyone with them can use your access." : esims ? "Install before you travel. Keep it private: anyone with the code can install the eSIM, and only once." : "Keep these safe: anyone with a code can use it."}
+            {vpnOrder ? "Your username and password for the VPN app. Keep them private: anyone with them can use your access." : "Keep these safe: anyone with a code can use it."}
           </p>
           <ul className="mt-4 space-y-3">
             {deliveries.map((delivery, index) =>
-              delivery.kind === "esim" && delivery.code ? (
-                <li key={index}>
-                  <EsimCard code={delivery.code} iccid={delivery.serial} details={delivery.details} title={`eSIM${deliveries.length > 1 ? ` ${index + 1}` : ""}`} />
-                </li>
-              ) : delivery.kind === "vpn_account" && delivery.code ? (
+              delivery.kind === "vpn_account" && delivery.code ? (
                 <li key={index} className="space-y-3 rounded-2xl border border-slate-200 p-4">
                   {delivery.serial ? <CopyValue label="Username" value={delivery.serial} /> : null}
                   <CopyValue label="Password" value={delivery.code} />
@@ -159,7 +147,6 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <p className="rounded-2xl bg-emerald-50 p-4 text-emerald-900">Delivered{order.recipient?.phone ? ` to ${order.recipient.phone}` : order.recipient?.account_number ? ` to ${order.recipient.account_number}` : ""}.</p>
       ) : null}
 
-      {tracked?.ok ? <EsimManage source={{ checkout: order.id }} esims={tracked.data.data} store="the store" /> : null}
       {vpn?.ok && vpn.data.vpn_subscription ? <VpnAccess source={{ checkout: order.id }} vpn={vpn.data.vpn_subscription} store="the store" /> : null}
 
       <div className="flex flex-wrap gap-2">

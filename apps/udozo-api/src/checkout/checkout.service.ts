@@ -526,7 +526,7 @@ export class CheckoutService implements OnModuleInit {
   }
 
   /** One checkout, with its codes once delivered. A checkout still waiting for payment is checked with the gateway first. */
-  /** The order a customer's own checkout placed (its eSIMs, for example); not found until it has one. */
+  /** The order a customer's own checkout placed (its VPN access, for example); not found until it has one. */
   async orderFor(customer: CustomerWithStore, id: string) {
     const checkout = await this.prisma.checkout.findUnique({ where: { id }, select: { customerId: true, orderId: true } });
     if (!checkout || checkout.customerId !== customer.id || !checkout.orderId) throw notFound();

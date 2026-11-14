@@ -124,7 +124,7 @@ Who we are, what we sell and who we serve, in two or three sentences.
 How prices are shown, the payment methods, the store wallet and top-ups.
 
 # Delivery
-How each product arrives (codes on the order page, tokens, eSIM install steps) and typical times.
+How each product arrives (codes on the order page, tokens) and typical times.
 
 # Refunds and problems
 What can be refunded and when, and how to report a problem with an order.
@@ -156,11 +156,9 @@ const deliveryText: Record<string, string> = {
   data: 'Data bundles: sent straight to the mobile number given, usually within seconds.',
   bills: 'Electricity and bills: paid to the meter or account number checked before paying; electricity tokens are on the order page.',
   pay_tv: 'Pay-TV: the subscription is paid to the smartcard or IUC number checked before paying; it shows on the decoder within minutes.',
-  esim: 'eSIMs: installed from the order page (a QR code, or Install on iPhone or Android), shown after Show eSIM. An eSIM installs once.',
   software: 'Software: the licence key is on the order page, hidden until Reveal.',
   vpn: 'VPN access: the username and password are on the order page; access lasts 30 days and never renews automatically.',
   rdp: 'RDP: the server sign-in details are on the order page.',
-  virtual_numbers: 'Virtual numbers: the number is on the order page; it lasts a month and is renewed from there, or deleted 15 days after it expires.',
   virtual_cards: 'Virtual cards: shown securely on the order page.',
   mobile_money: 'Mobile money: sent to the mobile money wallet of the number given.',
 };
@@ -168,7 +166,6 @@ const deliveryText: Record<string, string> = {
 const refundText: Record<string, string> = {
   gift_cards: 'Gift cards: a code that was revealed cannot be refunded; a code that does not work is investigated (report a problem from the order).',
   software: 'Software: a revealed licence key cannot be refunded; a key that does not activate is replaced or refunded after checking.',
-  esim: 'eSIMs: refunded only while never installed.',
   vpn: 'VPN access: a full refund within 14 days while the sign-in details were never shown; afterwards only if it cannot be made to work.',
 };
 

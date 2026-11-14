@@ -13,11 +13,6 @@ export const eventTypes = [
   'payout.failed',
   'customer_verification.approved',
   'customer_verification.declined',
-  'number.renewed',
-  'number.expired',
-  'number.deleted',
-  'number.sms_received',
-  'esim.updated',
   'vpn_subscription.updated',
   'dispute.opened',
   'dispute.message_received',
@@ -35,7 +30,7 @@ export const eventTypes = [
 export type EventType = (typeof eventTypes)[number];
 
 /**
- * Event types that belong to one product (docs/UDOZO_SPINOFF_PLAN.md): BitoCard's orders, numbers, eSIMs, VPN access,
+ * Event types that belong to one product (docs/UDOZO_SPINOFF_PLAN.md): BitoCard's orders, VPN access,
  * order disputes and customers' checks; Udozo's resale orders. The rest (top-ups, payouts, support tickets) are both
  * products'. Each instance lets endpoints subscribe to, and documents, only its own and the shared ones.
  */
@@ -45,11 +40,6 @@ export const eventOwners: Partial<Record<EventType, Product>> = {
   'order.refunded': 'bitocard',
   'customer_verification.approved': 'bitocard',
   'customer_verification.declined': 'bitocard',
-  'number.renewed': 'bitocard',
-  'number.expired': 'bitocard',
-  'number.deleted': 'bitocard',
-  'number.sms_received': 'bitocard',
-  'esim.updated': 'bitocard',
   'vpn_subscription.updated': 'bitocard',
   'dispute.opened': 'bitocard',
   'dispute.message_received': 'bitocard',

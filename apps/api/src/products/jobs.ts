@@ -10,8 +10,6 @@ export const jobOwners: Readonly<Record<string, Product>> = {
   orders: 'bitocard',
   catalogue: 'bitocard',
   'supplier-webhooks': 'bitocard',
-  numbers: 'bitocard',
-  esims: 'bitocard',
   vpn: 'bitocard',
   'vpn-reconcile': 'bitocard',
   crypto: 'bitocard',

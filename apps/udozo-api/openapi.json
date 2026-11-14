@@ -664,6 +664,7 @@
                       "id": "3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b",
                       "channel": "web_push",
                       "label": "Chrome on Windows",
+                      "app_version": null,
                       "current": true,
                       "last_pushed_at": "2026-10-06T08:31:12.000Z",
                       "last_seen_at": "2026-10-06T08:15:00.000Z",
@@ -762,6 +763,7 @@
                   "id": "3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b",
                   "channel": "web_push",
                   "label": "Chrome on Windows",
+                  "app_version": null,
                   "current": true,
                   "last_pushed_at": null,
                   "last_seen_at": "2026-10-06T08:15:00.000Z",
@@ -7915,10 +7917,9 @@
                       "key": "all_in_one",
                       "name": "All-in-one store",
                       "tagline": "Everything you sell, in one store.",
-                      "description": "Gift cards, top-ups, bills, eSIMs, software and more: a full catalogue with search, categories, brands and product rails.",
+                      "description": "Gift cards, top-ups, bills, software and more: a full catalogue with search, categories, brands and product rails.",
                       "categories": null,
                       "single_product": false,
-                      "crypto": false,
                       "resale": false,
                       "sections": [
                         "hero",
@@ -30245,7 +30246,7 @@
           "focus": {
             "type": "object",
             "description": "Single product stores: the product key it sells (one you have listed).",
-            "example": "esim:WW:global:10gb-30d"
+            "example": "software:WW:kaspersky:standard-12m"
           },
           "watermark_text": {
             "type": "string",
@@ -30337,7 +30338,7 @@
           "focus": {
             "type": "object",
             "description": "Single product stores: the product key it sells (one you have listed).",
-            "example": "esim:WW:global:10gb-30d"
+            "example": "software:WW:kaspersky:standard-12m"
           },
           "watermark_text": {
             "type": "string",
@@ -31252,11 +31253,9 @@
               "data",
               "bills",
               "pay_tv",
-              "esim",
               "software",
               "vpn",
               "rdp",
-              "virtual_numbers",
               "virtual_cards",
               "mobile_money"
             ],
@@ -31953,50 +31952,6 @@
           "supplier_id"
         ]
       },
-      "UpdateNumberDto": {
-        "type": "object",
-        "properties": {
-          "auto_renew": {
-            "type": "boolean",
-            "description": "Renew from your wallet 3 days before `expires_at`. Your customer can also switch this on the order’s page."
-          },
-          "customer_sending": {
-            "type": "boolean",
-            "description": "Let your customer send SMS from the order’s page (charged to your wallet)."
-          }
-        }
-      },
-      "SendMessageDto": {
-        "type": "object",
-        "properties": {
-          "to": {
-            "type": "string",
-            "description": "Who to send to, in international format, for example `+447700900123`.",
-            "example": "+447700900123"
-          },
-          "text": {
-            "type": "string",
-            "description": "The message: up to 160 characters (70 if it needs characters outside the GSM alphabet, such as emoji)."
-          }
-        },
-        "required": [
-          "to",
-          "text"
-        ]
-      },
-      "TopUpDto": {
-        "type": "object",
-        "properties": {
-          "option_id": {
-            "type": "string",
-            "description": "One of the options `GET /v1/esims/{id}/top-up-options` lists.",
-            "example": "opt_4f1c2b9a0d7e6c5b3a21"
-          }
-        },
-        "required": [
-          "option_id"
-        ]
-      },
       "Order": {
         "type": "object",
         "title": "Order",
@@ -32393,239 +32348,6 @@
           }
         }
       },
-      "VirtualNumber": {
-        "type": "object",
-        "title": "Virtual number",
-        "required": [
-          "object",
-          "id",
-          "order_id",
-          "mode",
-          "number",
-          "status",
-          "expires_at",
-          "delete_at",
-          "auto_renew",
-          "customer_sending",
-          "sends_sms",
-          "renewal_error",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `virtual_number`.",
-            "const": "virtual_number"
-          },
-          "id": {
-            "type": "string",
-            "description": "Virtual number ID.",
-            "format": "uuid"
-          },
-          "order_id": {
-            "type": "string",
-            "description": "The order that bought it.",
-            "format": "uuid"
-          },
-          "mode": {
-            "type": "string",
-            "description": "`test` (sandbox) or `live`.",
-            "enum": [
-              "test",
-              "live"
-            ]
-          },
-          "number": {
-            "type": "string",
-            "description": "The number, E.164 (for example `+442071234567`)."
-          },
-          "status": {
-            "type": "string",
-            "description": "`active`; `expired`: not renewed by `expires_at`, paused (no SMS in or out) and renewable until `delete_at`; `deleted`: released for good.",
-            "enum": [
-              "active",
-              "expired",
-              "deleted"
-            ]
-          },
-          "expires_at": {
-            "type": "string",
-            "description": "Paid up to. Renewing adds a month (from now, for an expired number).",
-            "format": "date-time"
-          },
-          "delete_at": {
-            "type": "string",
-            "description": "When an unrenewed number is deleted: 15 days after `expires_at`.",
-            "format": "date-time"
-          },
-          "auto_renew": {
-            "type": "boolean",
-            "description": "Renewed from your wallet 3 days before `expires_at` (retried twice a day while your wallet is short). Off until your customer switches it on on the order’s page, or you do."
-          },
-          "customer_sending": {
-            "type": "boolean",
-            "description": "Your customer may send SMS from the order’s page (charged to your wallet)."
-          },
-          "sends_sms": {
-            "type": "boolean",
-            "description": "The number can send SMS (`POST /v1/numbers/{id}/messages`)."
-          },
-          "renewal_error": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Why the last automatic renewal did not happen, for example `insufficient_funds`."
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When the number was bought.",
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "description": "When the number last changed. Use it to ignore an older event that arrives after a newer one.",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": false
-      },
-      "Esim": {
-        "type": "object",
-        "title": "eSIM",
-        "required": [
-          "object",
-          "id",
-          "order_id",
-          "mode",
-          "iccid",
-          "status",
-          "data",
-          "expires_at",
-          "top_ups",
-          "cancellable",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `esim`.",
-            "const": "esim"
-          },
-          "id": {
-            "type": "string",
-            "description": "eSIM ID.",
-            "format": "uuid"
-          },
-          "order_id": {
-            "type": "string",
-            "description": "The order that delivered it (its activation code is on the order).",
-            "format": "uuid"
-          },
-          "mode": {
-            "type": "string",
-            "description": "`test` (sandbox) or `live`.",
-            "enum": [
-              "test",
-              "live"
-            ]
-          },
-          "iccid": {
-            "type": "string",
-            "description": "Its ICCID."
-          },
-          "status": {
-            "type": "string",
-            "description": "`ready`: delivered, not installed yet; `installed`: on a phone, not used yet; `active`: in use; `used_up`: all its data used (top it up); `expired`: its plan ended; `cancelled`: cancelled before it was installed (refunded); `revoked` or `suspended`: stopped by the network.",
-            "enum": [
-              "ready",
-              "installed",
-              "active",
-              "used_up",
-              "expired",
-              "cancelled",
-              "revoked",
-              "suspended"
-            ]
-          },
-          "data": {
-            "type": "object",
-            "title": "eSIM data",
-            "required": [
-              "total",
-              "used",
-              "remaining",
-              "updated_at"
-            ],
-            "properties": {
-              "total": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "description": "Data in its plan, in bytes; null for unlimited plans or before it is reported."
-              },
-              "used": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "description": "Data used, in bytes (suppliers update it every few hours); null before it is reported."
-              },
-              "remaining": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "description": "Data left, in bytes."
-              },
-              "updated_at": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "When the use was last read.",
-                "format": "date-time"
-              }
-            },
-            "additionalProperties": false
-          },
-          "expires_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "When its plan ends (before installing: the last day to install it).",
-            "format": "date-time"
-          },
-          "top_ups": {
-            "type": "string",
-            "description": "`data`: takes more data; `days`: a day pass that takes more days; `none`.",
-            "enum": [
-              "none",
-              "data",
-              "days"
-            ]
-          },
-          "cancellable": {
-            "type": "boolean",
-            "description": "Never installed: `POST /v1/esims/{id}/cancel` cancels it (with every eSIM of its order) and refunds the order."
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When it was delivered.",
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "description": "When it last changed. Use it to ignore an older event that arrives after a newer one.",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": false
-      },
       "VpnSubscription": {
         "type": "object",
         "title": "VPN subscription",
@@ -32735,102 +32457,6 @@
           "updated_at": {
             "type": "string",
             "description": "When it last changed. Use it to ignore an older event that arrives after a newer one.",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": false
-      },
-      "NumberMessage": {
-        "type": "object",
-        "title": "Number message",
-        "required": [
-          "object",
-          "id",
-          "number_id",
-          "direction",
-          "from",
-          "to",
-          "text",
-          "status",
-          "charged",
-          "currency",
-          "failure_reason",
-          "created_at"
-        ],
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `number_message`.",
-            "const": "number_message"
-          },
-          "id": {
-            "type": "string",
-            "description": "Message ID.",
-            "format": "uuid"
-          },
-          "number_id": {
-            "type": "string",
-            "description": "The virtual number.",
-            "format": "uuid"
-          },
-          "direction": {
-            "type": "string",
-            "description": "`in` (received) or `out` (sent).",
-            "enum": [
-              "in",
-              "out"
-            ]
-          },
-          "from": {
-            "type": "string",
-            "description": "Who sent it (E.164)."
-          },
-          "to": {
-            "type": "string",
-            "description": "Who it was sent to (E.164)."
-          },
-          "text": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The message. Never in webhooks (null there): get the messages to read it."
-          },
-          "status": {
-            "type": "string",
-            "description": "`received` (in); `queued`, `sent`, `delivered` or `failed` (out).",
-            "enum": [
-              "received",
-              "queued",
-              "sent",
-              "delivered",
-              "failed"
-            ]
-          },
-          "charged": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "description": "Taken from your wallet for a sent message, in minor units of `currency`; null until the price is known, and for received messages."
-          },
-          "currency": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "ISO 4217 currency of `charged`."
-          },
-          "failure_reason": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Why a sent message failed."
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When it was received or sent.",
             "format": "date-time"
           }
         },
@@ -34753,11 +34379,9 @@
                     "data",
                     "bills",
                     "pay_tv",
-                    "esim",
                     "software",
                     "vpn",
                     "rdp",
-                    "virtual_numbers",
                     "virtual_cards",
                     "mobile_money"
                   ]
@@ -35096,175 +34720,6 @@
           }
         }
       },
-      "EsimTopUpOption": {
-        "type": "object",
-        "title": "EsimTopUpOption",
-        "description": "A top-up an eSIM can take now.",
-        "required": [
-          "object",
-          "id",
-          "name",
-          "data",
-          "days",
-          "amount",
-          "currency"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `esim_top_up_option`.",
-            "const": "esim_top_up_option"
-          },
-          "id": {
-            "type": "string",
-            "description": "Pass it as `option_id` to top up."
-          },
-          "name": {
-            "type": "string",
-            "description": "What it adds, for example `1GB, 7 days` or `1GB a day for 3 more days`."
-          },
-          "data": {
-            "type": "string",
-            "description": "The data it adds (`1GB`), or a day pass’s daily allowance (`1GB a day`)."
-          },
-          "days": {
-            "type": "integer",
-            "description": "Days it lasts, or adds to a day pass."
-          },
-          "amount": {
-            "type": "integer",
-            "description": "What it costs you (BitoCard’s price), in minor units of `currency` (for example kobo or cents)."
-          },
-          "currency": {
-            "type": "string",
-            "description": "Your wallet currency."
-          }
-        }
-      },
-      "EsimTopUp": {
-        "type": "object",
-        "title": "EsimTopUp",
-        "description": "Data or days added to an eSIM.",
-        "required": [
-          "object",
-          "id",
-          "esim_id",
-          "mode",
-          "name",
-          "status",
-          "amount",
-          "currency",
-          "paid_by",
-          "failure_reason",
-          "created_at",
-          "completed_at"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `esim_top_up`.",
-            "const": "esim_top_up"
-          },
-          "id": {
-            "type": "string",
-            "description": "Top-up ID.",
-            "format": "uuid"
-          },
-          "esim_id": {
-            "type": "string",
-            "description": "The eSIM.",
-            "format": "uuid"
-          },
-          "mode": {
-            "type": "string",
-            "description": "`test` (sandbox) or `live`.",
-            "enum": [
-              "test",
-              "live"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "description": "What it adds."
-          },
-          "status": {
-            "type": "string",
-            "description": "`pending` (the supplier has not confirmed yet: asked again), `completed` (added; paid) or `failed` (nothing taken).",
-            "enum": [
-              "pending",
-              "completed",
-              "failed"
-            ]
-          },
-          "amount": {
-            "type": "integer",
-            "description": "What it cost: BitoCard’s price to you, or what your customer paid when they topped up from your store, in minor units of `currency` (for example kobo or cents)."
-          },
-          "currency": {
-            "type": "string",
-            "description": "ISO 4217 currency of `amount`."
-          },
-          "paid_by": {
-            "type": "string",
-            "description": "`reseller` (your wallet) or `customer` (your store’s customer, from their wallet).",
-            "enum": [
-              "reseller",
-              "customer"
-            ]
-          },
-          "failure_reason": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Why it failed."
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When it was asked for.",
-            "format": "date-time"
-          },
-          "completed_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "When it was added or failed.",
-            "format": "date-time"
-          }
-        }
-      },
-      "EsimCancellation": {
-        "type": "object",
-        "title": "EsimCancellation",
-        "description": "The order’s eSIMs after cancelling.",
-        "required": [
-          "object",
-          "data",
-          "refunded"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `list`.",
-            "const": "list"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Esim"
-            },
-            "description": "Every eSIM of the order, now `cancelled`."
-          },
-          "refunded": {
-            "type": "boolean",
-            "description": "The order was refunded (see `order.refunded`)."
-          }
-        }
-      },
       "VpnPasswordReset": {
         "type": "object",
         "title": "VpnPasswordReset",
@@ -35318,7 +34773,6 @@
           "description",
           "redeem_instructions",
           "logo_url",
-          "features",
           "image_url",
           "listed",
           "pricing"
@@ -35348,11 +34802,9 @@
               "data",
               "bills",
               "pay_tv",
-              "esim",
               "software",
               "vpn",
               "rdp",
-              "virtual_numbers",
               "virtual_cards",
               "mobile_money"
             ]
@@ -35457,25 +34909,6 @@
               "null"
             ],
             "description": "The product logo from BitoCard files: the product image, else the brand logo; or null. Show it on a white tile."
-          },
-          "features": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "description": "Something the product can do.",
-              "enum": [
-                "calls_in",
-                "calls_out",
-                "sms_in",
-                "sms_out",
-                "sms_people",
-                "app_codes",
-                "emergency",
-                "caller_name",
-                "fax"
-              ]
-            },
-            "description": "What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products."
           },
           "image_url": {
             "type": [
@@ -35617,11 +35050,9 @@
                         "data",
                         "bills",
                         "pay_tv",
-                        "esim",
                         "software",
                         "vpn",
                         "rdp",
-                        "virtual_numbers",
                         "virtual_cards",
                         "mobile_money"
                       ]
@@ -35925,11 +35356,9 @@
                   "data",
                   "bills",
                   "pay_tv",
-                  "esim",
                   "software",
                   "vpn",
                   "rdp",
-                  "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
                 ]
@@ -36348,14 +35777,12 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "description": "What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`), `esim` (the secret LPA activation string in `code`; ICCID in `serial`) or `vpn_account` (password in `code`; username in `serial`).",
+                  "description": "What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over) or `vpn_account` (password in `code`; username in `serial`).",
                   "enum": [
                     "gift_card",
                     "licence_key",
                     "token",
                     "confirmation",
-                    "virtual_number",
-                    "esim",
                     "vpn_account"
                   ]
                 },
@@ -36364,7 +35791,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "The gift card code, licence key, electricity token, eSIM activation string or VPN password. A secret: show it only to your customer."
+                  "description": "The gift card code, licence key, electricity token or VPN password. A secret: show it only to your customer."
                 },
                 "pin": {
                   "type": [
@@ -36378,11 +35805,11 @@
                     "string",
                     "null"
                   ],
-                  "description": "A serial number, virtual phone number, eSIM ICCID, or VPN username."
+                  "description": "A serial number or VPN username."
                 },
                 "details": {
                   "type": "object",
-                  "description": "More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, `duration` for a software licence (for example `1 year` or `Lifetime`), or `number` and `number_type` for a virtual number.",
+                  "description": "More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, or `duration` for a software licence (for example `1 year` or `Lifetime`).",
                   "additionalProperties": {
                     "type": "string"
                   }
@@ -36564,32 +35991,6 @@
               "null"
             ],
             "description": "Your own reference for the customer, as given on the quote."
-          }
-        }
-      },
-      "NumberRenewalPrice": {
-        "type": "object",
-        "title": "Number renewal price",
-        "description": "What renewing a virtual number for a month would cost now, at today’s exchange rate.",
-        "required": [
-          "object",
-          "amount",
-          "currency"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `number_renewal_price`.",
-            "const": "number_renewal_price"
-          },
-          "amount": {
-            "type": "integer",
-            "description": "What renewing for a month takes from your wallet now, in minor units of `currency` (for example kobo or cents)."
-          },
-          "currency": {
-            "type": "string",
-            "description": "ISO 4217 currency (your wallet currency)."
           }
         }
       },
@@ -37376,11 +36777,9 @@
                   "data",
                   "bills",
                   "pay_tv",
-                  "esim",
                   "software",
                   "vpn",
                   "rdp",
-                  "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
                 ]
@@ -37629,11 +37028,9 @@
                   "data",
                   "bills",
                   "pay_tv",
-                  "esim",
                   "software",
                   "vpn",
                   "rdp",
-                  "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
                 ]
@@ -40148,7 +39545,6 @@
           "price",
           "description",
           "logo_url",
-          "features",
           "brand"
         ],
         "additionalProperties": false,
@@ -40180,11 +39576,9 @@
               "data",
               "bills",
               "pay_tv",
-              "esim",
               "software",
               "vpn",
               "rdp",
-              "virtual_numbers",
               "virtual_cards",
               "mobile_money"
             ]
@@ -40203,7 +39597,7 @@
           },
           "global": {
             "type": "boolean",
-            "description": "Usable in any country (gift cards, eSIMs, software, numbers) rather than one market’s services."
+            "description": "Usable in any country (gift cards, software) rather than one market’s services."
           },
           "face_currency": {
             "type": "string",
@@ -40275,25 +39669,6 @@
             ],
             "description": "The product logo from BitoCard files: the product image, else the brand logo; or null."
           },
-          "features": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "description": "Something the product can do.",
-              "enum": [
-                "calls_in",
-                "calls_out",
-                "sms_in",
-                "sms_out",
-                "sms_people",
-                "app_codes",
-                "emergency",
-                "caller_name",
-                "fax"
-              ]
-            },
-            "description": "What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products."
-          },
           "brand": {
             "$ref": "#/components/schemas/StoreBrand"
           }
@@ -40320,7 +39695,6 @@
           "price",
           "description",
           "logo_url",
-          "features",
           "brand",
           "denominations",
           "range",
@@ -40358,11 +39732,9 @@
               "data",
               "bills",
               "pay_tv",
-              "esim",
               "software",
               "vpn",
               "rdp",
-              "virtual_numbers",
               "virtual_cards",
               "mobile_money"
             ]
@@ -40381,7 +39753,7 @@
           },
           "global": {
             "type": "boolean",
-            "description": "Usable in any country (gift cards, eSIMs, software, numbers) rather than one market’s services."
+            "description": "Usable in any country (gift cards, software) rather than one market’s services."
           },
           "face_currency": {
             "type": "string",
@@ -40452,25 +39824,6 @@
               "null"
             ],
             "description": "The product logo from BitoCard files: the product image, else the brand logo; or null."
-          },
-          "features": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "description": "Something the product can do.",
-              "enum": [
-                "calls_in",
-                "calls_out",
-                "sms_in",
-                "sms_out",
-                "sms_people",
-                "app_codes",
-                "emergency",
-                "caller_name",
-                "fax"
-              ]
-            },
-            "description": "What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products."
           },
           "brand": {
             "$ref": "#/components/schemas/StoreBrand"
@@ -40571,11 +39924,9 @@
               "data",
               "bills",
               "pay_tv",
-              "esim",
               "software",
               "vpn",
               "rdp",
-              "virtual_numbers",
               "virtual_cards",
               "mobile_money"
             ]
@@ -40593,7 +39944,6 @@
               "gift-cards",
               "mobile",
               "bills",
-              "esims",
               "software",
               "vpn",
               "rdp",
@@ -40652,11 +40002,9 @@
               "data",
               "bills",
               "pay_tv",
-              "esim",
               "software",
               "vpn",
               "rdp",
-              "virtual_numbers",
               "virtual_cards",
               "mobile_money"
             ]
@@ -40674,7 +40022,6 @@
               "gift-cards",
               "mobile",
               "bills",
-              "esims",
               "software",
               "vpn",
               "rdp",
@@ -40740,7 +40087,6 @@
               "gift-cards",
               "mobile",
               "bills",
-              "esims",
               "software",
               "vpn",
               "rdp",
@@ -41070,11 +40416,9 @@
                         "data",
                         "bills",
                         "pay_tv",
-                        "esim",
                         "software",
                         "vpn",
                         "rdp",
-                        "virtual_numbers",
                         "virtual_cards",
                         "mobile_money"
                       ]
@@ -41085,7 +40429,7 @@
                     },
                     "viewAllHref": {
                       "type": "string",
-                      "description": "A path on the store, such as `/catalogs/esim`, or an https address."
+                      "description": "A path on the store, such as `/catalogs/gift_cards`, or an https address."
                     }
                   }
                 },
@@ -41177,11 +40521,9 @@
                           "data",
                           "bills",
                           "pay_tv",
-                          "esim",
                           "software",
                           "vpn",
                           "rdp",
-                          "virtual_numbers",
                           "virtual_cards",
                           "mobile_money"
                         ]
@@ -41299,11 +40641,9 @@
                           "data",
                           "bills",
                           "pay_tv",
-                          "esim",
                           "software",
                           "vpn",
                           "rdp",
-                          "virtual_numbers",
                           "virtual_cards",
                           "mobile_money"
                         ]
@@ -41438,7 +40778,6 @@
                       "description": "A drawn illustration shown when there is no image.",
                       "enum": [
                         "store",
-                        "esim",
                         "gift",
                         "globe",
                         "none"
@@ -41463,7 +40802,7 @@
                         },
                         "href": {
                           "type": "string",
-                          "description": "A path on the store, such as `/catalogs/esim`, or an https address."
+                          "description": "A path on the store, such as `/catalogs/gift_cards`, or an https address."
                         }
                       }
                     },
@@ -41707,11 +41046,9 @@
                                   "data",
                                   "bills",
                                   "pay_tv",
-                                  "esim",
                                   "software",
                                   "vpn",
                                   "rdp",
-                                  "virtual_numbers",
                                   "virtual_cards",
                                   "mobile_money"
                                 ]
@@ -42455,7 +41792,6 @@
           "description",
           "categories",
           "single_product",
-          "crypto",
           "resale",
           "sections",
           "available",
@@ -42508,11 +41844,9 @@
                 "data",
                 "bills",
                 "pay_tv",
-                "esim",
                 "software",
                 "vpn",
                 "rdp",
-                "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
               ]
@@ -42522,10 +41856,6 @@
           "single_product": {
             "type": "boolean",
             "description": "The store sells one product, chosen as its `focus`."
-          },
-          "crypto": {
-            "type": "boolean",
-            "description": "Always false: the crypto desk store was retired."
           },
           "resale": {
             "type": "boolean",
@@ -43656,8 +42986,6 @@
               "order.needs_review",
               "top_up.credited",
               "store.checkout_refused",
-              "number.expiring",
-              "number.renewal_failed",
               "payout.paid",
               "payout.failed",
               "bank_account.added",
@@ -43773,6 +43101,7 @@
           "id",
           "channel",
           "label",
+          "app_version",
           "current",
           "last_pushed_at",
           "last_seen_at",
@@ -43800,6 +43129,13 @@
           "label": {
             "type": "string",
             "description": "How it is shown, for example \"Chrome on Windows\"."
+          },
+          "app_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Udozo app’s version on a phone, for example `0.4.0`; null for a browser."
           },
           "current": {
             "type": "boolean",
@@ -43875,8 +43211,6 @@
               "order.needs_review",
               "top_up.credited",
               "store.checkout_refused",
-              "number.expiring",
-              "number.renewal_failed",
               "payout.paid",
               "payout.failed",
               "bank_account.added",
@@ -44251,12 +43585,10 @@
             "enum": [
               "reloadly",
               "vtpass",
-              "didww",
               "zendit",
               "pawapay",
               "remita",
               "africas_talking",
-              "esim_access",
               "flutterwave",
               "stripe",
               "monnify",
@@ -44402,12 +43734,10 @@
             "enum": [
               "reloadly",
               "vtpass",
-              "didww",
               "zendit",
               "pawapay",
               "remita",
               "africas_talking",
-              "esim_access",
               "flutterwave",
               "stripe",
               "monnify",

@@ -27,6 +27,24 @@ export const productSeeds = {
             UPDATE "plans" SET "price_cents" = 500 WHERE "code" = 'premium' AND EXISTS (SELECT 1 FROM fee)`,
     },
     { name: 'Premium with a free domain', sql: `UPDATE "plans" SET "limits" = "limits" || '{"free_domains": 1}'::jsonb WHERE "code" = 'premium' AND NOT ("limits" ? 'free_domains')` },
+    // Afrippa never runs on Udozo (the owner, 14 November 2026): the crypto rows migrations seed for it go, while its
+    // tables stay for the code still carried here. Coins, networks and their settings only while nothing was ever
+    // deposited, withdrawn, frozen or traded, so no crypto record is ever left without its coin.
+    {
+      name: 'no crypto switches',
+      sql: `DELETE FROM "feature_switches" WHERE "key" IN ('crypto_wallets', 'p2p_trading', 'crypto_app', 'crypto_global', 'crypto_cross_border', 'crypto_install_prompt', 'crypto_trade_abroad', 'crypto_exchange', 'reseller_exchange', 'reseller_desks', 'store_template_crypto_desk')`,
+    },
+    {
+      name: 'no crypto plan features',
+      sql: `UPDATE "plans" SET "features" = array_remove(array_remove("features", 'onchain_crypto'), 'reseller_desks') WHERE "features" && ARRAY['onchain_crypto', 'reseller_desks']`,
+    },
+    ...['p2p_fee_rates', 'p2p_merchant_rules', 'afrippa_two_step_policies', 'crypto_market_limits', 'chain_routes', 'crypto_networks', 'crypto_assets'].map(table => ({
+      name: `no ${table.replaceAll('_', ' ')}`,
+      sql: `DELETE FROM "${table}" WHERE NOT EXISTS (SELECT 1 FROM "crypto_addresses") AND NOT EXISTS (SELECT 1 FROM "crypto_deposits") AND NOT EXISTS (SELECT 1 FROM "crypto_withdrawals")
+            AND NOT EXISTS (SELECT 1 FROM "crypto_freezes") AND NOT EXISTS (SELECT 1 FROM "p2p_ads") AND NOT EXISTS (SELECT 1 FROM "p2p_orders")`,
+    })),
+    // Afrippa's own integration settings (its chain providers, signer and screening), which nothing on Udozo reads.
+    { name: "no Afrippa integration settings", sql: `DELETE FROM "integration_settings" WHERE "platform" = 'afrippa'` },
   ],
 };
 

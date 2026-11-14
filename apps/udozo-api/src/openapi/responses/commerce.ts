@@ -1,15 +1,13 @@
-import { productFeatureKeys } from '../../catalogue/features.js';
 import { ProductCategory } from '../../generated/prisma/client.js';
-import { eventObjectSchemas, exampleEsim, exampleNumberMessage, exampleVirtualNumber, exampleVpnSubscription } from '../../webhooks/openapi.js';
+import { eventObjectSchemas, exampleVpnSubscription } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 /** Every product category. */
 export const categories = Object.values(ProductCategory);
 export const category = (description = 'Product category.') => oneOf(description, categories);
-export const features = array(oneOf('Something the product can do.', productFeatureKeys), 'What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products.');
 const recipientTypes = ['phone', 'smartcard', 'meter', 'account', 'none'] as const;
-const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number', 'esim', 'vpn_account'] as const;
+const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'vpn_account'] as const;
 
 const product = objectSchema(
   'Product',
@@ -33,7 +31,6 @@ const product = objectSchema(
     description: nullableStr('About the product.'),
     redeem_instructions: nullableStr('How the customer redeems it, where it applies.'),
     logo_url: nullableStr('The product logo from BitoCard files: the product image, else the brand logo; or null. Show it on a white tile.'),
-    features,
     image_url: nullableStr('A picture for the product: its own image, else its brand’s gift card design.'),
     listed: bool('Listed on your BitoCard-hosted store. Your own systems can sell any product in your catalogue, listed or not.'),
     pricing: shape(
@@ -68,7 +65,6 @@ const productExample = {
   description: 'Top up any MTN Nigeria prepaid line.',
   redeem_instructions: null,
   logo_url: null,
-  features: [],
   image_url: null,
   listed: true,
   pricing: {
@@ -139,7 +135,7 @@ const pricingExample = {
   markups: [
     { category: null, product_id: null, product_name: null, markup_bps: 2000, customer_discount_bps: 0 },
     { category: 'airtime', product_id: null, product_name: null, markup_bps: null, customer_discount_bps: 50 },
-    { category: 'virtual_numbers', product_id: 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d', product_name: 'London number', markup_bps: null, customer_discount_bps: null, fixed_price: 1200000 },
+    { category: 'gift_cards', product_id: 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d', product_name: 'Amazon US', markup_bps: null, customer_discount_bps: null, fixed_price: 1200000 },
   ].map(row => ({ fixed_price: null, ...row })),
 };
 
@@ -277,11 +273,11 @@ const orderSchema = eventObjectSchemas.Order as { title: string; required: strin
 
 const delivery = shape(
   {
-    kind: oneOf('What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`), `esim` (the secret LPA activation string in `code`; ICCID in `serial`) or `vpn_account` (password in `code`; username in `serial`).', deliveryKinds),
-    code: nullableStr('The gift card code, licence key, electricity token, eSIM activation string or VPN password. A secret: show it only to your customer.'),
+    kind: oneOf('What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over) or `vpn_account` (password in `code`; username in `serial`).', deliveryKinds),
+    code: nullableStr('The gift card code, licence key, electricity token or VPN password. A secret: show it only to your customer.'),
     pin: nullableStr('The gift card PIN, where it has one. A secret.'),
-    serial: nullableStr('A serial number, virtual phone number, eSIM ICCID, or VPN username.'),
-    details: stringMap('More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, `duration` for a software licence (for example `1 year` or `Lifetime`), or `number` and `number_type` for a virtual number.'),
+    serial: nullableStr('A serial number or VPN username.'),
+    details: stringMap('More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, or `duration` for a software licence (for example `1 year` or `Lifetime`).'),
   },
   'One delivered item.',
 );
@@ -427,61 +423,6 @@ const receiptExample = {
   customer_reference: 'cust-1042',
 };
 
-const renewalPrice = objectSchema(
-  'Number renewal price',
-  {
-    object: constant('number_renewal_price'),
-    amount: money('What renewing for a month takes from your wallet now'),
-    currency: str('ISO 4217 currency (your wallet currency).'),
-  },
-  'What renewing a virtual number for a month would cost now, at today’s exchange rate.',
-);
-
-const sentMessage = { ...exampleNumberMessage, id: '5e6f7a8b-9c0d-4e1f-9a2b-3c4d5e6f7a8b', direction: 'out', from: '+442071234567', to: '+447700900123', text: 'Your table is ready.', status: 'queued' };
-
-const esimTopUpOption = objectSchema(
-  'EsimTopUpOption',
-  {
-    object: constant('esim_top_up_option'),
-    id: str('Pass it as `option_id` to top up.'),
-    name: str('What it adds, for example `1GB, 7 days` or `1GB a day for 3 more days`.'),
-    data: str('The data it adds (`1GB`), or a day pass’s daily allowance (`1GB a day`).'),
-    days: int('Days it lasts, or adds to a day pass.'),
-    amount: money('What it costs you (BitoCard’s price)'),
-    currency: str('Your wallet currency.'),
-  },
-  'A top-up an eSIM can take now.',
-);
-
-const esimTopUp = objectSchema(
-  'EsimTopUp',
-  {
-    object: constant('esim_top_up'),
-    id: uuid('Top-up ID.'),
-    esim_id: uuid('The eSIM.'),
-    mode,
-    name: str('What it adds.'),
-    status: oneOf('`pending` (the supplier has not confirmed yet: asked again), `completed` (added; paid) or `failed` (nothing taken).', ['pending', 'completed', 'failed']),
-    amount: money('What it cost: BitoCard’s price to you, or what your customer paid when they topped up from your store'),
-    currency: str('ISO 4217 currency of `amount`.'),
-    paid_by: oneOf('`reseller` (your wallet) or `customer` (your store’s customer, from their wallet).', ['reseller', 'customer']),
-    failure_reason: nullableStr('Why it failed.'),
-    created_at: time('When it was asked for.'),
-    completed_at: nullableTime('When it was added or failed.'),
-  },
-  'Data or days added to an eSIM.',
-);
-
-const esimCancellation = objectSchema(
-  'EsimCancellation',
-  {
-    object: constant('list'),
-    data: array(ref('Esim'), 'Every eSIM of the order, now `cancelled`.'),
-    refunded: bool('The order was refunded (see `order.refunded`).'),
-  },
-  'The order’s eSIMs after cancelling.',
-);
-
 const vpnPasswordReset = objectSchema(
   'VpnPasswordReset',
   {
@@ -491,23 +432,8 @@ const vpnPasswordReset = objectSchema(
   'VPN access with its new password.',
 );
 
-const exampleTopUp = {
-  object: 'esim_top_up',
-  id: '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d',
-  esim_id: '6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c',
-  mode: 'live',
-  name: 'Japan 1GB 7Days',
-  status: 'completed',
-  amount: 1_087_500,
-  currency: 'NGN',
-  paid_by: 'reseller',
-  failure_reason: null,
-  created_at: '2026-10-11T09:02:00.000Z',
-  completed_at: '2026-10-11T09:02:03.000Z',
-};
-
 export const commerceDocs: DocsArea = {
-  schemas: { EsimTopUpOption: esimTopUpOption, EsimTopUp: esimTopUp, EsimCancellation: esimCancellation, VpnPasswordReset: vpnPasswordReset, Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
+  schemas: { VpnPasswordReset: vpnPasswordReset, Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt },
   responses: {
     'GET /v1/catalogue/products': {
       status: 200,
@@ -560,49 +486,6 @@ export const commerceDocs: DocsArea = {
       description: 'The order’s new access link. The old link stopped working.',
       schema: 'OrderAccessLink',
       example: { ...accessExample, url: 'https://adadigital.bitocard.com/a/bca_Jm5Pq8Rs2Tu6Vw0Xy4Za7Bc1De9Fg3Hi5Jk8Lm2Nn0Op', replaced_at: '2026-10-06T10:02:41.318Z' },
-    },
-    'GET /v1/numbers': {
-      status: 200,
-      description: 'A page of your virtual numbers, newest first.',
-      schema: list(ref('VirtualNumber')),
-      example: listExample([exampleVirtualNumber], false),
-    },
-    'GET /v1/numbers/{id}': { status: 200, description: 'The number.', schema: 'VirtualNumber', example: exampleVirtualNumber },
-    'PATCH /v1/numbers/{id}': { status: 200, description: 'The number with its new settings.', schema: 'VirtualNumber', example: { ...exampleVirtualNumber, customer_sending: true } },
-    'GET /v1/numbers/{id}/renewal-price': { status: 200, description: 'The renewal price now.', schema: 'NumberRenewalPrice', example: { object: 'number_renewal_price', amount: 615_000, currency: 'NGN' } },
-    'POST /v1/numbers/{id}/renew': {
-      status: 200,
-      description: 'The renewed number: a month was taken from your wallet and added.',
-      schema: 'VirtualNumber',
-      example: { ...exampleVirtualNumber, expires_at: '2026-12-06T09:15:04.000Z', delete_at: '2026-12-21T09:15:04.000Z', updated_at: '2026-11-01T10:02:00.000Z' },
-    },
-    'GET /v1/numbers/{id}/messages': {
-      status: 200,
-      description: 'A page of the number’s messages, newest first, with their text.',
-      schema: list(ref('NumberMessage')),
-      example: listExample([{ ...exampleNumberMessage, text: 'Your verification code is 482913.' }, { ...sentMessage, status: 'delivered', charged: 1_500, currency: 'NGN' }], false),
-    },
-    'POST /v1/numbers/{id}/messages': {
-      status: 201,
-      description: 'The message: `queued` until the network reports it, then `sent` (with `charged`) or `failed` (nothing charged).',
-      schema: 'NumberMessage',
-      example: sentMessage,
-    },
-    'GET /v1/esims': { status: 200, description: 'A page of your eSIMs, newest first.', schema: list(ref('Esim')), example: listExample([exampleEsim('active')], false) },
-    'GET /v1/esims/{id}': { status: 200, description: 'The eSIM.', schema: 'Esim', example: exampleEsim('active') },
-    'GET /v1/esims/{id}/top-up-options': {
-      status: 200,
-      description: 'The top-ups it takes now, with BitoCard’s price to you.',
-      schema: list(ref('EsimTopUpOption'), {}, false),
-      example: { object: 'list', data: [{ object: 'esim_top_up_option', id: 'opt_4f1c2b9a0d7e6c5b3a21', name: 'Japan 1GB 7Days', data: '1GB', days: 7, amount: 1_087_500, currency: 'NGN' }] },
-    },
-    'GET /v1/esims/{id}/top-ups': { status: 200, description: 'Its top-ups, newest first.', schema: list(ref('EsimTopUp'), {}, false), example: { object: 'list', data: [exampleTopUp] } },
-    'POST /v1/esims/{id}/top-ups': { status: 201, description: 'The top-up: `completed` once the supplier added it, `failed` if refused (nothing taken), `pending` while unclear.', schema: 'EsimTopUp', example: exampleTopUp },
-    'POST /v1/esims/{id}/cancel': {
-      status: 200,
-      description: 'The order’s eSIMs, cancelled, and the order refunded.',
-      schema: 'EsimCancellation',
-      example: { object: 'list', data: [exampleEsim('cancelled', { data: { total: 1_073_741_824, used: 0, remaining: 1_073_741_824, updated_at: '2026-10-11T09:00:00.000Z' }, cancellable: false })], refunded: true },
     },
     'GET /v1/vpn-subscriptions': { status: 200, description: 'A page of your VPN access, newest first.', schema: list(ref('VpnSubscription')), example: listExample([exampleVpnSubscription('active')], false) },
     'GET /v1/vpn-subscriptions/{id}': { status: 200, description: 'The VPN access.', schema: 'VpnSubscription', example: exampleVpnSubscription('active') },

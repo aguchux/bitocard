@@ -4,7 +4,7 @@
  * without the RTK Query client. Amounts are minor units.
  */
 
-export type ProductCategory = 'gift_cards' | 'airtime' | 'data' | 'bills' | 'pay_tv' | 'esim' | 'software' | 'vpn' | 'rdp' | 'virtual_numbers' | 'virtual_cards' | 'mobile_money';
+export type ProductCategory = 'gift_cards' | 'airtime' | 'data' | 'bills' | 'pay_tv' | 'software' | 'vpn' | 'rdp' | 'virtual_cards' | 'mobile_money';
 
 export const categoryLabels: Record<ProductCategory, string> = {
   gift_cards: 'Gift cards',
@@ -12,28 +12,11 @@ export const categoryLabels: Record<ProductCategory, string> = {
   data: 'Data',
   bills: 'Bills',
   pay_tv: 'Pay-TV',
-  esim: 'eSIMs',
   software: 'Software',
-  virtual_numbers: 'Virtual numbers',
   vpn: 'VPN',
   rdp: 'RDP',
   virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
-};
-
-/** What a product can do (virtual numbers' calls and SMS), mirroring `apps/api/src/catalogue/features.ts`. */
-export type ProductFeature = 'calls_in' | 'calls_out' | 'sms_in' | 'sms_out' | 'sms_people' | 'app_codes' | 'emergency' | 'caller_name' | 'fax';
-
-export const productFeatureLabels: Record<ProductFeature, string> = {
-  calls_in: 'Incoming calls',
-  calls_out: 'Outgoing calls',
-  sms_in: 'Receives SMS',
-  sms_out: 'Sends SMS',
-  sms_people: 'SMS from people',
-  app_codes: 'Receives app codes',
-  emergency: 'Emergency calls',
-  caller_name: 'Shows caller name',
-  fax: 'Receives fax',
 };
 
 export type StoreBrand = {
@@ -71,8 +54,6 @@ export type StoreProduct = {
   price: StoreLocalPrice | null;
   description: string | null;
   logo_url: string | null;
-  /** What it can do, for icons and filters (empty for most categories). */
-  features: ProductFeature[];
   brand: StoreBrand;
 };
 
@@ -132,7 +113,7 @@ export type ProductRailSection = SectionBase & {
 export type CategoryGridSection = SectionBase & { type: 'category_grid'; title: string; subtitle: string; categories: ProductCategory[] };
 export type BrandGridSection = SectionBase & { type: 'brand_grid'; title: string; subtitle: string; tag: string; categories?: ProductCategory[]; limit: number };
 export type PromoTheme = 'pink' | 'sky' | 'navy' | 'light' | 'sunset';
-export type PromoIllustration = 'store' | 'esim' | 'gift' | 'globe' | 'none';
+export type PromoIllustration = 'store' | 'gift' | 'globe' | 'none';
 export type PromoSection = SectionBase & {
   type: 'promo';
   title: string;
@@ -239,7 +220,7 @@ export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'single_
 export type StoreThemeColors = { primary: string; accent: string; background: string; surface: string; ink: string; muted: string; heroFrom: string; heroTo: string; heroInk: string };
 export type StoreVariantStyle = {
   mode: 'light' | 'dark';
-  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint' | 'showroom' | 'shelf' | 'aisle';
+  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint' | 'showroom' | 'shelf' | 'aisle';
   corners: 'sharp' | 'soft' | 'round';
   cards: 'flat' | 'raised' | 'outline' | 'glass';
   font: 'sans' | 'display' | 'mono' | 'serif';
@@ -458,30 +439,6 @@ export function formatPrice(minor: number, currency: string) {
     return `${currency} ${(minor / 100).toFixed(2)}`;
   }
 }
-
-/** An eSIM on its order's page: status, data use (bytes) and expiry. Its activation code is on the order. */
-export type StoreEsim = {
-  object: 'esim';
-  id: string;
-  iccid: string;
-  status: 'ready' | 'installed' | 'active' | 'used_up' | 'expired' | 'cancelled' | 'revoked' | 'suspended';
-  data: { total: number | null; used: number | null; remaining: number | null; updated_at: string | null };
-  expires_at: string | null;
-  top_ups: 'none' | 'data' | 'days';
-  /** Never installed: cancelling it refunds the order. */
-  cancellable: boolean;
-};
-
-/** The top-ups an eSIM takes now at the store's price, and the customer's wallets that can pay (`available` false: the store tops it up). */
-export type StoreEsimTopUpOptions = {
-  object: 'list';
-  /** `prices`: what it costs from each wallet (the US dollar price at BitoCard's rate; null while unavailable). */
-  data: Array<{ id: string; name: string; data: string; days: number; amount: number; currency: string; prices: Array<{ currency: string; amount: number | null }> }>;
-  wallets: Array<{ currency: string; primary: boolean; balance: number }>;
-  available: boolean;
-};
-
-export type StoreEsimTopUp = { object: 'esim_top_up'; id: string; name: string; status: 'pending' | 'completed' | 'failed'; amount: number; currency: string; failure_reason: string | null };
 
 /** VPN access an order bought, on its order page: never the supplier; the sign-in details are the order's delivery. */
 export type StoreVpn = {

@@ -107,7 +107,7 @@ describe('the templates', () => {
     await prisma.featureSwitch.create({ data: { key: 'p2p_trading', resellerId: reseller.resellerId, enabled: true } });
     const refused = await reseller.browser.post('/v1/stores', { name: 'Desk', subdomain: sub('desk'), template: 'crypto_desk' });
     assert.deepEqual([refused.status, refused.json.error.param], [400, 'template']);
-    assert.ok(listed.json.data.every(item => item.crypto === false), 'kept in the response, always false');
+    assert.ok(listed.json.data.every(item => !('crypto' in item)), 'the crypto desk’s flag is gone with it');
   });
 });
 

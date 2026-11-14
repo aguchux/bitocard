@@ -6,7 +6,7 @@ import { customerCookie, shopperHeader } from "./customer";
 
 /** One delivered item on an order's page. Codes, PINs and tokens are null (`hidden`) until the customer presses Reveal. */
 export type AccessDelivery = {
-  kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number" | "esim" | "vpn_account";
+  kind: "gift_card" | "licence_key" | "token" | "confirmation" | "vpn_account";
   hidden: boolean;
   code: string | null;
   pin: string | null;
@@ -17,7 +17,7 @@ export type AccessDelivery = {
 export type AccessOrder = {
   mode: "test" | "live";
   status: "processing" | "completed" | "failed" | "refunded";
-  product: { key: string; name: string; category: string; country: string; brand: string; features: string[] };
+  product: { key: string; name: string; category: string; country: string; brand: string };
   quantity: number;
   face_value: number;
   face_currency: string;
@@ -51,52 +51,15 @@ export const accessToken = /^bca_[A-Za-z0-9_-]{40,60}$/;
 export const passCookie = "bc_access";
 export const passPath = (token: string) => `/a/${token}`;
 
-export type NumberMessage = {
-  direction: "in" | "out";
-  from: string;
-  to: string;
-  text: string;
-  status: "received" | "queued" | "sent" | "delivered" | "failed";
-  created_at: string;
-};
-
-/**
- * A virtual number's live state (`GET /v1/store/access/:token/number`): `null` when the order has no tracked number.
- * Deleted 15 days after it expires unrenewed (`delete_at`); messages newest first, up to 50.
- */
-export type OrderNumber = {
-  object: "order_number";
-  number: null | {
-    number: string;
-    status: "active" | "expired" | "deleted";
-    expires_at: string;
-    delete_at: string;
-    can_send: boolean;
-    /** Renewed from the store 3 days before it expires. */
-    auto_renew: boolean;
-    /** The customer can renew it for a month (while active or expired). */
-    can_renew: boolean;
-    messages: NumberMessage[];
-  };
-};
-
 type AccessAction =
   | ""
-  | "/number"
   | "/reveal"
   | "/code"
   | "/verify"
-  | "/messages"
-  | "/number/renew"
-  | "/number/auto-renew"
-  | "/esims"
-  | `/esims/${string}/top-up-options`
-  | `/esims/${string}/top-ups`
-  | `/esims/${string}/cancel`
   | "/vpn"
   | "/vpn/password-reset";
 /** Reads; everything else changes something and is a POST. */
-const reads = new Set<string>(["", "/number", "/esims", "/vpn"]);
+const reads = new Set<string>(["", "/vpn"]);
 
 /** Calls an order-page endpoint with the customer's proof (their store session, and the pass for this page). Never cached; never throws. */
 export async function accessApi<T>(token: string, action: AccessAction = "", body?: unknown, options: { idempotencyKey?: string } = {}): Promise<AccessResult<T>> {
@@ -104,7 +67,7 @@ export async function accessApi<T>(token: string, action: AccessAction = "", bod
   const jar = await cookies();
   const session = jar.get(customerCookie)?.value;
   const pass = jar.get(passCookie)?.value;
-  const read = reads.has(action) || action.endsWith("/top-up-options");
+  const read = reads.has(action);
   try {
     const res = await fetch(apiUrl(`/v1/store/access/${token}${action}`), {
       method: read ? "GET" : "POST",

@@ -99,7 +99,7 @@ test('the public storefront catalogue answers, and never names suppliers', { ski
   assert.equal(categories.headers.get('cache-control'), 'public, max-age=60');
   const products = await get('/v1/store/products?limit=5');
   assert.equal(products.status, 200);
-  assert.ok(!/reloadly|vtpass|didww/i.test(await products.text()));
+  assert.ok(!/reloadly|vtpass|zendit|remita/i.test(await products.text()));
   // The home page always renders: the published layout, or the approved default until one is published.
   const home = await get('/v1/store/home');
   assert.equal(home.status, 200, `home ${home.status}`);

@@ -5,9 +5,9 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 
-export type ScopedRecord = 'esim' | 'number' | 'vpn' | 'dispute' | 'ticket';
+export type ScopedRecord = 'vpn' | 'dispute' | 'ticket';
 
-const names: Record<ScopedRecord, string> = { esim: 'eSIM', number: 'number', vpn: 'VPN subscription', dispute: 'dispute', ticket: 'ticket' };
+const names: Record<ScopedRecord, string> = { vpn: 'VPN subscription', dispute: 'dispute', ticket: 'ticket' };
 
 /**
  * API keys belong to a store and see only that store's records. Services look records up by reseller; this checks, for
@@ -40,10 +40,6 @@ export class StoreScope {
     const isId = /^[0-9a-f-]{36}$/i.test(id);
     if (!isId) return null;
     switch (kind) {
-      case 'esim':
-        return (await this.prisma.esim.findUnique({ where: { id }, select: { order: { select: { storeId: true } } } }))?.order.storeId ?? null;
-      case 'number':
-        return (await this.prisma.virtualNumber.findUnique({ where: { id }, select: { order: { select: { storeId: true } } } }))?.order.storeId ?? null;
       case 'vpn':
         return (await this.prisma.vpnSubscription.findUnique({ where: { id }, select: { order: { select: { storeId: true } } } }))?.order.storeId ?? null;
       case 'dispute':

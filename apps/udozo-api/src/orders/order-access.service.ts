@@ -16,7 +16,7 @@ const minute = 60_000;
 /** Access links: `bca_` and 32 random bytes, base64url. */
 const tokenPattern = /^bca_[A-Za-z0-9_-]{40,60}$/;
 /** Deliveries whose code and PIN are secrets: hidden until the customer presses Reveal. */
-const secretKinds = new Set(['gift_card', 'licence_key', 'token', 'esim', 'vpn_account']);
+const secretKinds = new Set(['gift_card', 'licence_key', 'token', 'vpn_account']);
 /** What the page may show of the recipient: what the customer typed, nothing BitoCard added. */
 const recipientFields = ['phone', 'account_number', 'account_name', 'current_package', 'email'] as const;
 const codeLifetimeMs = 10 * minute;
@@ -190,7 +190,7 @@ export class OrderAccessService {
     };
   }
 
-  /** The order behind a link, for a caller who has proved it is theirs (other parts of its page, such as a number's inbox). */
+  /** The order behind a link, for a caller who has proved it is theirs (other parts of its page, such as its VPN access). */
   async provenOrder(token: string, proof: AccessProof) {
     const access = await this.find(token);
     if (this.method(access.order) === 'none' || !(await this.proven(access, proof))) throw proofRequired();
@@ -291,7 +291,6 @@ export class OrderAccessService {
         category: order.product.category,
         country: order.product.country,
         brand: order.product.brand,
-        features: order.product.features,
       },
       quantity: order.quantity,
       face_value: minor(order.faceValueMinor),

@@ -52,18 +52,8 @@
       "product": "bitocard"
     },
     {
-      "job": "numbers",
-      "schedule": "20 * * * *",
-      "product": "bitocard"
-    },
-    {
       "job": "domains",
       "schedule": "*/15 * * * *"
-    },
-    {
-      "job": "esims",
-      "schedule": "*/10 * * * *",
-      "product": "bitocard"
     },
     {
       "job": "vpn",

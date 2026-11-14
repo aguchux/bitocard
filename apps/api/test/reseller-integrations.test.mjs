@@ -18,7 +18,7 @@ before(async () => {
     const refuse = answer === 'refuse';
     if (call.url.startsWith('/oauth/token')) return refuse ? { status: 401, body: { message: 'Access denied' } } : { body: { access_token: 'token', expires_in: 3600 } };
     if (call.url.startsWith('/vtpass/balance')) return { body: refuse ? { code: 0, response_description: 'INVALID CREDENTIALS' } : { code: 1, contents: { balance: 5000 } } };
-    if (call.url.startsWith('/didww/balance')) return refuse ? { status: 401, body: { errors: [] } } : { body: { data: { attributes: { balance: '10.00' } } } };
+    if (call.url.startsWith('/zendit/balance')) return refuse ? { status: 401, body: { message: 'Unauthorized' } } : { body: { availableBalance: 1000, currency: 'USD' } };
     if (call.url.startsWith('/flutterwave/balances')) return refuse ? { status: 401, body: { status: 'error', message: 'Invalid authorization key' } } : { body: { status: 'success', data: [] } };
     if (call.url.startsWith('/monnify/api/v1/auth/login')) return { body: { requestSuccessful: !refuse } };
     return { status: 404, body: {} };
@@ -28,7 +28,7 @@ before(async () => {
       RELOADLY_AUTH_URL: provider.url,
       RELOADLY_TOPUPS_URL: `${provider.url}/topups`,
       VTPASS_API_URL: `${provider.url}/vtpass`,
-      DIDWW_API_URL: `${provider.url}/didww`,
+      ZENDIT_API_URL: `${provider.url}/zendit`,
       FLUTTERWAVE_API_URL: `${provider.url}/flutterwave`,
       MONNIFY_API_URL: `${provider.url}/monnify`,
     },
@@ -66,9 +66,9 @@ describe('availability', () => {
     const set = await offer('vtpass', { global: false, countries: ['ng'], approval: 'review' });
     assert.deepEqual([set.status, set.json.countries, set.json.offered], [200, ['NG'], true]);
     assert.equal((await offer('flutterwave', { global: false, countries: ['ZZ'], approval: 'review' })).json.error.code, 'country_unknown');
-    const stub = await admin.put('/v1/admin/integrations/telnyx/reseller-access', { enabled: true });
+    const stub = await admin.put('/v1/admin/integrations/nexway/reseller-access', { enabled: true });
     assert.deepEqual([stub.status, stub.json.error.code], [400, 'integration_not_connectable'], 'only integrations with a built adapter');
-    assert.equal((await admin.put('/v1/admin/integrations/telnyx/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 404);
+    assert.equal((await admin.put('/v1/admin/integrations/nexway/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 404);
     assert.equal((await admin.put('/v1/admin/integrations/nope/reseller-access', { enabled: true })).status, 404, 'no such integration');
 
     const ng = await allowedReseller('NG');
@@ -82,33 +82,33 @@ describe('availability', () => {
   });
 
   test('only integrations an admin switches reseller access on for are shown; off hides them and stops their connections', async () => {
-    await offer('didww', { global: true, countries: [], approval: 'automatic' });
+    await offer('zendit', { global: true, countries: [], approval: 'automatic' });
     const { browser, resellerId } = await allowedReseller();
-    const listed = async () => (await browser.get('/v1/integrations')).json.data.some(item => item.id === 'didww');
+    const listed = async () => (await browser.get('/v1/integrations')).json.data.some(item => item.id === 'zendit');
     assert.equal(await listed(), true);
-    assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-own' } })).status, 200);
+    assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-own' } })).status, 200);
     const service = server.app.get((await import('../dist/reseller-integrations/reseller-integrations.service.js')).ResellerIntegrationsService);
-    assert.ok(await service.active(resellerId, 'didww', 'live'));
+    assert.ok(await service.active(resellerId, 'zendit', 'live'));
 
-    const off = await admin.put('/v1/admin/integrations/didww/reseller-access', { enabled: false });
+    const off = await admin.put('/v1/admin/integrations/zendit/reseller-access', { enabled: false });
     assert.deepEqual([off.status, off.json.reseller_access, off.json.offered], [200, false, false]);
     assert.equal(await listed(), false);
-    assert.equal(await service.active(resellerId, 'didww', 'live'), null, 'its connections are not used');
-    assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-own' } })).status, 404);
-    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'integration_offer.access_updated', targetId: 'didww' } }));
+    assert.equal(await service.active(resellerId, 'zendit', 'live'), null, 'its connections are not used');
+    assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-own' } })).status, 404);
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'integration_offer.access_updated', targetId: 'zendit' } }));
 
-    assert.equal((await admin.put('/v1/admin/integrations/didww/reseller-access', { enabled: true })).status, 200);
-    assert.ok(await service.active(resellerId, 'didww', 'live'), 'kept, and used again once switched back on');
-    const card = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
+    assert.equal((await admin.put('/v1/admin/integrations/zendit/reseller-access', { enabled: true })).status, 200);
+    assert.ok(await service.active(resellerId, 'zendit', 'live'), 'kept, and used again once switched back on');
+    const card = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'zendit');
     assert.deepEqual(card.reseller_access, { available: true, enabled: true });
     const operations = await adminClient(server, ['operations']);
-    assert.equal((await operations.put('/v1/admin/integrations/didww/reseller-access', { enabled: false })).status, 403);
+    assert.equal((await operations.put('/v1/admin/integrations/zendit/reseller-access', { enabled: false })).status, 403);
   });
 
   test('only super admins change availability; support can read it', async () => {
     const support = await adminClient(server, ['support']);
     assert.equal((await support.get('/v1/admin/integrations/reseller-availability')).status, 200);
-    assert.equal((await support.put('/v1/admin/integrations/didww/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 403);
+    assert.equal((await support.put('/v1/admin/integrations/zendit/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 403);
   });
 });
 
@@ -165,13 +165,13 @@ describe('connecting', () => {
   });
 
   test('refused credentials are not saved; an unreachable provider says try again', async () => {
-    await offer('didww', { global: true, countries: [], approval: 'automatic' });
+    await offer('zendit', { global: true, countries: [], approval: 'automatic' });
     const { browser, resellerId } = await allowedReseller();
     answer = 'refuse';
-    const refused = await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'wrong-key-1234' } });
+    const refused = await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'wrong-key-1234' } });
     assert.deepEqual([refused.status, refused.json.error.code], [400, 'credentials_rejected']);
     answer = 'down';
-    const down = await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'some-key-1234' } });
+    const down = await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'some-key-1234' } });
     assert.deepEqual([down.status, down.json.error.code], [503, 'integration_unreachable']);
     assert.equal(await prisma.resellerConnection.count({ where: { resellerId } }), 0);
     answer = 'ok';
@@ -302,13 +302,13 @@ describe('isolation', () => {
 describe('the plan’s limit on own connections', () => {
   test('a new connection past the limit is refused; changing one already connected is not', async () => {
     await offer('reloadly', { global: true, countries: [], approval: 'automatic' });
-    await offer('didww', { global: true, countries: [], approval: 'automatic' });
+    await offer('zendit', { global: true, countries: [], approval: 'automatic' });
     const { browser } = await allowedReseller();
     const finance = await adminClient(server, ['finance']);
     assert.equal((await finance.put('/v1/admin/plans/premium/limits/own_connections', { value: 1 })).status, 200);
     try {
-      assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-own' } }, testMode)).status, 200);
-      assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-new' } }, testMode)).status, 200, 'changing it is fine');
+      assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-own' } }, testMode)).status, 200);
+      assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-new' } }, testMode)).status, 200, 'changing it is fine');
       const refused = await browser.put('/v1/integrations/reloadly/connection', { values: reloadly }, testMode);
       assert.deepEqual([refused.status, refused.json.error?.code, refused.json.error?.param], [409, 'plan_limit_reached', 'own_connections'], JSON.stringify(refused.json));
     } finally {

@@ -426,10 +426,7 @@ const schemas = {
         shape(
           {
             url: str('The address your supplier sends this connection’s order updates to.', { format: 'uri' }),
-            setup: oneOf('`manual`: enter the address in your supplier’s dashboard and save its signature secret here; `automatic`: BitoCard gives it to the supplier on every order.', [
-              'manual',
-              'automatic',
-            ]),
+            setup: oneOf('`manual`: enter the address in your supplier’s dashboard and save its signature secret here.', ['manual']),
             ready: bool('Whether updates can be accepted yet (a manual setup needs the signature secret saved).'),
           },
           'Where your supplier sends order updates for this live connection. Null in the sandbox and for integrations without updates.',

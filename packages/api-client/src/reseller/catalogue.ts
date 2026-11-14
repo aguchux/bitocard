@@ -3,7 +3,7 @@ import { settleOptimistic } from '../optimistic';
 import { type List, type Mode, type Page, params } from './common';
 
 /** Product categories, in the order the catalogue shows them. */
-export const catalogueCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
+export const catalogueCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'software', 'vpn', 'rdp', 'virtual_cards', 'mobile_money'] as const;
 export type CatalogueCategory = (typeof catalogueCategories)[number];
 
 /** What the customer must give when buying: a phone number, a smartcard or IUC number, a meter number, or nothing. */
@@ -29,8 +29,6 @@ export type Product = {
   recipient_type: RecipientType;
   description: string | null;
   redeem_instructions: string | null;
-  /** What it can do, for example `sms_in` or `app_codes` on a virtual number. */
-  features: string[];
   logo_url: string | null;
   /** A picture for the product: its own image, else its brand's gift card design. */
   image_url: string | null;

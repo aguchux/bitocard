@@ -15,13 +15,12 @@
   - Digital gift cards, mobile airtime and data bundles.
   - Supported utility bills and TV subscriptions.
   - Virtual payment cards, subject to supplier access and market eligibility.
-  - SMS-capable virtual numbers, subject to inventory, capabilities and supplier agreements.
   - Products, denominations, currencies, payment methods and exchange options vary by country.
   - Physical goods and integrations with stores such as Jumia and Konga are deferred.
 
 - **Supplier aggregation and routing**
   - Initial planned sources: Reloadly, Prestmit and Cardtonic.
-  - TV, utilities, virtual-card and virtual-number suppliers are under evaluation; no additional supplier is confirmed by this brief.
+  - TV, utilities and virtual-card suppliers are under evaluation; no additional supplier is confirmed by this brief.
   - Resellers see one BitoCard catalogue, price and order status. Supplier identities, credentials, costs and routing decisions remain internal.
   - Normalize equivalent supplier products into BitoCard product IDs while preserving country, denomination and service restrictions.
   - Select eligible purchase sources by availability, net margin, total costs and fulfilment reliability.
@@ -104,7 +103,6 @@
   - Reseller approval, verification and storefront/domain management.
   - Order history, receipts, status updates, support and exception review.
   - Payment, provider and ledger reconciliation, refund handling and margin reporting.
-  - Manage recurring number rentals and domain renewals separately from one-time digital purchases.
 
 - **Brand and current coming soon page**
   - Navy and pink identity with the interlocking B/exchange-arrow logo.

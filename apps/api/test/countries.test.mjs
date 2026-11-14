@@ -40,7 +40,7 @@ describe('admin management', () => {
     const { json } = await admin.get('/v1/admin/countries');
     const ng = json.data.find(c => c.code === 'NG');
     assert.deepEqual([ng.markup_cap_percent, ng.payout_hold_days, ng.min_withdrawal_minor, ng.reserved_accounts], [100, 15, 1500000, true]);
-    assert.equal(ng.categories.length, 12, 'every category, on or off');
+    assert.equal(ng.categories.length, 10, 'every category, on or off');
     assert.deepEqual([ng.categories.find(c => c.category === 'mobile_money')?.enabled, ng.categories.find(c => c.category === 'mobile_money')?.customer_verification], [false, true], 'mobile money: off, customers verify');
   });
 
@@ -69,11 +69,13 @@ describe('admin management', () => {
   });
 
   test('categories can be switched on and need verification set per country', async () => {
-    const updated = await admin.put('/v1/admin/countries/KE/categories/esim', { enabled: true });
+    const updated = await admin.put('/v1/admin/countries/KE/categories/software', { enabled: true });
     assert.equal(updated.status, 200);
-    assert.equal(updated.json.categories.find(c => c.category === 'esim').enabled, true);
+    assert.equal(updated.json.categories.find(c => c.category === 'software').enabled, true);
     const pub = await client(server.base).get('/v1/countries/KE');
-    assert.ok(pub.json.categories.some(c => c.category === 'esim'));
+    assert.ok(pub.json.categories.some(c => c.category === 'software'));
+    const gone = await admin.put('/v1/admin/countries/KE/categories/esim', { enabled: true });
+    assert.equal(gone.status, 400, 'eSIMs are no longer a category');
   });
 
   test('unknown categories and invalid values are refused', async () => {

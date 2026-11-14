@@ -26,8 +26,6 @@ import { CatalogueModule } from './catalogue/catalogue.module.js';
 import { StockModule } from './stock/stock.module.js';
 import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { OrdersModule } from './orders/orders.module.js';
-import { NumbersModule } from './numbers/numbers.module.js';
-import { EsimsModule } from './esims/esims.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
 import { IdentityModule } from './identity/identity.module.js';
 import { AdminModule } from './admin/admin.module.js';
@@ -140,8 +138,6 @@ export class AppModule {
         CryptoModule,
         AfrippaModule,
         SpinsModule,
-        NumbersModule,
-        EsimsModule,
         VpnModule,
         VpnApiModule,
         CheckoutModule,

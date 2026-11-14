@@ -31,7 +31,7 @@ export class EventsService {
   /** `object` is the public representation of the changed object, as the API returns it (never secrets). */
   async record(tx: Tx, input: { resellerId: string; storeId?: string | null; orderId?: string | null; mode: LedgerMode; type: EventType; object: object }) {
     const id = randomUUID();
-    // Events about an order's things (its eSIMs, numbers, VPN access) belong to the order's store.
+    // Events about an order's things (its VPN access) belong to the order's store.
     const storeId = input.storeId !== undefined ? input.storeId : input.orderId ? ((await tx.order.findUnique({ where: { id: input.orderId }, select: { storeId: true } }))?.storeId ?? null) : null;
     const createdAt = new Date();
     await tx.event.create({

@@ -53,7 +53,6 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   // Suppliers with a built adapter (also connectable by resellers).
   reloadly: [signUp('https://www.reloadly.com/registration'), docs('https://developers.reloadly.com/')],
   vtpass: [signUp('https://www.vtpass.com/register'), { label: 'Sandbox sign up', url: 'https://sandbox.vtpass.com/register' }, docs('https://www.vtpass.com/documentation/')],
-  didww: [signUp('https://www.didww.com/'), keys('https://my.didww.com/'), docs('https://doc.didww.com/api3/')],
   whatsapp: [signUp('https://business.facebook.com/'), keys('https://developers.facebook.com/apps/', 'Meta apps'), docs('https://developers.facebook.com/docs/whatsapp/cloud-api/')],
   calls: [signUp('https://dash.cloudflare.com/sign-up'), keys('https://dash.cloudflare.com/?to=/:account/calls/turn-keys', 'TURN keys'), docs('https://developers.cloudflare.com/realtime/turn/generate-credentials/')],
   store_hosts: [signUp('https://dash.cloudflare.com/sign-up'), keys('https://dash.cloudflare.com/profile/api-tokens', 'API tokens'), docs('https://developers.cloudflare.com/api/resources/dns/subresources/records/')],
@@ -67,8 +66,6 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   korba: [site('https://xchange.korba365.com/')],
   ipay_elipa: [site('https://ipayafrica.com/'), { label: 'Developer portal', url: 'https://dev.ipayafrica.com/' }],
   nexway: [site('https://www.nexway.com/')],
-  esim_access: [site('https://esimaccess.com/'), docs('https://docs.esimaccess.com/')],
-  esimerge: [site('https://esimerge.com/')],
   vpnresellers: [site('https://www.vpnresellers.com/'), docs('https://api.vpnresellers.com/docs/v4_1/')],
   ingram_micro: [site('https://www.ingrammicro.com/'), { label: 'Developer portal', url: 'https://developer.ingrammicro.com/' }],
   td_synnex: [site('https://www.tdsynnex.com/')],
@@ -76,10 +73,6 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   also: [site('https://www.also.com/')],
   prestmit: [site('https://prestmit.io/')],
   cardtonic: [site('https://cardtonic.com/')],
-  telnyx: [signUp('https://telnyx.com/sign-up'), keys('https://portal.telnyx.com/#/app/api-keys'), docs('https://developers.telnyx.com/')],
-  vonage: [signUp('https://dashboard.nexmo.com/sign-up'), keys('https://dashboard.nexmo.com/settings', 'API key and secret'), docs('https://developer.vonage.com/')],
-  twilio: [signUp('https://www.twilio.com/try-twilio'), keys('https://console.twilio.com/', 'Account SID and auth token'), docs('https://www.twilio.com/docs')],
-  plivo: [signUp('https://console.plivo.com/accounts/register/'), keys('https://console.plivo.com/dashboard/', 'Auth ID and token'), docs('https://www.plivo.com/docs/')],
   github: [signUp('https://github.com/signup'), keys('https://github.com/settings/personal-access-tokens', 'Fine-grained tokens'), docs('https://docs.github.com/en/rest/issues/issues')],
   anthropic: [signUp('https://console.anthropic.com/'), keys('https://console.anthropic.com/settings/keys', 'API keys'), docs('https://docs.anthropic.com/en/api/messages')],
   openai: [signUp('https://platform.openai.com/signup'), keys('https://platform.openai.com/api-keys', 'API keys'), docs('https://platform.openai.com/docs/api-reference/chat')],
@@ -92,8 +85,6 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   techlink_gh: [site('https://business.techlinkgh.com/')],
   kingflexy_gh: [site('https://kingflexygh.com/')],
   tupay: [site('https://tupay.africa/')],
-  airalo: [site('https://partners.airalo.com/'), docs('https://partners-doc.airalo.com/')],
-  esim_go: [site('https://esimgo.com/'), docs('https://docs.esim-go.com/')],
 
   // Blockchain providers (their links live with their definitions).
   ...Object.fromEntries(chainProviders.map(provider => [provider.id, provider.links])),

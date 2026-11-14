@@ -228,25 +228,8 @@ export const configSchema = z.object({
   VTPASS_CONTACT_PHONE: z.string().default('08011111111'),
   /** The commission agreed with VTpass per airtime and data service: `mtn 3; airtel 3.4; mtn-data 3`. */
   VTPASS_COMMISSIONS: z.string().optional(),
-  DIDWW_API_KEY: z.string().optional(),
-  /** Leave at the default to follow DIDWW_SANDBOX; any other value overrides it. */
-  DIDWW_API_URL: z.string().url().default('https://api.didww.com/v3'),
-  DIDWW_SANDBOX: flag.prefault('off'),
-  /** Countries whose numbers are synced (ISO codes); numbers are sold to resellers in every market. */
-  DIDWW_COUNTRIES: list.prefault('GB,US'),
-  /** BitoCard's public API address: DIDWW order callbacks go to <this>/v1/webhooks/didww and are signed over it. */
-  DIDWW_CALLBACK_URL: z.string().url().default('https://api.bitocard.com'),
-  /**
-   * Incoming SMS: DIDWW's HTTP IN SMS trunk (set up in DIDWW's panel and assigned to each number) posts to
-   * <DIDWW_CALLBACK_URL>/v1/webhooks/didww-sms?token=<this>. Without it, incoming SMS are refused.
-   */
-  DIDWW_SMS_WEBHOOK_TOKEN: z.string().min(16).optional(),
-  /** Outgoing SMS: the HTTP OUT SMS trunk's username and password (DIDWW panel > SMS trunks), separate from the API key. */
-  DIDWW_SMS_USERNAME: z.string().optional(),
-  DIDWW_SMS_PASSWORD: z.string().optional(),
-  DIDWW_SMS_URL: z.string().url().default('https://sms-out.didww.com'),
-  /** The most one SMS part may cost, in US cents: held from the wallet before sending (DIDWW prices a message only after it is sent). */
-  DIDWW_SMS_MAX_PRICE_CENTS: z.coerce.number().int().positive().default(10),
+  /** This API's public address: resellers' own supplier connections are told to send notifications to <this>/v1/webhooks/…. */
+  API_PUBLIC_URL: z.string().url().default('https://api.bitocard.com'),
   ZENDIT_API_KEY: z.string().optional(),
   /** Leave at the default to follow ZENDIT_SANDBOX (test mode, https://test-api.zendit.io/v1); any other value overrides it. */
   ZENDIT_API_URL: z.string().url().default('https://api.zendit.io/v1'),
@@ -277,7 +260,6 @@ export const configSchema = z.object({
   AFRICAS_TALKING_DATA_PLANS: z.string().optional(),
   /** In the status callback addresses set in its dashboard: /v1/webhooks/africas-talking?token=<this>. */
   AFRICAS_TALKING_CALLBACK_TOKEN: z.string().optional(),
-  /** eSIM Access (eSIM data packages): the access code and secret key from its console (Developer). No sandbox exists. */
   /** Remita Vending Bills (RemitaConnect): the account's secret key, sent as the secretKey header. */
   REMITA_SECRET_KEY: z.string().optional(),
   REMITA_SANDBOX: flag.prefault('off'),
@@ -285,11 +267,6 @@ export const configSchema = z.object({
   REMITA_API_URL: z.string().url().default('https://api-gateway.remita.net'),
   /** The phone number sent with bill and TV payments when the customer gave none (Remita asks for one). */
   REMITA_CONTACT_PHONE: z.string().optional(),
-  ESIM_ACCESS_ACCESS_CODE: z.string().optional(),
-  ESIM_ACCESS_SECRET_KEY: z.string().optional(),
-  ESIM_ACCESS_API_URL: z.string().url().default('https://api.esimaccess.com'),
-  /** In the webhook address saved in eSIM Access: /v1/webhooks/esim-access?token=<this>. */
-  ESIM_ACCESS_WEBHOOK_TOKEN: z.string().min(16).optional(),
   /** AI providers for support bots on BitoCard's keys (Premium). Prices: "model input output cached" in US dollars per million tokens. */
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_API_URL: z.string().url().default('https://api.anthropic.com'),
@@ -450,6 +427,7 @@ export const productDefaults: Record<'udozo', Record<string, string>> = {
     WEB_PUSH_SUBJECT: 'mailto:support@udozo.com',
     GOOGLE_REDIRECT_URI: 'https://api.udozo.com/v1/auth/google/callback',
     FACEBOOK_REDIRECT_URI: 'https://api.udozo.com/v1/auth/facebook/callback',
+    API_PUBLIC_URL: 'https://api.udozo.com',
     PAYMENT_RETURN_URL: 'https://shq.udozo.com/wallet',
     ALERT_EMAIL: 'alerts@udozo.com',
     SPACES_ROOT: 'udozo',

@@ -42,14 +42,14 @@ const byKey = async (browser, key, headers) => {
 };
 
 describe('supplier registry and sync', () => {
-  test('all 34 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
+  test('all 25 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
     const { data } = (await admin.get('/v1/admin/suppliers')).json;
-    assert.equal(data.length, 34);
+    assert.equal(data.length, 25);
     assert.equal(data.find(s => s.code === 'zendit').enabled, false, 'Zendit starts switched off');
     assert.deepEqual(data.filter(s => s.enabled).map(s => s.code).sort(), ['reloadly', 'vtpass']);
     const reloadlyRecord = data.find(s => s.code === 'reloadly');
     assert.deepEqual([reloadlyRecord.configured, reloadlyRecord.status, Boolean(reloadlyRecord.last_synced_at)], [true, 'mvp_live', true]);
-    assert.equal(data.find(s => s.code === 'didww').configured, false, 'stub until API access is confirmed');
+    assert.equal(data.find(s => s.code === 'nexway').configured, false, 'stub until API access is confirmed');
   });
 
   test('syncing maps supplier catalogues onto BitoCard products', async () => {
@@ -92,7 +92,7 @@ describe('supplier registry and sync', () => {
   });
 
   test('a supplier without credentials cannot sync; a failed sync is recorded and withdraws nothing', async () => {
-    assert.equal((await admin.post('/v1/admin/suppliers/didww/sync')).json.error.code, 'supplier_not_configured');
+    assert.equal((await admin.post('/v1/admin/suppliers/nexway/sync')).json.error.code, 'supplier_not_configured');
     // With credentials but no market switched on there is nothing to fetch: refused, not an empty success.
     const markets = await prisma.supplierMarket.findMany({ where: { supplierCode: 'reloadly', enabled: true } });
     await prisma.supplierMarket.updateMany({ where: { supplierCode: 'reloadly' }, data: { enabled: false } });
@@ -126,13 +126,13 @@ describe('supplier registry and sync', () => {
   });
 
   test('admins record the funding profile and switch markets; changes are audited', async () => {
-    const updated = await admin.patch('/v1/admin/suppliers/esim_access', { billing_model: 'prepaid_wallet', funding_currency: 'usd', min_first_deposit_minor: 5000, resale_approved: false, notes: 'Awaiting sandbox' });
+    const updated = await admin.patch('/v1/admin/suppliers/nexway', { billing_model: 'prepaid_wallet', funding_currency: 'usd', min_first_deposit_minor: 5000, resale_approved: false, notes: 'Awaiting sandbox' });
     assert.deepEqual([updated.json.funding.billing_model, updated.json.funding.currency, updated.json.funding.min_first_deposit_minor], ['prepaid_wallet', 'USD', 5000]);
     assert.equal((await admin.put('/v1/admin/suppliers/vtpass/markets/NG/gift_cards', { enabled: true })).json.error.param, 'category');
     const market = await admin.put('/v1/admin/suppliers/reloadly/markets/ke/gift_cards', { enabled: false });
     assert.equal(market.json.markets.find(m => m.country === 'KE' && m.category === 'gift_cards').enabled, false);
     await admin.put('/v1/admin/suppliers/reloadly/markets/KE/gift_cards', { enabled: true });
-    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'supplier.updated', targetId: 'esim_access' } }));
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'supplier.updated', targetId: 'nexway' } }));
 
     const support = await adminClient(server, ['support']);
     assert.equal((await support.patch('/v1/admin/suppliers/reloadly', { enabled: false })).status, 403);
@@ -175,7 +175,7 @@ describe('catalogue', () => {
     const { browser } = await resellerClient(server);
     assert.deepEqual((await browser.get('/v1/catalogue/products?category=pay_tv')).json.data.map(p => p.brand).sort(), ['dstv', 'dstv', 'gotv']);
     assert.deepEqual((await browser.get('/v1/catalogue/products?q=steam')).json.data.map(p => p.name), ['Steam Global']);
-    assert.equal((await browser.get('/v1/catalogue/products?category=esim')).json.data.length, 0);
+    assert.equal((await browser.get('/v1/catalogue/products?category=virtual_cards')).json.data.length, 0);
   });
 
   test('a Ghanaian reseller sees gift cards in cedis, but not Nigerian airtime', async () => {

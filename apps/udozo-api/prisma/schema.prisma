@@ -711,13 +711,11 @@ enum ProductCategory {
   data
   bills
   pay_tv
-  esim
   software
   /// Fixed-term VPN access (30 days, never renewed).
   vpn
   /// Remote desktop (RDP) servers. No supplier yet.
   rdp
-  virtual_numbers
   virtual_cards
   /// Money sent to a customer's mobile money wallet (cash-in), for example through pawaPay.
   mobile_money
@@ -1495,9 +1493,6 @@ model Supplier {
   resaleApproved       Boolean           @default(false) @map("resale_approved")
   requiresIpAllowlist  Boolean?          @map("requires_ip_allowlist")
   notes                String?
-  /// Admin feature rules for the supplier's products ({ feature: required | allowed | excluded }), for adapters with
-  /// gatedFeatures (DIDWW's numbers). Products breaking a rule are not synced.
-  featureRules         Json              @default("{}") @map("feature_rules")
   /// bitocard.com customers buying products routed here are asked for the identity check where the market requires it (true) or not.
   customerVerification Boolean           @default(true) @map("customer_verification")
   lastSyncedAt         DateTime?         @map("last_synced_at")
@@ -1549,8 +1544,6 @@ model Product {
   redeemInstructions String?           @map("redeem_instructions")
   /// From the supplier's catalogue (refreshed on every sync).
   logoUrl            String?           @map("logo_url")
-  /// What the product can do (`src/catalogue/features.ts`), for example sms_in or app_codes on a virtual number.
-  features           String[]          @default([])
   /// Listed on BitoCard's own store (bitocard.com) by an admin. Unlisted products are never shown there; resellers'
   /// catalogues and stores are not affected (they keep their own listings).
   listed             Boolean           @default(false)
@@ -1821,8 +1814,6 @@ model Order {
   product                   Product          @relation(fields: [productId], references: [id])
   deliveries                OrderDelivery[]
   access                    OrderAccess?
-  virtualNumber             VirtualNumber?
-  esims                     Esim[]
   vpnSubscription           VpnSubscription?
   attempts                  OrderAttempt[]
 
@@ -1833,12 +1824,12 @@ model Order {
   @@map("orders")
 }
 
-/// What the customer receives: gift card codes, licence keys, electricity tokens, eSIM activation strings, VPN
-/// credentials and confirmations. Every code, PIN and password is encrypted.
+/// What the customer receives: gift card codes, licence keys, electricity tokens, VPN credentials and confirmations.
+/// Every code, PIN and password is encrypted.
 model OrderDelivery {
   id              String           @id @default(uuid()) @db.Uuid
   orderId         String           @map("order_id") @db.Uuid
-  /// gift_card, licence_key, token, confirmation, virtual_number, esim or vpn_account.
+  /// gift_card, licence_key, token, confirmation or vpn_account.
   kind            String
   codeEncrypted   String?          @map("code_encrypted")
   pinEncrypted    String?          @map("pin_encrypted")
@@ -1936,86 +1927,6 @@ model OrderAccess {
   codes          OrderAccessCode[]
 
   @@map("order_access")
-}
-
-/// A virtual number sold through an order: its supplier's ID for it (internal), when it is paid up to, renewal and
-/// reminder state, and its SMS. Numbers stay with their supplier for life.
-model VirtualNumber {
-  id               String          @id @default(uuid()) @db.Uuid
-  orderId          String          @unique @map("order_id") @db.Uuid
-  resellerId       String          @map("reseller_id") @db.Uuid
-  mode             LedgerMode
-  productId        String          @map("product_id") @db.Uuid
-  supplierCode     String          @map("supplier_code")
-  /// The supplier's ID for the number (DIDWW's DID ID). Internal: never shown to resellers or customers.
-  supplierNumberId String          @map("supplier_number_id")
-  /// E.164, for example +442071234567.
-  number           String
-  /// The supplier's monthly cost, in `costCurrency` minor units: what renewals are priced from.
-  monthlyCostMinor BigInt          @map("monthly_cost_minor")
-  costCurrency     String          @map("cost_currency") @db.Char(3)
-  /// active; expired (paused: in the 15-day grace, renewable); deleted (released, gone for good).
-  status           String          @default("active")
-  /// Paid up to: renewing adds a month.
-  expiresAt        DateTime        @map("expires_at")
-  /// Renew from the reseller's wallet 3 days before expiry: off until the customer (on the order page) or the reseller switches it on.
-  autoRenew        Boolean         @default(false) @map("auto_renew")
-  /// The reseller lets the customer send SMS from the order page (charged to the reseller's wallet).
-  customerSending  Boolean         @default(false) @map("customer_sending")
-  renewedAt        DateTime?       @map("renewed_at")
-  /// Reminders for the current period: 7 days before expiry, on expiry, the delete warning 7 days after.
-  remindedAt       DateTime?       @map("reminded_at")
-  expiredAt        DateTime?       @map("expired_at")
-  warnedAt         DateTime?       @map("warned_at")
-  deletedAt        DateTime?       @map("deleted_at")
-  /// Why the last automatic renewal did not happen (for example the wallet was short), and when it was tried.
-  renewalError     String?         @map("renewal_error")
-  renewalAttemptAt DateTime?       @map("renewal_attempt_at")
-  /// A renewal the supplier left unclear (a timeout): its period (the hold's reference) and the renewals-left count asked
-  /// for, so it is asked again exactly as before (never a second month) while the hold stays. Cleared once settled.
-  renewalPending   String?         @map("renewal_pending")
-  renewalCycles    Int?            @map("renewal_cycles")
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @updatedAt @map("updated_at")
-  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  messages         NumberMessage[]
-
-  @@unique([supplierCode, supplierNumberId])
-  @@index([number, status])
-  @@index([status, expiresAt])
-  @@index([resellerId, mode, createdAt])
-  @@map("virtual_numbers")
-}
-
-/// An SMS to or from a virtual number. The text is encrypted at rest; messages are kept 90 days.
-model NumberMessage {
-  id                String        @id @default(uuid()) @db.Uuid
-  numberId          String        @map("number_id") @db.Uuid
-  /// in or out.
-  direction         String
-  /// The other party's number (E.164 without +, as the supplier gives it).
-  counterparty      String
-  textEncrypted     String        @map("text_encrypted")
-  /// received (in); queued, sent, delivered or failed (out).
-  status            String
-  /// The supplier's message ID: incoming ones are stored once however often they are delivered.
-  supplierMessageId String?       @map("supplier_message_id")
-  /// Outgoing: SMS parts sent, what the supplier charged (cost currency), and the hold and charge on the wallet.
-  parts             Int           @default(1)
-  costMinor         BigInt?       @map("cost_minor")
-  chargedMinor      BigInt?       @map("charged_minor")
-  holdId            String?       @map("hold_id") @db.Uuid
-  failureReason     String?       @map("failure_reason")
-  /// customer (from the order page) or reseller (API or SHQ).
-  sentBy            String?       @map("sent_by")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  number            VirtualNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
-
-  @@unique([direction, supplierMessageId])
-  @@index([numberId, createdAt])
-  @@index([createdAt])
-  @@map("number_messages")
 }
 
 /// A 6-digit code emailed to the order's customer (`recipient.email`) to open its page: hashed, single use, 10 minutes,
@@ -3070,83 +2981,6 @@ model DisputeMessage {
 
   @@index([disputeId, createdAt])
   @@map("dispute_messages")
-}
-
-/// An eSIM an order delivered, kept after its order for its status, data use, expiry, top-ups and cancelling. It stays
-/// with the supplier that issued it. Its activation code is only on the order's delivery (encrypted); never here.
-model Esim {
-  id              String      @id @default(uuid()) @db.Uuid
-  orderId         String      @map("order_id") @db.Uuid
-  resellerId      String      @map("reseller_id") @db.Uuid
-  mode            LedgerMode
-  productId       String      @map("product_id") @db.Uuid
-  supplierCode    String      @map("supplier_code")
-  /// The supplier's own ID for the eSIM (eSIM Access's esimTranNo: ICCIDs are reused). Internal: never shown.
-  supplierEsimId  String      @map("supplier_esim_id")
-  iccid           String
-  /// ready (not installed yet), installed, active, used_up, expired, cancelled, revoked or suspended.
-  status          String      @default("ready")
-  /// The supplier's own states as last reported (internal, for admins).
-  supplierStatus  String?     @map("supplier_status")
-  profileStatus   String?     @map("profile_status")
-  dataTotalBytes  BigInt?     @map("data_total_bytes")
-  dataUsedBytes   BigInt?     @map("data_used_bytes")
-  usageUpdatedAt  DateTime?   @map("usage_updated_at")
-  expiresAt       DateTime?   @map("expires_at")
-  /// The supplier takes top-ups for it (and whether they extend by days: day passes).
-  topUps          String      @default("none") @map("top_ups")
-  installedAt     DateTime?   @map("installed_at")
-  cancelledAt     DateTime?   @map("cancelled_at")
-  /// The last low-data threshold (percent left) and expiry warning the customer was told about, so each is sent once.
-  lowDataNotified Int?        @map("low_data_notified")
-  expiryNotified  DateTime?   @map("expiry_notified")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
-  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  topUpOrders     EsimTopUp[]
-
-  @@unique([supplierCode, supplierEsimId])
-  @@index([orderId])
-  @@index([resellerId, mode, createdAt])
-  @@map("esims")
-}
-
-/// More data (or days) added to an eSIM: paid by the reseller's wallet, or by the store's customer from their wallet
-/// (`customer_id`), held while the supplier adds it, taken once it confirms, returned if it refuses.
-model EsimTopUp {
-  id                String     @id @default(uuid()) @db.Uuid
-  esimId            String     @map("esim_id") @db.Uuid
-  resellerId        String     @map("reseller_id") @db.Uuid
-  customerId        String?    @map("customer_id") @db.Uuid
-  mode              LedgerMode
-  /// Our reference, sent to the supplier as its transaction ID (a repeat is the same top-up).
-  reference         String     @unique
-  /// The supplier's package (internal) and what it adds.
-  supplierPackage   String     @map("supplier_package")
-  name              String
-  days              Int?
-  costMinor         BigInt     @map("cost_minor")
-  costCurrency      String     @map("cost_currency") @db.Char(3)
-  /// BitoCard's price to the reseller, and (paid by a customer) the customer's price, in `currency`.
-  wholesaleMinor    BigInt     @map("wholesale_minor")
-  priceMinor        BigInt     @map("price_minor")
-  currency          String     @db.Char(3)
-  /// A customer who paid from their US dollar wallet: what left it.
-  walletCurrency    String?    @map("wallet_currency") @db.Char(3)
-  walletAmountMinor BigInt?    @map("wallet_amount_minor")
-  holdId            String?    @map("hold_id") @db.Uuid
-  /// pending (with the supplier), completed, failed.
-  status            String     @default("pending")
-  failureReason     String?    @map("failure_reason")
-  attempts          Int        @default(0)
-  nextCheckAt       DateTime?  @map("next_check_at")
-  createdAt         DateTime   @default(now()) @map("created_at")
-  completedAt       DateTime?  @map("completed_at")
-  esim              Esim       @relation(fields: [esimId], references: [id], onDelete: Cascade)
-
-  @@index([esimId, createdAt])
-  @@index([status, nextCheckAt])
-  @@map("esim_top_ups")
 }
 
 // ---------------------------------------------------------------------------

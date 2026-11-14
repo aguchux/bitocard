@@ -87,7 +87,7 @@ export function SpinDialog({ rewards, open: openOnArrival = false }: { rewards: 
                     Spin and win{test ? <span className="sr-only"> (test)</span> : null}
                   </h2>
                   <p className="truncate text-[11px] font-semibold tracking-[0.2em] text-white/55 uppercase">
-                    Crypto rewards · {rewards.daily_limit === 1 ? "one spin" : `${rewards.daily_limit} spins`} a day
+                    US dollar rewards · {rewards.daily_limit === 1 ? "one spin" : `${rewards.daily_limit} spins`} a day
                   </p>
                 </div>
                 {test ? <span className="shrink-0 rounded-full bg-amber-300/15 px-2.5 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-300/40" aria-hidden="true">Test</span> : null}

@@ -1,7 +1,7 @@
 import { categoryLabels, navigationGroups, productSources, quickBuyCategories, sectionIcons } from '../../storefront/layout.js';
 import { storeTemplates, templateKeys } from '../../stores/templates.js';
 import { array, bool, constant, int, list, listExample, nullable, nullableInt, nullableStr, nullableTime, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
-import { category, features } from './commerce.js';
+import { category } from './commerce.js';
 import type { DocsArea } from './index.js';
 
 const groupKeys = navigationGroups.map(group => group.key);
@@ -147,7 +147,6 @@ const storeTemplate = objectSchema(
     description: str('What the store sells and how it looks.'),
     categories: { type: ['array', 'null'], items: category(), description: 'The categories the store sells; null for every category, empty for none (the Resale shop sells BitoCard Shop listings, not catalogue products).' },
     single_product: bool('The store sells one product, chosen as its `focus`.'),
-    crypto: bool('Always false: the crypto desk store was retired.'),
     resale: bool('The Resale shop: sells BitoCard Shop suppliers’ resale listings (offered where reselling is open to you), never catalogue products.'),
     sections: array(str('A section type.', { enum: sectionTypes }), 'Sections the store’s editor offers.'),
     available: bool('Whether you can use it now.'),
@@ -262,7 +261,7 @@ const productProperties: Record<string, Schema> = {
   category_label: str('The category’s name, for example `Gift cards`.'),
   country: str('ISO 3166-1 alpha-2 country where the product is used.'),
   country_name: str('The country’s name in English.'),
-  global: bool('Usable in any country (gift cards, eSIMs, software, numbers) rather than one market’s services.'),
+  global: bool('Usable in any country (gift cards, software) rather than one market’s services.'),
   face_currency: str('ISO 4217 currency of the face values.'),
   denomination_type: oneOf('`fixed` face values, or a `range` the customer chooses within.', ['fixed', 'range']),
   from: int('Lowest face value, in minor units of `face_currency`.'),
@@ -280,7 +279,6 @@ const productProperties: Record<string, Schema> = {
   ),
   description: nullableStr('About the product.'),
   logo_url: nullableStr('The product logo from BitoCard files: the product image, else the brand logo; or null.'),
-  features,
   brand: ref('StoreBrand'),
 };
 const storeProduct = objectSchema('Store product', productProperties, 'A product on sale, with its face values. Prices are quoted at checkout.');
@@ -342,7 +340,7 @@ const span = shape(
   },
   'Where the section sits on the grid. Phones show every section full width, in order.',
 );
-const href = str('A path on the store, such as `/catalogs/esim`, or an https address.');
+const href = str('A path on the store, such as `/catalogs/gift_cards`, or an https address.');
 const section = (type: string, description: string, fields: Record<string, Schema>, data: Schema, optional: Record<string, Schema> = {}): Schema => {
   const required = { id: str('Section ID, unique on the page.'), type: constant(type), span, hidden: bool('Always false here: hidden sections are left out.'), ...fields, data };
   return { type: 'object', title: `${type} section`, description, required: Object.keys(required), additionalProperties: false, properties: { ...required, ...optional } };
@@ -384,7 +382,7 @@ const sections = [
       body: str('Body text; may be empty.'),
       bullets: array(str('A bullet point.')),
       theme: oneOf('The card’s colours.', ['pink', 'sky', 'navy', 'light', 'sunset']),
-      illustration: oneOf('A drawn illustration shown when there is no image.', ['store', 'esim', 'gift', 'globe', 'none']),
+      illustration: oneOf('A drawn illustration shown when there is no image.', ['store', 'gift', 'globe', 'none']),
     },
     { type: 'null', description: 'Always null.' },
     { cta: shape({ label: str('Button text.'), href }, 'The button.'), imageUrl: str('Image address (https).') },
@@ -468,7 +466,6 @@ const mtnProduct = {
   price: null,
   description: 'Top up any MTN Nigeria prepaid line.',
   logo_url: null,
-  features: [],
   brand: mtnBrand,
 };
 const amazonProduct = {
@@ -542,9 +539,8 @@ const countries = [
 
 const navigation = [
   { key: 'gift-cards', label: 'Gift cards', on_sale: true, categories: [giftCards], brands: [listing(amazonBrand, 1, true)] },
-  { key: 'mobile', label: 'Mobile', on_sale: true, categories: [airtime, data, category_('mobile_money', 'mobile', 0), category_('virtual_numbers', 'mobile', 0)], brands: [listing(mtnBrand, 3, true)] },
+  { key: 'mobile', label: 'Mobile', on_sale: true, categories: [airtime, data, category_('mobile_money', 'mobile', 0)], brands: [listing(mtnBrand, 3, true)] },
   { key: 'bills', label: 'Bills', on_sale: true, categories: [bills, payTv], brands: [listing(dstvBrand, 6, false)] },
-  { key: 'esims', label: 'eSIMs', on_sale: false, categories: [category_('esim', 'esims', 0)], brands: [] },
   { key: 'software', label: 'Software', on_sale: false, categories: [category_('software', 'software', 0)], brands: [] },
   { key: 'vpn', label: 'VPN', on_sale: false, categories: [category_('vpn', 'vpn', 0)], brands: [] },
   { key: 'rdp', label: 'RDP', on_sale: false, categories: [category_('rdp', 'rdp', 0)], brands: [] },
@@ -632,7 +628,6 @@ const templateExamples = storeTemplates.slice(0, 1).map(template => ({
   description: template.description,
   categories: template.categories,
   single_product: template.single,
-  crypto: false,
   resale: Boolean(template.resale),
   sections: template.sections,
   available: true,

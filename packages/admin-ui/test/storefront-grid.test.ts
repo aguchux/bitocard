@@ -197,7 +197,7 @@ describe('errors and summaries', () => {
   test('summaries describe what each section shows', () => {
     const rail = newSection('product_rail', 'r') as Extract<Section, { type: 'product_rail' }>;
     expect(sectionSummary(rail)).toBe('Trending · 6 products · cards');
-    expect(sectionSummary({ ...rail, source: 'category', category: 'esim', layout: 'list', limit: 1 })).toBe('eSIMs · 1 product · list');
+    expect(sectionSummary({ ...rail, source: 'category', category: 'software', layout: 'list', limit: 1 })).toBe('Software · 1 product · list');
     expect(sectionSummary({ ...rail, source: 'brand', brand: 'amazon' })).toBe('Brand: amazon · 6 products · cards');
     expect(sectionSummary({ ...rail, source: 'manual', productKeys: ['x', 'y'] })).toBe('Hand-picked · 2 products · cards');
     expect(sectionSummary(newSection('hero', 'h'))).toBe('Search · category chips');

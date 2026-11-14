@@ -55,8 +55,6 @@ import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.serv
 import { InboxService } from '../notifications/inbox.service.js';
 import { PushService } from '../notifications/push.service.js';
 import { MediaService } from '../media/media.service.js';
-import { NumbersService } from '../numbers/numbers.service.js';
-import { EsimsService } from '../esims/esims.service.js';
 import { VpnService } from '../vpn/vpn.service.js';
 import { CryptoDepositsService, depositBudgetMs } from '../crypto/chains/deposits.service.js';
 import { CryptoReconciliationService } from '../crypto/custody/reconciliation.service.js';
@@ -103,8 +101,6 @@ export class CronController {
     push: PushService,
     media: MediaService,
     checkout: CheckoutService,
-    numbers: NumbersService,
-    esims: EsimsService,
     deposits: CryptoDepositsService,
     withdrawals: CryptoWithdrawalsService,
     customerPayouts: CustomerPayoutsService,
@@ -172,9 +168,6 @@ export class CronController {
       plans: () => billing.renewDue(),
       /** Hourly: close last month's invoices, drop the credit limit for overdue ones, pay what is owed from top-ups. */
       invoices: () => invoices.run(),
-      /** Hourly: virtual number renewals, reminders, pausing at expiry, deletion 15 days later, and old messages. */
-      numbers: () => numbers.job(),
-      esims: () => esims.job(),
       /** Every 15 minutes: end VPN access at its expiry or after a refund (verified with the supplier), fix expiry drift, retry unconfirmed password resets. */
       vpn: () => vpn.job(),
       /** Daily: the VPN supplier's Active accounts and credit against BitoCard's active VPN access. */

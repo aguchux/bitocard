@@ -15,7 +15,6 @@ import { paymentGateways } from '../payments/payment-providers.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { desktopNavFor, installPromptFor } from '../stores/stores.service.js';
 import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.service.js';
-import { EsimsService } from '../esims/esims.service.js';
 import { StoreSellers } from './store-sellers.js';
 import { ProductOnly } from '../products/product.js';
 
@@ -158,15 +157,6 @@ class StartCheckoutDto {
 
   /** Paying from the wallet: which one, `USD` or the customer's country's currency (the default). */
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, { message: 'wallet_currency must be a 3-letter code' })
-  wallet_currency?: string;
-}
-
-class EsimTopUpDto {
-  @IsString() @Length(4, 64)
-  option_id: string;
-
-  /** The wallet that pays: the customer's country's currency (default) or `USD`. */
-  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
   wallet_currency?: string;
 }
 
@@ -362,40 +352,7 @@ export class CheckoutController {
     private readonly checkout: CheckoutService,
     private readonly stores: StoreSellers,
     private readonly settings: SettingsService,
-    private readonly esims: EsimsService,
   ) {}
-
-  /** The customer's own order behind one of their checkouts (eSIM pages). */
-  private async orderOf(caller: CustomerCaller, id: string) {
-    const order = await this.checkout.orderFor(caller.customer, id);
-    return { id: order.id, customerId: caller.customer.id };
-  }
-
-  @UseGuards(CustomerGuard)
-  @Get('checkouts/:id/esims')
-  async esimList(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
-    return { object: 'list' as const, data: await this.esims.forOrder((await this.orderOf(caller, id)).id) };
-  }
-
-  @UseGuards(CustomerGuard)
-  @Get('checkouts/:id/esims/:esim/top-up-options')
-  async esimOptions(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('esim', ParseUUIDPipe) esim: string) {
-    return this.esims.customerOptions(await this.orderOf(caller, id), esim);
-  }
-
-  @UseGuards(CustomerGuard)
-  @Post('checkouts/:id/esims/:esim/top-ups')
-  @HttpCode(HttpStatus.OK)
-  async esimTopUp(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('esim', ParseUUIDPipe) esim: string, @Body() body: EsimTopUpDto) {
-    return this.esims.customerTopUp(await this.orderOf(caller, id), esim, body);
-  }
-
-  @UseGuards(CustomerGuard)
-  @Post('checkouts/:id/esims/:esim/cancel')
-  @HttpCode(HttpStatus.OK)
-  async esimCancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('esim', ParseUUIDPipe) esim: string) {
-    return this.esims.customerCancel(await this.orderOf(caller, id), esim);
-  }
 
   /** How the store's customer account app looks (bitocard.com, or the store named): its desktop menu, and whether it asks shoppers to install the site as an app. */
   @Get('app')

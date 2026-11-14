@@ -32,8 +32,6 @@ export function presentProductBase(product: Product, logoUrl: string | null) {
     description: product.description,
     redeem_instructions: product.redeemInstructions,
     logo_url: logoUrl,
-    /** What it can do, for example `sms_in` or `app_codes` on a virtual number (see the docs for the list). */
-    features: product.features,
   };
 }
 

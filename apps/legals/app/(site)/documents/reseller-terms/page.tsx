@@ -151,9 +151,8 @@ export default function ResellerTerms() {
 
       <Section id="products" title="12. Products with their own rules">
         <ul>
-          <li><strong>Codes and keys.</strong> Gift card codes, licence keys and eSIM activation codes are like cash: whoever holds one can use it. Deliver them only to your customer, keep them secret and never put them in public places.</li>
-          <li><strong>Virtual numbers.</strong> Numbers are monthly and renewed from your wallet: your customer decides to renew and your wallet pays (you charge your customer as you agree with them). A number not renewed is paused at expiry and deleted for good 15 days later. Some countries require the user&apos;s documents before a number works.</li>
-          <li><strong>eSIMs and software.</strong> Refunds follow the supplier&apos;s rules: usually only an unused, uninstalled eSIM, and never a licence key that has been revealed. Show these rules to your customer before they buy.</li>
+          <li><strong>Codes and keys.</strong> Gift card codes and licence keys are like cash: whoever holds one can use it. Deliver them only to your customer, keep them secret and never put them in public places.</li>
+          <li><strong>Software.</strong> Refunds follow the supplier&apos;s rules, and never cover a licence key that has been revealed. Show these rules to your customer before they buy.</li>
           <li><strong>VPN access.</strong> Sold for 30 days and never renewed automatically: we end it at its expiry and when it is refunded. Its sign-in details are secret, like codes. Refunds follow our terms of use: in full before the sign-in details are first shown to your customer, and afterwards only when it cannot be made to work. We may suspend access that is abused. Make no claim about privacy, logging, speed or locations beyond what we publish.</li>
         </ul>
       </Section>

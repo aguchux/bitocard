@@ -3,8 +3,6 @@ import { ArrowRight } from "lucide-react";
 import { formatFace, type StoreBrand, type StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { BrandImage } from "./brand-image";
-import { FeatureIcons } from "./features";
-import { Flag } from "./flag";
 import { categoryTheme } from "./theme";
 
 /** A product's page: `/p/<key>` in the store, `/account/p/<key>` inside the customer's account app. */
@@ -46,14 +44,7 @@ export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand
       className={`flex h-full w-full items-center justify-center bg-gradient-to-br p-4 ${brand.color ? "" : theme.card} ${className}`}
       style={brand.color ? { backgroundColor: brand.color } : undefined}
     >
-      {product?.category === "virtual_numbers" && !brand.logo_url ? (
-        // A number shows its country's flag, not the initials of its type ("local", "mobile").
-        // Sized by the art's width, so the flag and its label fit small cards in phone grids too.
-        <span className="flex w-full flex-col items-center gap-[6%]">
-          <Flag code={product.country} className="aspect-[3/2] h-auto w-[34%] max-w-24 rounded-md shadow-lg" />
-          <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.55em] font-bold tracking-wide text-navy-900 uppercase">{brand.name} number</span>
-        </span>
-      ) : brand.logo_url ? (
+      {brand.logo_url ? (
         <BrandImage
           src={brand.logo_url}
           frame="flex aspect-square h-[64%] max-h-32 items-center justify-center rounded-[22%] bg-white p-[9%] shadow-md ring-1 ring-black/5"
@@ -83,11 +74,6 @@ export function ProductCard({ product, base }: { product: StoreProduct; base?: s
       <div className="flex flex-1 flex-col px-0.5 pt-2.5 @[14rem]:px-1 @[14rem]:pt-3">
         <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-navy-900 @[14rem]:text-lg">{product.name}</h3>
         <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 @[14rem]:text-sm">{product.description ?? `${product.category_label}${product.global ? "" : ` · ${product.country_name}`}`}</p>
-        {product.features?.length ? (
-          <div className="mt-2 @[14rem]:mt-2.5">
-            <FeatureIcons features={product.features} compact />
-          </div>
-        ) : null}
         <div className="mt-auto flex items-end justify-between gap-2 pt-2.5 @[14rem]:pt-3">
           <p className="min-w-0 text-sm text-slate-500">
             <span className="font-display text-base font-extrabold text-navy-900 @[14rem]:text-lg">{priceLabel(product)}</span>
@@ -112,11 +98,6 @@ export function ProductRow({ product, base }: { product: StoreProduct; base?: st
         {/* Two lines on phones rather than cutting the name after a word or two. */}
         <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-navy-900 sm:line-clamp-1 sm:text-lg">{product.name}</h3>
         <p className="truncate text-sm text-slate-500">{product.description ?? `${product.category_label} · ${product.country_name}`}</p>
-        {product.features?.length ? (
-          <div className="mt-1.5">
-            <FeatureIcons features={product.features} compact />
-          </div>
-        ) : null}
         <p className="mt-1 font-display text-base font-extrabold text-navy-900">{priceLabel(product)}</p>
       </div>
       <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-brand-500 transition group-hover:bg-brand-500 group-hover:text-white min-[400px]:grid">

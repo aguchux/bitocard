@@ -457,7 +457,7 @@ export default function IntegrationsPage() {
               {shown.length === 0 ? (
                 <Card>
                   <EmptyState title="No integration matches" icon={<Search className="size-6" aria-hidden />}>
-                    Try a name, or what you want to sell, such as gift cards, airtime or numbers.
+                    Try a name, or what you want to sell, such as gift cards, airtime or software.
                   </EmptyState>
                 </Card>
               ) : null}

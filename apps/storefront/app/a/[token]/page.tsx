@@ -1,24 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, Clock, LockKeyhole, Phone, Store, XCircle } from "lucide-react";
-import { categoryLabels, formatFace, type ProductCategory, type ProductFeature, type StoreEsim, type StoreVpn } from "@bitocard/api-client/storefront";
+import { CheckCircle2, Clock, LockKeyhole, Store, XCircle } from "lucide-react";
+import { categoryLabels, formatFace, type ProductCategory, type StoreVpn } from "@bitocard/api-client/storefront";
 import { brand } from "@bitocard/ui/site";
 import { RefreshWhile } from "@/components/store/order-status";
-import { FeatureIcons } from "@/components/store/features";
-import { type AccessDelivery, type AccessStore, accessApi, type OrderAccess, type OrderNumber, passPath } from "@/lib/access";
+import { type AccessDelivery, type AccessStore, accessApi, type OrderAccess, passPath } from "@/lib/access";
 import { Codes } from "./codes";
 import { EmailCodeGate } from "./gate";
-import { NumberLive } from "./number";
-import { EsimManage } from "@/components/store/esim-manage";
 import { VpnAccess } from "@/components/store/vpn-access";
 
 
 // The link opens the order: never indexed, and no Referer to other sites (it would carry the link).
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
-const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
 const dateTime = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
-const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key", "token", "esim", "vpn_account"]);
+const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key", "token", "vpn_account"]);
 
 function Shell({ store, children }: { store: AccessStore | null; children: React.ReactNode }) {
   const name = store?.name ?? brand.name;
@@ -49,37 +45,11 @@ function Notice({ tone, icon, children }: { tone: string; icon: React.ReactNode;
   return <div className={`flex items-start gap-3 rounded-2xl p-4 ${tone}`}>{icon}<div className="min-w-0">{children}</div></div>;
 }
 
-/** A virtual number from the delivery alone (when its live state cannot be loaded): the number, what it can do and when it is paid up to. */
-function NumberPanel({ delivery, features }: { delivery: AccessDelivery; features: string[] }) {
-  const number = delivery.details.number ?? delivery.serial;
-  const expires = delivery.details.expires_at;
-  return (
-    <section aria-labelledby="number" className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
-      <h2 id="number" className="flex items-center gap-2 text-xl font-bold">
-        <Phone className="size-5 text-brand-500" aria-hidden="true" /> Your number
-      </h2>
-      {number ? <p className="mt-3 font-mono text-2xl font-extrabold tracking-wide sm:text-3xl">{number}</p> : null}
-      {expires && !Number.isNaN(Date.parse(expires)) ? (
-        <p className="mt-2 flex items-center gap-2 text-sm text-slate-600">
-          <CalendarClock className="size-4" aria-hidden="true" /> Paid up to {date(expires)}. Renew before then to keep it: a number not renewed within 15 days of that date is deleted.
-        </p>
-      ) : null}
-      {features.length ? (
-        <div className="mt-5">
-          <p className="mb-2 text-sm font-semibold">What it can do</p>
-          <FeatureIcons features={features as ProductFeature[]} />
-        </div>
-      ) : null}
-      <p className="mt-5 text-sm text-slate-500">Some apps and services do not accept virtual numbers.</p>
-    </section>
-  );
-}
-
 /**
  * An order's page (`/a/<token>`), under the store's brand. The link only points at the order: it shows only to the
  * customer who proves it is theirs (signed in at the store it was bought from, or a code emailed to the order's
  * address); until then, nothing but the store's name. What it shows depends on the product: codes and keys behind
- * Reveal, a virtual number with what it can do, or the confirmation of a top-up or bill sent to a phone or account.
+ * Reveal, VPN access, or the confirmation of a top-up or bill sent to a phone or account.
  */
 export default async function OrderAccessPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -125,13 +95,7 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
   const order = result.data.order;
   const category = order.product.category as ProductCategory;
   const codes = order.deliveries.filter(delivery => secretKinds.has(delivery.kind));
-  const numbers = order.deliveries.filter(delivery => delivery.kind === "virtual_number");
   const sentTo = order.recipient.phone ?? order.recipient.account_number;
-  // A virtual number's live state (inbox, renewal); the delivery's own details stand in if it cannot be loaded.
-  const live = category === "virtual_numbers" ? await accessApi<OrderNumber>(token, "/number") : null;
-  const liveNumber = live?.ok ? live.data.number : null;
-  // eSIMs after delivery: status, data use, top-ups (paid by a store customer from their wallet) and cancelling.
-  const tracked = category === "esim" && (order.status === "completed" || order.status === "refunded") ? await accessApi<{ data: StoreEsim[] }>(token, "/esims") : null;
   // VPN access after delivery: whether it works, when it ends (never renewed), and a new password on request.
   const vpn = order.deliveries.some(delivery => delivery.kind === "vpn_account") ? await accessApi<{ vpn_subscription: StoreVpn | null }>(token, "/vpn") : null;
 
@@ -175,7 +139,7 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
         <>
           <Notice tone="bg-emerald-50 text-emerald-900" icon={<CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden="true" />}>
             <p className="font-semibold">Delivered{order.completed_at ? ` ${dateTime(order.completed_at)}` : ""}</p>
-            {sentTo && !codes.length && !numbers.length ? (
+            {sentTo && !codes.length ? (
               <p className="text-sm">
                 Sent to {sentTo}
                 {order.recipient.account_name ? ` (${order.recipient.account_name})` : ""}.
@@ -183,12 +147,6 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
             ) : null}
           </Notice>
           {codes.length ? <Codes token={token} deliveries={codes} instructions={order.redeem_instructions} /> : null}
-          {liveNumber ? (
-            <NumberLive token={token} data={liveNumber} features={order.product.features} />
-          ) : (
-            numbers.map((delivery, index) => <NumberPanel key={index} delivery={delivery} features={order.product.features} />)
-          )}
-          {tracked?.ok ? <EsimManage source={{ token }} esims={tracked.data.data} store={store.name} /> : null}
           {vpn?.ok && vpn.data.vpn_subscription ? <VpnAccess source={{ token }} vpn={vpn.data.vpn_subscription} store={store.name} /> : null}
           {order.deliveries.some(delivery => delivery.kind === "confirmation" && delivery.details.transaction_id) ? (
             <p className="text-sm text-slate-600">Transaction reference: {order.deliveries.find(delivery => delivery.details.transaction_id)?.details.transaction_id}</p>

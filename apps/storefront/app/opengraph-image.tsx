@@ -5,5 +5,5 @@ export const size = ogImageSize;
 export const contentType = "image/png";
 
 export default function OpenGraphImage() {
-  return brandOgImage({ eyebrow: "Digital marketplace", title: "One marketplace.", accent: "More ways to pay.", subtitle: "Gift cards · Airtime · Data · Bills · eSIMs · Software" });
+  return brandOgImage({ eyebrow: "Digital marketplace", title: "One marketplace.", accent: "More ways to pay.", subtitle: "Gift cards · Airtime · Data · Bills · Software · VPN" });
 }

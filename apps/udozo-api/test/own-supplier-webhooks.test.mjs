@@ -1,26 +1,23 @@
 // Supplier notifications to a reseller's own connection: each live connection has its own address, checked with that
-// reseller's own secret (Reloadly's webhook secret, DIDWW's API key); they only ever name that connection's own orders,
+// reseller's own secret (Reloadly's webhook secret); they only ever name that connection's own orders,
 // are stored and re-checked like BitoCard's, are listed for the reseller, and tell them (and admins) when given up on.
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, resellerClient, startApp } from './helpers.mjs';
-import { fakeDidww, fakeReloadly } from './fakes.mjs';
+import { fakeReloadly } from './fakes.mjs';
 
 const callbackBase = 'https://api.test.example';
 const bitocardSecret = 'bitocard-reloadly-webhook-secret';
 let server;
 let reloadly;
-let didww;
 let admin;
 let prisma;
 let wallets;
 
 before(async () => {
   reloadly = await fakeReloadly();
-  didww = await fakeDidww();
-  didww.state.keys.push('reseller-didww-key');
-  server = await startApp({ env: { ...reloadly.env, ...didww.env, DIDWW_CALLBACK_URL: callbackBase, RELOADLY_WEBHOOK_SECRET: bitocardSecret, CRON_SECRET: 'cron-secret' } });
+  server = await startApp({ env: { ...reloadly.env, API_PUBLIC_URL: callbackBase, RELOADLY_WEBHOOK_SECRET: bitocardSecret, CRON_SECRET: 'cron-secret' } });
   admin = await adminClient(server);
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   wallets = server.app.get((await import('../dist/ledger/wallet.service.js')).WalletService);
@@ -28,8 +25,7 @@ before(async () => {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
-  assert.equal((await admin.put('/v1/admin/countries/NG/categories/virtual_numbers', { enabled: true })).status, 200);
-  for (const id of ['reloadly', 'didww']) {
+  for (const id of ['reloadly']) {
     assert.equal((await admin.put(`/v1/admin/integrations/${id}/reseller-access`, { enabled: true })).status, 200);
     assert.equal((await admin.put(`/v1/admin/integrations/${id}/reseller-availability`, { global: true, countries: [], approval: 'automatic' })).status, 200);
   }
@@ -39,7 +35,6 @@ before(async () => {
 after(async () => {
   await server?.close();
   await reloadly?.close();
-  await didww?.close();
 });
 
 const until = async (check, what) => {
@@ -168,47 +163,5 @@ describe('own Reloadly connection notifications', () => {
     assert.equal(mine[0].link, '/integrations');
     assert.equal((await operations.get('/v1/admin/notifications')).json.data.filter(item => item.type === 'admin.supplier_notification.failed').length >= 1, true);
     assert.equal((await finance.get('/v1/admin/notifications')).json.data.some(item => item.type === 'admin.supplier_notification.failed'), false);
-  });
-});
-
-describe('own DIDWW connection callbacks', () => {
-  test('orders give DIDWW the connection’s own address; callbacks are checked with the reseller’s API key', async () => {
-    const reseller = await connected('didww', { api_key: 'reseller-didww-key' });
-    const connectionId = reseller.integration.connection.id;
-    assert.deepEqual(reseller.integration.connection.notifications, { url: `${callbackBase}/v1/webhooks/didww/${connectionId}`, setup: 'automatic', ready: true });
-
-    const product = await prisma.product.findUniqueOrThrow({ where: { key: 'virtual_numbers:GB:local:london-voice-sms-0ch' } });
-    const quote = (await reseller.browser.post('/v1/quotes', { product_id: product.id, face_value: Number(product.fixedValues[0]) })).json;
-    assert.equal(quote.source, 'own', JSON.stringify(quote));
-    didww.state.orderReply = 'Pending';
-    const created = (await reseller.browser.post('/v1/orders', { quote_id: quote.id })).json;
-    didww.state.orderReply = 'Completed';
-    assert.equal(created.status, 'processing', JSON.stringify(created));
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: created.id } });
-    const placed = didww.state.orders[order.supplierTransactionId];
-    const path = `/v1/webhooks/didww/${connectionId}?reference=${encodeURIComponent(order.supplierReference)}`;
-    assert.equal(placed.callback_url, `${callbackBase}${path}`);
-
-    const fields = { id: placed.id, type: 'orders', status: 'completed' };
-    const send = key =>
-      fetch(`${server.base}${path}`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-          'x-didww-signature': createHmac('sha1', key)
-            .update(`https://api.test.example:443${path}${Object.keys(fields).sort().map(name => `${name}${fields[name]}`).join('')}`)
-            .digest('hex'),
-        },
-        body: new URLSearchParams(fields).toString(),
-      });
-    // BitoCard's own DIDWW key does not sign the reseller's callbacks.
-    assert.equal((await send('didww-key')).status, 401);
-    didww.complete(placed.id);
-    assert.equal((await send('reseller-didww-key')).status, 200);
-    await until(async () => (await reseller.browser.get(`/v1/orders/${created.id}`)).json.status === 'completed', 'the order to complete');
-    // The order settles a moment before the notification records that it was processed.
-    await until(async () => (await prisma.supplierWebhook.findFirst({ where: { connectionId } }))?.status === 'processed', 'the callback to be processed');
-    const stored = await prisma.supplierWebhook.findFirstOrThrow({ where: { connectionId } });
-    assert.deepEqual([stored.status, stored.orderId], ['processed', created.id]);
   });
 });

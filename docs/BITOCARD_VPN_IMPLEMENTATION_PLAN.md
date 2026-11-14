@@ -98,7 +98,7 @@ Launch blockers requiring written answers or an executed agreement:
 
 ### 8. Public API and documentation — complete
 
-- [x] Following the eSIM pattern, VPN state is its own resource rather than a field on `Order`: `GET /v1/vpn-subscriptions(?order_id, status)`, `GET /v1/vpn-subscriptions/{id}` (`orders:read`), `POST /v1/vpn-subscriptions/{id}/password-reset` (`orders:write`, owners, admins and support), documented with full examples and checked against real responses.
+- [x] VPN state is its own resource rather than a field on `Order`: `GET /v1/vpn-subscriptions(?order_id, status)`, `GET /v1/vpn-subscriptions/{id}` (`orders:read`), `POST /v1/vpn-subscriptions/{id}/password-reset` (`orders:write`, owners, admins and support), documented with full examples and checked against real responses.
 - [x] `vpn_subscription.updated` reports status only (active, expired, revoked, suspended, needs review); credentials only on `GET /v1/orders/{id}`.
 - [x] Guides: Orders > VPN access, the changelog, the reference tag `VPN`.
 

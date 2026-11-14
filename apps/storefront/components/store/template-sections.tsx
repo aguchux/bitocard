@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, ShieldCheck, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Sparkles } from "lucide-react";
 import type { ResolvedSection, StoreBrand, StoreCountry, StoreDesign, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { BrandArt } from "./product-card";
 import { ProductDetail } from "./product-detail";
@@ -12,8 +12,8 @@ import { isServiceHero, ServiceHero } from "./service-heroes";
 
 /**
  * Reseller store templates' sections, drawn in the store's variant (`design.style`) with its theme's colours (the
- * `--st-*` variables on the store's shell). Each variant has its own hero; the quick-buy form, the crypto desk and the
- * product spotlight change shape with it too.
+ * `--st-*` variables on the store's shell). Each variant has its own hero; the quick-buy form and the product spotlight
+ * change shape with it too.
  */
 
 type Style = StoreDesign["style"];
@@ -167,29 +167,6 @@ export function VariantHero({ section, style, groups, countries, bleed }: { sect
               </ul>
             ) : null}
             {search}
-          </div>
-        </section>
-      );
-    case "market":
-      return (
-        <section aria-labelledby={id} className={frame} style={heroBand}>
-          <div className={`${bleed ? inner : "px-6"} py-12 sm:py-16`}>
-            <Title id={id} section={section} className="max-w-3xl text-4xl leading-tight sm:text-6xl" accentClass="opacity-80" />
-            {section.subtitle ? <p className="mt-4 max-w-2xl text-lg opacity-85">{section.subtitle}</p> : null}
-            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm opacity-85">
-              {[
-                [ShieldCheck, "Verified traders"],
-                [Zap, "Paid instantly from your wallet"],
-                [TrendingUp, "Prices set by traders"],
-              ].map(([Icon, text]) => {
-                const I = Icon as typeof Zap;
-                return (
-                  <li key={text as string} className="flex items-center gap-2">
-                    <I className="size-4" aria-hidden="true" /> {text as string}
-                  </li>
-                );
-              })}
-            </ul>
           </div>
         </section>
       );

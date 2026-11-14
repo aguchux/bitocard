@@ -83,7 +83,7 @@ function brandSlug(offer: Offer) {
  * Zendit: gift cards (vouchers, worldwide) and mobile airtime, bundles and data by country, priced in the wallet
  * currency. Each FIXED offer is one face value, so its offer carries `face_value` and is only routed for that value;
  * an offer's face values are gathered on one product. Vouchers that need the customer's details (email, name,
- * address) are not synced; eSIMs and bill payments are not synced yet.
+ * address) are not synced; bill payments are not synced yet.
  *
  * Every purchase uses our reference as Zendit's `transactionId` (unique per account), so a check finds it again. A
  * quantity above one is one purchase per card (`<reference>N<n>`), complete only when all are done.
