@@ -29,6 +29,11 @@
     "docker:up": "docker compose up -d --wait",
     "docker:down": "docker compose down",
     "docker:api": "docker compose --profile api up -d --build --wait",
+    "local:setup": "node docker/local/cli.mjs setup",
+    "local:refresh": "node docker/local/cli.mjs refresh",
+    "local:up": "node docker/local/cli.mjs up",
+    "local:down": "node docker/local/cli.mjs down",
+    "local:logs": "node docker/local/cli.mjs logs",
     "test:docker": "turbo run build --filter=@bitocard/api && npm run test:docker -w @bitocard/api"
   },
   "devDependencies": {

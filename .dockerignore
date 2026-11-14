@@ -8,3 +8,6 @@
 **/src/generated
 .git
 .kombai
+terraform
+mobile
+*.cdr

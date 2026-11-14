@@ -1,0 +1,80 @@
+# The local copy of BitoCard and Udozo, with a copy of the live data (docs/LOCAL_TESTING.md). Separate from
+# docker-compose.yml (the test databases), so the two never share data or ports.
+#   npm run local:setup     create .env.docker (once), then fill in the live database addresses and keys
+#   npm run local:refresh   copy the live databases into the local Postgres (read only on live), then scrub them
+#   npm run local:up        build and start every app; local:logs, local:down
+name: bitocard-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: local
+      POSTGRES_PASSWORD: local
+      POSTGRES_DB: postgres
+    ports: ["5433:5432"]
+    volumes:
+      - local-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U local -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Upstash's REST protocol in front of local Redis, one per product (as each has its own Redis live).
+  redis-http:
+    image: hiett/serverless-redis-http:latest
+    environment: { SRH_MODE: env, SRH_TOKEN: local_token, SRH_CONNECTION_STRING: "redis://redis:6379/0" }
+    depends_on: { redis: { condition: service_healthy } }
+  redis-http-udozo:
+    image: hiett/serverless-redis-http:latest
+    environment: { SRH_MODE: env, SRH_TOKEN: local_token, SRH_CONNECTION_STRING: "redis://redis:6379/1" }
+    depends_on: { redis: { condition: service_healthy } }
+
+  # Both APIs and every web app, built as for production (docker/local/Dockerfile).
+  apps:
+    build:
+      context: .
+      dockerfile: docker/local/Dockerfile
+    image: bitocard-local-apps
+    # Only the local secrets, never the live database addresses.
+    environment:
+      BITOCARD_ENCRYPTION_KEY: ${BITOCARD_ENCRYPTION_KEY:?run npm run local:setup}
+      UDOZO_ENCRYPTION_KEY: ${UDOZO_ENCRYPTION_KEY:?run npm run local:setup}
+      LOCAL_CRON_SECRET: ${LOCAL_CRON_SECRET:?run npm run local:setup}
+      BITOCARD_STORE_SERVER_SECRET: ${BITOCARD_STORE_SERVER_SECRET:?run npm run local:setup}
+      UDOZO_STORE_SERVER_SECRET: ${UDOZO_STORE_SERVER_SECRET:?run npm run local:setup}
+    ports:
+      - "3000-3007:3000-3007"
+      - "3010-3014:3010-3014"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis-http: { condition: service_started }
+      redis-http-udozo: { condition: service_started }
+
+  # Copies the live databases in: npm run local:refresh. Reads live, writes only the local Postgres.
+  refresh:
+    profiles: ["tools"]
+    image: postgres:17-alpine
+    environment:
+      PGHOST: postgres
+      PGUSER: local
+      PGPASSWORD: local
+      SOURCE_BITOCARD_DATABASE_URL: ${SOURCE_BITOCARD_DATABASE_URL:-}
+      SOURCE_UDOZO_DATABASE_URL: ${SOURCE_UDOZO_DATABASE_URL:-}
+    volumes:
+      - ./docker/local:/scripts:ro
+    entrypoint: ["sh", "/scripts/refresh.sh"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+volumes:
+  local-postgres:
