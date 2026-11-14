@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { applyDraftSuggestion, bodyOf, brandMatchKey, modelAfterBrandChange, titleOffer, withModel, withModelNext, emptyDraft, firstIncomplete, fromMinor, listingActions, maxVideoBytes, photoCounts, stepOf, stepProblem, toMinor, videoProblem, videoRefusal } from '../src/lib/listing-form.ts';
+import { applyDraftSuggestion, featuresOnCategoryChange, startingDraft, bodyOf, brandMatchKey, modelAfterBrandChange, titleOffer, withModel, withModelNext, emptyDraft, firstIncomplete, fromMinor, listingActions, maxVideoBytes, photoCounts, stepOf, stepProblem, toMinor, videoProblem, videoRefusal } from '../src/lib/listing-form.ts';
 
 const ready = { ready: 4, uploading: 0, failed: 0 };
 
@@ -174,4 +174,27 @@ test('brand and model follow udozo.com’s rules', () => {
   assert.equal(titleOffer(match, { brand: 'Apple', model: '', ...asks }), null);
   assert.equal(titleOffer(match, { brand: 'Samsung', model: 'Galaxy S23', ...asks }), null);
   assert.equal(titleOffer(null, { brand: '', model: '', ...asks }), null);
+});
+
+test('an ad started from a brand or category page starts with its subcategory and brand', () => {
+  const tree = [{ children: [{ id: 'c-phones', slug: 'mobile-phones', features: [{ key: 'brand' }] }, { id: 'c-cases', slug: 'phone-cases', features: [] }] }];
+  const both = startingDraft(emptyDraft, tree, { category: 'mobile-phones', brand: ' Samsung ' });
+  assert.equal(both.categoryId, 'c-phones');
+  assert.deepEqual(both.features, { brand: 'Samsung' });
+  // A top category's slug chooses nothing; the brand waits for a category that asks for one.
+  const top = startingDraft(emptyDraft, tree, { category: 'phones-tablets', brand: 'Samsung' });
+  assert.equal(top.categoryId, null);
+  assert.deepEqual(top.features, { brand: 'Samsung' });
+  // A category that asks no brand never gets one.
+  assert.deepEqual(startingDraft(emptyDraft, tree, { category: 'phone-cases', brand: 'Samsung' }).features, {});
+  assert.deepEqual(startingDraft(emptyDraft, tree, {}), emptyDraft);
+});
+
+test('choosing a category keeps only a brand filled in before any category, where the new one asks for it', () => {
+  const asks = { id: 'c-phones', features: [{ key: 'brand' }] };
+  const none = { id: 'c-cases', features: [] };
+  assert.deepEqual(featuresOnCategoryChange({ categoryId: null, features: { brand: 'Samsung' } }, asks), { brand: 'Samsung' });
+  assert.deepEqual(featuresOnCategoryChange({ categoryId: null, features: { brand: 'Samsung' } }, none), {});
+  assert.deepEqual(featuresOnCategoryChange({ categoryId: 'c-cases', features: { brand: 'Samsung', colour: 'red' } }, asks), {});
+  assert.deepEqual(featuresOnCategoryChange({ categoryId: 'c-phones', features: { brand: 'Samsung', storage: 128 } }, asks), { brand: 'Samsung', storage: 128 });
 });

@@ -183,3 +183,15 @@ test('a request shows the sellers’ answers, and I found it closes it', async (
   await waitFor(() => expect(screen.queryByRole('button', { name: 'I found it' })).toBeNull());
   expect(screen.getByText('WR-000012 · Found it')).toBeTruthy();
 });
+
+test('opened from a brand or category page, the words and category are filled in', async () => {
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ words: 'Toyota', category: 'cars' });
+  const posted = jest.fn(() => ({ ...request({ responses: 0 }), matches: [] }));
+  answers({ 'GET /v1/classifieds/channels': channels(true), 'GET /v1/classifieds/categories': categories, 'GET /v1/classifieds/areas': areas, 'POST /v1/classifieds/wanted': posted });
+  await renderScreen(<NewWantedScreen />);
+  expect((await screen.findByLabelText('What are you looking for?')).props.value).toBe('Toyota');
+  expect(await screen.findByLabelText('Category: Cars')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Post request' }));
+  await waitFor(() => expect(posted).toHaveBeenCalledWith(expect.objectContaining({ words: 'Toyota', category_id: 'c-cars' })));
+  (useLocalSearchParams as jest.Mock).mockReturnValue({});
+});

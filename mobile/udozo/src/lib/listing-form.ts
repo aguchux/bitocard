@@ -465,3 +465,31 @@ export function titleOffer(match: ShopModelMatch | null, current: { brand: strin
   if (!brand && !model) return null;
   return { brand, model, text: [brand?.name ?? (model ? current.brand.trim() : ''), model].filter(Boolean).join(' ') };
 }
+
+// ---- Started from a brand's or a category's page ----
+
+type CategoryTree = { children: { id: string; slug: string; features: { key: string }[] }[] }[];
+
+/**
+ * A new ad opened from a brand's or a category's page (`/post/new?category=<slug>&brand=<name>`): the subcategory with
+ * that slug chosen (a top category's slug chooses nothing: the seller picks which of its subcategories), and the brand
+ * filled in where the category asks for one, or kept until a category that does is chosen.
+ */
+export function startingDraft(draft: ListingDraft, tree: CategoryTree, start: { category?: string; brand?: string }): ListingDraft {
+  const brand = start.brand?.trim() ?? '';
+  let child: CategoryTree[number]['children'][number] | null = null;
+  for (const top of tree) for (const item of top.children) if (start.category && item.slug === start.category) child = item;
+  const asksBrand = !child || child.features.some(feature => feature.key === brandFeatureKey);
+  return { ...draft, categoryId: child?.id ?? draft.categoryId, features: brand && asksBrand ? { ...draft.features, [brandFeatureKey]: brand } : draft.features };
+}
+
+/**
+ * The details kept when the category changes: none (they were the old category's), except a brand filled in before any
+ * category was chosen (an ad started from a brand's page), kept where the new category asks for a brand.
+ */
+export function featuresOnCategoryChange(draft: Pick<ListingDraft, 'categoryId' | 'features'>, next: { id: string; features: { key: string }[] } | null): Record<string, FeatureValue> {
+  if (next && next.id === draft.categoryId) return draft.features;
+  const brand = draft.features[brandFeatureKey];
+  if (draft.categoryId === null && typeof brand === 'string' && brand.trim() && next?.features.some(feature => feature.key === brandFeatureKey)) return { [brandFeatureKey]: brand };
+  return {};
+}

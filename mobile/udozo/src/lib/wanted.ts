@@ -68,6 +68,17 @@ export type WantedCondition = (typeof wantedConditionChoices)[number]['value'];
 export type WantedForm = { words: string; categoryId: string | null; stateId: string | null; areaId: string | null; budget: string; condition: WantedCondition; details: string };
 export const emptyWanted: WantedForm = { words: '', categoryId: null, stateId: null, areaId: null, budget: '', condition: 'any', details: '' };
 
+/**
+ * A request opened from a brand's or a category's page (`/wanted/new?words=<brand>&category=<slug>`): the words filled
+ * in (at most 80 characters), and the subcategory with that slug chosen; a top category's slug chooses nothing, as the
+ * request needs one of its subcategories.
+ */
+export function startingWanted(form: WantedForm, tree: { children: { id: string; slug: string }[] }[], start: { words?: string; category?: string }): WantedForm {
+  let categoryId = form.categoryId;
+  for (const top of tree) for (const child of top.children) if (start.category && child.slug === start.category) categoryId = child.id;
+  return { ...form, words: start.words ? start.words.trim().slice(0, 80) : form.words, categoryId };
+}
+
 export type WantedProblem = { message: string; param: string };
 
 /** The body `POST /v1/classifieds/wanted` takes, the budget typed in major units and sent in minor units; or what is missing. */

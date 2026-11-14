@@ -46,6 +46,8 @@ import {
   withModelNext,
   draftOf,
   emptyDraft,
+  featuresOnCategoryChange,
+  startingDraft,
   firstIncomplete,
   lastStep,
   maxPhotos,
@@ -93,7 +95,8 @@ type Centre = { id: string; number: string; name: string; state: { id: string; n
  * edited).
  */
 export default function PostScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // A new ad may start with a category (a subcategory's slug) and a brand's name, from a brand's or a category's page.
+  const { id, category: startCategory, brand: startBrand } = useLocalSearchParams<{ id: string; category?: string; brand?: string }>();
   const theme = useTheme();
   const queries = useQueryClient();
   const ask = useDialog();
@@ -163,6 +166,13 @@ export default function PostScreen() {
     return offersFor({ resale: Boolean(resaleOpen.data?.open), pos: posRoom, connect: Boolean(market?.connect_shipping), auctions: Boolean(market?.auctions), shopOnly }, form);
   };
 
+  // A new ad from a brand's or category's page starts with them, once the categories are in (set while rendering).
+  const [seeded, setSeeded] = useState(!(id === 'new' && (startCategory || startBrand)));
+  if (!seeded && (!startCategory || tree.data)) {
+    setSeeded(true);
+    setDraft(current => startingDraft(current ?? emptyDraft, tree.data?.data ?? [], { category: startCategory, brand: startBrand }));
+  }
+
   // A saved listing opens at its first unfinished step, once (set while rendering, as React suggests for derived state).
   if (!draft && listing.data) {
     const made = draftOf(listing.data);
@@ -215,7 +225,7 @@ export default function PostScreen() {
       </SafeAreaView>
     );
   }
-  if (!draft || (listingId && listing.isPending)) return <Loading />;
+  if (!draft || !seeded || (listingId && listing.isPending)) return <Loading />;
   const offers = offersOf(draft);
   const auction = offers.auctions && draft.saleMethod === 'auction';
 
@@ -696,7 +706,7 @@ export default function PostScreen() {
         )}
       </View>
 
-      <CategoryPicker visible={picker === 'category'} onClose={() => setPicker(null)} categories={categories} selected={draft.categoryId} onChoose={categoryId => change({ categoryId, features: categoryId === draft.categoryId ? draft.features : {} })} />
+      <CategoryPicker visible={picker === 'category'} onClose={() => setPicker(null)} categories={categories} selected={draft.categoryId} onChoose={categoryId => change({ categoryId, features: featuresOnCategoryChange(draft, childOf(categories, categoryId)) })} />
       <BrandPicker visible={picker === 'brand'} onClose={() => setPicker(null)} categoryId={draft.categoryId} country={country} value={brand} onPick={picked => setBrand(picked.name)} onUse={setBrand} />
       <ModelPicker
         visible={picker === 'model'}
@@ -878,6 +888,12 @@ function ConnectShipping({ draft, change, centres, currency, problem }: {
       ) : null}
     </Card>
   );
+}
+
+/** A subcategory by its id, with the details it asks. */
+function childOf(categories: ShopTopCategory[], id: string) {
+  for (const top of categories) for (const child of top.children) if (child.id === id) return child;
+  return null;
 }
 
 /** One of the category's details: text or a number typed, a choice, yes or no, or the brand and model from their lists. */

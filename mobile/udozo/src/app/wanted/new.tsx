@@ -1,6 +1,6 @@
 import { regionWord, type ShopState, type ShopTopCategory } from '@shared/classifieds';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { CheckCircle2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -16,7 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useWantedOpen } from '@/hooks/use-wanted';
 import { useAccount } from '@/lib/account';
 import { api, ApiError } from '@/lib/api';
-import { emptyWanted, wantedBody, wantedConditionChoices, wantedRefusal, wantedToldText, type WantedCreated, type WantedForm, type WantedProblem } from '@/lib/wanted';
+import { emptyWanted, startingWanted, wantedBody, wantedConditionChoices, wantedRefusal, wantedToldText, type WantedCreated, type WantedForm, type WantedProblem } from '@/lib/wanted';
 
 /**
  * Post a request (udozo.com's /<cc>/wanted/new): a signed-in buyer says what they need, its category, where (anywhere,
@@ -26,6 +26,8 @@ import { emptyWanted, wantedBody, wantedConditionChoices, wantedRefusal, wantedT
 export default function NewWantedScreen() {
   const theme = useTheme();
   const queries = useQueryClient();
+  // Opened from a brand's or a category's page: the words and a subcategory's slug to start with.
+  const start = useLocalSearchParams<{ words?: string; category?: string }>();
   const { customer, pending } = useAccount();
   const country = customer?.country ?? null;
   const open = useWantedOpen(country);
@@ -35,6 +37,12 @@ export default function NewWantedScreen() {
   const [form, setForm] = useState<WantedForm>(emptyWanted);
   const [picker, setPicker] = useState<'category' | 'place' | null>(null);
   const [problem, setProblem] = useState<WantedProblem | null>(null);
+  // Filled in once, when the categories are in (set while rendering, as React suggests for derived state).
+  const [seeded, setSeeded] = useState(!(start.words || start.category));
+  if (!seeded && (!start.category || tree.data)) {
+    setSeeded(true);
+    setForm(current => startingWanted(current, tree.data?.data ?? [], { words: start.words, category: start.category }));
+  }
   const post = useMutation({
     mutationFn: (body: Record<string, unknown>) => api<WantedCreated>('/v1/classifieds/wanted', { body }),
     onSuccess: () => queries.invalidateQueries({ queryKey: ['wanted'] }),

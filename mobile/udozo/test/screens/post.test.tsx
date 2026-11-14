@@ -278,3 +278,22 @@ test('brand and model come from their lists, a typed one is kept, and the title 
   await fireEvent.press(await screen.findByText('Use “iPhone 15 Pro Max Gold”'));
   expect(screen.getByLabelText('Model: iPhone 15 Pro Max Gold')).toBeTruthy();
 });
+
+test('opened from a brand’s page, the subcategory and brand are filled in and saved with the first step', async () => {
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'new', category: 'mobile-phones', brand: 'Samsung' });
+  const withBrand = { data: [{ ...categories.data[0], children: [{ ...categories.data[0].children[0], features: [{ key: 'brand', name: 'Brand', data_type: 'text', unit: null, choices: [], placeholder: null, filter: true }] }] }] };
+  const created: unknown[] = [];
+  answers({
+    ...base,
+    'GET /v1/classifieds/categories': withBrand,
+    'GET /v1/classifieds/terms': { version: '2026-11-10', path: '/legal/terms', accepted: true, previous_version: null },
+    'POST /v1/classifieds/listings': (body: unknown) => (created.push(body), listing({ photos: [] })),
+    'GET /v1/classifieds/me/listings/l1': listing({ photos: [] }),
+  });
+  await renderScreen(<PostScreen />);
+  expect(await screen.findByLabelText('Category: Mobile phones · Phones and tablets')).toBeTruthy();
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Galaxy S23 Ultra');
+  await fireEvent.press(screen.getByText('Next'));
+  await waitFor(() => expect(created).toHaveLength(1));
+  expect(created[0]).toMatchObject({ title: 'Galaxy S23 Ultra', category_id: 'c-phones', features: [{ key: 'brand', value: 'Samsung' }] });
+});

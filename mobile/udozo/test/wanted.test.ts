@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { emptyWanted, wantedBody, wantedRefusal, wantedToldText, wantedWhen } from '../src/lib/wanted.ts';
+import { emptyWanted, startingWanted, wantedBody, wantedRefusal, wantedToldText, wantedWhen } from '../src/lib/wanted.ts';
 
 const form = { ...emptyWanted, words: '  Toyota   Corolla 2012 ', categoryId: 'cat-1' };
 
@@ -37,4 +37,12 @@ test('how long a request has, or how it ended, and who was told', () => {
   assert.equal(wantedWhen({ status: 'fulfilled', expires_at: '2026-11-16T09:00:00Z' }, now), 'Found it');
   assert.equal(wantedToldText(1), 'We told 1 seller who sell this. Their answers come to your chats.');
   assert.match(wantedToldText(0), /as they post/);
+});
+
+test('a request started from a brand or category page starts with its words and subcategory', () => {
+  const tree = [{ children: [{ id: 'c-cars', slug: 'cars' }] }];
+  assert.deepEqual(startingWanted(emptyWanted, tree, { words: ' Toyota ', category: 'cars' }), { ...emptyWanted, words: 'Toyota', categoryId: 'c-cars' });
+  // A top category's slug chooses nothing: a request needs one of its subcategories.
+  assert.deepEqual(startingWanted(emptyWanted, tree, { category: 'vehicles' }), emptyWanted);
+  assert.equal(startingWanted(emptyWanted, tree, { words: 'x'.repeat(90) }).words.length, 80);
 });

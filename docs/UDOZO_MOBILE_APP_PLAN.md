@@ -681,6 +681,20 @@ Views of listings opened in the app are not counted yet.
   loaded); then the listing's viewer opens its chat or the message box (`MessageSheet`, shared with the listing's bar),
   or rings the seller, or says why not in Udozo's dialog (`whyNot`). Hidden where no listing takes them; signed out
   they ask to sign in; on one's own page **Edit profile** instead (`test/screens/seller.test.tsx`).
+- **Brand and category pages open the same way** (14 November 2026, the owner's request): the banner, its fades,
+  floating buttons, chips and light status bar are `src/components/page-banner.tsx` (`PageBanner`, `FloatingBar`,
+  `RoundButton`, `BannerChip`, `BannerTitle`, `useLightStatusBar`), shared with the seller's page. **A brand**
+  (`src/app/brand/[slug].tsx`): its banner, else a gradient in its own colour darkened until white words read
+  (`readable`), its logo on a white tile (logos are drawn in the brand's colour; initials on that colour), the name, "N
+  for sale from M sellers" and the market as a chip. **A category** (`src/app/category/[slug].tsx`): its top category's
+  banner, else the theme's gradient, a top category's spotlight image on a white circle (a subcategory's icon), the name
+  and how many are for sale, then its subcategories as chips. Both float Back, then **Post an ad**
+  (`/post/new?category=<slug>&brand=<name>`: the category only for a subcategory, or a brand selling in exactly one;
+  `startingDraft` in `src/lib/listing-form.ts` fills them in, and a brand filled in before any category is kept when a
+  category asking for one is chosen, `featuresOnCategoryChange`), **Search** (the Search tab with `brand` and
+  `brand_name`, shown as a removable Brand chip, or `category`) and, where wanted requests are open in the market,
+  **Request an ad** (`/wanted/new?words=<brand>` or `?category=<slug>`, `startingWanted` in `src/lib/wanted.ts`);
+  signed out, posting and asking sign in first (`test/screens/brand.test.tsx`, `category.test.tsx`, `search.test.tsx`).
 
 ## Testing
 
