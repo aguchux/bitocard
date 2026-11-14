@@ -7,14 +7,14 @@ name: bitocard-local
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: local
       POSTGRES_PASSWORD: local
       POSTGRES_DB: postgres
     ports: ["5433:5432"]
     volumes:
-      - local-postgres:/var/lib/postgresql/data
+      - local-postgres:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U local -d postgres"]
       interval: 2s
@@ -63,7 +63,7 @@ services:
   # Copies the live databases in: npm run local:refresh. Reads live, writes only the local Postgres.
   refresh:
     profiles: ["tools"]
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       PGHOST: postgres
       PGUSER: local
