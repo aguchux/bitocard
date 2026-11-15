@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ActionCard } from "./gift-card-actions";
 import { ArrowDownToLine, ArrowUpFromLine, Smartphone, Wifi } from "lucide-react";
 
 type Tile = { label: string; hint: string; href: string; icon: typeof Smartphone; exchange?: boolean };
@@ -54,34 +53,10 @@ export function MobileActions({ exchangeOpen }: { exchangeOpen: boolean }) {
   );
 }
 
-const homeCards = [
+/** The same four as cards on Home (`HomeActions`), with a longer line each. */
+export const homeCards = [
   { ...tiles[0], tile: "bg-sky-400", text: "Top up any number in your country. We find the network for you." },
   { ...tiles[1], tile: "bg-teal-400", text: "Data bundles for any number, delivered in moments." },
   { ...tiles[2], tile: "bg-amber-400", text: "Send airtime you will not use to our number and get wallet money for it." },
   { ...tiles[3], tile: "bg-violet-400", text: "Airtime other customers sold us, for less than its value, sent within the hour." },
 ];
-
-/**
- * Airtime and data on the customer's Home, beside gift cards: the same four actions as the Mobile catalogue. Topping
- * up follows the Mobile group being on sale (`topUpOpen`); the exchange's two say Soon until it is open.
- */
-export function AirtimeActions({ topUpOpen, exchangeOpen }: { topUpOpen: boolean; exchangeOpen: boolean }) {
-  return (
-    <section aria-labelledby="airtime-data">
-      <h2 id="airtime-data" className="text-xl font-extrabold tracking-tight text-navy-900">
-        Airtime and data
-      </h2>
-      <p className="mt-1 mb-3 text-slate-500">I want to</p>
-      <ul className="grid gap-3 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
-        {homeCards.map(card => {
-          const open = card.exchange ? exchangeOpen : topUpOpen;
-          return (
-            <li key={card.label}>
-              <ActionCard icon={card.icon} tile={card.tile} title={card.label} text={card.text} href={open ? card.href : undefined} soon={!open} />
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}

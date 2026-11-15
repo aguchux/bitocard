@@ -2,14 +2,16 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
-import { GiftCardActions, giftCardCount } from "@/components/app/gift-card-actions";
+import { giftCardCount } from "@/components/app/gift-card-actions";
+import { HomeActions } from "@/components/app/home-actions";
 import { ProductCard } from "@/components/store/product-card";
 
 // Home's Gift cards choice: Buy opens the catalogue's gift cards with how many are on sale; Sell opens them too where
 // selling is open in the customer's country (they sell from a card's page), and says Soon, linking nowhere, elsewhere.
 const group = (onSale: boolean, products: number) =>
   ({ key: "gift-cards", label: "Gift cards", on_sale: onSale, brands: [], categories: [{ object: "store_category", category: "gift_cards", label: "Gift cards", group: "gift-cards", icon_url: null, image_url: null, products, on_sale: onSale }] }) as unknown as StoreNavigationGroup;
-const render = (value: StoreNavigationGroup | undefined, sellOpen = false) => renderToStaticMarkup(createElement(GiftCardActions, { group: value, sellOpen }));
+// Airtime and data closed here, so only the gift cards can link.
+const render = (value: StoreNavigationGroup | undefined, sellOpen = false) => renderToStaticMarkup(createElement(HomeActions, { giftCards: value, sellOpen, topUpOpen: false, exchangeOpen: false }));
 
 describe("gift card actions", () => {
   test("buy links to the gift cards with the real count; sell is marked Soon", () => {
@@ -24,7 +26,7 @@ describe("gift card actions", () => {
     const html = render(group(true, 3631), true);
     expect(html).toContain('href="/account/catalog?group=gift-cards"');
     expect(html).toContain('href="/account/catalog?group=gift-cards&amp;sell=1"');
-    expect(html).not.toContain(">Soon<");
+    expect(html.match(/>Soon</g)).toHaveLength(4);
     expect(html).toContain("once the card is accepted");
   });
 
@@ -32,7 +34,7 @@ describe("gift card actions", () => {
     for (const value of [group(false, 0), undefined]) {
       const html = render(value);
       expect(html).not.toContain("<a ");
-      expect(html.match(/>Soon</g)).toHaveLength(2);
+      expect(html.match(/>Soon</g)).toHaveLength(6);
     }
     expect(giftCardCount(undefined)).toBe(0);
   });

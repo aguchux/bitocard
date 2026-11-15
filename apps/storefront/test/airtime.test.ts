@@ -12,7 +12,8 @@ const redirect = vi.fn((url: string) => {
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url), useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { AirtimeActions, MobileActions } = await import("@/components/app/mobile-actions");
+const { MobileActions } = await import("@/components/app/mobile-actions");
+const { HomeActions } = await import("@/components/app/home-actions");
 const { AirtimePoolBoard } = await import("@/components/app/airtime/pool-board");
 const { buyAirtime, startAirtimeSale } = await import("@/lib/airtime-actions");
 const { BuyAirtimeForm, SellAirtimeForm, SendFromWarning } = await import("@/components/app/airtime/trade-forms");
@@ -85,17 +86,20 @@ describe("the Mobile catalogue's tiles", () => {
 });
 
 describe("Home's airtime and data", () => {
-  test("the four actions beside gift cards; the exchange's two say Soon until it is open", () => {
-    const closed = renderToStaticMarkup(createElement(AirtimeActions, { topUpOpen: true, exchangeOpen: false }));
+  test("six equal actions, gift cards then airtime and data: three across on desktops, one sliding row on phones", () => {
+    const closed = renderToStaticMarkup(createElement(HomeActions, { giftCards: undefined, sellOpen: false, topUpOpen: true, exchangeOpen: false }));
+    expect(closed.match(/<li /g)).toHaveLength(6);
+    expect(closed).toContain("lg:grid-cols-3");
+    expect(closed).toContain("snap-x");
     for (const title of ["Buy airtime", "Buy data", "Sell unused airtime", "Buy unused airtime"]) expect(closed).toContain(title);
     expect(closed).toContain('href="/account/topup"');
     expect(closed).toContain('href="/account/topup?kind=data"');
     expect(closed).not.toContain('href="/account/airtime/sell"');
-    expect(closed.match(/Soon/g)?.length).toBe(2);
-    const open = renderToStaticMarkup(createElement(AirtimeActions, { topUpOpen: true, exchangeOpen: true }));
+    expect(closed.match(/Soon/g)?.length).toBe(4);
+    const open = renderToStaticMarkup(createElement(HomeActions, { giftCards: undefined, sellOpen: false, topUpOpen: true, exchangeOpen: true }));
     expect(open).toContain('href="/account/airtime/sell"');
     expect(open).toContain('href="/account/airtime/buy"');
-    expect(open).not.toContain("Soon");
+    expect(open.match(/Soon/g)?.length).toBe(2);
   });
 });
 

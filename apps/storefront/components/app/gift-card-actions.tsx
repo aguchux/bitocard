@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Gift, HandCoins, type LucideIcon } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 
 /** The catalogue's gift card group. */
@@ -36,42 +36,5 @@ export function ActionCard({ icon: Icon, tile, title, text, href, soon }: { icon
     <div className={className} aria-disabled="true">
       {body}
     </div>
-  );
-}
-
-/**
- * Gift cards on the customer's Home: "I want to" buy them (the catalogue's gift cards) or sell them. Selling happens
- * on each card's page (its Sell tab), so Sell opens the gift cards where selling is open in the customer's country;
- * elsewhere it says Soon and links nowhere.
- */
-export function GiftCardActions({ group, sellOpen = false }: { group: StoreNavigationGroup | undefined; sellOpen?: boolean }) {
-  const count = giftCardCount(group);
-  const onSale = Boolean(group?.on_sale) && count > 0;
-  return (
-    <section aria-labelledby="gift-cards">
-      <h2 id="gift-cards" className="text-xl font-extrabold tracking-tight text-navy-900">
-        Gift cards
-      </h2>
-      <p className="mt-1 mb-3 text-slate-500">I want to</p>
-      <ul className="grid gap-3 sm:grid-cols-2 md:gap-4 xl:max-w-4xl">
-        <li>
-          <ActionCard
-            icon={Gift}
-            tile="bg-indigo-400"
-            title="Buy gift cards"
-            text={onSale ? `Choose from ${count.toLocaleString("en-GB")} local and international gift cards, delivered to your account.` : "Gift cards are coming to your country soon."}
-            href={onSale ? `/account/catalog?group=${giftCardGroup}` : undefined}
-            soon={!onSale}
-          />
-        </li>
-        <li>
-          {sellOpen ? (
-            <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Choose your card, then Sell. The money goes into your wallet once the card is accepted." href={sellCatalogHref} />
-          ) : (
-            <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Sell your unused local and international gift cards for money in your wallet." soon />
-          )}
-        </li>
-      </ul>
-    </section>
   );
 }

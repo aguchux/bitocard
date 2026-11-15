@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
-import { GiftCardActions, giftCardGroup } from "@/components/app/gift-card-actions";
-import { AirtimeActions } from "@/components/app/mobile-actions";
+import { giftCardGroup } from "@/components/app/gift-card-actions";
+import { HomeActions } from "@/components/app/home-actions";
 import { SpinDialog } from "@/components/app/spin-dialog";
 import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
@@ -95,9 +95,7 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
         </section>
       ) : null}
 
-      <GiftCardActions group={navigation.groups.find(group => group.key === giftCardGroup)} sellOpen={sellOpen} />
-
-      <AirtimeActions topUpOpen={topUpOpen} exchangeOpen={exchangeOpen} />
+      <HomeActions giftCards={navigation.groups.find(group => group.key === giftCardGroup)} sellOpen={sellOpen} topUpOpen={topUpOpen} exchangeOpen={exchangeOpen} />
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />
