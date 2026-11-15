@@ -153,8 +153,13 @@ export class GiftCardSalesService {
     if (reason) return empty;
     const where: Record<string, unknown> = { mode: this.mode(), provider: 'prestmit', enabled: true, available: true, brand: { not: null } };
     if (productKey) {
-      const [category, productCountry, brand] = productKey.split(':');
-      if (category !== 'gift_cards' || !productCountry || !brand) return { ...empty, reason: 'not_sellable' };
+      const [category, keyCountry, keyBrand] = productKey.split(':');
+      if (category !== 'gift_cards' || !keyCountry || !keyBrand) return { ...empty, reason: 'not_sellable' };
+      // The product's own brand and country, not the key's: synced keys often carry a variant there
+      // (`gift_cards:US:amazon-us` is brand `amazon`).
+      const product = await this.prisma.product.findUnique({ where: { key: productKey }, select: { brand: true, country: true } });
+      const brand = product?.brand || keyBrand;
+      const productCountry = product?.country || keyCountry;
       const entry = registryBrand(brand)?.slug;
       where.brand = { in: [...new Set([brand, ...(entry ? [entry] : [])])] };
       where.country = productCountry === 'WW' ? null : productCountry;

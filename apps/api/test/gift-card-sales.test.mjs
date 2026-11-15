@@ -165,6 +165,9 @@ describe('selling gift cards in the sandbox', () => {
     assert.deepEqual([offer.rate, offer.currency, offer.minimum, offer.form], [114_000, 'NGN', 25, 'both']);
     assert.doesNotMatch(JSON.stringify(open), /prestmit|1200/i);
     assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:GB:apple&country=NG`).then(res => res.json())).offers[0].name, 'iTunes UK');
+    // A synced key with a variant where the brand would be still finds the card by the product's own brand.
+    await prisma.product.create({ data: { key: 'gift_cards:US:amazon-us', category: 'gift_cards', country: 'US', brand: 'amazon', name: 'Amazon US', faceCurrency: 'USD', denominationType: 'range', minValueMinor: 500n, maxValueMinor: 50_000n } });
+    assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon-us&country=NG`).then(res => res.json())).offers[0]?.name, 'Amazon (USA) E-code');
     // A country store sells them too; a reseller's store never does.
     assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ng`).then(res => res.json())).available, true);
     const reseller = await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ada-digital`).then(res => res.json());
