@@ -270,8 +270,9 @@ export class PushService {
         const { push, locked } = pushDefault(type);
         return locked || (preferences.find(item => ownerKey(item) === ownerKey(row) && item.type === type)?.push ?? push);
       };
-      // A customer's device only gets their notifications from the store it subscribed on.
-      const matches = (row: Notification, device: (typeof devices)[number]) => ownerKey(device) === ownerKey(row) && (!row.customerId || device.storeId === row.storeId);
+      // A customer's account belongs to one store (bitocard.com's is shared by its country stores), so their browsers
+      // get every notice of theirs, whichever of those stores sent it.
+      const matches = (row: Notification, device: (typeof devices)[number]) => ownerKey(device) === ownerKey(row);
       const data = notifications.filter(pushed).flatMap(row => devices.filter(device => matches(row, device)).map(device => ({ notificationId: row.id, deviceId: device.id })));
       if (data.length === 0) return;
       const created = await this.prisma.pushDelivery.createManyAndReturn({ data, skipDuplicates: true, select: { id: true } });
@@ -338,12 +339,15 @@ export class PushService {
   }
 
   /**
-   * Whether the session that registered the device is still signed in. Staff sessions are in `sessions`. Storefront
-   * customers have no sign-in yet (it comes with hosted checkout): until it exists and is checked here, their devices
-   * are treated as signed out, so nothing is ever pushed to a customer device that could not be verified.
+   * Whether the session that registered the device is still signed in: staff sessions in `sessions`, store customers'
+   * in `customer_sessions` (the same customer's, not revoked, not expired). Signed out, nothing is pushed.
    */
   private async signedIn(device: Device, now: Date) {
-    if (device.audience === 'customer') return false;
+    if (device.audience === 'customer') {
+      if (!device.customerId) return false;
+      const session = await this.prisma.customerSession.findUnique({ where: { id: device.sessionId }, select: { revokedAt: true, expiresAt: true, customerId: true } });
+      return Boolean(session && !session.revokedAt && session.expiresAt > now && session.customerId === device.customerId);
+    }
     const session = await this.prisma.session.findUnique({ where: { id: device.sessionId }, select: { revokedAt: true, expiresAt: true, userId: true } });
     return Boolean(session && !session.revokedAt && session.expiresAt > now && session.userId === device.userId);
   }
@@ -351,7 +355,9 @@ export class PushService {
   /** The notification icon: Bitocard's app icon (public/icon-192.png) for staff; for customers their store's logo (never BitoCard's brand), if any. */
   private async iconFor(storeId: string | null) {
     if (!storeId) return '/icon-192.png';
-    return (await this.prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true } }))?.logoUrl ?? null;
+    const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true, reseller: { select: { house: true } } } });
+    // BitoCard's own stores (bitocard.com and its country stores) wear BitoCard's icon; a reseller's never does.
+    return store?.logoUrl ?? (store?.reseller.house ? '/icon-192.png' : null);
   }
 
   /** Keeps the device's record: last push, failures; drops it when the push service says it is gone or keeps refusing. */

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createECDH, createDecipheriv, createPublicKey, hkdfSync, randomBytes, randomUUID, verify } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import webpush from 'web-push';
-import { adminClient, fakeService, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 const vapid = webpush.generateVAPIDKeys();
 let server;
@@ -284,7 +284,42 @@ describe('admins', () => {
   });
 });
 
-describe('storefront customers (baseline)', () => {
+let customerCount = 0;
+/** A bitocard.com customer, signed up, email confirmed and signed in, calling the API as the store's server does. */
+async function signedInCustomer() {
+  let token = null;
+  const request = async (method, path, body, headers = {}) => {
+    const res = await fetch(`${server.base}${path}`, {
+      method,
+      headers: {
+        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { 'bitocard-customer-session': token } : {}),
+        ...(method === 'POST' ? { 'idempotency-key': `push-${Date.now()}-${Math.random()}` } : {}),
+        ...headers,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    const json = text ? JSON.parse(text) : null;
+    if (json?.session?.token) token = json.session.token;
+    return { status: res.status, json };
+  };
+  const email = `pushed${(customerCount += 1)}-${Date.now()}@example.com`;
+  const client = {
+    get: path => request('GET', path),
+    post: (path, body = {}, headers) => request('POST', path, body, headers),
+    put: (path, body) => request('PUT', path, body),
+    del: path => request('DELETE', path),
+  };
+  const signup = await client.post('/v1/store/account/signup', { name: 'Ada Shopper', email, password: 'correct horse battery', country: 'NG' });
+  assert.equal(signup.status, 201, JSON.stringify(signup.json));
+  assert.equal((await client.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+  client.id = signup.json.customer.id;
+  client.storeId = (await prisma.customer.findUniqueOrThrow({ where: { id: client.id } })).storeId;
+  return client;
+}
+
+describe('storefront customers', () => {
   /** A store and a customer of it. */
   async function storeCustomer(logoUrl = null) {
     const owner = await resellerClient(server);
@@ -293,7 +328,7 @@ describe('storefront customers (baseline)', () => {
     return { owner, store, customerId: customer.id };
   }
 
-  test('customer devices and preferences are their own; until customer sign-in exists nothing is pushed to them', async () => {
+  test('customer devices and preferences are their own; a device whose session is unknown is dropped', async () => {
     const { PushService } = await import('../dist/notifications/push.service.js');
     const push = server.app.get(PushService);
     const { owner, store, customerId } = await storeCustomer('https://cdn.example/ada.png');
@@ -313,24 +348,49 @@ describe('storefront customers (baseline)', () => {
     await assert.rejects(push.setPreference(caller, 'customer.security.email_changed', false), /always pushed/);
     assert.equal((await push.setPreference(caller, 'customer.order.refunded', false)).push, false);
 
-    // Queued like any other, but dropped instead of pushed: no customer session can be checked yet.
+    // Its session is not a real customer session: dropped instead of pushed.
     await inbox.customer({ customerId, storeId: store.id }, 'customer.order.completed', content('order-c1', { link: '/account/orders/o1' }));
     await until(async () => (await prisma.device.count({ where: { id: device.id } })) === 0, 'the unverifiable device to be dropped');
     assert.equal(received(sub).length, 0);
+    await assert.rejects(push.register({ ...caller, storeId: undefined }, sub.json), /register on their store/);
   });
 
-  test('a customer device only matches its own store', async () => {
-    const { PushService } = await import('../dist/notifications/push.service.js');
-    const push = server.app.get(PushService);
-    const { store, customerId } = await storeCustomer();
-    const other = await storeCustomer();
-    const caller = { owner: { customerId }, audience: 'customer', sessionId: randomUUID(), storeId: store.id };
-    const device = await push.register(caller, browserSubscription().json, chrome['user-agent']);
-    // The same customer ID at another store (accounts are per store) is a different inbox and device set.
-    await inbox.customer({ customerId, storeId: other.store.id }, 'customer.order.failed', content('elsewhere'));
-    await new Promise(resolve => setTimeout(resolve, 200));
-    assert.equal(await prisma.pushDelivery.count({ where: { deviceId: device.id } }), 0);
-    await assert.rejects(push.register({ ...caller, storeId: undefined }, browserSubscription().json), /register on their store/);
+  test('a signed-in customer reads their inbox and is pushed while signed in, whichever of their stores sent it', async () => {
+    const shopper = await signedInCustomer();
+    assert.deepEqual((await shopper.get('/v1/store/account/devices/push-settings')).json, { object: 'push_settings', enabled: true, public_key: vapid.publicKey });
+    const sub = browserSubscription();
+    const added = await shopper.post('/v1/store/account/devices', sub.json, { 'bitocard-client-agent': chrome['user-agent'] });
+    assert.equal(added.status, 201, JSON.stringify(added.json));
+    assert.deepEqual([added.json.label, added.json.current], ['Chrome on Windows', true]);
+
+    // A notice sent from another of BitoCard's own stores reaches the browser, with BitoCard's icon.
+    const house = await prisma.reseller.findFirstOrThrow({ where: { house: true } });
+    const countryStore = await prisma.store.create({ data: { resellerId: house.id, name: 'BitoCard Ghana', subdomain: `gh${Date.now()}`.slice(0, 20) } });
+    await inbox.customer({ customerId: shopper.id, storeId: countryStore.id }, 'customer.order.completed', content('order-country', { link: '/account/orders/o1' }));
+    await until(async () => received(sub).length === 1, 'the customer push');
+    const [pushed] = await pushes(sub);
+    assert.deepEqual([pushed.payload.title, pushed.payload.link, pushed.payload.account, pushed.payload.icon], ['Title order-country', '/account/orders/o1', null, '/icon-192.png']);
+
+    const list = await shopper.get('/v1/store/account/notifications');
+    assert.equal(list.json.data.length, 1);
+    assert.equal((await shopper.get('/v1/store/account/notifications/unread-count')).json.count, 1);
+    assert.equal((await shopper.post(`/v1/store/account/notifications/${list.json.data[0].id}/read`)).status, 200);
+    assert.equal((await shopper.get('/v1/store/account/notifications/unread-count')).json.count, 0);
+    const preferences = (await shopper.get('/v1/store/account/notification-preferences')).json.data;
+    assert.ok(preferences.length && preferences.every(item => item.type.startsWith('customer.')));
+    assert.equal((await shopper.put('/v1/store/account/notification-preferences/customer.order.refunded', { push: false })).json.push, false);
+    assert.equal((await shopper.put('/v1/store/account/notification-preferences/admin.payout.failed', { push: false })).status, 404);
+
+    // Another customer sees none of it; signed out, nothing more is pushed and the browser is forgotten.
+    const other = await signedInCustomer();
+    assert.equal((await other.get('/v1/store/account/notifications')).json.data.length, 0);
+    assert.equal((await other.post(`/v1/store/account/notifications/${list.json.data[0].id}/read`)).status, 404);
+    assert.equal((await other.del(`/v1/store/account/devices/${added.json.id}`)).status, 404);
+    assert.ok((await shopper.post('/v1/store/account/signout')).status < 300);
+    await inbox.customer({ customerId: shopper.id, storeId: shopper.storeId }, 'customer.order.failed', content('after-signout'));
+    await until(async () => (await prisma.device.count({ where: { id: added.json.id } })) === 0, 'the signed-out device to be dropped');
+    assert.equal(received(sub).length, 1);
+    assert.equal((await fetch(`${server.base}/v1/store/account/notifications`)).status, 401);
   });
 });
 

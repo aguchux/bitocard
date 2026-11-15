@@ -1712,7 +1712,8 @@
                     "country_stores": true,
                     "shq_install_prompt": false,
                     "shq_store_guide": true,
-                    "storefront_install_prompt": false
+                    "storefront_install_prompt": false,
+                    "gift_card_selling": false
                   }
                 }
               }
