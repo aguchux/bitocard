@@ -11,7 +11,7 @@ describe("account screens", () => {
   });
 
   test("only what is not built yet is marked Soon", () => {
-    expect(accountSections.filter(section => section.soon).map(section => section.key)).toEqual(["referrals", "notifications"]);
+    expect(accountSections.filter(section => section.soon).map(section => section.key)).toEqual(["referrals"]);
   });
 
   test("the current pill follows the path, ignoring queries, fragments and a trailing slash", () => {

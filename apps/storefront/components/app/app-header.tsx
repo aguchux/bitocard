@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LogOut, Menu, Search, Store, X } from "lucide-react";
 import { signOut } from "@/lib/account-actions";
+import { NotificationBell } from "./notifications/bell";
 import { appTabs } from "./tabs";
 
 /** The search form: a plain GET to the catalogue, so it works before any script loads. */
@@ -22,7 +23,7 @@ function SearchForm({ autoFocus = false, className = "" }: { autoFocus?: boolean
 
 /**
  * The account app's header: the store's brand, the search (a field between the brand and the menu from tablets up, a
- * search button opening a sheet on phones), and the menu drawer with the tabs, the full store and signing out.
+ * search button opening a sheet on phones), the notifications bell with what is unread, and the menu drawer with the tabs, the full store and signing out.
  */
 export function AppHeader({ brand, storeName }: { brand: React.ReactNode; storeName: string }) {
   const [menu, setMenu] = useState(false);
@@ -70,6 +71,7 @@ export function AppHeader({ brand, storeName }: { brand: React.ReactNode; storeN
         <button type="button" aria-label="Search" onClick={() => sheet.current?.showModal()} className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 md:hidden">
           <Search className="size-6" aria-hidden="true" />
         </button>
+        <NotificationBell />
         <button ref={menuButton} type="button" aria-label="Open menu" aria-expanded={menu} onClick={() => setMenu(true)} className="-mr-2 grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50">
           <Menu className="size-7" aria-hidden="true" />
         </button>

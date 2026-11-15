@@ -25,7 +25,7 @@ export const accountSections: AccountSection[] = [
   { key: "identity", href: "/account/verification", label: "Identity check", note: "Needed once for some products in some countries", icon: ShieldCheck },
   { key: "support", href: "/account/support", label: "Help & support", note: "Ask the store a question and follow its answers", icon: LifeBuoy },
   { key: "referrals", href: "/account/profile/referrals", label: "Referrals", note: "Invite friends to the store", icon: Gift, soon: true },
-  { key: "notifications", href: "/account/profile/notifications", label: "Notifications", note: "Choose the updates you get", icon: Bell, soon: true },
+  { key: "notifications", href: "/account/profile/notifications", label: "Notifications", note: "Your updates, and alerts on this device", icon: Bell },
 ];
 
 /** Which account screen a path is (null on the Account page itself and elsewhere). */
