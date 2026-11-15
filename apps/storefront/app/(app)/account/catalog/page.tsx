@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
-import { ArrowRight, X, Zap } from "lucide-react";
+import { ArrowRight, HandCoins, X, Zap } from "lucide-react";
 import type { StoreBrand, StoreList, StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { appProductBase, Carousel, CarouselItem, SectionTitle } from "@/components/app/blocks";
+import { giftCardGroup, sellCatalogHref } from "@/components/app/gift-card-actions";
 import { BrandImage } from "@/components/store/brand-image";
 import { ProductCard } from "@/components/store/product-card";
 import { query, storeApi } from "@/lib/api";
+import { currentCustomer } from "@/lib/customer";
+import { sellingOpenIn } from "@/lib/gift-card-sales";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 
 export const metadata: Metadata = { title: "Catalog" };
 
-type Search = { q?: string; group?: string; brand?: string };
+type Search = { q?: string; group?: string; brand?: string; sell?: string };
 
 const products = async (params: Record<string, string | number | undefined>) => {
   const result = await storeApi<StoreList<StoreProduct>>(await inMarket(`/v1/store/products${query(params)}`));
@@ -54,7 +57,7 @@ function BrandTile({ brand }: { brand: StoreBrand }) {
  * brands, so a long catalogue stays easy to scan on a phone. With a search, group or brand: a grid of matches.
  */
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { q = "", group = "", brand = "" } = await searchParams;
+  const { q = "", group = "", brand = "", sell = "" } = await searchParams;
   const navigation = await storeNavigation();
   const groups = navigation.groups.filter(item => item.on_sale);
   const filtered = Boolean(q || group || brand);
@@ -66,12 +69,30 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     filtered ? products({ q: q || undefined, group: group || undefined, brand: brand || undefined, sort: "popular", limit: 60 }) : Promise.resolve([]),
   ]);
   const brandName = brand ? (brands.find(item => item.slug === brand)?.name ?? brand) : "";
+  // Gift cards: Redeem gift card (top right) lists the same cards to choose one to sell, each opening on its Sell tab.
+  const giftCards = group === giftCardGroup;
+  const sellOpen = giftCards ? await sellingOpenIn((await currentCustomer())?.country) : false;
+  const selling = sellOpen && sell === "1";
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Catalog</h1>
-        <p className="mt-1 text-slate-600">Everything you can buy, grouped to find it fast.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-extrabold tracking-tight">{selling ? "Redeem a gift card" : "Catalog"}</h1>
+          <p className="mt-1 text-slate-600">
+            {selling ? "Choose the card you have. You see what you get before you send it, and the money goes into your wallet once it is accepted." : "Everything you can buy, grouped to find it fast."}
+          </p>
+        </div>
+        {selling ? (
+          <Link href={href({ q, group, brand })} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 font-semibold text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300">
+            Back to buying
+          </Link>
+        ) : sellOpen ? (
+          <Link href={sellCatalogHref} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
+            <HandCoins className="size-5" aria-hidden="true" />
+            Redeem gift card
+          </Link>
+        ) : null}
       </div>
 
       {/* The groups as underlined tabs on phones and tablets; on desktop the sub rail lists them. */}
@@ -116,7 +137,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
               {matches.map(product => (
                 <li key={product.id}>
-                  <ProductCard product={product} base={appProductBase} />
+                  <ProductCard product={product} base={appProductBase} search={selling ? "?sell=1" : ""} />
                 </li>
               ))}
             </ul>

@@ -5,6 +5,9 @@ import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 /** The catalogue's gift card group. */
 export const giftCardGroup = "gift-cards";
 
+/** The catalogue's gift cards to choose one to sell: each card then opens on its Sell tab. */
+export const sellCatalogHref = `/account/catalog?group=${giftCardGroup}&sell=1`;
+
 /** How many gift cards are on sale in the group, from the menu's own counts. */
 export function giftCardCount(group: StoreNavigationGroup | undefined) {
   return group?.categories.reduce((sum, category) => sum + (category.on_sale ? category.products : 0), 0) ?? 0;
@@ -63,7 +66,7 @@ export function GiftCardActions({ group, sellOpen = false }: { group: StoreNavig
         </li>
         <li>
           {sellOpen ? (
-            <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Choose your card, then Sell. The money goes into your wallet once the card is accepted." href={`/account/catalog?group=${giftCardGroup}`} />
+            <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Choose your card, then Sell. The money goes into your wallet once the card is accepted." href={sellCatalogHref} />
           ) : (
             <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Sell your unused local and international gift cards for money in your wallet." soon />
           )}

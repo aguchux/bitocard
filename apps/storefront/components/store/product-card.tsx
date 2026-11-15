@@ -60,11 +60,11 @@ export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand
   return plate;
 }
 
-/** A product in a rail or a grid: art, name, what it is, and its face value. */
-export function ProductCard({ product, base }: { product: StoreProduct; base?: string }) {
+/** A product in a rail or a grid: art, name, what it is, and its face value. `search` is added to its link (`?sell=1`). */
+export function ProductCard({ product, base, search = "" }: { product: StoreProduct; base?: string; search?: string }) {
   return (
     <Link
-      href={productHref(product, base)}
+      href={`${productHref(product, base)}${search}`}
       // A container, so the card tightens itself in two-column phone grids and carousels whatever the screen width.
       className="group @container flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-3"
     >

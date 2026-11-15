@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { GiftCardActions, giftCardCount } from "@/components/app/gift-card-actions";
+import { ProductCard } from "@/components/store/product-card";
 
 // Home's Gift cards choice: Buy opens the catalogue's gift cards with how many are on sale; Sell opens them too where
 // selling is open in the customer's country (they sell from a card's page), and says Soon, linking nowhere, elsewhere.
@@ -19,9 +20,10 @@ describe("gift card actions", () => {
     expect(html.match(/<a /g)).toHaveLength(1);
   });
 
-  test("where selling is open, Sell opens the gift cards to choose one, with no Soon", () => {
+  test("where selling is open, Sell opens the gift cards to choose one (each on its Sell tab), with no Soon", () => {
     const html = render(group(true, 3631), true);
-    expect(html.match(/href="\/account\/catalog\?group=gift-cards"/g)).toHaveLength(2);
+    expect(html).toContain('href="/account/catalog?group=gift-cards"');
+    expect(html).toContain('href="/account/catalog?group=gift-cards&amp;sell=1"');
     expect(html).not.toContain(">Soon<");
     expect(html).toContain("once the card is accepted");
   });
@@ -34,4 +36,10 @@ describe("gift card actions", () => {
     }
     expect(giftCardCount(undefined)).toBe(0);
   });
+});
+
+test("a product card can open its page on Sell", () => {
+  const product = { key: "gift_cards:US:amazon-us", name: "Amazon US", description: null, category_label: "Gift cards", global: false, country_name: "United States", brand: { slug: "amazon", name: "Amazon", initials: "A", color: null, logo_url: null, image_url: null }, from: 1000, to: 1000, currency: "USD", price: null } as never;
+  const html = renderToStaticMarkup(createElement(ProductCard, { product, base: "/account/p", search: "?sell=1" }));
+  expect(html).toContain('href="/account/p/gift_cards%3AUS%3Aamazon-us?sell=1"');
 });
