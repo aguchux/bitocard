@@ -3,6 +3,9 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { formatFace, type StorePaymentMethods, type StoreProductDetail } from "@bitocard/api-client/storefront";
 import { BuyForm } from "@/components/store/buy-form";
+import { BuySell } from "@/components/store/buy-sell";
+import { SellForm } from "@/components/store/sell-form";
+import { sellOptionsFor } from "@/lib/gift-card-sales";
 import { walletFor } from "@/lib/wallet";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
@@ -40,7 +43,7 @@ export async function productMetadata(key: string, base: string): Promise<Metada
  * (`/p/<key>`) with breadcrumbs; inside the customer's account app (`inApp`, `/account/p/<key>`) with a back link to
  * the catalogue, and related products staying in the app.
  */
-export async function ProductDetail({ product, inApp = false }: { product: StoreProductDetail; inApp?: boolean }) {
+export async function ProductDetail({ product, inApp = false, sell = false }: { product: StoreProductDetail; inApp?: boolean; sell?: boolean }) {
   const base = inApp ? "/account/p" : "/p";
   const theme = themeOf(product.category);
   const [navigation, customer, market, { store }] = await Promise.all([storeNavigation(), currentCustomer(), currentMarket(), currentStore()]);
@@ -55,6 +58,23 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
     country ? storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }) : null,
     customer && country ? walletFor() : null,
   ]);
+  // Gift cards the store buys back, in the customer's own country (or the market they shop in).
+  const sellOptions = product.category === "gift_cards" ? await sellOptionsFor(product.key, customer?.country ?? (market && market !== "global" ? market : null)) : null;
+  const sandbox = methods?.ok ? methods.data.mode === "test" : false;
+  const buyForm = (
+    <BuyForm
+      product={product}
+      countries={navigation.countries}
+      country={country}
+      lockCountry={Boolean(fixed)}
+      methods={methods?.ok ? methods.data.data : []}
+      walletRequired={methods?.ok ? Boolean(methods.data.wallet_required) : false}
+      wallet={wallet}
+      signedIn={Boolean(customer)}
+      back={`${base}/${encodeURIComponent(product.key)}`}
+      sandbox={sandbox}
+    />
+  );
 
   return (
     <div className="space-y-8 sm:space-y-12">
@@ -123,18 +143,15 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
             </section>
           )}
 
-          <BuyForm
-            product={product}
-            countries={navigation.countries}
-            country={country}
-            lockCountry={Boolean(fixed)}
-            methods={methods?.ok ? methods.data.data : []}
-            walletRequired={methods?.ok ? Boolean(methods.data.wallet_required) : false}
-            wallet={wallet}
-            signedIn={Boolean(customer)}
-            back={`${base}/${encodeURIComponent(product.key)}`}
-            sandbox={methods?.ok ? methods.data.mode === "test" : false}
-          />
+          {sellOptions?.available ? (
+            <BuySell
+              initial={sell ? "sell" : "buy"}
+              buy={buyForm}
+              sell={<SellForm offers={sellOptions.offers} signedIn={Boolean(customer)} back={`${base}/${encodeURIComponent(product.key)}?sell=1`} sandbox={sandbox} />}
+            />
+          ) : (
+            buyForm
+          )}
           <p className="mt-2 text-sm text-slate-500">Values shown are what the product is worth; you see your price before you pay.</p>
 
           <div className="mt-6 flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">

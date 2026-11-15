@@ -165,6 +165,10 @@ describe('selling gift cards in the sandbox', () => {
     assert.deepEqual([offer.rate, offer.currency, offer.minimum, offer.form], [114_000, 'NGN', 25, 'both']);
     assert.doesNotMatch(JSON.stringify(open), /prestmit|1200/i);
     assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:GB:apple&country=NG`).then(res => res.json())).offers[0].name, 'iTunes UK');
+    // A country store sells them too; a reseller's store never does.
+    assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ng`).then(res => res.json())).available, true);
+    const reseller = await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ada-digital`).then(res => res.json());
+    assert.deepEqual([reseller.available, reseller.reason], [false, 'store_unavailable']);
 
     const ada = await customer(server);
     const quote = await ada.post('/v1/store/gift-card-sales/quote', { offer_id: offer.id, amount: 100 });

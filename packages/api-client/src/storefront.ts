@@ -698,3 +698,52 @@ export type StorePublicSpinClaim = {
   currency?: string;
   amount?: number;
 };
+
+/** A gift card customers of BitoCard's own stores can sell, at its rate after BitoCard's margin (`GET /v1/store/gift-card-sales/offers`). */
+export type GiftCardSellOffer = {
+  id: string;
+  name: string;
+  /** How the card is taken: photos of a physical card, its code, or either. */
+  form: "physical" | "ecode" | "both";
+  /** The smallest and largest card value taken, in the card's own units. */
+  minimum: number;
+  maximum: number;
+  /** The customer's wallet currency. */
+  currency: string;
+  /** What the customer gets per unit of the card's value, in minor units of `currency`. */
+  rate: number;
+  terms: string | null;
+};
+
+export type GiftCardSellOptions = {
+  object: "gift_card_sell_options";
+  available: boolean;
+  /** Why selling is closed: country_unsupported, not_enabled, not_configured or not_sellable. */
+  reason: string | null;
+  currency: string | null;
+  offers: GiftCardSellOffer[];
+  count?: number;
+};
+
+export type GiftCardSaleQuote = { object: "gift_card_sale_quote"; offer_id: string; amount: number; currency: string; payout: number };
+
+/** A gift card the customer sold: credited to their wallet once accepted, never before. */
+export type GiftCardSale = {
+  object: "gift_card_sale";
+  id: string;
+  number: string;
+  mode: "live" | "test";
+  status: "pending" | "completed" | "rejected" | "failed";
+  card: { name: string; brand: string | null; brand_slug: string | null; country: string | null };
+  form: "physical" | "ecode";
+  amount: number;
+  currency: string;
+  /** What they were told they would get, and what they got (minor units). */
+  quoted: number;
+  paid: number | null;
+  code_hint: string | null;
+  photos: number;
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
+};

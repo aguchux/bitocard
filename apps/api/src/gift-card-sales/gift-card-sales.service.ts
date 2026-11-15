@@ -144,9 +144,10 @@ export class GiftCardSalesService {
    * What a customer in `country` can sell of a product (`gift_cards:US:amazon`): the cards Prestmit buys of that
    * brand and country, each at its rate after BitoCard's margin. Public (it says nothing about anyone).
    */
-  async offersFor(productKey: string | undefined, country: string | undefined) {
+  async offersFor(productKey: string | undefined, country: string | undefined, store?: string) {
     const code = country?.toUpperCase();
-    const reason = await this.closedFor(code);
+    // BitoCard's own stores only: bitocard.com and its country stores (every 2-letter subdomain is BitoCard's).
+    const reason = store && store !== 'bitocard' && !/^[a-z]{2}$/.test(store) ? 'store_unavailable' : await this.closedFor(code);
     const currency = (code && payoutCountries[code]) ?? null;
     const empty = { object: 'gift_card_sell_options' as const, available: false, reason, currency, offers: [] as ReturnType<GiftCardSalesService['presentOffer']>[] };
     if (reason) return empty;

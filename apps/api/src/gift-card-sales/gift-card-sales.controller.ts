@@ -23,6 +23,10 @@ class OffersQueryDto {
 
   @IsOptional() @Matches(/^[A-Za-z]{2}$/, { message: 'country must be a 2-letter country code' })
   country?: string;
+
+  /** The store's server names its store (none: bitocard.com). Only BitoCard's own stores sell gift cards. */
+  @IsOptional() @Matches(/^[a-z0-9-]{1,63}$/, { message: 'store must be a store subdomain' })
+  store?: string;
 }
 
 class QuoteDto {
@@ -55,7 +59,7 @@ export class GiftCardSellOffersController {
 
   @Get()
   offers(@Query() query: OffersQueryDto) {
-    return this.sales.offersFor(query.product, query.country);
+    return this.sales.offersFor(query.product, query.country, query.store);
   }
 }
 

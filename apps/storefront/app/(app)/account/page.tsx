@@ -8,7 +8,8 @@ import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
-import { customerApi } from "@/lib/customer";
+import { currentCustomer, customerApi } from "@/lib/customer";
+import { sellingOpenIn } from "@/lib/gift-card-sales";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { walletFor } from "@/lib/wallet";
@@ -44,6 +45,7 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
     walletFor(),
     customerApi<StoreSpinRewards>("GET", "/v1/store/spins"),
   ]);
+  const sellOpen = await sellingOpenIn((await currentCustomer())?.country);
   const rewards = spins.ok ? spins.data : null;
   const figures = summary.ok ? summary.data : null;
   // Card widths: the next one peeks at every width; on desktops three and a quarter show (exactly three without a wallet).
@@ -87,7 +89,7 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
         </section>
       ) : null}
 
-      <GiftCardActions group={navigation.groups.find(group => group.key === giftCardGroup)} />
+      <GiftCardActions group={navigation.groups.find(group => group.key === giftCardGroup)} sellOpen={sellOpen} />
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />

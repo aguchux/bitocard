@@ -42,6 +42,8 @@ describe("desktop sub rails", () => {
     expect(active("/account/disputes")).toBe("/account/disputes");
     expect(active("/account/disputes/dsp_1")).toBe("/account/disputes");
     expect(active("/account/disputes/new", "checkout=chk_1")).toBe("/account/disputes");
+    expect(active("/account/sold")).toBe("/account/sold");
+    expect(active("/account/sold/gs_1")).toBe("/account/sold");
   });
 
   test("Wallet lists the country's wallet, US dollars and the transactions (crypto has left BitoCard)", () => {

@@ -1,4 +1,4 @@
-import { CircleCheck, DollarSign, Gift, LayoutGrid, ListOrdered, MessageSquareWarning, ReceiptText, RotateCcw, Truck, Wallet, type LucideIcon } from "lucide-react";
+import { CircleCheck, DollarSign, Gift, HandCoins, LayoutGrid, ListOrdered, MessageSquareWarning, ReceiptText, RotateCcw, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { groupIcon } from "@/components/store/theme";
 import { accountSections, activeAccountSection } from "./account-sections";
 
@@ -37,6 +37,7 @@ export const orderSections: SubMenuItem[] = [
   { href: "/account/orders?show=delivered", label: "Delivered", icon: CircleCheck },
   { href: "/account/orders?show=refunded", label: "Refunded", icon: RotateCcw },
   { href: "/account/disputes", label: "Your disputes", icon: MessageSquareWarning },
+  { href: "/account/sold", label: "Sold gift cards", icon: HandCoins },
 ];
 
 /** The Catalog tab: everything, then each menu group on sale (as the page's chips). */
@@ -60,7 +61,7 @@ export const walletSections = (currency: string | null): SubMenuItem[] => [
 export function subMenusFor(context: SubMenuContext): SubMenu[] {
   return [
     { key: "catalog", label: "Catalog", href: "/account/catalog", param: "group", owns: ["/account/catalog", "/account/p"], items: catalogSections(context.groups) },
-    { key: "orders", label: "Orders", href: "/account/orders", param: "show", owns: ["/account/orders", "/account/disputes"], items: orderSections },
+    { key: "orders", label: "Orders", href: "/account/orders", param: "show", owns: ["/account/orders", "/account/disputes", "/account/sold"], items: orderSections },
     { key: "wallet", label: "Wallet", href: "/account/wallet", param: "wallet", owns: ["/account/wallet"], items: walletSections(context.currency) },
     // Shown only on its screens (activeAccountSection), not on the Account page, whose rows are its menu.
     { key: "account", label: "Account", href: "/account/profile", owns: [], items: accountSections.map(({ href, label, icon, soon }) => ({ href, label, icon, soon })) },

@@ -33,10 +33,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-3xl font-extrabold tracking-tight">Orders</h1>
-        {/* On desktop the sub rail lists the filters and the disputes. */}
-        <Link href="/account/disputes" className="text-sm font-semibold text-brand-500 hover:underline lg:hidden">
-          Your disputes
-        </Link>
+        {/* On desktop the sub rail lists the filters, the disputes and the gift cards sold. */}
+        <span className="flex gap-4 lg:hidden">
+          <Link href="/account/sold" className="text-sm font-semibold text-brand-500 hover:underline">
+            Sold gift cards
+          </Link>
+          <Link href="/account/disputes" className="text-sm font-semibold text-brand-500 hover:underline">
+            Your disputes
+          </Link>
+        </span>
       </div>
       <UnderlineTabs
         label="Show"

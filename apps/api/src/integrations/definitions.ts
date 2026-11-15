@@ -490,7 +490,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       secret('PRESTMIT_API_KEY', 'API key', { help: 'Prestmit console > Developers > API keys (console.prestmit.io/developers; the sandbox’s at sandbox.prestmit.io/developers). API access is asked for from sales@prestmit.com.' }),
       secret('PRESTMIT_API_SECRET', 'API secret', { help: 'The key’s secret, which signs every request (API-Hash). Shown once when the key is made.' }),
       secret('PRESTMIT_WEBHOOK_SECRET', 'Webhook secret', { required: false, help: 'Developers > Webhooks: the signing secret of the webhook pointing at the address above. Without it trades are still checked on schedule.' }),
-      field('PRESTMIT_SELL_MARGIN_PERCENT', 'Margin (%)', { required: true, help: 'What BitoCard keeps of what Prestmit pays for each card, from 0 to 50, for example 5. A card may have its own (Catalog > Gift cards customers sell). Customers see their rate after it. Nobody can sell until it is set.' }),
+      field('PRESTMIT_SELL_MARGIN_PERCENT', 'Margin (%)', { required: true, help: 'What BitoCard keeps of what Prestmit pays for each card, from 0 to 50, for example 5. A card may have its own (PATCH /v1/admin/gift-card-sales/offers/:id). Customers see their rate after it. Nobody can sell until it is set.' }),
       field('PRESTMIT_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Prestmit’s sandbox (dev-api.prestmit.io) for Test connection and the cards shown in BitoCard’s sandbox, where sales are simulated. Off: live (api.prestmit.io).' }),
       field('PRESTMIT_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
     ],

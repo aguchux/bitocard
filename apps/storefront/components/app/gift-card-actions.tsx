@@ -37,10 +37,11 @@ function ActionCard({ icon: Icon, tile, title, text, href, soon }: { icon: Lucid
 }
 
 /**
- * Gift cards on the customer's Home: "I want to" buy them (the catalogue's gift cards) or sell them. Selling is not
- * built yet, so it says Soon and links nowhere until it is.
+ * Gift cards on the customer's Home: "I want to" buy them (the catalogue's gift cards) or sell them. Selling happens
+ * on each card's page (its Sell tab), so Sell opens the gift cards where selling is open in the customer's country;
+ * elsewhere it says Soon and links nowhere.
  */
-export function GiftCardActions({ group }: { group: StoreNavigationGroup | undefined }) {
+export function GiftCardActions({ group, sellOpen = false }: { group: StoreNavigationGroup | undefined; sellOpen?: boolean }) {
   const count = giftCardCount(group);
   const onSale = Boolean(group?.on_sale) && count > 0;
   return (
@@ -61,7 +62,11 @@ export function GiftCardActions({ group }: { group: StoreNavigationGroup | undef
           />
         </li>
         <li>
-          <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Sell your unused local and international gift cards for money in your wallet." soon />
+          {sellOpen ? (
+            <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Choose your card, then Sell. The money goes into your wallet once the card is accepted." href={`/account/catalog?group=${giftCardGroup}`} />
+          ) : (
+            <ActionCard icon={HandCoins} tile="bg-pink-400" title="Sell gift cards" text="Sell your unused local and international gift cards for money in your wallet." soon />
+          )}
         </li>
       </ul>
     </section>
