@@ -52,6 +52,11 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too.",
   },
+  gift_card_selling: {
+    scopes: ['global', 'country'],
+    description:
+      "Customers of BitoCard's own stores sell their gift cards on each gift card's page; once the card is accepted, BitoCard credits the customer's wallet. Off until selling is cleared in the market.",
+  },
   spin_rewards: {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 over 50 to 100 spins, a few a day, paid by BitoCard into their spin rewards and moved into their store wallet in US dollars or their own currency. Off until the promotion's terms are cleared.",

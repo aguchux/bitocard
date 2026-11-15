@@ -136,6 +136,12 @@ const integrationKeyList = [
   'REMITA_SANDBOX',
   'REMITA_API_URL',
   'REMITA_CONTACT_PHONE',
+  'PRESTMIT_API_KEY',
+  'PRESTMIT_API_SECRET',
+  'PRESTMIT_WEBHOOK_SECRET',
+  'PRESTMIT_SANDBOX',
+  'PRESTMIT_API_URL',
+  'PRESTMIT_SELL_MARGIN_PERCENT',
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_API_URL',
   'ANTHROPIC_PRICES',
@@ -475,6 +481,21 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     ],
   },
   {
+    id: 'prestmit',
+    name: 'Prestmit',
+    description:
+      'Customers sell their gift cards through BitoCard: Prestmit buys them, paying BitoCard’s Prestmit wallet in naira, and BitoCard credits the customer’s wallet once Prestmit approves, less BitoCard’s margin. Without the API key and secret nobody can sell live. The Sandbox switch syncs the cards Prestmit buys from its sandbox for BitoCard’s sandbox only (sales there are simulated).',
+    webhookPath: '/v1/webhooks/prestmit',
+    fields: [
+      secret('PRESTMIT_API_KEY', 'API key', { help: 'Prestmit console > Developers > API keys (console.prestmit.io/developers; the sandbox’s at sandbox.prestmit.io/developers). API access is asked for from sales@prestmit.com.' }),
+      secret('PRESTMIT_API_SECRET', 'API secret', { help: 'The key’s secret, which signs every request (API-Hash). Shown once when the key is made.' }),
+      secret('PRESTMIT_WEBHOOK_SECRET', 'Webhook secret', { required: false, help: 'Developers > Webhooks: the signing secret of the webhook pointing at the address above. Without it trades are still checked on schedule.' }),
+      field('PRESTMIT_SELL_MARGIN_PERCENT', 'Margin (%)', { required: true, help: 'What BitoCard keeps of what Prestmit pays for each card, from 0 to 50, for example 5. A card may have its own (Catalog > Gift cards customers sell). Customers see their rate after it. Nobody can sell until it is set.' }),
+      field('PRESTMIT_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Prestmit’s sandbox (dev-api.prestmit.io) for Test connection and the cards shown in BitoCard’s sandbox, where sales are simulated. Off: live (api.prestmit.io).' }),
+      field('PRESTMIT_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
+    ],
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic (Claude)',
     description: 'Claude models for support bots that run on BitoCard’s keys (stores on Premium). Stores using their own Anthropic key never use this one. Test connection lists the models the key can use.',
@@ -569,7 +590,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass', 'zendit', 'pawapay', 'africas_talking', 'remita']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'zendit', 'pawapay', 'africas_talking', 'remita', 'prestmit']);
 /** Credential groups whose adapter transport is implemented. They stay unavailable until their Supplier row and markets are enabled. */
 const builtCredentialSuppliers = new Set(['vpnresellers']);
 

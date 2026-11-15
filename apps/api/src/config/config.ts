@@ -255,6 +255,15 @@ export const configSchema = z.object({
   REMITA_API_URL: z.string().url().default('https://api-gateway.remita.net'),
   /** The phone number sent with bill and TV payments when the customer gave none (Remita asks for one). */
   REMITA_CONTACT_PHONE: z.string().optional(),
+  /** Prestmit: customers sell their gift cards to it through BitoCard (src/gift-card-sales). */
+  PRESTMIT_API_KEY: z.string().optional(),
+  PRESTMIT_API_SECRET: z.string().optional(),
+  PRESTMIT_WEBHOOK_SECRET: z.string().optional(),
+  PRESTMIT_SANDBOX: flag.prefault('off'),
+  /** Leave at the default to follow PRESTMIT_SANDBOX; any other value overrides it. */
+  PRESTMIT_API_URL: z.string().url().default('https://api.prestmit.io/partners/v1'),
+  /** BitoCard's margin on cards customers sell, as a percentage of what Prestmit pays (0 to 50). Selling waits until it is set. */
+  PRESTMIT_SELL_MARGIN_PERCENT: z.string().regex(/^(?:(?:[0-9]|[1-4][0-9])(?:\.[0-9]{1,2})?|50(?:\.0{1,2})?)$/, 'a percentage from 0 to 50, up to 2 decimals').optional(),
   /** AI providers for support bots on BitoCard's keys (Premium). Prices: "model input output cached" in US dollars per million tokens. */
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_API_URL: z.string().url().default('https://api.anthropic.com'),

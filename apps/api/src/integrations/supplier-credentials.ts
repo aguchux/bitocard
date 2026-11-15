@@ -47,7 +47,6 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   { code: 'pax8', name: 'Pax8', description: 'Business software and cloud subscriptions.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), address('Default: https://api.pax8.com')] },
   { code: 'also', name: 'ALSO Cloud Marketplace', description: 'Microsoft cloud and business security subscriptions (Europe).', fields: [id('USERNAME', 'API username'), secret('PASSWORD', 'API password'), address('ALSO marketplace API base address')] },
   // Gift card trading.
-  { code: 'prestmit', name: 'Prestmit', description: 'Gift card sales and trades.', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Prestmit API base address')] },
   { code: 'cardtonic', name: 'Cardtonic', description: 'Gift card sales and trades.', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Cardtonic API base address')] },
   // Wider Africa bills.
   { code: 'cellulant', name: 'Cellulant / Tingg', description: 'Bills and pay-TV across Africa.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), optional('SERVICE_CODE', 'Service code'), address('Tingg API base address (sandbox or live)')] },

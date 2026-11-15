@@ -2543,6 +2543,7 @@ model Customer {
   p2pOrdersBought           P2pOrder[]                @relation("p2pOrderBuyer")
   p2pStandings              P2pStanding[]
   p2pMerchants              P2pMerchant[]
+  giftCardSales             GiftCardSale[]
   p2pBlocksMade             P2pBlock[]                @relation("p2pBlocker")
   p2pBlocksReceived         P2pBlock[]                @relation("p2pBlocked")
   p2pReportsMade            P2pReport[]               @relation("p2pReporter")
@@ -5327,4 +5328,85 @@ model TraderDevice {
   @@unique([customerId, deviceHash])
   @@index([deviceHash])
   @@map("trader_devices")
+}
+
+/// Gift cards Prestmit buys, synced from its rate calculator: what BitoCard's customers can sell (src/gift-card-sales).
+/// Cards synced from Prestmit's sandbox serve BitoCard's sandbox only (`mode`).
+model GiftCardSellOffer {
+  id              String         @id @default(uuid()) @db.Uuid
+  mode            LedgerMode
+  provider        String         @default("prestmit")
+  /// The provider's own card id.
+  providerCardId  String         @map("provider_card_id")
+  name            String
+  /// The card's own country (ISO 3166 alpha-2); null when the provider's country is not one BitoCard knows.
+  country         String?        @db.VarChar(2)
+  countryLabel    String         @map("country_label")
+  /// physical, ecode or both.
+  form            String
+  /// Naira per unit of the card's face value.
+  rate            Decimal        @db.Decimal(18, 4)
+  /// The smallest card value taken, in the card's own units.
+  minimum         Int
+  categoryName    String         @map("category_name")
+  terms           String?
+  /// The brand registry entry the card is sold under (matched from its name; an admin's choice is never synced over).
+  brand           String?
+  brandSetByAdmin Boolean        @default(false) @map("brand_set_by_admin")
+  enabled         Boolean        @default(true)
+  /// False once the provider no longer lists it.
+  available       Boolean        @default(true)
+  /// BitoCard's margin on this card in basis points; null follows PRESTMIT_SELL_MARGIN_PERCENT.
+  marginBps       Int?           @map("margin_bps")
+  seenAt          DateTime       @default(now()) @map("seen_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  sales           GiftCardSale[]
+
+  @@unique([provider, mode, providerCardId])
+  @@index([mode, brand, country])
+  @@map("gift_card_sell_offers")
+}
+
+/// A customer's gift card sold to Prestmit through BitoCard: credited to their wallet once Prestmit approves it, never before.
+model GiftCardSale {
+  id                 String            @id @default(uuid()) @db.Uuid
+  /// Shown as GS-000123.
+  number             Int               @unique @default(autoincrement())
+  mode               LedgerMode
+  customerId         String            @map("customer_id") @db.Uuid
+  storeId            String            @map("store_id") @db.Uuid
+  offerId            String            @map("offer_id") @db.Uuid
+  /// physical (photos sent) or ecode (the code sent; never kept, only its last characters).
+  form               String
+  /// The card's value in its own units (for example 100 for a $100 card).
+  amount             Int
+  /// The customer's wallet currency (NGN).
+  currency           String            @db.VarChar(10)
+  /// The provider's rate and BitoCard's margin when the card was sent.
+  rate               Decimal           @db.Decimal(18, 4)
+  marginBps          Int               @map("margin_bps")
+  /// What the customer was told they would get (minor units).
+  quotedMinor        BigInt            @map("quoted_minor")
+  /// What the provider paid BitoCard, and what the customer got (minor units), once approved.
+  providerTotalMinor BigInt?           @map("provider_total_minor")
+  payoutMinor        BigInt?           @map("payout_minor")
+  /// submitting (being sent), pending (with the provider), completed, rejected or failed (the provider never took it).
+  status             String            @default("submitting")
+  providerReference  String?           @map("provider_reference")
+  rejectionReason    String?           @map("rejection_reason")
+  codeHint           String?           @map("code_hint")
+  photos             Int               @default(0)
+  checks             Int               @default(0)
+  nextCheckAt        DateTime?         @map("next_check_at")
+  entryId            String?           @map("entry_id") @db.Uuid
+  decidedAt          DateTime?         @map("decided_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  offer              GiftCardSellOffer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([status, nextCheckAt])
+  @@map("gift_card_sales")
 }

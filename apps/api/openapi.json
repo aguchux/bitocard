@@ -38103,6 +38103,7 @@
               "own_payment_gateways",
               "customer_app_bottom_bar_desktop",
               "customer_wallets",
+              "gift_card_selling",
               "spin_rewards",
               "store_template_all_in_one",
               "store_template_topups",
@@ -38150,6 +38151,10 @@
               "customer_wallets": {
                 "type": "boolean",
                 "description": "Store customers have a wallet: they top it up (card, mobile money, Flutterwave or their own bank account number) and buy only from it, never withdrawing. Off, they pay at checkout instead (any balance left can still be spent). On unless switched off."
+              },
+              "gift_card_selling": {
+                "type": "boolean",
+                "description": "Customers of BitoCard's own stores sell their gift cards on each gift card's page; once the card is accepted, BitoCard credits the customer's wallet. Off until selling is cleared in the market."
               },
               "spin_rewards": {
                 "type": "boolean",

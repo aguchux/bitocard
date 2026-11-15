@@ -26,6 +26,7 @@ const addresses: Record<string, Address[]> = {
     { key: 'AFRICAS_TALKING_API_URL', live: 'https://api.africastalking.com', sandbox: 'https://api.sandbox.africastalking.com' },
     { key: 'AFRICAS_TALKING_DATA_URL', live: 'https://bundles.africastalking.com', sandbox: 'https://bundles.sandbox.africastalking.com' },
   ],
+  prestmit: [{ key: 'PRESTMIT_API_URL', live: 'https://api.prestmit.io/partners/v1', sandbox: 'https://dev-api.prestmit.io/partners/v1' }],
   monnify: [{ key: 'MONNIFY_API_URL', live: 'https://api.monnify.com', sandbox: 'https://sandbox.monnify.com' }],
   // Flutterwave test keys use the live address.
   flutterwave: [{ key: 'FLUTTERWAVE_API_URL', live: 'https://api.flutterwave.com/v3', sandbox: 'https://api.flutterwave.com/v3' }],
@@ -43,6 +44,7 @@ export const sandboxSwitches = {
   pawapay: 'PAWAPAY_SANDBOX',
   remita: 'REMITA_SANDBOX',
   africas_talking: 'AFRICAS_TALKING_SANDBOX',
+  prestmit: 'PRESTMIT_SANDBOX',
   monnify: 'MONNIFY_SANDBOX',
   flutterwave: 'FLUTTERWAVE_SANDBOX',
   stripe: 'STRIPE_SANDBOX',

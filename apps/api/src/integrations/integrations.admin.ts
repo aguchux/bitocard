@@ -25,6 +25,7 @@ import { IntegrationsService, schemaFor } from './integrations.service.js';
 import { linksFor } from './links.js';
 import { aiProvider, type AiProviderName, aiProviderLabels } from '../support/ai/providers.js';
 import { GithubIssues } from '../support/github.js';
+import { Prestmit } from '../gift-card-sales/prestmit.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -76,6 +77,7 @@ export class IntegrationsAdminService {
     if (group.id === 'store_hosts') return this.testStoreHosts(adminId);
     if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id, platform);
     if (group.id === 'github') return this.testGithub(adminId, platform);
+    if (group.id === 'prestmit') return this.testPrestmit(adminId);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -102,6 +104,30 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
     return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Prestmit: whether it takes gift card sales now, asked with BitoCard's key and secret. */
+  private async testPrestmit(adminId: string) {
+    await this.integrations.refresh(true);
+    const config = this.integrations.config;
+    const environment = config.PRESTMIT_SANDBOX ? ('sandbox' as const) : ('live' as const);
+    const where = environment === 'sandbox' ? 'Prestmit’s sandbox' : 'Prestmit';
+    const prestmit = new Prestmit({ apiKey: config.PRESTMIT_API_KEY, apiSecret: config.PRESTMIT_API_SECRET, baseUrl: urlsFor(config, environment).PRESTMIT_API_URL });
+    let ok = false;
+    let message: string | null = null;
+    if (!prestmit.configured()) message = 'Set the API key and API secret first.';
+    else {
+      try {
+        ok = true;
+        message = (await prestmit.sellingOpen()) ? null : `${where} answered, but is not taking gift card sales right now.`;
+      } catch (error) {
+        ok = false;
+        const detail = error instanceof Error ? error.message.replace(/^prestmit: /, '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `${where} refused these credentials (${detail}).` : `Could not reach ${where} (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'prestmit', before: null, after: { environment, ok } });
+    return { object: 'integration_test' as const, integration: 'prestmit', environment, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** Engineering escalations: the repository read with the product's own token. */

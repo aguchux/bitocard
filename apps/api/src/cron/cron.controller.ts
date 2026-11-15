@@ -1,3 +1,4 @@
+import { GiftCardSalesService } from '../gift-card-sales/gift-card-sales.service.js';
 import { P2pMerchantsService } from '../afrippa/merchants.service.js';
 import { P2pOrdersService } from '../afrippa/orders.service.js';
 import { ListingsService } from '../classifieds/listings.service.js';
@@ -96,6 +97,7 @@ export class CronController {
     safePay: SafePayService,
     resale: ResaleStoresService,
     resaleOrders: ResaleOrdersService,
+    giftCardSales: GiftCardSalesService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -173,6 +175,8 @@ export class CronController {
       /** Every minute: Afrippa's P2P orders left unpaid past their window expire (their coins back to the seller), then the deadline reminders. */
       'p2p-orders': () => p2pOrders.job(),
       'p2p-merchants': () => merchants.check(),
+      /** Every 15 minutes: the gift cards Prestmit buys (every 6 hours) and customers' sales due a check. */
+      'gift-card-sales': () => giftCardSales.job(),
       /** Every 15 minutes: every blockchain provider's latest block (Crypto > Chains health). */
       'chain-health': () => deposits.checkAll(),
       /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */

@@ -116,6 +116,11 @@
       "job": "p2p-merchants",
       "schedule": "25 4 * * *",
       "product": "bitocard"
+    },
+    {
+      "job": "gift-card-sales",
+      "schedule": "*/15 * * * *",
+      "product": "bitocard"
     }
   ]
 }

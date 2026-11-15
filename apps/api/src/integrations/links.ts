@@ -61,7 +61,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   td_synnex: [site('https://www.tdsynnex.com/')],
   pax8: [site('https://www.pax8.com/'), { label: 'Developer portal', url: 'https://devx.pax8.com/' }],
   also: [site('https://www.also.com/')],
-  prestmit: [site('https://prestmit.io/')],
+  prestmit: [signUp('https://prestmit.io/developers'), keys('https://console.prestmit.io/developers', 'Developers: API keys and webhooks'), docs('https://documentation.prestmit.io/')],
   cardtonic: [site('https://cardtonic.com/')],
   github: [signUp('https://github.com/signup'), keys('https://github.com/settings/personal-access-tokens', 'Fine-grained tokens'), docs('https://docs.github.com/en/rest/issues/issues')],
   anthropic: [signUp('https://console.anthropic.com/'), keys('https://console.anthropic.com/settings/keys', 'API keys'), docs('https://docs.anthropic.com/en/api/messages')],
