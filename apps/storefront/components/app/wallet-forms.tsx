@@ -306,9 +306,12 @@ export function MoveMoney({ wallet }: { wallet: StoreWallet }) {
             <input type="hidden" name="from" value={wallet.currency} />
             <p className="text-sm text-slate-600">From your {walletName(wallet.currency)}: {formatFace(balance, wallet.currency)} available.</p>
             <TextField label={`Amount (${wallet.currency})`} name="amount" inputMode="decimal" required value={amount} onChange={event => setAmount(event.target.value)} state={stale ? {} : state} />
+            {/* Sent from state, not the select: React resets a form after its action, which puts a select back on its
+                first option while the state (and what the quote was for) stays on the chosen wallet. */}
+            <input type="hidden" name="to" value={to} />
             <label className="block">
               <span className="text-sm font-semibold">To</span>
-              <select name="to" value={to} onChange={event => setTo(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3">
+              <select value={to} onChange={event => setTo(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3">
                 {others.map(item => (
                   <option key={item.currency} value={item.currency}>
                     Your {walletName(item.currency)} ({formatFace(item.balance, item.currency)})
