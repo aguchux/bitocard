@@ -511,35 +511,19 @@ export class StorefrontService {
   }
 
   /**
-   * The markets with a live country store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`, Stage 4): the `country_stores`
-   * switch on for that market, and its store published with its address ready (so root never sends a shopper to a
-   * subdomain that is not actually serving traffic yet).
-   */
-  private async readyCountryStores() {
-    const rows = await this.prisma.store.findMany({
-      where: { status: 'published', hostStatus: 'ready', reseller: { house: true, countryRef: { isNot: null } } },
-      select: { subdomain: true, reseller: { select: { country: true } } },
-    });
-    const byCountry = new Map(rows.filter(row => row.reseller.country).map(row => [row.reseller.country!, row.subdomain]));
-    const on = await Promise.all([...byCountry.keys()].map(async code => [code, await this.settings.isOnForCountry('country_stores', code)] as const));
-    for (const [code, enabled] of on) if (!enabled) byCountry.delete(code);
-    return byCountry;
-  }
-
-  /**
    * The countries for the country picker: every market BitoCard has set up (Settings > Markets), with the products on
-   * sale there (none yet is fine), plus any other country with products on sale. `store_subdomain` names a market's
-   * own live country store, so root can offer to take the shopper there instead of staying global.
+   * sale there (none yet is fine), plus any other country with products on sale. Choosing one only changes what
+   * bitocard.com shows: there are no country stores to go to (retired, docs/BITOCARD_MULTI_WALLETS_PLAN.md).
    */
   async countries() {
-    // A reseller's store, or a market's own country store, sells in its own country only.
+    // A reseller's store sells in its own country only.
     const store = this.scope.getStore()?.store;
     if (store) {
       const market = await this.prisma.country.findUnique({ where: { code: store.country }, select: { name: true } });
-      return [{ code: store.country, name: market?.name ?? countryName(store.country), products: await this.prisma.product.count({ where: (await this.availability()).where }), store_subdomain: null }];
+      return [{ code: store.country, name: market?.name ?? countryName(store.country), products: await this.prisma.product.count({ where: (await this.availability()).where }) }];
     }
     // Always the whole store's countries, so a shopper can pick another market.
-    const [{ where }, countryStores] = await Promise.all([this.scope.run({ market: null }, () => this.availability()), this.readyCountryStores()]);
+    const { where } = await this.scope.run({ market: null }, () => this.availability());
     const [grouped, markets] = await Promise.all([
       this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } }),
       this.prisma.country.findMany({ select: { code: true, name: true } }),
@@ -549,7 +533,7 @@ export class StorefrontService {
     return [...codes]
       // Products usable anywhere (`WW`) are not a country to pick: they show in every country.
       .filter(code => /^[A-Z]{2}$/.test(code) && code !== worldwideCountry)
-      .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0, store_subdomain: countryStores.get(code) ?? null }))
+      .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0 }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 

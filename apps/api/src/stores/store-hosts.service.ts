@@ -47,9 +47,9 @@ class HostConflict extends Error {}
 /**
  * Each store's address, `<subdomain>.bitocard.com`: a DNS-only CNAME in bitocard.com's Cloudflare zone pointing to
  * Vercel, and the address on the storefront's Vercel project (which issues its certificate). Set up when the store is
- * created or renamed; the `domains` job retries anything pending or failed. Reseller stores and BitoCard's own
- * country stores (`ng`, `gh`, `ke`…) are both hosted this way; only the single root `bitocard` store is skipped (it
- * already is bitocard.com, with no address of its own to set up). On Udozo's instance the same is done in udozo.com's
+ * created or renamed; the `domains` job retries anything pending or failed. Resellers' stores are hosted this way;
+ * the root `bitocard` store is skipped (it already is bitocard.com), and BitoCard's old country stores (`ng`, `gh`…)
+ * are retired: their addresses are taken down (`retire`). On Udozo's instance the same is done in udozo.com's
  * zone for its resellers' stores (their sandbox addresses: udozo.com's DNS is on Cloudflare, where Vercel cannot issue a
  * wildcard certificate); Udozo's own house stores (udozo.com itself, BitoCard's old country stores) are skipped.
  */
@@ -117,16 +117,44 @@ export class StoreHostsService {
     }
   }
 
-  /** The `domains` job: stores whose address is pending or failed, oldest attempt first. */
+  /**
+   * Takes down the addresses of BitoCard's retired country stores (`host_status` `retiring`, set by migration
+   * `20270204100000_retire_country_stores`): the domain on the storefront's Vercel project and BitoCard's own Cloudflare
+   * record (by its ID, never anyone else's), then `retired`. A failure is kept for the next run.
+   */
+  async retire() {
+    const due = await this.prisma.store.findMany({ where: { hostStatus: 'retiring', platform: 'bitocard' }, take: 50 });
+    const outcome = { retired: 0, failed: 0 };
+    if (!due.length) return outcome;
+    const { vercel, cloudflare } = this.clients();
+    const zone = productOf(this.config).storeHostDomain;
+    for (const store of due) {
+      try {
+        if (store.hostName) await vercel.removeFromProject(`${store.hostName}.${zone}`);
+        if (store.hostRecordId) await cloudflare.deleteRecord(store.hostRecordId);
+        await this.prisma.store.update({ where: { id: store.id }, data: { hostStatus: 'retired', hostName: null, hostRecordId: null, hostError: null, hostSyncedAt: new Date() } });
+        outcome.retired += 1;
+      } catch (error) {
+        const message = (error instanceof Error ? error.message : 'unknown error').slice(0, 500);
+        this.logger.warn({ err: message, store: store.id }, 'Retired store address not taken down');
+        await this.prisma.store.update({ where: { id: store.id }, data: { hostError: message, hostSyncedAt: new Date() } });
+        outcome.failed += 1;
+      }
+    }
+    return outcome;
+  }
+
+  /** The `domains` job: retired country stores' addresses taken down, then stores whose address is pending or failed, oldest attempt first. */
   async job() {
     if (!this.configured()) return { set_up: 0, failed: 0, skipped: 'store addresses not configured' };
+    const retired = await this.retire();
     const due = await this.prisma.store.findMany({
       where: { hostStatus: { in: ['pending', 'failed'] }, id: { not: rootStoreId }, platform: 'bitocard', ...(this.config.APP_PRODUCT === 'udozo' ? { reseller: { house: false } } : {}) },
       orderBy: [{ hostSyncedAt: { sort: 'asc', nulls: 'first' } }],
       select: { id: true },
       take: 50,
     });
-    const outcome = { set_up: 0, failed: 0 };
+    const outcome = { set_up: 0, failed: 0, retired: retired.retired, retire_failed: retired.failed };
     for (const { id } of due) {
       if ((await this.sync(id)) === 'ready') outcome.set_up += 1;
       else outcome.failed += 1;

@@ -48,10 +48,10 @@ export class HandoffService {
     if (url.origin === store.origin) return url.origin;
     const suffix = `.${store.host}`;
     const udozo = this.config.APP_PRODUCT === 'udozo';
-    if (url.protocol === store.protocol && url.host.endsWith(suffix)) {
+    if (udozo && url.protocol === store.protocol && url.host.endsWith(suffix)) {
       const subdomain = url.host.slice(0, -suffix.length);
-      // BitoCard: its two-letter country stores. Udozo: any of its published stores (their sandbox addresses).
-      if ((udozo ? /^[a-z0-9-]+$/ : /^[a-z]{2}$/).test(subdomain) && (await this.customers.sharedStore(subdomain))) return url.origin;
+      // Udozo: any of its published stores (their sandbox addresses). BitoCard's country stores are retired.
+      if (/^[a-z0-9-]+$/.test(subdomain) && (await this.customers.sharedStore(subdomain))) return url.origin;
     }
     // Udozo's live stores are on their resellers' own domains (or their www), over https.
     if (udozo && url.protocol === 'https:' && !url.port && (await this.storeDomain(url.hostname))) return url.origin;

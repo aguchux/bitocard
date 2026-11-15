@@ -11,7 +11,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode, ManualTopUp, Prisma } from '../generated/prisma/client.js';
 import { type AccountRef, LedgerService, type Line } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
-import { currencyNotHeld, walletCurrencies, WalletService } from '../ledger/wallet.service.js';
+import { currencyNotHeld, WalletService } from '../ledger/wallet.service.js';
+import { CustomerWalletsService } from '../checkout/customer-wallets.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney, manualTopUpCodeEmail } from '../notifications/templates.js';
@@ -61,6 +62,7 @@ export class ManualTopUpsService {
     private readonly email: EmailService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly customerWallets: CustomerWalletsService,
   ) {}
 
   /** Asks for a top-up of a reseller's wallet (live or the sandbox, their country's currency or US dollars). */
@@ -76,11 +78,11 @@ export class ManualTopUpsService {
   async requestForCustomer(adminId: string, customerId: string, input: TopUpInput) {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, include: { store: { include: { reseller: true } } } });
     if (!customer) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such customer.');
-    const countryCode = customer.store.reseller.house ? customer.country : customer.store.reseller.country;
+    const countryCode = customer.country ?? (customer.store.reseller.house ? null : customer.store.reseller.country);
     if (!countryCode) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'The customer has not chosen their country yet, so they have no wallet to top up.');
     const country = await this.prisma.country.findUniqueOrThrow({ where: { code: countryCode } });
     const currency = (input.currency ?? country.currency).toUpperCase();
-    if (!walletCurrencies(country.currency).includes(currency)) throw currencyNotHeld(currency);
+    if (!(await this.customerWallets.heldCurrencies(customer.id, country.currency)).includes(currency)) throw currencyNotHeld(currency);
     const mode = this.stores.mode(customer.store);
     if (input.mode && input.mode !== mode) throw invalid('mode_mismatch', `This customer's store runs in ${mode === 'live' ? 'live' : 'sandbox'} mode: their wallet can only be topped up there.`, 'mode');
     return this.request(adminId, { type: 'customer', customerId }, { ...input, mode, currency });

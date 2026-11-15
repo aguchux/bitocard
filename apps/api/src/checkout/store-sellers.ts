@@ -126,6 +126,17 @@ export class StoreSellers {
   }
 
   /**
+   * Who sells a product on bitocard.com: the house account of the product's own market when it is one of BitoCard's
+   * markets (Nigerian airtime is sold by BitoCard Nigeria in naira, whoever buys it), else the customer's home market's
+   * (`home`). Elsewhere (a reseller's store) the store's seller, as always.
+   */
+  async sellerForProduct(store: HouseAwareStore, product: { country: string }, home: Reseller): Promise<Reseller> {
+    if (!this.isRoot(store) || !product.country || product.country === home.country) return home;
+    const market = await this.prisma.country.findUnique({ where: { code: product.country }, select: { code: true } });
+    return market ? this.house.resellerFor(market.code) : home;
+  }
+
+  /**
    * How a store's customers can pay, best first. bitocard.com offers the market's checkout methods. A reseller's store
    * adds their own gateway connections (active, not switched off): `preferred` ones first, replacing BitoCard's same
    * gateway, `fallback` ones after BitoCard's methods when BitoCard does not offer that gateway.

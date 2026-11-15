@@ -185,8 +185,8 @@ describe('customer wallets', () => {
     const shopper = await customer();
     const wallet = (await shopper.get('/v1/store/wallet')).json;
     assert.deepEqual(wallet.wallets, [
-      { currency: 'NGN', primary: true, balance: 0 },
-      { currency: 'USD', primary: false, balance: 0 },
+      { currency: 'NGN', primary: true, balance: 0, removable: false },
+      { currency: 'USD', primary: false, balance: 0, removable: false },
     ]);
     const dollars = (await shopper.get('/v1/store/wallet?currency=USD')).json;
     assert.deepEqual([dollars.currency, dollars.reserved_accounts_available], ['USD', false], 'bank account numbers are for the country wallet');

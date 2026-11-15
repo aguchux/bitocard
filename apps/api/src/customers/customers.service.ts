@@ -93,34 +93,22 @@ export class CustomersService {
     return { customer: session.customer, sessionId: session.id, mfaVerifiedAt: session.mfaVerifiedAt, mfaReconfirmedAt: session.mfaReconfirmedAt };
   }
 
-  /** Country stores by subdomain, briefly: asked on every signed-in request to one. */
-  private readonly countryStores = new Map<string, { store: CustomerWithStore['store'] | null; until: number }>();
-
-  /**
-   * The published BitoCard country store at this subdomain (a house account's store other than bitocard.com itself),
-   * whose customers are bitocard.com's own; null for anything else.
-   */
-  async countryStore(subdomain: string): Promise<CustomerWithStore['store'] | null> {
-    const cached = this.countryStores.get(subdomain);
-    if (cached && cached.until > Date.now()) return cached.store;
-    const found = subdomain === houseSubdomain ? null : await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: { select: { house: true } } } });
-    const store = found && found.status === 'published' && found.reseller.house ? found : null;
-    this.countryStores.set(subdomain, { store, until: Date.now() + 60_000 });
-    return store;
-  }
+  /** Stores sharing the house store's accounts, by subdomain, briefly (Udozo: asked on every signed-in request to one). */
+  private readonly sharedStores = new Map<string, { store: CustomerWithStore['store'] | null; until: number }>();
 
   /**
    * The published store at this subdomain where accounts of the house store (bitocard.com, or Udozo's marketplace)
-   * work too, or null. BitoCard: its country stores (`countryStore`). Udozo: every published store whose reseller is not
-   * suspended, so one Udozo account works on udozo.com and every reseller's store (docs/UDOZO_SPINOFF_PLAN.md, step 3).
+   * work too, or null. BitoCard: none (its country stores are retired; bitocard.com is the one store). Udozo: every
+   * published store whose reseller is not suspended, so one Udozo account works on udozo.com and every reseller's store
+   * (docs/UDOZO_SPINOFF_PLAN.md, step 3).
    */
   async sharedStore(subdomain: string): Promise<CustomerWithStore['store'] | null> {
-    if (this.config.APP_PRODUCT !== 'udozo') return this.countryStore(subdomain);
-    const cached = this.countryStores.get(subdomain);
+    if (this.config.APP_PRODUCT !== 'udozo') return null;
+    const cached = this.sharedStores.get(subdomain);
     if (cached && cached.until > Date.now()) return cached.store;
     const found = subdomain === houseSubdomain ? null : await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: { select: { house: true, status: true } } } });
     const store = found && found.status === 'published' && found.reseller.status !== 'suspended' ? found : null;
-    this.countryStores.set(subdomain, { store, until: Date.now() + 60_000 });
+    this.sharedStores.set(subdomain, { store, until: Date.now() + 60_000 });
     return store;
   }
 

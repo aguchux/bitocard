@@ -11,7 +11,7 @@ import { type Checkout, type CheckoutStatus, type Order, type OrderDelivery, typ
 import { IdentityService } from '../identity/identity.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
-import { currencyNotHeld, WalletService, walletCurrencies } from '../ledger/wallet.service.js';
+import { currencyNotHeld, WalletService } from '../ledger/wallet.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { OrdersService, receiptNumber } from '../orders/orders.service.js';
@@ -218,14 +218,12 @@ export class CheckoutService implements OnModuleInit {
     }
     const store = customer.store;
     const mode = this.stores.mode(store);
-    // The customer's own country (fixed at sign-up), whatever country was sent.
-    const seller = await this.stores.sellerFor(customer, input.country);
-    // The first checkout anywhere through root for this market provisions that market's own country store
-    // (docs/BITOCARD_COUNTRY_STORES_PLAN.md, Stage 5): every market in the list, not only the original three pilots.
-    // Once a country store exists, customers routed through it reach this branch only via isRoot being false, so a
-    // settled market never repeats the (idempotent, but needless) check.
-    if (this.stores.isRoot(store) && seller.country) await this.house.storeFor(seller.country);
+    // Fixes an older account's country first (`country_required`), whatever country was sent.
+    const home = await this.stores.sellerFor(customer, input.country);
     const product = await this.prisma.product.findUnique({ where: { id: input.product_id } });
+    // On bitocard.com the product decides who sells it (docs/BITOCARD_MULTI_WALLETS_PLAN.md): its own market, when it
+    // is one of BitoCard's, else the customer's home market. The customer pays from any wallet at BitoCard's rate.
+    const seller = product ? await this.stores.sellerForProduct(store, product, home) : home;
     const listed = product && (this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } }));
     if (!product || !listed) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');
     // A reseller's store sells only what its template allows (its categories, or its one product).
@@ -267,9 +265,10 @@ export class CheckoutService implements OnModuleInit {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before buying this. It takes a few minutes and is needed once.');
     }
 
-    const walletCurrency = fromWallet ? this.walletCurrencyFor(quote.currency, input.wallet_currency) : quote.currency;
+    const payable = fromWallet ? await this.payableWallets(customer, quote.currency) : [quote.currency];
+    const walletCurrency = fromWallet ? this.walletCurrencyFor(payable, quote.currency, input.wallet_currency) : quote.currency;
     if (input.preview) {
-      const options = await this.walletOptions(customer.id, mode, quote);
+      const options = await this.walletOptions(customer.id, mode, quote, payable);
       return {
         object: 'checkout_preview' as const,
         quote_id: quote.id,
@@ -278,7 +277,7 @@ export class CheckoutService implements OnModuleInit {
         tax: quote.taxName ? { name: quote.taxName, amount: minor(quote.taxMinor) } : null,
         expires_at: quote.expiresAt.toISOString(),
         wallet_balance: options.find(option => option.currency === quote.currency)?.balance ?? 0,
-        /** What each wallet would pay: the price in the country wallet, or in US dollars at BitoCard's rate. */
+        /** What each of the customer's wallets would pay: the price itself, or converted at BitoCard's rate. */
         wallet_options: options,
       };
     }
@@ -331,18 +330,24 @@ export class CheckoutService implements OnModuleInit {
     return this.present((await this.load({ id }))!);
   }
 
-  /** The wallet a purchase is paid from: the price's own currency (the customer's country's) or US dollars. */
-  private walletCurrencyFor(priceCurrency: string, asked?: string) {
+  /** The wallets a purchase can be paid from: the price's own currency first, then every wallet the customer holds. */
+  private async payableWallets(customer: CustomerWithStore, priceCurrency: string) {
+    const { held } = await this.customerWallets.walletsOf(customer);
+    return [...new Set([priceCurrency, ...held])];
+  }
+
+  /** The wallet a purchase is paid from: the price's own currency by default, else any the customer holds. */
+  private walletCurrencyFor(payable: string[], priceCurrency: string, asked?: string) {
     const currency = asked ? asked.toUpperCase() : priceCurrency;
-    if (!walletCurrencies(priceCurrency).includes(currency)) throw currencyNotHeld(currency);
+    if (!payable.includes(currency)) throw currencyNotHeld(currency);
     return currency;
   }
 
-  /** Each wallet's balance and what it would pay for this quote (US dollars at BitoCard's rate; null while rates are paused). */
-  private async walletOptions(customerId: string, mode: Checkout['mode'], quote: { priceMinor: bigint; currency: string }) {
+  /** Each wallet's balance and what it would pay for this quote (at BitoCard's rate; null while a rate is paused). */
+  private async walletOptions(customerId: string, mode: Checkout['mode'], quote: { priceMinor: bigint; currency: string }, payable: string[]) {
     return Promise.all(
-      walletCurrencies(quote.currency).map(async currency => {
-        const amount = currency === quote.currency ? quote.priceMinor : ((await this.fx.usdCovering(quote.priceMinor, quote.currency).catch(() => null))?.amount ?? null);
+      payable.map(async currency => {
+        const amount = currency === quote.currency ? quote.priceMinor : ((await this.fx.covering(quote.priceMinor, quote.currency, currency).catch(() => null))?.amount ?? null);
         const balance = await this.customerWallets.balance(customerId, mode, currency);
         return { currency, amount: amount === null ? null : minor(amount), balance: minor(balance), enough: amount !== null && balance >= amount };
       }),
@@ -352,7 +357,7 @@ export class CheckoutService implements OnModuleInit {
   /**
    * Pays a checkout from the customer's wallet: in one step the price leaves their wallet for the seller's
    * `customer_payments` (exactly as a gateway payment arrives) and the checkout is paid; then the order is placed as
-   * usual. From the US dollar wallet, the price is converted at BitoCard's rate (`FxService.usdCovering`, rounded up)
+   * usual. From another wallet, the price is converted at BitoCard's rate (`FxService.covering`, rounded up)
    * through BitoCard's currency exchange accounts, and recorded on the checkout so a refund goes back exactly. A
    * wallet too low refuses it, saying how much to add, and nothing is kept.
    */
@@ -368,14 +373,14 @@ export class CheckoutService implements OnModuleInit {
   }) {
     const { id, customer, seller, mode, quote, walletCurrency } = input;
     const converted = walletCurrency !== quote.currency;
-    const cost = converted ? (await this.fx.usdCovering(quote.priceMinor, quote.currency)).amount : quote.priceMinor;
+    const cost = converted ? (await this.fx.covering(quote.priceMinor, quote.currency, walletCurrency)).amount : quote.priceMinor;
     const balance = await this.customerWallets.balance(customer.id, mode, walletCurrency);
     const short = () =>
       new ApiError(
         HttpStatus.PAYMENT_REQUIRED,
         'invalid_request_error',
         'wallet_balance_low',
-        `Your ${walletCurrency === quote.currency ? '' : 'US dollar '}wallet has ${formatMoney(balance, walletCurrency)}. Add ${formatMoney(cost - balance > 0n ? cost - balance : cost, walletCurrency)} to buy this.`,
+        `Your ${walletCurrency === quote.currency ? '' : walletCurrency === 'USD' ? 'US dollar ' : `${walletCurrency} `}wallet has ${formatMoney(balance, walletCurrency)}. Add ${formatMoney(cost - balance > 0n ? cost - balance : cost, walletCurrency)} to buy this.`,
       );
     if (balance < cost) throw short();
     const entry = await this.ledger.prepare({

@@ -44,6 +44,11 @@ export const switchDefinitions = {
     description:
       "Store customers have a wallet: they top it up (card, mobile money, Flutterwave or their own bank account number) and buy only from it, never withdrawing. Off, they pay at checkout instead (any balance left can still be spent). On unless switched off.",
   },
+  customer_foreign_wallets: {
+    scopes: ['global', 'country'],
+    description:
+      "Customers of other countries may add a wallet in this market's currency (beside their US dollar and own country's wallets), top it up with this market's methods and move money into it. Off until holding the currency for others is cleared.",
+  },
   crypto_wallets: {
     scopes: ['global', 'country', 'reseller'],
     description: "Store customers hold crypto (USDT, USDC, BTC, ETH, BNB) in BitoCard wallets. Off until crypto is cleared to operate in the market.",
@@ -132,16 +137,11 @@ export const switchDefinitions = {
   storefront_install_prompt: {
     scopes: ['global', 'country'],
     description:
-      "bitocard.com asks shoppers to install it as an app (home screen, full screen), on root bitocard.com (the global setting) and on this market's country store: at most three times, on separate visits at least an hour apart, never once installed. Never on resellers' stores. Off: no prompt, and the browser's own install bar is held back too.",
+      "bitocard.com asks shoppers to install it as an app (home screen, full screen), on bitocard.com, for shoppers in this market: at most three times, on separate visits at least an hour apart, never once installed. Never on resellers' stores. Off: no prompt, and the browser's own install bar is held back too.",
   },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
-  },
-  country_stores: {
-    scopes: ['global', 'country'],
-    description:
-      'bitocard.com serves this market through its own country store (`<country>.bitocard.com`, for example ng.bitocard.com), with that market’s house account as seller of record for every purchase there, instead of the buyer’s own country. Root bitocard.com redirects into it once set up. Off: root bitocard.com serves the market as today.',
   },
   classifieds: {
     scopes: ['global', 'country'],

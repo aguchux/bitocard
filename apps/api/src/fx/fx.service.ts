@@ -22,6 +22,9 @@ export type FxRate = {
   pay: Decimal;
   /** Converting USD into this currency (the less favourable rate for the receiver, minus the margin). */
   receive: Decimal;
+  /** The fresh sources' highest and lowest rates, before the margin (what `convert` crosses with). */
+  high: Decimal;
+  low: Decimal;
   marginBps: number;
   asOf: Date;
 };
@@ -166,7 +169,7 @@ export class FxService {
 
   /** Current effective rates for a currency; fails if conversions are paused or no fresh rate exists. */
   async rate(currency: string): Promise<FxRate> {
-    if (currency === 'USD') return { currency, pay: new Decimal(1), receive: new Decimal(1), marginBps: 0, asOf: new Date() };
+    if (currency === 'USD') return { currency, pay: new Decimal(1), receive: new Decimal(1), high: new Decimal(1), low: new Decimal(1), marginBps: 0, asOf: new Date() };
     const setting = await this.prisma.currencySetting.findUnique({ where: { currency } });
     if (!setting || setting.paused) throw conversionUnavailable(currency);
     const rates = await this.freshRates(currency);
@@ -179,6 +182,8 @@ export class FxService {
       currency,
       pay: highest.mul(new Decimal(1).plus(margin)),
       receive: lowest.mul(new Decimal(1).minus(margin)),
+      high: highest,
+      low: lowest,
       marginBps: setting.marginBps,
       asOf: new Date(Math.min(...rates.map(r => r.fetchedAt.getTime()))),
     };
@@ -250,6 +255,33 @@ export class FxService {
     const rate = await this.rate(currency);
     const cents = BigInt(new Decimal(amount.toString()).div(rate.receive).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0));
     return { amount: cents > 0n ? cents : 1n, rate: rate.receive };
+  }
+
+  /**
+   * Minor units of `to` per minor unit of `from`, for converting between any two of a customer's wallets: through US
+   * dollars, the paying side at its highest source rate and the receiving side at its lowest, then **one** margin
+   * (the larger of the two currencies'), never one per leg. Refused while either currency is paused or stale.
+   */
+  async crossRate(from: string, to: string) {
+    if (from === to) return { rate: new Decimal(1), marginBps: 0 };
+    const [a, b] = await Promise.all([this.rate(from), this.rate(to)]);
+    const marginBps = Math.max(a.marginBps, b.marginBps);
+    const scale = new Decimal(10).pow(digitsOf(to) - digitsOf(from));
+    return { rate: b.low.div(a.high).mul(scale).mul(new Decimal(1).minus(new Decimal(marginBps).div(10_000))), marginBps };
+  }
+
+  /** Converting `amount` minor units of `from` into `to` (rounded down): what a wallet-to-wallet move gives. */
+  async convert(amount: bigint, from: string, to: string) {
+    const { rate } = await this.crossRate(from, to);
+    return { amount: BigInt(new Decimal(amount.toString()).mul(rate).toDecimalPlaces(0, Decimal.ROUND_DOWN).toFixed(0)), rate };
+  }
+
+  /** The minor units of `from` that pay `amount` owed in `to` (rounded up, at least one): paying a price from another wallet. */
+  async covering(amount: bigint, to: string, from: string) {
+    if (from === to) return { amount, rate: new Decimal(1) };
+    const { rate } = await this.crossRate(from, to);
+    const needed = BigInt(new Decimal(amount.toString()).div(rate).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0));
+    return { amount: needed > 0n ? needed : 1n, rate };
   }
 
   async list() {

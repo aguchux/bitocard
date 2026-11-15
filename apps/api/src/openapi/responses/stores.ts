@@ -317,7 +317,6 @@ const storeCountry = objectSchema('Store country', {
   code: str('ISO 3166-1 alpha-2 country code.'),
   name: str('Country name.'),
   products: int('Products on sale there (zero is possible for a market not stocked yet).'),
-  store_subdomain: nullableStr('This market’s own live store (`<store_subdomain>.bitocard.com`), or null while bitocard.com still serves it directly.'),
 });
 const navigationGroup = objectSchema('Store menu group', {
   key: oneOf('Group key; filter products with `group`.', groupKeys),
@@ -527,10 +526,10 @@ const payTv = category_('pay_tv', 'bills', 12);
 const bills = category_('bills', 'bills', 4);
 
 const countries = [
-  { code: 'GH', name: 'Ghana', products: 9, store_subdomain: null },
-  { code: 'KE', name: 'Kenya', products: 0, store_subdomain: null },
-  { code: 'NG', name: 'Nigeria', products: 40, store_subdomain: 'ng' },
-  { code: 'US', name: 'United States', products: 12, store_subdomain: null },
+  { code: 'GH', name: 'Ghana', products: 9 },
+  { code: 'KE', name: 'Kenya', products: 0 },
+  { code: 'NG', name: 'Nigeria', products: 40 },
+  { code: 'US', name: 'United States', products: 12 },
 ];
 
 const navigation = [

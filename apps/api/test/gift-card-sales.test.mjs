@@ -168,8 +168,8 @@ describe('selling gift cards in the sandbox', () => {
     // A synced key with a variant where the brand would be still finds the card by the product's own brand.
     await prisma.product.create({ data: { key: 'gift_cards:US:amazon-us', category: 'gift_cards', country: 'US', brand: 'amazon', name: 'Amazon US', faceCurrency: 'USD', denominationType: 'range', minValueMinor: 500n, maxValueMinor: 50_000n } });
     assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon-us&country=NG`).then(res => res.json())).offers[0]?.name, 'Amazon (USA) E-code');
-    // A country store sells them too; a reseller's store never does.
-    assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ng`).then(res => res.json())).available, true);
+    // bitocard.com only: the retired country stores and resellers' stores never buy cards.
+    assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ng`).then(res => res.json())).reason, 'store_unavailable');
     const reseller = await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ada-digital`).then(res => res.json());
     assert.deepEqual([reseller.available, reseller.reason], [false, 'store_unavailable']);
 

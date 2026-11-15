@@ -2544,6 +2544,7 @@ model Customer {
   p2pStandings              P2pStanding[]
   p2pMerchants              P2pMerchant[]
   giftCardSales             GiftCardSale[]
+  walletCurrencies          CustomerWalletCurrency[]
   p2pBlocksMade             P2pBlock[]                @relation("p2pBlocker")
   p2pBlocksReceived         P2pBlock[]                @relation("p2pBlocked")
   p2pReportsMade            P2pReport[]               @relation("p2pReporter")
@@ -2620,6 +2621,22 @@ model CustomerHandoff {
 
   @@index([expiresAt])
   @@map("customer_handoffs")
+}
+
+/**
+ * The extra wallets a store customer added (`POST /v1/store/wallet/wallets`): currencies of markets an admin opened
+ * with `customer_foreign_wallets`. US dollars and the customer's own country's currency are always theirs and never
+ * listed here. Removing one (only while empty) deletes its row; balances are the ledger's `customer_wallet` accounts.
+ */
+model CustomerWalletCurrency {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  currency   String   @db.VarChar(10)
+  createdAt  DateTime @default(now()) @map("created_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, currency])
+  @@map("customer_wallet_currencies")
 }
 
 model CustomerSession {

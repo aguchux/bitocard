@@ -126,37 +126,35 @@ describe('store addresses', () => {
     assert.equal((await row(store.id)).hostRecordId, saved.hostRecordId);
   });
 
-  test('the single root bitocard.com store is never hosted; a market’s own country store is hosted exactly like a reseller’s', async () => {
+  test('the root bitocard.com store is never hosted; the retired country stores were unpublished by migration', async () => {
     await cron();
-    // The root house store (seeded by migration, the only house store that exists before any country store is created).
-    const root = await prisma.store.findFirst({ where: { reseller: { house: true } } });
-    assert.ok(root);
+    const root = await prisma.store.findUniqueOrThrow({ where: { id: '00000000-0000-4000-8000-0000000000b2' } });
     assert.equal(zone.records.some(record => record.name === `${root.subdomain}.bitocard.com`), false);
-
-    const house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
-    const ng = await house.storeFor('NG');
-    assert.equal(ng.subdomain, 'ng');
-    assert.equal(ng.status, 'published');
-    const host = `ng.bitocard.com`;
-    assert.ok(zone.records.some(record => record.name === host), 'a country store gets its own Cloudflare record');
-    assert.equal((await row(ng.id)).hostStatus, 'ready');
-    // Asking again returns the same store, not a second one.
-    assert.equal((await house.storeFor('ng')).id, ng.id);
+    const countryStores = await prisma.store.findMany({ where: { reseller: { house: true }, id: { not: root.id }, platform: 'bitocard' } });
+    assert.ok(countryStores.length > 0, 'the migration had made them');
+    assert.ok(countryStores.every(store => store.status === 'draft' && ['retiring', 'retired'].includes(store.hostStatus)), 'none is served or set up again');
+    assert.equal((await fetch(`${server.base}/v1/storefronts/ng`)).status, 404);
   });
 
-  test('storeFor refuses to adopt a name that is not a house store, even if something already holds it', async () => {
-    const house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
-    await prisma.country.upsert({
-      where: { code: 'ZZ' },
-      create: { code: 'ZZ', name: 'Zedland', currency: 'ZZZ', minWithdrawalMinor: 1000n },
-      update: {},
-    });
-    const squatter = await prisma.reseller.create({ data: { name: 'Squatter', country: 'ZZ', status: 'active', planCode: 'standard' } });
-    await prisma.store.create({ data: { resellerId: squatter.id, name: 'Squatter store', subdomain: 'zz', status: 'draft' } });
-    await assert.rejects(house.storeFor('ZZ'), error => {
-      assert.equal(error.code, 'subdomain_taken');
-      return true;
-    });
+  test('a retired country store’s address is taken down by the domains job: its own record and its Vercel domain only', async () => {
+    const ng = await prisma.store.findUniqueOrThrow({ where: { subdomain: 'ng' } });
+    zone.records.push({ id: 'rec_ng', type: 'CNAME', name: 'ng.bitocard.com', content: 'cname.vercel-dns.com', comment: `bitocard:store:${ng.id}` });
+    zone.records.push({ id: 'rec_other', type: 'TXT', name: 'ng.bitocard.com', content: 'someone else', comment: null });
+    vercel.state.projectDomains['ng.bitocard.com'] = { name: 'ng.bitocard.com', verified: true };
+    await prisma.store.update({ where: { id: ng.id }, data: { hostStatus: 'retiring', hostName: 'ng', hostRecordId: 'rec_ng' } });
+
+    const run = await cron();
+    assert.equal(run.status, 200, JSON.stringify(run.json));
+    const after = await row(ng.id);
+    assert.deepEqual([after.hostStatus, after.hostName, after.hostRecordId], ['retired', null, null]);
+    assert.deepEqual(zone.records.filter(record => record.name === 'ng.bitocard.com').map(record => record.id), ['rec_other'], 'a record BitoCard did not make stays');
+    assert.equal(vercel.state.projectDomains['ng.bitocard.com'], undefined);
+    zone.records = zone.records.filter(record => record.id !== 'rec_other');
+
+    // Asked again: nothing more to do, and the store is never set up again.
+    await cron();
+    assert.equal((await row(ng.id)).hostStatus, 'retired');
+    assert.equal(zone.records.some(record => record.name === 'ng.bitocard.com'), false);
   });
 
   test('Test connection reads the zone and the storefront project, and refuses another zone', async () => {

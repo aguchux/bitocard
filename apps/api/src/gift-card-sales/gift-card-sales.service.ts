@@ -146,8 +146,8 @@ export class GiftCardSalesService {
    */
   async offersFor(productKey: string | undefined, country: string | undefined, store?: string) {
     const code = country?.toUpperCase();
-    // BitoCard's own stores only: bitocard.com and its country stores (every 2-letter subdomain is BitoCard's).
-    const reason = store && store !== 'bitocard' && !/^[a-z]{2}$/.test(store) ? 'store_unavailable' : await this.closedFor(code);
+    // bitocard.com only (its country stores are retired; resellers' stores never buy cards).
+    const reason = store && store !== 'bitocard' ? 'store_unavailable' : await this.closedFor(code);
     const currency = (code && payoutCountries[code]) ?? null;
     const empty = { object: 'gift_card_sell_options' as const, available: false, reason, currency, offers: [] as ReturnType<GiftCardSalesService['presentOffer']>[] };
     if (reason) return empty;

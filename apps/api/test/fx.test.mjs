@@ -53,6 +53,22 @@ describe('exchange rates', () => {
     assert.equal(amount, 3_857_000n, 'US$25.00 at 1542.8 is NGN 38,570.00');
   });
 
+  test('any two wallets convert through US dollars at one margin, never one per leg', async () => {
+    const { FxService } = await import('../dist/fx/fx.service.js');
+    const fx = server.app.get(FxService);
+    // NGN 1500 to 1520, KES 129 to 130, both at 1.5%: NGN pays at its highest (1520), KES receives at its lowest (129).
+    const { amount, rate } = await fx.convert(1_000_000n, 'NGN', 'KES');
+    assert.equal(amount, 83_595n, 'NGN 10,000.00 is KES 835.95 (129 / 1520, less 1.5% once)');
+    assert.equal(rate.toFixed(8), (129 / 1520 * 0.985).toFixed(8));
+    assert.equal((await fx.convert(10_000n, 'USD', 'NGN')).amount, 14_775_000n, 'US$100 out at the receive rate, as before');
+    assert.equal((await fx.convert(500n, 'KES', 'KES')).amount, 500n);
+
+    const cover = await fx.covering(83_595n, 'KES', 'NGN');
+    assert.ok(cover.amount >= 999_995n && cover.amount <= 1_000_000n, `paying KES 835.95 from naira takes about NGN 10,000 (${cover.amount})`);
+    assert.ok((await fx.convert(cover.amount, 'NGN', 'KES')).amount >= 83_595n, 'what covering asks for always covers it');
+    assert.equal((await fx.covering(1n, 'KES', 'NGN')).amount >= 1n, true);
+  });
+
   test('sources that disagree beyond the limit pause the currency and alert admins', async () => {
     oxr.state.rates = { NGN: 1500, GHS: 15, KES: 129 };
     flw.state.rates = { NGN: 1520, GHS: 16, KES: 130 };

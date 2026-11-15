@@ -8,6 +8,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { FxService } from '../fx/fx.service.js';
 import { walletCurrencies } from '../ledger/wallet.service.js';
+import { CustomerWalletsService } from '../checkout/customer-wallets.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
 
 /** What every customer can win in all, in US cents. */
@@ -102,6 +103,7 @@ export class SpinsService {
     private readonly settings: SettingsService,
     private readonly fx: FxService,
     private readonly stores: StoreSellers,
+    private readonly customerWallets: CustomerWalletsService,
   ) {}
 
   /** The customer's store seller, mode and market (`store_unavailable` without a country). */
@@ -112,6 +114,15 @@ export class SpinsService {
     if (!seller.country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
     const market = await this.prisma.country.findUniqueOrThrow({ where: { code: seller.country }, select: { code: true, currency: true } });
     return { mode: this.stores.mode(customer.store), seller, country: market.code, currency: market.currency };
+  }
+
+  /** The wallets rewards can go to: the store's market's currency, US dollars and every other wallet the customer holds. */
+  private async walletsFor(customer: CustomerWithStore, marketCurrency: string) {
+    const held = await this.customerWallets
+      .walletsOf(customer)
+      .then(wallets => wallets.held)
+      .catch(() => [] as string[]);
+    return [...new Set([...walletCurrencies(marketCurrency), ...held])];
   }
 
   /** The public Customer Catcher is BitoCard-only and separately enabled per market in Admin > Spin rewards. */
@@ -246,7 +257,7 @@ export class SpinsService {
         message: reason === 'daily_limit' ? 'Your saved visitor spins were removed because you already used today’s registered spins.' : 'This account has already started Spin and win, so the visitor claim cannot be added.',
       };
     }
-    const currencies = walletCurrencies(context.currency);
+    const currencies = await this.walletsFor(customer, context.currency);
     const amounts = (await Promise.all(currencies.map(async currency => ({ currency, amount: Number((await this.fx.exchange(BigInt(claim.wonCents), 'USD', currency)).amount) })))).filter(item => item.amount > 0);
     return { object: 'public_spin_claim', status: 'active', reason: null, usd: usd(claim.wonCents), spins: claim.spinsUsed, currencies: amounts };
   }
@@ -259,7 +270,7 @@ export class SpinsService {
     const claim = await this.prisma.publicSpinClaim.findUniqueOrThrow({ where: { tokenHash: tokenHash(token) } });
     if (claim.spinsUsed < 1) throw conflict('nothing_to_exchange', 'Spin first, then claim your win.');
     const selected = status.currencies?.find(item => item.currency === currencyAsked.toUpperCase());
-    if (!selected) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', 'Choose your local or US dollar wallet.', 'currency');
+    if (!selected) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', 'Choose one of your wallets.', 'currency');
     const amount = BigInt(selected.amount);
     const id = randomUUID();
     const entry = await this.ledger.prepare({
@@ -379,7 +390,7 @@ export class SpinsService {
       daily_limit: limit,
       allowance: this.present(allowance, allowance ? await this.spinsToday(allowance.id) : 0, limit),
       recent: recent.map(spin => this.presentSpin(spin)),
-      rewards: { usd: usd(await this.rewards(customer.id, mode)), exchange_currencies: walletCurrencies(market?.currency) },
+      rewards: { usd: usd(await this.rewards(customer.id, mode)), exchange_currencies: market ? await this.walletsFor(customer, market.currency) : walletCurrencies(undefined) },
     };
   }
 
@@ -452,7 +463,7 @@ export class SpinsService {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
     }
     const context = await this.context(customer);
-    const currencies = walletCurrencies(context.currency);
+    const currencies = await this.walletsFor(customer, context.currency);
     const currency = (input.currency ?? context.currency).toUpperCase();
     if (!currencies.includes(currency)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', `Rewards go to your ${currencies.join(' or ')} wallet.`, 'currency');
