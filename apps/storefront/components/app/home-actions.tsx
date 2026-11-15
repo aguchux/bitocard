@@ -2,11 +2,12 @@ import { Gift, HandCoins } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { ActionCard, giftCardCount, giftCardGroup, sellCatalogHref } from "./gift-card-actions";
 import { homeCards } from "./mobile-actions";
+import { ActionRow } from "./action-row";
 
 /**
  * Home's "I want to": buying and selling gift cards, then airtime and data (topping up, and the airtime exchange's
  * selling and buying), as one set of equal cards. Three across in two rows on desktops; one row that slides sideways
- * (snapping, the next card peeking, no scroll bar) on phones and tablets. A closed action says Soon and links nowhere.
+ * (snapping, the next card peeking, no scroll bar; swiped, or dragged and stepped with arrows by a mouse) on phones and tablets. A closed action says Soon and links nowhere.
  */
 export function HomeActions({ giftCards, sellOpen, topUpOpen, exchangeOpen }: { giftCards: StoreNavigationGroup | undefined; sellOpen: boolean; topUpOpen: boolean; exchangeOpen: boolean }) {
   const count = giftCardCount(giftCards);
@@ -38,16 +39,16 @@ export function HomeActions({ giftCards, sellOpen, topUpOpen, exchangeOpen }: { 
       <h2 id="home-actions" className="mb-3 text-xl font-extrabold tracking-tight text-navy-900">
         I want to
       </h2>
-      <ul
-        aria-label="What you can do"
-        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:grid lg:auto-rows-fr lg:grid-cols-3 lg:gap-4 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
+      <ActionRow
+        label="What you can do"
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:grid lg:auto-rows-fr lg:grid-cols-3 lg:gap-4 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
       >
         {cards.map(card => (
           <li key={card.key} className="relative w-[80%] shrink-0 snap-start sm:w-[45%] lg:w-auto">
             <ActionCard icon={card.icon} tile={card.tile} title={card.title} text={card.text} href={card.href} soon={!card.href} />
           </li>
         ))}
-      </ul>
+      </ActionRow>
     </section>
   );
 }
