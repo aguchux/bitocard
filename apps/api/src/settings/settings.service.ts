@@ -67,6 +67,11 @@ export const switchDefinitions = {
     description:
       "The airtime exchange on bitocard.com: customers sell unused airtime to BitoCard (sent to its collector lines, credited to their wallet after a hold) and buy airtime from the pool at a discount, with the pool shown to everyone. Off until the networks and lawyers have cleared it.",
   },
+  bank_deposits: {
+    scopes: ['global', 'country'],
+    description:
+      "Bank deposits: customers top up their wallet by paying cash into, or transferring to, Golojan's own bank accounts for the market (set on Settings > Markets), then say they paid; finance checks the bank and credits what arrived. An alternative for markets whose payment gateways are off or not working.",
+  },
   spin_rewards: {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 over 50 to 100 spins, a few a day, paid by BitoCard into their spin rewards and moved into their store wallet in US dollars or their own currency. Off until the promotion's terms are cleared.",

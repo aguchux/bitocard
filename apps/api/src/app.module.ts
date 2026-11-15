@@ -48,6 +48,7 @@ import { AfrippaModule } from './afrippa/afrippa.module.js';
 import { SpinsModule } from './spins/spins.module.js';
 import { GiftCardSalesModule } from './gift-card-sales/gift-card-sales.controller.js';
 import { AirtimeModule } from './airtime/airtime.controller.js';
+import { BankDepositsModule } from './bank-deposits/bank-deposits.controller.js';
 import { ManualTopUpsModule } from './top-ups/manual-top-ups.module.js';
 import { AddressRateLimitGuard, RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
 import { AfrippaGateGuard } from './afrippa/gate.guard.js';
@@ -123,6 +124,7 @@ export class AppModule {
         SpinsModule,
         GiftCardSalesModule,
         AirtimeModule,
+        BankDepositsModule,
         VpnModule,
         VpnApiModule,
         CheckoutModule,

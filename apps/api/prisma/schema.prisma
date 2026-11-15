@@ -2585,6 +2585,7 @@ model Customer {
   spinExchanges             SpinExchange[]
   publicSpinClaim           PublicSpinClaim?
   manualTopUps              ManualTopUp[]
+  bankDeposits              BankDeposit[]
   classifiedListings        ClassifiedListing[]
   classifiedSeller          ClassifiedSeller?
   classifiedTermsAcceptances ClassifiedTermsAcceptance[]
@@ -3100,6 +3101,72 @@ model ManualTopUp {
   @@index([customerId, createdAt])
   @@index([status, createdAt])
   @@map("manual_top_ups")
+}
+
+/// A bank account Golojan receives customers' bank deposits and transfers into, in one market and currency. Shown to
+/// customers topping up by bank deposit where the market's `bank_deposits` switch is on; each request keeps a copy of
+/// the details it was given, so changing or removing an account never changes what a customer was told.
+model DepositBankAccount {
+  id            String        @id @default(uuid()) @db.Uuid
+  /// ISO 3166-1 alpha-2: the market whose customers see it.
+  country       String        @db.Char(2)
+  currency      String        @db.Char(3)
+  bankName      String        @map("bank_name")
+  accountName   String        @map("account_name")
+  accountNumber String        @map("account_number")
+  /// Anything else the bank needs (sort code, branch, SWIFT), shown under the account.
+  details       String?
+  active        Boolean       @default(true)
+  position      Int           @default(0)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  deposits      BankDeposit[]
+
+  @@index([country, active])
+  @@map("deposit_bank_accounts")
+}
+
+/// A customer's request to top up their wallet by paying cash into, or transferring to, one of Golojan's bank
+/// accounts: `awaiting_payment`, then `sent` once they say they paid, then `credited` (finance credited what arrived,
+/// once, `bank_deposit:<id>`) or `rejected`; or `cancelled` by them, or `expired` unpaid. Shown as BD-000123.
+model BankDeposit {
+  id                  String              @id @default(uuid()) @db.Uuid
+  number              Int                 @unique @default(autoincrement())
+  mode                LedgerMode
+  customerId          String              @map("customer_id") @db.Uuid
+  storeId             String              @map("store_id") @db.Uuid
+  accountId           String?             @map("account_id") @db.Uuid
+  country             String              @db.Char(2)
+  currency            String              @db.Char(3)
+  amountMinor         BigInt              @map("amount_minor")
+  /// The reference the customer writes on the deposit slip or transfer, so finance can find it.
+  reference           String              @unique
+  /// The account's details as the customer was shown them.
+  bankName            String              @map("bank_name")
+  accountName         String              @map("account_name")
+  accountNumber       String              @map("account_number")
+  details             String?
+  status              String              @default("awaiting_payment")
+  /// cash or transfer, said by the customer when they mark it sent.
+  method              String?
+  senderName          String?             @map("sender_name")
+  senderNote          String?             @map("sender_note")
+  sentAt              DateTime?           @map("sent_at")
+  expiresAt           DateTime            @map("expires_at")
+  creditedAmountMinor BigInt?             @map("credited_amount_minor")
+  externalReference   String?             @map("external_reference")
+  decidedBy           String?             @map("decided_by") @db.Uuid
+  decidedAt           DateTime?           @map("decided_at")
+  decisionNote        String?             @map("decision_note")
+  entryId             String?             @map("entry_id") @db.Uuid
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  customer            Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  account             DepositBankAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+  @@map("bank_deposits")
 }
 
 /// Money an admin recorded as sent to a supplier outside BitoCard (a bank transfer to its account): funds

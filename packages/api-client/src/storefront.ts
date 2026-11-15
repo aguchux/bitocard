@@ -348,7 +348,6 @@ export type StoreAirtimePool = {
 
 export type StoreAirtimeSaleStatus = 'awaiting_transfer' | 'sent' | 'received' | 'credited' | 'expired' | 'cancelled' | 'not_received' | 'reversed';
 
-/** A customer's airtime sold to BitoCard (AS-000123): where to send it while they still have to, then its progress. */
 /** `GET /v1/store/airtime/seller`: where the customer stands as a seller, and today's limit per network. */
 export type StoreAirtimeSeller = {
   object: "airtime_seller";
@@ -361,6 +360,7 @@ export type StoreAirtimeSeller = {
   networks: Array<{ network: string; new_seller: boolean; established_after: number; daily_limit: number; seller_daily: number }>;
 };
 
+/** A customer's airtime sold to BitoCard (AS-000123): where to send it while they still have to, then its progress. */
 export type StoreAirtimeSale = {
   object: 'airtime_sale';
   id: string;
@@ -412,6 +412,64 @@ export type StoreAirtimePurchaseQuote = { object: 'airtime_purchase_quote'; netw
 export const ratePercent = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
 
 /** What a seller's airtime sale is doing, in words. */
+export type StoreBankDepositStatus = 'awaiting_payment' | 'sent' | 'credited' | 'rejected' | 'cancelled' | 'expired';
+
+/** One of Golojan's bank accounts a customer can pay cash into, or transfer to, to top their wallet up. */
+export type StoreDepositBankAccount = {
+  object: 'deposit_bank_account';
+  id: string;
+  country: string;
+  currency: string;
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  details: string | null;
+};
+
+/** `GET /v1/store/wallet/bank-deposits/options?currency=`: whether a wallet can be topped up by bank deposit, and where. */
+export type StoreBankDepositOptions = {
+  object: 'bank_deposit_options';
+  country: string;
+  currency: string;
+  available: boolean;
+  accounts: StoreDepositBankAccount[];
+  min_amount: number;
+  window_hours: number;
+};
+
+/** A wallet top-up by bank deposit or transfer (BD-000123): pay, say so, then finance credits what arrived. */
+export type StoreBankDeposit = {
+  object: 'bank_deposit';
+  id: string;
+  number: string;
+  mode: 'live' | 'test';
+  status: StoreBankDepositStatus;
+  currency: string;
+  amount: number;
+  credited_amount: number | null;
+  /** Written on the deposit slip or as the transfer's description, so finance can find it. */
+  reference: string;
+  account: { bank_name: string; account_name: string; account_number: string; details: string | null };
+  method: 'cash' | 'transfer' | null;
+  sender_name: string | null;
+  note: string | null;
+  /** Why it was not credited, when rejected. */
+  decision_note: string | null;
+  expires_at: string;
+  sent_at: string | null;
+  decided_at: string | null;
+  created_at: string;
+};
+
+export const bankDepositStatus: Record<StoreBankDepositStatus, string> = {
+  awaiting_payment: 'Waiting for your payment',
+  sent: 'Checking our bank',
+  credited: 'Added to your wallet',
+  rejected: 'Not credited',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
+
 export const airtimeSaleStatus: Record<StoreAirtimeSaleStatus, string> = {
   awaiting_transfer: 'Send the airtime',
   sent: 'Checking it arrived',

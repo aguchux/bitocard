@@ -514,6 +514,7 @@ export * from './classifieds';
 export * from './shop-assistants';
 export * from './top-ups';
 export * from './airtime';
+export * from './bank-deposits';
 export * from './team';
 export * from './marketing';
 export * from './contact-messages';

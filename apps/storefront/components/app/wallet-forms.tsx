@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { ArrowLeftRight, Landmark, Plus, Trash2, X } from "lucide-react";
-import { formatFace, walletName, type StorePaymentMethod, type StoreWallet, type StoreWalletCurrencyOption } from "@bitocard/api-client/storefront";
+import { ArrowLeftRight, Banknote, Landmark, Plus, Trash2, X } from "lucide-react";
+import { formatFace, walletName, type StoreBankDepositOptions, type StorePaymentMethod, type StoreWallet, type StoreWalletCurrencyOption } from "@bitocard/api-client/storefront";
+import { BankDepositForm } from "@/components/app/bank-deposit-forms";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
 import { addWallet, type ConversionState, convertWallets, openBankAccount, removeWallet, simulateDeposit, topUpWallet } from "@/lib/wallet";
@@ -120,14 +121,19 @@ export function BankAccountDialog({ needsBvn }: { needsBvn: boolean }) {
 /**
  * "Add funds" beside the balance: a popup (native dialog: Escape and the backdrop close it, focus stays inside) to top
  * up by card or mobile money through a payment page. Where the market offers bank account numbers it also shows the
- * customer's (to transfer to), or the link to get one. Opens by itself when the customer came to top up for a purchase.
+ * customer's (to transfer to), or the link to get one; where the market takes bank deposits (`bankDeposits`), paying
+ * cash into, or transferring to, Golojan's own account, which finance credits once it arrives (the only way shown while
+ * no gateway is on). Opens by itself when the customer came to top up for a purchase.
  */
-export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet; amount?: string; open?: boolean }) {
+export function AddFunds({ wallet, amount, open = false, bankDeposits = null }: { wallet: StoreWallet; amount?: string; open?: boolean; bankDeposits?: StoreBankDepositOptions | null }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (open && !dialog.current?.open) dialog.current?.showModal();
   }, [open]);
   const sandbox = wallet.mode === "test";
+  const deposits = bankDeposits?.available && bankDeposits.currency === wallet.currency ? bankDeposits : null;
+  // No gateway open here: the bank deposit is the way in, so the card form (which could not be used) is left out.
+  const gateways = wallet.top_up_methods.length > 0 || sandbox || !deposits;
   return (
     <>
       <button
@@ -152,7 +158,18 @@ export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet
           </button>
         </div>
         <div className="space-y-6 p-5">
-          <TopUpForm currency={wallet.currency} primary={wallet.wallets.find(item => item.currency === wallet.currency)?.primary ?? true} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
+          {gateways ? <TopUpForm currency={wallet.currency} primary={wallet.wallets.find(item => item.currency === wallet.currency)?.primary ?? true} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} /> : null}
+          {deposits ? (
+            <section aria-labelledby="add-deposit" className={gateways ? "border-t border-slate-100 pt-5" : undefined}>
+              <h3 id="add-deposit" className="mb-1 flex items-center gap-2 font-semibold">
+                <Banknote className="size-5" aria-hidden="true" /> Bank deposit or transfer
+              </h3>
+              <p className="mb-3 text-sm text-slate-600">
+                Pay cash into our bank account, or transfer to it, with the reference we give you. We add it to your wallet once it arrives, usually within a working day.
+              </p>
+              <BankDepositForm options={deposits} amount={amount} />
+            </section>
+          ) : null}
           {wallet.reserved_accounts_available ? (
             <section aria-labelledby="add-bank" className="border-t border-slate-100 pt-5">
               <h3 id="add-bank" className="mb-1 flex items-center gap-2 font-semibold">

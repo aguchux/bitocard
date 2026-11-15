@@ -1,4 +1,5 @@
 import { AirtimeModule } from '../airtime/airtime.controller.js';
+import { BankDepositsModule } from '../bank-deposits/bank-deposits.controller.js';
 import { GiftCardSalesModule } from '../gift-card-sales/gift-card-sales.controller.js';
 import { AfrippaModule } from '../afrippa/afrippa.module.js';
 import { Module } from '@nestjs/common';
@@ -19,5 +20,5 @@ import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 import { ShopAssistantModule } from '../classifieds/assistant/assistant.module.js';
 import { ResaleModule } from '../resale/resale.module.js';
 
-@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, ResaleModule, GiftCardSalesModule, AirtimeModule], controllers: [CronController] })
+@Module({ imports: [AfrippaModule, CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, ResaleModule, GiftCardSalesModule, AirtimeModule, BankDepositsModule], controllers: [CronController] })
 export class CronModule {}

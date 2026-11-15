@@ -1,4 +1,4 @@
-import { AlertTriangle, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Banknote, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'reports' | 'support' | 'settings';
 
@@ -51,6 +51,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Bank transfer accounts', href: '/orders/reserved-accounts', icon: Landmark },
       { label: 'VPN access', href: '/orders/vpn', icon: ShieldEllipsis },
       { label: 'Airtime exchange', href: '/orders/airtime', icon: Smartphone },
+      { label: 'Bank deposits', href: '/orders/bank-deposits', icon: Banknote },
     ],
   },
   catalog: {

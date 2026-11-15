@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CreditCard, KeyRound, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
+import { Banknote, CreditCard, KeyRound, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
 import { Card, categoryName, PanelNav, SettingsPanel, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
@@ -10,6 +10,7 @@ import { IdentityProvider } from "./identity-provider";
 import { SmsProvider } from "./sms-provider";
 import { PaymentMethods } from "./payment-methods";
 import { TaxRateCard } from "./tax-rate";
+import { BankDepositAccounts } from "./bank-deposit-accounts";
 import { TwoStepSignIn } from "./two-step";
 
 
@@ -25,6 +26,7 @@ const panels = [
   { id: "identity", label: "Identity checks", icon: ShieldCheck },
   { id: "phone", label: "Phone verification", icon: Smartphone },
   { id: "payments", label: "Payment methods", icon: CreditCard },
+  { id: "bank-deposits", label: "Bank deposits", icon: Banknote },
   { id: "tax", label: "Tax", icon: Receipt },
   { id: "two-step", label: "Two-step sign-in", icon: KeyRound },
 ];
@@ -182,6 +184,10 @@ function Markets() {
 
           <SettingsPanel id="payments" icon={CreditCard} title="Payment methods" description={`How resellers top up and customers pay in ${country.name}, in the order offered.`}>
             <PaymentMethods code={country.code} country={country.name} editable={paymentsEditable} />
+          </SettingsPanel>
+
+          <SettingsPanel id="bank-deposits" icon={Banknote} title="Bank deposits" description={`Golojan's accounts customers in ${country.name} pay cash into, or transfer to, when gateways are off or not working.`}>
+            <BankDepositAccounts key={country.code} code={country.code} country={country.name} currency={country.currency} editable={can(admin, "finance")} />
           </SettingsPanel>
 
           <SettingsPanel id="tax" icon={Receipt} title="Tax" description="The rate charged on taxable categories, confirmed by finance after tax advice.">

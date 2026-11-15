@@ -41,6 +41,14 @@ export default function TermsOfUse() {
           <li><strong>Refunds go back to how you paid.</strong> If you are refunded, the money returns to the card, bank account or mobile money wallet you paid with. Banks and mobile money providers can take a few days to show it.</li>
         </ul>
         <p>We tell you by email or in your account when your problem has a reply or a decision. Reporting a problem does not affect your statutory rights as a consumer, or your right to dispute a card payment with your bank. If you dispute a payment with your bank, we may share your order&apos;s details with the payment provider and the store to respond to it.</p>
+        <h3 id="bank-deposits">Adding money by bank deposit</h3>
+        <p>Where we offer it in your country, you can add money to your wallet by paying cash into, or transferring to, our own bank account (Golojan&apos;s), instead of paying online.</p>
+        <ul>
+          <li><strong>Use the reference we give you.</strong> We show the account and a reference for each request. Write the reference on the deposit slip or as the transfer&apos;s description, and pay within 72 hours of asking. Then tell us you sent it, with the name the money came from.</li>
+          <li><strong>We add it once it arrives.</strong> Nothing is added until we see the money in our account, usually within a working day. We add what actually arrived: if it is less or more than you asked, that is what we add.</li>
+          <li><strong>If we cannot match it,</strong> we tell you why. Contact us with the slip or the transfer&apos;s receipt if you paid and it was not added.</li>
+          <li>Money added this way is wallet money like any other: spent only in the store and never withdrawn.</li>
+        </ul>
         <h3 id="help">Help, chat and AI assistants</h3>
         <p>You can ask a store a question from your account (&ldquo;Help &amp; support&rdquo;) or chat with it. The store answers first and can pass your question to BitoCard.</p>
         <ul>

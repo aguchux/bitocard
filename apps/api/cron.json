@@ -126,6 +126,11 @@
       "job": "airtime",
       "schedule": "*/5 * * * *",
       "product": "bitocard"
+    },
+    {
+      "job": "bank-deposits",
+      "schedule": "17 * * * *",
+      "product": "bitocard"
     }
   ]
 }

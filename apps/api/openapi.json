@@ -1714,7 +1714,8 @@
                     "shq_store_guide": true,
                     "storefront_install_prompt": false,
                     "gift_card_selling": false,
-                    "airtime_exchange": false
+                    "airtime_exchange": false,
+                    "bank_deposits": false
                   }
                 }
               }
@@ -38100,6 +38101,7 @@
               "customer_foreign_wallets",
               "gift_card_selling",
               "airtime_exchange",
+              "bank_deposits",
               "spin_rewards",
               "store_template_all_in_one",
               "store_template_topups",
@@ -38158,6 +38160,10 @@
               "airtime_exchange": {
                 "type": "boolean",
                 "description": "The airtime exchange on bitocard.com: customers sell unused airtime to BitoCard (sent to its collector lines, credited to their wallet after a hold) and buy airtime from the pool at a discount, with the pool shown to everyone. Off until the networks and lawyers have cleared it."
+              },
+              "bank_deposits": {
+                "type": "boolean",
+                "description": "Bank deposits: customers top up their wallet by paying cash into, or transferring to, Golojan's own bank accounts for the market (set on Settings > Markets), then say they paid; finance checks the bank and credits what arrived. An alternative for markets whose payment gateways are off or not working."
               },
               "spin_rewards": {
                 "type": "boolean",

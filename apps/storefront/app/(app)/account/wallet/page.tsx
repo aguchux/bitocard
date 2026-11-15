@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, Landmark, Wallet } from "lucide-react";
-import { formatFace, walletName, type StoreList, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
+import { Banknote, ChevronLeft, ChevronRight, Landmark, Wallet } from "lucide-react";
+import { bankDepositStatus, formatFace, walletName, type StoreList, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
+import { bankDepositOptions, myBankDeposits } from "@/lib/bank-deposits";
 import { ActivityHeading, MoneyActivityList } from "@/components/app/wallet-activity";
 import { AddFunds, AddWallet, BankAccountDialog, BankAccountLink, MoveMoney, RemoveWallet } from "@/components/app/wallet-forms";
 import { activityHref, recentItems } from "@/lib/activity";
@@ -35,6 +36,9 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     walletCurrencies(),
   ]);
   const wallet = chosen ?? (asked ? await walletFor() : null);
+  const [deposits, depositList] = wallet?.enabled ? await Promise.all([bankDepositOptions(wallet.currency), myBankDeposits()]) : [null, []];
+  // Bank deposits still waiting on the customer or on us.
+  const openDeposits = depositList.filter(item => item.status === "awaiting_payment" || item.status === "sent");
   // The money wallets' last 24 hours (a few); everything else is on Transactions.
   const recentMoney = activity.ok ? recentItems(activity.data.data) : [];
   const back = params.back ? safeNext(params.back, "") : "";
@@ -118,13 +122,35 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
               {wallet.enabled ? (
                 <div className="flex flex-wrap gap-2">
                   {wallet.balance > 0 ? <MoveMoney key={wallet.currency} wallet={wallet} /> : null}
-                  <AddFunds wallet={wallet} amount={params.amount} open={Boolean(back || params.amount)} />
+                  <AddFunds wallet={wallet} amount={params.amount} open={Boolean(back || params.amount)} bankDeposits={deposits} />
                 </div>
               ) : null}
             </div>
           </section>
           {wallet.enabled && wallet.reserved_accounts_available && !wallet.reserved_accounts.length ? (
             <BankAccountDialog needsBvn={wallet.reserved_account_needs_bvn} />
+          ) : null}
+          {openDeposits.length ? (
+            <section aria-labelledby="open-deposits" className={card}>
+              <h2 id="open-deposits" className="mb-3 flex items-center gap-2 font-bold">
+                <Banknote className="size-5" aria-hidden="true" /> Bank deposits
+              </h2>
+              <ul className="divide-y divide-slate-100">
+                {openDeposits.map(item => (
+                  <li key={item.id}>
+                    <Link href={`/account/wallet/deposits/${item.id}`} className="flex min-h-14 items-center justify-between gap-3 py-2 hover:text-brand-600">
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{formatFace(item.amount, item.currency)}</span>
+                        <span className="block truncate text-sm text-slate-500">
+                          {item.reference} · {bankDepositStatus[item.status]}
+                        </span>
+                      </span>
+                      <ChevronRight className="size-5 shrink-0 text-slate-400" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
           {shown?.removable ? <RemoveWallet currency={wallet.currency} /> : null}
         </>

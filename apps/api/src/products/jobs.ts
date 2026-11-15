@@ -17,6 +17,7 @@ export const jobOwners: Readonly<Record<string, Product>> = {
   'p2p-merchants': 'bitocard',
   'gift-card-sales': 'bitocard',
   airtime: 'bitocard',
+  'bank-deposits': 'bitocard',
   'chain-health': 'bitocard',
   'crypto-reconcile': 'bitocard',
   classifieds: 'udozo',
