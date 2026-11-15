@@ -76,6 +76,22 @@ export async function ProductDetail({ product, inApp = false, sell = false }: { 
     />
   );
 
+  // Buying's notes belong to the Buy tab: on Sell they would describe the wrong thing.
+  const buying = (
+    <>
+      {buyForm}
+      <p className="mt-2 text-sm text-slate-500">Values shown are what the product is worth; you see your price before you pay.</p>
+
+      <div className="mt-6 flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+        <Info className="mt-0.5 size-5 shrink-0 text-slate-500" aria-hidden="true" />
+        <div>
+          <p>{delivery[product.recipient_type] ?? delivery.none}</p>
+          {product.redeem_instructions ? <p className="mt-2 whitespace-pre-line">{product.redeem_instructions}</p> : null}
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="space-y-8 sm:space-y-12">
       {inApp ? (
@@ -146,21 +162,12 @@ export async function ProductDetail({ product, inApp = false, sell = false }: { 
           {sellOptions?.available ? (
             <BuySell
               initial={sell ? "sell" : "buy"}
-              buy={buyForm}
+              buy={buying}
               sell={<SellForm offers={sellOptions.offers} signedIn={Boolean(customer)} back={`${base}/${encodeURIComponent(product.key)}?sell=1`} sandbox={sandbox} />}
             />
           ) : (
-            buyForm
+            buying
           )}
-          <p className="mt-2 text-sm text-slate-500">Values shown are what the product is worth; you see your price before you pay.</p>
-
-          <div className="mt-6 flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-            <Info className="mt-0.5 size-5 shrink-0 text-slate-500" aria-hidden="true" />
-            <div>
-              <p>{delivery[product.recipient_type] ?? delivery.none}</p>
-              {product.redeem_instructions ? <p className="mt-2 whitespace-pre-line">{product.redeem_instructions}</p> : null}
-            </div>
-          </div>
         </div>
       </div>
 
