@@ -3,32 +3,52 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, Banknote, Landmark, Plus, Trash2, X } from "lucide-react";
 import { formatFace, walletName, type StoreBankDepositOptions, type StorePaymentMethod, type StoreWallet, type StoreWalletCurrencyOption } from "@bitocard/api-client/storefront";
-import { BankDepositForm } from "@/components/app/bank-deposit-forms";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
+import { startBankDeposit } from "@/lib/bank-deposits";
 import { addWallet, type ConversionState, convertWallets, openBankAccount, removeWallet, simulateDeposit, topUpWallet } from "@/lib/wallet";
 
-/** Topping the wallet up: an amount, then the payment page of the method chosen. */
-export function TopUpForm({ currency, primary = true, methods, amount, sandbox }: { currency: string; primary?: boolean; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(topUpWallet, {});
+/** The choice beside a payment gateway's methods that pays cash into, or transfers to, Golojan's bank account. */
+const bankDepositChoice = "bank_deposit";
+
+/**
+ * Adding money: one amount, then how to pay, each way a choice the customer clicks (a gateway's methods, and where the
+ * market takes them, a bank deposit). The chosen way's details show beneath it and the button says what happens next:
+ * a gateway's payment page, or the account and reference to pay into.
+ */
+export function FundsForm({ currency, primary = true, methods, amount, sandbox, deposits }: { currency: string; primary?: boolean; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean; deposits: StoreBankDepositOptions | null }) {
+  const [topUpState, topUp, topUpPending] = useActionState<FormState, FormData>(topUpWallet, {});
+  const [depositState, deposit, depositPending] = useActionState<FormState, FormData>(startBankDeposit, {});
+  // No gateway open here (and not the sandbox): the bank deposit is the only way in.
+  const gateways = methods.length > 0 || sandbox || !deposits;
+  const [choice, setChoice] = useState(methods[0]?.id ?? (gateways ? "" : bankDepositChoice));
+  const byDeposit = choice === bankDepositChoice;
+  const state = byDeposit ? depositState : topUpState;
+  const choices: Array<{ id: string; label: string; description: string; networks: string[] }> = [
+    ...methods.map(method => ({ id: method.id, label: method.label, description: method.description, networks: method.networks })),
+    ...(deposits ? [{ id: bankDepositChoice, label: "Bank deposit", description: "Cash at the bank, or a transfer, to our account", networks: [] }] : []),
+  ];
   return (
-    <form action={action} className="space-y-4" aria-label="Top up your wallet">
+    <form action={byDeposit ? deposit : topUp} className="space-y-4" aria-label="Add money to your wallet">
       <FormMessage state={state} />
-      {primary ? null : <input type="hidden" name="currency" value={currency} />}
+      {primary && !byDeposit ? null : <input type="hidden" name="currency" value={currency} />}
       <TextField label={`Amount (${currency})`} name="amount" inputMode="decimal" required defaultValue={amount} state={state} hint="Spent only in this store. Wallet money cannot be withdrawn." />
-      {methods.length ? (
+      {choices.length ? (
         <fieldset>
           <legend className="text-sm font-semibold">Pay with</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {methods.map((method, index) => (
-              <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
-                <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-brand-500" />
+            {choices.map(item => (
+              <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
+                <input type="radio" name="method" value={item.id} checked={choice === item.id} onChange={() => setChoice(item.id)} className="mt-1 accent-brand-500" />
                 <span>
-                  <span className="block text-sm font-semibold">{method.label}</span>
-                  <span className="block text-xs text-slate-500">{method.description}</span>
-                  {method.networks.length ? (
-                    <span className="mt-1.5 flex flex-wrap gap-1" aria-label={`Networks: ${method.networks.join(", ")}`}>
-                      {method.networks.map(network => (
+                  <span className="flex items-center gap-1.5 text-sm font-semibold">
+                    {item.id === bankDepositChoice ? <Banknote className="size-4" aria-hidden="true" /> : null}
+                    {item.label}
+                  </span>
+                  <span className="block text-xs text-slate-500">{item.description}</span>
+                  {item.networks.length ? (
+                    <span className="mt-1.5 flex flex-wrap gap-1" aria-label={`Networks: ${item.networks.join(", ")}`}>
+                      {item.networks.map(network => (
                         <span key={network} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                           {network}
                         </span>
@@ -43,8 +63,36 @@ export function TopUpForm({ currency, primary = true, methods, amount, sandbox }
       ) : sandbox ? null : (
         <p className="text-sm text-slate-600">{primary ? "Card and mobile money top-ups are not open in your country yet." : `Top-ups of your ${walletName(currency)} are not open yet.`}</p>
       )}
-      <Submit pending={pending} className="w-full sm:w-auto">
-        <Plus className="size-4" aria-hidden="true" /> {sandbox ? "Add test money" : "Continue to payment"}
+      {byDeposit && deposits ? (
+        <div className="space-y-3 rounded-2xl bg-slate-50 p-4">
+          <p className="text-sm text-slate-600">Pay cash into our bank account, or transfer to it, with the reference we give you on the next screen. We add it to your wallet once it arrives, usually within a working day.</p>
+          {deposits.accounts.length > 1 ? (
+            <fieldset>
+              <legend className="text-sm font-semibold">Pay into</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {deposits.accounts.map((account, index) => (
+                  <label key={account.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
+                    <input type="radio" name="account_id" value={account.id} defaultChecked={index === 0} className="mt-1 accent-brand-500" />
+                    <span className="text-sm font-semibold">{account.bank_name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <input type="hidden" name="account_id" value={deposits.accounts[0]?.id ?? ""} />
+          )}
+        </div>
+      ) : null}
+      <Submit pending={byDeposit ? depositPending : topUpPending} className="w-full sm:w-auto">
+        {byDeposit ? (
+          <>
+            <Banknote className="size-4" aria-hidden="true" /> Get the account details
+          </>
+        ) : (
+          <>
+            <Plus className="size-4" aria-hidden="true" /> {sandbox ? "Add test money" : "Continue to payment"}
+          </>
+        )}
       </Submit>
     </form>
   );
@@ -132,8 +180,6 @@ export function AddFunds({ wallet, amount, open = false, bankDeposits = null }: 
   }, [open]);
   const sandbox = wallet.mode === "test";
   const deposits = bankDeposits?.available && bankDeposits.currency === wallet.currency ? bankDeposits : null;
-  // No gateway open here: the bank deposit is the way in, so the card form (which could not be used) is left out.
-  const gateways = wallet.top_up_methods.length > 0 || sandbox || !deposits;
   return (
     <>
       <button
@@ -158,18 +204,7 @@ export function AddFunds({ wallet, amount, open = false, bankDeposits = null }: 
           </button>
         </div>
         <div className="space-y-6 p-5">
-          {gateways ? <TopUpForm currency={wallet.currency} primary={wallet.wallets.find(item => item.currency === wallet.currency)?.primary ?? true} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} /> : null}
-          {deposits ? (
-            <section aria-labelledby="add-deposit" className={gateways ? "border-t border-slate-100 pt-5" : undefined}>
-              <h3 id="add-deposit" className="mb-1 flex items-center gap-2 font-semibold">
-                <Banknote className="size-5" aria-hidden="true" /> Bank deposit or transfer
-              </h3>
-              <p className="mb-3 text-sm text-slate-600">
-                Pay cash into our bank account, or transfer to it, with the reference we give you. We add it to your wallet once it arrives, usually within a working day.
-              </p>
-              <BankDepositForm options={deposits} amount={amount} />
-            </section>
-          ) : null}
+          <FundsForm currency={wallet.currency} primary={wallet.wallets.find(item => item.currency === wallet.currency)?.primary ?? true} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} deposits={deposits} />
           {wallet.reserved_accounts_available ? (
             <section aria-labelledby="add-bank" className="border-t border-slate-100 pt-5">
               <h3 id="add-bank" className="mb-1 flex items-center gap-2 font-semibold">

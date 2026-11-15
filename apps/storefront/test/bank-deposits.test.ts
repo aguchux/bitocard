@@ -62,22 +62,26 @@ afterEach(() => {
 });
 
 describe("Add funds", () => {
-  test("bank deposits sit beside the card form where offered", () => {
+  test("one amount, then card or bank deposit as choices side by side; the card is chosen first", () => {
     const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card]), bankDeposits: options }));
+    expect(html.match(/name="amount"/g)).toHaveLength(1);
+    expect(html).toContain('checked="" value="stripe"');
+    expect(html).toContain('value="bank_deposit"');
     expect(html).toContain("Continue to payment");
-    expect(html).toContain("Bank deposit or transfer");
-    expect(html).toContain('name="account_id" value="a1"');
+    expect(html).not.toContain("Get the account details");
   });
 
   test("with no gateway on, the bank deposit is the only way in", () => {
     const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([]), bankDeposits: options }));
     expect(html).not.toContain("Continue to payment");
+    expect(html).toContain('checked="" value="bank_deposit"');
     expect(html).toContain("Get the account details");
+    expect(html).toContain('name="account_id" value="a1"');
   });
 
   test("not offered: no bank deposit section", () => {
     const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card]), bankDeposits: { ...options, available: false, accounts: [] } }));
-    expect(html).not.toContain("Bank deposit or transfer");
+    expect(html).not.toContain("bank_deposit");
   });
 });
 
