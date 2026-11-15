@@ -135,6 +135,11 @@ describe('many wallets', () => {
     const started = await shopper.post('/v1/store/wallet/top-ups', { amount: 50_000, method: 'stripe', currency: 'KES', return_url: returnUrl });
     assert.equal(started.status, 201, JSON.stringify(started.json));
     assert.deepEqual([started.json.currency, started.json.method.id], ['KES', 'stripe']);
+
+    // Admins see every wallet the customer holds, home first.
+    const seen = await admin.get(`/v1/admin/storefront/customers/${shopper.id}`);
+    assert.equal(seen.status, 200, JSON.stringify(seen.json));
+    assert.deepEqual(seen.json.wallet_currencies, ['NGN', 'USD', 'KES']);
   });
 
   test('money moves between wallets at the shown rate, once, never past the balance', async () => {

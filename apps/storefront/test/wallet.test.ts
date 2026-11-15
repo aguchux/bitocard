@@ -9,7 +9,7 @@ const revalidatePath = vi.fn();
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(path) }));
 
-const { topUpWallet, openBankAccount, cancelTopUp } = await import("@/lib/wallet");
+const { topUpWallet, openBankAccount, cancelTopUp, addWallet, removeWallet, convertWallets, walletCurrencies } = await import("@/lib/wallet");
 const { startCheckout, cancelCheckout } = await import("@/lib/account-actions");
 const { cancelErrorText } = await import("@/lib/cancel-payment");
 const { paymentMethodsFor } = await import("@/lib/payment-methods");
@@ -95,6 +95,46 @@ describe("topping the wallet up", () => {
     expect((await openBankAccount({}, form({ bvn: "22222222222" }))).notice).toMatch(/account number is ready/);
     expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toEqual({ bvn: "22222222222" });
     expect(revalidatePath).toHaveBeenCalledWith("/account/wallet");
+  });
+
+  test("adding a wallet: the currency goes to the API and the new wallet opens; a refusal says why", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_wallet", currency: "KES" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    await expect(addWallet({}, form({ currency: "kes" }))).rejects.toThrow("redirect:/account/wallet?wallet=KES");
+    const [url, init] = (fetch.mock.calls as unknown as Call[])[0];
+    expect([url, init.method, bodyOf([url, init])]).toEqual(["http://api.test/v1/store/wallet/wallets", "POST", { currency: "KES" }]);
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { type: "invalid_request_error", code: "currency_unavailable", message: "KES wallets are not open.", param: "currency" } }, 400)));
+    expect(await addWallet({}, form({ currency: "KES" }))).toEqual({ error: "KES wallets are not open.", field: "currency" });
+  });
+
+  test("removing a wallet asks the API to remove that one, then shows the home wallet", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_wallet", currency: "NGN" }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(removeWallet({}, form({ currency: "KES" }))).rejects.toThrow("redirect:/account/wallet");
+    const [url, init] = (fetch.mock.calls as unknown as Call[])[0];
+    expect([url, init.method]).toEqual(["http://api.test/v1/store/wallet/wallets/KES", "DELETE"]);
+  });
+
+  test("moving money: first what arrives, then the move at no less than that", async () => {
+    const quote = { object: "wallet_conversion", mode: "live", from: { amount: 5000, currency: "USD" }, to: { amount: 645000, currency: "KES" }, rate: "129", id: null, created_at: null };
+    const fetch = vi.fn(async () => reply(quote));
+    vi.stubGlobal("fetch", fetch);
+    expect((await convertWallets({}, form({ from: "USD", to: "KES", amount: "50" }))).quote).toEqual(quote);
+    expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toEqual({ from: "USD", to: "KES", amount: 5000, preview: true });
+
+    const done = { ...quote, id: "e1", created_at: "2026-11-15T10:00:00.000Z" };
+    const moved = vi.fn(async () => reply(done));
+    vi.stubGlobal("fetch", moved);
+    expect((await convertWallets({}, form({ from: "USD", to: "KES", amount: "50", expected: "645000" }))).done).toEqual(done);
+    expect(bodyOf((moved.mock.calls as unknown as Call[])[0])).toEqual({ from: "USD", to: "KES", amount: 5000, preview: false, expected_amount: 645000 });
+    expect(await convertWallets({}, form({ from: "USD", to: "USD", amount: "5" }))).toEqual({ error: "Choose two different wallets.", field: "to" });
+  });
+
+  test("the currencies to add come from the API; none when it cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ object: "list", data: [{ object: "wallet_currency_option", currency: "KES", country: "KE", country_name: "Kenya", available: true, reason: null }] })));
+    expect((await walletCurrencies()).map(option => option.currency)).toEqual(["KES"]);
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { type: "api_error", code: "api_error", message: "Down" } }, 503)));
+    expect(await walletCurrencies()).toEqual([]);
   });
 
   test("the Wallet tab is its own place", () => {

@@ -14,11 +14,11 @@ import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
-import { countryStoreFor, countryStoreUrl, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
 import { storeShell } from "@/lib/store-theme";
 import { currentStore, storeCredit, storeSubdomain } from "@/lib/store";
+import { walletFor } from "@/lib/wallet";
 import { pendingPublicSpinClaim } from "@/lib/spin-actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -56,20 +56,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!customer.email_verified) redirect(`/account/verify?next=${next}`);
 
   // The store's choice (else BitoCard's default); the side rail if the API cannot be reached.
-  const [app, navigation, publicSpinClaim] = await Promise.all([
+  const [app, navigation, publicSpinClaim, wallet] = await Promise.all([
     store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
     storeNavigation(),
     pendingPublicSpinClaim(),
+    walletFor(),
   ]);
-  // On root, a customer whose fixed country now has its own live country store belongs there, same as the store pages
-  // (docs/BITOCARD_COUNTRY_STORES_PLAN.md); their account is the same account, just served from its own address —
-  // unless they explicitly chose to stay global, a standing choice that carries over into their account too.
-  if (!store && !(await marketIsGlobal())) {
-    const subdomain = countryStoreFor(navigation.countries, customer.country);
-    if (subdomain) redirect(countryStoreUrl(subdomain));
-  }
   // What the desktop sub rails list: the catalogue's groups on sale (as the Catalog page's chips) and the customer's wallets.
-  const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency };
+  const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency, wallets: wallet?.wallets.map(item => item.currency) };
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";
   const rail = desktopNav === "rail";
   // A market's own country store is BitoCard's own, just localised: it wears BitoCard's own brand, like root. Only a

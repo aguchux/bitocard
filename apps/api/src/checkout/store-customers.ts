@@ -71,6 +71,13 @@ export class StoreCustomersService {
     return { object: 'list' as const, data: await this.present(rows.slice(0, limit)), has_more: rows.length > limit };
   }
 
+  /** The wallets a customer holds, their home country's currency first (their store's country's for an older account). */
+  private async walletCurrencies(customer: { id: string; country: string | null; storeId: string }) {
+    const code = customer.country ?? (await this.prisma.store.findUnique({ where: { id: customer.storeId }, select: { reseller: { select: { country: true } } } }))?.reseller.country;
+    const market = code ? await this.prisma.country.findUnique({ where: { code }, select: { currency: true } }) : null;
+    return market ? this.wallets.heldCurrencies(customer.id, market.currency) : ['USD'];
+  }
+
   /** One customer with their account state and their latest 50 purchases (unpaid checkouts left out). */
   async get(storeId: string, id: string) {
     const customer = await this.prisma.customer.findFirst({ where: { id, storeId } });
@@ -94,6 +101,8 @@ export class StoreCustomersService {
       disputes,
       /** The customer's wallet balances (spend only, never withdrawn), per mode and currency. */
       wallet: await this.wallets.balances(id),
+      /** The wallets they hold: their own country's currency first, US dollars, then the ones they added (null home: no country yet). */
+      wallet_currencies: await this.walletCurrencies(customer),
       /**
        * Their latest BitoCard Verify check at this store: `reviewable` when the store's business reviews it (registered
        * and KYB-verified) on verify.bitocard.com. Never its documents or details.

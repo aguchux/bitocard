@@ -2,16 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { StoreReservedAccount, StoreWallet, StoreWalletTopUp } from "@bitocard/api-client/storefront";
+import type { StoreList, StoreReservedAccount, StoreWallet, StoreWalletConversion, StoreWalletCurrencyOption, StoreWalletTopUp } from "@bitocard/api-client/storefront";
 import type { FormState } from "@/lib/account-actions";
 import { customerApi, siteOrigin } from "@/lib/customer";
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
 /**
- * One of the signed-in customer's wallets: their own country's currency (chosen at sign-up and fixed; a reseller's
- * store is the reseller's) unless `USD` is asked for. `wallets` lists both. Null when signed out, before an older
- * account has chosen its country, or when the API cannot be reached.
+ * One of the signed-in customer's wallets: their own country's currency (chosen at sign-up and fixed) unless another
+ * they hold is asked for. `wallets` lists them all. Null when signed out, before an older account has chosen its
+ * country, or when the API cannot be reached.
  */
 export async function walletFor(currency?: string): Promise<StoreWallet | null> {
   const result = await customerApi<StoreWallet>("GET", `/v1/store/wallet${currency ? `?${new URLSearchParams({ currency }).toString()}` : ""}`);
@@ -82,3 +82,45 @@ export async function simulateDeposit(form: FormData) {
   revalidatePath("/account/wallet");
 }
 
+
+/** The currencies the customer could add as wallets (markets BitoCard opened for it). Empty when none, or unreachable. */
+export async function walletCurrencies(): Promise<StoreWalletCurrencyOption[]> {
+  const result = await customerApi<StoreList<StoreWalletCurrencyOption>>("GET", "/v1/store/wallet/currencies");
+  return result.ok ? result.data.data : [];
+}
+
+/** Adds a wallet in another market's currency, then opens it. */
+export async function addWallet(_state: FormState, form: FormData): Promise<FormState> {
+  const currency = text(form, "currency").toUpperCase();
+  const result = await customerApi<StoreWallet>("POST", "/v1/store/wallet/wallets", { currency });
+  if (!result.ok) return { error: result.message, field: result.param };
+  revalidatePath("/account", "layout");
+  redirect(`/account/wallet?wallet=${encodeURIComponent(currency)}`);
+}
+
+/** Removes an added wallet with nothing in it, then shows the home wallet. */
+export async function removeWallet(_state: FormState, form: FormData): Promise<FormState> {
+  const currency = text(form, "currency").toUpperCase();
+  const result = await customerApi<StoreWallet>("DELETE", `/v1/store/wallet/wallets/${encodeURIComponent(currency)}`);
+  if (!result.ok) return { error: result.message, field: result.param };
+  revalidatePath("/account", "layout");
+  redirect("/account/wallet");
+}
+
+/** Moving money between wallets: first what arrives (`preview`), then the move itself at no less than that. */
+export type ConversionState = FormState & { quote?: StoreWalletConversion; done?: StoreWalletConversion };
+
+export async function convertWallets(_state: ConversionState, form: FormData): Promise<ConversionState> {
+  const amount = Math.round(Number(text(form, "amount").replace(/[,\s]/g, "")) * 100);
+  if (!Number.isFinite(amount) || amount < 1) return { error: "Enter the amount to move.", field: "amount" };
+  const from = text(form, "from");
+  const to = text(form, "to");
+  if (!from || !to || from === to) return { error: "Choose two different wallets.", field: "to" };
+  const expected = text(form, "expected");
+  const preview = !expected;
+  const result = await customerApi<StoreWalletConversion>("POST", "/v1/store/wallet/conversions", { from, to, amount, preview, ...(preview ? {} : { expected_amount: Number(expected) }) });
+  if (!result.ok) return { error: result.message, field: result.code === "rate_changed" ? undefined : result.param };
+  if (preview) return { quote: result.data };
+  revalidatePath("/account", "layout");
+  return { done: result.data, notice: "Moved." };
+}

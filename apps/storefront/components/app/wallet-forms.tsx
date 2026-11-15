@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
-import { Landmark, Plus, X } from "lucide-react";
-import type { StorePaymentMethod, StoreWallet } from "@bitocard/api-client/storefront";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { ArrowLeftRight, Landmark, Plus, Trash2, X } from "lucide-react";
+import { formatFace, walletName, type StorePaymentMethod, type StoreWallet, type StoreWalletCurrencyOption } from "@bitocard/api-client/storefront";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
-import { openBankAccount, simulateDeposit, topUpWallet } from "@/lib/wallet";
+import { addWallet, type ConversionState, convertWallets, openBankAccount, removeWallet, simulateDeposit, topUpWallet } from "@/lib/wallet";
 
 /** Topping the wallet up: an amount, then the payment page of the method chosen. */
 export function TopUpForm({ currency, primary = true, methods, amount, sandbox }: { currency: string; primary?: boolean; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean }) {
@@ -40,7 +40,7 @@ export function TopUpForm({ currency, primary = true, methods, amount, sandbox }
           </div>
         </fieldset>
       ) : sandbox ? null : (
-        <p className="text-sm text-slate-600">{primary ? "Card and mobile money top-ups are not open in your country yet." : "US dollar top-ups are not open in your country yet."}</p>
+        <p className="text-sm text-slate-600">{primary ? "Card and mobile money top-ups are not open in your country yet." : `Top-ups of your ${walletName(currency)} are not open yet.`}</p>
       )}
       <Submit pending={pending} className="w-full sm:w-auto">
         <Plus className="size-4" aria-hidden="true" /> {sandbox ? "Add test money" : "Continue to payment"}
@@ -145,7 +145,7 @@ export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3">
           <h2 id="add-funds-title" className="text-lg font-bold">
-            {wallet.currency === "USD" && wallet.wallets.length > 1 ? "Add US dollars" : "Add funds"}
+            {wallet.wallets.length > 1 ? `Add to your ${walletName(wallet.currency)}` : "Add funds"}
           </h2>
           <button type="button" aria-label="Close" onClick={() => dialog.current?.close()} className="grid size-11 place-items-center rounded-xl hover:bg-slate-50">
             <X className="size-6" aria-hidden="true" />
@@ -190,6 +190,145 @@ export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet
             </section>
           ) : null}
         </div>
+      </dialog>
+    </>
+  );
+}
+
+const dialogClass = "m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-navy-900 shadow-2xl backdrop:bg-navy-900/50";
+
+/** A dialog's header with its title and Close. */
+function DialogHead({ id, title, onClose }: { id: string; title: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3">
+      <h2 id={id} className="flex items-center gap-2 text-lg font-bold">
+        {title}
+      </h2>
+      <button type="button" aria-label="Close" onClick={onClose} className="grid size-11 place-items-center rounded-xl hover:bg-slate-50">
+        <X className="size-6" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/** Why a currency cannot be added yet, in words. */
+const optionReason = (reason: string | null) => (reason === "rate_unavailable" ? "Paused just now" : "Not open yet");
+
+/**
+ * "Add wallet": a wallet in the currency of another market BitoCard opened for it. Each is topped up with that market's
+ * own methods, and pays for anything at BitoCard's rate, shown before paying. Shown only while there is one to add.
+ */
+export function AddWallet({ options }: { options: StoreWalletCurrencyOption[] }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [state, action, pending] = useActionState<FormState, FormData>(addWallet, {});
+  if (!options.length) return null;
+  return (
+    <>
+      <button type="button" onClick={() => dialog.current?.showModal()} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-brand-500 ring-1 ring-slate-200 hover:ring-slate-300">
+        <Plus className="size-4" aria-hidden="true" /> Add wallet
+      </button>
+      <dialog ref={dialog} aria-labelledby="add-wallet-title" onClick={event => event.target === dialog.current && dialog.current?.close()} className={dialogClass}>
+        <DialogHead id="add-wallet-title" title="Add a wallet" onClose={() => dialog.current?.close()} />
+        <div className="space-y-4 p-5">
+          <p className="text-sm text-slate-600">Hold money in another currency. Top it up with that country&apos;s payment methods, move money into it, and pay from it anywhere in the store. Like every wallet, it is spent only here and never withdrawn.</p>
+          <FormMessage state={state} />
+          <ul className="space-y-2">
+            {options.map(option => (
+              <li key={option.currency} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 p-3">
+                <span className="min-w-0">
+                  <span className="block font-semibold">{option.currency}</span>
+                  <span className="block text-sm text-slate-500">{option.country_name}</span>
+                </span>
+                {option.available ? (
+                  <form action={action}>
+                    <input type="hidden" name="currency" value={option.currency} />
+                    <Submit pending={pending}>Add</Submit>
+                  </form>
+                ) : (
+                  <span className="text-sm text-slate-500">{optionReason(option.reason)}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </dialog>
+    </>
+  );
+}
+
+/** Removing the wallet shown: only an added one, only while it has nothing in it. */
+export function RemoveWallet({ currency }: { currency: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(removeWallet, {});
+  return (
+    <form action={action} className="space-y-2">
+      <FormMessage state={state} />
+      <input type="hidden" name="currency" value={currency} />
+      <button type="submit" disabled={pending} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-slate-600 hover:text-red-700 disabled:opacity-60">
+        <Trash2 className="size-4" aria-hidden="true" /> Remove your {walletName(currency)}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * "Move money" between the customer's wallets: the amount and the two wallets, then what arrives at BitoCard's rate
+ * (shown first, `preview`), then Move, refused if the rate has moved against them since.
+ */
+export function MoveMoney({ wallet }: { wallet: StoreWallet }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [state, action, pending] = useActionState<ConversionState, FormData>(convertWallets, {});
+  const others = wallet.wallets.filter(item => item.currency !== wallet.currency);
+  const [to, setTo] = useState(others[0]?.currency ?? "");
+  const [amount, setAmount] = useState("");
+  // A quote stands only for what it was asked for; changing anything asks again.
+  const [stale, setStale] = useState(false);
+  const quote = state.quote && !stale ? state.quote : null;
+  if (!others.length) return null;
+  const balance = wallet.balance;
+  return (
+    <>
+      <button type="button" onClick={() => dialog.current?.showModal()} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-white/10 px-5 font-semibold text-white ring-1 ring-white/20 hover:bg-white/15">
+        <ArrowLeftRight className="size-5" aria-hidden="true" /> Move money
+      </button>
+      <dialog ref={dialog} aria-labelledby="move-money-title" onClick={event => event.target === dialog.current && dialog.current?.close()} className={dialogClass}>
+        <DialogHead id="move-money-title" title={<><ArrowLeftRight className="size-5" aria-hidden="true" /> Move money</>} onClose={() => dialog.current?.close()} />
+        {state.done && !stale ? (
+          <div className="space-y-4 p-5" role="status">
+            <p className="font-semibold">Moved {formatFace(state.done.from.amount, state.done.from.currency)} to your {walletName(state.done.to.currency)}.</p>
+            <p className="text-sm text-slate-600">{formatFace(state.done.to.amount, state.done.to.currency)} is there now.</p>
+            <button type="button" onClick={() => { setStale(true); setAmount(""); dialog.current?.close(); }} className="inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
+              Done
+            </button>
+          </div>
+        ) : (
+          <form action={action} onChange={() => setStale(true)} onSubmit={() => setStale(false)} className="space-y-4 p-5">
+            <FormMessage state={stale ? {} : state} />
+            <input type="hidden" name="from" value={wallet.currency} />
+            <p className="text-sm text-slate-600">From your {walletName(wallet.currency)}: {formatFace(balance, wallet.currency)} available.</p>
+            <TextField label={`Amount (${wallet.currency})`} name="amount" inputMode="decimal" required value={amount} onChange={event => setAmount(event.target.value)} state={stale ? {} : state} />
+            <label className="block">
+              <span className="text-sm font-semibold">To</span>
+              <select name="to" value={to} onChange={event => setTo(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3">
+                {others.map(item => (
+                  <option key={item.currency} value={item.currency}>
+                    Your {walletName(item.currency)} ({formatFace(item.balance, item.currency)})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {quote ? (
+              <div className="rounded-2xl bg-slate-50 p-4" aria-live="polite">
+                <p className="text-sm text-slate-600">You get</p>
+                <p className="font-display text-2xl font-extrabold">{formatFace(quote.to.amount, quote.to.currency)}</p>
+                <p className="mt-1 text-xs text-slate-500">At our exchange rate, 1 {quote.from.currency} = {quote.rate} {quote.to.currency}. Spent only in this store; never withdrawn.</p>
+                <input type="hidden" name="expected" value={quote.to.amount} />
+              </div>
+            ) : null}
+            <Submit pending={pending} className="w-full sm:w-auto">
+              {quote ? `Move ${formatFace(quote.from.amount, quote.from.currency)}` : "See what you get"}
+            </Submit>
+          </form>
+        )}
       </dialog>
     </>
   );

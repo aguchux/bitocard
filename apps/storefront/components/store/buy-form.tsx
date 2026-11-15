@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useId, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { Lock, Wallet } from "lucide-react";
-import { formatFace, localFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
+import { formatFace, localFace, walletName, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
 import { type FormState, startCheckout } from "@/lib/account-actions";
 import { type PaymentChoice, paymentMethodsFor } from "@/lib/payment-methods";
 import { prefillFrom } from "@/lib/quick-buy";
@@ -289,7 +289,7 @@ export function BuyForm({
                       className="mt-1 accent-brand-500"
                     />
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{option.currency === preview.currency ? `${option.currency} wallet` : "US dollar wallet"}</span>
+                      <span className="block text-sm font-semibold">{walletName(option.currency)}</span>
                       <span className="block text-sm text-navy-900">{option.amount === null ? "Not available right now" : formatFace(option.amount, option.currency)}</span>
                       <span className={`block text-xs ${option.enough ? "text-slate-500" : "text-amber-700"}`}>Balance {formatFace(option.balance, option.currency)}</span>
                     </span>
@@ -297,7 +297,7 @@ export function BuyForm({
                 ))}
               </div>
               {payOption.currency !== preview.currency && payOption.amount !== null ? (
-                <p className="mt-2 text-xs text-slate-500">Converted at our exchange rate. A refund goes back to your US dollar wallet in full.</p>
+                <p className="mt-2 text-xs text-slate-500">Converted at our exchange rate. A refund goes back to your {walletName(payOption.currency)} in full.</p>
               ) : null}
             </fieldset>
           ) : (

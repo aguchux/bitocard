@@ -58,6 +58,15 @@ describe("desktop sub rails", () => {
     expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Transactions"]);
     expect(active("/account/wallet", "wallet=USD", { ...context, currency: "USD" })).toBe("/account/wallet");
     expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Transactions"]);
+    // Every wallet the customer holds, the ones they added after US dollars.
+    const many = { ...context, wallets: ["NGN", "USD", "KES"] };
+    expect(subMenusFor(many)[2]!.items.map(item => [item.label, item.href])).toEqual([
+      ["NGN wallet", "/account/wallet"],
+      ["US dollars", "/account/wallet?wallet=USD"],
+      ["KES wallet", "/account/wallet?wallet=KES"],
+      ["Transactions", "/account/wallet/transactions"],
+    ]);
+    expect(active("/account/wallet", "wallet=kes", many)).toBe("/account/wallet?wallet=KES");
   });
 
   test("crypto has no rail: its old addresses are no tab's place", () => {

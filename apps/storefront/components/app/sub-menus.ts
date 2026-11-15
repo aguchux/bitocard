@@ -28,7 +28,8 @@ export type SubMenu = {
 };
 
 /** What the rails need from the signed-in customer and the store: the catalogue's groups and the customer's wallet currency. */
-export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null };
+/** `wallets`: the customer's wallets in order (home, US dollars, the ones added); else their home `currency` and US dollars. */
+export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null; wallets?: string[] };
 
 /** The Orders tab: its filters (the API's `?show=` groups, as the page's chips) and the customer's disputes. */
 export const orderSections: SubMenuItem[] = [
@@ -47,22 +48,26 @@ export const catalogSections = (groups: SubMenuContext["groups"]): SubMenuItem[]
 ];
 
 /**
- * The Wallet tab: the country's wallet (the page's default) and the US dollar wallet (`?wallet=`, as the page's
- * tabs), then all their activity (its own screen, reached on phones by each activity card's View all). A
- * country that uses dollars has one money wallet; an account still without a country has its default.
+ * The Wallet tab: the home wallet (the page's default), US dollars and any others the customer added (`?wallet=`, as
+ * the page's tabs), then all their activity (its own screen, reached on phones by each activity card's View all). A
+ * country that uses dollars has one home wallet; an account still without a country has its default.
  */
-export const walletSections = (currency: string | null): SubMenuItem[] => [
-  { href: "/account/wallet", label: !currency ? "Your wallet" : currency === "USD" ? "US dollars" : `${currency} wallet`, icon: Wallet },
-  ...(currency && currency !== "USD" ? [{ href: "/account/wallet?wallet=USD", label: "US dollars", icon: DollarSign }] : []),
-  { href: "/account/wallet/transactions", label: "Transactions", icon: ReceiptText },
-];
+export const walletSections = (currency: string | null, wallets?: string[]): SubMenuItem[] => {
+  const held = wallets?.length ? wallets : currency ? [...new Set([currency, "USD"])] : [];
+  const home = held[0] ?? null;
+  return [
+    { href: "/account/wallet", label: !home ? "Your wallet" : home === "USD" ? "US dollars" : `${home} wallet`, icon: Wallet },
+    ...held.slice(1).map(code => ({ href: `/account/wallet?wallet=${code}`, label: code === "USD" ? "US dollars" : `${code} wallet`, icon: code === "USD" ? DollarSign : Wallet })),
+    { href: "/account/wallet/transactions", label: "Transactions", icon: ReceiptText },
+  ];
+};
 
 /** The tabs with places of their own, in the app's tab order, shown as a second rail beside the app's rail on desktop. */
 export function subMenusFor(context: SubMenuContext): SubMenu[] {
   return [
     { key: "catalog", label: "Catalog", href: "/account/catalog", param: "group", owns: ["/account/catalog", "/account/p"], items: catalogSections(context.groups) },
     { key: "orders", label: "Orders", href: "/account/orders", param: "show", owns: ["/account/orders", "/account/disputes", "/account/sold"], items: orderSections },
-    { key: "wallet", label: "Wallet", href: "/account/wallet", param: "wallet", owns: ["/account/wallet"], items: walletSections(context.currency) },
+    { key: "wallet", label: "Wallet", href: "/account/wallet", param: "wallet", owns: ["/account/wallet"], items: walletSections(context.currency, context.wallets) },
     // Shown only on its screens (activeAccountSection), not on the Account page, whose rows are its menu.
     { key: "account", label: "Account", href: "/account/profile", owns: [], items: accountSections.map(({ href, label, icon, soon }) => ({ href, label, icon, soon })) },
   ];

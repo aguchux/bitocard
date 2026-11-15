@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import type { StoreApp } from "@bitocard/api-client/storefront";
 import { InstallPrompt } from "@bitocard/ui/install-ui";
@@ -7,7 +6,7 @@ import { ChatWidget } from "@/components/app/chat-widget";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
-import { countryStoreFor, countryStoreUrl, currentMarket, marketIsGlobal } from "@/lib/market";
+import { currentMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
 import { storeShell } from "@/lib/store-theme";
@@ -52,22 +51,13 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       </div>
     );
   }
-  const [{ groups, countries }, market, customer, global, app] = await Promise.all([
+  const [{ groups, countries }, market, customer, app] = await Promise.all([
     storeNavigation(),
     currentMarket(),
     currentCustomer(),
-    marketIsGlobal(),
     store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
   ]);
-  // On root (no store context at all), a signed-in customer whose fixed country now has its own live country store
-  // belongs there: send them, rather than serving their market from root (docs/BITOCARD_COUNTRY_STORES_PLAN.md) —
-  // unless they explicitly chose to stay global (the market dialog's "Stay global"), which is a standing choice,
-  // not just for one visit.
-  if (!store && !global) {
-    const subdomain = countryStoreFor(countries, customer?.country);
-    if (subdomain) redirect(countryStoreUrl(subdomain));
-  }
-  // A reseller's store wears its template's variant and colour theme; a market's own country store wears BitoCard's own.
+  // A reseller's store wears its template's variant and colour theme; bitocard.com wears BitoCard's own.
   return (
     <div className={shell} {...storeShell(store && !store.house ? store.design : undefined)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">

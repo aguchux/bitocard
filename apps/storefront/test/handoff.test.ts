@@ -33,34 +33,32 @@ afterEach(() => {
 
 describe("the signed-in cookie", () => {
   test("names only BitoCard's own sites, on the parent domain", () => {
-    for (const origin of ["https://bitocard.com", "https://ng.bitocard.com", "https://gh.bitocard.com"]) expect(isHouseOrigin(origin), origin).toBe(true);
-    // BitoCard Shop and crypto have left BitoCard (Udozo and Afrippa keep accounts of their own).
-    for (const origin of ["https://evil.com", "https://acme-store.bitocard.com", "http://ng.bitocard.com", "https://ng.bitocard.com/", "https://bitocard.com.evil.com", "https://crypto.bitocard.com", "https://shop.bitocard.com", "nope"]) expect(isHouseOrigin(origin), origin).toBe(false);
+    expect(isHouseOrigin("https://bitocard.com")).toBe(true);
+    // BitoCard Shop and crypto have left BitoCard (Udozo and Afrippa keep accounts of their own); the country stores are retired.
+    for (const origin of ["https://evil.com", "https://acme-store.bitocard.com", "https://ng.bitocard.com", "https://gh.bitocard.com", "https://bitocard.com/", "https://bitocard.com.evil.com", "https://crypto.bitocard.com", "https://shop.bitocard.com", "nope"]) expect(isHouseOrigin(origin), origin).toBe(false);
     expect(signedInDomain()).toBe(".bitocard.com");
     vi.stubEnv("STOREFRONT_URL", "http://localhost:3000");
     expect(signedInDomain()).toBeUndefined();
-    expect(isHouseOrigin("http://ng.localhost:3000")).toBe(true);
+    expect([isHouseOrigin("http://localhost:3000"), isHouseOrigin("http://ng.localhost:3000")]).toEqual([true, false]);
   });
 
   test("holds a first name and a site, and refuses anything else", () => {
-    const value = encodeSignedIn({ name: "  Adaeze Okafor ", origin: "https://ng.bitocard.com" });
-    expect(decodeSignedIn(value)).toEqual({ name: "Adaeze", origin: "https://ng.bitocard.com" });
+    const value = encodeSignedIn({ name: "  Adaeze Okafor ", origin: "https://bitocard.com" });
+    expect(decodeSignedIn(value)).toEqual({ name: "Adaeze", origin: "https://bitocard.com" });
+    expect(decodeSignedIn(encodeSignedIn({ name: "Ada", origin: "https://ng.bitocard.com" }))).toBeNull();
     expect(decodeSignedIn(encodeSignedIn({ name: "Ada", origin: "https://evil.com" }))).toBeNull();
     expect(decodeSignedIn("not base64 json")).toBeNull();
     expect(decodeSignedIn(undefined)).toBeNull();
     expect(handoffStart("https://ng.bitocard.com", "https://bitocard.com", "/account/orders")).toBe("https://ng.bitocard.com/handoff/go?to=https%3A%2F%2Fbitocard.com&next=%2Faccount%2Forders");
   });
 
-  test("set on BitoCard's sites when signing in, never on a reseller's store; offered only on another site", async () => {
-    setRequest({ host: "ng.bitocard.com" });
+  test("set on bitocard.com when signing in, never on a reseller's store; never offered on the site it names", async () => {
+    setRequest({ host: "bitocard.com" });
     await rememberSignedIn({ name: "Adaeze Okafor" });
     const set = request.set.find(cookie => cookie.name === signedInCookie)!;
     expect(set.options).toMatchObject({ domain: ".bitocard.com", httpOnly: true, sameSite: "lax", path: "/" });
-    expect(decodeSignedIn(set.value)).toEqual({ name: "Adaeze", origin: "https://ng.bitocard.com" });
+    expect(decodeSignedIn(set.value)).toEqual({ name: "Adaeze", origin: "https://bitocard.com" });
     expect(await signedInElsewhere()).toBeNull();
-
-    setRequest({ host: "bitocard.com" }, { [signedInCookie]: set.value });
-    expect(await signedInElsewhere()).toEqual({ name: "Adaeze", origin: "https://ng.bitocard.com", host: "ng.bitocard.com" });
 
     setRequest({ host: "acme.bitocard.com" }, { [signedInCookie]: set.value });
     expect(await signedInElsewhere()).toBeNull();
@@ -69,39 +67,26 @@ describe("the signed-in cookie", () => {
   });
 
   test("signing out removes it only when it names this site", async () => {
-    const ng = encodeSignedIn({ name: "Ada", origin: "https://ng.bitocard.com" });
-    setRequest({ host: "bitocard.com" }, { [signedInCookie]: ng });
+    const root = encodeSignedIn({ name: "Ada", origin: "https://bitocard.com" });
+    setRequest({ host: "acme.bitocard.com" }, { [signedInCookie]: root });
     await forgetSignedIn();
     expect(request.set).toEqual([]);
-    setRequest({ host: "ng.bitocard.com" }, { [signedInCookie]: ng });
+    setRequest({ host: "bitocard.com" }, { [signedInCookie]: root });
     await forgetSignedIn();
     expect(request.set).toEqual([{ name: signedInCookie, value: "", options: expect.objectContaining({ maxAge: 0, domain: ".bitocard.com" }) }]);
   });
 });
 
 describe("/handoff/go", () => {
-  const go = (query: string) => GET(new NextRequest(`https://ng.bitocard.com/handoff/go?${query}`));
+  const go = (query: string) => GET(new NextRequest(`https://bitocard.com/handoff/go?${query}`));
 
-  test("signed in: a code for that site, in the fragment of its /handoff", async () => {
-    setRequest({ host: "ng.bitocard.com" }, { bc_customer: "bcc_session" });
-    reply = (url, method) => (method === "POST" && url.endsWith("/v1/store/account/handoff") ? Response.json({ object: "customer_handoff", code: "bch_abc-DEF_123", to: "https://bitocard.com" }) : null);
-    const response = await go("to=https%3A%2F%2Fbitocard.com&next=%2Faccount%2Forders");
-    expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("https://bitocard.com/handoff#c=bch_abc-DEF_123&n=%2Faccount%2Forders");
-    const asked = calls.find(call => call.method === "POST")!;
-    expect(asked.body).toEqual({ to: "https://bitocard.com" });
-    expect(asked.headers.get("bitocard-customer-session")).toBe("bcc_session");
-    expect(asked.headers.get("bitocard-store")).toBe("ng");
-  });
-
-  test("signed out: sign in here first, then on; never to a site that is not BitoCard's", async () => {
-    setRequest({ host: "ng.bitocard.com" });
-    const signIn = await go("to=https%3A%2F%2Fbitocard.com&next=%2Fcatalogs");
-    expect(signIn.headers.get("location")).toBe(`https://ng.bitocard.com/signin?next=${encodeURIComponent("/handoff/go?to=https%3A%2F%2Fbitocard.com&next=%2Fcatalogs")}`);
-    setRequest({ host: "ng.bitocard.com" }, { bc_customer: "bcc_session" });
-    expect((await go("to=https%3A%2F%2Fevil.com&next=%2Forders")).headers.get("location")).toBe("https://ng.bitocard.com/orders");
-    // BitoCard Shop is no longer one of BitoCard's sites: no code is made for it.
-    expect((await go("to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng")).headers.get("location")).toBe("https://ng.bitocard.com/ng");
+  test("bitocard.com is the only BitoCard site now: no code is ever made, the shopper just goes on", async () => {
+    setRequest({ host: "bitocard.com" }, { bc_customer: "bcc_session" });
+    for (const to of ["https://bitocard.com", "https://ng.bitocard.com", "https://shop.bitocard.com", "https://evil.com"]) {
+      const response = await go(`to=${encodeURIComponent(to)}&next=%2Faccount%2Forders`);
+      expect(response.status, to).toBe(303);
+      expect(response.headers.get("location"), to).toBe("https://bitocard.com/account/orders");
+    }
     expect(calls.some(call => call.method === "POST")).toBe(false);
     setRequest({ host: "acme.bitocard.com" }, { bc_customer: "bcc_session" });
     expect((await GET(new NextRequest("https://acme.bitocard.com/handoff/go?to=https%3A%2F%2Fbitocard.com"))).status).toBe(404);

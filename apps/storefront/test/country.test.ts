@@ -41,12 +41,16 @@ describe("the signed-in customer's country", () => {
     expect(await currentMarket()).toBe("NG");
     expect(await marketLocked()).toBe(false);
 
-    // Having chosen to stay global (the market dialog's "Stay global", or the country store's "Shop globally" link),
-    // that standing choice wins over their account's own country, and they browse in US dollars.
+    // Having chosen to stay global (the market dialog's "Stay global"), that choice wins over their own country.
     setRequest({ host: "bitocard.com" }, { bc_customer: "bcc_session", bc_market: "global" });
     vi.stubGlobal("fetch", vi.fn(async () => reply(customer("NG", "NGN"))));
     expect(await currentMarket()).toBe("global");
     expect(await marketLocked()).toBe(false);
+
+    // Choosing another market shows that market's products, on bitocard.com: nobody is sent anywhere.
+    setRequest({ host: "bitocard.com" }, { bc_customer: "bcc_session", bc_market: "KE" });
+    vi.stubGlobal("fetch", vi.fn(async () => reply(customer("NG", "NGN"))));
+    expect(await currentMarket()).toBe("KE");
   });
 
   test("signed out (or an older account without one), the cookie's market stands and can be changed", async () => {
@@ -99,24 +103,6 @@ describe("the signed-in customer's country", () => {
 });
 
 const storefront = (body: Record<string, unknown>) => reply({ object: "storefront", name: "BitoCard Ghana", subdomain: "gh", branding: {}, checkout_mode: "live", ...body });
-
-describe("a market's own country store", () => {
-  test("is the market, locked: the dialog never asks there, and its own currency prices every shopper, signed in or not", async () => {
-    setRequest({ host: "gh.bitocard.com" });
-    vi.stubGlobal("fetch", vi.fn(async () => storefront({ house: true, country: "GH", currency: "GHS" })));
-    expect(await currentMarket()).toBe("GH");
-    expect(await marketLocked()).toBe(true);
-    expect(await marketIsGlobal()).toBe(false);
-    expect(await withPrices("/v1/store/home")).toBe("/v1/store/home?currency=GHS");
-
-    // A signed-in customer from another market browsing here still sees this store's own currency: it is the same
-    // store for every shopper, not personalised by account.
-    setRequest({ host: "gh.bitocard.com" }, { bc_customer: "bcc_session" });
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => (String(url).includes("/v1/store/account") ? reply(customer("NG", "NGN")) : storefront({ house: true, country: "GH", currency: "GHS" }))));
-    expect(await currentMarket()).toBe("GH");
-    expect(await withPrices("/v1/store/home")).toBe("/v1/store/home?currency=GHS");
-  });
-});
 
 describe("a reseller's hosted store", () => {
   test("has no market to choose: the API keeps it to the reseller's own country on its own, and prices are its face values", async () => {

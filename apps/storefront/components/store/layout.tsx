@@ -76,14 +76,6 @@ export function StoreHeader({
                 <CurrencyMenu />
               </div>
             </>
-          ) : store.house ? (
-            <a
-              href={appUrl("storefront", "/go-global")}
-              className="hidden min-h-11 items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-navy-900 hover:bg-slate-50 sm:inline-flex sm:px-3"
-              title="Shop every market on bitocard.com, priced in US dollars"
-            >
-              Shop globally
-            </a>
           ) : null}
           <Link
             href={signedIn ? "/account" : "/signin"}

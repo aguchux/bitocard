@@ -31,6 +31,8 @@ export type StoreCustomerDetail = Omit<StoreCustomer, 'object'> & {
   identity_case?: { id: string; status: 'draft' | 'submitted' | 'approved' | 'declined' | 'resubmit'; reviewable: boolean } | null;
   /** Wallet balances (spend only, never withdrawn), per mode and currency. */
   wallet: Array<{ mode: 'live' | 'test'; currency: string; balance: number }>;
+  /** The wallets they hold: their own country's currency first, US dollars, then the ones they added. */
+  wallet_currencies?: string[];
   purchases_list: Array<{
     id: string;
     order_id: string | null;

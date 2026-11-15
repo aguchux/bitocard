@@ -12,12 +12,12 @@ import {
 } from "@bitocard/api-client/admin";
 import { WalletTopUp } from "@/components/wallet-top-up";
 
-/** The customer's two wallets: their country's currency (named once they have held it) and US dollars. */
-function customerWallets(wallet: Array<{ currency: string }>) {
-  const local = wallet.find(item => item.currency !== "USD")?.currency ?? null;
+/** The customer's wallets: their own country's currency (the default), US dollars, then any they added. */
+function customerWallets(held: string[] | undefined) {
+  const [home, ...rest] = held?.length ? held : ["USD"];
   return [
-    { code: null, currency: local ?? "", label: local ? `${local} (their country)` : "Their country's currency" },
-    { code: "USD", currency: "USD", label: "US dollars" },
+    { code: null, currency: home, label: home === "USD" ? "US dollars (their country)" : `${home} (their country)` },
+    ...rest.map(code => ({ code, currency: code, label: code === "USD" ? "US dollars" : code })),
   ];
 }
 
@@ -74,7 +74,7 @@ export default function StorefrontCustomerPage() {
               <WalletTopUp
                 target={{ type: "customer", id }}
                 targetName={data.name}
-                currencies={customerWallets(data.wallet)}
+                currencies={customerWallets(data.wallet_currencies)}
                 modeNote="The wallet is topped up in the store's own mode (live, or the sandbox while checkout is in sandbox): the only one the customer sees."
               />
             </div>

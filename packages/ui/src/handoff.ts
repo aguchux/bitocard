@@ -20,8 +20,8 @@ function storeBase() {
 }
 
 /**
- * Whether an origin is one of BitoCard's own sites a customer can be handed between: bitocard.com, a two-letter
- * country store under it (same scheme and port). Whether a country store is open is the API's to say.
+ * Whether an origin is one of BitoCard's own sites a customer can be handed between: bitocard.com itself (its country
+ * stores are retired, docs/BITOCARD_MULTI_WALLETS_PLAN.md).
  */
 export function isHouseOrigin(origin: string) {
   let url: URL;
@@ -31,9 +31,7 @@ export function isHouseOrigin(origin: string) {
     return false;
   }
   if (url.origin !== origin) return false;
-  const store = storeBase();
-  if (url.origin === store.origin) return true;
-  return url.protocol === store.protocol && new RegExp(`^[a-z]{2}\\.${store.host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`).test(url.host);
+  return url.origin === storeBase().origin;
 }
 
 /** The parent domain the cookie is shared on (`.bitocard.com`), or none where browsers would refuse it (localhost, an IP). */

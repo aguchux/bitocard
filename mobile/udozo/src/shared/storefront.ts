@@ -74,7 +74,7 @@ export type StoreProductDetail = StoreProduct & {
 /** `on_sale` is false for a category not open yet (listed only in the menu, with `products: 0`). */
 export type StoreCategory = { object: 'store_category'; category: ProductCategory; label: string; group: string | null; icon_url: string | null; image_url: string | null; products: number; on_sale: boolean };
 /** A market BitoCard has set up, or another country with products on sale; `products` may be 0. */
-export type StoreCountry = { code: string; name: string; products: number; store_subdomain: string | null };
+export type StoreCountry = { code: string; name: string; products: number };
 /** Every menu group is always listed; `on_sale` is false until one of its categories has products on sale. */
 export type StoreNavigationGroup = { key: string; label: string; on_sale: boolean; categories: StoreCategory[]; brands: StoreBrand[] };
 export type StoreList<T> = { object: 'list'; data: T[]; has_more?: boolean; total?: number };
@@ -287,13 +287,31 @@ export type StoreWallet = {
   reserved_accounts: StoreReservedAccount[];
   reserved_accounts_available: boolean;
   reserved_account_needs_bvn: boolean;
-  /** Both wallets: the customer's country's currency first (`primary`), then US dollars. */
+  /** Every wallet: the customer's country's currency first (`primary`), then US dollars, then the ones they added. */
   wallets: StoreWalletSummary[];
 };
 
-export type StoreWalletSummary = { currency: string; primary: boolean; balance: number };
+/** One of the customer's wallets; `removable` while it is an added one with nothing in it. */
+export type StoreWalletSummary = { currency: string; primary: boolean; balance: number; removable?: boolean };
 
-/** Paying from the wallet: what each wallet would pay for a quote (US dollars at BitoCard's rate; `amount` null while unavailable). */
+/** A currency the customer could add as a wallet (`GET /v1/store/wallet/currencies`); `reason` while it cannot be. */
+export type StoreWalletCurrencyOption = { object: 'wallet_currency_option'; currency: string; country: string; country_name: string; available: boolean; reason: string | null };
+
+/** Money moved between two of the customer's wallets (`id` null for a preview). */
+export type StoreWalletConversion = {
+  object: 'wallet_conversion';
+  mode: 'live' | 'test';
+  from: { amount: number; currency: string };
+  to: { amount: number; currency: string };
+  rate: string;
+  id: string | null;
+  created_at: string | null;
+};
+
+/** What a wallet is called: "US dollar wallet", or "NGN wallet". */
+export const walletName = (currency: string) => (currency === 'USD' ? 'US dollar wallet' : `${currency} wallet`);
+
+/** Paying from the wallet: what each wallet would pay for a quote (converted at BitoCard's rate; `amount` null while unavailable). */
 export type StoreWalletOption = { currency: string; amount: number | null; balance: number; enough: boolean };
 
 export type StoreWalletTopUp = {
@@ -697,4 +715,53 @@ export type StorePublicSpinClaim = {
   id?: string;
   currency?: string;
   amount?: number;
+};
+
+/** A gift card customers of BitoCard's own stores can sell, at its rate after BitoCard's margin (`GET /v1/store/gift-card-sales/offers`). */
+export type GiftCardSellOffer = {
+  id: string;
+  name: string;
+  /** How the card is taken: photos of a physical card, its code, or either. */
+  form: "physical" | "ecode" | "both";
+  /** The smallest and largest card value taken, in the card's own units. */
+  minimum: number;
+  maximum: number;
+  /** The customer's wallet currency. */
+  currency: string;
+  /** What the customer gets per unit of the card's value, in minor units of `currency`. */
+  rate: number;
+  terms: string | null;
+};
+
+export type GiftCardSellOptions = {
+  object: "gift_card_sell_options";
+  available: boolean;
+  /** Why selling is closed: country_unsupported, not_enabled, not_configured or not_sellable. */
+  reason: string | null;
+  currency: string | null;
+  offers: GiftCardSellOffer[];
+  count?: number;
+};
+
+export type GiftCardSaleQuote = { object: "gift_card_sale_quote"; offer_id: string; amount: number; currency: string; payout: number };
+
+/** A gift card the customer sold: credited to their wallet once accepted, never before. */
+export type GiftCardSale = {
+  object: "gift_card_sale";
+  id: string;
+  number: string;
+  mode: "live" | "test";
+  status: "pending" | "completed" | "rejected" | "failed";
+  card: { name: string; brand: string | null; brand_slug: string | null; country: string | null };
+  form: "physical" | "ecode";
+  amount: number;
+  currency: string;
+  /** What they were told they would get, and what they got (minor units). */
+  quoted: number;
+  paid: number | null;
+  code_hint: string | null;
+  photos: number;
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
 };

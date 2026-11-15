@@ -31,15 +31,6 @@ describe("store header", () => {
     expect(html).toContain("Start Reselling");
   });
 
-  test("a market's own country store wears BitoCard's own wordmark, never its own name or logo, and keeps the reseller call to action", () => {
-    const html = render(store(true));
-    expect(html).toContain("Bitocard home");
-    expect(html).not.toContain("BitoCard NG");
-    expect(html).not.toContain("ada-logo.png");
-    expect(html).toContain("Start Reselling");
-    expect(html).toContain("Shop globally");
-  });
-
   test("a reseller's store shows its own name and logo, never BitoCard's wordmark or the reseller call to action", () => {
     const html = render(store(false));
     expect(html).toContain("Ada Digital");
