@@ -530,8 +530,9 @@ model Reseller {
   resaleRelationships       ResaleRelationship[]
   resaleOrders              ClassifiedOrder[]
   resaleStoreReports        ResaleStoreReport[]
-  @@map("resellers")
   invoices              Invoice[]
+
+  @@map("resellers")
 }
 
 enum ResellerRole {
@@ -1006,6 +1007,11 @@ enum AccountKind {
   /// Afrippa: a seller's coins held for an open P2P order (the amount and the seller's fee), released to the buyer or
   /// returned to the seller. Never below zero.
   crypto_escrow
+  /// Airtime BitoCard bought from customers and holds on its collector lines, at what it cost (an asset, debit-normal),
+  /// one account per network (`shard`).
+  airtime_inventory
+  /// What BitoCard owes sellers for airtime received but still inside its hold, before it reaches their wallet.
+  airtime_payable
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -1856,8 +1862,6 @@ model OrderAccess {
   @@map("order_access")
 }
 
-
-
 /// A 6-digit code emailed to the order's customer (`recipient.email`) to open its page: hashed, single use, 10 minutes,
 /// 5 tries. Sends are limited (one a minute, ten a day per order).
 model OrderAccessCode {
@@ -2529,6 +2533,7 @@ model Customer {
   market                    Country?                  @relation(fields: [country], references: [code], onDelete: Restrict)
   sessions                  CustomerSession[]
   codes                     CustomerCode[]
+  phones                    CustomerPhone[]
   checkouts                 Checkout[]
   orders                    Order[]
   notifications             Notification[]
@@ -2596,12 +2601,15 @@ model Customer {
   handoffs                  CustomerHandoff[]
   assistantThreads          AssistantThread[]
   resaleRelationships       ResaleRelationship[]
+  airtimeSales              AirtimeSale[]
+  airtimePurchases          AirtimePurchase[]
+  airtimeStanding           AirtimeSellerStanding?
+  resaleStoreReports        ResaleStoreReport[]
 
   @@unique([storeId, email])
   @@unique([storeId, googleSubject])
   @@unique([storeId, phone])
   @@map("customers")
-  resaleStoreReports        ResaleStoreReport[]
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
@@ -2655,6 +2663,21 @@ model CustomerSession {
 
   @@index([customerId])
   @@map("customer_sessions")
+}
+
+/// A customer's confirmed mobile numbers (up to five); `customers.phone` is the default one.
+model CustomerPhone {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  storeId    String   @map("store_id") @db.Uuid
+  phone      String
+  verifiedAt DateTime @map("verified_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, phone])
+  @@index([customerId])
+  @@map("customer_phones")
 }
 
 enum CustomerCodePurpose {
@@ -2814,8 +2837,6 @@ model DisputeMessage {
   @@index([disputeId, createdAt])
   @@map("dispute_messages")
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Crypto wallets and P2P trading
@@ -5426,4 +5447,166 @@ model GiftCardSale {
   @@index([customerId, createdAt])
   @@index([status, nextCheckAt])
   @@map("gift_card_sales")
+}
+
+/// A network the airtime exchange takes, per country, with BitoCard's rates (basis points of face value: what sellers
+/// get, what buyers pay) and limits (docs/BITOCARD_AIRTIME_EXCHANGE_PLAN.md).
+/// A seller's standing on the airtime exchange: strikes count from `clearedAt`; `pausedAt` when selling was paused.
+model AirtimeSellerStanding {
+  customerId  String    @id @map("customer_id") @db.Uuid
+  clearedAt   DateTime? @map("cleared_at")
+  clearedBy   String?   @map("cleared_by") @db.Uuid
+  clearReason String?   @map("clear_reason")
+  pausedAt    DateTime? @map("paused_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("airtime_seller_standings")
+}
+
+model AirtimeNetwork {
+  country          String                 @db.Char(2)
+  network          String
+  name             String
+  currency         String                 @db.VarChar(10)
+  sellRateBps      Int                    @default(8000) @map("sell_rate_bps")
+  buyRateBps       Int                    @default(8800) @map("buy_rate_bps")
+  minAmountMinor   BigInt                 @default(10000) @map("min_amount_minor")
+  maxAmountMinor   BigInt                 @default(500000) @map("max_amount_minor")
+  sellerDailyMinor BigInt                 @default(2000000) @map("seller_daily_minor")
+  /// What a new seller may sell a day, until they have `establishedAfter` credited sales.
+  newSellerDailyMinor BigInt              @default(500000) @map("new_seller_daily_minor")
+  establishedAfter Int                    @default(3) @map("established_after")
+  creditHoldHours  Int                    @default(24) @map("credit_hold_hours")
+  /// How a seller sends on this network, with {number}, {amount} and {pin} filled in when shown.
+  transferSteps    String                 @map("transfer_steps")
+  enabled          Boolean                @default(true)
+  position         Int                    @default(0)
+  updatedAt        DateTime               @default(now()) @updatedAt @map("updated_at")
+  lines            AirtimeCollectorLine[]
+  pools            AirtimePool[]
+
+  @@id([country, network])
+  @@map("airtime_networks")
+}
+
+/// One of BitoCard's own lines on a network: receives sellers' airtime and sends buyers theirs, within its own daily
+/// limits (counted per day, `counterDay`), with the airtime believed on it.
+model AirtimeCollectorLine {
+  id                 String            @id @default(uuid()) @db.Uuid
+  country            String            @db.Char(2)
+  network            String
+  /// E.164.
+  number             String            @unique
+  label              String?
+  active             Boolean           @default(true)
+  dailyReceiveMinor  BigInt            @default(5000000) @map("daily_receive_minor")
+  dailySendMinor     BigInt            @default(5000000) @map("daily_send_minor")
+  counterDay         DateTime          @default(now()) @map("counter_day") @db.Date
+  receivedTodayMinor BigInt            @default(0) @map("received_today_minor")
+  sentTodayMinor     BigInt            @default(0) @map("sent_today_minor")
+  balanceMinor       BigInt            @default(0) @map("balance_minor")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  networkRef         AirtimeNetwork    @relation(fields: [country, network], references: [country, network], onDelete: Restrict)
+  sales              AirtimeSale[]
+  purchases          AirtimePurchase[]
+
+  @@index([country, network])
+  @@map("airtime_collector_lines")
+}
+
+/// The pool per mode and network, in face value: airtime held, the part promised to buyers, its cost and totals.
+model AirtimePool {
+  mode           LedgerMode
+  country        String         @db.Char(2)
+  network        String
+  availableMinor BigInt         @default(0) @map("available_minor")
+  reservedMinor  BigInt         @default(0) @map("reserved_minor")
+  costMinor      BigInt         @default(0) @map("cost_minor")
+  boughtMinor    BigInt         @default(0) @map("bought_minor")
+  soldMinor      BigInt         @default(0) @map("sold_minor")
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at")
+  networkRef     AirtimeNetwork @relation(fields: [country, network], references: [country, network], onDelete: Restrict)
+
+  @@id([mode, country, network])
+  @@map("airtime_pools")
+}
+
+/// A customer selling airtime to BitoCard (AS-000123).
+model AirtimeSale {
+  id               String               @id @default(uuid()) @db.Uuid
+  number           Int                  @unique @default(autoincrement())
+  mode             LedgerMode
+  customerId       String               @map("customer_id") @db.Uuid
+  storeId          String               @map("store_id") @db.Uuid
+  country          String               @db.Char(2)
+  network          String
+  lineId           String               @map("line_id") @db.Uuid
+  /// The seller's own confirmed number (E.164): the transfer must come from it.
+  fromPhone        String               @map("from_phone")
+  amountMinor      BigInt               @map("amount_minor")
+  currency         String               @db.VarChar(10)
+  rateBps          Int                  @map("rate_bps")
+  payoutMinor      BigInt               @map("payout_minor")
+  /// awaiting_transfer, sent, received (credit waiting for the hold), credited; or expired, cancelled, not_received, reversed.
+  status           String               @default("awaiting_transfer")
+  expiresAt        DateTime             @map("expires_at")
+  sentAt           DateTime?            @map("sent_at")
+  receivedAt       DateTime?            @map("received_at")
+  creditAt         DateTime?            @map("credit_at")
+  creditedAt       DateTime?            @map("credited_at")
+  overdueAlertedAt DateTime?            @map("overdue_alerted_at")
+  /// A strike against the seller: they said it was sent and it never arrived, or the network reversed it.
+  struckAt         DateTime?            @map("struck_at")
+  decidedBy        String?              @map("decided_by") @db.Uuid
+  note             String?
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  line             AirtimeCollectorLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([customerId, struckAt])
+  @@index([status, expiresAt])
+  @@index([status, creditAt])
+  @@index([mode, network, receivedAt])
+  @@map("airtime_sales")
+}
+
+/// A customer buying airtime from the pool (AP-000123).
+model AirtimePurchase {
+  id          String                @id @default(uuid()) @db.Uuid
+  number      Int                   @unique @default(autoincrement())
+  mode        LedgerMode
+  customerId  String                @map("customer_id") @db.Uuid
+  storeId     String                @map("store_id") @db.Uuid
+  country     String                @db.Char(2)
+  network     String
+  /// The number to top up (E.164).
+  phone       String
+  amountMinor BigInt                @map("amount_minor")
+  currency    String                @db.VarChar(10)
+  rateBps     Int                   @map("rate_bps")
+  priceMinor  BigInt                @map("price_minor")
+  /// What the airtime cost BitoCard (the pool's average), once sent.
+  costMinor   BigInt?               @map("cost_minor")
+  lineId      String?               @map("line_id") @db.Uuid
+  /// paid (waiting to be sent), delivering (staff sending it), delivered, refunded.
+  status      String                @default("paid")
+  expiresAt   DateTime              @map("expires_at")
+  claimedAt   DateTime?             @map("claimed_at")
+  deliveredAt DateTime?             @map("delivered_at")
+  refundedAt  DateTime?             @map("refunded_at")
+  decidedBy   String?               @map("decided_by") @db.Uuid
+  note        String?
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  customer    Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  line        AirtimeCollectorLine? @relation(fields: [lineId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([status, expiresAt])
+  @@index([mode, network, deliveredAt])
+  @@map("airtime_purchases")
 }

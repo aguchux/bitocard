@@ -1713,7 +1713,8 @@
                     "shq_install_prompt": false,
                     "shq_store_guide": true,
                     "storefront_install_prompt": false,
-                    "gift_card_selling": false
+                    "gift_card_selling": false,
+                    "airtime_exchange": false
                   }
                 }
               }
@@ -38098,6 +38099,7 @@
               "customer_wallets",
               "customer_foreign_wallets",
               "gift_card_selling",
+              "airtime_exchange",
               "spin_rewards",
               "store_template_all_in_one",
               "store_template_topups",
@@ -38152,6 +38154,10 @@
               "gift_card_selling": {
                 "type": "boolean",
                 "description": "Customers of BitoCard's own stores sell their gift cards on each gift card's page; once the card is accepted, BitoCard credits the customer's wallet. Off until selling is cleared in the market."
+              },
+              "airtime_exchange": {
+                "type": "boolean",
+                "description": "The airtime exchange on bitocard.com: customers sell unused airtime to BitoCard (sent to its collector lines, credited to their wallet after a hold) and buy airtime from the pool at a discount, with the pool shown to everyone. Off until the networks and lawyers have cleared it."
               },
               "spin_rewards": {
                 "type": "boolean",

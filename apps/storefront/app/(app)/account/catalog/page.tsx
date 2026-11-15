@@ -1,18 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
-import { ArrowRight, HandCoins, X, Zap } from "lucide-react";
+import { HandCoins, X } from "lucide-react";
 import type { StoreBrand, StoreList, StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { appProductBase, Carousel, CarouselItem, SectionTitle } from "@/components/app/blocks";
 import { giftCardGroup, sellCatalogHref } from "@/components/app/gift-card-actions";
+import { MobileActions } from "@/components/app/mobile-actions";
 import { BrandImage } from "@/components/store/brand-image";
 import { ProductCard } from "@/components/store/product-card";
+import { airtimePool } from "@/lib/airtime";
 import { query, storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
 import { sellingOpenIn } from "@/lib/gift-card-sales";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
+import { currentStore } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Catalog" };
 
@@ -73,6 +76,8 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const giftCards = group === giftCardGroup;
   const sellOpen = giftCards ? await sellingOpenIn((await currentCustomer())?.country) : false;
   const selling = sellOpen && sell === "1";
+  // Mobile: the airtime exchange's tiles open once it is open, on bitocard.com only.
+  const exchangeOpen = group === "mobile" && !(await currentStore()).store ? Boolean((await airtimePool())?.open) : false;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -103,18 +108,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         tabs={[{ href: href({ q }), label: "All" }, ...groups.map(item => ({ href: href({ q, group: item.key, brand }), label: item.label }))]}
       />
 
-      {group === "mobile" ? (
-        <Link href="/account/topup" className="flex items-center gap-3 rounded-2xl bg-navy-900 p-4 text-white transition hover:bg-navy-800">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10">
-            <Zap className="size-6" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-bold">Quick top-up</span>
-            <span className="block text-sm text-white/70">Phone number and amount. We find the network.</span>
-          </span>
-          <ArrowRight className="size-5 shrink-0" aria-hidden="true" />
-        </Link>
-      ) : null}
+      {group === "mobile" ? <MobileActions exchangeOpen={exchangeOpen} /> : null}
 
       {filtered ? (
         <section aria-labelledby="results">

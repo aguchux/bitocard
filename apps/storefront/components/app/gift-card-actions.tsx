@@ -13,7 +13,7 @@ export function giftCardCount(group: StoreNavigationGroup | undefined) {
   return group?.categories.reduce((sum, category) => sum + (category.on_sale ? category.products : 0), 0) ?? 0;
 }
 
-function ActionCard({ icon: Icon, tile, title, text, href, soon }: { icon: LucideIcon; tile: string; title: string; text: string; href?: string; soon?: boolean }) {
+export function ActionCard({ icon: Icon, tile, title, text, href, soon }: { icon: LucideIcon; tile: string; title: string; text: string; href?: string; soon?: boolean }) {
   const body = (
     <>
       <span className={`grid size-12 place-items-center rounded-full text-white ${tile}`}>

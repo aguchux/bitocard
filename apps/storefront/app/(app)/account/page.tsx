@@ -3,15 +3,18 @@ import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lu
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
 import { GiftCardActions, giftCardGroup } from "@/components/app/gift-card-actions";
+import { AirtimeActions } from "@/components/app/mobile-actions";
 import { SpinDialog } from "@/components/app/spin-dialog";
 import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
+import { airtimePool } from "@/lib/airtime";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { sellingOpenIn } from "@/lib/gift-card-sales";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
+import { currentStore } from "@/lib/store";
 import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
@@ -33,7 +36,7 @@ function spent(summary: StoreCustomerSummary | null) {
 }
 
 /**
- * Home: the customer's figures, the product groups to start from, popular products and their latest orders.
+ * Home: the customer's figures, gift cards and airtime and data to start from, the product groups, popular products and their latest orders.
  */
 export default async function AccountHome({ searchParams }: { searchParams: Promise<{ spin?: string }> }) {
   const { spin } = await searchParams;
@@ -46,6 +49,9 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
     customerApi<StoreSpinRewards>("GET", "/v1/store/spins"),
   ]);
   const sellOpen = await sellingOpenIn((await currentCustomer())?.country);
+  // The airtime exchange is bitocard.com's own, never a reseller's store.
+  const exchangeOpen = !(await currentStore()).store && Boolean((await airtimePool())?.open);
+  const topUpOpen = Boolean(navigation.groups.find(group => group.key === "mobile")?.on_sale);
   const rewards = spins.ok ? spins.data : null;
   const figures = summary.ok ? summary.data : null;
   // Card widths: the next one peeks at every width; on desktops three and a quarter show (exactly three without a wallet).
@@ -90,6 +96,8 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
       ) : null}
 
       <GiftCardActions group={navigation.groups.find(group => group.key === giftCardGroup)} sellOpen={sellOpen} />
+
+      <AirtimeActions topUpOpen={topUpOpen} exchangeOpen={exchangeOpen} />
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />

@@ -121,6 +121,11 @@
       "job": "gift-card-sales",
       "schedule": "*/15 * * * *",
       "product": "bitocard"
+    },
+    {
+      "job": "airtime",
+      "schedule": "*/5 * * * *",
+      "product": "bitocard"
     }
   ]
 }

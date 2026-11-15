@@ -9,7 +9,8 @@ export const metadata: Metadata = { title: "Top up", robots: { index: false, fol
  * Airtime and data in two fields: phone number and amount (or a bundle, for data). The network is found from the
  * number itself, never chosen from a list first. Paid straight from the wallet.
  */
-export default async function TopUpPage() {
+export default async function TopUpPage({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
+  const { kind } = await searchParams;
   const customer = await currentCustomer();
   const country = customer?.country ?? null;
   const wallet = customer && country ? await walletFor() : null;
@@ -21,7 +22,7 @@ export default async function TopUpPage() {
         <p className="mt-1 text-slate-600">Enter the number. We find the network and quote the price before you pay.</p>
       </div>
       {country ? (
-        <TopUpForm country={country} currency={customer?.currency ?? undefined} wallet={wallet} signedIn={Boolean(customer)} back="/account/topup" />
+        <TopUpForm country={country} currency={customer?.currency ?? undefined} wallet={wallet} signedIn={Boolean(customer)} back="/account/topup" initial={kind === "data" ? "data" : "airtime"} key={kind === "data" ? "data" : "airtime"} />
       ) : (
         <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">Sign in to top up from your wallet.</p>
       )}

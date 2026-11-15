@@ -308,6 +308,129 @@ export type StoreWalletConversion = {
   created_at: string | null;
 };
 
+/**
+ * One network of the airtime exchange's pool, as everyone sees it (`GET /v1/store/airtime/pool`): what BitoCard holds
+ * to sell now (`available`), what it bought and sold in all and in the last 24 hours, and its rates (basis points of
+ * face value: what sellers get, what buyers pay). Amounts in minor units.
+ */
+export type StoreAirtimeNetwork = {
+  object: 'airtime_network';
+  network: string;
+  name: string;
+  open: boolean;
+  sell_rate_bps: number;
+  buy_rate_bps: number;
+  min_amount: number;
+  max_amount: number;
+  available: number;
+  bought_total: number;
+  sold_total: number;
+  bought_24h: number;
+  sold_24h: number;
+};
+
+/** One of a customer's confirmed mobile numbers (up to five; one is the default). */
+export type StoreCustomerPhone = { object: "customer_phone"; phone: string; default: boolean; verified_at: string };
+
+/** `GET /v1/store/account/phones`: the confirmed numbers, the default first, and a number saved but not confirmed yet. */
+export type StoreCustomerPhones = { object: "list"; data: StoreCustomerPhone[]; limit: number; default: string | null; unconfirmed: string | null };
+
+export type StoreAirtimePool = {
+  object: 'airtime_pool';
+  country: string;
+  currency: string | null;
+  mode: 'live' | 'test';
+  open: boolean;
+  networks: StoreAirtimeNetwork[];
+  totals: { available: number; bought_total: number; sold_total: number; bought_24h: number; sold_24h: number };
+  updated_at: string | null;
+};
+
+export type StoreAirtimeSaleStatus = 'awaiting_transfer' | 'sent' | 'received' | 'credited' | 'expired' | 'cancelled' | 'not_received' | 'reversed';
+
+/** A customer's airtime sold to BitoCard (AS-000123): where to send it while they still have to, then its progress. */
+/** `GET /v1/store/airtime/seller`: where the customer stands as a seller, and today's limit per network. */
+export type StoreAirtimeSeller = {
+  object: "airtime_seller";
+  completed_sales: number;
+  strikes: number;
+  strike_limit: number;
+  paused: boolean;
+  strikes_expire_at: string | null;
+  sold_today: number;
+  networks: Array<{ network: string; new_seller: boolean; established_after: number; daily_limit: number; seller_daily: number }>;
+};
+
+export type StoreAirtimeSale = {
+  object: 'airtime_sale';
+  id: string;
+  number: string;
+  mode: 'live' | 'test';
+  network: string;
+  amount: number;
+  currency: string;
+  rate_bps: number;
+  payout: number;
+  from_phone: string;
+  status: StoreAirtimeSaleStatus;
+  collector_number: string | null;
+  transfer_steps: string | null;
+  expires_at: string;
+  sent_at: string | null;
+  received_at: string | null;
+  credit_at: string | null;
+  credited_at: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type StoreAirtimePurchaseStatus = 'paid' | 'delivering' | 'delivered' | 'refunded';
+
+/** Airtime a customer bought from the pool (AP-000123). */
+export type StoreAirtimePurchase = {
+  object: 'airtime_purchase';
+  id: string;
+  number: string;
+  mode: 'live' | 'test';
+  network: string;
+  phone: string;
+  amount: number;
+  currency: string;
+  rate_bps: number;
+  price: number;
+  status: StoreAirtimePurchaseStatus;
+  expires_at: string;
+  delivered_at: string | null;
+  refunded_at: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type StoreAirtimePurchaseQuote = { object: 'airtime_purchase_quote'; network: string; amount: number; currency: string; rate_bps: number; price: number; phone: string; available: number };
+
+/** A rate in basis points as a percentage of face value ("88%", "87.5%"). */
+export const ratePercent = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
+
+/** What a seller's airtime sale is doing, in words. */
+export const airtimeSaleStatus: Record<StoreAirtimeSaleStatus, string> = {
+  awaiting_transfer: 'Send the airtime',
+  sent: 'Checking it arrived',
+  received: 'Received: paying soon',
+  credited: 'Paid to your wallet',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+  not_received: 'Not received',
+  reversed: 'Reversed by the network',
+};
+
+/** What a buyer's airtime purchase is doing, in words. */
+export const airtimePurchaseStatus: Record<StoreAirtimePurchaseStatus, string> = {
+  paid: 'Paid: sending soon',
+  delivering: 'Being sent',
+  delivered: 'Sent',
+  refunded: 'Refunded',
+};
+
 /** What a wallet is called: "US dollar wallet", or "NGN wallet". */
 export const walletName = (currency: string) => (currency === 'USD' ? 'US dollar wallet' : `${currency} wallet`);
 

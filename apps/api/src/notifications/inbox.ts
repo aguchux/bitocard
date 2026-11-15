@@ -166,6 +166,10 @@ export const notificationTypes = {
   'admin.afrippa.chat_waiting': { realm: 'afrippa_admin', roles: ['support', 'operations'], severity: 'warning', label: 'A trader is waiting in chat' },
   'admin.afrippa.kyc_submitted': { realm: 'afrippa_admin', roles: ['operations', 'support'], severity: 'info', label: 'A trader identity check to review' },
   'admin.wallet.manual_top_up': { realm: 'admin', roles: ['finance'], severity: 'info', label: 'Wallet topped up by hand' },
+  'admin.airtime.sale_sent': { realm: 'admin', roles: ['operations'], severity: 'info', label: 'A seller sent airtime to check' },
+  'admin.airtime.purchase_paid': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Airtime to send to a buyer' },
+  'admin.airtime.overdue': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Airtime trade past its hour' },
+  'admin.airtime.seller_paused': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'An airtime seller was paused after strikes' },
   'admin.supplier.funded': { realm: 'admin', roles: ['finance', 'operations'], severity: 'info', label: 'Supplier funded by hand' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------
@@ -208,6 +212,12 @@ export const notificationTypes = {
   'customer.resale.deal_answered': { realm: 'customer', severity: 'info', label: 'A reseller answered your deal', push: true },
   'customer.gift_card_sale.accepted': { realm: 'customer', severity: 'success', label: 'Gift card sale accepted', push: true },
   'customer.gift_card_sale.declined': { realm: 'customer', severity: 'warning', label: 'Gift card sale declined', push: true },
+  'customer.airtime.sale_received': { realm: 'customer', severity: 'success', label: 'Your airtime arrived', push: true },
+  'customer.airtime.sale_credited': { realm: 'customer', severity: 'success', label: 'Airtime sale paid to your wallet', push: true },
+  'customer.airtime.sale_failed': { realm: 'customer', severity: 'warning', label: 'Airtime sale not completed', push: true },
+  'customer.airtime.purchase_delivered': { realm: 'customer', severity: 'success', label: 'Airtime sent', push: true },
+  'customer.airtime.purchase_refunded': { realm: 'customer', severity: 'warning', label: 'Airtime purchase refunded', push: true },
+  'customer.airtime.selling_paused': { realm: 'customer', severity: 'warning', label: 'Selling airtime paused or resumed', push: true },
   'customer.p2p.order_opened': { realm: 'customer', severity: 'info', label: 'New order on your ad', push: true },
   'customer.p2p.order_paid': { realm: 'customer', severity: 'warning', label: 'Buyer says they paid', push: true },
   'customer.p2p.order_released': { realm: 'customer', severity: 'success', label: 'Coins released', push: true },

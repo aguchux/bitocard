@@ -50,6 +50,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Chargebacks', href: '/orders/chargebacks', icon: CreditCard },
       { label: 'Bank transfer accounts', href: '/orders/reserved-accounts', icon: Landmark },
       { label: 'VPN access', href: '/orders/vpn', icon: ShieldEllipsis },
+      { label: 'Airtime exchange', href: '/orders/airtime', icon: Smartphone },
     ],
   },
   catalog: {

@@ -3,20 +3,22 @@ import { Lock, Mail } from "lucide-react";
 import { accountCard, AccountScreen } from "@/components/app/account-menu";
 import { CountryForm, NameForm } from "@/components/store/account-forms";
 import { Flag } from "@/components/store/flag";
+import { PhoneNumbers } from "@/components/store/phone-numbers";
 import { ProfilePhoneForm } from "@/components/store/profile-phone-form";
 import { markets } from "@/lib/countries";
 import { currentCustomer } from "@/lib/customer";
+import { myPhones } from "@/lib/phones";
 
 export const metadata: Metadata = { title: "Profile" };
 
 /**
- * Profile: name, sign-in email, verified mobile number and the customer's fixed buying country.
+ * Profile: name, sign-in email, confirmed mobile numbers (up to five, one the default) and the fixed buying country.
  */
 export default async function DetailsPage() {
-  const [customer, countries] = await Promise.all([currentCustomer().then(found => found!), markets()]);
+  const [customer, countries, phones] = await Promise.all([currentCustomer().then(found => found!), markets(), myPhones()]);
   const country = countries.find(item => item.code === customer.country);
   return (
-    <AccountScreen title="Profile" lead="Your name, email, verified phone number and the country you buy from.">
+    <AccountScreen title="Profile" lead="Your name, email, confirmed mobile numbers and the country you buy from.">
       <section aria-labelledby="details" className={accountCard}>
         <h2 id="details" className="mb-4 text-lg font-bold">
           Your details
@@ -32,7 +34,16 @@ export default async function DetailsPage() {
             <p className="mt-1.5 text-xs text-slate-500">You sign in with this email, and your codes are sent to it.</p>
           </div>
           <div className="border-t border-slate-100 pt-5">
-            <ProfilePhoneForm key={customer.phone ?? 'none'} phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} />
+            {phones ? (
+              <PhoneNumbers
+                key={`${phones.default ?? ""}|${phones.data.map(item => item.phone).join(",")}`}
+                phones={phones}
+                country={customer.country}
+                available={customer.phone_verification_available}
+              />
+            ) : (
+              <ProfilePhoneForm key={customer.phone ?? 'none'} phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} />
+            )}
           </div>
         </div>
       </section>

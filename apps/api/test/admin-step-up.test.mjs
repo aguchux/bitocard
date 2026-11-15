@@ -62,6 +62,7 @@ const protectedRoutes = [
   ['delete', `/v1/admin/pricing-rules/${randomId}`],
   ['put', '/v1/admin/tax-rates/NG', {}],
   ['patch', '/v1/admin/currencies/NGN', {}],
+  ['patch', '/v1/admin/airtime/networks/NG/mtn', { sell_rate_bps: 8000 }],
   ['put', '/v1/admin/plans/premium/limits/stores', { value: 5 }],
   ['put', `/v1/admin/stores/${randomId}/subscription`, { plan: 'premium' }],
   ['put', `/v1/admin/resellers/${randomId}/credit-limit`, { cents: 2500, reason: 'x' }],

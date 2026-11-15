@@ -29,6 +29,11 @@ export type CustomerWithStore = Customer & { store: Store & { reseller: { house:
 const countryLocked = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_locked', 'Your country is set for good: your wallet and payments are in its currency.', 'country');
 
 /** `market` must be loaded when the customer has a country (`CustomersService.present` does it). */
+/** A customer keeps up to five confirmed mobile numbers. */
+export const maxPhones = 5;
+const phoneInUse = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+const phoneLimit = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_limit', `You can have up to ${maxPhones} mobile numbers. Remove one first.`, 'phone');
+
 export function presentCustomer(customer: Customer & { market?: Pick<Country, 'currency' | 'smsProvider'> | null }) {
   return {
     object: 'customer' as const,
@@ -307,12 +312,19 @@ export class CustomersService {
     return record.target;
   }
 
-  /** A customer has one confirmed number. Changing it leaves the old number in place until the new one is confirmed. */
-  async addPhone(customer: Customer & { store?: Pick<Store, 'platform'> }, raw: string) {
+  /**
+   * Sends a code to a number. Confirmed, it joins the customer's numbers (up to five): through `POST …/phone` it becomes
+   * the default at once (the single-number flow), through `POST …/phones` only when there is no confirmed default yet.
+   * The default stays in place until the new number is confirmed.
+   */
+  async addPhone(customer: Customer & { store?: Pick<Store, 'platform'> }, raw: string, { another = false } = {}) {
     // A number from the customer's own country only (normalisePhone refuses others, and asks for the country first).
     const phone = normalisePhone(raw, customer.country);
-    const taken = await this.prisma.customer.findFirst({ where: { storeId: customer.storeId, phone, id: { not: customer.id } } });
-    if (taken) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+    if (await this.phoneTaken(customer, phone)) throw phoneInUse();
+    if (another) {
+      if (await this.prisma.customerPhone.findFirst({ where: { customerId: customer.id, phone } })) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_already_added', 'This number is already on your account.', 'phone');
+      if (await this.prisma.customerPhone.count({ where: { customerId: customer.id } }) >= maxPhones) throw phoneLimit();
+    }
     const purpose: CustomerCodePurpose = 'phone_verification';
     const latest = await this.prisma.customerCode.findFirst({ where: { customerId: customer.id, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
@@ -336,16 +348,79 @@ export class CustomersService {
     return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
   }
 
-  async verifyPhone(customer: Customer, code: string) {
+  /** Confirms the number the last code went to. `makeDefault` (the single-number flow) makes it the default too. */
+  async verifyPhone(customer: Customer, code: string, { makeDefault = true } = {}) {
     const phone = await this.consumeCode(customer, 'phone_verification', code);
     if (!phone) throw codeInvalid();
+    if (await this.phoneTaken(customer, phone)) throw phoneInUse();
+    const now = new Date();
     try {
-      const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: { phone, phoneVerifiedAt: new Date() }, include: { market: true } });
+      const updated = await this.prisma.$transaction(async tx => {
+        const current = await tx.customer.findUniqueOrThrow({ where: { id: customer.id } });
+        const existing = await tx.customerPhone.findFirst({ where: { customerId: customer.id, phone } });
+        if (!existing) {
+          if (await tx.customerPhone.count({ where: { customerId: customer.id } }) >= maxPhones) throw phoneLimit();
+          await tx.customerPhone.create({ data: { customerId: customer.id, storeId: customer.storeId, phone, verifiedAt: now } });
+        }
+        const asDefault = makeDefault || !current.phone || !current.phoneVerifiedAt || current.phone === phone;
+        return asDefault
+          ? tx.customer.update({ where: { id: customer.id }, data: { phone, phoneVerifiedAt: now }, include: { market: true } })
+          : tx.customer.findUniqueOrThrow({ where: { id: customer.id }, include: { market: true } });
+      });
       return presentCustomer(updated);
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw phoneInUse();
       throw error;
     }
+  }
+
+  /** Another account at the store has the number as its default (confirmed or not) or among its confirmed numbers. */
+  private async phoneTaken(customer: Pick<Customer, 'id' | 'storeId'>, phone: string) {
+    const [asDefault, listed] = await Promise.all([
+      this.prisma.customer.findFirst({ where: { storeId: customer.storeId, phone, id: { not: customer.id } }, select: { id: true } }),
+      this.prisma.customerPhone.findFirst({ where: { storeId: customer.storeId, phone, customerId: { not: customer.id } }, select: { id: true } }),
+    ]);
+    return Boolean(asDefault || listed);
+  }
+
+  /** The customer's confirmed numbers, the default first. */
+  async listPhones(customer: Pick<Customer, 'id'>) {
+    const current = await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, include: { phones: { orderBy: { createdAt: 'asc' } } } });
+    const defaultPhone = current.phoneVerifiedAt ? current.phone : null;
+    const data = current.phones
+      .map(item => ({ object: 'customer_phone' as const, phone: item.phone, default: item.phone === defaultPhone, verified_at: item.verifiedAt.toISOString() }))
+      .sort((a, b) => Number(b.default) - Number(a.default));
+    return { object: 'list' as const, data, limit: maxPhones, default: defaultPhone, unconfirmed: current.phone && !current.phoneVerifiedAt ? current.phone : null };
+  }
+
+  /** Whether the number (in E.164) is one of the customer's confirmed numbers. */
+  async ownsPhone(customer: Pick<Customer, 'id'>, phone: string) {
+    return Boolean(await this.prisma.customerPhone.findFirst({ where: { customerId: customer.id, phone }, select: { id: true } }));
+  }
+
+  async makeDefaultPhone(customer: Customer, raw: string) {
+    const phone = normalisePhone(raw, customer.country);
+    const listed = await this.prisma.customerPhone.findFirst({ where: { customerId: customer.id, phone } });
+    if (!listed) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'Add and confirm that number first.', 'phone');
+    if (await this.phoneTaken(customer, phone)) throw phoneInUse();
+    try {
+      await this.prisma.customer.update({ where: { id: customer.id }, data: { phone, phoneVerifiedAt: listed.verifiedAt } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw phoneInUse();
+      throw error;
+    }
+    return this.listPhones(customer);
+  }
+
+  async removePhone(customer: Customer, raw: string) {
+    const phone = normalisePhone(raw, customer.country);
+    const current = await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id } });
+    if (current.phone === phone && current.phoneVerifiedAt) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'default_phone', 'Make another number your default before removing this one.', 'phone');
+    }
+    const removed = await this.prisma.customerPhone.deleteMany({ where: { customerId: customer.id, phone } });
+    if (!removed.count) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'That number is not on your account.', 'phone');
+    return this.listPhones(customer);
   }
 
   async resendVerification(customer: CustomerWithStore) {

@@ -62,6 +62,11 @@ export const switchDefinitions = {
     description:
       "Customers of BitoCard's own stores sell their gift cards on each gift card's page; once the card is accepted, BitoCard credits the customer's wallet. Off until selling is cleared in the market.",
   },
+  airtime_exchange: {
+    scopes: ['global', 'country'],
+    description:
+      "The airtime exchange on bitocard.com: customers sell unused airtime to BitoCard (sent to its collector lines, credited to their wallet after a hold) and buy airtime from the pool at a discount, with the pool shown to everyone. Off until the networks and lawyers have cleared it.",
+  },
   spin_rewards: {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 over 50 to 100 spins, a few a day, paid by BitoCard into their spin rewards and moved into their store wallet in US dollars or their own currency. Off until the promotion's terms are cleared.",

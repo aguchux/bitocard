@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
@@ -319,6 +319,42 @@ export class CustomerAccountController {
   @HttpCode(HttpStatus.OK)
   verifyPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
     return this.customers.verifyPhone(caller.customer, body.code);
+  }
+
+  /** The customer's confirmed mobile numbers (up to five), the default first. */
+  @UseGuards(CustomerGuard)
+  @Get('phones')
+  phones(@CurrentCustomer() caller: CustomerCaller) {
+    return this.customers.listPhones(caller.customer);
+  }
+
+  /** Adds another number: a code is texted to it, and it joins the list once confirmed. */
+  @UseGuards(CustomerGuard)
+  @Post('phones')
+  @HttpCode(HttpStatus.ACCEPTED)
+  addAnotherPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
+    return this.customers.addPhone(caller.customer, body.phone, { another: true });
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('phones/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyAnotherPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
+    await this.customers.verifyPhone(caller.customer, body.code, { makeDefault: false });
+    return this.customers.listPhones(caller.customer);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('phones/default')
+  @HttpCode(HttpStatus.OK)
+  defaultPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
+    return this.customers.makeDefaultPhone(caller.customer, body.phone);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Delete('phones/:phone')
+  removePhone(@CurrentCustomer() caller: CustomerCaller, @Param('phone') phone: string) {
+    return this.customers.removePhone(caller.customer, phone);
   }
 
   /** The customer's identity check for a market (BitoCard Verify across Africa, Didit elsewhere), where buying needs one. */

@@ -102,6 +102,33 @@ export async function verifyProfilePhone(_state: FormState, form: FormData): Pro
   return { notice: 'Your phone number is confirmed.' };
 }
 
+/** Another number: a code is texted to it (it joins the list once confirmed, never moving the default). */
+export async function addAnotherPhone(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<{ object: "notice"; phone: string }>("POST", "/v1/store/account/phones", { phone: text(form, "phone") });
+  return result.ok ? { notice: `We sent a code to ${result.data.phone}.` } : failed(result);
+}
+
+export async function verifyAnotherPhone(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<unknown>("POST", "/v1/store/account/phones/verify", { code: text(form, "code") });
+  if (!result.ok) return failed(result);
+  revalidatePath("/account", "layout");
+  return { notice: "Your number is confirmed." };
+}
+
+export async function makeDefaultPhone(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<unknown>("POST", "/v1/store/account/phones/default", { phone: text(form, "phone") });
+  if (!result.ok) return failed(result);
+  revalidatePath("/account", "layout");
+  return { notice: "That is now your default number." };
+}
+
+export async function removePhone(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<unknown>("DELETE", `/v1/store/account/phones/${encodeURIComponent(text(form, "phone"))}`);
+  if (!result.ok) return failed(result);
+  revalidatePath("/account", "layout");
+  return { notice: "Number removed." };
+}
+
 /** Sets the country of an account from before it was asked (once: it never changes after). */
 export async function setCountry(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { country: text(form, "country") });

@@ -23,10 +23,11 @@ const detectDelayMs = 500;
  * else a guess from its prefix), never a list of bundles to pick through first. Falls back to a network choice only
  * when neither can tell. Paid straight from the wallet, as `BuyForm`'s wallet flow does.
  */
-export function TopUpForm({ country, currency, wallet, signedIn, back }: { country: string; currency?: string; wallet: StoreWallet | null; signedIn: boolean; back: string }) {
+/** `initial`: the tab it opens on (`?kind=data` from the Mobile catalogue's Buy data). */
+export function TopUpForm({ country, currency, wallet, signedIn, back, initial = "airtime" }: { country: string; currency?: string; wallet: StoreWallet | null; signedIn: boolean; back: string; initial?: Category }) {
   const id = useId();
   const [state, action, pending] = useActionState<FormState, FormData>(startCheckout, {});
-  const [category, setCategory] = useState<Category>("airtime");
+  const [category, setCategory] = useState<Category>(initial);
   const [phone, setPhone] = useState("");
   const [guess, setGuess] = useState<{ detected: boolean; product: StoreProduct | null }>({ detected: false, product: null });
   const [networks, setNetworks] = useState<StoreProduct[] | null>(null);

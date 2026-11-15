@@ -109,6 +109,27 @@ export default function TermsOfUse() {
         <p>If you do, or if the VPN network provider reports abuse of your access, we may suspend or end it without a refund, and report it to the authorities where the law requires it. If we suspend your access by mistake, we will restore it, or refund you in full if you prefer. If the service stops for good for reasons that are not your fault, you will be refunded in full.</p>
       </Section>
 
+      <Section id="airtime" title="5a. The airtime exchange">
+        <p>Where we run it, on bitocard.com, you can sell us airtime you will not use and buy airtime from us for less than its face value. Each network&apos;s rates, and how much airtime we hold, are shown to everyone. These rules apply:</p>
+        <h3 id="airtime-selling">Selling us airtime</h3>
+        <ul>
+          <li>You can keep up to five mobile numbers on your account, each confirmed by a code we text to it, and choose one as your default. You may sell only airtime on your own line: one of those confirmed numbers, the one you choose for the sale.</li>
+          <li><strong>Airtime sent from a number that is not confirmed on your account, or not the number you chose for the sale, cannot be matched to you. It is not paid for or refunded, it is lost, and it cannot be claimed later.</strong></li>
+          <li>You send it with your network&apos;s own transfer service, to the number we give you for that sale, within an hour. Airtime sent to the wrong number or network, or for a different amount, may be lost; we will try to help but cannot promise to recover it.</li>
+          <li>Once it arrives, we pay you the rate shown when you started, into your BitoCard wallet, after a hold (24 hours unless shown otherwise). Like all wallet money, it is spent only in our store and is never withdrawn.</li>
+          <li>If the network reverses the transfer during the hold (for example because the line was reported stolen), nothing is paid. If airtime you sold us is later found to be stolen or obtained by fraud, we may take back what we paid and close your account.</li>
+          <li>There are limits on how much you can sell in a day, set per network, and they are lower for new sellers until a few of their sales are complete. Your limits are shown before you sell.</li>
+          <li>If you say you sent airtime and it never arrives, or the network reverses a transfer you made, that is a strike. Three strikes within 90 days pause your selling until we have looked at your sales; you can ask us to on Help &amp; support.</li>
+        </ul>
+        <h3 id="airtime-buying">Buying airtime from us</h3>
+        <ul>
+          <li>You see the price before you pay. It is paid from your wallet and held until the airtime is sent.</li>
+          <li>We send it only to one of the numbers confirmed on your account, the one you choose, on the network you choose, within an hour. If we cannot, the whole price goes back to your wallet.</li>
+          <li>Check the network before paying: airtime sent to the number you chose cannot be taken back.</li>
+        </ul>
+        <p>We may change the rates and limits at any time; a change never affects a sale or purchase already started. We may pause the exchange, or a network, at any time.</p>
+      </Section>
+
       <Section id="no-advice" title="6. No financial advice">
         <p>Nothing on these websites is financial, investment, legal or tax advice, and we do not promise any level of income or profit from reselling.</p>
       </Section>
