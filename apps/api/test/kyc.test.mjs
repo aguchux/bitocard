@@ -341,6 +341,71 @@ describe('customers’ checks', () => {
   });
 });
 
+describe('unfinished checks', () => {
+  async function owner() {
+    const reseller = await resellerClient(server, { country: 'NG' });
+    await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
+    const started = await reseller.browser.post('/v1/account/verification', { consent: true });
+    assert.equal(started.status, 201, JSON.stringify(started.json));
+    return { reseller, started: started.json, person: await applicant(started.json.url) };
+  }
+  const checkOf = caseId => prisma.identityVerification.findFirstOrThrow({ where: { providerReference: caseId } });
+
+  test('the owner starts again from scratch: the old check closes and its link and case stop working', async () => {
+    const { reseller, person } = await owner();
+    await person.put('consent', { consent: true });
+    const fresh = await reseller.browser.post('/v1/account/verification', { consent: true, restart: true });
+    assert.equal(fresh.status, 201, JSON.stringify(fresh.json));
+    const again = await applicant(fresh.json.url);
+    assert.notEqual(again.case.id, person.case.id, 'a new case');
+    assert.equal(again.case.consented, false, 'nothing carried over');
+    const old = await checkOf(person.case.id);
+    assert.deepEqual([old.status, old.reason], ['expired', 'restarted']);
+    assert.equal((await person.get()).status, 401, 'the old session ended');
+  });
+
+  test('a check with no progress for three days closes itself; progress keeps it open', async () => {
+    const { IdentityService } = await import('../dist/identity/identity.service.js');
+    const identity = server.app.get(IdentityService);
+    const idle = await owner();
+    const busy = await owner();
+    const old = new Date(Date.now() - 4 * 24 * 3600_000);
+    for (const { person } of [idle, busy]) {
+      await prisma.identityVerification.updateMany({ where: { providerReference: person.case.id }, data: { createdAt: old } });
+      await prisma.$executeRaw`UPDATE kyc_cases SET updated_at = ${old} WHERE id = ${person.case.id}::uuid`;
+    }
+    assert.equal((await busy.person.put('consent', { consent: true })).status, 200, 'the busy one moves today');
+    await identity.checkOpen();
+    const closed = await checkOf(idle.person.case.id);
+    assert.deepEqual([closed.status, closed.reason], ['expired', 'abandoned']);
+    assert.equal((await checkOf(busy.person.case.id)).status, 'in_progress');
+    assert.ok(await prisma.notification.findFirst({ where: { type: 'verification.updated', title: { contains: 'expired' } } }));
+    // Starting again opens a new check.
+    const next = await idle.reseller.browser.post('/v1/account/verification', { consent: true });
+    assert.notEqual((await applicant(next.json.url)).case.id, idle.person.case.id);
+  });
+
+  test('operations cancel an unfinished check; the owner starts again; a sent Verify check is decided on its case', async () => {
+    const { reseller, person } = await owner();
+    const check = await checkOf(person.case.id);
+    const support = await adminClient(server, ['support']);
+    assert.equal((await support.post(`/v1/admin/verifications/${check.id}/cancel`, { reason: 'Stuck for weeks' })).status, 403);
+    const cancelled = await admin.post(`/v1/admin/verifications/${check.id}/cancel`, { reason: 'Stuck for weeks' });
+    assert.equal(cancelled.status, 200, JSON.stringify(cancelled.json));
+    assert.deepEqual([cancelled.json.status, cancelled.json.reason], ['expired', 'cancelled']);
+    assert.equal((await admin.post(`/v1/admin/verifications/${check.id}/cancel`, { reason: 'Stuck for weeks' })).json.error.code, 'verification_closed');
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'verification.cancelled', targetId: check.resellerId } }));
+    assert.equal((await person.get()).status, 401, 'its link stopped working');
+    const next = await reseller.browser.post('/v1/account/verification', { consent: true });
+    const person2 = await applicant(next.json.url);
+    assert.notEqual(person2.case.id, person.case.id);
+
+    const sent = await complete(person2, { kyb: 'unregistered' });
+    const inReview = await checkOf(sent.id);
+    assert.equal((await admin.post(`/v1/admin/verifications/${inReview.id}/cancel`, { reason: 'Stuck for weeks' })).json.error.code, 'use_verify_review');
+  });
+});
+
 describe('Ghana reserved accounts', () => {
   test('GHS accounts send the holder’s names and phone, never a BVN', async () => {
     const calls = [];

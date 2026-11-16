@@ -333,6 +333,9 @@ export class KycService {
   async submit(caseId: string) {
     const c = await this.load(caseId);
     if (c.status !== 'draft' && c.status !== 'resubmit') throw conflict('case_locked', 'This check was already submitted.');
+    // A check closed unfinished (expired, started again or cancelled) can no longer be sent.
+    const open = await this.prisma.identityVerification.findUnique({ where: { id: c.verificationId }, select: { status: true } });
+    if (open?.status !== 'in_progress') throw conflict('case_closed', 'This check was closed. Start a new one.');
     const missing = this.missing(c);
     if (missing.length) throw invalid('case_incomplete', `Some parts of your check are missing: ${missing.join(', ')}.`);
     const reviewer = await this.reviewerFor(c);

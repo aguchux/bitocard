@@ -57,6 +57,15 @@ export class VerifyLinks {
     return this.link(verification.providerReference, kycPlatform(verification.resellerId));
   }
 
+  /**
+   * Closes the case of a check that was closed unfinished: its links and sessions stop working at once, and its
+   * documents are deleted by the next retention run. A case already sent or decided keeps its own retention.
+   */
+  async close(caseId: string) {
+    await this.prisma.kycSession.deleteMany({ where: { caseId } });
+    await this.prisma.kycCase.updateMany({ where: { id: caseId, status: { in: ['draft', 'resubmit'] } }, data: { purgeAfter: new Date() } });
+  }
+
   /** A fresh single-use link into the case, on its product's Verify (verify.bitocard.com or verify.afrippa.com). */
   async link(caseId: string, platform: Platform = 'bitocard') {
     const token = `bkh_${randomToken(32)}`;

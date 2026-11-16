@@ -194,6 +194,12 @@ export const adminApi = bitocardApi.injectEndpoints({
       invalidatesTags: [{ type: 'Verification', id: 'LIST' }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
     }),
 
+    /** Closes an unfinished check (or a provider's stuck in review) so its owner can start again from scratch. */
+    cancelVerification: build.mutation<Verification, { id: string; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/verifications/${id}/cancel`, method: 'POST', body }),
+      invalidatesTags: [{ type: 'Verification', id: 'LIST' }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+
     // -- Orders -----------------------------------------------------------------------------------------------------
     orders: build.infiniteQuery<List<AdminOrder>, { status?: OrderStatus; needs_review?: boolean; reseller_id?: string }, string>({
       infiniteQueryOptions: cursorPages,
@@ -467,6 +473,7 @@ export const {
   useDeletePlanMutation,
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,
+  useCancelVerificationMutation,
   useOrdersInfiniteQuery,
   useOrderQuery,
   useSupplierWebhooksInfiniteQuery,

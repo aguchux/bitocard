@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ExternalLink, RotateCw, ShieldCheck } from "lucide-react";
-import { Button, Card, CardHeader, errorMessage, formatDateTime, KeyValue, Notice, PageHeader, QueryView, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { ActionDialog, Button, Card, CardHeader, errorMessage, formatDateTime, KeyValue, Notice, PageHeader, QueryView, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { kycDeclineReasons } from "@bitocard/api-client/kyc";
 import { type Verification, useAccountVerificationQuery, useStartAccountVerificationMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
@@ -13,6 +13,9 @@ const reasons: Record<string, string> = {
   name_mismatch: "The name on your document did not match the name on your account.",
   bvn_consent_declined: "Sharing your BVN record was declined.",
   expired: "The check was not finished in time. Start a new one.",
+  abandoned: "The check was closed after three days without progress. Start a new one.",
+  restarted: "You started the check again.",
+  cancelled: "BitoCard closed the unfinished check. Start a new one.",
 };
 
 /** The business as BitoCard Verify sees it. */
@@ -47,7 +50,7 @@ function Outcome({ check }: { check: Verification }) {
     case "declined":
       return <Notice tone="red" title="Check not passed">{reasons[check.reason ?? "not_verified"] ?? (check.reason && check.reason in kycDeclineReasons ? `${kycDeclineReasons[check.reason as keyof typeof kycDeclineReasons]}.` : reasons.not_verified)} You can start a new check.</Notice>;
     case "expired":
-      return <Notice tone="grey" title="Check expired">{reasons.expired}</Notice>;
+      return <Notice tone="grey" title={check.reason === "cancelled" ? "Check cancelled" : "Check expired"}>{reasons[check.reason ?? "expired"] ?? reasons.expired}</Notice>;
     default:
       return <Notice tone="amber" title="Not started">The business owner needs to complete an identity check before your account can take live orders.</Notice>;
   }
@@ -56,13 +59,14 @@ function Outcome({ check }: { check: Verification }) {
 function StartCheck({ check }: { check: Verification }) {
   const [consent, setConsent] = useState(false);
   const [start, state] = useStartAccountVerificationMutation();
+  const [restarting, setRestarting] = useState(false);
   const inProgress = check.status === "in_progress";
   // Didit's page can be reopened; a BitoCard Verify link works once, so continuing asks the API for a fresh one.
   const resume = inProgress ? check.url : null;
   const reopen = inProgress && !resume && check.provider === "bitocard";
 
-  const begin = async () => {
-    const result = await start({ consent: true })
+  const begin = async (restart = false) => {
+    const result = await start({ consent: true, ...(restart ? { restart: true } : {}) })
       .unwrap()
       .catch(() => null);
     if (result?.url) goTo(result.url);
@@ -72,9 +76,24 @@ function StartCheck({ check }: { check: Verification }) {
     return (
       <div className="space-y-3">
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-        <Button icon={<ExternalLink className="size-4" aria-hidden />} loading={state.isLoading} onClick={() => (resume ? goTo(resume) : void begin())}>
-          Continue the check
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button icon={<ExternalLink className="size-4" aria-hidden />} loading={state.isLoading} onClick={() => (resume ? goTo(resume) : void begin())}>
+            Continue the check
+          </Button>
+          <Button variant="secondary" icon={<RotateCw className="size-4" aria-hidden />} disabled={state.isLoading} onClick={() => setRestarting(true)}>
+            Start again
+          </Button>
+        </div>
+        <p className="text-sm text-muted">Stuck? Start again closes this check and deletes what you sent, so you begin from the first step. A check with no progress for three days closes on its own.</p>
+        <ActionDialog
+          open={restarting}
+          onClose={() => setRestarting(false)}
+          title="Start the check again?"
+          description="Your unfinished check is closed and what you sent with it is deleted. You start from the first step."
+          confirmLabel="Start again"
+          requireReason={false}
+          onConfirm={() => begin(true)}
+        />
       </div>
     );
   }
@@ -112,7 +131,7 @@ function StartCheck({ check }: { check: Verification }) {
             : "I agree to the identity check, including the face check that uses my biometric data, as described in the privacy notice."}
         </span>
       </label>
-      <Button icon={<ShieldCheck className="size-4" aria-hidden />} loading={state.isLoading} disabled={!consent} onClick={begin}>
+      <Button icon={<ShieldCheck className="size-4" aria-hidden />} loading={state.isLoading} disabled={!consent} onClick={() => void begin()}>
         {ours ? "Start BitoCard Verify" : "Start the identity check"}
       </Button>
     </div>

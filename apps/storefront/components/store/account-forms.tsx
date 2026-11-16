@@ -371,6 +371,14 @@ export function VerificationForm({ country, countryName, provider, resume }: { c
         </span>
       </label>
       <Submit pending={pending}>{resume ? "Continue your check" : "Start the check"}</Submit>
+      {resume ? (
+        <div className="space-y-1 border-t border-slate-100 pt-4">
+          <button type="submit" name="restart" value="1" disabled={pending} className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60">
+            Start again
+          </button>
+          <p className="text-sm text-slate-500">Stuck? This closes your unfinished check and deletes what you sent, so you begin from the first step. A check with no progress for three days closes on its own.</p>
+        </div>
+      ) : null}
     </form>
   );
 }

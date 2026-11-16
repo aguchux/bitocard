@@ -225,6 +225,8 @@ export async function startVerification(_state: FormState, form: FormData): Prom
     last_name: text(form, "last_name"),
     bvn: ours ? undefined : text(form, "bvn") || undefined,
     consent: form.get("consent") === "on",
+    // Start again: the unfinished check is closed and a new one opened from scratch.
+    ...(form.get("restart") === "1" ? { restart: true } : {}),
     redirect_url: `${await siteOrigin()}/account/verification?country=${encodeURIComponent(country)}`,
   });
   if (!result.ok) return failed(result);

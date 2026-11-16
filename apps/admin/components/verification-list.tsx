@@ -1,15 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, XCircle } from "lucide-react";
 import { ActionDialog, Button, Card, DataTable, errorMessage, Field, formatDateTime, humanise, Input, LoadMore, StatusBadge } from "@bitocard/admin-ui";
 import { can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
-import { useDecideVerificationMutation, useVerificationsInfiniteQuery, type Verification, type VerificationStatus } from "@bitocard/api-client/admin";
+import { useCancelVerificationMutation, useDecideVerificationMutation, useVerificationsInfiniteQuery, type Verification, type VerificationStatus } from "@bitocard/api-client/admin";
 
 /**
  * Identity checks, newest first. In the review queue, operations admins approve or decline each check after looking at
  * it in the provider's console; every decision is audited.
  */
+/** Whether an admin can cancel the check: unfinished, or a provider's (never Verify's) waiting in review. */
+export const cancellable = (check: Pick<Verification, "status" | "provider">) => check.status === "in_progress" || (check.status === "in_review" && check.provider !== "bitocard");
+
+/** Cancel check: closes an unfinished check, with a reason, so its owner can start again from scratch. */
+export function CancelCheck({ check }: { check: Verification }) {
+  const [open, setOpen] = useState(false);
+  const [cancel] = useCancelVerificationMutation();
+  return (
+    <>
+      <Button size="sm" variant="secondary" icon={<Ban className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+        Cancel check
+      </Button>
+      <ActionDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Cancel this identity check?"
+        description="The check is closed and anything sent with it is deleted, so they can start again from scratch. They are told, and your reason is kept in the audit log."
+        confirmLabel="Cancel check"
+        tone="danger"
+        onConfirm={reason => cancel({ id: check.id, reason }).unwrap()}
+      />
+    </>
+  );
+}
+
 export function VerificationList({ status, subject }: { status?: VerificationStatus; subject?: "reseller" | "customer" }) {
   const admin = useAdmin();
   const query = useVerificationsInfiniteQuery({ status, subject });
@@ -57,9 +82,14 @@ export function VerificationList({ status, subject }: { status?: VerificationSta
             cell: check =>
               // BitoCard Verify's checks are decided on their case, with its documents (the API refuses them here).
               check.provider === "bitocard" ? (
-                <AppLink href={`/verifications/verify/${check.provider_reference}`} className="text-sm font-semibold text-brand-700 hover:underline">
-                  {check.status === "in_review" ? "Review case" : "Open case"}
-                </AppLink>
+                <span className="inline-flex items-center gap-3">
+                  {operator && check.status === "in_progress" ? <CancelCheck check={check} /> : null}
+                  <AppLink href={`/verifications/verify/${check.provider_reference}`} className="text-sm font-semibold text-brand-700 hover:underline">
+                    {check.status === "in_review" ? "Review case" : "Open case"}
+                  </AppLink>
+                </span>
+              ) : operator && check.status === "in_progress" ? (
+                <CancelCheck check={check} />
               ) : operator && check.status === "in_review" ? (
                 <span className="inline-flex gap-2">
                   <Button

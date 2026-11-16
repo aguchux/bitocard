@@ -40,8 +40,11 @@ export type BvnCheck = {
 export const resellerIdentityApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     accountVerification: build.query<Verification, void>({ query: () => '/v1/account/verification', providesTags: ['IdentityCheck'] }),
-    /** Owner only, and only with consent (the face check is biometric). Send the browser to the returned `url`. */
-    startAccountVerification: build.mutation<Verification, { consent: true }>({
+    /**
+     * Owner only, and only with consent (the face check is biometric). Send the browser to the returned `url`.
+     * `restart` closes an unfinished check and starts a new one from scratch.
+     */
+    startAccountVerification: build.mutation<Verification, { consent: true; restart?: boolean }>({
       query: body => ({ url: '/v1/account/verification', method: 'POST', body }),
       invalidatesTags: ['IdentityCheck'],
     }),

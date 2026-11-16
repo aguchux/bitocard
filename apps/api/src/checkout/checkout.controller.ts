@@ -187,6 +187,10 @@ class VerificationDto {
 
   @IsBoolean() @Equals(true, { message: 'consent must be true' })
   consent: boolean;
+
+  /** Close the unfinished check and start a new one from scratch. */
+  @IsOptional() @IsBoolean()
+  restart?: boolean;
 }
 
 class HandoffDto {

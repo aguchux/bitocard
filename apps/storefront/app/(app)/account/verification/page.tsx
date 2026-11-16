@@ -15,7 +15,7 @@ type Status = { verified: boolean; provider?: "bitocard" | "didit"; latest: { st
 
 /** A declined check's reason in words (BitoCard Verify's codes, and the older ones). */
 const reasonText = (reason: string) =>
-  kycDeclineReasons[reason as keyof typeof kycDeclineReasons] ?? ({ not_verified: "We could not confirm your identity", name_mismatch: "The name did not match", expired: "The check was not finished in time" } as Record<string, string>)[reason] ?? reason;
+  kycDeclineReasons[reason as keyof typeof kycDeclineReasons] ?? ({ not_verified: "We could not confirm your identity", name_mismatch: "The name did not match", expired: "The check was not finished in time", abandoned: "It had no progress for three days", cancelled: "It was closed by our team" } as Record<string, string>)[reason] ?? reason;
 
 /**
  * The customer's identity check for their country: needed once before buying some products in some countries. One of
@@ -59,7 +59,11 @@ export default async function VerificationPage({ searchParams }: { searchParams:
           </a>
         ) : (
           <>
-            {status?.ok && status.data.latest?.reason ? <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your last check did not pass: {reasonText(status.data.latest.reason)}.</p> : null}
+            {status?.ok && status.data.latest?.reason && status.data.latest.reason !== "restarted" ? (
+              <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                {status.data.latest.status === "expired" ? "Your last check was closed" : "Your last check did not pass"}: {reasonText(status.data.latest.reason)}. Start a new one below.
+              </p>
+            ) : null}
             <VerificationForm country={country} countryName={name} provider={status?.ok ? status.data.provider : undefined} resume={status?.ok && status.data.latest?.status === "in_progress"} />
           </>
         )}

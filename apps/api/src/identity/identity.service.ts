@@ -27,6 +27,10 @@ const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];
 const reuseSessionMs = 24 * 3600 * 1000;
 /** Checks nobody finished are closed after this. */
 const expireAfterMs = 7 * 24 * 3600 * 1000;
+/** An unfinished check closes on its own after this long without progress, so its owner can start afresh. */
+export const abandonAfterMs = 3 * 24 * 3600 * 1000;
+/** Why an open check was closed without a decision. */
+export type ClosedReason = 'abandoned' | 'restarted' | 'cancelled';
 
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such verification.');
@@ -175,12 +179,17 @@ export class IdentityService {
   }
 
   /** The business owner's check. Returns the Didit page to send them to; an unfinished session is reused for a day. */
-  async startResellerVerification(resellerId: string, userId: string, consent: boolean) {
+  async startResellerVerification(resellerId: string, userId: string, consent: boolean, restart = false) {
     if (!consent) throw consentRequired();
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     if (reseller.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', 'Your identity is already verified.');
-    const latest = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
+    let latest = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
     if (latest?.status === 'in_review') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_in_review', 'Your check is being reviewed. We will email you the outcome.');
+    // Start again: the unfinished check is closed and a new one opened, with nothing carried over.
+    if (restart && latest?.status === 'in_progress') {
+      await this.close(latest, 'restarted', userId);
+      latest = null;
+    }
     const provider = await this.providerFor(reseller.country);
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (provider === 'bitocard') {
@@ -338,7 +347,7 @@ export class IdentityService {
     resellerId: string,
     mode: LedgerMode,
     reference: string,
-    input: { country: string; first_name: string; last_name: string; bvn?: string; redirect_url: string; consent: boolean },
+    input: { country: string; first_name: string; last_name: string; bvn?: string; redirect_url: string; consent: boolean; restart?: boolean },
     options: { storeId?: string | null } = {},
   ) {
     if (!input.consent) throw consentRequired();
@@ -350,8 +359,13 @@ export class IdentityService {
     if (method === 'bvn' && !/^\d{11}$/.test(input.bvn ?? '')) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Nigerian customers are checked with their 11-digit BVN.', 'bvn');
     }
-    const latest = await this.latestCustomer(resellerId, mode, reference);
+    let latest = await this.latestCustomer(resellerId, mode, reference);
     if (latest?.status === 'approved' || latest?.status === 'in_review') return presentCustomerVerification(latest);
+    // Start again: the unfinished check is closed and a new one opened, with nothing carried over.
+    if (input.restart && latest?.status === 'in_progress') {
+      await this.close(latest, 'restarted', null);
+      latest = null;
+    }
     if (latest?.status === 'in_progress' && latest.provider === verifyProvider) return presentCustomerVerification(await this.freshLink(latest));
     if (latest?.status === 'in_progress' && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentCustomerVerification(latest);
     if (mode === 'live') {
@@ -513,7 +527,12 @@ export class IdentityService {
         approved: { title: `Your ${what} was approved`, body: ownerBvn ? 'You can open your reserved bank accounts now.' : autoApprove ? 'Your account is live.' : 'BitoCard will activate your account shortly.' },
         declined: { title: `Your ${what} was declined`, body: reason === 'name_mismatch' ? 'The name on the record did not match your verified name.' : 'Start a new check from the verification page.' },
         in_review: { title: `Your ${what} is being reviewed`, body: 'BitoCard is reviewing it; we will tell you the outcome.' },
-        expired: { title: `Your ${what} expired`, body: 'It was not finished in time. Start a new one when you are ready.' },
+        expired:
+          reason === 'cancelled'
+            ? { title: `Your ${what} was cancelled`, body: 'BitoCard closed your unfinished check. Start a new one from the verification page.' }
+            : reason === 'restarted'
+              ? { title: `You started your ${what} again`, body: 'Your unfinished check was closed and a new one started.' }
+              : { title: `Your ${what} expired`, body: 'It was not finished in time. Start a new one when you are ready.' },
       };
       const outcome = outcomes[status];
       if (outcome) {
@@ -561,8 +580,8 @@ export class IdentityService {
         const after = await this.refresh(record);
         outcome.checked += 1;
         if (!openStatuses.includes(after.status)) outcome.decided += 1;
-        else if (after.status === 'in_progress' && record.createdAt.getTime() < now.getTime() - expireAfterMs) {
-          await this.apply(after, { status: 'expired' });
+        else if (after.status === 'in_progress' && (await this.lastProgress(after)).getTime() < now.getTime() - abandonAfterMs) {
+          await this.close(after, 'abandoned', null);
           outcome.expired += 1;
         }
       } catch (error) {
@@ -580,6 +599,22 @@ export class IdentityService {
     });
     outcome.expired += sandbox.count;
     return outcome;
+  }
+
+  /** When an open check last moved: a Verify case's last change (each step saves it), else when the check started. */
+  private async lastProgress(record: IdentityVerification) {
+    if (record.provider !== verifyProvider) return record.createdAt;
+    const c = await this.prisma.kycCase.findUnique({ where: { id: record.providerReference }, select: { updatedAt: true } });
+    return c && c.updatedAt > record.createdAt ? c.updatedAt : record.createdAt;
+  }
+
+  /**
+   * Closes an open check without a decision (`expired`, with why), so its owner can start a new one from scratch. A
+   * Verify case's links and sessions stop working and its documents are deleted.
+   */
+  private async close(record: IdentityVerification, reason: ClosedReason, actorId: string | null) {
+    await this.apply(record, { status: 'expired', reason }, actorId, { trusted: true });
+    if (record.provider === verifyProvider) await this.verify.close(record.providerReference);
   }
 
   // -- Admin -----------------------------------------------------------------------------------------------------
@@ -626,6 +661,22 @@ export class IdentityService {
     const record = await this.prisma.identityVerification.findUnique({ where: { id }, include: { reseller: { select: { name: true } } } });
     if (!record || record.resellerId === afrippaOperatorId) throw notFound();
     return this.presentAdmin(record);
+  }
+
+  /**
+   * An admin cancels a check that was never finished (or a provider's check stuck in review), so the owner can start
+   * again from scratch. A BitoCard Verify check that was sent is decided on its case instead.
+   */
+  async adminCancel(actorId: string | null, id: string, reason: string) {
+    const record = await this.prisma.identityVerification.findUnique({ where: { id } });
+    if (!record || record.resellerId === afrippaOperatorId) throw notFound();
+    if (!openStatuses.includes(record.status)) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_closed', 'This check is already closed.');
+    if (record.status === 'in_review' && record.provider === verifyProvider) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'use_verify_review', 'This check was sent for review: decide it from its case, with its documents.');
+    }
+    await this.close(record, 'cancelled', actorId);
+    await this.audit.record({ actorId, action: 'verification.cancelled', targetType: 'reseller', targetId: record.resellerId, before: { verification_id: record.id, status: record.status }, after: { status: 'expired', reason } });
+    return this.adminGet(id);
   }
 
   /** An admin's decision on a check the provider sent for review, after looking at it in the provider's console. */

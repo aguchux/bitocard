@@ -70,6 +70,16 @@ describe("starting the identity check", () => {
     expect(JSON.parse(String(call[1].body)).bvn).toBe("12345678901");
   });
 
+  test("Start again asks the API to close the unfinished check and open a new one", async () => {
+    const fetch = vi.fn(async () => reply({ status: "in_progress", url: "https://verify.bitocard.com/s#t=newlinknewlinknewlinknewl" }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await start({ country: "GH", provider: "bitocard", first_name: "Kofi", last_name: "Mensah", consent: "on", restart: "1" })).toEqual({
+      redirected: "https://verify.bitocard.com/s#t=newlinknewlinknewlinknewl",
+    });
+    const [call] = fetch.mock.calls as unknown as Call[];
+    expect(JSON.parse(String(call[1].body)).restart).toBe(true);
+  });
+
   test("the API's refusal stays on the form", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "consent_required", message: "Agree to the check first.", param: "consent" } }, 400)));
     expect(await start({ country: "GH", provider: "bitocard", first_name: "Kofi", last_name: "Mensah" })).toEqual({ error: "Agree to the check first.", field: "consent" });

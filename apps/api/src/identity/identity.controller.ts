@@ -18,6 +18,11 @@ class ConsentDto {
   @ApiProperty({ description: 'The owner agrees to the identity check, including the face (biometric) check.' })
   @IsBoolean()
   consent: boolean;
+
+  @ApiPropertyOptional({ description: 'Close the unfinished check and start a new one from scratch, instead of continuing it.' })
+  @IsOptional()
+  @IsBoolean()
+  restart?: boolean;
 }
 
 class StartCustomerVerificationDto {
@@ -65,6 +70,10 @@ class DecideVerificationDto {
   @IsOptional() @IsString() @Length(3, 200) verified_name?: string;
 }
 
+class CancelVerificationDto {
+  @IsString() @Length(5, 500) reason: string;
+}
+
 const customerReference = (reference: string) => {
   if (!referencePattern.test(reference)) {
     throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Customer references use letters, numbers and . _ : @ - (up to 100).', 'reference');
@@ -93,7 +102,7 @@ export class ResellerVerificationController {
   @Roles()
   @Post()
   start(@CurrentCaller() caller: Caller, @Body() body: ConsentDto) {
-    return this.identity.startResellerVerification(resellerOf(caller), personOf(caller), body.consent);
+    return this.identity.startResellerVerification(resellerOf(caller), personOf(caller), body.consent, body.restart === true);
   }
 }
 
@@ -192,6 +201,14 @@ export class AdminVerificationsController {
   @HttpCode(HttpStatus.OK)
   decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideVerificationDto) {
     return this.identity.decide(adminId(caller), id, body);
+  }
+
+  /** Closes an unfinished check (or a provider's check stuck in review) so its owner can start again from scratch. */
+  @AdminRoles('operations')
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CancelVerificationDto) {
+    return this.identity.adminCancel(adminId(caller), id, body.reason);
   }
 }
 

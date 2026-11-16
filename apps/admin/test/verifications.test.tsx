@@ -40,7 +40,7 @@ beforeEach(() => {
     if (url.pathname === "/v1/admin/auth/session") return ok({ object: "admin_session", admin: { id: "a1", name: "Ada Okafor", email: "ada@bitocard.com", roles: ["operations"] }, step_up_until: null });
     if (url.pathname === "/v1/admin/notifications/unread-count") return ok({ object: "unread_count", count: 0 });
     if (url.pathname === "/v1/admin/verifications")
-      return ok({ object: "list", has_more: false, data: [check({ id: "v1" }), check({ id: "v2", expected_name: "Ada Obi", provider: "didit", provider_reference: "didit-9" })] });
+      return ok({ object: "list", has_more: false, data: [check({ id: "v1" }), check({ id: "v2", expected_name: "Ada Obi", provider: "didit", provider_reference: "didit-9" }), check({ id: "v3", expected_name: "Uche Eze", provider: "bitocard", provider_reference: "case-3", status: "in_progress" })] });
     return Response.json({ error: { type: "not_found_error", code: "resource_missing", message: "Not found." } }, { status: 404 });
   });
 });
@@ -65,5 +65,8 @@ describe("Verifications", () => {
     // Only Didit's row has Approve and Decline.
     expect(table.getAllByRole("button", { name: "Approve" })).toHaveLength(1);
     expect(table.getAllByRole("button", { name: "Decline" })).toHaveLength(1);
+    // An unfinished check can be cancelled so its owner starts again; one sent for review cannot.
+    expect(table.getAllByRole("button", { name: "Cancel check" })).toHaveLength(1);
+    expect(table.getByRole("link", { name: "Open case" }).getAttribute("href")).toBe("/verifications/verify/case-3");
   });
 });

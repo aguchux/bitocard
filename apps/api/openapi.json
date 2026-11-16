@@ -34416,6 +34416,10 @@
           "consent": {
             "type": "boolean",
             "description": "The owner agrees to the identity check, including the face (biometric) check."
+          },
+          "restart": {
+            "type": "boolean",
+            "description": "Close the unfinished check and start a new one from scratch, instead of continuing it."
           }
         },
         "required": [

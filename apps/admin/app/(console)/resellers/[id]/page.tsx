@@ -26,6 +26,7 @@ import {
 } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
 import { ResellerSwitchesCard } from "@/components/reseller-switches";
+import { CancelCheck, cancellable } from "@/components/verification-list";
 import { ResellerWalletsCard } from "@/components/reseller-wallets";
 import { StartupAllowanceCard } from "@/components/startup-allowance";
 import {
@@ -205,7 +206,13 @@ export default function ResellerPage() {
                       <StatusBadge status={latestCheck.status} />
                     </div>
                     <p className="text-sm text-muted">{`Started ${formatDateTime(latestCheck.created_at)}${latestCheck.verified_name ? ` · verified as ${latestCheck.verified_name}` : ""}`}</p>
-                    {latestCheck.reason ? <p className="text-sm text-ink">{latestCheck.reason}</p> : null}
+                    {latestCheck.reason ? <p className="text-sm text-ink">{humanise(latestCheck.reason)}</p> : null}
+                    {operator && cancellable(latestCheck) ? (
+                      <div className="pt-2">
+                        <CancelCheck check={latestCheck} />
+                        <p className="mt-2 text-xs text-muted">Closes the unfinished check so the owner can start again. Checks with no progress for three days close on their own.</p>
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <p className="text-sm text-muted">The owner has not started the identity check.</p>
