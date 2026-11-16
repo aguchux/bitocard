@@ -1,5 +1,13 @@
 import type { EmailMessage } from './email.service.js';
 
+/**
+ * An email BitoCard's team sends a reseller's owner from the admin app (a quick email or a custom one): the words
+ * as given, then a link into SHQ. Plain paragraphs, escaped like every template.
+ */
+export function resellerTeamEmail(to: string, input: { subject: string; heading: string; paragraphs: string[]; link: { label: string; url: string } }): EmailMessage {
+  return { to, subject: input.subject, ...layout(input.heading, [...input.paragraphs, `${input.link.label}: ${input.link.url}`, 'The BitoCard team']) };
+}
+
 const escape = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
 /** Whose email it is: BitoCard's, or Afrippa's (its admins' sign-in emails). */

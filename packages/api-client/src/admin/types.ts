@@ -168,6 +168,23 @@ export type ResellerWallet = Record<string, unknown> & {
 };
 
 export type VerificationStatus = 'in_progress' | 'approved' | 'declined' | 'in_review' | 'expired';
+/** A quick email the team can send a reseller's owner; `suggested` says why it applies now, or null. */
+export type ResellerQuickEmail = {
+  key: string;
+  kind: 'onboarding' | 'growth';
+  label: string;
+  description: string;
+  subject: string;
+  suggested: string | null;
+  last_sent_at: string | null;
+};
+export type ResellerEmails = {
+  object: 'reseller_emails';
+  to: { name: string; email: string } | null;
+  templates: ResellerQuickEmail[];
+  sent: Array<{ object: 'reseller_email'; template: string | null; subject: string | null; to: string | null; sent_by: { name: string } | null; sent_at: string }>;
+};
+
 export type Verification = {
   object: 'verification';
   id: string;

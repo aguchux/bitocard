@@ -25,6 +25,7 @@ import {
   StatusBadge,
 } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
+import { ResellerEmailsCard } from "@/components/reseller-emails";
 import { ResellerSwitchesCard } from "@/components/reseller-switches";
 import { CancelCheck, cancellable } from "@/components/verification-list";
 import { ResellerWalletsCard } from "@/components/reseller-wallets";
@@ -220,6 +221,8 @@ export default function ResellerPage() {
               </div>
             </Card>
           </div>
+
+          {can(admin, "operations", "support") ? <ResellerEmailsCard resellerId={reseller.id} /> : null}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>

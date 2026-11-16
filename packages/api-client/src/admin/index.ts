@@ -42,6 +42,7 @@ import type {
   SupplierWebhookStatus,
   Switches,
   Verification,
+  ResellerEmails,
   VerificationStatus,
   TaxRate,
   UpdatePlanInput,
@@ -198,6 +199,16 @@ export const adminApi = bitocardApi.injectEndpoints({
     cancelVerification: build.mutation<Verification, { id: string; reason: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/verifications/${id}/cancel`, method: 'POST', body }),
       invalidatesTags: [{ type: 'Verification', id: 'LIST' }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+
+    /** Quick and custom emails to a reseller's owner: which apply now, and what was sent. */
+    resellerEmails: build.query<ResellerEmails, string>({
+      query: id => `/v1/admin/resellers/${id}/emails`,
+      providesTags: (_result, _error, id) => [{ type: 'Reseller', id: `emails:${id}` }],
+    }),
+    sendResellerEmail: build.mutation<ResellerEmails, { id: string; template: string; subject?: string; message?: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/emails`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id: `emails:${id}` }, { type: 'Reseller', id }, 'Activity'],
     }),
 
     // -- Orders -----------------------------------------------------------------------------------------------------
@@ -474,6 +485,8 @@ export const {
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,
   useCancelVerificationMutation,
+  useResellerEmailsQuery,
+  useSendResellerEmailMutation,
   useOrdersInfiniteQuery,
   useOrderQuery,
   useSupplierWebhooksInfiniteQuery,
