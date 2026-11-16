@@ -88,44 +88,41 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             {wallet.enabled ? <AddWallet options={addable} /> : null}
           </div>
           <section aria-label="Balance" className="rounded-3xl bg-navy-900 p-6 text-white">
-            {/* Top row: the label on the left, the customer's own bank account (or the link to get one) top right. */}
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            {/* The customer's own bank account number (or the link to get one) sits above everything, on its own line. */}
+            {wallet.enabled && wallet.reserved_accounts_available ? (
+              wallet.reserved_accounts[0] ? (
+                <p className="mb-3 flex flex-wrap items-center gap-1.5 text-sm text-white/80" aria-label="Your bank account number">
+                  <Landmark className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="font-semibold tracking-wide text-white">{wallet.reserved_accounts[0].account_number}</span>
+                  <span>· {wallet.reserved_accounts[0].bank_name}</span>
+                </p>
+              ) : (
+                <div className="-mx-2 -mt-2 mb-1">
+                  <BankAccountLink tone="light" />
+                </div>
+              )
+            ) : null}
+            {/* The wallet's name on the left; its actions together in one row, top right. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="flex items-center gap-2 text-sm text-white/70">
                 <Wallet className="size-4" aria-hidden="true" /> {wallet.wallets.length > 1 ? walletName(wallet.currency) : "Wallet balance"}
                 {wallet.mode === "test" ? " (test)" : ""}
               </p>
-              {wallet.enabled && wallet.reserved_accounts_available ? (
-                wallet.reserved_accounts[0] ? (
-                  <p className="flex items-center gap-1.5 text-sm text-white/80" aria-label="Your bank account number">
-                    <Landmark className="size-4 shrink-0" aria-hidden="true" />
-                    <span className="font-semibold tracking-wide text-white">{wallet.reserved_accounts[0].account_number}</span>
-                    <span>· {wallet.reserved_accounts[0].bank_name}</span>
-                  </p>
-                ) : (
-                  <span className="-mx-2">
-                    <BankAccountLink tone="light" />
-                  </span>
-                )
-              ) : null}
-            </div>
-            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
-                <p className="mt-2 text-sm text-white/70">
-                  {!wallet.enabled
-                    ? "This store now takes payment when you buy. You can still spend what is left here."
-                    : wallet.currency !== primary
-                      ? `Pay from it when you choose: prices in other currencies are converted at our rate, shown before you pay. Spent only in this store; cannot be withdrawn.`
-                      : "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."}
-                </p>
-              </div>
               {wallet.enabled ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {wallet.balance > 0 ? <MoveMoney key={wallet.currency} wallet={wallet} /> : null}
                   <AddFunds wallet={wallet} amount={params.amount} open={Boolean(back || params.amount)} bankDeposits={deposits} />
                 </div>
               ) : null}
             </div>
+            <p className="mt-3 font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
+            <p className="mt-2 max-w-xl text-sm text-white/70">
+              {!wallet.enabled
+                ? "This store now takes payment when you buy. You can still spend what is left here."
+                : wallet.currency !== primary
+                  ? `Pay from it when you choose: prices in other currencies are converted at our rate, shown before you pay. Spent only in this store; cannot be withdrawn.`
+                  : "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."}
+            </p>
           </section>
           {wallet.enabled && wallet.reserved_accounts_available && !wallet.reserved_accounts.length ? (
             <BankAccountDialog needsBvn={wallet.reserved_account_needs_bvn} />

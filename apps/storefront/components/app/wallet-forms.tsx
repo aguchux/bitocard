@@ -185,9 +185,9 @@ export function AddFunds({ wallet, amount, open = false, bankDeposits = null }: 
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
-        className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600"
+        className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"
       >
-        <Plus className="size-5" aria-hidden="true" /> Add funds
+        <Plus className="size-4" aria-hidden="true" /> Add funds
       </button>
       <dialog
         ref={dialog}
@@ -339,8 +339,8 @@ export function MoveMoney({ wallet }: { wallet: StoreWallet }) {
   const balance = wallet.balance;
   return (
     <>
-      <button type="button" onClick={() => dialog.current?.showModal()} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-white/10 px-5 font-semibold text-white ring-1 ring-white/20 hover:bg-white/15">
-        <ArrowLeftRight className="size-5" aria-hidden="true" /> Move money
+      <button type="button" onClick={() => dialog.current?.showModal()} className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15">
+        <ArrowLeftRight className="size-4" aria-hidden="true" /> Move money
       </button>
       <dialog ref={dialog} aria-labelledby="move-money-title" onClick={event => event.target === dialog.current && dialog.current?.close()} className={dialogClass}>
         <DialogHead id="move-money-title" title={<><ArrowLeftRight className="size-5" aria-hidden="true" /> Move money</>} onClose={() => dialog.current?.close()} />
