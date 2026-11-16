@@ -1,7 +1,9 @@
 import { createNextConfig } from "@bitocard/next-config";
 
 export default createNextConfig({
-  indexable: false,
+  // Not the blanket noindex header: a header cannot be lifted per page, and sign-up and sign-in are indexable.
+  // Every other page is noindex through the root layout's metadata (lib/seo.ts).
+  indexable: true,
   async redirects() {
     // B2B reselling has left BitoCard for Udozo (docs/UDOZO_SPINOFF_PLAN.md): old Resale links land on the stores.
     return [

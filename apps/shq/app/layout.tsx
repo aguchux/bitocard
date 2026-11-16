@@ -2,16 +2,18 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { installCaptureScript } from "@bitocard/ui/install";
 import { InstallSupport } from "@bitocard/ui/install-ui";
-import { siteUrl } from "@bitocard/ui/site";
 import { Providers } from "@/components/providers";
+import { shqOrigin } from "@/lib/seo";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: siteUrl(3004),
+  metadataBase: shqOrigin(),
+  applicationName: "BitoCard SHQ",
   title: { default: "BitoCard SHQ", template: "%s | BitoCard SHQ" },
   description: "Seller Head Quarters: run your BitoCard reseller business.",
+  // The back office is private. Only the public doors (lib/seo.ts publicPaths) override this.
   robots: { index: false, follow: false },
 };
 
