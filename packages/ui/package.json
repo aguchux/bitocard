@@ -28,7 +28,8 @@
     "./offline-worker": "./src/offline-worker.ts",
     "./underline-tabs": "./src/underline-tabs.tsx",
     "./answer-html": "./src/answer-html.tsx",
-    "./avatar": "./src/avatar.tsx"
+    "./avatar": "./src/avatar.tsx",
+    "./money-input": "./src/money-input.tsx"
   },
   "scripts": {
     "lint": "eslint .",
@@ -53,6 +54,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@bitocard/api-client": "*",
     "libphonenumber-js": "^1.13.14"
   },
   "sideEffects": [

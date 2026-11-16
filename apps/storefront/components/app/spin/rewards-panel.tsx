@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRightLeft, Coins, Loader2 } from "lucide-react";
-import { formatPrice, type StoreSpinExchangePreview, type StoreSpinRewardBalance } from "@bitocard/api-client/storefront";
+import { formatFace, type StoreSpinExchangePreview, type StoreSpinRewardBalance } from "@bitocard/api-client/storefront";
 import { exchangeRewards, previewExchange } from "@/lib/spin-actions";
 import { usd } from "@/lib/spin";
 import styles from "./spin.module.css";
@@ -39,7 +39,7 @@ export function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewar
     setState("idle");
     setQuote(null);
     if (result.ok) {
-      setMessage({ tone: "done", text: `${formatPrice(result.data.amount, result.data.currency)} is in your wallet. Spend it on anything in the store.` });
+      setMessage({ tone: "done", text: `${formatFace(result.data.amount, result.data.currency)} is in your wallet. Spend it on anything in the store.` });
       onExchanged();
     } else setMessage({ tone: "error", text: result.message });
   }
@@ -86,7 +86,7 @@ export function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewar
               <div className="flex items-end justify-between gap-3 border-b border-dashed border-slate-200 pb-3">
                 <div>
                   <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">You get</p>
-                  <p className="font-display text-3xl font-black tabular-nums">{formatPrice(quote.amount, quote.currency)}</p>
+                  <p className="font-display text-3xl font-black tabular-nums">{formatFace(quote.amount, quote.currency)}</p>
                 </div>
                 <p className="text-right text-xs text-slate-500">
                   {usd(quote.usd)}

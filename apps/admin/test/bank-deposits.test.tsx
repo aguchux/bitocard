@@ -90,7 +90,9 @@ describe("bank deposits in the admin app", () => {
       const dialog = await screen.findByRole("dialog");
       expect(dialog.textContent).toContain("Zenith Bank 1012345678");
       const amount = within(dialog).getByLabelText(/Amount that arrived/);
-      expect((amount as HTMLInputElement).value).toBe("5000");
+      // A money field with the naira sign, opening at what the customer asked for.
+      expect((amount as HTMLInputElement).value).toBe("5,000");
+      expect(amount.parentElement?.textContent).toContain("₦");
       fireEvent.change(amount, { target: { value: "4,500" } });
       fireEvent.change(within(dialog).getByLabelText(/Bank's reference/), { target: { value: "ZEN-77812" } });
       fireEvent.click(within(dialog).getByRole("button", { name: /^Credit .*4,500/ }));

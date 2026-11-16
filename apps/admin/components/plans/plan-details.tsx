@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Save, Trash2 } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, errorMessage, Field, Input, Notice, Textarea, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, errorMessage, Field, Input, MoneyInput, Notice, Textarea, Toggle } from "@bitocard/admin-ui";
 import { useDeletePlanMutation, useUpdatePlanMutation } from "@bitocard/api-client/admin";
 import { SettingsPlan, toMinor, toMajor } from "@/components/plans/amounts";
 
@@ -49,7 +49,7 @@ export function PlanDetails({ plan, editable }: { plan: SettingsPlan; editable: 
           </Field>
         ) : (
           <Field label="Price a month (US dollars)" htmlFor={`plan-price-${plan.code}`} hint="Used where no local price is set: converted at the day's rate when charged." error={price && badPrice ? "Enter a price above zero, like 25 or 24.99." : undefined}>
-            <Input id={`plan-price-${plan.code}`} inputMode="decimal" value={price} disabled={!editable} onChange={event => setPrice(event.target.value)} />
+            <MoneyInput id={`plan-price-${plan.code}`} currency="USD" value={price} disabled={!editable} onValueChange={setPrice} />
           </Field>
         )}
         <div className="md:col-span-2">

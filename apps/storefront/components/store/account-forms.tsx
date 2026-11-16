@@ -18,6 +18,7 @@ import {
 } from "@/lib/account-actions";
 import type { Market } from "@/lib/countries";
 import { PhoneInput } from "@bitocard/ui/phone-input";
+import { MoneyInput } from "@bitocard/ui/money-input";
 
 const empty: FormState = {};
 const inputClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400";
@@ -42,19 +43,60 @@ export function FormMessage({ state }: { state: FormState }) {
   return null;
 }
 
-/** A labelled input; outlined when the API named it in its error. A password field gets its own show/hide toggle. */
+type MoneyFieldProps = {
+  /** An amount of money: the currency's sign inside the field, only an amount can be typed, commas as it is typed. */
+  currency: string;
+  /** Controlled money field: what is shown ("1,250.50") and the amount in minor units. */
+  onValueChange?: (text: string, minor: number | null) => void;
+};
+
+/**
+ * A labelled input; outlined when the API named it in its error. A password field gets its own show/hide toggle.
+ * With `currency` it is a money field (`MoneyInput`); read its value with `parseMoney` (it carries commas).
+ */
 export function TextField({
   label,
   name,
   state,
   hint,
   type,
+  currency,
+  onValueChange,
   ...props
-}: { label: string; name: string; state?: FormState; hint?: ReactNode } & React.InputHTMLAttributes<HTMLInputElement>) {
+}: { label: string; name: string; state?: FormState; hint?: ReactNode } & Partial<MoneyFieldProps> & React.InputHTMLAttributes<HTMLInputElement>) {
   const id = useId();
   const wrong = state?.field === name;
   const [show, setShow] = useState(false);
   const isPassword = type === "password";
+  if (currency) {
+    // MoneyInput sets its own keyboard and change handling (`onValueChange`), after these.
+    const { value, defaultValue, ...rest } = props;
+    return (
+      <div className="space-y-1.5">
+        <label htmlFor={id} className="block text-sm font-semibold text-navy-900">
+          {label}
+        </label>
+        <MoneyInput
+          id={id}
+          name={name}
+          currency={currency}
+          className={inputClass}
+          symbolClassName="text-[15px] font-semibold text-slate-500"
+          aria-invalid={wrong || undefined}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          {...rest}
+          value={value === undefined ? undefined : String(value)}
+          defaultValue={defaultValue === undefined ? undefined : String(defaultValue)}
+          onValueChange={onValueChange}
+        />
+        {hint ? (
+          <p id={`${id}-hint`} className="text-xs text-slate-500">
+            {hint}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-semibold text-navy-900">

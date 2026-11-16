@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, Banknote, Landmark, Plus, Trash2, X } from "lucide-react";
 import { formatFace, walletName, type StoreBankDepositOptions, type StorePaymentMethod, type StoreWallet, type StoreWalletCurrencyOption } from "@bitocard/api-client/storefront";
+import { MoneyInput } from "@bitocard/ui/money-input";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
 import { startBankDeposit } from "@/lib/bank-deposits";
@@ -32,7 +33,8 @@ export function FundsForm({ currency, primary = true, methods, amount, sandbox, 
     <form action={byDeposit ? deposit : topUp} className="space-y-4" aria-label="Add money to your wallet">
       <FormMessage state={state} />
       {primary && !byDeposit ? null : <input type="hidden" name="currency" value={currency} />}
-      <TextField label={`Amount (${currency})`} name="amount" inputMode="decimal" required defaultValue={amount} state={state} hint="Spent only in this store. Wallet money cannot be withdrawn." />
+      <input type="hidden" name="amount_currency" value={currency} />
+      <TextField label="Amount" name="amount" currency={currency} required defaultValue={amount} state={state} hint="Spent only in this store. Wallet money cannot be withdrawn." />
       {choices.length ? (
         <fieldset>
           <legend className="text-sm font-semibold">Pay with</legend>
@@ -223,7 +225,8 @@ export function AddFunds({ wallet, amount, open = false, bankDeposits = null }: 
                         {sandbox ? (
                           <form action={simulateDeposit} className="mt-3 flex flex-wrap items-center gap-2">
                             <input type="hidden" name="id" value={account.id} />
-                            <input name="amount" defaultValue="5000" inputMode="decimal" aria-label="Test transfer amount" className="min-h-10 w-28 rounded-xl border border-slate-200 bg-white px-3" />
+                            <input type="hidden" name="amount_currency" value={wallet.currency} />
+                            <MoneyInput name="amount" currency={wallet.currency} defaultValue="5000" aria-label="Test transfer amount" className="min-h-10 w-32 rounded-xl border border-slate-200 bg-white px-3" />
                             <button type="submit" className="min-h-10 rounded-xl bg-white px-3 font-semibold ring-1 ring-slate-200 hover:ring-slate-300">
                               Simulate a transfer
                             </button>
@@ -357,7 +360,7 @@ export function MoveMoney({ wallet }: { wallet: StoreWallet }) {
             <FormMessage state={stale ? {} : state} />
             <input type="hidden" name="from" value={wallet.currency} />
             <p className="text-sm text-slate-600">From your {walletName(wallet.currency)}: {formatFace(balance, wallet.currency)} available.</p>
-            <TextField label={`Amount (${wallet.currency})`} name="amount" inputMode="decimal" required value={amount} onChange={event => setAmount(event.target.value)} state={stale ? {} : state} />
+            <TextField label="Amount" name="amount" currency={wallet.currency} required value={amount} onValueChange={text => setAmount(text)} state={stale ? {} : state} />
             {/* Sent from state, not the select: React resets a form after its action, which puts a select back on its
                 first option while the state (and what the quote was for) stays on the chosen wallet. */}
             <input type="hidden" name="to" value={to} />

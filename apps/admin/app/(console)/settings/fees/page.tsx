@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { CheckCircle2, Pencil, Plus, Trash2, XCircle } from "lucide-react";
-import { ActionDialog, Button, Card, CardHeader, type Column, DataTable, errorMessage, Field, formatMoney, Input, Notice, PageHeader, RefreshFailed, Select, Skeleton } from "@bitocard/admin-ui";
+import { ActionDialog, Button, Card, CardHeader, type Column, DataTable, errorMessage, Field, formatMoney, Input, MoneyInput, Notice, PageHeader, RefreshFailed, Select, Skeleton } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
 import {
   type FeeKind,
   type FeeReportGroup,
@@ -31,7 +32,9 @@ function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => vo
   const [category, setCategory] = useState(rule?.category ?? "");
   const [plan, setPlan] = useState(rule?.plan_code ?? "");
   const [rate, setRate] = useState(rule ? rule.rate_percent : "");
-  const [minFee, setMinFee] = useState(rule?.min_fee_minor ? String(rule.min_fee_minor) : "");
+  const feeCurrency = countries.data?.data.find(item => item.code === country)?.currency ?? "USD";
+  const [minFee, setMinFee] = useState(rule?.min_fee_minor && rule.country_code ? moneyInputValue(rule.min_fee_minor, countries.data?.data.find(item => item.code === rule.country_code)?.currency ?? "USD") : "");
+  const minFeeMinor = minFee ? parseMoney(minFee, feeCurrency) : null;
   const ppb = percentToPpb(rate);
   const editing = Boolean(rule);
 
@@ -45,13 +48,14 @@ function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => vo
       requireReason={false}
       onConfirm={async () => {
         if (ppb === null) throw new Error("Enter a rate from 0 to 10%, with at most 7 decimal places.");
+        if (minFee && minFeeMinor === null) throw new Error("Enter the minimum fee as an amount, for example 50.00.");
         await save({
           kind,
           country_code: country || null,
           category: kind === "supplier_order" ? category || null : null,
           plan_code: plan || null,
           rate_ppb: ppb,
-          min_fee_minor: minFee ? Number(minFee) : null,
+          min_fee_minor: country && minFeeMinor ? minFeeMinor : null,
         }).unwrap();
       }}
     >
@@ -102,8 +106,8 @@ function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => vo
         <Field label="Rate (%)" htmlFor="rule-rate" hint={ppb === null ? "0 to 10, up to 7 decimals (0.0000001)" : `${ppb.toLocaleString("en-GB")} parts per billion`}>
           <Input id="rule-rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} placeholder="0.01" aria-invalid={rate !== "" && ppb === null ? true : undefined} />
         </Field>
-        <Field label="Minimum fee (minor units)" htmlFor="rule-min" hint={country ? "Optional, in the country's currency." : "Needs a country."}>
-          <Input id="rule-min" inputMode="numeric" value={minFee} disabled={!country} onChange={event => setMinFee(event.target.value.replace(/\D/g, ""))} placeholder="None" />
+        <Field label="Minimum fee" htmlFor="rule-min" hint={country ? `Optional, in ${feeCurrency}.` : "Needs a country."}>
+          <MoneyInput id="rule-min" currency={feeCurrency} value={minFee} disabled={!country} onValueChange={setMinFee} placeholder="None" />
         </Field>
       </div>
     </ActionDialog>
@@ -187,6 +191,8 @@ export default function FeesPage() {
   const admin = useAdmin();
   const finance = can(admin, "finance");
   const rules = useFeeRulesQuery();
+  const countries = useCountriesQuery();
+  const currencyOf = (code: string) => countries.data?.data.find(item => item.code === code)?.currency;
   const [remove] = useDeleteFeeRuleMutation();
   const [editing, setEditing] = useState<FeeRule | "new" | null>(null);
   const [deleting, setDeleting] = useState<FeeRule | null>(null);
@@ -199,7 +205,7 @@ export default function FeesPage() {
       cell: row => [row.country_code ?? "Any country", row.category ? humanise(row.category) : "any category", row.plan_code ? `${row.plan_code} plan` : "any plan"].join(" · "),
     },
     { key: "rate", header: "Rate", align: "right", cell: row => `${row.rate_percent}%` },
-    { key: "min", header: "Minimum", align: "right", hideOnMobile: true, cell: row => (row.min_fee_minor && row.country_code ? `${row.min_fee_minor} minor` : "None") },
+    { key: "min", header: "Minimum", align: "right", hideOnMobile: true, cell: row => { const currency = row.country_code ? currencyOf(row.country_code) : undefined; return row.min_fee_minor && row.country_code ? (currency ? formatMoney(row.min_fee_minor, currency) : `${row.min_fee_minor} minor`) : "None"; } },
     {
       key: "actions",
       header: "",

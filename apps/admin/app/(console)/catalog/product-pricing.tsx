@@ -2,7 +2,6 @@
 
 import { useId, useState } from "react";
 import {
-  amountToMinor,
   Badge,
   bpsToPercent,
   Button,
@@ -12,6 +11,7 @@ import {
   formatBps,
   formatMoney,
   Input,
+  MoneyInput,
   Notice,
   percentToBps,
   PriceBreakdown,
@@ -28,6 +28,7 @@ import {
   useSetPricingRuleMutation,
   useUpdateProductMutation,
 } from "@bitocard/api-client/admin";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
 import { kindLabels } from "./pricing-labels";
 
 type Choice = "inherit" | PriceKind;
@@ -49,8 +50,8 @@ const reasons: Record<string, string> = {
   not_priced: "Not priced",
 };
 
-/** Minor units as a plain amount for the input ("25" or "25.5"). */
-const plain = (minor: number) => String(minor / 100);
+/** Minor units as the amount a field shows ("25", "1,250.50"). */
+const plain = (minor: number, currency: string) => moneyInputValue(minor, currency);
 
 /**
  * Pricing a product before listing it: what each supplier charges, the rule that applies and what BitoCard makes per
@@ -71,12 +72,14 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
   const [margin, setMargin] = useState("");
   const [fixed, setFixed] = useState("");
   const [fixedCurrency, setFixedCurrency] = useState("USD");
-  const faceMinor = amountToMinor(face);
+  const faceMinor = parseMoney(face, product.face_currency);
+  // The fixed price's sign and decimals follow its currency while it is a whole code; US dollars until then.
+  const fixedMoney = /^[A-Z]{3}$/.test(fixedCurrency) ? fixedCurrency : "USD";
   const trial = {
     kind: choice === "inherit" ? undefined : choice,
     reseller_discount_bps: choice === "discount" || choice === "auto" ? (percentToBps(discount) ?? undefined) : undefined,
     margin_bps: choice === "markup" || choice === "auto" ? (percentToBps(margin) ?? undefined) : undefined,
-    fixed_price: choice === "fixed" ? (amountToMinor(fixed) ?? undefined) : undefined,
+    fixed_price: choice === "fixed" ? (parseMoney(fixed, fixedMoney) ?? undefined) : undefined,
     fixed_currency: choice === "fixed" ? fixedCurrency : undefined,
   };
   const args = useDebouncedValue({ product_id: product.id, country, ...(faceMinor ? { face_value: faceMinor } : {}), ...(choice === "inherit" ? {} : trial) });
@@ -143,9 +146,9 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
           </Field>
           {data?.face_values?.length ? (
             <Field label={`Face value (${product.face_currency})`} htmlFor={`${id}-face`} hint={`${data.face_values.length} value${data.face_values.length === 1 ? "" : "s"}; each supplier's offers are listed below.`}>
-              <Select id={`${id}-face`} value={plain(data.face_value)} onChange={event => setFace(event.target.value)}>
+              <Select id={`${id}-face`} value={plain(data.face_value, product.face_currency)} onChange={event => setFace(event.target.value)}>
                 {data.face_values.map(value => (
-                  <option key={value} value={plain(value)}>
+                  <option key={value} value={plain(value, product.face_currency)}>
                     {formatMoney(value, product.face_currency)}
                   </option>
                 ))}
@@ -157,7 +160,7 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
               htmlFor={`${id}-face`}
               hint={data?.range ? `Any amount from ${formatMoney(data.range.min, product.face_currency)} to ${formatMoney(data.range.max, product.face_currency)}.` : undefined}
             >
-              <Input id={`${id}-face`} inputMode="decimal" value={face || (data ? plain(data.face_value) : "")} onChange={event => setFace(event.target.value)} />
+              <MoneyInput id={`${id}-face`} currency={product.face_currency} value={face || (data ? plain(data.face_value, product.face_currency) : "")} onValueChange={setFace} />
             </Field>
           )}
         </div>
@@ -190,7 +193,7 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
         {choice === "fixed" ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Price to resellers" htmlFor={`${id}-fixed`}>
-              <Input id={`${id}-fixed`} inputMode="decimal" value={fixed} onChange={event => setFixed(event.target.value)} />
+              <MoneyInput id={`${id}-fixed`} currency={fixedMoney} value={fixed} onValueChange={setFixed} />
             </Field>
             <Field label="Currency" htmlFor={`${id}-fixed-currency`}>
               <Input id={`${id}-fixed-currency`} maxLength={3} value={fixedCurrency} onChange={event => setFixedCurrency(event.target.value.toUpperCase())} />
@@ -236,7 +239,7 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
                       {offer.chosen ? (
                         <Badge tone="green">Cheapest: used</Badge>
                       ) : !offer.covers ? (
-                        <Button variant="ghost" size="sm" onClick={() => setFace(plain(offer.face_value))}>
+                        <Button variant="ghost" size="sm" onClick={() => setFace(plain(offer.face_value, product.face_currency))}>
                           Price this value
                         </Button>
                       ) : null}

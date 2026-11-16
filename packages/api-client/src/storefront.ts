@@ -4,6 +4,10 @@
  * without the RTK Query client. Amounts are minor units.
  */
 
+import { formatCurrency } from './money';
+
+export { currencyDigits as moneyDigits, currencySymbol, formatCurrency, formatMoneyInput, moneyInputValue, parseMoney } from './money';
+
 export type ProductCategory = 'gift_cards' | 'airtime' | 'data' | 'bills' | 'pay_tv' | 'software' | 'vpn' | 'rdp' | 'mobile_money';
 
 export const categoryLabels: Record<ProductCategory, string> = {
@@ -239,7 +243,6 @@ export type StoreHome = {
   countries: StoreCountry[];
 };
 
-/** "$10.00", "₦1,000" or "GBP 5.00": a face value in its currency. */
 /** Minor-unit digits as the store shows them (the API's `wholeCurrencies` too). */
 const currencyDigits = (currency: string) => (['JPY', 'KRW', 'UGX', 'RWF', 'XOF', 'XAF'].includes(currency) ? 0 : 2);
 
@@ -254,13 +257,9 @@ export function localFace(value: number, product: Pick<StoreProduct, 'face_curre
   return { amount: Math.ceil((value * Number(price.rate)) / unit - 1e-9) * unit, currency: price.currency };
 }
 
+/** "$10", "₦1,000" or "GH₵5.50": a face value with its currency's sign (whole amounts without ".00"). */
 export function formatFace(minor: number, currency: string) {
-  const digits = currencyDigits(currency);
-  try {
-    return new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: minor % 10 ** digits === 0 ? 0 : digits, maximumFractionDigits: digits }).format(minor / 10 ** digits);
-  } catch {
-    return `${currency} ${(minor / 10 ** digits).toFixed(digits)}`;
-  }
+  return formatCurrency(minor, currency, { trim: true });
 }
 
 // -- Customers and checkout (M10b) -------------------------------------------------------------------------------

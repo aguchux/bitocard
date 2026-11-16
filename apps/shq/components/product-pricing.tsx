@@ -2,7 +2,6 @@
 
 import { useId, useState } from "react";
 import {
-  amountToMinor,
   bpsToPercent,
   Button,
   Dialog,
@@ -18,7 +17,9 @@ import {
   Skeleton,
   useDebouncedValue,
 } from "@bitocard/admin-ui";
+import { parseMoney } from "@bitocard/api-client/money";
 import { type Product, usePricePreviewQuery, useSetListingMutation, useSetMarkupMutation } from "@bitocard/api-client/reseller";
+import { MoneyField } from "@/components/money-field";
 
 const from = { product: "this product", category: "your category setting", general: "your general setting", none: "no setting" } as const;
 
@@ -37,12 +38,15 @@ export function ProductPricingDialog({ product, open, onClose, manage }: { produ
   const [fixed, setFixed] = useState("");
   const current = usePricePreviewQuery({ id: product.id, face_value: face || undefined }, { skip: !open || !face });
   const scheme = current.data?.scheme;
+  // The fixed price is typed in the reseller's currency, the one prices are shown in.
+  const priceCurrency = current.data?.currency ?? product.pricing.currency;
+  const fixedMinor = fixed ? parseMoney(fixed, priceCurrency) : null;
   const trial = useDebouncedValue({
     id: product.id,
     face_value: face || undefined,
     ...(scheme === "discount" && percentToBps(customerDiscount) !== null ? { customer_discount_bps: percentToBps(customerDiscount)! } : {}),
     ...(scheme === "markup" && markupMode === "markup" && percentToBps(markup) !== null ? { markup_bps: percentToBps(markup)! } : {}),
-    ...(scheme === "markup" && markupMode === "fixed" && amountToMinor(fixed) !== null ? { fixed_price: amountToMinor(fixed)! } : {}),
+    ...(scheme === "markup" && markupMode === "fixed" && fixedMinor !== null ? { fixed_price: fixedMinor } : {}),
   });
   const preview = usePricePreviewQuery(trial, { skip: !open || !face });
   const [save, saveState] = useSetMarkupMutation();
@@ -52,7 +56,6 @@ export function ProductPricingDialog({ product, open, onClose, manage }: { produ
   const capPercent = data ? data.markup_cap_bps / 100 : 100;
   const discountBps = percentToBps(customerDiscount);
   const markupBps = percentToBps(markup);
-  const fixedMinor = amountToMinor(fixed);
   const invalid =
     (customerDiscount !== "" && discountBps === null) ||
     (markupMode === "markup" && (markupBps === null || markupBps > capPercent * 100)) ||
@@ -110,7 +113,7 @@ export function ProductPricingDialog({ product, open, onClose, manage }: { produ
       <div className="space-y-4">
         {saveState.error || listState.error ? <Notice tone="red">{errorMessage(saveState.error ?? listState.error)}</Notice> : null}
         {values.length > 1 ? (
-          <Field label={`Face value (${product.face_currency})`} htmlFor={`${id}-face`}>
+          <Field label="Face value" htmlFor={`${id}-face`}>
             <Select id={`${id}-face`} value={String(face)} onChange={event => setFace(Number(event.target.value))}>
               {values.map(value => (
                 <option key={value} value={value}>
@@ -168,8 +171,8 @@ export function ProductPricingDialog({ product, open, onClose, manage }: { produ
                     <Input id={`${id}-markup`} inputMode="decimal" value={markup} onChange={event => setMarkup(event.target.value)} />
                   </Field>
                 ) : markupMode === "fixed" ? (
-                  <Field label={`Your customer pays (${data.currency})`} htmlFor={`${id}-fixed`}>
-                    <Input id={`${id}-fixed`} inputMode="decimal" value={fixed} onChange={event => setFixed(event.target.value)} />
+                  <Field label="Your customer pays" htmlFor={`${id}-fixed`}>
+                    <MoneyField id={`${id}-fixed`} currency={data.currency} value={fixed} onValueChange={setFixed} />
                   </Field>
                 ) : null}
               </div>

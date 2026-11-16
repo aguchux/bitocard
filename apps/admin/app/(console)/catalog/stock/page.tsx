@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { KeyRound, PackagePlus, Search } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, Field, FilterSelect, formatBps, formatDateTime, formatMoney, Input, KeyValue, Notice, PageHeader, Select, Textarea, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, Field, FilterSelect, formatBps, formatDateTime, formatMoney, Input, KeyValue, MoneyInput, Notice, PageHeader, Select, Textarea, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
 import {
   licenceTerms,
   parseLicenceKeys,
@@ -23,9 +24,13 @@ import {
   useWithdrawStockCodeMutation,
 } from "@bitocard/api-client/admin";
 
-/** "12.50" to 1250; null unless it is a positive amount with at most two decimals. */
-const toMinor = (text: string) => (/^\d+(\.\d{1,2})?$/.test(text.trim()) && Number(text) > 0 ? Math.round(Number(text) * 100) : null);
-const major = (minor: number) => (minor / 100).toFixed(2);
+/** A typed amount ("1,250.50") in the currency's minor units, or null unless it is an amount above zero. */
+const toMinor = (text: string, currency: string) => {
+  const minor = parseMoney(text, currency);
+  return minor !== null && minor > 0 ? minor : null;
+};
+/** The currency while it is a whole code, else US dollars, for the field's sign and decimals. */
+const codeOrUsd = (currency: string) => (/^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : "USD");
 
 function stockStatus(item: StockItem) {
   if (item.paused) return <Badge tone="amber" dot={false}>Paused</Badge>;
@@ -72,8 +77,8 @@ function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void 
   const [listed, setListed] = useState(true);
   const [codes, setCodes] = useState("");
   const [done, setDone] = useState<string | null>(null);
-  const faceMinor = toMinor(face);
-  const costMinor = toMinor(cost);
+  const faceMinor = toMinor(face, codeOrUsd(currency));
+  const costMinor = toMinor(cost, codeOrUsd(currency));
   const marginBps = margin.trim() === "" ? undefined : Math.round(Number(margin) * 100);
   const software = category === "software";
   const valid =
@@ -197,10 +202,10 @@ function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void 
               <Input id="stock-currency" value={currency} onChange={event => setCurrency(event.target.value.toUpperCase())} maxLength={3} />
             </Field>
             <Field label="Face value" htmlFor="stock-face" hint="Shown on stores.">
-              <Input id="stock-face" inputMode="decimal" value={face} onChange={event => setFace(event.target.value)} placeholder="49.99" />
+              <MoneyInput id="stock-face" currency={codeOrUsd(currency)} value={face} onValueChange={setFace} placeholder="49.99" />
             </Field>
             <Field label="Cost per code" htmlFor="stock-cost" hint="What BitoCard paid.">
-              <Input id="stock-cost" inputMode="decimal" value={cost} onChange={event => setCost(event.target.value)} placeholder="30.00" />
+              <MoneyInput id="stock-cost" currency={codeOrUsd(currency)} value={cost} onValueChange={setCost} placeholder="30.00" />
             </Field>
             <Field label="Margin %" htmlFor="stock-margin" hint="Optional; else the pricing rules.">
               <Input id="stock-margin" inputMode="decimal" value={margin} onChange={event => setMargin(event.target.value)} placeholder="10" />
@@ -238,10 +243,10 @@ function StockDialog({ item, onClose }: { item: StockItem; onClose: () => void }
   const [withdraw] = useWithdrawStockCodeMutation();
   const [pasted, setPasted] = useState("");
   const [added, setAdded] = useState<string | null>(null);
-  const [cost, setCost] = useState(major(item.cost));
+  const [cost, setCost] = useState(moneyInputValue(item.cost, item.currency));
   const [margin, setMargin] = useState(item.margin_bps === null ? "" : String(item.margin_bps / 100));
   const [withdrawing, setWithdrawing] = useState<StockCode | null>(null);
-  const costMinor = toMinor(cost);
+  const costMinor = toMinor(cost, item.currency);
   const marginBps = margin.trim() === "" ? null : Math.round(Number(margin) * 100);
   const pricingChanged = costMinor !== item.cost || marginBps !== item.margin_bps;
 
@@ -285,8 +290,8 @@ function StockDialog({ item, onClose }: { item: StockItem; onClose: () => void }
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Pricing</h3>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label={`Cost per code (${item.currency})`} htmlFor="stock-edit-cost">
-              <Input id="stock-edit-cost" inputMode="decimal" value={cost} disabled={!pricing} onChange={event => setCost(event.target.value)} />
+            <Field label="Cost per code" htmlFor="stock-edit-cost">
+              <MoneyInput id="stock-edit-cost" currency={item.currency} value={cost} disabled={!pricing} onValueChange={setCost} />
             </Field>
             <Field label="Margin %" htmlFor="stock-edit-margin" hint={item.margin_bps === null ? "Using the pricing rules." : `Own rule: ${formatBps(item.margin_bps)}.`}>
               <Input id="stock-edit-margin" inputMode="decimal" value={margin} disabled={!pricing} onChange={event => setMargin(event.target.value)} placeholder="Pricing rules" />

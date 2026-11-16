@@ -2,9 +2,10 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, DataTable, Dialog, errorMessage, Field, formatDateTime, formatMoney, formatRelative, Input, Notice, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, DataTable, Dialog, errorMessage, Field, formatDateTime, formatMoney, formatRelative, Input, MoneyInput, Notice, Select, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type Chargeback, type ChargebackStatus, useChargebacksQuery, useClearChargebackMutation, useRecordChargebackMutation, useResolveChargebackMutation } from "@bitocard/api-client/admin";
+import { type Chargeback, type ChargebackStatus, useChargebacksQuery, useClearChargebackMutation, useRecordChargebackMutation, useCountriesQuery, useResolveChargebackMutation } from "@bitocard/api-client/admin";
+import { parseMoney } from "@bitocard/api-client/money";
 
 const filters = [
   { value: "open", label: "Open" },
@@ -16,12 +17,6 @@ const filters = [
 type Filter = (typeof filters)[number]["value"];
 type Pending = { dispute: Chargeback; action: "won" | "lost" | "clear" };
 
-/** "12.50" in the payment's currency as minor units, or null when it is not an amount. */
-function toMinor(text: string) {
-  const match = /^(\d{1,12})(?:\.(\d{1,2}))?$/.exec(text.trim());
-  return match ? Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0")) : null;
-}
-
 /** Finance records a dispute it sees in another gateway's dashboard (Stripe's arrive by themselves). */
 function RecordChargeback({ open, onClose }: { open: boolean; onClose: () => void }) {
   const id = useId();
@@ -30,7 +25,12 @@ function RecordChargeback({ open, onClose }: { open: boolean; onClose: () => voi
   const [disputeId, setDisputeId] = useState("");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  const minor = amount.trim() ? toMinor(amount) : undefined;
+  const countries = useCountriesQuery();
+  // The payment's currency gives the amount its sign and decimals; the API takes the amount in its minor units.
+  const currencies = [...new Set([...(countries.data?.data ?? []).map(item => item.currency), "USD"])];
+  const [chosenCurrency, setCurrency] = useState<string | null>(null);
+  const currency = chosenCurrency ?? currencies[0] ?? "USD";
+  const minor = amount.trim() ? parseMoney(amount, currency) : undefined;
   const valid = /^[0-9a-f-]{36}$/i.test(paymentId.trim()) && disputeId.trim().length > 0 && reason.trim().length >= 5 && minor !== null;
 
   const close = () => {
@@ -38,6 +38,7 @@ function RecordChargeback({ open, onClose }: { open: boolean; onClose: () => voi
     setDisputeId("");
     setAmount("");
     setReason("");
+    setCurrency(null);
     state.reset();
     onClose();
   };
@@ -76,7 +77,16 @@ function RecordChargeback({ open, onClose }: { open: boolean; onClose: () => voi
           <Input id={`${id}-dispute`} autoComplete="off" maxLength={200} value={disputeId} onChange={event => setDisputeId(event.target.value)} />
         </Field>
         <Field label="Disputed amount" htmlFor={`${id}-amount`} hint="In the payment's currency. Leave empty for the whole payment.">
-          <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" value={amount} onChange={event => setAmount(event.target.value)} />
+          <div className="flex gap-2">
+            <Select aria-label="Payment currency" className="w-28 shrink-0" value={currency} onChange={event => setCurrency(event.target.value)}>
+              {currencies.map(code => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </Select>
+            <MoneyInput id={`${id}-amount`} wrapperClassName="flex-1" currency={currency} value={amount} onValueChange={setAmount} />
+          </div>
         </Field>
         <Field label="Reason" htmlFor={`${id}-reason`} hint="Recorded in the activity log.">
           <Input id={`${id}-reason`} autoComplete="off" maxLength={500} value={reason} onChange={event => setReason(event.target.value)} />

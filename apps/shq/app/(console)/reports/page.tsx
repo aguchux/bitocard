@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, StatCard, type Column, type DateRange } from "@bitocard/admin-ui";
+import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, StatCard, type Column, type DateRange, formatMoney } from "@bitocard/admin-ui";
 import { type ResellerPnlReport, useResellerPnlQuery } from "@bitocard/api-client/reseller";
 import { ReportDownloads } from "@/components/report-downloads";
 import { ShqShell } from "@/components/shq-shell";
@@ -10,7 +10,7 @@ import { ShqShell } from "@/components/shq-shell";
 type Row = ResellerPnlReport["breakdown"][number];
 
 const groupLabels: Record<Row["group"], string> = { revenue: "Revenue", expense: "Expense", adjustment: "Adjustment" };
-const money = (minor: number, currency: string) => `${(minor / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+const money = (minor: number, currency: string) => formatMoney(minor, currency);
 
 const columnsFor = (currency: string): Array<Column<Row>> => [
   { key: "label", header: "Item", cell: row => row.label },

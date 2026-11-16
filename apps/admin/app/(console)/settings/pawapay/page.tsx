@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Globe2, Plus, RefreshCw, Store } from "lucide-react";
-import { Badge, Button, Card, Dialog, Field, Input, Notice, QueryView, Select, Skeleton, StatCard, errorMessage } from "@bitocard/admin-ui";
+import { Badge, Button, Card, Dialog, Field, Input, MoneyInput, Notice, QueryView, Select, Skeleton, StatCard, errorMessage } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type PawapayCountry, useCreateCountryMutation, usePawapayCoverageQuery, useSetPaymentMethodsMutation } from "@bitocard/api-client/admin";
+import { parseMoney } from "@bitocard/api-client/money";
 
 type Filter = "all" | "markets" | "new";
 const filters: Array<{ key: Filter; label: string }> = [
@@ -173,10 +174,10 @@ function AddMarketDialog({ country, onClose }: { country: PawapayCountry; onClos
 
   const submit = async () => {
     setError(null);
-    const units = Number(minimum);
-    if (!Number.isFinite(units) || units < 0) return setError("Enter the minimum withdrawal as a number.");
+    const minor = parseMoney(minimum, currency);
+    if (minor === null) return setError("Enter the minimum withdrawal as an amount, for example 10.00.");
     try {
-      await create({ code: country.code, name: name.trim(), currency, min_withdrawal_minor: Math.round(units * 100) }).unwrap();
+      await create({ code: country.code, name: name.trim(), currency, min_withdrawal_minor: minor }).unwrap();
       if (payments && deposits) {
         await setMethods({ code: country.code, purpose: "checkout", enabled: ["pawapay"] }).unwrap();
         await setMethods({ code: country.code, purpose: "wallet_top_up", enabled: ["pawapay"] }).unwrap();
@@ -218,8 +219,8 @@ function AddMarketDialog({ country, onClose }: { country: PawapayCountry; onClos
             ))}
           </Select>
         </Field>
-        <Field label={`Minimum withdrawal (${currency})`} htmlFor="market-minimum" hint="The smallest payout a reseller there can ask for.">
-          <Input id="market-minimum" inputMode="decimal" value={minimum} onChange={event => setMinimum(event.target.value)} />
+        <Field label="Minimum withdrawal" htmlFor="market-minimum" hint="The smallest payout a reseller there can ask for.">
+          <MoneyInput id="market-minimum" currency={currency} value={minimum} onValueChange={setMinimum} />
         </Field>
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" className="mt-0.5 size-4" checked={payments && deposits} disabled={!deposits} onChange={event => setPayments(event.target.checked)} />

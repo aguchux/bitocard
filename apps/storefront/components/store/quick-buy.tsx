@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type { QuickBuyCategory, StoreProduct } from "@bitocard/api-client/storefront";
+import { MoneyInput } from "@bitocard/ui/money-input";
 import { quickBuyHref, quickBuyNeeds } from "@/lib/quick-buy";
 
 type Tab = { category: QuickBuyCategory; label: string; products: StoreProduct[] };
@@ -74,9 +75,9 @@ export function QuickBuyForm({ id, tabs, tone }: { id: string; tabs: Tab[]; tone
         {needs.amount ? (
           <div className="space-y-1.5">
             <label htmlFor={`${id}-amount`} className={label}>
-              Amount ({product.face_currency})
+              Amount
             </label>
-            <input id={`${id}-amount`} value={amount} onChange={event => setAmount(event.target.value)} inputMode="decimal" required className={field} />
+            <MoneyInput id={`${id}-amount`} currency={product.face_currency} value={amount} onValueChange={text => setAmount(text)} required className={field} symbolClassName="text-[15px] font-semibold text-slate-500" />
           </div>
         ) : (
           <div className="hidden lg:block" />

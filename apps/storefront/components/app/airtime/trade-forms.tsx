@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
-import { ratePercent, type StoreAirtimeNetwork, type StoreAirtimeSeller } from "@bitocard/api-client/storefront";
+import { moneyInputValue, ratePercent, type StoreAirtimeNetwork, type StoreAirtimeSeller } from "@bitocard/api-client/storefront";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import { type AirtimeBuyState, type AirtimeFormState, buyAirtime, startAirtimeSale } from "@/lib/airtime-actions";
 import { buyerPays, nairaToMinor, sellerGets } from "@/lib/airtime-rules";
@@ -83,12 +83,12 @@ export function SendFromWarning({ phone }: { phone: string | null }) {
   );
 }
 
-function QuickAmounts({ onPick }: { onPick: (naira: number) => void }) {
+function QuickAmounts({ currency, onPick }: { currency: string; onPick: (amount: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
       {quickAmounts.map(naira => (
-        <button key={naira} type="button" onClick={() => onPick(naira)} className="min-h-10 rounded-full px-3 text-sm font-semibold ring-1 ring-slate-200 hover:ring-slate-300">
-          ₦{naira.toLocaleString("en-GB")}
+        <button key={naira} type="button" onClick={() => onPick(moneyInputValue(naira * 100, currency))} className="min-h-10 rounded-full px-3 text-sm font-semibold ring-1 ring-slate-200 hover:ring-slate-300">
+          {money(naira * 100, currency)}
         </button>
       ))}
     </div>
@@ -137,8 +137,8 @@ export function SellAirtimeForm({ networks, initial, phones, currency, seller = 
       <FormMessage state={state} />
       <NetworkChoice networks={networks} value={network} onChange={setNetwork} />
       <div className="space-y-2">
-        <TextField label={`How much airtime (${currency})`} name="amount" inputMode="numeric" required value={amount} onChange={event => setAmount(event.target.value)} state={state} />
-        <QuickAmounts onPick={naira => setAmount(String(naira))} />
+        <TextField label="How much airtime" name="amount" currency={currency} required value={amount} onValueChange={text => setAmount(text)} state={state} />
+        <QuickAmounts currency={currency} onPick={setAmount} />
       </div>
       {limit ? (
         <p className="text-sm text-slate-600">
@@ -209,8 +209,8 @@ export function BuyAirtimeForm({ networks, initial, phones, currency, balance }:
         </p>
       ) : null}
       <div className="space-y-2">
-        <TextField label={`How much airtime (${currency})`} name="amount" inputMode="numeric" required value={amount} onChange={event => change(setAmount)(event.target.value)} state={stale ? {} : state} />
-        <QuickAmounts onPick={naira => change(setAmount)(String(naira))} />
+        <TextField label="How much airtime" name="amount" currency={currency} required value={amount} onValueChange={text => change(setAmount)(text)} state={stale ? {} : state} />
+        <QuickAmounts currency={currency} onPick={change(setAmount)} />
       </div>
       <NumberChoice name="phone" legend="Send it to" phones={phones} value={number} onChange={change(setNumber)} />
       <p className="text-xs text-slate-500">Check the number is on the network you chose: airtime sent to a number on another network cannot be taken back.</p>

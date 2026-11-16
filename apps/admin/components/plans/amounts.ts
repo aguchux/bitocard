@@ -1,5 +1,6 @@
 import { currencyDigits } from "@bitocard/admin-ui";
 import { type PlanSettings } from "@bitocard/api-client/admin";
+import { moneyInputValue } from "@bitocard/api-client/money";
 
 export type SettingsPlan = PlanSettings["plans"][number];
 
@@ -10,7 +11,8 @@ export function toMinor(value: string, currency: string) {
   if (!match || (digits === 0 && match[2])) return null;
   return Number(match[1]) * 10 ** digits + Number((match[2] ?? "").padEnd(digits, "0") || 0);
 }
-export const toMajor = (minor: number, currency: string) => String(minor / 10 ** currencyDigits(currency));
+/** Minor units as a money field shows them ("35,000", "24.99"). */
+export const toMajor = (minor: number, currency: string) => moneyInputValue(minor, currency);
 
 /** "Business" to "business"; what the code field suggests from the name. */
 export const codeFrom = (name: string) =>

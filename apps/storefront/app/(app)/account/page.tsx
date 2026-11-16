@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
-import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
+import { formatFace, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
 import { giftCardGroup } from "@/components/app/gift-card-actions";
 import { HomeActions } from "@/components/app/home-actions";
@@ -19,14 +19,8 @@ import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
 
-/** A figure with the currency's own symbol (₦31,363.50), short enough for a stat card; the code where there is none. */
-function amount(minor: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("en-GB", { style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: minor % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(minor / 100);
-  } catch {
-    return formatPrice(minor, currency);
-  }
-}
+/** A figure with the currency's own sign (₦31,363.50, GH₵50, KSh 200), short enough for a stat card. */
+const amount = (minor: number, currency: string) => formatFace(minor, currency);
 
 /** What the customer spent: one currency as is, several as the largest with a note. */
 function spent(summary: StoreCustomerSummary | null) {

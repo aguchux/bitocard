@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { StoreWalletOption } from "@bitocard/api-client/storefront";
+import { parseMoney, type StoreWalletOption } from "@bitocard/api-client/storefront";
 import { type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
 import { forgetSignedIn, rememberSignedIn } from "@/lib/handoff";
 
@@ -158,8 +158,10 @@ export async function startCheckout(_state: FormState, form: FormData): Promise<
     const value = text(form, `recipient_${name}`);
     if (value) recipient[name] = value;
   }
-  // A listed value comes in minor units; an amount the customer typed, in the currency's main unit.
-  const amount = text(form, "face_value_minor") ? Number(text(form, "face_value_minor")) : Math.round(Number(text(form, "face_value")) * 100);
+  // A listed value comes in minor units; an amount the customer typed ("1,500.50"), in the face currency's main unit.
+  const amount = text(form, "face_value_minor")
+    ? Number(text(form, "face_value_minor"))
+    : (parseMoney(text(form, "face_value"), text(form, "amount_currency") || "USD") ?? Number.NaN);
   if (!Number.isFinite(amount) || amount <= 0) return { error: "Choose a value.", field: "face_value" };
   const method = text(form, "method") || undefined;
   const fromWallet = form.get("wallet_required") === "1" || method === "wallet";

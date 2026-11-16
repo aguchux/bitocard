@@ -80,6 +80,15 @@ describe("topping the wallet up", () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ object: "customer_top_up", id: "t2", mode: "test", checkout_url: "https://sandbox.test" }, 201)));
     await expect(topUpWallet({}, form({ amount: "10" }))).rejects.toThrow("redirect:/account/wallet?top_up=t2");
     expect(await topUpWallet({}, form({ amount: "0.5" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
+    expect(await topUpWallet({}, form({ amount: "1.2.3", amount_currency: "NGN" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
+    expect(await topUpWallet({}, form({ amount: "12.345", amount_currency: "NGN" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
+  });
+
+  test("the amount is read in the field's currency, commas and all", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_top_up", id: "t4", mode: "test", checkout_url: null }, 201));
+    vi.stubGlobal("fetch", fetch);
+    await expect(topUpWallet({}, form({ amount: "12,500.75", amount_currency: "NGN" }))).rejects.toThrow("redirect:/account/wallet?top_up=t4");
+    expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toMatchObject({ amount: 1_250_075 });
   });
 
   test("the US dollar wallet: its currency is sent and the payment page returns to it", async () => {

@@ -1,21 +1,10 @@
 /** Joins class names, skipping empty ones. */
 export const cn = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
-const digitsCache = new Map<string, number>();
+import { currencyDigits, formatCurrency, withSymbol } from '@bitocard/api-client/money';
 
-/** Decimal places a currency uses (2 for NGN, GHS, KES, USD; 0 for currencies without minor units). */
-export function currencyDigits(currency: string) {
-  let digits = digitsCache.get(currency);
-  if (digits === undefined) {
-    try {
-      digits = new Intl.NumberFormat('en-GB', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-    } catch {
-      digits = 2;
-    }
-    digitsCache.set(currency, digits);
-  }
-  return digits;
-}
+/** Decimal places a currency uses, and its sign ("₦", "GH₵", "KSh"). */
+export { currencyDigits, currencySymbol } from '@bitocard/api-client/money';
 
 const compactUnits: Array<[number, string]> = [
   [1e12, 'T'],
@@ -25,20 +14,18 @@ const compactUnits: Array<[number, string]> = [
 ];
 
 /**
- * Money from integer minor units, for example 1234567 NGN → "NGN 12,345.67" (code first, unambiguous across markets).
- * `compact` gives "NGN 2.5M". Its suffixes are fixed here because Intl's compact notation differs between ICU versions
- * (newer en-GB data says "2.5m"), which would differ between browsers and between the server and the browser.
+ * Money from integer minor units with its currency's sign, for example 1234567 NGN → "₦12,345.67", 500 GHS → "GH₵5.00"
+ * (`@bitocard/api-client/money`). `compact` gives "₦2.5M". Its suffixes are fixed here because Intl's compact notation
+ * differs between ICU versions (newer en-GB data says "2.5m"), which would differ between browsers and the server.
  */
 export function formatMoney(minor: number, currency: string, options: { compact?: boolean } = {}) {
-  const digits = currencyDigits(currency);
-  const major = minor / 10 ** digits;
   if (options.compact) {
+    const major = minor / 10 ** currencyDigits(currency);
     const [size, suffix] = compactUnits.find(([unit]) => Math.abs(major) >= unit) ?? [1, ''];
     const amount = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(major / size);
-    return `${currency} ${amount}${suffix}`;
+    return withSymbol(`${amount}${suffix}`, currency);
   }
-  const formatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency, currencyDisplay: 'code', minimumFractionDigits: digits, maximumFractionDigits: digits });
-  return formatter.format(major).replace(/ /g, ' ');
+  return formatCurrency(minor, currency);
 }
 
 export const formatNumber = (value: number) => new Intl.NumberFormat('en-GB').format(value);

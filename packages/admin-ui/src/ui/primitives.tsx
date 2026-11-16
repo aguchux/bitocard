@@ -1,7 +1,8 @@
 'use client';
 
-import { forwardRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { forwardRef, useState, type ButtonHTMLAttributes, type ComponentProps, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { MoneyInput as BaseMoneyInput } from '@bitocard/ui/money-input';
 import { cn } from '../format';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -89,6 +90,17 @@ export function Field({ label, hint, error, children, htmlFor }: { label: string
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
   return <input ref={ref} className={cn(fieldBase, 'min-h-11', className)} {...props} />;
+});
+
+type BaseMoneyProps = ComponentProps<typeof BaseMoneyInput>;
+
+/**
+ * A money field styled like `Input`: the currency's sign inside on the left ("₦", "GH₵", "KSh", "$"), only an amount
+ * can be typed (digits, one point, the currency's decimals) and commas go between thousands as it is typed. Read the
+ * value with `amountToMinor` or `parseMoney` (both take commas), or use `onValueChange`'s minor units.
+ */
+export const MoneyInput = forwardRef<HTMLInputElement, BaseMoneyProps>(function MoneyInput({ className, placeholder, currency, ...props }, ref) {
+  return <BaseMoneyInput ref={ref} currency={currency} placeholder={placeholder ?? '0.00'} className={cn(fieldBase, 'min-h-11 tabular-nums', className)} symbolClassName="font-semibold text-muted" {...props} />;
 });
 
 /** The eye/eye-off button alone, for composing with `IconInput`'s `end` slot. */

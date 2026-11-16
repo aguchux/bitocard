@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, ExternalLink, KeyRound, LifeBuoy, MessageSquareWarning } from "lucide-react";
-import { formatFace, formatPrice, type StoreCheckout, type StoreVpn } from "@bitocard/api-client/storefront";
+import { formatFace, type StoreCheckout, type StoreVpn } from "@bitocard/api-client/storefront";
 import { CopyValue, VpnAccess } from "@/components/store/vpn-access";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
@@ -40,11 +40,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             {order.product.name}
           </h1>
           <p className="mt-1 text-slate-600">
-            {formatFace(order.face_value, order.face_currency)} each · {order.status === "awaiting_payment" || order.status === "failed" ? "price" : "paid"} {formatPrice(order.amount, order.currency)} with {order.method.label.toLowerCase()}
+            {formatFace(order.face_value, order.face_currency)} each · {order.status === "awaiting_payment" || order.status === "failed" ? "price" : "paid"} {formatFace(order.amount, order.currency)} with {order.method.label.toLowerCase()}
             {order.charged
               ? order.method.id === "wallet"
-                ? ` (${formatPrice(order.charged.amount, order.charged.currency)} from your US dollar wallet)`
-                : ` (charged as ${formatPrice(order.charged.amount, order.charged.currency)}, as your card is charged in ${order.charged.currency})`
+                ? ` (${formatFace(order.charged.amount, order.charged.currency)} from your US dollar wallet)`
+                : ` (charged as ${formatFace(order.charged.amount, order.charged.currency)}, as your card is charged in ${order.charged.currency})`
               : ""}
             {order.order?.receipt_number ? ` · Receipt ${order.order.receipt_number}` : ""}
           </p>
@@ -106,7 +106,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       {order.failure_reason && order.status !== "completed" ? <p className="rounded-2xl bg-slate-50 p-4 text-slate-700">{order.failure_reason}</p> : null}
       {order.status === "refunded" ? (
         <p className="rounded-2xl bg-slate-50 p-4 text-slate-700">
-          {formatPrice(order.amount, order.currency)} was refunded to how you paid. Banks and mobile money providers can take a few days to show it.
+          {formatFace(order.amount, order.currency)} was refunded to how you paid. Banks and mobile money providers can take a few days to show it.
         </p>
       ) : null}
 

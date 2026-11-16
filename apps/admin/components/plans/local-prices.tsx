@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Save } from "lucide-react";
-import { Button, Card, CardHeader, errorMessage, formatMoney, Input, Notice } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, errorMessage, formatMoney, MoneyInput, Notice } from "@bitocard/admin-ui";
 import { useUpdatePlanMutation } from "@bitocard/api-client/admin";
 import { SettingsPlan, toMinor, toMajor } from "@/components/plans/amounts";
 
@@ -50,16 +50,16 @@ export function LocalPrices({ plan, editable }: { plan: SettingsPlan; editable: 
                     </p>
                   </div>
                   <div>
-                    <Input
+                    <MoneyInput
                       id={id}
-                      inputMode="decimal"
+                      currency={row.currency}
                       placeholder={row.charged !== null && row.fixed === null ? toMajor(row.charged, row.currency) : "Converted"}
                       value={values[row.currency] ?? ""}
                       disabled={!editable}
                       aria-invalid={invalid}
-                      onChange={event => {
+                      onValueChange={text => {
                         setSaved(false);
-                        setValues(current => ({ ...current, [row.currency]: event.target.value }));
+                        setValues(current => ({ ...current, [row.currency]: text }));
                       }}
                     />
                     {invalid ? <p className="mt-1 text-xs text-red-600">Enter an amount above zero.</p> : null}

@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Copy, Globe, Mail, RefreshCw, Search, ServerCog, Trash2 } from "lucide-react";
 import { appUrl } from "@bitocard/ui/site";
-import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, errorMessage, Field, formatDate, Input, Notice, Select, StatusBadge, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, errorMessage, Field, formatDate, formatMoney, Input, Notice, Select, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import {
   type DnsImport,
   type DnsRecordType,
@@ -29,7 +29,7 @@ import {
   useUpdateDomainMutation,
 } from "@bitocard/api-client/reseller";
 
-const usd = (cents: number) => `US$${(cents / 100).toFixed(2)}`;
+const usd = (cents: number) => formatMoney(cents, "USD");
 export const statusLabels: Record<StoreDomain["status"], string> = {
   purchasing: "Buying",
   pending: "Waiting for DNS",

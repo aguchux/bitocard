@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const sharedFiles = ['classifieds.ts', 'home.ts', 'storefront.ts'];
+export const sharedFiles = ['classifieds.ts', 'home.ts', 'money.ts', 'storefront.ts'];
 const from = join(here, '../../../packages/api-client/src');
 const to = join(here, '../src/shared');
 

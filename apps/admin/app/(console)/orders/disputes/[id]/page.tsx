@@ -10,8 +10,8 @@ import {
   DisputeReply,
   DisputeThread,
   Field,
-  Input,
   KeyValue,
+  MoneyInput,
   Notice,
   PageHeader,
   QueryView,
@@ -27,6 +27,7 @@ import {
   formatDateTime,
   formatMoney,
 } from "@bitocard/admin-ui";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type AdminDispute, type DisputeAction, useAdminDisputeQuery, useExecuteDisputeMutation, useReplyAdminDisputeMutation, useReturnDisputeMutation } from "@bitocard/api-client/admin";
 
@@ -38,21 +39,15 @@ function actionsFor(dispute: AdminDispute): DisputeAction[] {
   return [...(dispute.order_id ? (["refund_customer"] as const) : []), "credit_reseller", "reject"];
 }
 
-/** "12.50" as minor units, or null when it is not an amount. */
-function toMinor(text: string) {
-  const match = /^(\d{1,12})(?:\.(\d{1,2}))?$/.exec(text.trim());
-  return match ? Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0")) : null;
-}
-
 function ExecuteDialog({ dispute, finance, open, onClose }: { dispute: AdminDispute; finance: boolean; open: boolean; onClose: () => void }) {
   const id = useId();
   const options = actionsFor(dispute).filter(action => finance || !moneyActions.has(action));
   const first = dispute.recommendation && options.includes(dispute.recommendation) ? dispute.recommendation : options[0];
   const [execute, state] = useExecuteDisputeMutation();
   const [action, setAction] = useState<DisputeAction>(first);
-  const [amount, setAmount] = useState(dispute.recommended_amount ? (dispute.recommended_amount / 100).toFixed(2) : "");
+  const [amount, setAmount] = useState(dispute.recommended_amount ? moneyInputValue(dispute.recommended_amount, dispute.currency) : "");
   const [note, setNote] = useState("");
-  const minor = action === "credit_reseller" ? toMinor(amount) : undefined;
+  const minor = action === "credit_reseller" ? parseMoney(amount, dispute.currency) : undefined;
   const valid = note.trim().length >= 3 && (action !== "credit_reseller" || (minor !== null && minor! > 0));
   const close = () => {
     state.reset();
@@ -97,7 +92,7 @@ function ExecuteDialog({ dispute, finance, open, onClose }: { dispute: AdminDisp
         </Field>
         {action === "credit_reseller" ? (
           <Field label={`Amount (${dispute.currency})`} htmlFor={`${id}-amount`}>
-            <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" value={amount} onChange={event => setAmount(event.target.value)} />
+            <MoneyInput id={`${id}-amount`} currency={dispute.currency} value={amount} onValueChange={setAmount} />
           </Field>
         ) : null}
         <Field label="Decision note" htmlFor={`${id}-note`}>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { ChevronRight } from "lucide-react";
-import { formatPrice, type StoreCheckout, type StoreList } from "@bitocard/api-client/storefront";
+import { formatFace, type StoreCheckout, type StoreList } from "@bitocard/api-client/storefront";
 import { StatusPill } from "@/components/store/order-status";
 import { query } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
@@ -71,7 +71,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   </span>
                   <span className="block text-sm text-slate-500">{date(order.created_at)}</span>
                   <span className="mt-1 block font-extrabold">
-                    {formatPrice(order.amount, order.currency)}
+                    {formatFace(order.amount, order.currency)}
                     {order.mode === "test" ? <span className="ml-2 text-xs font-semibold text-amber-700">Test</span> : null}
                   </span>
                 </span>

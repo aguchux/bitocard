@@ -3,7 +3,8 @@
 import { Suspense, useId, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, DataTable, Dialog, errorMessage, Field, formatMoney, formatRelative, Input, Notice, PageHeader, Select, StatusBadge, Tabs, Textarea, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, DataTable, Dialog, errorMessage, Field, formatMoney, formatRelative, Input, MoneyInput, Notice, PageHeader, Select, StatusBadge, Tabs, Textarea, Toggle } from "@bitocard/admin-ui";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type AdminAirtimeLine,
@@ -34,12 +35,8 @@ const tabs = [
 type Tab = (typeof tabs)[number]["value"];
 
 const percent = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
-/** "2,000" or "2000.50" in naira as kobo; null when it is not an amount. */
-function toMinor(text: string) {
-  const match = /^(\d{1,9})(?:\.(\d{1,2}))?$/.exec(text.replace(/,/g, "").trim());
-  return match ? Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0")) : null;
-}
-const units = (minor: number) => String(minor / 100);
+/** "2,000" or "2,000.50" in the network's currency as minor units; null when it is not an amount. */
+const toMinor = (text: string, currency: string) => parseMoney(text, currency);
 const naira = (minor: number | null | undefined, currency = "NGN") => formatMoney(minor ?? 0, currency);
 
 /**
@@ -149,17 +146,18 @@ function NetworkDialog({ network, onClose }: { network: AdminAirtimeNetwork; onC
   const [update, state] = useUpdateAirtimeNetworkMutation();
   const [sell, setSell] = useState(String(network.sell_rate_bps / 100));
   const [buy, setBuy] = useState(String(network.buy_rate_bps / 100));
-  const [min, setMin] = useState(units(network.min_amount));
-  const [max, setMax] = useState(units(network.max_amount));
-  const [daily, setDaily] = useState(units(network.seller_daily));
-  const [newDaily, setNewDaily] = useState(units(network.new_seller_daily));
+  const currency = network.currency;
+  const [min, setMin] = useState(moneyInputValue(network.min_amount, currency));
+  const [max, setMax] = useState(moneyInputValue(network.max_amount, currency));
+  const [daily, setDaily] = useState(moneyInputValue(network.seller_daily, currency));
+  const [newDaily, setNewDaily] = useState(moneyInputValue(network.new_seller_daily, currency));
   const [established, setEstablished] = useState(String(network.established_after));
   const [hold, setHold] = useState(String(network.credit_hold_hours));
   const [steps, setSteps] = useState(network.transfer_steps);
   const [enabled, setEnabled] = useState(network.enabled);
   const sellBps = Math.round(Number(sell) * 100);
   const buyBps = Math.round(Number(buy) * 100);
-  const amounts = [toMinor(min), toMinor(max), toMinor(daily), toMinor(newDaily)];
+  const amounts = [toMinor(min, currency), toMinor(max, currency), toMinor(daily, currency), toMinor(newDaily, currency)];
   const establishedCount = Number(established);
   const valid =
     sellBps > 0 && buyBps <= 10_000 && sellBps < buyBps && amounts.every(value => value !== null) && amounts[3]! <= amounts[2]! && Number.isInteger(Number(hold)) && Number.isInteger(establishedCount) && establishedCount >= 0 && establishedCount <= 100;
@@ -210,17 +208,17 @@ function NetworkDialog({ network, onClose }: { network: AdminAirtimeNetwork; onC
           <Field label="Buyers pay (%)" htmlFor={`${id}-buy`}>
             <Input id={`${id}-buy`} inputMode="decimal" value={buy} onChange={event => setBuy(event.target.value)} />
           </Field>
-          <Field label="Least a trade (₦)" htmlFor={`${id}-min`}>
-            <Input id={`${id}-min`} inputMode="numeric" value={min} onChange={event => setMin(event.target.value)} />
+          <Field label="Least a trade" htmlFor={`${id}-min`}>
+            <MoneyInput id={`${id}-min`} currency={currency} value={min} onValueChange={setMin} />
           </Field>
-          <Field label="Most a trade (₦)" htmlFor={`${id}-max`}>
-            <Input id={`${id}-max`} inputMode="numeric" value={max} onChange={event => setMax(event.target.value)} />
+          <Field label="Most a trade" htmlFor={`${id}-max`}>
+            <MoneyInput id={`${id}-max`} currency={currency} value={max} onValueChange={setMax} />
           </Field>
-          <Field label="Most a seller a day (₦)" htmlFor={`${id}-daily`}>
-            <Input id={`${id}-daily`} inputMode="numeric" value={daily} onChange={event => setDaily(event.target.value)} />
+          <Field label="Most a seller a day" htmlFor={`${id}-daily`}>
+            <MoneyInput id={`${id}-daily`} currency={currency} value={daily} onValueChange={setDaily} />
           </Field>
-          <Field label="Most a new seller a day (₦)" htmlFor={`${id}-new-daily`} hint="Never more than every seller's limit.">
-            <Input id={`${id}-new-daily`} inputMode="numeric" value={newDaily} onChange={event => setNewDaily(event.target.value)} />
+          <Field label="Most a new seller a day" htmlFor={`${id}-new-daily`} hint="Never more than every seller's limit.">
+            <MoneyInput id={`${id}-new-daily`} currency={currency} value={newDaily} onValueChange={setNewDaily} />
           </Field>
           <Field label="New until this many sales are complete" htmlFor={`${id}-established`}>
             <Input id={`${id}-established`} inputMode="numeric" value={established} onChange={event => setEstablished(event.target.value)} />
@@ -304,20 +302,21 @@ function LineDialog({ networks, line, onClose }: { networks: AdminAirtimeNetwork
   const [network, setNetwork] = useState(line ? `${line.country}:${line.network}` : networks[0] ? `${networks[0].country}:${networks[0].network}` : "");
   const [number, setNumber] = useState(line?.number ?? "");
   const [label, setLabel] = useState(line?.label ?? "");
-  const [receive, setReceive] = useState(line ? units(line.daily_receive) : "50000");
-  const [send, setSend] = useState(line ? units(line.daily_send) : "50000");
-  const [balance, setBalance] = useState(line ? units(line.balance) : "");
+  const currency = networks.find(item => `${item.country}:${item.network}` === network)?.currency ?? "NGN";
+  const [receive, setReceive] = useState(line ? moneyInputValue(line.daily_receive, currency) : "50,000");
+  const [send, setSend] = useState(line ? moneyInputValue(line.daily_send, currency) : "50,000");
+  const [balance, setBalance] = useState(line ? moneyInputValue(line.balance, currency) : "");
   const [reason, setReason] = useState("");
-  const balanceChanged = Boolean(line) && balance !== units(line!.balance);
-  const limits = [toMinor(receive), toMinor(send)];
-  const valid = limits.every(value => value !== null) && (line ? !balanceChanged || (toMinor(balance) !== null && reason.trim().length >= 3) : number.trim().length >= 7 && Boolean(network));
+  const balanceChanged = Boolean(line) && toMinor(balance, currency) !== line!.balance;
+  const limits = [toMinor(receive, currency), toMinor(send, currency)];
+  const valid = limits.every(value => value !== null) && (line ? !balanceChanged || (toMinor(balance, currency) !== null && reason.trim().length >= 3) : number.trim().length >= 7 && Boolean(network));
   const error = adding.error ?? updating.error;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!valid) return;
     const [country, key] = network.split(":");
     const done = line
-      ? await update({ id: line.id, label: label.trim() || null, daily_receive: limits[0]!, daily_send: limits[1]!, ...(balanceChanged ? { balance: toMinor(balance)!, reason: reason.trim() } : {}) })
+      ? await update({ id: line.id, label: label.trim() || null, daily_receive: limits[0]!, daily_send: limits[1]!, ...(balanceChanged ? { balance: toMinor(balance, currency)!, reason: reason.trim() } : {}) })
           .unwrap()
           .catch(() => null)
       : await add({ country, network: key, number: number.trim(), label: label.trim() || undefined, daily_receive: limits[0]!, daily_send: limits[1]! })
@@ -364,17 +363,17 @@ function LineDialog({ networks, line, onClose }: { networks: AdminAirtimeNetwork
           <Input id={`${id}-label`} maxLength={60} value={label} onChange={event => setLabel(event.target.value)} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Receives a day (₦)" htmlFor={`${id}-receive`}>
-            <Input id={`${id}-receive`} inputMode="numeric" value={receive} onChange={event => setReceive(event.target.value)} />
+          <Field label="Receives a day" htmlFor={`${id}-receive`}>
+            <MoneyInput id={`${id}-receive`} currency={currency} value={receive} onValueChange={setReceive} />
           </Field>
-          <Field label="Sends a day (₦)" htmlFor={`${id}-send`}>
-            <Input id={`${id}-send`} inputMode="numeric" value={send} onChange={event => setSend(event.target.value)} />
+          <Field label="Sends a day" htmlFor={`${id}-send`}>
+            <MoneyInput id={`${id}-send`} currency={currency} value={send} onValueChange={setSend} />
           </Field>
         </div>
         {line ? (
           <>
-            <Field label="Airtime on the line (₦)" htmlFor={`${id}-balance`} hint="Change only to match the balance the phone shows.">
-              <Input id={`${id}-balance`} inputMode="decimal" value={balance} onChange={event => setBalance(event.target.value)} />
+            <Field label="Airtime on the line" htmlFor={`${id}-balance`} hint="Change only to match the balance the phone shows.">
+              <MoneyInput id={`${id}-balance`} currency={currency} value={balance} onValueChange={setBalance} />
             </Field>
             {balanceChanged ? (
               <Field label="Why it changed" htmlFor={`${id}-reason`}>

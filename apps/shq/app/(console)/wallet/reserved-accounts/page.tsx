@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Check, Copy, Landmark, PiggyBank, ShieldCheck } from "lucide-react";
-import { Button, Card, currencyDigits, Dialog, EmptyState, errorMessage, Field, formatMoney, Input, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
+import { Button, Card, Dialog, EmptyState, errorMessage, Field, formatMoney, Input, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import {
   type BvnCheck,
   type ReservedAccount,
@@ -15,17 +15,10 @@ import {
   useSimulateDepositMutation,
   useStartBvnCheckMutation,
 } from "@bitocard/api-client/reseller";
+import { parseMoney } from "@bitocard/api-client/money";
+import { MoneyField } from "@/components/money-field";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
-
-/** "5,000.50" → minor units, or null when it is not a valid amount. */
-function toMinor(value: string, currency: string) {
-  const cleaned = value.replace(/[,\s]/g, "");
-  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  const digits = currencyDigits(currency);
-  if ((cleaned.split(".")[1] ?? "").length > digits) return null;
-  return Math.round(Number(cleaned) * 10 ** digits);
-}
 
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -209,7 +202,7 @@ function SimulateDeposit({ account, onClose }: { account: ReservedAccount | null
   const [value, setValue] = useState("");
   const [simulate, state] = useSimulateDepositMutation();
   const [done, setDone] = useState<string | null>(null);
-  const amount = account ? toMinor(value, account.currency) : null;
+  const amount = account ? parseMoney(value, account.currency) : null;
   const close = () => {
     setValue("");
     setDone(null);
@@ -250,8 +243,8 @@ function SimulateDeposit({ account, onClose }: { account: ReservedAccount | null
         <div className="space-y-4">
           {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
           {done ? <Notice tone="green">{done}</Notice> : null}
-          <Field label={`Amount (${account.currency})`} htmlFor={`${id}-amount`} hint={`At least ${formatMoney(100, account.currency)}.`}>
-            <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" placeholder="5000" value={value} onChange={event => setValue(event.target.value)} />
+          <Field label="Amount" htmlFor={`${id}-amount`} hint={`At least ${formatMoney(100, account.currency)}.`}>
+            <MoneyField id={`${id}-amount`} currency={account.currency} placeholder="5,000" value={value} onValueChange={setValue} />
           </Field>
         </div>
       ) : null}

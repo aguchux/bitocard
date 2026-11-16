@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarClock, CheckCircle2, Eye, Globe, Link2, ShoppingCart } from "lucide-react";
-import { Badge, Button, Card, CardHeader, type Column, DataTable, EmptyState, errorMessage, formatDate, formatRelative, LineChart, Notice, QueryView, Skeleton, StatCard } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, type Column, DataTable, EmptyState, errorMessage, formatDate, formatMoney, formatRelative, LineChart, Notice, QueryView, Skeleton, StatCard } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { type Store, type StoreDomain, type StoreDomains, type StoreTraffic, useStoreDomainsQuery, useStoresQuery, useStoreTrafficQuery } from "@bitocard/api-client/reseller";
 import { BuyDomain, ConnectDomain, DomainCard, mailNames, statusLabels, statusTone } from "@/components/domains";
@@ -169,7 +169,7 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
           value={next ? formatDate(next.expires_at!) : "—"}
           icon={<CalendarClock />}
           tone="violet"
-          footer={<span className="block truncate text-sm text-muted">{next ? `${next.name}${next.price ? ` · ${`US$${(next.price.amount / 100).toFixed(2)}`} paid` : ""}` : "No bought domains"}</span>}
+          footer={<span className="block truncate text-sm text-muted">{next ? `${next.name}${next.price ? ` · ${formatMoney(next.price.amount, "USD")} paid` : ""}` : "No bought domains"}</span>}
         />
       </div>
 

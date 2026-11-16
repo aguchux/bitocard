@@ -14,7 +14,7 @@ export const bpsToPercent = (bps: number | null | undefined) => (bps === null ||
 
 /** "12.50" in a currency's main unit as minor units, or null when it is not an amount. */
 export function amountToMinor(value: string) {
-  const match = /^(\d{1,12})(?:\.(\d{1,2}))?$/.exec(value.trim());
+  const match = /^(\d{1,12})(?:\.(\d{1,2}))?$/.exec(value.trim().replace(/,/g, ''));
   return match ? Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0')) : null;
 }
 

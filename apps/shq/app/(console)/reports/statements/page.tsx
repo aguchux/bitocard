@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, type Column, type DateRange } from "@bitocard/admin-ui";
+import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, type Column, type DateRange, formatMoney } from "@bitocard/admin-ui";
 import { type ResellerStatementRow, useResellerStatementQuery } from "@bitocard/api-client/reseller";
 import { ReportDownloads } from "@/components/report-downloads";
 import { ShqShell } from "@/components/shq-shell";
@@ -18,7 +18,7 @@ const typeLabels: Record<string, string> = {
   chargeback: "Chargeback",
 };
 
-const money = (minor: number, currency: string) => `${minor < 0 ? "-" : ""}${(Math.abs(minor) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+const money = (minor: number, currency: string) => formatMoney(minor, currency);
 const shortDate = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 /** The most rows drawn on the page; the CSV and PDF downloads hold every one. */

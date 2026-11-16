@@ -83,7 +83,11 @@ describe('manual top-up form', () => {
 
     fireEvent.change(screen.getByLabelText('Wallet'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'test' } });
-    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '25000.5' } });
+    // A money field: the wallet's sign inside it, letters dropped and commas between thousands.
+    const amount = screen.getByLabelText('Amount (USD)') as HTMLInputElement;
+    expect(amount.parentElement?.textContent).toContain('$');
+    fireEvent.change(amount, { target: { value: '25000.5x' } });
+    expect(amount.value).toBe('25,000.5');
     fireEvent.change(screen.getByLabelText('Bank or payment reference'), { target: { value: ' GTB-1 ' } });
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Bank transfer in' } });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));

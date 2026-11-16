@@ -147,16 +147,19 @@ export function BuyForm({
           </div>
         </fieldset>
       ) : product.range ? (
+        <>
+        <input type="hidden" name="amount_currency" value={product.face_currency} />
         <TextField
-          label={`Amount (${product.face_currency})`}
+          label="Amount"
           name="face_value"
-          inputMode="decimal"
+          currency={product.face_currency}
           required
           key={`amount-${prefill.amount}`}
           defaultValue={prefill.amount}
           state={state}
           hint={`From ${formatFace(product.range.min, product.face_currency)} to ${formatFace(product.range.max, product.face_currency)}${rangeInLocal(product)}.`}
         />
+        </>
       ) : null}
 
       {multiples.has(product.category) ? (

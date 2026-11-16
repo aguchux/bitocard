@@ -1,10 +1,6 @@
-import { formatPrice } from "@bitocard/api-client/storefront";
+import { formatCurrency } from "@bitocard/api-client/storefront";
 
-/** Money with the currency's own symbol (₦1,140), as Home shows it; the code where there is none. */
+/** Money with the currency's own sign (₦1,140, GH₵5.50, KSh 200, $10), as Home shows it; whole amounts without ".00". */
 export function money(minor: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("en-GB", { style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: minor % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(minor / 100);
-  } catch {
-    return formatPrice(minor, currency);
-  }
+  return formatCurrency(minor, currency, { trim: true });
 }

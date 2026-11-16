@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const files = ['classifieds.ts', 'home.ts', 'storefront.ts'];
+const files = ['classifieds.ts', 'home.ts', 'money.ts', 'storefront.ts'];
 const original = (file: string) => new URL(`../../../packages/api-client/src/${file}`, import.meta.url);
 
 test('src/shared is the same as packages/api-client/src', { skip: !existsSync(original('classifieds.ts')) && 'not in the monorepo' }, () => {

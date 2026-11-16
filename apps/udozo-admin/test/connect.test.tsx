@@ -377,7 +377,7 @@ describe("Connect", () => {
     expect(screen.getByText("Confirmed")).toBeTruthy();
     expect(screen.getByText("Passed")).toBeTruthy();
     expect(screen.getByText(/Photos of the shopfront/).textContent).toContain("not met");
-    expect(screen.getByText(/NGN\s*50,000\.00/)).toBeTruthy();
+    expect(screen.getByText(/₦50,000\.00/)).toBeTruthy();
   });
 
   test("operations ask for changes, schedule and record the visit, then approve", async () => {

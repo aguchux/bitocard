@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { MailCheck } from "lucide-react";
-import { Button, ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod, Dialog, errorMessage, Field, formatDateTime, formatMoney, Input, KeyValue, Notice, resendWait, Select, Textarea } from "@bitocard/admin-ui";
+import { Button, ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod, Dialog, errorMessage, Field, formatDateTime, formatMoney, Input, KeyValue, MoneyInput, Notice, resendWait, Select, Textarea } from "@bitocard/admin-ui";
 import {
   type ConfirmMethod,
   type Mode,
@@ -13,6 +13,7 @@ import {
   useRequestSupplierFundingMutation,
   useResendSupplierFundingCodeMutation,
 } from "@bitocard/api-client/admin";
+import { parseMoney } from "@bitocard/api-client/money";
 
 /**
  * Recording money sent to a supplier outside BitoCard (a bank transfer to its account): the supplier, amount and
@@ -44,7 +45,10 @@ export function SupplierFundingDialog({ open, onClose, mode, suppliers, onDone }
     return () => clearInterval(timer);
   }, [pending]);
 
-  const valid = /^\d+(\.\d{1,2})?$/.test(amount.trim()) && Number(amount) > 0 && /^[A-Z]{3}$/.test(currency) && reason.trim().length >= 5;
+  // The amount's sign and decimals follow the currency while it is a whole code; US dollars until then.
+  const amountCurrency = /^[A-Z]{3}$/.test(currency) ? currency : "USD";
+  const minor = parseMoney(amount, amountCurrency);
+  const valid = minor !== null && minor > 0 && /^[A-Z]{3}$/.test(currency) && reason.trim().length >= 5;
   const wait = pending ? resendWait(pending.code_sent_at, now) : 0;
 
   const close = () => {
@@ -101,7 +105,7 @@ export function SupplierFundingDialog({ open, onClose, mode, suppliers, onDone }
               Cancel movement
             </Button>
             <Button loading={busy} disabled={code.length !== 6} onClick={() => confirmFunding()}>
-              Fund {pending.amount / 100} {pending.currency}
+              Fund {formatMoney(pending.amount, pending.currency)}
             </Button>
           </>
         ) : (
@@ -115,7 +119,7 @@ export function SupplierFundingDialog({ open, onClose, mode, suppliers, onDone }
               icon={<MailCheck className="size-4" aria-hidden />}
               onClick={() =>
                 void run(async () => {
-                  const created = await request({ mode, supplier_code: supplierCode, currency, amount: Math.round(Number(amount) * 100), reason: reason.trim() }).unwrap();
+                  const created = await request({ mode, supplier_code: supplierCode, currency, amount: minor!, reason: reason.trim() }).unwrap();
                   setPending(created);
                   setMethods(created.confirm_with);
                   setMethod(defaultConfirmMethod(created.confirm_with));
@@ -180,8 +184,8 @@ export function SupplierFundingDialog({ open, onClose, mode, suppliers, onDone }
               <Field label="Currency" htmlFor={`${id}-currency`} hint="The supplier's funding currency, for example USD.">
                 <Input id={`${id}-currency`} value={currency} onChange={event => setCurrency(event.target.value.toUpperCase())} maxLength={3} className="uppercase" />
               </Field>
-              <Field label="Amount" htmlFor={`${id}-amount`} hint="In the currency's main unit, for example 5000.00.">
-                <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" value={amount} onChange={event => setAmount(event.target.value)} />
+              <Field label="Amount" htmlFor={`${id}-amount`} hint="In the currency's main unit, for example 5,000.00.">
+                <MoneyInput id={`${id}-amount`} currency={amountCurrency} value={amount} onValueChange={setAmount} />
               </Field>
             </div>
             <Field label="Reason" htmlFor={`${id}-reason`} hint="The bank transfer this records, for finance's own tracking. Recorded in the activity log. At least 5 characters.">

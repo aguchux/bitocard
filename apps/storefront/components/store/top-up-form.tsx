@@ -197,7 +197,10 @@ export function TopUpForm({ country, currency, wallet, signedIn, back, initial =
       ) : null}
 
       {category === "airtime" && product ? (
-        <TextField label={`Amount (${product.face_currency})`} name="face_value" inputMode="decimal" required value={amount} onChange={event => setAmount(event.target.value)} state={state} />
+        <>
+          <input type="hidden" name="amount_currency" value={product.face_currency} />
+          <TextField label="Amount" name="face_value" currency={product.face_currency} required value={amount} onValueChange={text => setAmount(text)} state={state} />
+        </>
       ) : category === "data" && network ? (
         <div className="space-y-1.5">
           <label htmlFor={`${id}-bundle`} className={fieldLabel}>

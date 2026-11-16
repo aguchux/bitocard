@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Gift, Loader2, X } from "lucide-react";
-import { formatPrice, type StorePublicSpinClaim } from "@bitocard/api-client/storefront";
+import { formatFace, type StorePublicSpinClaim } from "@bitocard/api-client/storefront";
 import { claimPublicSpin, dismissPublicSpinClaim } from "@/lib/spin-actions";
 
 /** First-login handoff for wins made on /spin while signed out. */
@@ -45,7 +45,7 @@ export function PublicSpinClaimDialog({ initial }: { initial: StorePublicSpinCla
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {(claim.currencies ?? []).map(option => (
                 <button key={option.currency} type="button" disabled={busy !== null} onClick={() => move(option.currency)} className="min-h-14 rounded-2xl bg-navy-900 px-4 font-bold text-white hover:bg-navy-800 disabled:opacity-60">
-                  {busy === option.currency ? <Loader2 className="mx-auto size-5 animate-spin" aria-label="Adding" /> : `Add ${formatPrice(option.amount, option.currency)}`}
+                  {busy === option.currency ? <Loader2 className="mx-auto size-5 animate-spin" aria-label="Adding" /> : `Add ${formatFace(option.amount, option.currency)}`}
                 </button>
               ))}
             </div>

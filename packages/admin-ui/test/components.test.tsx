@@ -8,13 +8,14 @@ import { pushServiceWorker } from '../src/push-worker';
 afterEach(cleanup);
 
 describe('formatting', () => {
-  test('money is shown from minor units with the currency code', () => {
-    expect(formatMoney(1_234_567, 'NGN')).toBe('NGN 12,345.67');
-    expect(formatMoney(500, 'JPY')).toBe('JPY 500');
-    expect(formatMoney(250_000_000, 'NGN', { compact: true })).toBe('NGN 2.5M');
-    expect(formatMoney(-125_000, 'USD', { compact: true })).toBe('USD -1.3K');
-    expect(formatMoney(99_900, 'GHS', { compact: true })).toBe('GHS 999');
-    expect(formatMoney(4_200_000_000_000, 'NGN', { compact: true })).toBe('NGN 42B');
+  test('money is shown from minor units with the currency sign', () => {
+    expect(formatMoney(1_234_567, 'NGN')).toBe('₦12,345.67');
+    expect(formatMoney(500, 'JPY')).toBe('¥500');
+    expect(formatMoney(5_000, 'KES')).toBe('KSh 50.00');
+    expect(formatMoney(250_000_000, 'NGN', { compact: true })).toBe('₦2.5M');
+    expect(formatMoney(-125_000, 'USD', { compact: true })).toBe('-$1.3K');
+    expect(formatMoney(99_900, 'GHS', { compact: true })).toBe('GH₵999');
+    expect(formatMoney(4_200_000_000_000, 'NGN', { compact: true })).toBe('₦42B');
   });
   test('changes, rates, names and times', () => {
     expect(percentChange(150, 100)).toBe(50);

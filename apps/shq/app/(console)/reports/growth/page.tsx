@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { TrendingUp } from "lucide-react";
-import { Card, CardHeader, DateRangePicker, defaultDateRange, errorMessage, LineChart, PageHeader, StatCard, Tabs, Trend, type DateRange } from "@bitocard/admin-ui";
+import { Card, CardHeader, DateRangePicker, defaultDateRange, errorMessage, formatMoney, LineChart, PageHeader, StatCard, Tabs, Trend, type DateRange } from "@bitocard/admin-ui";
 import { type ResellerReportMetric, useResellerGrowthQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 
-// Earnings and sales come in minor units of the wallet's currency.
-const money = (value: number) => (value / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Earnings and sales come in minor units of the wallet's currency, written with its sign ("₦12,345.67").
+const money = (value: number, currency: string) => formatMoney(value, currency);
 
-const metrics: Array<{ value: ResellerReportMetric; label: string; format: (value: number) => string }> = [
+const metrics: Array<{ value: ResellerReportMetric; label: string; format: (value: number, currency: string) => string }> = [
   { value: "earnings", label: "Earnings", format: money },
   { value: "gross_sales", label: "Gross sales", format: money },
   { value: "orders", label: "Orders", format: value => value.toLocaleString("en-GB") },
@@ -38,18 +38,18 @@ export default function ResellerGrowthPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCard
           label={`${chosen.label} (this range)`}
-          value={data ? chosen.format(data.current) : "—"}
+          value={data ? chosen.format(data.current, data.currency) : "—"}
           icon={<TrendingUp className="size-5" aria-hidden />}
           loading={growth.isLoading}
           footer={<Trend change={data?.change_percent ?? null} />}
         />
-        <StatCard label="Previous range" value={data ? chosen.format(data.previous) : "—"} icon={<TrendingUp className="size-5" aria-hidden />} loading={growth.isLoading} footer="Same length, immediately before" />
+        <StatCard label="Previous range" value={data ? chosen.format(data.previous, data.currency) : "—"} icon={<TrendingUp className="size-5" aria-hidden />} loading={growth.isLoading} footer="Same length, immediately before" />
       </div>
 
       <Card>
         <CardHeader title={chosen.label} description={projectedFrom ? `The trend continues past ${shortDate(projectedFrom)} (dates after it are projected).` : "Daily values for the range."} />
         <div className="px-3 pb-5 sm:px-5">
-          {data ? <LineChart label={chosen.label} labels={data.points.map(point => shortDate(point.date))} series={[{ name: chosen.label, color: "#ec4899", values: data.points.map(point => point.value), format: chosen.format }]} /> : null}
+          {data ? <LineChart label={chosen.label} labels={data.points.map(point => shortDate(point.date))} series={[{ name: chosen.label, color: "#ec4899", values: data.points.map(point => point.value), format: (value: number) => chosen.format(value, data.currency) }]} /> : null}
         </div>
       </Card>
     </ShqShell>

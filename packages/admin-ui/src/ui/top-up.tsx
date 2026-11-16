@@ -6,7 +6,7 @@ import type { ConfirmMethod, ManualTopUp, ManualTopUpInput, ManualTopUpSource } 
 import { errorMessage, formatDateTime, formatMoney } from '../format';
 import { Dialog } from './data';
 import { amountToMinor } from './pricing';
-import { Button, Field, Input, KeyValue, Select, Textarea } from './primitives';
+import { Button, Field, Input, KeyValue, MoneyInput, Select, Textarea } from './primitives';
 import { Badge, Notice, type Tone } from './status';
 import { ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod } from './confirm-code';
 import { productName } from '@bitocard/api-client';
@@ -256,7 +256,7 @@ export function WalletTopUpDialog({
             </div>
             {!chooseMode && modeNote ? <p className="text-sm text-muted">{modeNote}</p> : null}
             <Field label={`Amount (${chosen?.currency ?? ''})`} htmlFor={`${id}-amount`} error={touched ? problems.amount : undefined}>
-              <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" value={amount} onChange={event => setAmount(event.target.value)} placeholder="25000.00" />
+              <MoneyInput id={`${id}-amount`} currency={chosen?.currency ?? 'USD'} value={amount} onValueChange={setAmount} placeholder="25,000.00" />
             </Field>
             <Field label="Where the money comes from" htmlFor={`${id}-source`}>
               <Select id={`${id}-source`} value={source} onChange={event => setSource(event.target.value as ManualTopUpSource)}>

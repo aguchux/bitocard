@@ -171,7 +171,7 @@ describe("the buy orders list", () => {
     expect(screen.getAllByText("Ada Obi").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Accepted, to meet").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Buyer said they did not buy it").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/NGN\s450,000\.00/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/₦450,000\.00/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "BO-000123" }).every(link => link.getAttribute("href") === "/classifieds/buy-orders/bo_1")).toBe(true);
     expect(listCalls()[0].get("status")).toBeNull();
 

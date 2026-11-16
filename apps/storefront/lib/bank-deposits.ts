@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { StoreBankDeposit, StoreBankDepositOptions, StoreList } from "@bitocard/api-client/storefront";
+import { parseMoney } from "@bitocard/api-client/storefront";
 import type { FormState } from "@/lib/account-actions";
 import { customerApi } from "@/lib/customer";
 
@@ -23,8 +24,9 @@ export async function myBankDeposits(): Promise<StoreBankDeposit[]> {
 
 /** Starts a bank deposit for an amount, then opens its page with where to pay and the reference to write. */
 export async function startBankDeposit(_state: FormState, form: FormData): Promise<FormState> {
-  const amount = Math.round(Number(text(form, "amount").replace(/[,\s]/g, "")) * 100);
-  if (!Number.isFinite(amount) || amount < 100) return { error: "Enter an amount of at least 1.", field: "amount" };
+  // Read in the currency the field showed (`amount_currency`, else the wallet's `currency`).
+  const amount = parseMoney(text(form, "amount"), text(form, "amount_currency") || text(form, "currency") || "USD");
+  if (amount === null || amount < 100) return { error: "Enter an amount of at least 1.", field: "amount" };
   const result = await customerApi<StoreBankDeposit>("POST", "/v1/store/wallet/bank-deposits", {
     amount,
     currency: text(form, "currency") || undefined,

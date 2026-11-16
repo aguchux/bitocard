@@ -2,7 +2,8 @@
 
 import { Suspense, useId, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { ActionDialog, Button, Card, DataTable, Dialog, errorMessage, Field, formatMoney, formatRelative, Input, Notice, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
+import { ActionDialog, Button, Card, DataTable, Dialog, errorMessage, Field, formatMoney, formatRelative, Input, MoneyInput, Notice, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type AdminBankDeposit, type BankDepositStatus, useBankDepositsQuery, useCreditBankDepositMutation, useRejectBankDepositMutation } from "@bitocard/api-client/admin";
 
@@ -22,12 +23,6 @@ const statusLabel: Record<BankDepositStatus, string> = {
   cancelled: "Cancelled",
   expired: "Expired",
 };
-
-/** "2,000" or "2000.50" as minor units; null when it is not an amount. */
-function toMinor(text: string) {
-  const match = /^(\d{1,10})(?:\.(\d{1,2}))?$/.exec(text.replace(/,/g, "").trim());
-  return match ? Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0")) : null;
-}
 
 /**
  * Customers' bank deposits: they paid cash into, or transferred to, one of Golojan's accounts and said so. Finance
@@ -159,10 +154,10 @@ function BankDeposits() {
 function CreditDialog({ deposit, onClose }: { deposit: AdminBankDeposit; onClose: () => void }) {
   const id = useId();
   const [credit, state] = useCreditBankDepositMutation();
-  const [amount, setAmount] = useState(String(deposit.amount / 100));
+  const [amount, setAmount] = useState(moneyInputValue(deposit.amount, deposit.currency));
   const [external, setExternal] = useState("");
   const [note, setNote] = useState("");
-  const minor = toMinor(amount);
+  const minor = parseMoney(amount, deposit.currency);
   const valid = minor !== null && minor > 0;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -192,7 +187,7 @@ function CreditDialog({ deposit, onClose }: { deposit: AdminBankDeposit; onClose
       <form id={`${id}-form`} onSubmit={submit} className="space-y-4" noValidate>
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
         <Field label={`Amount that arrived (${deposit.currency})`} htmlFor={`${id}-amount`} hint={`The customer asked to add ${formatMoney(deposit.amount, deposit.currency)}.`}>
-          <Input id={`${id}-amount`} inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} aria-invalid={!valid || undefined} />
+          <MoneyInput id={`${id}-amount`} currency={deposit.currency} value={amount} onValueChange={setAmount} aria-invalid={!valid || undefined} />
         </Field>
         <Field label="Bank's reference (optional)" htmlFor={`${id}-ref`}>
           <Input id={`${id}-ref`} value={external} maxLength={120} onChange={event => setExternal(event.target.value)} />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Dialog, errorMessage, Field, Input, Notice, Textarea, Toggle } from "@bitocard/admin-ui";
+import { Button, Dialog, errorMessage, Field, Input, MoneyInput, Notice, Textarea, Toggle } from "@bitocard/admin-ui";
 import { type PlanSettings, useCreatePlanMutation } from "@bitocard/api-client/admin";
 import { toMinor, codeFrom } from "@/components/plans/amounts";
 
@@ -67,7 +67,7 @@ export function NewPlanDialog({ settings, open, onClose, onCreated }: { settings
             />
           </Field>
           <Field label="Price a month (US dollars)" htmlFor="new-plan-price" error={price && (cents === null || cents === 0) ? "Enter a price above zero." : undefined}>
-            <Input id="new-plan-price" inputMode="decimal" value={price} onChange={event => setPrice(event.target.value)} placeholder="49" />
+            <MoneyInput id="new-plan-price" currency="USD" value={price} onValueChange={setPrice} placeholder="49" />
           </Field>
           <div className="flex items-end justify-between gap-3 rounded-xl border border-line p-3">
             <span className="text-sm font-semibold text-ink">Offer to resellers now</span>

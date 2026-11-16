@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   ActionDialog,
-  amountToMinor,
   bpsToPercent,
   Button,
   Card,
@@ -15,6 +14,7 @@ import {
   Field,
   formatDateTime,
   Input,
+  MoneyInput,
   Notice,
   PageHeader,
   percentToBps,
@@ -22,6 +22,7 @@ import {
   Select,
 } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { parseMoney } from "@bitocard/api-client/money";
 import { describeRule, kindLabels } from "../pricing-labels";
 import {
   type PriceKind,
@@ -69,7 +70,9 @@ export default function PricingPage() {
   const [fixedCurrency, setFixedCurrency] = useState("USD");
   const discountBps = percentToBps(discount);
   const marginBps = percentToBps(margin);
-  const fixedMinor = amountToMinor(fixed);
+  // The sign and decimals follow the currency while it is a whole code; US dollars until then.
+  const fixedMoney = /^[A-Z]{3}$/.test(fixedCurrency) ? fixedCurrency : "USD";
+  const fixedMinor = parseMoney(fixed, fixedMoney);
 
   const startAdding = () => {
     setCategory("");
@@ -209,7 +212,7 @@ export default function PricingPage() {
           {kind === "fixed" ? (
             <>
               <Field label="Price to resellers" htmlFor="rule-fixed" hint="Per item. Never sold below cost: an item that costs more is not offered.">
-                <Input id="rule-fixed" inputMode="decimal" value={fixed} onChange={event => setFixed(event.target.value)} />
+                <MoneyInput id="rule-fixed" currency={fixedMoney} value={fixed} onValueChange={setFixed} />
               </Field>
               <Field label="Currency" htmlFor="rule-fixed-currency" hint="Converted to each market’s currency at BitoCard’s rate.">
                 <Input id="rule-fixed-currency" maxLength={3} value={fixedCurrency} onChange={event => setFixedCurrency(event.target.value.toUpperCase())} />

@@ -8,6 +8,7 @@
     "./admin": "./src/admin/index.ts",
     "./reseller": "./src/reseller/index.ts",
     "./storefront": "./src/storefront.ts",
+    "./money": "./src/money.ts",
     "./classifieds": "./src/classifieds.ts",
     "./home": "./src/home.ts",
     "./discovery": "./src/discovery.ts",

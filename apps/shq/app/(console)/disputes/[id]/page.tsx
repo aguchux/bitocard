@@ -12,7 +12,6 @@ import {
   DisputeReply,
   DisputeThread,
   Field,
-  Input,
   KeyValue,
   Notice,
   PageHeader,
@@ -29,6 +28,8 @@ import {
   formatDateTime,
   formatMoney,
 } from "@bitocard/admin-ui";
+import { parseMoney } from "@bitocard/api-client/money";
+import { MoneyField } from "@/components/money-field";
 import { type Dispute, type DisputeAction, useDisputeQuery, useEscalateDisputeMutation, useReplyDisputeMutation, useResolveDisputeMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -41,12 +42,6 @@ function recommendationsFor(dispute: Dispute): DisputeAction[] {
   return [...(dispute.order_id ? (["refund_customer"] as const) : []), "credit_reseller", "reject"];
 }
 
-/** "12.50" as minor units, or null when it is not an amount. */
-function toMinor(text: string) {
-  const match = /^(\d{1,12})(?:\.(\d{1,2}))?$/.exec(text.trim());
-  return match ? Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0")) : null;
-}
-
 function EscalateDialog({ dispute, open, onClose }: { dispute: Dispute; open: boolean; onClose: () => void }) {
   const id = useId();
   const options = recommendationsFor(dispute);
@@ -54,7 +49,7 @@ function EscalateDialog({ dispute, open, onClose }: { dispute: Dispute; open: bo
   const [recommendation, setRecommendation] = useState<DisputeAction>(options[0]);
   const [amount, setAmount] = useState("");
   const [report, setReport] = useState("");
-  const minor = recommendation === "credit_reseller" ? toMinor(amount) : undefined;
+  const minor = recommendation === "credit_reseller" ? parseMoney(amount, dispute.currency) : undefined;
   const valid = report.trim().length >= 10 && (recommendation !== "credit_reseller" || (minor !== null && minor! > 0));
   const close = () => {
     state.reset();
@@ -97,8 +92,8 @@ function EscalateDialog({ dispute, open, onClose }: { dispute: Dispute; open: bo
           </Select>
         </Field>
         {recommendation === "credit_reseller" ? (
-          <Field label={`Amount (${dispute.currency})`} htmlFor={`${id}-amount`} hint="How much BitoCard should credit to your wallet.">
-            <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" value={amount} onChange={event => setAmount(event.target.value)} />
+          <Field label="Amount" htmlFor={`${id}-amount`} hint="How much BitoCard should credit to your wallet.">
+            <MoneyField id={`${id}-amount`} currency={dispute.currency} value={amount} onValueChange={setAmount} />
           </Field>
         ) : null}
         <Field label="Your report" htmlFor={`${id}-report`} hint="What you checked and what you found: the order, the delivery, the payment, your contact with the customer.">

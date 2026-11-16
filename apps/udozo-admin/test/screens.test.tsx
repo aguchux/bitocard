@@ -216,7 +216,7 @@ describe("admin.udozo.com", () => {
   test("setup fees: every market's fee in US dollars, a market following it, and going back to it", async () => {
     page(<SetupFeesPage />);
     const all = await screen.findByLabelText("Every market", {}, slow);
-    expect(within(all).getByText("On: USD 10.00")).toBeTruthy();
+    expect(within(all).getByText("On: $10.00")).toBeTruthy();
     const usd = within(all).getByLabelText("Amount (USD)") as HTMLInputElement;
     expect(usd.value).toBe("10");
     fireEvent.change(usd, { target: { value: "12" } });

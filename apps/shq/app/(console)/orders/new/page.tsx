@@ -4,7 +4,7 @@ import { Suspense, useEffect, useId, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, Search, ShoppingCart } from "lucide-react";
-import { Button, Card, CardHeader, categoryName, cn, currencyDigits, EmptyState, errorMessage, ErrorState, Field, FilterSelect, formatMoney, humanise, Input, LoadMore, Notice, PageHeader, RefreshFailed, Select, Skeleton, useDebouncedValue } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, categoryName, cn, EmptyState, errorMessage, ErrorState, Field, FilterSelect, formatMoney, humanise, Input, LoadMore, Notice, PageHeader, RefreshFailed, Select, Skeleton, useDebouncedValue } from "@bitocard/admin-ui";
 import {
   type CatalogueCategory,
   catalogueCategories,
@@ -15,20 +15,12 @@ import {
   useCreateQuoteMutation,
   usePlaceOrderMutation,
 } from "@bitocard/api-client/reseller";
+import { parseMoney } from "@bitocard/api-client/money";
+import { MoneyField } from "@/components/money-field";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
 const maxQuantity = 10;
-
-/** Major units typed by a person ("25.50") to integer minor units, or null when it is not a valid amount. */
-function toMinor(value: string, currency: string) {
-  const trimmed = value.trim();
-  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
-  const digits = currencyDigits(currency);
-  const [whole, fraction = ""] = trimmed.split(".");
-  if (fraction.length > digits) return null;
-  return Number(whole) * 10 ** digits + Number(fraction.padEnd(digits, "0") || "0");
-}
 
 function ProductPicker({ onPick }: { onPick: (product: Product) => void }) {
   const [category, setCategory] = useState<"" | CatalogueCategory>("");
@@ -222,7 +214,7 @@ function OrderForm({ product, onChange }: { product: Product; onChange: () => vo
   const [invalid, setInvalid] = useState<string | null>(null);
 
   const denomination = product.denomination;
-  const face = fixed ? (faceValue ? Number(faceValue) : null) : toMinor(amount, product.face_currency);
+  const face = fixed ? (faceValue ? Number(faceValue) : null) : parseMoney(amount, product.face_currency);
   const reset = () => {
     setQuote(null);
     setInvalid(null);
@@ -299,11 +291,11 @@ function OrderForm({ product, onChange }: { product: Product; onChange: () => vo
             </fieldset>
           ) : denomination.type === "range" ? (
             <Field
-              label={`Amount (${product.face_currency})`}
+              label="Amount"
               htmlFor={`${id}-amount`}
               hint={`From ${formatMoney(denomination.min, product.face_currency)} to ${formatMoney(denomination.max, product.face_currency)}.`}
             >
-              <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" required value={amount} onChange={event => changed(setAmount)(event.target.value)} />
+              <MoneyField id={`${id}-amount`} currency={product.face_currency} required value={amount} onValueChange={changed(setAmount)} />
             </Field>
           ) : null}
 

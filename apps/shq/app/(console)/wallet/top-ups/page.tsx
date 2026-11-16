@@ -3,8 +3,10 @@
 import { Suspense, useId, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, CreditCard, ExternalLink, XCircle } from "lucide-react";
-import { Button, Card, CardHeader, currencyDigits, DataTable, errorMessage, Field, formatDateTime, formatMoney, Input, LoadMore, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, DataTable, errorMessage, Field, formatDateTime, formatMoney, LoadMore, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
 import { type PaymentGateway, type TopUp, useCancelTopUpMutation, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpMethodsQuery, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
+import { parseMoney } from "@bitocard/api-client/money";
+import { MoneyField } from "@/components/money-field";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { walletName, WalletSwitch } from "@/components/wallets";
@@ -12,16 +14,6 @@ import { walletName, WalletSwitch } from "@/components/wallets";
 /** Smallest and largest top-up the API accepts, in minor units. */
 const minAmount = 100;
 const maxAmount = 100_000_000_00;
-
-/** "5,000.50" in the wallet currency → minor units, or null when it is not a valid amount. */
-function toMinor(value: string, currency: string) {
-  const cleaned = value.replace(/[,\s]/g, "");
-  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  const digits = currencyDigits(currency);
-  const [, fraction = ""] = cleaned.split(".");
-  if (fraction.length > digits) return null;
-  return Math.round(Number(cleaned) * 10 ** digits);
-}
 
 /** What each top-up was paid with, as the list shows it. */
 const paidWith: Record<TopUp["method"], string> = {
@@ -52,8 +44,8 @@ function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: b
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setCreated(null);
-    const amount = currency ? toMinor(value, currency) : null;
-    if (amount === null) return setInvalid("Enter an amount, for example 5000.");
+    const amount = currency ? parseMoney(value, currency) : null;
+    if (amount === null) return setInvalid("Enter an amount, for example 5,000.");
     if (amount < minAmount) return setInvalid(`The smallest top-up is ${formatMoney(minAmount, currency)}.`);
     if (amount > maxAmount) return setInvalid(`The largest single top-up is ${formatMoney(maxAmount, currency)}.`);
     setInvalid(null);
@@ -114,14 +106,13 @@ function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: b
         ) : null}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="sm:w-72">
-            <Field label={`Amount${currency ? ` (${currency})` : ""}`} htmlFor={`${id}-amount`} error={invalid ?? undefined} hint={currency ? `At least ${formatMoney(minAmount, currency)}.` : undefined}>
-              <Input
+            <Field label="Amount" htmlFor={`${id}-amount`} error={invalid ?? undefined} hint={currency ? `At least ${formatMoney(minAmount, currency)}.` : undefined}>
+              <MoneyField
                 id={`${id}-amount`}
-                inputMode="decimal"
-                autoComplete="off"
-                placeholder="5000"
+                currency={currency || "USD"}
+                placeholder="5,000"
                 value={value}
-                onChange={event => setValue(event.target.value)}
+                onValueChange={setValue}
                 aria-invalid={invalid ? true : undefined}
                 disabled={!currency}
               />

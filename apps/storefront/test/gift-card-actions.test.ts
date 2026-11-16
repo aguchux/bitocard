@@ -41,7 +41,8 @@ describe("gift card actions", () => {
 });
 
 test("a product card can open its page on Sell", () => {
-  const product = { key: "gift_cards:US:amazon-us", name: "Amazon US", description: null, category_label: "Gift cards", global: false, country_name: "United States", brand: { slug: "amazon", name: "Amazon", initials: "A", color: null, logo_url: null, image_url: null }, from: 1000, to: 1000, currency: "USD", price: null } as never;
+  const product = { key: "gift_cards:US:amazon-us", name: "Amazon US", description: null, category_label: "Gift cards", global: false, country_name: "United States", brand: { slug: "amazon", name: "Amazon", initials: "A", color: null, logo_url: null, image_url: null }, from: 1000, to: 1000, face_currency: "USD", price: null } as never;
   const html = renderToStaticMarkup(createElement(ProductCard, { product, base: "/account/p", search: "?sell=1" }));
   expect(html).toContain('href="/account/p/gift_cards%3AUS%3Aamazon-us?sell=1"');
+  expect(html).toContain("$10");
 });

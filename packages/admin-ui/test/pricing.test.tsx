@@ -20,6 +20,7 @@ describe('pricing inputs', () => {
     expect(amountToMinor('12.5')).toBe(1250);
     expect(amountToMinor('12.05')).toBe(1205);
     expect(amountToMinor('7')).toBe(700);
+    expect(amountToMinor('1,250.50')).toBe(125_050);
     expect(amountToMinor('1.234')).toBeNull();
     expect(amountToMinor('abc')).toBeNull();
   });

@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { ArrowLeftRight } from "lucide-react";
-import { amountToMinor, Button, cn, Dialog, errorMessage, Field, formatMoney, Input, Notice, useDebouncedValue } from "@bitocard/admin-ui";
+import { Button, cn, Dialog, errorMessage, Field, formatMoney, Notice, useDebouncedValue } from "@bitocard/admin-ui";
+import { parseMoney, withSymbol } from "@bitocard/api-client/money";
 import { type WalletConversion, type WalletSummary, useConvertWalletMutation } from "@bitocard/api-client/reseller";
+import { MoneyField } from "@/components/money-field";
 
 /** "US dollars" for USD, otherwise the currency code. */
 export const walletName = (currency: string) => (currency === "USD" ? "US dollar wallet" : `${currency} wallet`);
@@ -57,7 +59,7 @@ function Convert({ onClose, from, to, available }: { onClose: () => void; from: 
   const [convert, state] = useConvertWalletMutation();
   const [preview, previewState] = useConvertWalletMutation();
   const [previewed, setPreviewed] = useState<WalletConversion | null>(null);
-  const amount = amountToMinor(value.replace(/[,\s]/g, ""));
+  const amount = value ? parseMoney(value, from) : null;
   const typed = useDebouncedValue(amount, 400);
   const tooMuch = amount !== null && amount > available;
   // The preview shown is the one for the amount typed now.
@@ -115,18 +117,18 @@ function Convert({ onClose, from, to, available }: { onClose: () => void; from: 
         <form id={`${id}-form`} onSubmit={submit} className="space-y-4" noValidate>
           {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
           <Field
-            label={`Amount (${from})`}
+            label="Amount"
             htmlFor={`${id}-amount`}
             hint={`Your ${walletName(from)} has ${formatMoney(available, from)}.`}
             error={tooMuch ? "That is more than this wallet has." : undefined}
           >
-            <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" placeholder="20" value={value} onChange={event => setValue(event.target.value)} aria-invalid={tooMuch || undefined} />
+            <MoneyField id={`${id}-amount`} currency={from} placeholder="20" value={value} onValueChange={setValue} aria-invalid={tooMuch || undefined} />
           </Field>
           <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm" aria-live="polite">
             {quote ? (
               <>
                 <p className="font-semibold text-ink">{`You get ${formatMoney(quote.to.amount, quote.to.currency)}`}</p>
-                <p className="text-xs text-muted">{`Rate: ${to === "USD" ? from : to} ${Number(quote.rate).toLocaleString("en-GB", { maximumFractionDigits: 4 })} per US dollar`}</p>
+                <p className="text-xs text-muted">{`Rate: ${withSymbol(Number(quote.rate).toLocaleString("en-GB", { maximumFractionDigits: 4 }), to === "USD" ? from : to)} per US dollar`}</p>
               </>
             ) : previewState.error && typed ? (
               <p className="text-muted">{errorMessage(previewState.error, "Conversions are not available right now.")}</p>

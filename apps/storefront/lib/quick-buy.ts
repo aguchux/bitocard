@@ -15,7 +15,9 @@ export function quickBuyNeeds(category: QuickBuyCategory, product: Pick<StorePro
 export function quickBuyHref(key: string, fill: { number: string; amount: string }) {
   const params = new URLSearchParams();
   if (fill.number.trim()) params.set("number", fill.number.trim());
-  if (fill.amount.trim()) params.set("amount", fill.amount.trim());
+  // The money field shows commas ("1,500"); the address carries the plain amount.
+  const amount = fill.amount.replace(/[,\s]/g, "");
+  if (amount) params.set("amount", amount);
   const search = params.toString();
   return `/p/${encodeURIComponent(key)}${search ? `?${search}` : ""}`;
 }

@@ -8,14 +8,12 @@ import {
   Button,
   Card,
   CardHeader,
-  currencyDigits,
   DataTable,
   errorMessage,
   Field,
   formatDateTime,
   formatMoney,
   formatRelative,
-  Input,
   KeyValue,
   LoadMore,
   Notice,
@@ -26,19 +24,11 @@ import {
   StatusBadge,
 } from "@bitocard/admin-ui";
 import { type BankAccount, type Payout, useBankAccountsQuery, useCreatePayoutMutation, usePayoutsInfiniteQuery, useSimulatePayoutMutation, usePublicCountryQuery, useWalletQuery } from "@bitocard/api-client/reseller";
+import { moneyInputValue, parseMoney } from "@bitocard/api-client/money";
+import { MoneyField } from "@/components/money-field";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
-/** "5,000.50" → minor units, or null when it is not a valid amount. */
-function toMinor(value: string, currency: string) {
-  const cleaned = value.replace(/[,\s]/g, "");
-  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  const digits = currencyDigits(currency);
-  if ((cleaned.split(".")[1] ?? "").length > digits) return null;
-  return Math.round(Number(cleaned) * 10 ** digits);
-}
-
-const toMajor = (minor: number, currency: string) => (minor / 10 ** currencyDigits(currency)).toFixed(currencyDigits(currency));
 const accountLabel = (account: BankAccount) => `${account.bank_name} ····${account.account_number_last4}`;
 
 function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boolean }) {
@@ -65,8 +55,8 @@ function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boo
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setDone(null);
-    const amount = toMinor(value, currency);
-    if (amount === null || amount <= 0) return setInvalid("Enter an amount, for example 5000.");
+    const amount = parseMoney(value, currency);
+    if (amount === null || amount <= 0) return setInvalid("Enter an amount, for example 5,000.");
     if (amount < minimum) return setInvalid(`The smallest withdrawal is ${formatMoney(minimum, currency)}.`);
     if (amount > earnings.withdrawable) return setInvalid(`You can withdraw up to ${formatMoney(earnings.withdrawable, currency)}.`);
     if (!chosen) return setInvalid("Choose a bank account.");
@@ -118,10 +108,10 @@ function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boo
             </Select>
           </Field>
           {coolingOff && chosen ? <Notice tone="amber">{`Withdrawals to this new account start ${formatDateTime(chosen.payouts_available_from)}.`}</Notice> : null}
-          <Field label={`Amount (${currency})`} htmlFor={`${id}-amount`} error={invalid ?? undefined}>
+          <Field label="Amount" htmlFor={`${id}-amount`} error={invalid ?? undefined}>
             <div className="flex gap-2">
-              <Input id={`${id}-amount`} inputMode="decimal" autoComplete="off" placeholder="5000" value={value} onChange={event => setValue(event.target.value)} aria-invalid={invalid ? true : undefined} />
-              <Button type="button" variant="ghost" onClick={() => setValue(toMajor(earnings.withdrawable, currency))} disabled={!canWithdraw}>
+              <MoneyField id={`${id}-amount`} currency={currency} wrapperClassName="min-w-0 flex-1" placeholder="5,000" value={value} onValueChange={setValue} aria-invalid={invalid ? true : undefined} />
+              <Button type="button" variant="ghost" onClick={() => setValue(moneyInputValue(earnings.withdrawable, currency))} disabled={!canWithdraw}>
                 All
               </Button>
             </div>

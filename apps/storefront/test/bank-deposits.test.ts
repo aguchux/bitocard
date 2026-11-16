@@ -79,6 +79,15 @@ describe("Add funds", () => {
     expect(html).toContain('name="account_id" value="a1"');
   });
 
+  test("the amount is a money field: the wallet's sign inside it, an amount keyboard, read in the wallet's currency", () => {
+    const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card]), bankDeposits: options, amount: "25000" }));
+    expect(html).toMatch(/<span aria-hidden="true"[^>]*>₦<\/span><input[^>]*name="amount"/);
+    expect(html).toMatch(/name="amount"[^>]*inputMode="decimal"|inputMode="decimal"[^>]*name="amount"/);
+    expect(html).toContain('value="25,000"');
+    expect(html).toContain('name="amount_currency" value="NGN"');
+    expect(html).not.toContain("Amount (NGN)");
+  });
+
   test("not offered: no bank deposit section", () => {
     const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card]), bankDeposits: { ...options, available: false, accounts: [] } }));
     expect(html).not.toContain("bank_deposit");
@@ -99,6 +108,7 @@ describe("bank deposit actions", () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { type: "conflict_error", code: "too_many_deposits", message: "You have 3 bank deposits waiting." } }, 409)));
     expect(await startBankDeposit({}, form({ amount: "10" }))).toMatchObject({ error: "You have 3 bank deposits waiting." });
     expect(await startBankDeposit({}, form({ amount: "0" }))).toMatchObject({ field: "amount" });
+    expect(await startBankDeposit({}, form({ amount: "12abc", amount_currency: "NGN" }))).toMatchObject({ field: "amount" });
   });
 
   test("I've sent it: how they paid and the sender's name", async () => {

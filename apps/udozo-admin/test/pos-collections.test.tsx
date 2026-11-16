@@ -125,13 +125,13 @@ describe("POS collections in admin", () => {
 
   test("lists every transfer, filtered, and finance changes a market's fee", async () => {
     shown(<CollectionsPage />);
-    expect(await screen.findByText("NGN 8,000.00 from BOLA ADE", {}, slow)).toBeTruthy();
+    expect(await screen.findByText("₦8,000.00 from BOLA ADE", {}, slow)).toBeTruthy();
     expect(screen.getAllByText("Not matched").length).toBe(2);
     expect(screen.getAllByRole("link", { name: "Ada's Gadget Hub" })[0]!.getAttribute("href")).toBe("/pos/accounts/acc1");
     fireEvent.click(screen.getByRole("button", { name: "Not matched", pressed: false }));
     await waitFor(() => expect(sent.some(item => item.path === "/v1/admin/pos/collections" && item.search.includes("status=unmatched"))).toBe(true));
 
-    expect(await screen.findByText("1% (at least NGN 50.00, at most NGN 500.00) on top of the gateway's fee", {}, slow)).toBeTruthy();
+    expect(await screen.findByText("1% (at least ₦50.00, at most ₦500.00) on top of the gateway's fee", {}, slow)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Change" }));
     fireEvent.change(openDialog().getByLabelText("Margin (%)"), { target: { value: "1.5" } });
     fireEvent.change(openDialog().getByLabelText("At most (NGN)"), { target: { value: "" } });
