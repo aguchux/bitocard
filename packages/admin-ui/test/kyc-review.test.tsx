@@ -88,11 +88,22 @@ describe('BitoCard Verify review', () => {
     await waitFor(() => expect(onDecide).toHaveBeenCalledWith({ action: 'resubmit', items: ['selfie'], note: 'Your selfie is too dark.' }));
   });
 
-  test('only submitted cases are decided, unless an admin overrides', () => {
-    expect(kycCanDecide({ status: 'submitted' })).toBe(true);
-    expect(kycCanDecide({ status: 'approved' })).toBe(false);
-    expect(kycCanDecide({ status: 'approved' }, { override: true })).toBe(true);
-    expect(kycCanDecide({ status: 'draft' }, { override: true })).toBe(false);
+  test('only submitted cases are decided; admins may only overturn an approved customer check', () => {
+    expect(kycCanDecide({ status: 'submitted', subject: 'reseller' })).toBe(true);
+    expect(kycCanDecide({ status: 'approved', subject: 'customer' })).toBe(false);
+    expect(kycCanDecide({ status: 'approved', subject: 'customer' }, { override: true })).toBe(true);
+    expect(kycCanDecide({ status: 'approved', subject: 'reseller' }, { override: true })).toBe(false);
+    expect(kycCanDecide({ status: 'declined', subject: 'customer' }, { override: true })).toBe(false);
+    expect(kycCanDecide({ status: 'resubmit', subject: 'reseller' }, { override: true })).toBe(false);
+    expect(kycCanDecide({ status: 'draft', subject: 'customer' }, { override: true })).toBe(false);
+    const approved = render(<KycCaseActions kase={{ ...kase, status: 'approved' }} onDecide={vi.fn()} override />);
+    expect(approved.queryByRole('button', { name: 'Approve' })).toBeNull();
+    expect(approved.queryByRole('button', { name: 'Ask to resubmit' })).toBeNull();
+    expect(approved.getByRole('button', { name: 'Overturn approval' })).toBeTruthy();
+    approved.unmount();
+    const reseller = render(<KycCaseActions kase={{ ...kase, status: 'approved', subject: 'reseller' }} onDecide={vi.fn()} override />);
+    expect(reseller.container.textContent).toBe('');
+    reseller.unmount();
     const { container } = render(<KycCaseActions kase={{ ...kase, status: 'draft' }} onDecide={vi.fn()} override />);
     expect(container.textContent).toBe('');
   });

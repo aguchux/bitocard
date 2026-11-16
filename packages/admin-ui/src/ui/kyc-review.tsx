@@ -342,10 +342,12 @@ export function KycCaseView({ kase, fetchDocument, caseLink }: { kase: KycReview
   );
 }
 
-/** Whether a case can be decided now: submitted cases, and (for admins, overriding) any decided one. */
-export function kycCanDecide(kase: Pick<KycReviewCase, 'status'>, options: { override?: boolean } = {}) {
-  if (kase.status === 'submitted') return true;
-  return Boolean(options.override) && (kase.status === 'approved' || kase.status === 'declined' || kase.status === 'resubmit');
+/**
+ * Whether a case can be decided now, as the API allows: a submitted case, and for admins (`override`) an approved
+ * customer check, which they may only overturn (decline). Every other decided case is final.
+ */
+export function kycCanDecide(kase: Pick<KycReviewCase, 'status' | 'subject'>, options: { override?: boolean } = {}) {
+  return kase.status === 'submitted' || (Boolean(options.override) && kase.status === 'approved' && kase.subject === 'customer');
 }
 
 /**
@@ -365,18 +367,22 @@ export function KycCaseActions({ kase, onDecide, override }: { kase: KycReviewCa
     setItems([]);
   };
   if (!kycCanDecide(kase, { override })) return null;
-  const decided = kase.status !== 'submitted';
+  const revoking = kase.status !== 'submitted';
 
   return (
     <div className="space-y-3">
-      {decided ? <Notice tone="amber">{`This case was already decided${kase.decided_by ? ` by ${kase.decided_by.name}` : ''}. A new decision replaces it.`}</Notice> : null}
+      {revoking ? <Notice tone="amber">{`This check was approved${kase.decided_by ? ` by ${kase.decided_by.name}` : ''}. You can still overturn it: declining it means the customer is no longer verified.`}</Notice> : null}
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setDialog('approve')}>Approve</Button>
-        <Button variant="secondary" onClick={() => setDialog('resubmit')}>
-          Ask to resubmit
-        </Button>
+        {revoking ? null : (
+          <>
+            <Button onClick={() => setDialog('approve')}>Approve</Button>
+            <Button variant="secondary" onClick={() => setDialog('resubmit')}>
+              Ask to resubmit
+            </Button>
+          </>
+        )}
         <Button variant="danger" onClick={() => setDialog('decline')}>
-          Decline
+          {revoking ? 'Overturn approval' : 'Decline'}
         </Button>
       </div>
 

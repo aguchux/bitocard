@@ -55,7 +55,12 @@ export function VerificationList({ status, subject }: { status?: VerificationSta
             header: "",
             align: "right",
             cell: check =>
-              operator && check.status === "in_review" ? (
+              // BitoCard Verify's checks are decided on their case, with its documents (the API refuses them here).
+              check.provider === "bitocard" ? (
+                <AppLink href={`/verifications/verify/${check.provider_reference}`} className="text-sm font-semibold text-brand-700 hover:underline">
+                  {check.status === "in_review" ? "Review case" : "Open case"}
+                </AppLink>
+              ) : operator && check.status === "in_review" ? (
                 <span className="inline-flex gap-2">
                   <Button
                     size="sm"
