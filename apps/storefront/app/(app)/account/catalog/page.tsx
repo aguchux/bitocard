@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { HandCoins, X } from "lucide-react";
 import type { StoreBrand, StoreList, StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
@@ -100,13 +99,6 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         ) : null}
       </div>
 
-      {/* The groups as underlined tabs on phones and tablets; on desktop the sub rail lists them. */}
-      <UnderlineTabs
-        label="Categories"
-        className="lg:hidden"
-        current={group ? href({ q, group, brand }) : href({ q })}
-        tabs={[{ href: href({ q }), label: "All" }, ...groups.map(item => ({ href: href({ q, group: item.key, brand }), label: item.label }))]}
-      />
 
       {group === "mobile" ? <MobileActions exchangeOpen={exchangeOpen} /> : null}
 

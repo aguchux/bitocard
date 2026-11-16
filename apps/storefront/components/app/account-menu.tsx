@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
-import { AccountPills } from "./account-pills";
 
 /** A white card on the Account screens. */
 export const accountCard = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70 sm:p-6";
@@ -57,12 +56,10 @@ export function AccountList({ label, children }: { label: string; children: Reac
 export function AccountScreen({ title, lead, children }: { title: string; lead?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="space-y-3 lg:hidden">
-        <Link href="/account/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
-          <ChevronLeft className="size-4" aria-hidden="true" /> Your account
-        </Link>
-        <AccountPills />
-      </div>
+      {/* The screens' tabs are across the top on phones (SubTabs in the layout); on desktop the sub rail. */}
+      <Link href="/account/profile" className="-ml-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900 lg:hidden">
+        <ChevronLeft className="size-4" aria-hidden="true" /> Your account
+      </Link>
       <header className="space-y-2">
         <h1 className="font-display text-3xl font-extrabold tracking-tight text-navy-900">{title}</h1>
         {lead ? <p className="text-slate-600">{lead}</p> : null}

@@ -10,6 +10,7 @@ import { AppHeader } from "@/components/app/app-header";
 import { AppNav, AppRail } from "@/components/app/app-nav";
 import { ChatWidget } from "@/components/app/chat-widget";
 import { SubRail } from "@/components/app/sub-rail";
+import { SubTabs } from "@/components/app/sub-tabs";
 import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
@@ -95,12 +96,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppNav desktopNav={desktopNav} />
       <div className="flex flex-1">
         {rail ? <AppRail /> : null}
-        {/* Desktop: a tab's own places (Catalog, Orders, Wallet, Account screens) as a second rail; pills elsewhere. */}
+        {/* Desktop: a tab's own places (Catalog, Orders, Wallet, Account screens) as a second rail; tabs on phones (SubTabs). */}
         <Suspense fallback={null}>
           <SubRail context={subMenus} />
         </Suspense>
         <div className={`flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
           <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8 has-[[data-full-bleed]]:max-w-none">
+            {/* Phones and tablets: the same places as sliding tabs across the top. */}
+            <Suspense fallback={null}>
+              <SubTabs context={subMenus} />
+            </Suspense>
             {children}
           </main>
           <footer className="px-4 pb-6 text-center text-xs text-slate-500">

@@ -4,10 +4,18 @@ import { describe, expect, test, vi } from "vitest";
 import { Gift } from "lucide-react";
 
 let pathname = "/account/profile/security";
-vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+let search = "";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) }));
 
 const { UnderlineTabs } = await import("@bitocard/ui/underline-tabs");
-const { AccountPills } = await import("@/components/app/account-pills");
+const { SubTabs } = await import("@/components/app/sub-tabs");
+
+const context = { groups: [{ key: "gift_cards", label: "Gift cards" }, { key: "mobile", label: "Mobile" }], currency: "NGN", wallets: ["NGN", "USD"] };
+const tabs = (path: string, query = "") => {
+  pathname = path;
+  search = query;
+  return renderToStaticMarkup(createElement(SubTabs, { context }));
+};
 
 const currentLink = (html: string) => html.match(/<a [^>]*aria-current="page"[^>]*>(.*?)<\/a>/)?.[1] ?? null;
 
@@ -50,13 +58,29 @@ describe("BitoCard's standard tabs", () => {
   });
 });
 
-describe("the account app's rows are the standard tabs", () => {
+describe("the account app's sub menus as sliding tabs across the top on phones and tablets", () => {
+  test("every tab's places, the current one marked, hidden on desktop where the sub rail lists them", () => {
+    const wallet = tabs("/account/wallet/deposits", "show=open");
+    expect(wallet).toContain('aria-label="Wallet menu"');
+    expect(wallet).toContain("lg:hidden");
+    for (const label of ["NGN wallet", "US dollars", "Deposits", "Transactions"]) expect(wallet).toContain(label);
+    expect(currentLink(wallet)).toContain("Deposits");
+
+    expect(currentLink(tabs("/account/wallet", "wallet=USD"))).toContain("US dollars");
+    expect(currentLink(tabs("/account/orders", "show=delivered"))).toContain("Delivered");
+    expect(currentLink(tabs("/account/disputes"))).toContain("Your disputes");
+    expect(currentLink(tabs("/account/catalog", "group=mobile"))).toContain("Mobile");
+  });
+
   test("the Account screens, the current screen marked, Soon kept", () => {
-    pathname = "/account/profile/security";
-    const html = renderToStaticMarkup(createElement(AccountPills));
-    expect(html).toContain('aria-label="Account settings"');
+    const html = tabs("/account/profile/security");
+    expect(html).toContain('aria-label="Account menu"');
     expect(currentLink(html)).toContain("Security");
-    expect(html.match(/Soon/g)).toHaveLength(2);
+    expect(html).toContain("Soon");
     expect(html).not.toContain("bg-brand-500");
+  });
+
+  test("nothing where the page has no menu (Home)", () => {
+    expect(tabs("/account")).toBe("");
   });
 });
