@@ -16,6 +16,14 @@ class OptionsQueryDto {
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, currencyRule) currency?: string;
 }
 
+const shows = ['open', 'done', 'awaiting_payment', 'sent', 'credited', 'rejected', 'cancelled', 'expired'] as const;
+
+class MyListDto {
+  @IsOptional() @IsIn(shows) show?: (typeof shows)[number];
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsUUID() starting_after?: string;
+}
+
 class CreateDto {
   /** Which wallet (the customer's country's currency by default). */
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, currencyRule) currency?: string;
@@ -89,8 +97,8 @@ export class CustomerBankDepositsController {
   }
 
   @Get()
-  list(@CurrentCustomer() caller: CustomerCaller) {
-    return this.deposits.list(caller.customer);
+  list(@CurrentCustomer() caller: CustomerCaller, @Query() query: MyListDto) {
+    return this.deposits.list(caller.customer, query);
   }
 
   @Post()

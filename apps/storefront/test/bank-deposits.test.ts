@@ -3,7 +3,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { StoreBankDepositOptions, StoreWallet } from "@bitocard/api-client/storefront";
+import type { StoreBankDeposit, StoreBankDepositOptions, StoreWallet } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
 
 const redirect = vi.fn((url: string) => {
@@ -15,6 +15,8 @@ vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(
 
 const { AddFunds } = await import("@/components/app/wallet-forms");
 const { markDepositSent, startBankDeposit } = await import("@/lib/bank-deposits");
+const { DepositRows } = await import("@/components/app/bank-deposit-status");
+const { default: DepositsPage } = await import("@/app/(app)/account/wallet/deposits/page");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 const form = (values: Record<string, string>) => {
@@ -91,6 +93,50 @@ describe("Add funds", () => {
   test("not offered: no bank deposit section", () => {
     const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card]), bankDeposits: { ...options, available: false, accounts: [] } }));
     expect(html).not.toContain("bank_deposit");
+  });
+});
+
+const deposit = (over: Partial<StoreBankDeposit>): StoreBankDeposit => ({
+  object: "bank_deposit",
+  id: "d1",
+  number: "BD-000001",
+  mode: "live",
+  status: "sent",
+  currency: "NGN",
+  amount: 500_000,
+  credited_amount: null,
+  reference: "BCAB12CD34",
+  account: { bank_name: "Zenith Bank", account_name: "De-Golojan Technologies Ltd", account_number: "1012345678", details: null },
+  method: "cash",
+  sender_name: "Ada Obi",
+  note: null,
+  decision_note: null,
+  expires_at: "2026-11-19T10:00:00Z",
+  sent_at: "2026-11-16T11:00:00Z",
+  decided_at: null,
+  created_at: "2026-11-16T10:00:00Z",
+  ...over,
+});
+
+describe("Deposits", () => {
+  test("each deposit with its amount (what was added, once credited), reference, number and status in words, opening its page", () => {
+    const html = renderToStaticMarkup(createElement(DepositRows, { items: [deposit({}), deposit({ id: "d2", status: "credited", credited_amount: 450_000 }), deposit({ id: "d3", status: "rejected" })] }));
+    expect(html).toContain('href="/account/wallet/deposits/d1"');
+    expect(html).toContain("₦5,000");
+    expect(html).toContain("₦4,500");
+    expect(html).toContain("BCAB12CD34 · BD-000001");
+    for (const words of ["Checking our bank", "Added to your wallet", "Not credited"]) expect(html).toContain(words);
+  });
+
+  test("the page asks for the filter and the page it shows, and offers older ones", async () => {
+    const fetch = vi.fn(async () => reply({ object: "list", data: [deposit({ status: "awaiting_payment" })], has_more: true }));
+    vi.stubGlobal("fetch", fetch);
+    const html = renderToStaticMarkup(await DepositsPage({ searchParams: Promise.resolve({ show: "open" }) }));
+    const url = String((fetch.mock.calls as unknown as Call[]).find(call => String(call[0]).includes("bank-deposits"))![0]);
+    expect(url).toContain("/v1/store/wallet/bank-deposits?limit=20&show=open");
+    expect(html).toContain("Waiting for your payment");
+    expect(html).toMatch(/aria-current="page"[^>]*>In progress</);
+    expect(html).toContain('href="/account/wallet/deposits?show=open&amp;after=d1"');
   });
 });
 

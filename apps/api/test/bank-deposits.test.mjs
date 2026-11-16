@@ -156,6 +156,21 @@ describe('bank deposits', () => {
     assert.equal(late.json.error.code, 'deposit_not_waiting');
     assert.equal((await admin.post(`/v1/admin/bank-deposits/${open[0].id}/credit`, {})).json.status, 'credited');
     assert.equal(await naira(shopper), 100_000);
+
+    // The Deposits list: every deposit newest first, filtered to open or done ones, a page at a time.
+    const all = (await shopper.get('/v1/store/wallet/bank-deposits')).json;
+    assert.equal(all.data.length, 5);
+    assert.equal(all.has_more, false);
+    assert.equal(all.data[0].id, open[2].id);
+    assert.deepEqual((await shopper.get('/v1/store/wallet/bank-deposits?show=open')).json.data.map(item => item.id).sort(), [open[1].id, open[2].id].sort());
+    assert.deepEqual(new Set((await shopper.get('/v1/store/wallet/bank-deposits?show=done')).json.data.map(item => item.status)), new Set(['credited', 'rejected', 'cancelled']));
+    assert.deepEqual((await shopper.get('/v1/store/wallet/bank-deposits?show=rejected')).json.data.map(item => item.id), [first.id]);
+    const page = (await shopper.get('/v1/store/wallet/bank-deposits?limit=3')).json;
+    assert.deepEqual([page.data.length, page.has_more], [3, true]);
+    const rest = (await shopper.get(`/v1/store/wallet/bank-deposits?limit=3&starting_after=${page.data[2].id}`)).json;
+    assert.deepEqual([rest.data.length, rest.has_more], [2, false]);
+    assert.equal(new Set([...page.data, ...rest.data].map(item => item.id)).size, 5);
+    assert.equal((await shopper.get('/v1/store/wallet/bank-deposits?show=lost')).status, 400);
     await ledgerOk();
   });
 

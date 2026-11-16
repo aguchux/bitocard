@@ -51,8 +51,10 @@ export const MoneyInput = forwardRef<HTMLInputElement, Native & {
   }, [shown]);
 
   return (
-    <div className={`relative ${wrapperClassName}`}>
-      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 ${symbolClassName}`}>
+    // Placed with inline styles, never utility classes: an app whose stylesheet does not scan this file would leave
+    // the sign loose above the field.
+    <div className={wrapperClassName} style={{ position: 'relative' }}>
+      <span aria-hidden="true" className={symbolClassName} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, display: 'flex', alignItems: 'center', paddingLeft: '0.875rem', pointerEvents: 'none', lineHeight: 1 }}>
         {symbol}
       </span>
       <input

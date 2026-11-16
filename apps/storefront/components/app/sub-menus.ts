@@ -1,4 +1,4 @@
-import { CircleCheck, DollarSign, Gift, HandCoins, LayoutGrid, ListOrdered, MessageSquareWarning, ReceiptText, RotateCcw, Truck, Wallet, type LucideIcon } from "lucide-react";
+import { Banknote, CircleCheck, DollarSign, Gift, HandCoins, LayoutGrid, ListOrdered, MessageSquareWarning, ReceiptText, RotateCcw, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { groupIcon } from "@/components/store/theme";
 import { accountSections, activeAccountSection } from "./account-sections";
 
@@ -58,6 +58,7 @@ export const walletSections = (currency: string | null, wallets?: string[]): Sub
   return [
     { href: "/account/wallet", label: !home ? "Your wallet" : home === "USD" ? "US dollars" : `${home} wallet`, icon: Wallet },
     ...held.slice(1).map(code => ({ href: `/account/wallet?wallet=${code}`, label: code === "USD" ? "US dollars" : `${code} wallet`, icon: code === "USD" ? DollarSign : Wallet })),
+    { href: "/account/wallet/deposits", label: "Deposits", icon: Banknote },
     { href: "/account/wallet/transactions", label: "Transactions", icon: ReceiptText },
   ];
 };

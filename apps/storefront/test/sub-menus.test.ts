@@ -46,8 +46,11 @@ describe("desktop sub rails", () => {
     expect(active("/account/sold/gs_1")).toBe("/account/sold");
   });
 
-  test("Wallet lists the country's wallet, US dollars and the transactions (crypto has left BitoCard)", () => {
-    expect(subMenusFor(context)[2]!.items.map(item => item.label)).toEqual(["NGN wallet", "US dollars", "Transactions"]);
+  test("Wallet lists the country's wallet, US dollars, the bank deposits and the transactions (crypto has left BitoCard)", () => {
+    expect(subMenusFor(context)[2]!.items.map(item => item.label)).toEqual(["NGN wallet", "US dollars", "Deposits", "Transactions"]);
+    // Deposits, and each deposit's own page, are under Deposits.
+    expect(active("/account/wallet/deposits", "show=open")).toBe("/account/wallet/deposits");
+    expect(active("/account/wallet/deposits/d1")).toBe("/account/wallet/deposits");
     // The Transactions screen has its own item, whatever its list or page; the wallets are not current there.
     expect(active("/account/wallet/transactions")).toBe("/account/wallet/transactions");
     expect(active("/account/wallet/transactions", "show=crypto&after=x")).toBe("/account/wallet/transactions");
@@ -55,15 +58,16 @@ describe("desktop sub rails", () => {
     expect(active("/account/wallet", "wallet=usd")).toBe("/account/wallet?wallet=USD");
     expect(active("/account/wallet", "wallet=NGN")).toBe("/account/wallet");
     // A dollar country has one money wallet; an account without a country its default.
-    expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Transactions"]);
+    expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Deposits", "Transactions"]);
     expect(active("/account/wallet", "wallet=USD", { ...context, currency: "USD" })).toBe("/account/wallet");
-    expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Transactions"]);
+    expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Deposits", "Transactions"]);
     // Every wallet the customer holds, the ones they added after US dollars.
     const many = { ...context, wallets: ["NGN", "USD", "KES"] };
     expect(subMenusFor(many)[2]!.items.map(item => [item.label, item.href])).toEqual([
       ["NGN wallet", "/account/wallet"],
       ["US dollars", "/account/wallet?wallet=USD"],
       ["KES wallet", "/account/wallet?wallet=KES"],
+      ["Deposits", "/account/wallet/deposits"],
       ["Transactions", "/account/wallet/transactions"],
     ]);
     expect(active("/account/wallet", "wallet=kes", many)).toBe("/account/wallet?wallet=KES");

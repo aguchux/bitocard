@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Banknote, ChevronLeft, ChevronRight, Landmark, Wallet } from "lucide-react";
-import { bankDepositStatus, formatFace, walletName, type StoreList, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
+import { Banknote, ChevronLeft, Landmark, Wallet } from "lucide-react";
+import { formatFace, walletName, type StoreList, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
 import { bankDepositOptions, myBankDeposits } from "@/lib/bank-deposits";
 import { ActivityHeading, MoneyActivityList } from "@/components/app/wallet-activity";
+import { DepositRows } from "@/components/app/bank-deposit-status";
 import { AddFunds, AddWallet, BankAccountDialog, BankAccountLink, MoveMoney, RemoveWallet } from "@/components/app/wallet-forms";
 import { activityHref, recentItems } from "@/lib/activity";
 import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
@@ -127,26 +128,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           {wallet.enabled && wallet.reserved_accounts_available && !wallet.reserved_accounts.length ? (
             <BankAccountDialog needsBvn={wallet.reserved_account_needs_bvn} />
           ) : null}
-          {openDeposits.length ? (
+          {depositList.length ? (
             <section aria-labelledby="open-deposits" className={card}>
-              <h2 id="open-deposits" className="mb-3 flex items-center gap-2 font-bold">
-                <Banknote className="size-5" aria-hidden="true" /> Bank deposits
-              </h2>
-              <ul className="divide-y divide-slate-100">
-                {openDeposits.map(item => (
-                  <li key={item.id}>
-                    <Link href={`/account/wallet/deposits/${item.id}`} className="flex min-h-14 items-center justify-between gap-3 py-2 hover:text-brand-600">
-                      <span className="min-w-0">
-                        <span className="block font-semibold">{formatFace(item.amount, item.currency)}</span>
-                        <span className="block truncate text-sm text-slate-500">
-                          {item.reference} · {bankDepositStatus[item.status]}
-                        </span>
-                      </span>
-                      <ChevronRight className="size-5 shrink-0 text-slate-400" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {/* The ones still in progress here; View all opens Deposits with every one and its status. */}
+              <ActivityHeading id="open-deposits" note={openDeposits.length ? "In progress" : undefined} viewAll="/account/wallet/deposits">
+                <span className="flex items-center gap-2">
+                  <Banknote className="size-5" aria-hidden="true" /> Bank deposits
+                </span>
+              </ActivityHeading>
+              {openDeposits.length ? <DepositRows items={openDeposits} /> : <p className="text-sm text-slate-600">None in progress. View all to see past deposits and their status.</p>}
             </section>
           ) : null}
           {shown?.removable ? <RemoveWallet currency={wallet.currency} /> : null}

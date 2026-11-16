@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AlertTriangle, ChevronLeft } from "lucide-react";
-import { bankDepositStatus, formatFace, type StoreBankDeposit } from "@bitocard/api-client/storefront";
+import { formatFace, type StoreBankDeposit } from "@bitocard/api-client/storefront";
 import { DepositSentForm } from "@/components/app/bank-deposit-forms";
+import { DepositBadge } from "@/components/app/bank-deposit-status";
 import { RefreshWhile } from "@/components/store/order-status";
 import { CopyValue } from "@/components/store/vpn-access";
 import { cancelBankDeposit } from "@/lib/bank-deposits";
@@ -13,14 +14,6 @@ export const metadata: Metadata = { title: "Bank deposit", robots: { index: fals
 
 const when = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 
-const tone: Record<StoreBankDeposit["status"], string> = {
-  awaiting_payment: "bg-amber-50 text-amber-900",
-  sent: "bg-sky-50 text-sky-900",
-  credited: "bg-green-50 text-green-800",
-  rejected: "bg-red-50 text-red-800",
-  cancelled: "bg-slate-100 text-slate-700",
-  expired: "bg-slate-100 text-slate-700",
-};
 
 function explain(deposit: StoreBankDeposit) {
   const amount = formatFace(deposit.amount, deposit.currency);
@@ -63,7 +56,7 @@ export default async function BankDepositPage({ params }: { params: Promise<{ id
             {deposit.number} · started {when(deposit.created_at)}
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1.5 text-sm font-semibold ${tone[deposit.status]}`}>{bankDepositStatus[deposit.status]}</span>
+        <DepositBadge status={deposit.status} size="md" />
       </div>
 
       <div className="space-y-4 rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">

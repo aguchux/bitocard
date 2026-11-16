@@ -108,10 +108,27 @@ export class BankDepositsService {
     return this.present(row);
   }
 
-  async list(customer: CustomerWithStore) {
+  /**
+   * The customer's bank deposits, newest first, a page at a time: `show` keeps those still `open` (waiting for their
+   * payment or for us), `done` (credited, not credited, cancelled or expired) or one status; `starting_after` an
+   * earlier page's last id.
+   */
+  async list(customer: CustomerWithStore, query: { show?: string; limit?: number; starting_after?: string } = {}) {
     await this.expireDue({ customerId: customer.id });
-    const rows = await this.prisma.bankDeposit.findMany({ where: { customerId: customer.id }, orderBy: { createdAt: 'desc' }, take: 25 });
-    return { object: 'list' as const, data: rows.map(row => this.present(row)) };
+    const statuses: Record<string, string[]> = { open: ['awaiting_payment', 'sent'], done: ['credited', 'rejected', 'cancelled', 'expired'] };
+    const status = query.show ? (statuses[query.show] ?? [query.show]) : undefined;
+    const limit = query.limit ?? 25;
+    const after = query.starting_after ? await this.prisma.bankDeposit.findFirst({ where: { id: query.starting_after, customerId: customer.id }, select: { id: true, createdAt: true } }) : null;
+    const rows = await this.prisma.bankDeposit.findMany({
+      where: {
+        customerId: customer.id,
+        ...(status ? { status: { in: status } } : {}),
+        ...(after ? { OR: [{ createdAt: { lt: after.createdAt } }, { createdAt: after.createdAt, id: { lt: after.id } }] } : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+    });
+    return { object: 'list' as const, data: rows.slice(0, limit).map(row => this.present(row)), has_more: rows.length > limit };
   }
 
   async get(customer: CustomerWithStore, id: string) {
