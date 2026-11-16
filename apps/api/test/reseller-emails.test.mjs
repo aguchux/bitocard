@@ -61,6 +61,35 @@ describe('reseller emails', () => {
     assert.ok(sent.json.sent[0].sent_by.name);
   });
 
+  test('the WhatsApp group email goes only where admins set the market’s link, and the link stays admin only', async () => {
+    const reseller = await resellerClient(server, { country: 'KE' });
+    const path = `/v1/admin/resellers/${reseller.resellerId}/emails`;
+    const off = (await admin.get(path)).json.templates.find(item => item.key === 'join_whatsapp');
+    assert.equal(off.available, false);
+    assert.equal((await admin.post(path, { template: 'join_whatsapp' })).json.error.code, 'whatsapp_group_missing');
+
+    assert.equal((await admin.patch('/v1/admin/countries/KE', { whatsapp_group_url: 'https://example.com/group' })).status, 400);
+    const link = 'https://chat.whatsapp.com/AbCdEf1234567890';
+    const set = await admin.patch('/v1/admin/countries/KE', { whatsapp_group_url: link });
+    assert.equal(set.json.whatsapp_group_url, link, JSON.stringify(set.json));
+    try {
+      const open = (await admin.get(path)).json.templates.find(item => item.key === 'join_whatsapp');
+      assert.deepEqual([open.available, Boolean(open.suggested)], [true, true]);
+      const sent = await admin.post(path, { template: 'join_whatsapp' });
+      assert.equal(sent.status, 200, JSON.stringify(sent.json));
+      const email = outbox.findLast(item => item.to === reseller.email);
+      assert.match(email.text, /chat\.whatsapp\.com\/AbCdEf1234567890/);
+
+      // Never on the public market list, nor sent to another market's reseller.
+      const kenya = (await admin.get('/v1/countries')).json.data.find(country => country.code === 'KE');
+      assert.ok(kenya && !('whatsapp_group_url' in kenya));
+      const ghana = await resellerClient(server, { country: 'GH' });
+      assert.equal((await admin.post(`/v1/admin/resellers/${ghana.resellerId}/emails`, { template: 'join_whatsapp' })).json.error.code, 'whatsapp_group_missing');
+    } finally {
+      await admin.patch('/v1/admin/countries/KE', { whatsapp_group_url: null });
+    }
+  });
+
   test('only operations and support send them', async () => {
     const reseller = await resellerClient(server, { country: 'KE' });
     const finance = await adminClient(server, ['finance']);

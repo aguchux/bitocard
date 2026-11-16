@@ -68,9 +68,9 @@ function QuickRow({ title, items, onPick, disabled }: { title: string; items: Re
           <button
             key={item.key}
             type="button"
-            disabled={disabled}
+            disabled={disabled || item.available === false}
             onClick={() => onPick(item)}
-            title={item.suggested ?? item.description}
+            title={item.available === false ? (item.unavailable_reason ?? item.description) : (item.suggested ?? item.description)}
             className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold ring-1 disabled:opacity-50 ${
               item.suggested ? "bg-brand-50 text-brand-700 ring-brand-200 hover:bg-brand-100" : "bg-white text-ink ring-line hover:bg-canvas"
             }`}
@@ -83,6 +83,13 @@ function QuickRow({ title, items, onPick, disabled }: { title: string; items: Re
           </button>
         ))}
       </div>
+      {items
+        .filter(item => item.available === false && item.unavailable_reason)
+        .map(item => (
+          <p key={item.key} className="mt-2 text-xs text-muted">
+            {item.label}: {item.unavailable_reason}
+          </p>
+        ))}
     </section>
   );
 }

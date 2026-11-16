@@ -176,6 +176,9 @@ export type ResellerQuickEmail = {
   description: string;
   subject: string;
   suggested: string | null;
+  /** False where it cannot be sent to this reseller (the WhatsApp group email without a link for their market). */
+  available?: boolean;
+  unavailable_reason?: string | null;
   last_sent_at: string | null;
 };
 export type ResellerEmails = {
@@ -453,6 +456,8 @@ export type Country = {
   public_spin_limit?: number;
   /** The two-step sign-in methods resellers based here may choose. Missing on older API versions. */
   reseller_two_step_methods?: TwoStepMethod[];
+  /** The market’s reseller WhatsApp group invite link (admin only). Missing on older API versions. */
+  whatsapp_group_url?: string | null;
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;
 };
 

@@ -29,14 +29,14 @@ export class ResellerEmailsService {
   private async load(resellerId: string) {
     const reseller = await this.prisma.reseller.findUnique({
       where: { id: resellerId },
-      include: { members: { where: { role: 'owner' }, include: { user: { include: { phones: { select: { verifiedAt: true } } } } } } },
+      include: { countryRef: { select: { whatsappGroupUrl: true } }, members: { where: { role: 'owner' }, include: { user: { include: { phones: { select: { verifiedAt: true } } } } } } },
     });
     if (!reseller || reseller.house || reseller.platform !== 'bitocard') throw notFound();
-    return { reseller, owner: reseller.members[0]?.user ?? null };
+    return { reseller, owner: reseller.members[0]?.user ?? null, whatsappGroupUrl: reseller.countryRef?.whatsappGroupUrl ?? null };
   }
 
   private async state(resellerId: string): Promise<ResellerEmailState> {
-    const { reseller, owner } = await this.load(resellerId);
+    const { reseller, owner, whatsappGroupUrl } = await this.load(resellerId);
     const [stores, publishedStores, listedProducts, liveApiKeys] = await Promise.all([
       this.prisma.store.count({ where: { resellerId } }),
       this.prisma.store.count({ where: { resellerId, status: 'published' } }),
@@ -54,6 +54,8 @@ export class ResellerEmailsService {
       listedProducts,
       liveApiKeys,
       paidPlan: reseller.planCode !== freePlanCode,
+      market: reseller.country,
+      whatsappGroup: Boolean(whatsappGroupUrl),
     };
   }
 
@@ -83,6 +85,9 @@ export class ResellerEmailsService {
         description: email.description,
         subject: email.subject,
         suggested: email.suggested(state),
+        // Gated by market: the WhatsApp group email only where admins set the reseller’s market’s group link.
+        available: !email.whatsappGroup || state.whatsappGroup,
+        unavailable_reason: email.whatsappGroup && !state.whatsappGroup ? (state.market ? 'No WhatsApp group link is set for this reseller’s market (Settings > Markets).' : 'This reseller has no market yet.') : null,
         last_sent_at: lastSent.get(email.key)?.toISOString() ?? null,
       })),
       sent: sent.map(entry => {
@@ -101,7 +106,7 @@ export class ResellerEmailsService {
 
   /** Sends a quick email (`template`, with an optional personal note) or a custom one (`subject` and `message`). */
   async send(actorId: string | null, resellerId: string, input: { template: string; subject?: string; message?: string }) {
-    const { reseller, owner } = await this.load(resellerId);
+    const { reseller, owner, whatsappGroupUrl } = await this.load(resellerId);
     if (!owner) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'no_owner', 'This reseller has no owner to email.');
     const custom = input.template === customEmailKey;
     const template = custom ? null : quickEmails.find(email => email.key === input.template);
@@ -110,6 +115,9 @@ export class ResellerEmailsService {
     if (custom && !input.subject?.trim()) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Give the email a subject.', 'subject');
     if (custom && !note.length) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Write the message.', 'message');
 
+    if (template?.whatsappGroup && !whatsappGroupUrl) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'whatsapp_group_missing', 'No WhatsApp group link is set for this reseller’s market. Add one in Settings > Markets.', 'template');
+    }
     if (template) {
       const recent = await this.prisma.auditLog.findFirst({
         where: { action, targetType: 'reseller', targetId: resellerId, createdAt: { gt: new Date(Date.now() - resendAfterMs) }, after: { path: ['template'], equals: template.key } },
@@ -125,7 +133,7 @@ export class ResellerEmailsService {
           subject,
           heading: template.heading,
           paragraphs: [...template.paragraphs({ firstName, business: reseller.name }), ...note],
-          link: { label: template.linkLabel, url: `${dashboard}${template.path}` },
+          link: { label: template.linkLabel, url: template.whatsappGroup ? whatsappGroupUrl! : `${dashboard}${template.path}` },
         })
       : resellerTeamEmail(owner.email, { subject, heading: subject, paragraphs: [`Hi ${firstName},`, ...note], link: { label: 'Open BitoCard SHQ', url: `${dashboard}/` } });
     try {

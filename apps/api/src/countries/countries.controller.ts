@@ -41,6 +41,11 @@ class UpdateCountryDto {
   @IsOptional() @IsBoolean() public_spins_enabled?: boolean;
   @IsOptional() @IsInt() @Min(1) @Max(10) public_spin_limit?: number;
   @IsOptional() @IsInt() @Min(0) min_withdrawal_minor?: number;
+  /** The market’s reseller WhatsApp group invite link, or null to remove it. */
+  @ValidateIf((_object, value) => value !== null)
+  @IsOptional()
+  @Matches(/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}$/, { message: 'whatsapp_group_url must be a WhatsApp group invite link (https://chat.whatsapp.com/…)' })
+  whatsapp_group_url?: string | null;
   /** Two-step sign-in: the methods resellers based here may choose (at least one). */
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsIn(['authenticator', 'email', 'sms'], { each: true }) reseller_two_step_methods?: Array<'authenticator' | 'email' | 'sms'>;
 }

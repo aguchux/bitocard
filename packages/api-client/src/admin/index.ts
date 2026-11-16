@@ -371,7 +371,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     /** Country-wide settings, such as who runs its identity checks (`identity_provider`). */
     updateCountry: build.mutation<
       Country,
-      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; sms_fallback_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; public_spins_enabled?: boolean; public_spin_limit?: number; reseller_two_step_methods?: TwoStepMethod[] }
+      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; sms_fallback_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; public_spins_enabled?: boolean; public_spin_limit?: number; reseller_two_step_methods?: TwoStepMethod[]; whatsapp_group_url?: string | null }
     >({
       query: ({ code, ...body }) => ({ url: `/v1/admin/countries/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Country', 'Activity'],

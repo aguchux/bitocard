@@ -41,6 +41,8 @@ export function presentCountryAdmin(country: CountryWithCategories) {
     sms_provider: country.smsProvider as 'termii' | 'africas_talking' | null,
     /** The two-step sign-in methods resellers based here may choose. */
     reseller_two_step_methods: country.resellerMfaMethods,
+    /** The market’s reseller WhatsApp group invite link: admin only, never public. */
+    whatsapp_group_url: country.whatsappGroupUrl,
     categories: country.categories
       .sort((a, b) => productCategories.indexOf(a.category) - productCategories.indexOf(b.category))
       .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification, taxable: c.taxable })),
@@ -60,6 +62,7 @@ export type CountryUpdate = Partial<{
   public_spins_enabled: boolean;
   public_spin_limit: number;
   reseller_two_step_methods: Array<'authenticator' | 'email' | 'sms'>;
+  whatsapp_group_url: string | null;
 }>;
 
 /** Markets: which countries are open, their currency, money rules and the product categories sold there. */
@@ -134,6 +137,7 @@ export class CountriesService {
         spinDailyLimit: input.spin_daily_limit,
         publicSpinsEnabled: input.public_spins_enabled,
         publicSpinLimit: input.public_spin_limit,
+        whatsappGroupUrl: input.whatsapp_group_url,
         minWithdrawalMinor: input.min_withdrawal_minor === undefined ? undefined : BigInt(input.min_withdrawal_minor),
         // Kept in a fixed order, whatever order they were sent in.
         resellerMfaMethods: input.reseller_two_step_methods ? mfaMethods.filter(method => input.reseller_two_step_methods!.includes(method)) : undefined,

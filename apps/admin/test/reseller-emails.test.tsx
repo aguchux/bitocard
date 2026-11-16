@@ -18,6 +18,7 @@ const overview = (sent: unknown[] = []) => ({
     { key: "start_kyc", kind: "onboarding", label: "Start KYC", description: "Asks the owner to complete the identity check.", subject: "Complete your identity check to go live", suggested: "The identity check is not done.", last_sent_at: null },
     { key: "setup_store", kind: "onboarding", label: "Set up your store", description: "Invites them to create their store.", subject: "Set up your store in a few minutes", suggested: null, last_sent_at: null },
     { key: "upgrade_plan", kind: "growth", label: "Upgrade plan", description: "What a paid plan adds.", subject: "Grow your business with a BitoCard plan", suggested: null, last_sent_at: null },
+    { key: "join_whatsapp", kind: "growth", label: "Join WhatsApp group", description: "The market's WhatsApp group.", subject: "Join BitoCard's WhatsApp group for resellers", suggested: null, available: false, unavailable_reason: "No WhatsApp group link is set for this reseller's market (Settings > Markets).", last_sent_at: null },
   ],
   sent,
 });
@@ -61,6 +62,8 @@ describe("Reseller emails", () => {
     const kyc = await screen.findByRole("button", { name: /Start KYC.*suggested/ }, slow);
     expect(screen.getByRole("button", { name: /^Set up your store$/ })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Growing their business" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: /Join WhatsApp group/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/No WhatsApp group link is set/)).toBeTruthy();
     fireEvent.click(kyc);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Complete your identity check to go live")).toBeTruthy();

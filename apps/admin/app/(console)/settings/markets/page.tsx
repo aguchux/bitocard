@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Banknote, CreditCard, KeyRound, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
+import { Banknote, CreditCard, KeyRound, LayoutGrid, MessageCircle, Receipt, ShieldCheck, Smartphone } from "lucide-react";
 import { Card, categoryName, PanelNav, SettingsPanel, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
@@ -12,6 +12,7 @@ import { PaymentMethods } from "./payment-methods";
 import { TaxRateCard } from "./tax-rate";
 import { BankDepositAccounts } from "./bank-deposit-accounts";
 import { TwoStepSignIn } from "./two-step";
+import { WhatsappGroup } from "./whatsapp-group";
 
 
 const fields = [
@@ -29,6 +30,7 @@ const panels = [
   { id: "bank-deposits", label: "Bank deposits", icon: Banknote },
   { id: "tax", label: "Tax", icon: Receipt },
   { id: "two-step", label: "Two-step sign-in", icon: KeyRound },
+  { id: "whatsapp-group", label: "WhatsApp group", icon: MessageCircle },
 ];
 
 /** Markets: what each country sells and where customers must verify their identity. */
@@ -197,6 +199,9 @@ function Markets() {
           <div className="grid gap-5 xl:grid-cols-2">
             <SettingsPanel id="two-step" icon={KeyRound} title="Two-step sign-in" description={`Whether resellers in ${country.name} must use it in SHQ, and how.`}>
               <TwoStepSignIn key={country.code} code={country.code} country={country.name} allowed={country.reseller_two_step_methods} smsProvider={country.sms_provider ?? null} editable={editable} />
+            </SettingsPanel>
+            <SettingsPanel id="whatsapp-group" icon={MessageCircle} title="WhatsApp group" description={`BitoCard’s WhatsApp group for resellers in ${country.name}. Only admins see the link.`}>
+              <WhatsappGroup key={`${country.code}:${country.whatsapp_group_url ?? ""}`} code={country.code} country={country.name} url={country.whatsapp_group_url ?? null} editable={editable} />
             </SettingsPanel>
           </div>
         </div>

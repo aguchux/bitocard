@@ -640,6 +640,8 @@ model Country {
   publicSpinLimit           Int               @default(6) @map("public_spin_limit")
   /// The two-step sign-in methods resellers based here may choose (SMS also needs the market's SMS provider).
   resellerMfaMethods        MfaMethod[]       @default([authenticator, email, sms]) @map("reseller_mfa_methods")
+  /// The invite link of BitoCard’s WhatsApp group for resellers in this market (https://chat.whatsapp.com/…). Admin only.
+  whatsappGroupUrl          String?           @map("whatsapp_group_url")
   createdAt                 DateTime          @default(now()) @map("created_at")
   updatedAt                 DateTime          @updatedAt @map("updated_at")
   categories                CountryCategory[]

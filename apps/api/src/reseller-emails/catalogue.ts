@@ -16,6 +16,9 @@ export type ResellerEmailState = {
   listedProducts: number;
   liveApiKeys: number;
   paidPlan: boolean;
+  /** The reseller’s market, and whether admins gave it a WhatsApp group link. */
+  market: string | null;
+  whatsappGroup: boolean;
 };
 
 export type QuickEmailKind = 'onboarding' | 'growth';
@@ -31,6 +34,8 @@ export type QuickEmail = {
   paragraphs: (input: { firstName: string; business: string }) => string[];
   /** The SHQ page it sends them to. */
   path: string;
+  /** Links to the reseller market’s WhatsApp group instead of SHQ: only sendable where admins set one. */
+  whatsappGroup?: true;
   linkLabel: string;
   /** Why it is suggested now, or null when it does not apply (it can still be sent). */
   suggested: (state: ResellerEmailState) => string | null;
@@ -190,6 +195,23 @@ export const quickEmails: QuickEmail[] = [
     path: '/settings/plan',
     linkLabel: 'Compare plans',
     suggested: state => (state.status === 'active' && !state.paidPlan && state.publishedStores > 0 ? 'Live on the free plan.' : null),
+  },
+  {
+    key: 'join_whatsapp',
+    kind: 'growth',
+    label: 'Join WhatsApp group',
+    description: 'Invites them to BitoCard’s WhatsApp group for resellers in their market: tips, product news and help from our team.',
+    subject: 'Join BitoCard’s WhatsApp group for resellers',
+    heading: 'Join our WhatsApp group',
+    paragraphs: ({ firstName }) => [
+      `Hi ${firstName},`,
+      'We run a WhatsApp group for BitoCard resellers in your country, where our team shares tips, new products and price news, and answers questions. Join it with the button below.',
+      'Please keep it friendly and never share codes, passwords or your customers’ details in the group. Our team will never ask for them.',
+    ],
+    path: '/',
+    linkLabel: 'Join the WhatsApp group',
+    whatsappGroup: true,
+    suggested: state => (state.whatsappGroup && state.status !== 'suspended' ? 'Their market has a WhatsApp group.' : null),
   },
   {
     key: 'need_help',
