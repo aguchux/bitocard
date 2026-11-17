@@ -38,13 +38,9 @@ spec:
             - secretRef:
                 name: bitocard-api-secrets
           env:
-            - name: UPSTASH_REDIS_REST_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: redis-bitocard-secrets
-                  key: REDIS_TOKEN
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=256" }
           resources:
-            requests: { cpu: 50m, memory: 192Mi }
+            requests: { cpu: 20m, memory: 128Mi }
             limits: { memory: 512Mi }
           securityContext:
             allowPrivilegeEscalation: false
@@ -63,11 +59,7 @@ spec:
             - secretRef:
                 name: bitocard-api-secrets
           env:
-            - name: UPSTASH_REDIS_REST_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: redis-bitocard-secrets
-                  key: REDIS_TOKEN
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=384" }
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 5
@@ -79,8 +71,32 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 4
           resources:
-            requests: { cpu: 100m, memory: 256Mi }
-            limits: { memory: 768Mi }
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 640Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+        # The scheduled jobs, beside the API (one pod fewer): each minute (UTC), every due job is called as
+        # GET /v1/cron/<job> on this pod's own API, with its CRON_SECRET; a job still running is never started again.
+        # With more than one replica each pod's scheduler calls its own API: every job is safe to run twice.
+        - name: scheduler
+          image: ghcr.io/aguchux/bitocard-api:latest
+          command: ["node", "scripts/scheduler.mjs"]
+          env:
+            - { name: API_INTERNAL_URL, value: "http://127.0.0.1:3001" }
+            - { name: APP_PRODUCT, value: "bitocard" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=48" }
+            - name: CRON_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bitocard-api-secrets
+                  key: CRON_SECRET
+          resources:
+            requests: { cpu: 5m, memory: 24Mi }
+            limits: { memory: 96Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -103,51 +119,3 @@ spec:
   ports:
     - { name: http, port: 80, targetPort: http }
     - { name: direct, port: 3001, targetPort: http }
----
-# The scheduled jobs: each minute (UTC), every due job is called as GET /v1/cron/<job> on the API's own Service,
-# never through the internet, with its CRON_SECRET. One replica only; a job still running is never started again.
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: bitocard-api-scheduler
-  labels:
-    app.kubernetes.io/name: bitocard-api-scheduler
-    app.kubernetes.io/part-of: bitocard
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: bitocard-api-scheduler
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: bitocard-api-scheduler
-        app.kubernetes.io/part-of: bitocard
-    spec:
-      imagePullSecrets:
-        - name: ghcr
-      securityContext:
-        seccompProfile: { type: RuntimeDefault }
-      containers:
-        - name: scheduler
-          image: ghcr.io/aguchux/bitocard-api:latest
-          command: ["node", "scripts/scheduler.mjs"]
-          env:
-            - { name: API_INTERNAL_URL, value: "http://bitocard-api:3001" }
-            - { name: APP_PRODUCT, value: "bitocard" }
-            - name: CRON_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: bitocard-api-secrets
-                  key: CRON_SECRET
-          resources:
-            requests: { cpu: 10m, memory: 48Mi }
-            limits: { memory: 128Mi }
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 1000
-            capabilities:
-              drop: [ALL]

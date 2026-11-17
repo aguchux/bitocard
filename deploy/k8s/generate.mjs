@@ -1,5 +1,5 @@
 // Writes the Kubernetes manifests of BitoCard and Udozo from one list, so every app is set up the same way: each
-// product in its own directory (deploy/k8s/bitocard, deploy/k8s/udozo: its API, scheduler, frontends, Redis, routes,
+// product in its own directory (deploy/k8s/bitocard, deploy/k8s/udozo: its API, scheduler, frontends, routes,
 // certificate and kustomization), and what both use in deploy/k8s/shared. Run after changing an app, a host or a size,
 // then commit what it wrote:
 //   node deploy/k8s/generate.mjs
@@ -31,7 +31,7 @@ export const frontends = [
   { name: 'udozo-verify', dir: 'apps/verify', pkg: '@bitocard/verify', product: 'udozo', hosts: ['verify.udozo.com'], site: 'https://verify.udozo.com', build: { NEXT_PUBLIC_VERIFY_BRAND: 'udozo' } },
 ];
 
-/** Both APIs: their image, port and host. Each product has its own Redis (`redis-<product>`). */
+/** Both APIs: their image, port and host. Each keeps its own Upstash Redis (UPSTASH_REDIS_REST_* in its secrets). */
 export const apis = [
   { name: 'bitocard-api', dir: 'apps/api', product: 'bitocard', port: 3001, host: 'api.bitocard.com', dockerfile: 'apps/api/Dockerfile' },
   { name: 'udozo-api', dir: 'apps/udozo-api', product: 'udozo', port: 3010, host: 'api.udozo.com', dockerfile: 'apps/udozo-api/Dockerfile' },
@@ -47,6 +47,23 @@ export const buildAddresses = {
   bitocard: { API_URL: 'https://api.bitocard.com', STOREFRONT_URL: 'https://bitocard.com', LEGALS_URL: 'https://legals.bitocard.com', SHQ_URL: 'https://shq.bitocard.com' },
   udozo: { API_URL: 'https://api.udozo.com', UDOZO_URL: 'https://udozo.com', CONNECT_URL: 'https://connect.udozo.com', POS_URL: 'https://pos.udozo.com' },
 };
+
+/**
+ * How big everything is, sized for a low-traffic start on the one node the cluster has (2 vCPUs, about 2.9 GB of which
+ * DigitalOcean's own pods ask for about 0.6 GB): everything asks for about 1.6 GB, and each Node.js process's heap is
+ * capped (`heapMb`) so it stays near what it asks for. Frontends restart in place on a deploy (`rollout: 'replace'`, a
+ * few seconds each), so a rollout never needs room for a second copy; the APIs start their new pod first. Grow these
+ * (and set `rollout: 'surge'`) once the node pool grows.
+ */
+export const sizes = {
+  web: { cpu: '10m', memory: '96Mi', limit: '320Mi', heapMb: 160, rollout: 'replace' },
+  api: { cpu: '50m', memory: '192Mi', limit: '640Mi', heapMb: 384, rollout: 'surge' },
+  migrate: { cpu: '20m', memory: '128Mi', limit: '512Mi' },
+  scheduler: { cpu: '5m', memory: '24Mi', limit: '96Mi', heapMb: 48 },
+};
+
+const rollout = kind =>
+  kind === 'surge' ? 'rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }' : 'rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }';
 
 /** Each app's image: frontends carry their product in the name (`bitocard-storefront`, `udozo-web`). */
 export const imageOf = app => `${registry}/${app.image ?? app.name}`;
@@ -80,7 +97,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    ${rollout(sizes.web.rollout)}
   selector:
     matchLabels:
       app.kubernetes.io/name: ${app.name}
@@ -104,7 +121,8 @@ spec:
                 name: ${app.product}-web-config
           env:
             - { name: PORT, value: "3000" }
-            - { name: SITE_URL, value: "${app.site}" }${secretEnv}
+            - { name: SITE_URL, value: "${app.site}" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=${sizes.web.heapMb}" }${secretEnv}
           readinessProbe:
             tcpSocket: { port: http }
             periodSeconds: 5
@@ -113,8 +131,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: ${sizes.web.cpu}, memory: ${sizes.web.memory} }
+            limits: { memory: ${sizes.web.limit} }
           ${security(10)}
 ---
 apiVersion: v1
@@ -134,12 +152,7 @@ function api(app) {
                 name: ${app.name}-config
             - secretRef:
                 name: ${app.name}-secrets
-          env:
-            - name: UPSTASH_REDIS_REST_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: redis-${app.product}-secrets
-                  key: REDIS_TOKEN`;
+          env:`;
   return `---
 apiVersion: apps/v1
 kind: Deployment
@@ -148,7 +161,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    ${rollout(sizes.api.rollout)}
   selector:
     matchLabels:
       app.kubernetes.io/name: ${app.name}
@@ -169,9 +182,10 @@ spec:
           image: ${imageOf(app)}:latest
           command: ["sh", "-c", "node scripts/check-env.mjs && node scripts/migrate-deploy.mjs"]
           ${env}
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=256" }
           resources:
-            requests: { cpu: 50m, memory: 192Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: ${sizes.migrate.cpu}, memory: ${sizes.migrate.memory} }
+            limits: { memory: ${sizes.migrate.limit} }
           ${security(10)}
       containers:
         - name: api
@@ -179,6 +193,7 @@ spec:
           ports:
             - { name: http, containerPort: ${app.port} }
           ${env}
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=${sizes.api.heapMb}" }
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 5
@@ -190,8 +205,27 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 4
           resources:
-            requests: { cpu: 100m, memory: 256Mi }
-            limits: { memory: 768Mi }
+            requests: { cpu: ${sizes.api.cpu}, memory: ${sizes.api.memory} }
+            limits: { memory: ${sizes.api.limit} }
+          ${security(10)}
+        # The scheduled jobs, beside the API (one pod fewer): each minute (UTC), every due job is called as
+        # GET /v1/cron/<job> on this pod's own API, with its CRON_SECRET; a job still running is never started again.
+        # With more than one replica each pod's scheduler calls its own API: every job is safe to run twice.
+        - name: scheduler
+          image: ${imageOf(app)}:latest
+          command: ["node", "scripts/scheduler.mjs"]
+          env:
+            - { name: API_INTERNAL_URL, value: "http://127.0.0.1:${app.port}" }
+            - { name: APP_PRODUCT, value: "${app.product}" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=${sizes.scheduler.heapMb}" }
+            - name: CRON_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ${app.name}-secrets
+                  key: CRON_SECRET
+          resources:
+            requests: { cpu: ${sizes.scheduler.cpu}, memory: ${sizes.scheduler.memory} }
+            limits: { memory: ${sizes.scheduler.limit} }
           ${security(10)}
       # Long requests (catalogue syncs, reports) finish before the pod goes.
       terminationGracePeriodSeconds: 60
@@ -205,155 +239,6 @@ spec:
   ports:
     - { name: http, port: 80, targetPort: http }
     - { name: direct, port: ${app.port}, targetPort: http }
----
-# The scheduled jobs: each minute (UTC), every due job is called as GET /v1/cron/<job> on the API's own Service,
-# never through the internet, with its CRON_SECRET. One replica only; a job still running is never started again.
-apiVersion: apps/v1
-kind: Deployment
-${metadata(`${app.name}-scheduler`, app.product)}
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: ${app.name}-scheduler
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: ${app.name}-scheduler
-        app.kubernetes.io/part-of: ${app.product}
-    spec:
-      imagePullSecrets:
-        - name: ghcr
-      securityContext:
-        seccompProfile: { type: RuntimeDefault }
-      containers:
-        - name: scheduler
-          image: ${imageOf(app)}:latest
-          command: ["node", "scripts/scheduler.mjs"]
-          env:
-            - { name: API_INTERNAL_URL, value: "http://${app.name}:${app.port}" }
-            - { name: APP_PRODUCT, value: "${app.product}" }
-            - name: CRON_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: ${app.name}-secrets
-                  key: CRON_SECRET
-          resources:
-            requests: { cpu: 10m, memory: 48Mi }
-            limits: { memory: 128Mi }
-          ${security(10)}
-`;
-}
-
-/**
- * The product's Redis, in place of Upstash: Redis itself (password set, append-only file on a DigitalOcean volume
- * kept if the claim is deleted) and, beside it, serverless-redis-http speaking Upstash's REST protocol, so the API
- * keeps its client and only the address changes.
- */
-function redis(product) {
-  const name = `redis-${product.key}`;
-  return `${header(`${product.label}'s Redis (never shared with the other product). Postgres stays the record of everything: Redis holds
-# caches, rate limits and short locks, so keys without an expiry are never evicted (volatile-lru).`)}---
-apiVersion: apps/v1
-kind: StatefulSet
-${metadata(name, product.key)}
-spec:
-  serviceName: ${name}
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: ${name}
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: ${name}
-        app.kubernetes.io/part-of: ${product.key}
-        app.kubernetes.io/component: redis
-    spec:
-      securityContext:
-        fsGroup: 999
-        seccompProfile: { type: RuntimeDefault }
-      containers:
-        - name: redis
-          image: redis:8.2-alpine
-          args: ["--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-lru", "--protected-mode", "no"]
-          env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef: { name: ${name}-secrets, key: REDIS_PASSWORD }
-          ports:
-            - { name: redis, containerPort: 6379 }
-          readinessProbe:
-            exec:
-              command: ["sh", "-c", "redis-cli -a \\"$REDIS_PASSWORD\\" --no-auth-warning ping | grep -q PONG"]
-            periodSeconds: 5
-          livenessProbe:
-            tcpSocket: { port: redis }
-            initialDelaySeconds: 10
-            periodSeconds: 20
-          volumeMounts:
-            - { name: data, mountPath: /data }
-          resources:
-            requests: { cpu: 25m, memory: 64Mi }
-            limits: { memory: 256Mi }
-          ${security(10, 999)}
-        - name: rest
-          image: hiett/serverless-redis-http:0.0.10
-          env:
-            - { name: SRH_MODE, value: env }
-            - name: SRH_TOKEN
-              valueFrom:
-                secretKeyRef: { name: ${name}-secrets, key: REDIS_TOKEN }
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef: { name: ${name}-secrets, key: REDIS_PASSWORD }
-            - { name: SRH_CONNECTION_STRING, value: "redis://:$(REDIS_PASSWORD)@127.0.0.1:6379" }
-          ports:
-            - { name: rest, containerPort: 80 }
-          readinessProbe:
-            tcpSocket: { port: rest }
-            periodSeconds: 5
-          resources:
-            requests: { cpu: 25m, memory: 96Mi }
-            limits: { memory: 256Mi }
-          securityContext:
-            allowPrivilegeEscalation: false
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes: [ReadWriteOnce]
-        storageClassName: do-block-storage-retain
-        resources:
-          requests: { storage: 5Gi }
----
-apiVersion: v1
-kind: Service
-${metadata(name, product.key)}
-spec:
-  selector:
-    app.kubernetes.io/name: ${name}
-  ports:
-    - { name: rest, port: 80, targetPort: rest }
-    - { name: redis, port: 6379, targetPort: redis }
----
-# Only the product's own API reaches its Redis.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: ${name}
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: ${name}
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: ${product.key}-api
 `;
 }
 
@@ -432,7 +317,7 @@ spec:
 function kustomization(product) {
   const own = [...apis, ...frontends].filter(app => app.product === product.key);
   const images = [...new Set(own.map(imageOf))].map(image => `  - { name: ${image}, newTag: latest }`).join('\n');
-  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends, Redis, routes and certificate, in the namespace
+  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends, routes and certificate, in the namespace
 # \`${namespace}\`. Applied with the rest by \`kubectl apply -k deploy/k8s\`, or alone by \`kubectl apply -k deploy/k8s/${product.key}\`
 # (after deploy/k8s/shared once).
 #
@@ -448,7 +333,6 @@ labels:
 resources:
   - api.yaml
   - frontends.yaml
-  - redis.yaml
   - ingress.yaml
   - certificate.yaml
 
@@ -465,8 +349,6 @@ secretGenerator:
     envs: [env/api.secret.env]
   - name: ${product.key}-web-secrets
     envs: [env/web.secret.env]
-  - name: redis-${product.key}-secrets
-    envs: [env/redis.secret.env]
 
 # The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (\`kustomize edit set image\`).
 images:
@@ -503,7 +385,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const dir = new URL(`${product.key}/`, here);
     write(new URL('api.yaml', dir), header(`${product.label}'s API: its migrations, its Service and its scheduler.`) + apis.filter(app => app.product === product.key).map(api).join(''));
     write(new URL('frontends.yaml', dir), header(`${product.label}'s Next.js apps: a Deployment and a Service each.`) + frontends.filter(app => app.product === product.key).map(frontend).join(''));
-    write(new URL('redis.yaml', dir), redis(product));
     write(new URL('ingress.yaml', dir), ingresses(product));
     write(new URL('certificate.yaml', dir), certificate(product));
     write(new URL('kustomization.yaml', dir), kustomization(product));

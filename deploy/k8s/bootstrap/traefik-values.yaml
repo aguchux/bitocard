@@ -5,11 +5,10 @@
 # deploy/droplet/Caddyfile; refresh from https://www.cloudflare.com/ips/), so the APIs (TRUST_PROXY=2) take the
 # visitor's address from Cloudflare and never one a client wrote. Anything else that reaches the load balancer has its
 # forwarded headers dropped.
+# One replica for a low-traffic start on one node (a restart is a few seconds); 2 with a PodDisruptionBudget once the
+# node pool grows.
 deployment:
-  replicas: 2
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 1
+  replicas: 1
 ingressClass:
   enabled: true
   isDefaultClass: true
@@ -40,5 +39,5 @@ logs:
     enabled: true
     format: json
 resources:
-  requests: { cpu: 50m, memory: 64Mi }
-  limits: { memory: 256Mi }
+  requests: { cpu: 20m, memory: 48Mi }
+  limits: { memory: 192Mi }

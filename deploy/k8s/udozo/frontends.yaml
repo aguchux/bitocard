@@ -12,7 +12,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector:
     matchLabels:
       app.kubernetes.io/name: udozo
@@ -37,6 +37,7 @@ spec:
           env:
             - { name: PORT, value: "3000" }
             - { name: SITE_URL, value: "https://udozo.com" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=160" }
             - name: STORE_SERVER_SECRET
               valueFrom:
                 secretKeyRef:
@@ -50,8 +51,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 320Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -83,7 +84,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector:
     matchLabels:
       app.kubernetes.io/name: udozo-shq
@@ -108,6 +109,7 @@ spec:
           env:
             - { name: PORT, value: "3000" }
             - { name: SITE_URL, value: "https://shq.udozo.com" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=160" }
           readinessProbe:
             tcpSocket: { port: http }
             periodSeconds: 5
@@ -116,8 +118,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 320Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -149,7 +151,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector:
     matchLabels:
       app.kubernetes.io/name: udozo-admin
@@ -174,6 +176,7 @@ spec:
           env:
             - { name: PORT, value: "3000" }
             - { name: SITE_URL, value: "https://admin.udozo.com" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=160" }
           readinessProbe:
             tcpSocket: { port: http }
             periodSeconds: 5
@@ -182,8 +185,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 320Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -215,7 +218,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector:
     matchLabels:
       app.kubernetes.io/name: udozo-connect
@@ -240,6 +243,7 @@ spec:
           env:
             - { name: PORT, value: "3000" }
             - { name: SITE_URL, value: "https://connect.udozo.com" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=160" }
             - name: STORE_SERVER_SECRET
               valueFrom:
                 secretKeyRef:
@@ -253,8 +257,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 320Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -286,7 +290,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector:
     matchLabels:
       app.kubernetes.io/name: udozo-pos
@@ -311,6 +315,7 @@ spec:
           env:
             - { name: PORT, value: "3000" }
             - { name: SITE_URL, value: "https://pos.udozo.com" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=160" }
             - name: STORE_SERVER_SECRET
               valueFrom:
                 secretKeyRef:
@@ -324,8 +329,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 320Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -357,7 +362,7 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   strategy:
-    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector:
     matchLabels:
       app.kubernetes.io/name: udozo-verify
@@ -382,6 +387,7 @@ spec:
           env:
             - { name: PORT, value: "3000" }
             - { name: SITE_URL, value: "https://verify.udozo.com" }
+            - { name: NODE_OPTIONS, value: "--max-old-space-size=160" }
           readinessProbe:
             tcpSocket: { port: http }
             periodSeconds: 5
@@ -390,8 +396,8 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 50m, memory: 160Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 320Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

@@ -1,13 +1,11 @@
-# The apps (everything but Redis, which has its own policy in each product's redis.yaml) take requests only from
-# Traefik's namespace and from the namespace's own pods (frontends call their API's Service; schedulers their API).
+# Every app in the namespace takes requests only from Traefik's namespace and from the namespace's own pods (frontends
+# call their API's Service). Redis stays on Upstash, outside the cluster.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: apps
 spec:
-  podSelector:
-    matchExpressions:
-      - { key: app.kubernetes.io/component, operator: NotIn, values: [redis] }
+  podSelector: {}
   policyTypes: [Ingress]
   ingress:
     - from:

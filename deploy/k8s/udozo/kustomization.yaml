@@ -1,4 +1,4 @@
-# Udozo on Kubernetes: its API and scheduler, frontends, Redis, routes and certificate, in the namespace
+# Udozo on Kubernetes: its API and scheduler, frontends, routes and certificate, in the namespace
 # `bitocard`. Applied with the rest by `kubectl apply -k deploy/k8s`, or alone by `kubectl apply -k deploy/k8s/udozo`
 # (after deploy/k8s/shared once).
 #
@@ -16,7 +16,6 @@ labels:
 resources:
   - api.yaml
   - frontends.yaml
-  - redis.yaml
   - ingress.yaml
   - certificate.yaml
 
@@ -33,8 +32,6 @@ secretGenerator:
     envs: [env/api.secret.env]
   - name: udozo-web-secrets
     envs: [env/web.secret.env]
-  - name: redis-udozo-secrets
-    envs: [env/redis.secret.env]
 
 # The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (`kustomize edit set image`).
 images:

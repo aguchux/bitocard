@@ -17,9 +17,7 @@ helm upgrade --install traefik traefik/traefik --namespace traefik --create-name
   $(pin "$TRAEFIK_CHART_VERSION") --values "$here/traefik-values.yaml" --wait
 
 # shellcheck disable=SC2046
-helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace \
-  $(pin "$CERT_MANAGER_VERSION") --set crds.enabled=true \
-  --set 'extraArgs={--dns01-recursive-nameservers-only,--dns01-recursive-nameservers=1.1.1.1:53\,8.8.8.8:53}' --wait
+helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace   $(pin "$CERT_MANAGER_VERSION") --values "$here/cert-manager-values.yaml" --wait
 
 echo
 echo "The load balancer's address (point the DNS records at it, proxied through Cloudflare):"
