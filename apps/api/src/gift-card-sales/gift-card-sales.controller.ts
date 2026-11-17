@@ -4,7 +4,8 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
-import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, resellerOf, Roles, SessionOnly } from '../auth/caller.js';
+import { Mode } from '../ledger/mode.js';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
@@ -107,6 +108,21 @@ export class CustomerGiftCardSalesController {
   }
 }
 
+/** Buy back on a reseller's stores: whether it is open, their cut and their customers' sales (SHQ sessions only). */
+@ApiExcludeController()
+@SessionOnly()
+@Roles('admin', 'finance', 'support')
+@Controller('gift-card-sales')
+@ProductOnly('bitocard')
+export class ResellerGiftCardSalesController {
+  constructor(private readonly sales: GiftCardSalesService) {}
+
+  @Get('buy-back')
+  buyBack(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+    return this.sales.resellerBuyBack(resellerOf(caller), mode);
+  }
+}
+
 /** Prestmit's trade notifications: signature-checked, then the trade is read back from Prestmit. */
 @ApiExcludeController()
 @Public()
@@ -186,7 +202,7 @@ export class AdminGiftCardSalesController {
 
 @Module({
   imports: [CheckoutModule, IdentityModule, SettingsModule],
-  controllers: [GiftCardSellOffersController, CustomerGiftCardSalesController, PrestmitWebhookController, AdminGiftCardSalesController],
+  controllers: [GiftCardSellOffersController, CustomerGiftCardSalesController, ResellerGiftCardSalesController, PrestmitWebhookController, AdminGiftCardSalesController],
   providers: [GiftCardSalesService],
   exports: [GiftCardSalesService],
 })

@@ -4,7 +4,7 @@ import { StoreSellers } from '../checkout/store-sellers.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { GiftCardSale, GiftCardSellOffer, LedgerMode } from '../generated/prisma/client.js';
+import type { GiftCardSale, GiftCardSellOffer, LedgerMode, Reseller, Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
@@ -15,6 +15,7 @@ import { formatMoney } from '../notifications/templates.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { brandRegistry, registryBrand } from '../storefront/brand-registry.js';
+import { templateSells } from '../stores/templates.js';
 import { Prestmit, type PrestmitCard, type PrestmitTrade } from './prestmit.js';
 
 /**
@@ -74,6 +75,20 @@ const rateMinor = (rate: string | { toString(): string }) => BigInt(Math.floor(N
 /** What the customer gets of a total: the total less BitoCard's margin, rounded down. */
 export const afterMargin = (total: bigint, marginBps: number) => (total * BigInt(10_000 - marginBps)) / 10_000n;
 
+/** The most a reseller keeps of BitoCard's payout when PRESTMIT_RESELLER_SPREAD_CAP_PERCENT is unset: 10%. */
+export const defaultSpreadCapBps = 1000;
+
+/**
+ * Who buys the card on a store: BitoCard's own stores (no reseller, no cut), or a reseller's store, where the reseller
+ * keeps `spreadBps` of BitoCard's payout. `mode` follows the store (a reseller's store is the sandbox until it goes live).
+ */
+type Buyer = { resellerId: string | null; spreadBps: number; mode: LedgerMode; currency: string };
+
+/** Whether a reseller's store's template sells gift cards (a single-product store only when its product is one). */
+function templateSellsGiftCards(store: { template: string; focus: string | null }) {
+  return store.focus ? store.focus.startsWith('gift_cards:') && templateSells(store, { key: store.focus, category: 'gift_cards' }) : templateSells(store, { key: '', category: 'gift_cards' });
+}
+
 @Injectable()
 export class GiftCardSalesService {
   private readonly logger = new Logger(GiftCardSalesService.name);
@@ -132,12 +147,48 @@ export class GiftCardSalesService {
   }
 
   /** Why selling is closed for customers of a country, or null when it is open. */
-  private async closedFor(country: string | null | undefined) {
+  private async closedFor(country: string | null | undefined, mode: LedgerMode = this.mode()) {
     if (!country || !payoutCountries[country]) return 'country_unsupported';
     if (!(await this.settings.isOnForCountry('gift_card_selling', country))) return 'not_enabled';
     if (this.defaultMargin() === null) return 'not_configured';
-    if (this.mode() === 'live' && !this.client().prestmit.configured()) return 'not_configured';
+    if (mode === 'live' && !this.client().prestmit.configured()) return 'not_configured';
     return null;
+  }
+
+  /** The most a reseller may keep of BitoCard's payout, in basis points. */
+  private spreadCap() {
+    return marginBpsOf(this.integrations.config.PRESTMIT_RESELLER_SPREAD_CAP_PERCENT) ?? defaultSpreadCapBps;
+  }
+
+  /**
+   * The reseller's cut, set by itself from what they already charge: their gift card markup (else their general
+   * markup), held to the cap. They never set it apart: their customers sell at BitoCard's rate less the same share.
+   */
+  async resellerSpread(resellerId: string) {
+    const rows = await this.prisma.resellerMarkup.findMany({ where: { resellerId, productId: null, OR: [{ category: 'gift_cards' }, { category: null }] } });
+    const markup = rows.find(row => row.category === 'gift_cards')?.markupBps ?? rows.find(row => row.category === null)?.markupBps ?? 0;
+    return Math.min(Math.max(markup, 0), this.spreadCap());
+  }
+
+  /**
+   * Who buys cards on a store, or why it does not. BitoCard's own stores in the customer's country; a reseller's store
+   * in its reseller's country, while `reseller_gift_card_buyback` is on for them (off by default), its template sells
+   * gift cards, and, live, the reseller is verified.
+   */
+  private async buyerAt(store: Store & { reseller: Reseller }, customerCountry: string | null | undefined): Promise<{ buyer: Buyer } | { reason: string }> {
+    if (this.stores.isHouse(store)) {
+      const reason = await this.closedFor(customerCountry);
+      return reason ? { reason } : { buyer: { resellerId: null, spreadBps: 0, mode: this.mode(), currency: payoutCountries[customerCountry!] } };
+    }
+    const reseller = store.reseller;
+    if (store.status !== 'published' || reseller.status === 'suspended') return { reason: 'store_unavailable' };
+    if (!templateSellsGiftCards(store)) return { reason: 'store_unavailable' };
+    if (!(await this.settings.isOn('reseller_gift_card_buyback', reseller.id))) return { reason: 'store_unavailable' };
+    const mode = this.stores.mode(store);
+    if (mode === 'live' && reseller.status !== 'active') return { reason: 'store_unavailable' };
+    const reason = await this.closedFor(reseller.country, mode);
+    if (reason) return { reason };
+    return { buyer: { resellerId: reseller.id, spreadBps: await this.resellerSpread(reseller.id), mode, currency: payoutCountries[reseller.country!] } };
   }
 
   /**
@@ -146,12 +197,15 @@ export class GiftCardSalesService {
    */
   async offersFor(productKey: string | undefined, country: string | undefined, store?: string) {
     const code = country?.toUpperCase();
-    // bitocard.com only (its country stores are retired; resellers' stores never buy cards).
-    const reason = store && store !== 'bitocard' ? 'store_unavailable' : await this.closedFor(code);
-    const currency = (code && payoutCountries[code]) ?? null;
+    // bitocard.com, or a reseller's store where buy back is on (`buyerAt`).
+    const at = await this.stores.resolve(store && store !== 'bitocard' ? store : null).catch(() => null);
+    const found = at ? await this.buyerAt(at, code) : { reason: 'store_unavailable' };
+    const reason = 'reason' in found ? found.reason : null;
+    const buyer = 'buyer' in found ? found.buyer : null;
+    const currency = buyer?.currency ?? (code && payoutCountries[code]) ?? null;
     const empty = { object: 'gift_card_sell_options' as const, available: false, reason, currency, offers: [] as ReturnType<GiftCardSalesService['presentOffer']>[] };
-    if (reason) return empty;
-    const where: Record<string, unknown> = { mode: this.mode(), provider: 'prestmit', enabled: true, available: true, brand: { not: null } };
+    if (!buyer) return empty;
+    const where: Record<string, unknown> = { mode: buyer.mode, provider: 'prestmit', enabled: true, available: true, brand: { not: null } };
     if (productKey) {
       const [category, keyCountry, keyBrand] = productKey.split(':');
       if (category !== 'gift_cards' || !keyCountry || !keyBrand) return { ...empty, reason: 'not_sellable' };
@@ -165,11 +219,11 @@ export class GiftCardSalesService {
       where.country = productCountry === 'WW' ? null : productCountry;
     }
     const offers = await this.prisma.giftCardSellOffer.findMany({ where, orderBy: [{ rate: 'desc' }, { name: 'asc' }], take: productKey ? 20 : 500 });
-    const shown = offers.filter(offer => this.marginFor(offer) !== null).map(offer => this.presentOffer(offer, currency!));
+    const shown = offers.filter(offer => this.marginFor(offer) !== null).map(offer => this.presentOffer(offer, buyer.currency, buyer.spreadBps));
     return { ...empty, available: shown.length > 0, reason: shown.length ? null : 'not_sellable', offers: productKey ? shown : shown.slice(0, 0), count: shown.length };
   }
 
-  private presentOffer(offer: GiftCardSellOffer, currency: string) {
+  private presentOffer(offer: GiftCardSellOffer, currency: string, spreadBps = 0) {
     const margin = this.marginFor(offer) ?? 0;
     return {
       id: offer.id,
@@ -179,20 +233,22 @@ export class GiftCardSalesService {
       maximum: maxAmount,
       currency,
       /** What the customer gets per unit of the card's value, in minor units. */
-      rate: Number(afterMargin(rateMinor(offer.rate), margin)),
+      rate: Number(afterMargin(afterMargin(rateMinor(offer.rate), margin), spreadBps)),
       terms: offer.terms,
     };
   }
 
   // Selling.
 
-  private async open(customer: CustomerWithStore) {
-    if (!this.stores.isHouse(customer.store)) throw conflict('gift_card_selling_unavailable', 'Selling gift cards is not available in this store.');
+  private async open(customer: CustomerWithStore): Promise<Buyer> {
     if (!customer.emailVerifiedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
-    const reason = await this.closedFor(customer.country);
-    if (reason) throw conflict('gift_card_selling_unavailable', reason === 'country_unsupported' ? 'Selling gift cards is not available in your country yet.' : 'Selling gift cards is not available right now.');
-    const currency = payoutCountries[customer.country!];
-    return { currency, mode: this.mode() };
+    const store = this.stores.isHouse(customer.store) ? { ...customer.store, reseller: { house: true } as Reseller } : await this.prisma.store.findUniqueOrThrow({ where: { id: customer.storeId }, include: { reseller: true } });
+    const found = await this.buyerAt(store as Store & { reseller: Reseller }, customer.country);
+    if ('reason' in found) {
+      if (found.reason === 'store_unavailable') throw conflict('gift_card_selling_unavailable', 'Selling gift cards is not available in this store.');
+      throw conflict('gift_card_selling_unavailable', found.reason === 'country_unsupported' ? 'Selling gift cards is not available in your country yet.' : 'Selling gift cards is not available right now.');
+    }
+    return found.buyer;
   }
 
   private async offer(id: string, mode: LedgerMode) {
@@ -201,20 +257,20 @@ export class GiftCardSalesService {
     return offer;
   }
 
-  private price(offer: GiftCardSellOffer, amount: number) {
+  private price(offer: GiftCardSellOffer, amount: number, spreadBps: number) {
     if (!Number.isInteger(amount) || amount < offer.minimum || amount > maxAmount) {
       throw invalid('amount_out_of_range', `Enter a whole amount from ${offer.minimum} to ${maxAmount}.`, 'amount');
     }
     const margin = this.marginFor(offer)!;
     const total = rateMinor(offer.rate) * BigInt(amount);
-    return { margin, total, payout: afterMargin(total, margin) };
+    return { margin, total, payout: afterMargin(afterMargin(total, margin), spreadBps) };
   }
 
   /** What the customer would get for a card of this value, before sending it. */
   async quote(customer: CustomerWithStore, offerId: string, amount: number) {
-    const { currency, mode } = await this.open(customer);
+    const { currency, mode, spreadBps } = await this.open(customer);
     const offer = await this.offer(offerId, mode);
-    const { payout } = this.price(offer, amount);
+    const { payout } = this.price(offer, amount, spreadBps);
     return { object: 'gift_card_sale_quote' as const, offer_id: offer.id, amount, currency, payout: Number(payout) };
   }
 
@@ -223,9 +279,9 @@ export class GiftCardSalesService {
    * credited until Prestmit approves it. `expected_payout`, when sent, is what the customer saw: less is refused.
    */
   async create(customer: CustomerWithStore, input: SaleInput, files: SalePhoto[]) {
-    const { currency, mode } = await this.open(customer);
+    const { currency, mode, resellerId, spreadBps } = await this.open(customer);
     const offer = await this.offer(input.offer_id, mode);
-    const { margin, payout } = this.price(offer, Number(input.amount));
+    const { margin, payout } = this.price(offer, Number(input.amount), spreadBps);
     if (input.expected_payout !== undefined && payout < BigInt(input.expected_payout)) {
       throw conflict('rate_changed', `The rate for this card has changed: you would now get ${formatMoney(payout, currency)}. Check it and send again.`);
     }
@@ -251,6 +307,8 @@ export class GiftCardSalesService {
         currency,
         rate: offer.rate,
         marginBps: margin,
+        resellerId,
+        resellerSpreadBps: spreadBps,
         quotedMinor: payout,
         codeHint: code ? code.slice(-4) : null,
         photos: photos.length,
@@ -300,25 +358,46 @@ export class GiftCardSalesService {
 
   private async complete(sale: GiftCardSale, totalNaira: number | null) {
     const total = totalNaira !== null ? BigInt(Math.round(totalNaira * 100)) : rateMinor(sale.rate) * BigInt(sale.amount);
-    const payout = afterMargin(total, sale.marginBps);
-    const margin = total - payout;
+    // BitoCard keeps its margin of what Prestmit paid; a reseller's store keeps its cut of the rest.
+    const bitocardPays = afterMargin(total, sale.marginBps);
+    const payout = afterMargin(bitocardPays, sale.resellerSpreadBps);
+    const margin = total - bitocardPays;
+    const earning = sale.resellerId ? bitocardPays - payout : 0n;
+    const reseller = earning > 0n ? await this.prisma.reseller.findUniqueOrThrow({ where: { id: sale.resellerId! }, include: { countryRef: true } }) : null;
     const entry = await this.ledger.prepare({
       mode: sale.mode,
       type: 'gift_card_sale',
       reference: `gift_card_sale:${sale.id}`,
-      resellerId: null,
+      resellerId: sale.resellerId,
       description: `Gift card sold (GS-${String(sale.number).padStart(6, '0')})`,
       metadata: { gift_card_sale_id: sale.id, provider: 'prestmit', provider_reference: sale.providerReference },
       lines: [
         { account: { kind: 'supplier_float', currency: sale.currency, provider: 'prestmit' }, debit: total },
         ...(payout > 0n ? [{ account: { kind: 'customer_wallet' as const, currency: sale.currency, customerId: sale.customerId }, credit: payout }] : []),
         ...(margin > 0n ? [{ account: { kind: 'platform_revenue' as const, currency: sale.currency }, credit: margin }] : []),
+        ...(earning > 0n ? [{ account: { kind: 'reseller_earnings_held' as const, currency: sale.currency, resellerId: sale.resellerId! }, credit: earning }] : []),
       ],
     });
     const done = await this.prisma.$transaction(async tx => {
-      const claimed = await tx.giftCardSale.updateMany({ where: { id: sale.id, status: { in: ['submitting', 'pending'] } }, data: { status: 'completed', providerTotalMinor: total, payoutMinor: payout, decidedAt: new Date(), nextCheckAt: null } });
+      const claimed = await tx.giftCardSale.updateMany({
+        where: { id: sale.id, status: { in: ['submitting', 'pending'] } },
+        data: { status: 'completed', providerTotalMinor: total, payoutMinor: payout, resellerEarningMinor: sale.resellerId ? earning : null, decidedAt: new Date(), nextCheckAt: null },
+      });
       if (!claimed.count) return null;
       const written = await this.ledger.write(tx, entry);
+      // The reseller's cut waits out their market's payout hold, as a sale's profit does.
+      if (reseller) {
+        await tx.earningsLot.create({
+          data: {
+            resellerId: reseller.id,
+            mode: sale.mode,
+            currency: sale.currency,
+            amountMinor: earning,
+            reference: `gift_card_sale:${sale.id}`,
+            releaseAt: new Date(Date.now() + (reseller.countryRef?.payoutHoldDays ?? 0) * 86_400_000),
+          },
+        });
+      }
       return tx.giftCardSale.update({ where: { id: sale.id }, data: { entryId: written.id } });
     });
     if (!done) return this.prisma.giftCardSale.findUniqueOrThrow({ where: { id: sale.id } });
@@ -450,6 +529,41 @@ export class GiftCardSalesService {
       reason: sale.rejectionReason,
       created_at: sale.createdAt.toISOString(),
       decided_at: sale.decidedAt?.toISOString() ?? null,
+    };
+  }
+
+  // Resellers.
+
+  /**
+   * Buy back on the reseller's stores: whether it is open for them, their cut (their gift card markup, capped) and the
+   * cards their customers sold, with what each customer got and what the reseller earned. Never Prestmit's name, its
+   * rate or BitoCard's margin.
+   */
+  async resellerBuyBack(resellerId: string, mode: LedgerMode) {
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    const enabled = await this.settings.isOn('reseller_gift_card_buyback', resellerId);
+    const reason = !enabled ? 'not_enabled' : await this.closedFor(reseller.country, mode);
+    const sales = await this.prisma.giftCardSale.findMany({
+      where: { resellerId, mode },
+      include: { offer: true, customer: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return {
+      object: 'gift_card_buy_back' as const,
+      mode,
+      available: reason === null,
+      reason,
+      currency: (reseller.country && payoutCountries[reseller.country]) ?? null,
+      /** Your cut of BitoCard's rate, from your gift card markup (else your general markup), up to `cap_bps`. */
+      spread_bps: await this.resellerSpread(resellerId),
+      cap_bps: this.spreadCap(),
+      data: sales.map(sale => ({
+        ...this.present(sale, sale.offer),
+        customer: sale.customer,
+        spread_bps: sale.resellerSpreadBps,
+        earned: sale.resellerEarningMinor === null ? null : Number(sale.resellerEarningMinor),
+      })),
     };
   }
 

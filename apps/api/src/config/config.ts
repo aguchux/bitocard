@@ -263,6 +263,7 @@ export const configSchema = z.object({
   /** Leave at the default to follow PRESTMIT_SANDBOX; any other value overrides it. */
   PRESTMIT_API_URL: z.string().url().default('https://api.prestmit.io/partners/v1'),
   /** BitoCard's margin on cards customers sell, as a percentage of what Prestmit pays (0 to 50). Selling waits until it is set. */
+  PRESTMIT_RESELLER_SPREAD_CAP_PERCENT: z.string().regex(/^(?:(?:[0-9]|[1-4][0-9])(?:\.[0-9]{1,2})?|50(?:\.0{1,2})?)$/, 'a percentage from 0 to 50, up to 2 decimals').optional(),
   PRESTMIT_SELL_MARGIN_PERCENT: z.string().regex(/^(?:(?:[0-9]|[1-4][0-9])(?:\.[0-9]{1,2})?|50(?:\.0{1,2})?)$/, 'a percentage from 0 to 50, up to 2 decimals').optional(),
   /** AI providers for support bots on BitoCard's keys (Premium). Prices: "model input output cached" in US dollars per million tokens. */
   ANTHROPIC_API_KEY: z.string().optional(),

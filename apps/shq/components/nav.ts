@@ -34,6 +34,7 @@ import {
   UserCog,
   Users,
   Globe,
+  Gift,
   Wallet,
   Webhook,
 } from "lucide-react";
@@ -72,6 +73,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "All orders", href: "/orders", icon: ListOrdered },
       { label: "New order", href: "/orders/new", icon: Sparkles },
       { label: "Disputes", href: "/disputes", icon: MessageSquareWarning },
+      { label: "Cards sold to you", href: "/gift-card-sales", icon: Gift },
     ],
   },
   catalogue: {

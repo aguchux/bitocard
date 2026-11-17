@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, fakeService, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 const { prestmitHash, prestmitSignatureValid, prestmitForm, prestmitCountry } = await import('../dist/gift-card-sales/prestmit.js');
 const { matchBrand, afterMargin, marginBpsOf } = await import('../dist/gift-card-sales/gift-card-sales.service.js');
@@ -45,12 +45,13 @@ function fakePrestmit() {
   };
 }
 
-function storeClient(server) {
+function storeClient(server, store = null) {
   let token = null;
   const request = async (method, path, body, form) => {
     const res = await fetch(`${server.base}${path}`, {
       method,
       headers: {
+        ...(store ? { 'bitocard-store': store } : {}),
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(token ? { 'bitocard-customer-session': token } : {}),
         ...(method === 'POST' ? { 'idempotency-key': `gs-${Date.now()}-${Math.random()}` } : {}),
@@ -80,8 +81,8 @@ function storeClient(server) {
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 
 let counter = 0;
-async function customer(server, country = 'NG') {
-  const shopper = storeClient(server);
+async function customer(server, country = 'NG', store = null) {
+  const shopper = storeClient(server, store);
   const email = `seller${(counter += 1)}-${Date.now()}@example.com`;
   const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada Seller', email, password: 'correct horse battery', country });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
@@ -168,7 +169,7 @@ describe('selling gift cards in the sandbox', () => {
     // A synced key with a variant where the brand would be still finds the card by the product's own brand.
     await prisma.product.create({ data: { key: 'gift_cards:US:amazon-us', category: 'gift_cards', country: 'US', brand: 'amazon', name: 'Amazon US', faceCurrency: 'USD', denominationType: 'range', minValueMinor: 500n, maxValueMinor: 50_000n } });
     assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon-us&country=NG`).then(res => res.json())).offers[0]?.name, 'Amazon (USA) E-code');
-    // bitocard.com only: the retired country stores and resellers' stores never buy cards.
+    // The retired country stores never buy cards, nor a store that does not exist (resellers' stores: below).
     assert.equal((await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ng`).then(res => res.json())).reason, 'store_unavailable');
     const reseller = await fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG&store=ada-digital`).then(res => res.json());
     assert.deepEqual([reseller.available, reseller.reason], [false, 'store_unavailable']);
@@ -212,6 +213,58 @@ describe('selling gift cards in the sandbox', () => {
     assert.equal((await other.get(`/v1/store/gift-card-sales/${sold.json.id}`)).status, 404);
     const notices = await prisma.notification.findMany({ where: { customerId: ada.id, type: { startsWith: 'customer.gift_card_sale.' } } });
     assert.deepEqual(notices.map(notice => notice.type).sort(), ['customer.gift_card_sale.accepted', 'customer.gift_card_sale.declined']);
+  });
+
+  test('buy back on a reseller’s store: BitoCard’s rate less the reseller’s gift card markup (capped), their cut to their earnings', async () => {
+    const owner = await resellerClient(server);
+    await owner.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, owner.email) });
+    await prisma.reseller.update({ where: { id: owner.resellerId }, data: { status: 'active' } });
+    await prisma.resellerMarkup.create({ data: { resellerId: owner.resellerId, category: 'gift_cards', markupBps: 800 } });
+    const subdomain = `buyback${Date.now().toString(36)}`.slice(0, 30);
+    const store = await owner.browser.post('/v1/stores', { name: 'Ada Digital', subdomain });
+    assert.equal(store.status, 201, JSON.stringify(store.json));
+    assert.equal((await owner.browser.post(`/v1/stores/${store.json.id}/publish`)).status, 200);
+    const offersAt = () => fetch(`${server.base}/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=GH&store=${subdomain}`).then(res => res.json());
+
+    // Off by default: the reseller's store buys nothing, and SHQ says why.
+    assert.deepEqual([(await offersAt()).available, (await offersAt()).reason], [false, 'store_unavailable']);
+    const shq = () => owner.browser.get('/v1/gift-card-sales/buy-back', { 'bitocard-mode': 'test' });
+    assert.deepEqual([(await shq()).json.available, (await shq()).json.reason], [false, 'not_enabled']);
+
+    assert.equal((await admin.put('/v1/admin/switches/reseller_gift_card_buyback', { reseller_id: owner.resellerId, enabled: true })).status, 200);
+    const open = await offersAt();
+    assert.equal(open.available, true, JSON.stringify(open));
+    // ₦1,140 a dollar (BitoCard's rate) less the reseller's 8%: ₦1,048.80, in the reseller's currency whatever country was asked.
+    assert.deepEqual([open.offers[0].rate, open.offers[0].currency], [104_880, 'NGN']);
+
+    const shopper = await customer(server, 'NG', subdomain);
+    const quote = await shopper.post('/v1/store/gift-card-sales/quote', { offer_id: open.offers[0].id, amount: 100 });
+    assert.deepEqual([quote.status, quote.json.payout], [200, 10_488_000], JSON.stringify(quote.json));
+    const sold = await shopper.sell({ offer_id: open.offers[0].id, amount: 100, expected_payout: 10_488_000, code: 'WXYZ-9876' });
+    assert.equal(sold.status, 201, JSON.stringify(sold.json));
+    const revenueBefore = (await prisma.ledgerAccount.findFirst({ where: { kind: 'platform_revenue', mode: 'test', currency: 'NGN' } })).balanceMinor;
+    const approved = await shopper.post(`/v1/store/gift-card-sales/${sold.json.id}/simulate`, { outcome: 'approved' });
+    assert.deepEqual([approved.json.status, approved.json.paid], ['completed', 10_488_000]);
+    const balance = async (kind, where) => (await prisma.ledgerAccount.findFirst({ where: { kind, mode: 'test', currency: 'NGN', ...where } }))?.balanceMinor ?? 0n;
+    assert.equal(await balance('customer_wallet', { customerId: shopper.id }), 10_488_000n);
+    // ₦120,000 from Prestmit: ₦6,000 BitoCard's margin, ₦9,120 the reseller's 8% of the rest, ₦104,880 the customer's.
+    assert.equal((await balance('platform_revenue', {})) - revenueBefore, 600_000n);
+    assert.equal(await balance('reseller_earnings_held', { resellerId: owner.resellerId }), 912_000n);
+    const lot = await prisma.earningsLot.findUnique({ where: { reference: `gift_card_sale:${sold.json.id}` } });
+    assert.equal(lot.amountMinor, 912_000n);
+    assert.equal((await admin.get('/v1/admin/ledger/check?mode=test')).json.ok, true);
+
+    const seen = (await shq()).json;
+    assert.deepEqual([seen.available, seen.spread_bps, seen.cap_bps, seen.currency], [true, 800, 1000, 'NGN']);
+    assert.deepEqual(seen.data.map(sale => [sale.status, sale.paid, sale.earned, sale.spread_bps, sale.customer.id]), [['completed', 10_488_000, 912_000, 800, shopper.id]]);
+    assert.doesNotMatch(JSON.stringify(seen), /prestmit|margin|"rate"|provider/i);
+
+    // A markup above the cap takes only the cap: 10% unless admins set another.
+    await prisma.resellerMarkup.updateMany({ where: { resellerId: owner.resellerId }, data: { markupBps: 3000 } });
+    assert.equal((await offersAt()).offers[0].rate, 102_600);
+    // Switched off again: nothing more is bought there.
+    assert.equal((await admin.put('/v1/admin/switches/reseller_gift_card_buyback', { reseller_id: owner.resellerId, enabled: false })).status, 200);
+    assert.equal((await shopper.post('/v1/store/gift-card-sales/quote', { offer_id: open.offers[0].id, amount: 100 })).json.error.code, 'gift_card_selling_unavailable');
   });
 });
 

@@ -285,7 +285,7 @@ export const accountDocs: DocsArea = {
       status: 200,
       description: 'Your settings.',
       schema: 'Settings',
-      example: { object: 'settings', options: exampleOptions, features: { startup_allowance: true, welcome_bonus: false, reserved_accounts: true, custom_domains: false, own_integrations: false, own_payment_gateways: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, customer_foreign_wallets: false, spin_rewards: false, store_template_all_in_one: true, store_template_topups: true, store_template_gift_cards: true, store_template_single_product: true, store_template_vpn_shop: true, store_template_rdp_shop: true, reseller_two_step: false, manual_reseller_approval: false, shq_install_prompt: false, shq_store_guide: true, storefront_install_prompt: false, gift_card_selling: false, airtime_exchange: false, bank_deposits: false } },
+      example: { object: 'settings', options: exampleOptions, features: { startup_allowance: true, welcome_bonus: false, reserved_accounts: true, custom_domains: false, own_integrations: false, own_payment_gateways: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, customer_foreign_wallets: false, spin_rewards: false, store_template_all_in_one: true, store_template_topups: true, store_template_gift_cards: true, store_template_single_product: true, store_template_vpn_shop: true, store_template_rdp_shop: true, reseller_two_step: false, manual_reseller_approval: false, shq_install_prompt: false, shq_store_guide: true, storefront_install_prompt: false, gift_card_selling: false, reseller_gift_card_buyback: false, airtime_exchange: false, bank_deposits: false } },
     },
     'PUT /v1/settings/options/{key}': {
       status: 200,

@@ -5493,6 +5493,10 @@ model GiftCardSale {
   /// The provider's rate and BitoCard's margin when the card was sent.
   rate               Decimal           @db.Decimal(18, 4)
   marginBps          Int               @map("margin_bps")
+  /// A reseller's store: the reseller and their cut of BitoCard's payout (basis points), and what it came to once approved.
+  resellerId         String?           @map("reseller_id") @db.Uuid
+  resellerSpreadBps  Int               @default(0) @map("reseller_spread_bps")
+  resellerEarningMinor BigInt?         @map("reseller_earning_minor")
   /// What the customer was told they would get (minor units).
   quotedMinor        BigInt            @map("quoted_minor")
   /// What the provider paid BitoCard, and what the customer got (minor units), once approved.
@@ -5514,6 +5518,7 @@ model GiftCardSale {
   offer              GiftCardSellOffer @relation(fields: [offerId], references: [id], onDelete: Restrict)
 
   @@index([customerId, createdAt])
+  @@index([resellerId, createdAt])
   @@index([status, nextCheckAt])
   @@map("gift_card_sales")
 }

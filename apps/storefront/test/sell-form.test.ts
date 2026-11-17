@@ -77,5 +77,9 @@ describe("what can be sold", () => {
     expect((await sellOptionsFor("gift_cards:US:amazon", "NG"))?.available).toBe(true);
     expect(await sellingOpenIn("NG")).toBe(true);
     expect(urls).toEqual(["http://api.test/v1/store/gift-card-sales/offers?product=gift_cards%3AUS%3Aamazon&country=NG", "http://api.test/v1/store/gift-card-sales/offers?country=NG"]);
+    // A reseller's store names itself: the API decides whether it buys cards (buy back) and at its rate.
+    setRequest({ host: "ada.bitocard.com" });
+    await sellOptionsFor("gift_cards:US:amazon", "NG");
+    expect(urls.at(-1)).toBe("http://api.test/v1/store/gift-card-sales/offers?product=gift_cards%3AUS%3Aamazon&country=NG&store=ada");
   });
 });

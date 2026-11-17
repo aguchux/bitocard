@@ -62,6 +62,11 @@ export const switchDefinitions = {
     description:
       "Customers of BitoCard's own stores sell their gift cards on each gift card's page; once the card is accepted, BitoCard credits the customer's wallet. Off until selling is cleared in the market.",
   },
+  reseller_gift_card_buyback: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "Customers of resellers' stores sell their gift cards there too (with gift card selling on in the market): they get BitoCard's rate less the reseller's cut (their gift card markup, capped), which goes to the reseller's earnings once the card is accepted. Off until buy back is cleared.",
+  },
   airtime_exchange: {
     scopes: ['global', 'country'],
     description:

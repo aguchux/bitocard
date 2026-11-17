@@ -61,8 +61,8 @@ export async function ProductDetail({ product, inApp = false, sell = false }: { 
     customer && country ? walletFor() : null,
     rateFor(product, country),
   ]);
-  // Gift cards the store buys back, in the customer's own country (or the market they shop in).
-  const sellOptions = product.category === "gift_cards" ? await sellOptionsFor(product.key, customer?.country ?? (market && market !== "global" ? market : null)) : null;
+  // Gift cards the store buys back: a reseller's store in its own country, else the customer's (or the market they shop in).
+  const sellOptions = product.category === "gift_cards" ? await sellOptionsFor(product.key, store?.country ?? customer?.country ?? (market && market !== "global" ? market : null)) : null;
   const sandbox = methods?.ok ? methods.data.mode === "test" : false;
   const buyForm = (
     <BuyForm
