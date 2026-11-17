@@ -526,6 +526,7 @@ export * from './support';
 export * from '../support-bots';
 export * from './storefront';
 export * from './spins';
+export * from './account-switch';
 export * from './stock';
 export * from './payment-methods';
 export * from './crypto';

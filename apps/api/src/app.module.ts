@@ -9,6 +9,7 @@ import { CheckoutModule } from './checkout/checkout.module.js';
 import { CountriesModule } from './countries/countries.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { ResellerEmailsModule } from './reseller-emails/reseller-emails.controller.js';
+import { AccountSwitchModule } from './account-switch/account-switch.controller.js';
 import { DomainsModule } from './domains/domains.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StoresModule } from './stores/stores.module.js';
@@ -89,6 +90,7 @@ export class AppModule {
         PlanAccessModule,
         PlansModule,
         ResellerEmailsModule,
+        AccountSwitchModule,
         DomainsModule,
         StoresModule,
         HealthModule,

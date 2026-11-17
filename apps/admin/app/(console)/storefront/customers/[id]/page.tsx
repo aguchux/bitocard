@@ -11,6 +11,7 @@ import {
   useUpdateStorefrontCustomerMutation,
 } from "@bitocard/api-client/admin";
 import { WalletTopUp } from "@/components/wallet-top-up";
+import { MakeResellerCard } from "@/components/account-switch";
 
 /** The customer's wallets: their own country's currency (the default), US dollars, then any they added. */
 function customerWallets(held: string[] | undefined) {
@@ -68,6 +69,7 @@ export default function StorefrontCustomerPage() {
               )
             }
           />
+          {can(admin, "operations", "support") ? <MakeResellerCard customerId={id} canChange={can(admin, "operations")} /> : null}
           <Card>
             <CardHeader title="Wallet top-ups" description="Money added by BitoCard by hand. Spend only: it is never withdrawn." />
             <div className="px-5 pb-5 sm:px-6">

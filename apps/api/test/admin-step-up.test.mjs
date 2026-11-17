@@ -77,6 +77,8 @@ const protectedRoutes = [
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver/remove`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/unsuspend`, { reason: 'x' }],
+  ['post', `/v1/admin/resellers/${randomId}/make-customer`, { reason: 'x' }],
+  ['post', `/v1/admin/storefront/customers/${randomId}/make-reseller`, { business_name: 'x', reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/members/${randomId}/two-step/reset`, { reason: 'x' }],
   ['post', '/v1/admin/countries', {}],
   ['patch', '/v1/admin/countries/NG', {}],
