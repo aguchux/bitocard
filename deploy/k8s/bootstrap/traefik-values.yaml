@@ -20,6 +20,8 @@ providers:
   # For Udozo's TLSStore (deploy/k8s/udozo/tls-store.yaml): its Origin CA certificate is the default one.
   kubernetesCRD:
     enabled: true
+# The DigitalOcean load balancer is made and kept by this Service: change it only here (annotations, then install.sh),
+# never in DigitalOcean's control panel, whose changes the cluster's reconciler reverts (or which leave it unusable).
 service:
   annotations:
     service.beta.kubernetes.io/do-loadbalancer-name: golojan-traefik

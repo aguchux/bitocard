@@ -52,7 +52,11 @@ Every value comes from kustomize generators over `<shared|bitocard|udozo>/env/*.
 
 1. **Install Traefik:**
    `KUBECONFIG=terraform/golojancluster-kubeconfig.yaml sh deploy/k8s/bootstrap/install.sh`.
-   It prints the load balancer's address.
+   It prints the load balancer's address (`129.212.132.241`, `golojan-traefik`).
+   **Load balancers and volumes are managed only through kubectl:** the load balancer belongs to Traefik's Service
+   (`bootstrap/traefik-values.yaml` annotations, applied by `install.sh`). Never change it, or any volume, in
+   DigitalOcean's control panel: the cluster's reconciler reverts those changes, or they leave the cluster unusable.
+   Nothing here uses volumes (the databases are Neon, Redis is Upstash).
 2. **Fill in the settings:** run `sh deploy/k8s/init-env.sh`, then fill in every file it lists.
 3. **Make the two Origin CA certificates** (Certificates below): for each of `bitocard` and `udozo`,
    `sh deploy/k8s/origin-cert.sh <product> csr`, sign it in that zone's Cloudflare dashboard, then
