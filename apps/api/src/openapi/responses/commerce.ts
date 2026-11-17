@@ -156,6 +156,28 @@ const pricePreview = objectSchema(
     your_profit: money('What you make per sale'),
     markup_cap_bps: int('The most you can mark up markup products, in basis points.'),
     fixed_below_cost: bool('Your fixed price is below BitoCard’s price, so customers pay BitoCard’s price and you make nothing. Raise it.'),
+    rate: nullable(
+      shape(
+        {
+          face_currency: str('The card’s currency: its face value is in it.'),
+          bitocard_rate: num('BitoCard’s rate to you: what one unit of the card’s currency (£1, $1) costs you, in minor units of `currency`.', { type: ['number', 'null'] }),
+          customer_rate: num('Your rate to customers: BitoCard’s rate plus your markup, in minor units of `currency` per unit of the card’s currency.', { type: ['number', 'null'] }),
+          markup_bps: int('Your markup on BitoCard’s rate, in basis points.'),
+          values: array(
+            shape(
+              {
+                face_value: int('The card’s value, in minor units of `face_currency`.'),
+                bitocard_price: money('What BitoCard charges you for it'),
+                customer_price: money('What your customer pays for it'),
+                your_profit: money('What you make on it'),
+              },
+              'One value of the card at the two rates.',
+            ),
+          ),
+        },
+        'Gift cards are sold by rate: the card keeps its face value and is paid for at a rate per unit of its currency. Null for other categories.',
+      ),
+    ),
     settings: shape(
       {
         customer_discount_bps: int('The customer discount that applied, in basis points.'),
@@ -191,6 +213,7 @@ const pricePreviewExample = {
   your_profit: 1000,
   markup_cap_bps: 10000,
   fixed_below_cost: false,
+  rate: null,
   settings: { customer_discount_bps: 50, markup_bps: 0, fixed_price: null, from: { customer_discount: 'category', markup: 'none', fixed: 'none' } },
 };
 

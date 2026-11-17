@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Database, Globe2, Package, Search, Store } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatRelative, summariseOffers, ImageField, Input, LoadMore, Notice, PageHeader, StatCard, StatusBadge, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { ProductPricingDialog } from "./product-pricing";
+import { GiftCardRateDialog } from "./gift-card-rate";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type AdminProduct,
@@ -364,7 +365,13 @@ function Products() {
           }}
         />
       ) : null}
-      {pricing ? <ProductPricingDialog key={pricing.id} product={pricing} open onClose={() => setPricing(null)} finance={can(admin, "finance")} operator={operator} /> : null}
+      {pricing ? (
+        pricing.category === "gift_cards" ? (
+          <GiftCardRateDialog key={pricing.id} product={pricing} open onClose={() => setPricing(null)} finance={can(admin, "finance")} operator={operator} />
+        ) : (
+          <ProductPricingDialog key={pricing.id} product={pricing} open onClose={() => setPricing(null)} finance={can(admin, "finance")} operator={operator} />
+        )
+      ) : null}
     </AdminShell>
   );
 }

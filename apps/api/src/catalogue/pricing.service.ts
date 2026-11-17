@@ -32,6 +32,15 @@ export const faceValueCategories = new Set<ProductCategory>(['airtime', 'data', 
 export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'software', 'vpn', 'rdp']);
 /** The country of products usable anywhere, such as BitoCard's own software licences (ISO's user-assigned "WW"). */
 export const worldwideCountry = 'WW';
+/**
+ * Categories sold by rate: the card shows its face value, and its price is the face value at a rate, BitoCard's being
+ * what the supplier charges (converted at BitoCard's rate) plus BitoCard's markup, the reseller's that plus theirs.
+ * No discount or fixed prices; only rules for the category (any market, supplier or brand) apply.
+ */
+export const rateCategories = new Set<ProductCategory>(['gift_cards']);
+export const isRated = (product: Pick<Product, 'category'>) => rateCategories.has(product.category);
+/** BitoCard's markup on a rated product when no rule for its category says otherwise, so it never sells at cost. */
+export const defaultRateMarginBps = 1_000;
 
 export type Offer = SupplierProduct & { supplier: Supplier };
 /** An offer from the reseller's own supplier account, with when the reseller wants it used. */
@@ -140,6 +149,12 @@ const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
 /** amount x (1 + bps/10000), rounded up. */
 const addBps = (amount: bigint, bps: number) => ceilDiv(mulBps(amount, 10_000 + bps), 10_000n);
 
+/**
+ * A rate: what one unit of the card's currency (£1, $1) costs in the market's minor units, from an amount for a face
+ * value in the card's minor units (every currency is kept to two decimals, so one unit is 100 minor units).
+ */
+export const perUnit = (amount: bigint, face: bigint) => (face > 0n ? Number(new Decimal(amount.toString()).mul(100).div(face.toString()).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)) : null);
+
 export const unavailable = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
 
 /**
@@ -202,21 +217,25 @@ export class PricingService {
    * entirely, for renewals priced from a monthly cost).
    */
   rule(ctx: PricingContext, product: Product, supplierCode: string | null, options: { skipFixed?: boolean } = {}): ResolvedRule {
+    const rated = isRated(product);
     let best: PricingRule | null = null;
     let bestScore = -1;
     for (const rule of ctx.rules) {
       if (rule.productId && rule.productId !== product.id) continue;
+      if (rated && !rule.productId && rule.category !== product.category) continue;
       if (rule.supplierCode && rule.supplierCode !== supplierCode) continue;
       if (rule.category && rule.category !== product.category) continue;
       if (rule.countryCode && rule.countryCode !== ctx.country.code) continue;
-      if (rule.kind === 'fixed' && (options.skipFixed || !singleValue(product) || rule.fixedMinor === null || !rule.fixedCurrency)) continue;
+      if (rule.kind === 'fixed' && (rated || options.skipFixed || !singleValue(product) || rule.fixedMinor === null || !rule.fixedCurrency)) continue;
       const score = (rule.productId ? 8 : 0) + (rule.supplierCode ? 4 : 0) + (rule.category ? 2 : 0) + (rule.countryCode ? 1 : 0);
       if (score > bestScore) [best, bestScore] = [rule, score];
     }
+    if (!best && rated) return { kind: 'markup', marginBps: defaultRateMarginBps, resellerDiscountBps: 0, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
     if (!best) return { kind: 'auto', marginBps: 0, resellerDiscountBps: 0, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
     const level: Level = best.productId ? 'product' : best.supplierCode ? 'supplier' : best.category ? 'category' : best.countryCode ? 'country' : 'general';
     return {
-      kind: best.kind as PriceKind,
+      // A rated product is always marked up from cost, whatever kind an older rule was saved with.
+      kind: rated ? 'markup' : (best.kind as PriceKind),
       marginBps: best.marginBps,
       resellerDiscountBps: best.resellerDiscountBps,
       fixedMinor: best.fixedMinor,
@@ -240,7 +259,7 @@ export class PricingService {
     };
     const markup = pick('markupBps');
     const discount = pick('customerDiscountBps');
-    const fixed = ofProduct?.fixedMinor ?? null;
+    const fixed = isRated(product) ? null : (ofProduct?.fixedMinor ?? null);
     return {
       customerDiscountBps: discount.value,
       markupBps: Math.min(markup.value, ctx.capBps, maxResellerMarkupBps),
@@ -469,6 +488,9 @@ export class PricingService {
         throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such product in this category.', 'product_id');
       }
       category = product.category;
+      if (isRated(product) && input.fixed_price !== undefined && input.fixed_price !== null) {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Gift cards are sold by rate: set your markup on BitoCard’s rate.', 'fixed_price');
+      }
       if (input.fixed_price !== undefined && input.fixed_price !== null) await this.assertFixedWithinCap(resellerId, input.product_id, BigInt(input.fixed_price), cap);
     } else if (input.fixed_price !== undefined && input.fixed_price !== null) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A fixed price is set for one product.', 'fixed_price');
@@ -604,6 +626,7 @@ export class PricingService {
     if (face === null || face <= 0n) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Say which face value to price.', 'face_value');
     const priced = await this.choose(ctx, product, face);
     const discount = priced.basis === 'discount';
+    const rate = isRated(product) ? await this.resellerRate(ctx, product, face, priced) : null;
     return {
       object: 'price_preview' as const,
       product_id: product.id,
@@ -623,12 +646,31 @@ export class PricingService {
       your_profit: minor(priced.price - priced.wholesale),
       markup_cap_bps: Math.min(ctx.capBps, maxResellerMarkupBps),
       fixed_below_cost: priced.fixedBelowCost,
+      /** Gift cards: sold by rate (per unit of the card's currency), with what each of the card's values comes to. */
+      rate,
       settings: {
         customer_discount_bps: priced.terms.customerDiscountBps,
         markup_bps: priced.terms.markupBps,
         fixed_price: priced.terms.fixedMinor === null ? null : minor(priced.terms.fixedMinor),
         from: { customer_discount: priced.terms.from.customerDiscount, markup: priced.terms.from.markup, fixed: priced.terms.from.fixed },
       },
+    };
+  }
+
+  /** BitoCard's rate to the reseller and theirs to customers, and each of the card's values at them. */
+  private async resellerRate(ctx: PricingContext, product: ProductWithOffers, face: bigint, priced: Priced) {
+    const values = [];
+    for (const value of rateValues(product)) {
+      const at = value === face ? priced : await this.choose(ctx, product, value).catch(() => null);
+      if (!at) continue;
+      values.push({ face_value: minor(value), bitocard_price: minor(at.wholesale), customer_price: minor(at.price), your_profit: minor(at.price - at.wholesale) });
+    }
+    return {
+      face_currency: product.faceCurrency,
+      bitocard_rate: perUnit(priced.wholesale, face),
+      customer_rate: perUnit(priced.price, face),
+      markup_bps: priced.terms.markupBps,
+      values,
     };
   }
 
@@ -650,8 +692,14 @@ export class PricingService {
     fixed_price?: number;
     fixed_currency?: string;
   }) {
-    const kind: PriceKind = input.kind ?? 'auto';
+    let kind: PriceKind = input.kind ?? 'auto';
     const invalid = (message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', message, param);
+    // Rated categories (gift cards) are sold by rate: their rules are always a markup on what the supplier charges.
+    const ratedProduct = input.product_id ? await this.prisma.product.findUnique({ where: { id: input.product_id }, select: { category: true } }) : null;
+    if ((input.category && rateCategories.has(input.category)) || (ratedProduct && isRated(ratedProduct))) {
+      if (kind === 'discount' || kind === 'fixed') throw invalid('Gift cards are sold by rate: set BitoCard’s markup on what the supplier charges.', 'kind');
+      kind = 'markup';
+    }
     if (kind === 'fixed') {
       if (!input.product_id && !input.supplier_code) throw invalid('A fixed price is set for a supplier or a product.', 'kind');
       if (!input.fixed_price || !input.fixed_currency) throw invalid('Give the fixed price and its currency.', 'fixed_price');
@@ -728,6 +776,7 @@ export class PricingService {
       const offerFace = covers ? face : BigInt((offer.meta as { face_value: string }).face_value);
       const offerFaceLocal = covers ? faceLocal : await this.faceIn(ctx, product, offerFace).catch(() => null);
       const eligible = this.eligibleOffers(ctx, { ...product, supplierProducts: [offer] }).length === 1;
+      const blocked = eligible ? null : this.whyNotOffered(ctx, product, offer);
       const priced = eligible && offerFaceLocal !== null ? await this.priceOffer(ctx, product, offerFace, offerFaceLocal, offer).catch(() => null) : null;
       const rule = this.rule(ctx, product, offer.supplierCode);
       const discounted = new Decimal(offerFace.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
@@ -751,7 +800,10 @@ export class PricingService {
         rule: presentResolved(priced?.rule ?? rule),
         scheme: priced ? (priced.basis === 'discount' ? 'discount' : 'markup') : null,
         sellable: Boolean(priced),
-        reason: priced ? null : !eligible ? 'not_offered' : cost === null ? 'no_exchange_rate' : rule.kind === 'discount' || (rule.kind === 'auto' && offerFaceLocal !== null && cost > offerFaceLocal) ? 'cost_above_face_value' : rule.kind === 'fixed' ? 'price_below_cost' : 'not_priced',
+        /** Gift cards: what £1 (or $1) of card value costs BitoCard here, and BitoCard's rate to resellers. */
+        supplier_rate: isRated(product) && cost !== null ? perUnit(cost, offerFace) : null,
+        bitocard_rate: isRated(product) && priced ? perUnit(priced.wholesale, offerFace) : null,
+        reason: priced ? null : blocked ? blocked : cost === null ? 'no_exchange_rate' : rule.kind === 'discount' || (rule.kind === 'auto' && offerFaceLocal !== null && cost > offerFaceLocal) ? 'cost_above_face_value' : rule.kind === 'fixed' ? 'price_below_cost' : 'not_priced',
         wholesale: priced ? minor(priced.wholesale) : null,
         bitocard_profit: priced ? minor(priced.wholesale - priced.cost) : null,
         reseller_discount: priced && priced.basis === 'discount' ? minor(priced.face - priced.wholesale) : null,
@@ -762,6 +814,16 @@ export class PricingService {
     // What sells now: the chosen offer's rule (else the rule without a supplier).
     const chosenOffer = product.supplierProducts.find(offer => offer.id === chosen);
     const now = chosenOffer ? this.rule(ctx, product, chosenOffer.supplierCode) : current;
+    const rated = isRated(product);
+    const values = [];
+    if (rated) {
+      for (const value of rateValues(product)) {
+        const at = await this.price(ctx, product, value).catch(() => null);
+        if (at) values.push({ face_value: minor(value), cost: minor(at.cost), wholesale: minor(at.wholesale), bitocard_profit: minor(at.wholesale - at.cost) });
+      }
+    }
+    const chosenPriced = chosenOffer ? offers.find(item => item.offer_id === chosenOffer.id) : null;
+    const marketReason = this.unavailableReason(ctx, product);
     return {
       object: 'admin_price_preview' as const,
       product_id: product.id,
@@ -776,8 +838,41 @@ export class PricingService {
       current: presentResolved(trial?.kind ? current : now),
       trial: trial?.kind ? presentResolved(now) : null,
       offers,
+      /** Why nothing can be sold here, in words, when no offer is chosen. */
+      unavailable_reason: chosen ? null : marketReason ? (marketReason.code === 'category_unavailable' ? `${categoryWord(product.category)} are off in ${country.name}.` : marketReason.message) : null,
+      /** Gift cards: priced by rate from the cheapest supplier, with each value at it. */
+      rate: rated
+        ? {
+            face_currency: product.faceCurrency,
+            margin_bps: now.marginBps,
+            level: now.level,
+            supplier_rate: chosenPriced?.supplier_rate ?? null,
+            bitocard_rate: chosenPriced?.bitocard_rate ?? null,
+            values,
+          }
+        : null,
     };
   }
+
+  /** Why an offer cannot be used in this market, as a code the admin app words. */
+  private whyNotOffered(ctx: PricingContext, product: Product, offer: Offer) {
+    if (this.unavailableReason(ctx, product)?.code === 'category_unavailable') return 'category_off';
+    if (!offer.available) return 'offer_unavailable';
+    if (!offer.supplier.enabled) return 'supplier_off';
+    if (offer.supplierCode !== stockSupplier && !ctx.markets.has(`${offer.supplierCode}:${product.category}`)) return 'supplier_not_in_market';
+    if (!this.servesHere(ctx, product, offer.supplierCode)) return 'supplier_domestic_only';
+    if (ctx.mode !== 'test' && !this.adapters.get(offer.supplierCode).configured()) return 'supplier_not_set_up';
+    return 'not_offered';
+  }
+}
+
+const categoryWords: Partial<Record<ProductCategory, string>> = { gift_cards: 'Gift cards' };
+const categoryWord = (category: ProductCategory) => categoryWords[category] ?? category.replace(/_/g, ' ');
+
+/** The values shown in a rate table: the card's fixed values (at most 12), or a range's lowest and highest. */
+function rateValues(product: ProductWithOffers) {
+  if (product.denominationType === 'range') return [product.minValueMinor, product.maxValueMinor].filter((value): value is bigint => value !== null && value > 0n);
+  return (faceChoices(product) ?? []).slice(0, 12).map(value => BigInt(value));
 }
 
 /** A product's face values (fixed products, plus each one-value offer's), lowest first; null for a range. */

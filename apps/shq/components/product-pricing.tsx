@@ -20,6 +20,7 @@ import {
 import { parseMoney } from "@bitocard/api-client/money";
 import { type Product, usePricePreviewQuery, useSetListingMutation, useSetMarkupMutation } from "@bitocard/api-client/reseller";
 import { MoneyField } from "@/components/money-field";
+import { GiftCardRateDialog } from "@/components/gift-card-rate";
 
 const from = { product: "this product", category: "your category setting", general: "your general setting", none: "no setting" } as const;
 
@@ -28,7 +29,12 @@ const from = { product: "this product", category: "your category setting", gener
  * as you change your discount or markup. Discount products sell at face value at most (you choose how much of your
  * discount your customer gets); markup products take your markup or a fixed price.
  */
-export function ProductPricingDialog({ product, open, onClose, manage }: { product: Product; open: boolean; onClose: () => void; manage: boolean }) {
+/** Gift cards are sold by rate and get their own dialog; everything else is priced here. */
+export function ProductPricingDialog(props: { product: Product; open: boolean; onClose: () => void; manage: boolean }) {
+  return props.product.category === "gift_cards" ? <GiftCardRateDialog {...props} /> : <PricingDialog {...props} />;
+}
+
+function PricingDialog({ product, open, onClose, manage }: { product: Product; open: boolean; onClose: () => void; manage: boolean }) {
   const id = useId();
   const values = product.pricing.denominations.map(item => item.face_value);
   const [face, setFace] = useState(values[0] ?? 0);

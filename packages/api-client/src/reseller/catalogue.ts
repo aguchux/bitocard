@@ -126,6 +126,14 @@ export type PricePreview = {
   your_profit: number;
   markup_cap_bps: number;
   fixed_below_cost: boolean;
+  /** Gift cards are sold by rate: BitoCard's and yours per unit of the card's currency (minor units of `currency`), and each value of the card. Null for other categories; missing on older API versions. */
+  rate?: {
+    face_currency: string;
+    bitocard_rate: number | null;
+    customer_rate: number | null;
+    markup_bps: number;
+    values: Array<{ face_value: number; bitocard_price: number; customer_price: number; your_profit: number }>;
+  } | null;
   settings: {
     customer_discount_bps: number;
     markup_bps: number;

@@ -153,9 +153,9 @@ describe('refunding delivered checkout orders', () => {
 
   test('the store’s margin is taken back: from held earnings, and once released from withdrawable earnings', async () => {
     const product = await giftCard('Amazon Released Card', ['RELEASED-CODE-0001', 'RELEASED-CODE-0002']);
-    // BitoCard's stock costs less than face value: a discount product. BitoCard passes 10% of face value to the store.
-    await prisma.pricingRule.create({ data: { productId: product.id, kind: 'discount', marginBps: 0, resellerDiscountBps: 1000 } });
+    // Gift cards are sold by rate: the store adds its 10% markup on BitoCard's rate, and keeps it.
     const store = await resellerStore([product], { live: true });
+    await prisma.resellerMarkup.create({ data: { resellerId: store.resellerId, productId: product.id, category: 'gift_cards', markupBps: 1000 } });
     const held = await customer(store.subdomain);
     const first = await held.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
     const delivered = await payOnStripe(held, first.json.id);
@@ -184,7 +184,7 @@ describe('refunding delivered checkout orders', () => {
     // Withdrawn already: refused, so finance refunds by hand instead of the wallet going negative.
     const third = await customer(store.subdomain);
     const product2 = await giftCard('Amazon Withdrawn Card', ['WITHDRAWN-CODE-0001']);
-    await prisma.pricingRule.create({ data: { productId: product2.id, kind: 'discount', marginBps: 0, resellerDiscountBps: 1000 } });
+    await prisma.resellerMarkup.create({ data: { resellerId: store.resellerId, productId: product2.id, category: 'gift_cards', markupBps: 1000 } });
     await listForTest(server, { resellerId: store.resellerId, productIds: [product2.id] });
     const last = await third.post('/v1/store/checkouts', { product_id: product2.id, face_value: 2500, country: 'NG', return_url: returnUrl });
     const sold = await prisma.order.findUniqueOrThrow({ where: { id: (await payOnStripe(third, last.json.id)).order.id } });

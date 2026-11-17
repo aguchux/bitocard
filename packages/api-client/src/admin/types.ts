@@ -411,12 +411,40 @@ export type AdminPricePreview = {
     rule: ResolvedPriceRule;
     scheme: 'discount' | 'markup' | null;
     sellable: boolean;
-    reason: 'not_offered' | 'cost_above_face_value' | 'price_below_cost' | 'no_exchange_rate' | 'not_priced' | null;
+    reason:
+      | 'not_offered'
+      | 'category_off'
+      | 'offer_unavailable'
+      | 'supplier_off'
+      | 'supplier_not_in_market'
+      | 'supplier_domestic_only'
+      | 'supplier_not_set_up'
+      | 'cost_above_face_value'
+      | 'price_below_cost'
+      | 'no_exchange_rate'
+      | 'not_priced'
+      | null;
+    /** Gift cards: what one unit of the card's currency costs BitoCard here, and BitoCard's rate to resellers (minor units of the market's currency). Missing on older API versions. */
+    supplier_rate?: number | null;
+    bitocard_rate?: number | null;
     wholesale: number | null;
     bitocard_profit: number | null;
     reseller_discount: number | null;
     chosen: boolean;
   }>;
+  /** Why nothing can be sold in this market, in words. Missing on older API versions. */
+  unavailable_reason?: string | null;
+  /** Gift cards: sold by rate. Missing on older API versions and for other categories. */
+  rate?: GiftCardRate | null;
+};
+/** A gift card's rate in one market: per unit of the card's currency, in the market's minor units. */
+export type GiftCardRate = {
+  face_currency: string;
+  margin_bps: number;
+  level: ResolvedPriceRule['level'];
+  supplier_rate: number | null;
+  bitocard_rate: number | null;
+  values: Array<{ face_value: number; cost: number; wholesale: number; bitocard_profit: number }>;
 };
 export type AdminPricePreviewArgs = {
   product_id: string;

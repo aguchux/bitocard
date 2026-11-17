@@ -19858,7 +19858,7 @@
     },
     "/v1/catalogue/products/{id}/price-preview": {
       "get": {
-        "description": "What one sale of a product earns you: BitoCard’s price, your customer’s price and your profit, under the product’s scheme. `discount` products (airtime, data, bills, gift cards…) sell at face value at most: you earn your discount from BitoCard and may give part of it to your customer (`customer_discount_bps`). `markup` products (software, mobile money…) are priced up from BitoCard’s price with your markup or a fixed price. Try settings with the query (nothing is saved); save them with `PUT /v1/pricing/markups`.",
+        "description": "What one sale of a product earns you: BitoCard’s price, your customer’s price and your profit, under the product’s scheme. `discount` products (airtime, data, bills…) sell at face value at most: you earn your discount from BitoCard and may give part of it to your customer (`customer_discount_bps`). `markup` products (software, mobile money…) are priced up from BitoCard’s price with your markup or a fixed price. Gift cards are sold by rate: `rate` gives BitoCard’s rate to you and yours to customers (your markup on it), per unit of the card’s currency, and what each of the card’s values comes to. Try settings with the query (nothing is saved); save them with `PUT /v1/pricing/markups`.",
         "operationId": "CatalogueController_preview",
         "parameters": [
           {
@@ -19938,6 +19938,7 @@
                   "your_profit": 1000,
                   "markup_cap_bps": 10000,
                   "fixed_below_cost": false,
+                  "rate": null,
                   "settings": {
                     "customer_discount_bps": 50,
                     "markup_bps": 0,
@@ -38751,6 +38752,7 @@
           "your_profit",
           "markup_cap_bps",
           "fixed_below_cost",
+          "rate",
           "settings"
         ],
         "additionalProperties": false,
@@ -38829,6 +38831,81 @@
           "fixed_below_cost": {
             "type": "boolean",
             "description": "Your fixed price is below BitoCard’s price, so customers pay BitoCard’s price and you make nothing. Raise it."
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "Gift cards are sold by rate: the card keeps its face value and is paid for at a rate per unit of its currency. Null for other categories.",
+                "required": [
+                  "face_currency",
+                  "bitocard_rate",
+                  "customer_rate",
+                  "markup_bps",
+                  "values"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "face_currency": {
+                    "type": "string",
+                    "description": "The card’s currency: its face value is in it."
+                  },
+                  "bitocard_rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "BitoCard’s rate to you: what one unit of the card’s currency (£1, $1) costs you, in minor units of `currency`."
+                  },
+                  "customer_rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "Your rate to customers: BitoCard’s rate plus your markup, in minor units of `currency` per unit of the card’s currency."
+                  },
+                  "markup_bps": {
+                    "type": "integer",
+                    "description": "Your markup on BitoCard’s rate, in basis points."
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "description": "One value of the card at the two rates.",
+                      "required": [
+                        "face_value",
+                        "bitocard_price",
+                        "customer_price",
+                        "your_profit"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "face_value": {
+                          "type": "integer",
+                          "description": "The card’s value, in minor units of `face_currency`."
+                        },
+                        "bitocard_price": {
+                          "type": "integer",
+                          "description": "What BitoCard charges you for it, in minor units of `currency` (for example kobo or cents)."
+                        },
+                        "customer_price": {
+                          "type": "integer",
+                          "description": "What your customer pays for it, in minor units of `currency` (for example kobo or cents)."
+                        },
+                        "your_profit": {
+                          "type": "integer",
+                          "description": "What you make on it, in minor units of `currency` (for example kobo or cents)."
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "settings": {
             "type": "object",

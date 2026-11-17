@@ -35,6 +35,17 @@ after(async () => {
 });
 
 const sandbox = { 'bitocard-mode': 'test' };
+/** A product priced up from cost that is not a gift card (BitoCard's own software), for resellers' fixed prices. */
+const softwareKey = 'software:WW:testsoft:suite-12m';
+const softwareProduct = async () => {
+  const existing = await prisma.product.findUnique({ where: { key: softwareKey } });
+  if (existing) return existing.id;
+  const product = await prisma.product.create({
+    data: { key: softwareKey, category: 'software', country: 'WW', brand: 'testsoft', name: 'Test Suite (1 year)', faceCurrency: 'USD', denominationType: 'fixed', fixedValues: [5000n] },
+  });
+  await prisma.supplierProduct.create({ data: { supplierCode: 'stock', productId: product.id, sku: 'test-suite-12m', costCurrency: 'USD', costRatio: 1.05, syncedAt: new Date() } });
+  return product.id;
+};
 const productId = async key => (await prisma.product.findUniqueOrThrow({ where: { key } })).id;
 const byKey = async (browser, key, headers) => {
   const id = await productId(key);
@@ -152,8 +163,9 @@ describe('catalogue', () => {
     for (const secret of ['reloadly', 'vtpass', 'sku', 'cost', 'dstv:dstv-padi', 'supplier']) assert.ok(!text.toLowerCase().includes(secret), `leaked ${secret}`);
 
     const amazon = json.data.find(p => p.name === 'Amazon US');
-    // US$25: (25.00 x 1.0094, rounded up, + 0.50 fee) = US$25.74, at 1522.5 = NGN 39,189.15; plus BitoCard's 3% = NGN 40,364.83.
-    assert.deepEqual(amazon.pricing.denominations.find(d => d.face_value === 2500), { face_value: 2500, wholesale: 4_036_483, price: 4_036_483 });
+    // Gift cards are sold by rate. US$25: (25.00 x 1.0094, rounded up, + 0.50 fee) = US$25.74, at 1522.5 = NGN 39,189.15;
+    // plus BitoCard's gift card markup of 10% = NGN 43,108.07.
+    assert.deepEqual(amazon.pricing.denominations.find(d => d.face_value === 2500), { face_value: 2500, wholesale: 4_310_807, price: 4_310_807 });
     assert.equal(amazon.pricing.currency, 'NGN');
     assert.deepEqual(amazon.denomination, { type: 'fixed', values: [1000, 2500, 5000] });
 
@@ -184,8 +196,8 @@ describe('catalogue', () => {
     const list = (await browser.get('/v1/catalogue/products?limit=100')).json.data;
     assert.ok(!list.some(p => p.country === 'NG'));
     const amazon = list.find(p => p.name === 'Amazon US');
-    // US$25.74 at GHS 15.225 = GHS 391.90 (rounded up), plus 3% = GHS 403.66.
-    assert.deepEqual(amazon.pricing.denominations.find(d => d.face_value === 2500), { face_value: 2500, wholesale: 40_366, price: 40_366 });
+    // US$25.74 at GHS 15.225 = GHS 391.90 (rounded up), plus the 10% gift card markup = GHS 431.09.
+    assert.deepEqual(amazon.pricing.denominations.find(d => d.face_value === 2500), { face_value: 2500, wholesale: 43_109, price: 43_109 });
     assert.equal((await byKey(browser, 'airtime:NG:mtn:topup')).error.code, 'international_selling_required');
   });
 
@@ -246,9 +258,40 @@ describe('pricing', () => {
     assert.equal((await browser.put('/v1/pricing/markups', { category: 'gift_cards', fixed_price: 500 })).json.error.param, 'fixed_price', 'a fixed price is for one product');
   });
 
+  test('gift cards are sold by rate: BitoCard’s markup on cost, the reseller’s on that, and no fixed prices', async () => {
+    const { browser } = await resellerClient(server);
+    const amazon = await productId('gift_cards:US:amazon-us');
+    await browser.put('/v1/pricing/markups', { product_id: amazon, markup_bps: 500 });
+    try {
+      const preview = (await browser.get(`/v1/catalogue/products/${amazon}/price-preview?face_value=2500`)).json;
+      assert.deepEqual([preview.scheme, preview.bitocard_price, preview.customer_price], ['markup', 4_310_807, Math.ceil((4_310_807 * 105) / 100)]);
+      // NGN 43,108.07 for US$25 is NGN 1,724.3228 per US$1 (in kobo, two decimals kept); the customer pays 5% above it.
+      assert.deepEqual([preview.rate.face_currency, preview.rate.bitocard_rate, preview.rate.markup_bps], ['USD', 172_432.28, 500]);
+      assert.deepEqual(preview.rate.values.map(row => row.face_value), [1000, 2500, 5000]);
+      assert.ok(preview.rate.values.every(row => row.your_profit === row.customer_price - row.bitocard_price && row.your_profit > 0));
+      const fixed = await browser.put('/v1/pricing/markups', { product_id: amazon, fixed_price: 5_000_000 });
+      assert.deepEqual([fixed.status, fixed.json.error.param], [400, 'fixed_price'], 'gift cards take a markup, never a fixed price');
+      const finance = await adminClient(server, ['finance']);
+      assert.equal((await finance.put('/v1/admin/pricing-rules', { category: 'gift_cards', kind: 'discount', reseller_discount_bps: 100 })).json.error.param, 'kind');
+      // A rule for every category (a supplier's, or the general one) never prices gift cards.
+      const supplier = (await finance.put('/v1/admin/pricing-rules', { supplier_code: 'reloadly', kind: 'discount', margin_bps: 0 })).json;
+      try {
+        assert.equal((await browser.get(`/v1/catalogue/products/${amazon}/price-preview?face_value=2500`)).json.bitocard_price, 4_310_807);
+      } finally {
+        await finance.delete(`/v1/admin/pricing-rules/${supplier.id}`);
+      }
+      const admin = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${amazon}&country=NG&face_value=2500`)).json;
+      assert.deepEqual([admin.rate.margin_bps, admin.rate.level, admin.rate.bitocard_rate], [1000, 'category', 172_432.28]);
+      assert.equal(admin.rate.values.find(row => row.face_value === 2500).wholesale, 4_310_807);
+      assert.ok(admin.offers.every(offer => offer.supplier_rate > 0));
+    } finally {
+      await browser.delete(`/v1/pricing/markups?product_id=${amazon}`);
+    }
+  });
+
   test('a fixed customer price per product, never below BitoCard’s price', async () => {
     const { browser } = await resellerClient(server);
-    const steam = await productId('gift_cards:US:steam-global');
+    const steam = await softwareProduct();
     const before = (await browser.get(`/v1/catalogue/products/${steam}`)).json.pricing.denominations[0];
     await browser.put('/v1/pricing/markups', { product_id: steam, fixed_price: before.wholesale + 12_345 });
     const fixed = (await browser.get(`/v1/catalogue/products/${steam}/price-preview?face_value=${before.face_value}`)).json;
@@ -262,14 +305,14 @@ describe('pricing', () => {
 
   test('a fixed price is held to the Markup Protection Scheme: refused above the cap, and capped if the cap is lowered', async () => {
     const { browser } = await resellerClient(server, { country: 'KE' });
-    const steam = await productId('gift_cards:US:steam-global');
-    const den = (await byKey(browser, 'gift_cards:US:steam-global')).pricing.denominations[0];
+    const steam = await softwareProduct();
+    const den = (await byKey(browser, softwareKey)).pricing.denominations[0];
     const tooHigh = await browser.put('/v1/pricing/markups', { product_id: steam, fixed_price: den.wholesale * 3 });
     assert.deepEqual([tooHigh.status, tooHigh.json.error.code, tooHigh.json.error.param], [400, 'markup_above_cap', 'fixed_price'], 'at most 100% above BitoCard’s price');
     assert.equal((await browser.put('/v1/pricing/markups', { product_id: steam, fixed_price: den.wholesale * 2 })).status, 200, 'exactly at the cap is allowed');
     await admin.patch('/v1/admin/countries/KE', { markup_cap_percent: 10 });
     try {
-      const capped = (await byKey(browser, 'gift_cards:US:steam-global')).pricing.denominations[0];
+      const capped = (await byKey(browser, softwareKey)).pricing.denominations[0];
       assert.equal(capped.price, Math.ceil(capped.wholesale * 1.1), 'a saved fixed price is capped again when priced');
     } finally {
       await admin.patch('/v1/admin/countries/KE', { markup_cap_percent: 100 });
@@ -344,11 +387,11 @@ describe('pricing', () => {
     const steam = await productId('gift_cards:US:steam-global');
     const wholesale = async () => (await browser.get(`/v1/catalogue/products/${steam}`)).json.pricing.denominations[0].wholesale;
     const general = await wholesale();
-    const supplier = (await finance.put('/v1/admin/pricing-rules', { supplier_code: 'reloadly', kind: 'markup', margin_bps: 2000 })).json;
+    const supplier = (await finance.put('/v1/admin/pricing-rules', { supplier_code: 'reloadly', category: 'gift_cards', kind: 'markup', margin_bps: 2000 })).json;
     try {
       const marked = await wholesale();
-      assert.ok(marked > general, 'Reloadly’s 20% markup overrides the general 3%');
-      assert.equal(Math.ceil((general / 1.03) * 1.2) - marked <= 1, true);
+      assert.ok(marked > general, 'Reloadly’s 20% on gift cards overrides the 10% gift card markup');
+      assert.equal(Math.ceil((general / 1.1) * 1.2) - marked <= 1, true);
       const refused = await finance.put('/v1/admin/pricing-rules', { product_id: steam, kind: 'fixed', fixed_price: 999, fixed_currency: 'USD' });
       assert.deepEqual([refused.status, refused.json.error.param], [400, 'kind'], 'Steam is any amount from $5 to $100');
       const preview = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${steam}&country=NG&face_value=500`)).json;
@@ -430,10 +473,10 @@ describe('quotes', () => {
     const product_id = await productId('gift_cards:US:amazon-us');
     assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 2000 })).json.error.param, 'face_value');
     const pair = (await browser.post('/v1/quotes', { product_id, face_value: 1000, quantity: 2 })).json;
-    assert.deepEqual([pair.quantity, pair.unit_wholesale, pair.wholesale], [2, 1_662_266, 3_324_532]);
+    assert.deepEqual([pair.quantity, pair.unit_wholesale, pair.wholesale], [2, 1_775_235, 3_550_470]);
     const quote = (await browser.post('/v1/quotes', { product_id, face_value: 1000 })).json;
-    // US$10: (10.00 x 1.0094 = 10.094, rounded up to 10.10) + 0.50 = US$10.60, at 1522.5 = NGN 16,138.50; plus 3%.
-    assert.deepEqual([quote.face_currency, quote.wholesale, quote.price], ['USD', 1_662_266, 1_662_266]);
+    // US$10: (10.00 x 1.0094 = 10.094, rounded up to 10.10) + 0.50 = US$10.60, at 1522.5 = NGN 16,138.50; plus 10%.
+    assert.deepEqual([quote.face_currency, quote.wholesale, quote.price], ['USD', 1_775_235, 1_775_235]);
     const row = await prisma.quote.findUniqueOrThrow({ where: { id: quote.id } });
     assert.deepEqual([row.supplierCostMinor, row.supplierCurrency, row.fxRate.toString()], [1060n, 'USD', '1522.5']);
   });
@@ -523,7 +566,7 @@ describe('quotes', () => {
       const quote = (await browser.post('/v1/quotes', body, sandbox)).json;
       // The price includes 7.5% VAT: VAT is 7.5/107.5 of it; profit is what is left above wholesale.
       const vat = Math.round((quote.price * 7.5) / 107.5);
-      assert.deepEqual([quote.price, quote.tax.name, quote.tax.amount, quote.reseller_profit], [Math.ceil(quote.wholesale * 1.1), 'VAT', vat, quote.price - quote.wholesale - vat]);
+      assert.deepEqual([quote.price, quote.tax.name, quote.tax.amount, quote.reseller_profit], [Math.ceil((quote.wholesale * 11) / 10), 'VAT', vat, quote.price - quote.wholesale - vat]);
       assert.equal((await browser.post('/v1/quotes', body)).json.error.code, 'tax_not_configured', 'Nigeria VAT is not confirmed yet');
     } finally {
       await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: false });
