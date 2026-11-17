@@ -23,12 +23,12 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/bitocard-storefront:latest
+          image: golojan/bitocard_storefront:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -95,12 +95,12 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/bitocard-shq:latest
+          image: golojan/bitocard_shq:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -162,12 +162,12 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/bitocard-admin:latest
+          image: golojan/bitocard_admin:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -229,12 +229,12 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/bitocard-legals:latest
+          image: golojan/bitocard_legals:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -296,12 +296,12 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/bitocard-docs:latest
+          image: golojan/bitocard_docs:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -363,12 +363,12 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/bitocard-verify:latest
+          image: golojan/bitocard_verify:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:

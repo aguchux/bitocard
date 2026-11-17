@@ -1,0 +1,135 @@
+# CI/CD for the Kubernetes cluster (deploy/k8s): builds the images of BitoCard's and Udozo's APIs and frontends and
+# pushes them to Docker Hub as golojan/bitocard_<app>:<commit> and :latest (the list is deploy/k8s/images.json, written
+# by deploy/k8s/generate.mjs), then, once switched on, rolls the cluster onto them.
+#
+# - On every push to main: only the images the push affects (deploy/k8s/affected.mjs: each app's package and the
+#   workspace packages it uses, by turbo's graph; everything when the lockfile, images.json or the frontends'
+#   Dockerfile changed).
+# - By hand (Actions > Docker images > Run workflow): every image, or those named, and optionally deploy them.
+# - Deploying: after every image built, each affected Deployment is set to the new commit's image
+#   (`kubectl set image`; an API's migrations run in its pod's init container first) and waited for. Automatic on
+#   pushes only while the repository variable K8S_AUTO_DEPLOY is `on`; a Deployment not on the cluster yet is skipped
+#   (the first apply, with its settings and secrets, is deploy/k8s/deploy.sh from a machine holding the env files).
+#
+# Needs: secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token of the golojan account, Read & Write);
+# to deploy, secret K8S_KUBECONFIG (the cluster's kubeconfig, its whole text) in the `production` environment.
+name: Docker images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Build only these images, comma separated (for example bitocard_storefront,bitocard_udozo_api); empty builds all
+        required: false
+      deploy:
+        description: Roll the cluster onto the images built
+        type: boolean
+        default: false
+
+concurrency:
+  group: docker-images-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - id: list
+        env:
+          BASE: ${{ github.event_name == 'push' && github.event.before || 'all' }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          images=$(node deploy/k8s/affected.mjs "$BASE" "$ONLY")
+          count=$(node -e 'console.log(JSON.parse(process.argv[1]).length)' "$images")
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "### Images to build: $count" >> "$GITHUB_STEP_SUMMARY"
+          node -e 'for (const i of JSON.parse(process.argv[1])) console.log(`- ${i.image}`)' "$images" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.images) }}
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: |
+            GIT_COMMIT_SHA=${{ github.sha }}
+            ${{ matrix.args }}
+          tags: |
+            ${{ matrix.image }}:${{ github.sha }}
+            ${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: [plan, build]
+    if: >-
+      github.ref == 'refs/heads/main' && needs.plan.outputs.count != '0' &&
+      ((github.event_name == 'push' && vars.K8S_AUTO_DEPLOY == 'on') || inputs.deploy)
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: azure/setup-kubectl@v4
+      - name: Roll the cluster onto this commit's images
+        env:
+          KUBECONFIG_TEXT: ${{ secrets.K8S_KUBECONFIG }}
+          IMAGES: ${{ needs.plan.outputs.images }}
+          TAG: ${{ github.sha }}
+        run: |
+          set -eu
+          [ -n "$KUBECONFIG_TEXT" ] || { echo "K8S_KUBECONFIG is not set" >&2; exit 1; }
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          printf '%s' "$KUBECONFIG_TEXT" > "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
+          rolled=""
+          for pair in $(node -e 'for (const i of JSON.parse(process.env.IMAGES)) console.log(`${i.deployment}=${i.image}`)'); do
+            deployment="${pair%%=*}"; image="${pair#*=}"
+            if ! kubectl -n bitocard get deployment "$deployment" >/dev/null 2>&1; then
+              echo "skip $deployment: not on the cluster yet (apply it once with deploy/k8s/deploy.sh)"; continue
+            fi
+            # Every container of the pod, the API's migrations and scheduler included.
+            kubectl -n bitocard set image "deployment/$deployment" "*=$image:$TAG"
+            rolled="$rolled $deployment"
+          done
+          for deployment in $rolled; do
+            kubectl -n bitocard rollout status "deployment/$deployment" --timeout=10m
+          done
+          echo "### Rolled out $TAG:$rolled" >> "$GITHUB_STEP_SUMMARY"

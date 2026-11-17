@@ -14,6 +14,8 @@ function mount() {
   document.body.append(host);
   const root = createRoot(host);
   const items = ["a", "b"].map(id => createElement("li", { key: id }, createElement("a", { href: `/l/${id}` }, `Item ${id}`)));
+  // Marquee requires children in its props, so they go there rather than as createElement's third argument.
+  // eslint-disable-next-line react/no-children-prop
   act(() => root.render(createElement(Marquee, { label: "Trending", count: 2, children: items })));
   mounted.push(() => act(() => root.unmount()));
   return host;

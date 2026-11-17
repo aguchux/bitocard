@@ -17,6 +17,9 @@ providers:
   kubernetesIngress:
     publishedService:
       enabled: true
+  # For Udozo's TLSStore (deploy/k8s/udozo/tls-store.yaml): its Origin CA certificate is the default one.
+  kubernetesCRD:
+    enabled: true
 service:
   annotations:
     service.beta.kubernetes.io/do-loadbalancer-name: golojan-traefik

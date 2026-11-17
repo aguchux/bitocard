@@ -1,0 +1,11 @@
+# Traefik's default certificate: Udozo's Cloudflare Origin CA certificate, served to any host no route's TLS names
+# (resellers' own domains, reached through Cloudflare for SaaS; deploy/k8s/README.md).
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+spec:
+  defaultCertificate:
+    secretName: udozo-tls

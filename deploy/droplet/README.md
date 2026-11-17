@@ -17,10 +17,9 @@ visitor ──https──▶ Cloudflare (proxied, Full (strict)) ──https─�
   requests from Cloudflare's ranges, and holds requests for up to 30 seconds while a deploy restarts the API.
 - **Webhooks to resellers** are delivered straight after each change (the `database` transport) plus the `webhooks`
   job, as everywhere off Vercel. Vercel Queues is not used.
-- **Deploys** (`.github/workflows/deploy-api.yml`): each push to `main` touching the API builds the image, applies
-  migrations from it, starts it, waits until healthy, then smoke tests and checks the new commit is served.
-- **Rollback**: Actions > Deploy API > Run workflow with an earlier image. Or on the droplet:
-  `sh /opt/bitocard/deploy.sh $(sed -n 2p /opt/bitocard/images.log)`.
+- **Deploys: none from CI any more** (17 November 2026: the API is moving to Kubernetes, `deploy/k8s`, and the
+  droplet's workflow was removed). Until the cut-over, deploy by hand on the droplet with an image already pushed:
+  `sh /opt/bitocard/deploy.sh <image>`; roll back with `sh /opt/bitocard/deploy.sh $(sed -n 2p /opt/bitocard/images.log)`.
 
 ## 1. Create the droplet
 

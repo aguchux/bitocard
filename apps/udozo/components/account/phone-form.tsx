@@ -15,6 +15,8 @@ export function PhoneForm({ phone, verified, country, available: sms, whatsapp =
   const countrySet = Boolean(country);
   // A code goes by text where the country can text, and on WhatsApp where Udozo is on WhatsApp there.
   const available = sms || whatsapp;
+  const [adding, setAdding] = useState(false);
+  const [sendState, sendAction, sendPending] = useActionState(addPhone, {});
   const send = (label: string) => (
     <>
       {sms ? <Submit pending={sendPending}>{label}</Submit> : null}
@@ -25,8 +27,6 @@ export function PhoneForm({ phone, verified, country, available: sms, whatsapp =
       ) : null}
     </>
   );
-  const [adding, setAdding] = useState(false);
-  const [sendState, sendAction, sendPending] = useActionState(addPhone, {});
   const [verifyState, verifyAction, verifyPending] = useActionState(verifyPhone, {});
   const complete = Boolean(verifyState.notice);
   const showCode = Boolean(sendState.notice) && !complete;

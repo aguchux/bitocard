@@ -1,1 +1,0 @@
-{"auths":{"ghcr.io":{"auth":"<base64 of github-user:token with read:packages>"}}}

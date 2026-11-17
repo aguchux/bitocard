@@ -23,14 +23,14 @@ spec:
         app.kubernetes.io/part-of: bitocard
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       # Before the new image serves: the settings checked (the database answers, ENCRYPTION_KEY opens the stored
       # secrets, Redis accepts its token), then the migrations (Prisma's lock keeps a second pod from running them too).
       initContainers:
         - name: migrate
-          image: ghcr.io/aguchux/bitocard-api:latest
+          image: golojan/bitocard_api:latest
           command: ["sh", "-c", "node scripts/check-env.mjs && node scripts/migrate-deploy.mjs"]
           envFrom:
             - configMapRef:
@@ -50,7 +50,7 @@ spec:
               drop: [ALL]
       containers:
         - name: api
-          image: ghcr.io/aguchux/bitocard-api:latest
+          image: golojan/bitocard_api:latest
           ports:
             - { name: http, containerPort: 3001 }
           envFrom:
@@ -83,7 +83,7 @@ spec:
         # GET /v1/cron/<job> on this pod's own API, with its CRON_SECRET; a job still running is never started again.
         # With more than one replica each pod's scheduler calls its own API: every job is safe to run twice.
         - name: scheduler
-          image: ghcr.io/aguchux/bitocard-api:latest
+          image: golojan/bitocard_api:latest
           command: ["node", "scripts/scheduler.mjs"]
           env:
             - { name: API_INTERNAL_URL, value: "http://127.0.0.1:3001" }

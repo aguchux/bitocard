@@ -1,6 +1,6 @@
 # The API on the DigitalOcean droplet: the API itself, the scheduler that runs its jobs, and Caddy in front.
-# Lives in /opt/bitocard on the droplet; CI copies it there and runs deploy.sh with the image to run
-# (.github/workflows/deploy-api.yml). Secrets are in /etc/bitocard/api.env, never in this repository.
+# Lives in /opt/bitocard on the droplet; deploy.sh runs it with the image to run (by hand: CI no longer deploys here,
+# the API is moving to Kubernetes, deploy/k8s). Secrets are in /etc/bitocard/api.env, never in this repository.
 # Runbook: deploy/droplet/README.md.
 #
 # Memory is capped per container, so on a small droplet a runaway API restarts itself instead of the kernel killing

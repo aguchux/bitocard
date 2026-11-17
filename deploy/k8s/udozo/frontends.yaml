@@ -23,12 +23,12 @@ spec:
         app.kubernetes.io/part-of: udozo
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/udozo-web:latest
+          image: golojan/bitocard_udozo:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -95,12 +95,12 @@ spec:
         app.kubernetes.io/part-of: udozo
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/udozo-shq:latest
+          image: golojan/bitocard_udozo_shq:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -162,12 +162,12 @@ spec:
         app.kubernetes.io/part-of: udozo
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/udozo-admin:latest
+          image: golojan/bitocard_udozo_admin:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -229,12 +229,12 @@ spec:
         app.kubernetes.io/part-of: udozo
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/udozo-connect:latest
+          image: golojan/bitocard_udozo_connect:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -301,12 +301,12 @@ spec:
         app.kubernetes.io/part-of: udozo
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/udozo-pos:latest
+          image: golojan/bitocard_udozo_pos:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:
@@ -373,12 +373,12 @@ spec:
         app.kubernetes.io/part-of: udozo
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/aguchux/udozo-verify:latest
+          image: golojan/bitocard_udozo_verify:latest
           ports:
             - { name: http, containerPort: 3000 }
           envFrom:

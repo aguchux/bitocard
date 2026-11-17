@@ -1,4 +1,4 @@
-# The API image. Built by CI (.github/workflows/deploy-api.yml) and run on the DigitalOcean droplet (deploy/droplet),
+# The API image. Built by CI (.github/workflows/docker-images.yml, golojan/bitocard_api) for Kubernetes (deploy/k8s),
 # and locally with `npm run docker:api`. Build from the repository root:
 #   docker build -f apps/api/Dockerfile -t bitocard-api .
 # Migrations are their own step (`node scripts/migrate-deploy.mjs`), run once per deploy before the new image starts.

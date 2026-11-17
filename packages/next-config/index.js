@@ -25,6 +25,9 @@ export function createNextConfig({ indexable = true, ...config } = {}) {
     reactStrictMode: true,
     turbopack: { root: repoRoot },
     outputFileTracingRoot: repoRoot,
+    // The Kubernetes images (deploy/k8s/web.Dockerfile) build with NEXT_OUTPUT=standalone: only the files each app's
+    // server needs, so an image is a few hundred megabytes instead of the whole workspace. Vercel builds as before.
+    ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" } : {}),
     ...config,
     // Load only the modules a page imports from BitoCard's own barrels (with "sideEffects" in their package.json),
     // so a page using two buttons does not ship the KYC viewer, chat panel and editor too.

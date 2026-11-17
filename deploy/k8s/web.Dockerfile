@@ -1,5 +1,5 @@
 # One image per Next.js app (BitoCard's and Udozo's frontends) for the Kubernetes cluster (deploy/k8s). Built by
-# .github/workflows/k8s-images.yml from the repository root, for example:
+# .github/workflows/docker-images.yml (pushed to Docker Hub as golojan/bitocard_<app>) from the repository root, for example:
 #   docker build -f deploy/k8s/web.Dockerfile --build-arg APP=@bitocard/storefront --build-arg APP_DIR=apps/storefront \
 #     --build-arg SITE_URL=https://bitocard.com -t bitocard-storefront .
 #
@@ -29,7 +29,7 @@ ARG UDOZO_URL=""
 ARG CONNECT_URL=""
 ARG POS_URL=""
 ARG NEXT_PUBLIC_VERIFY_BRAND=""
-ENV NEXT_TELEMETRY_DISABLED=1 TURBO_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 TURBO_TELEMETRY_DISABLED=1 NEXT_OUTPUT=standalone
 WORKDIR /repo
 COPY --from=prune /repo/out/json/ .
 RUN npm ci --no-audit --no-fund
@@ -38,17 +38,23 @@ RUN set -e; \
   for name in SITE_URL API_URL STOREFRONT_URL LEGALS_URL SHQ_URL SHOP_URL UDOZO_URL CONNECT_URL POS_URL NEXT_PUBLIC_VERIFY_BRAND; do \
     value=$(eval "echo \$$name"); [ -n "$value" ] || unset "$name"; \
   done; \
-  npx turbo run build --filter="$APP"
+  # Loose env mode: turbo.json lists only the shared addresses, and strict mode would hide these build arguments.
+  npx turbo run build --filter="$APP" --env-mode=loose
 
+# Only what the app's server needs (Next.js's standalone output, NEXT_OUTPUT above): its traced files and node_modules,
+# then its static files and public/ beside them, and the shared fonts the social cards read at run time
+# (process.cwd()/../../packages/ui/assets/fonts).
 FROM node:22-alpine
 ARG APP_DIR
-ARG NEXT_PUBLIC_VERIFY_BRAND=""
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
-WORKDIR /repo
-COPY --from=build --chown=node:node /repo /repo
-WORKDIR /repo/${APP_DIR}
+WORKDIR /app
+COPY --from=build --chown=node:node /repo/${APP_DIR}/.next/standalone/ ./
+COPY --from=build --chown=node:node /repo/${APP_DIR}/.next/static ./${APP_DIR}/.next/static
+COPY --from=build --chown=node:node /repo/${APP_DIR}/public ./${APP_DIR}/public
+COPY --from=build --chown=node:node /repo/packages/ui/assets ./packages/ui/assets
+WORKDIR /app/${APP_DIR}
 ARG GIT_COMMIT_SHA=""
 ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
 USER node
 EXPOSE 3000
-CMD ["sh", "-c", "exec node /repo/node_modules/next/dist/bin/next start --port \"$PORT\" --hostname 0.0.0.0"]
+CMD ["node", "server.js"]

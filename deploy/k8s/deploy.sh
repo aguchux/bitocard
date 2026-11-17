@@ -12,8 +12,12 @@ here="$(cd "$(dirname "$0")" && pwd)"
 missing=$(cd "$here" && for example in shared/env/*.example bitocard/env/*.example udozo/env/*.example; do
   target="${example%.example}"; [ -s "$target" ] || echo "$target"; done)
 [ -z "$missing" ] || { echo "Missing (run deploy/k8s/init-env.sh, then fill them in):" >&2; echo "$missing" >&2; exit 1; }
-blank=$(cd "$here" && grep -l '=$' shared/env/*.env bitocard/env/*.env udozo/env/*.env 2>/dev/null || true)
+blank=$(cd "$here" && grep -lE '^[^#]*=$' shared/env/*.env bitocard/env/*.env udozo/env/*.env 2>/dev/null || true)
 [ -z "$blank" ] || { echo "Still blank:" >&2; echo "$blank" >&2; exit 1; }
+# Each product's Cloudflare Origin CA certificate and its key (deploy/k8s/origin-cert.sh).
+nocert=$(cd "$here" && for product in bitocard udozo; do for file in origin.key origin.pem; do
+  [ -s "$product/env/$file" ] || echo "$product/env/$file"; done; done)
+[ -z "$nocert" ] || { echo "No Origin CA certificate (run deploy/k8s/origin-cert.sh <product> csr, then install):" >&2; echo "$nocert" >&2; exit 1; }
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

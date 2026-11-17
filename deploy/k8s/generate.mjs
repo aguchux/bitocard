@@ -1,6 +1,6 @@
 // Writes the Kubernetes manifests of BitoCard and Udozo from one list, so every app is set up the same way: each
 // product in its own directory (deploy/k8s/bitocard, deploy/k8s/udozo: its API, scheduler, frontends, routes,
-// certificate and kustomization), and what both use in deploy/k8s/shared. Run after changing an app, a host or a size,
+// Origin CA certificate and kustomization), and what both use in deploy/k8s/shared. Run after changing an app, a host or a size,
 // then commit what it wrote:
 //   node deploy/k8s/generate.mjs
 // Secrets and settings are never here: they are kustomize generators over each directory's env/*.env (never
@@ -8,22 +8,23 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const registry = 'ghcr.io/aguchux';
+/** Docker Hub: every image is golojan/bitocard_<app> (bitocard_storefront, bitocard_udozo_api…). */
+const registry = 'golojan';
 export const namespace = 'bitocard';
 
 /**
- * Every Next.js app: its image, the hosts it answers, its product, the address it is known by (SITE_URL) and whether
+ * Every Next.js app: its name (its image is golojan/bitocard_<name>), the hosts it answers, its product, the address it is known by (SITE_URL) and whether
  * it signs requests with its API's store server secret. `wildcard` serves resellers' store subdomains; `build` adds
  * build-time values.
  */
 export const frontends = [
-  { name: 'storefront', image: 'bitocard-storefront', dir: 'apps/storefront', pkg: '@bitocard/storefront', product: 'bitocard', hosts: ['bitocard.com', 'www.bitocard.com'], wildcard: '*.bitocard.com', site: 'https://bitocard.com', storeSecret: true },
-  { name: 'shq', image: 'bitocard-shq', dir: 'apps/shq', pkg: '@bitocard/shq', product: 'bitocard', hosts: ['shq.bitocard.com'], site: 'https://shq.bitocard.com' },
-  { name: 'admin', image: 'bitocard-admin', dir: 'apps/admin', pkg: '@bitocard/admin', product: 'bitocard', hosts: ['admin.bitocard.com'], site: 'https://admin.bitocard.com' },
-  { name: 'legals', image: 'bitocard-legals', dir: 'apps/legals', pkg: '@bitocard/legals', product: 'bitocard', hosts: ['legals.bitocard.com'], site: 'https://legals.bitocard.com' },
-  { name: 'docs', image: 'bitocard-docs', dir: 'apps/docs', pkg: '@bitocard/docs', product: 'bitocard', hosts: ['docs.bitocard.com'], site: 'https://docs.bitocard.com' },
-  { name: 'verify', image: 'bitocard-verify', dir: 'apps/verify', pkg: '@bitocard/verify', product: 'bitocard', hosts: ['verify.bitocard.com'], site: 'https://verify.bitocard.com' },
-  { name: 'udozo', image: 'udozo-web', dir: 'apps/udozo', pkg: '@udozo/web', product: 'udozo', hosts: ['udozo.com', 'www.udozo.com'], wildcard: '*.udozo.com', site: 'https://udozo.com', storeSecret: true, catchAll: true },
+  { name: 'storefront', dir: 'apps/storefront', pkg: '@bitocard/storefront', product: 'bitocard', hosts: ['bitocard.com', 'www.bitocard.com'], wildcard: '*.bitocard.com', site: 'https://bitocard.com', storeSecret: true },
+  { name: 'shq', dir: 'apps/shq', pkg: '@bitocard/shq', product: 'bitocard', hosts: ['shq.bitocard.com'], site: 'https://shq.bitocard.com' },
+  { name: 'admin', dir: 'apps/admin', pkg: '@bitocard/admin', product: 'bitocard', hosts: ['admin.bitocard.com'], site: 'https://admin.bitocard.com' },
+  { name: 'legals', dir: 'apps/legals', pkg: '@bitocard/legals', product: 'bitocard', hosts: ['legals.bitocard.com'], site: 'https://legals.bitocard.com' },
+  { name: 'docs', dir: 'apps/docs', pkg: '@bitocard/docs', product: 'bitocard', hosts: ['docs.bitocard.com'], site: 'https://docs.bitocard.com' },
+  { name: 'verify', dir: 'apps/verify', pkg: '@bitocard/verify', product: 'bitocard', hosts: ['verify.bitocard.com'], site: 'https://verify.bitocard.com' },
+  { name: 'udozo', dir: 'apps/udozo', pkg: '@udozo/web', product: 'udozo', hosts: ['udozo.com', 'www.udozo.com'], wildcard: '*.udozo.com', site: 'https://udozo.com', storeSecret: true, catchAll: true },
   { name: 'udozo-shq', dir: 'apps/udozo-shq', pkg: '@udozo/shq', product: 'udozo', hosts: ['shq.udozo.com'], site: 'https://shq.udozo.com' },
   { name: 'udozo-admin', dir: 'apps/udozo-admin', pkg: '@udozo/admin', product: 'udozo', hosts: ['admin.udozo.com'], site: 'https://admin.udozo.com' },
   { name: 'udozo-connect', dir: 'apps/udozo-connect', pkg: '@udozo/connect', product: 'udozo', hosts: ['connect.udozo.com'], site: 'https://connect.udozo.com', storeSecret: true },
@@ -33,8 +34,8 @@ export const frontends = [
 
 /** Both APIs: their image, port and host. Each keeps its own Upstash Redis (UPSTASH_REDIS_REST_* in its secrets). */
 export const apis = [
-  { name: 'bitocard-api', dir: 'apps/api', product: 'bitocard', port: 3001, host: 'api.bitocard.com', dockerfile: 'apps/api/Dockerfile' },
-  { name: 'udozo-api', dir: 'apps/udozo-api', product: 'udozo', port: 3010, host: 'api.udozo.com', dockerfile: 'apps/udozo-api/Dockerfile' },
+  { name: 'bitocard-api', dir: 'apps/api', pkg: '@bitocard/api', product: 'bitocard', port: 3001, host: 'api.bitocard.com', dockerfile: 'apps/api/Dockerfile' },
+  { name: 'udozo-api', dir: 'apps/udozo-api', pkg: '@udozo/api', product: 'udozo', port: 3010, host: 'api.udozo.com', dockerfile: 'apps/udozo-api/Dockerfile' },
 ];
 
 export const products = [
@@ -65,8 +66,11 @@ export const sizes = {
 const rollout = kind =>
   kind === 'surge' ? 'rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }' : 'rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }';
 
-/** Each app's image: frontends carry their product in the name (`bitocard-storefront`, `udozo-web`). */
-export const imageOf = app => `${registry}/${app.image ?? app.name}`;
+/** Each app's Docker Hub repository, `bitocard_` and its name: bitocard_api, bitocard_storefront, bitocard_udozo_shq. */
+export const repoOf = app => `bitocard_${app.name.replace(/^bitocard-/, '').replace(/-/g, '_')}`;
+
+/** Each app's image: `golojan/bitocard_storefront`. */
+export const imageOf = app => `${registry}/${repoOf(app)}`;
 
 const header = what => `# ${what}\n# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.\n`;
 
@@ -108,7 +112,7 @@ spec:
         app.kubernetes.io/part-of: ${app.product}
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       containers:
@@ -172,7 +176,7 @@ spec:
         app.kubernetes.io/part-of: ${app.product}
     spec:
       imagePullSecrets:
-        - name: ghcr
+        - name: registry
       securityContext:
         seccompProfile: { type: RuntimeDefault }
       # Before the new image serves: the settings checked (the database answers, ENCRYPTION_KEY opens the stored
@@ -279,7 +283,8 @@ ${rules.join('\n')}
   const catchAll = own.find(app => app.catchAll);
   if (catchAll) {
     // Live stores on their own domains: any other host reaches the store app, which names the store from the host.
-    // Their certificates are Cloudflare for SaaS's at the edge (deploy/k8s/README.md).
+    // Their certificates are Cloudflare for SaaS's at the edge; here they get Udozo's Origin CA certificate, Traefik's
+    // default (tls-store.yaml; deploy/k8s/README.md).
     out += `---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -299,25 +304,29 @@ spec:
   return out;
 }
 
-function certificate(product) {
-  return `${header(`${product.label}'s certificate: the apex and its wildcard (resellers' store subdomains included), from the shared
-# Let's Encrypt issuer (deploy/k8s/shared/issuer.yaml), renewed by cert-manager.`)}---
-apiVersion: cert-manager.io/v1
-kind: Certificate
+/**
+ * The product's Cloudflare Origin CA certificate as a TLS Secret (`<product>-tls`, which its Ingresses name): what
+ * Cloudflare checks when it connects here (SSL/TLS mode Full (strict)), never what visitors see, which is Cloudflare's
+ * own edge certificate. One per product, for its apex and wildcard; made by deploy/k8s/origin-cert.sh, the key never
+ * leaving the machine that runs it. Udozo's is also Traefik's default (tls-store.yaml), for its resellers' own domains.
+ */
+function tlsStore(product) {
+  return `${header(`Traefik's default certificate: ${product.label}'s Cloudflare Origin CA certificate, served to any host no route's TLS names
+# (resellers' own domains, reached through Cloudflare for SaaS; deploy/k8s/README.md).`)}---
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
 metadata:
-  name: ${product.key}
+  name: default
 spec:
-  secretName: ${product.key}-tls
-  issuerRef: { name: letsencrypt, kind: Issuer }
-  dnsNames: ["${product.domain}", "*.${product.domain}"]
-  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+  defaultCertificate:
+    secretName: ${product.key}-tls
 `;
 }
 
 function kustomization(product) {
   const own = [...apis, ...frontends].filter(app => app.product === product.key);
   const images = [...new Set(own.map(imageOf))].map(image => `  - { name: ${image}, newTag: latest }`).join('\n');
-  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends, routes and certificate, in the namespace
+  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends, routes and Origin CA certificate, in the namespace
 # \`${namespace}\`. Applied with the rest by \`kubectl apply -k deploy/k8s\`, or alone by \`kubectl apply -k deploy/k8s/${product.key}\`
 # (after deploy/k8s/shared once).
 #
@@ -333,8 +342,8 @@ labels:
 resources:
   - api.yaml
   - frontends.yaml
-  - ingress.yaml
-  - certificate.yaml
+  - ingress.yaml${product.key === 'udozo' ? `
+  - tls-store.yaml` : ''}
 
 configMapGenerator:
   # The API's settings that are not secret (origins, cookies, rate limits, Redis's address).
@@ -349,6 +358,13 @@ secretGenerator:
     envs: [env/api.secret.env]
   - name: ${product.key}-web-secrets
     envs: [env/web.secret.env]
+  # Cloudflare's Origin CA certificate for ${product.domain} and *.${product.domain} (deploy/k8s/origin-cert.sh). Named
+  # exactly: the Ingresses${product.key === 'udozo' ? " and Traefik's default store" : ''} find it by name.
+  - name: ${product.key}-tls
+    type: kubernetes.io/tls
+    files: [tls.crt=env/origin.pem, tls.key=env/origin.key]
+    options:
+      disableNameSuffixHash: true
 
 # The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (\`kustomize edit set image\`).
 images:
@@ -357,15 +373,17 @@ ${images}
 }
 
 /**
- * What CI builds (.github/workflows/k8s-images.yml reads images.json): each image's Dockerfile and build arguments, the
+ * What CI builds (.github/workflows/docker-images.yml reads images.json): each image's Dockerfile and build arguments, the
  * frontends' with their product's addresses and their own SITE_URL.
  */
 export function imageBuilds() {
   return [
-    ...apis.map(app => ({ name: app.name, image: imageOf(app), dockerfile: app.dockerfile, args: '' })),
+    ...apis.map(app => ({ name: repoOf(app), image: imageOf(app), deployment: app.name, pkg: app.pkg, dockerfile: app.dockerfile, args: '' })),
     ...frontends.map(app => ({
-      name: app.image ?? app.name,
+      name: repoOf(app),
       image: imageOf(app),
+      deployment: app.name,
+      pkg: app.pkg,
       dockerfile: 'deploy/k8s/web.Dockerfile',
       args: Object.entries({ APP: app.pkg, APP_DIR: app.dir, SITE_URL: app.site, ...buildAddresses[app.product], ...(app.build ?? {}) })
         .map(([key, value]) => `${key}=${value}`)
@@ -386,7 +404,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     write(new URL('api.yaml', dir), header(`${product.label}'s API: its migrations, its Service and its scheduler.`) + apis.filter(app => app.product === product.key).map(api).join(''));
     write(new URL('frontends.yaml', dir), header(`${product.label}'s Next.js apps: a Deployment and a Service each.`) + frontends.filter(app => app.product === product.key).map(frontend).join(''));
     write(new URL('ingress.yaml', dir), ingresses(product));
-    write(new URL('certificate.yaml', dir), certificate(product));
+    if (product.key === 'udozo') write(new URL('tls-store.yaml', dir), tlsStore(product));
     write(new URL('kustomization.yaml', dir), kustomization(product));
   }
   write(new URL('images.json', here), `${JSON.stringify(imageBuilds(), null, 2)}\n`);

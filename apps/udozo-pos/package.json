@@ -24,6 +24,7 @@
     "@bitocard/eslint-config": "*",
     "@bitocard/typescript-config": "*",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",

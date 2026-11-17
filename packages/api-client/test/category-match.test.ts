@@ -23,18 +23,18 @@ describe("finding a category by what was typed", () => {
     expect(slugs("rugs")).toEqual(["carpets-rugs"]);
     expect(slugs("cups")).toEqual(["tableware"]);
     expect(slugs("ankara")).toEqual(["fabrics"]);
-    expect(slugs("fashion")).toEqual(["bags", "fabrics"], "a top category's name finds its subcategories");
+    expect(slugs("fashion"), "a top category's name finds its subcategories").toEqual(["bags", "fabrics"]);
   });
 
   test("words holding a whole search word find it, ahead of looser fits", () => {
     expect(slugs("plastic chairs")[0]).toBe("plastic-furniture");
     expect(slugs("ceramic plates for sale")).toContain("tableware");
-    expect(slugs("monob")).toEqual(["plastic-furniture"], "the start of a search word");
+    expect(slugs("monob"), "the start of a search word").toEqual(["plastic-furniture"]);
   });
 
   test("a short or unrelated word finds little", () => {
     expect(slugs("a")).toEqual([]);
-    expect(slugs("ac")).not.toContain("bags", "only the start of a search word counts");
+    expect(slugs("ac"), "only the start of a search word counts").not.toContain("bags");
     expect(slugs("helicopter")).toEqual([]);
   });
 
