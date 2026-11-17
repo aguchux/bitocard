@@ -5,7 +5,8 @@
 #   KUBECONFIG=terraform/golojancluster-kubeconfig.yaml sh deploy/k8s/bootstrap/install.sh
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
-TRAEFIK_CHART_VERSION="${TRAEFIK_CHART_VERSION:-}"
+# The chart version these values were checked against (traefik-values.yaml follows its schema).
+TRAEFIK_CHART_VERSION="${TRAEFIK_CHART_VERSION:-42.4.0}"
 pin() { [ -n "$1" ] && printf -- '--version %s' "$1" || true; }
 
 helm repo add traefik https://traefik.github.io/charts >/dev/null
