@@ -1,12 +1,17 @@
-# Traefik, the cluster's way in (Helm chart traefik/traefik; install.sh). One DigitalOcean load balancer sends every
-# request, with the PROXY protocol so Traefik sees the real sender, and Traefik routes it by host (deploy/k8s/ingress.yaml).
+# Traefik routes every request by host to its app (Helm chart traefik/traefik; install.sh). Nothing reaches it from
+# the internet directly: there is no load balancer and no public address. Visitors come through Cloudflare's edge,
+# then the Cloudflare Tunnel (`cloudflared` pods, deploy/k8s/shared/tunnel.yaml), which connects out to Cloudflare and
+# sends each request here over the cluster's own network, to the `web` entry point (plain HTTP inside the cluster;
+# HTTPS ends at Cloudflare, which redirects plain HTTP itself with Always Use HTTPS).
 #
-# Behind Cloudflare: forwarded headers are believed only from Cloudflare's ranges (the same list as
-# deploy/droplet/Caddyfile; refresh from https://www.cloudflare.com/ips/), so the APIs (TRUST_PROXY=2) take the
-# visitor's address from Cloudflare and never one a client wrote. Anything else that reaches the load balancer has its
-# forwarded headers dropped.
-# One replica for a low-traffic start on one node (a restart is a few seconds); 2 with a PodDisruptionBudget once the
-# node pool grows.
+# Forwarded headers are believed only from the cluster's own addresses (the tunnel's pods): Cloudflare puts the
+# visitor's address in X-Forwarded-For, cloudflared passes it on, and Traefik adds the tunnel pod's. So the APIs
+# (TRUST_PROXY=2: Traefik, then the tunnel) take the visitor's address, never one a client wrote.
+#
+# Never add a load balancer (a `LoadBalancer` Service) without meaning to: DigitalOcean charges for each one. Load
+# balancers and volumes are managed only through kubectl, never DigitalOcean's control panel.
+#
+# One replica for a low-traffic start on one node (a restart is a few seconds); 2 once the node pool grows.
 deployment:
   replicas: 1
 ingressClass:
@@ -14,38 +19,15 @@ ingressClass:
   isDefaultClass: true
   name: traefik
 providers:
-  kubernetesIngress:
-    publishedService:
-      enabled: true
-  # For Udozo's TLSStore (deploy/k8s/udozo/tls-store.yaml): its Origin CA certificate is the default one.
-  kubernetesCRD:
-    enabled: true
-# The DigitalOcean load balancer is made and kept by this Service: change it only here (annotations, then install.sh),
-# never in DigitalOcean's control panel, whose changes the cluster's reconciler reverts (or which leave it unusable).
+  kubernetesIngress: {}
 service:
-  annotations:
-    service.beta.kubernetes.io/do-loadbalancer-name: golojan-traefik
-    service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
-    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: tcp
   spec:
-    externalTrafficPolicy: Cluster
-# Plain HTTP goes to HTTPS on the public port (443), never Traefik's own (8443).
-ports:
-  web:
-    http:
-      redirections:
-        entryPoint:
-          to: websecure
-          scheme: https
-          permanent: true
+    type: ClusterIP
 additionalArguments:
-  - --entryPoints.web.proxyProtocol.trustedIPs=10.0.0.0/8
-  - --entryPoints.websecure.proxyProtocol.trustedIPs=10.0.0.0/8
-  - --entryPoints.web.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
-  - --entryPoints.websecure.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+  - --entryPoints.web.forwardedHeaders.trustedIPs=10.0.0.0/8
   # Long requests (catalogue syncs, reports, uploads) are not cut short.
-  - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=300s
-  - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=300s
+  - --entryPoints.web.transport.respondingTimeouts.readTimeout=300s
+  - --entryPoints.web.transport.respondingTimeouts.writeTimeout=300s
 accessLog:
   enabled: true
   format: json

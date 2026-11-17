@@ -1,4 +1,5 @@
-# Udozo's routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml).
+# Udozo's routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml), which the Cloudflare Tunnel
+# feeds (deploy/k8s/shared/tunnel.yaml).
 # Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
 ---
 apiVersion: networking.k8s.io/v1
@@ -6,13 +7,9 @@ kind: Ingress
 metadata:
   name: udozo-sites
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
-  tls:
-    - secretName: udozo-tls
-      hosts: ["udozo.com", "*.udozo.com"]
   rules:
     - host: "api.udozo.com"
       http:
@@ -92,14 +89,10 @@ kind: Ingress
 metadata:
   name: udozo-stores
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
     traefik.ingress.kubernetes.io/router.priority: "2"
 spec:
   ingressClassName: traefik
-  tls:
-    - secretName: udozo-tls
-      hosts: ["udozo.com", "*.udozo.com"]
   rules:
     - host: "*.udozo.com"
       http:
@@ -116,7 +109,7 @@ kind: Ingress
 metadata:
   name: udozo-custom-domains
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+    traefik.ingress.kubernetes.io/router.entrypoints: web
     traefik.ingress.kubernetes.io/router.priority: "1"
 spec:
   ingressClassName: traefik

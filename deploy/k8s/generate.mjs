@@ -1,6 +1,6 @@
 // Writes the Kubernetes manifests of BitoCard and Udozo from one list, so every app is set up the same way: each
 // product in its own directory (deploy/k8s/bitocard, deploy/k8s/udozo: its API, scheduler, frontends, routes,
-// Origin CA certificate and kustomization), and what both use in deploy/k8s/shared. Run after changing an app, a host or a size,
+// and kustomization), and what both use in deploy/k8s/shared. Run after changing an app, a host or a size,
 // then commit what it wrote:
 //   node deploy/k8s/generate.mjs
 // Secrets and settings are never here: they are kustomize generators over each directory's env/*.env (never
@@ -263,35 +263,31 @@ kind: Ingress
 metadata:
   name: ${name}
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"${priority ? `\n    traefik.ingress.kubernetes.io/router.priority: "${priority}"` : ''}
+    traefik.ingress.kubernetes.io/router.entrypoints: web${priority ? `\n    traefik.ingress.kubernetes.io/router.priority: "${priority}"` : ''}
 spec:
   ingressClassName: traefik
-  tls:
-    - secretName: ${product.key}-tls
-      hosts: ["${product.domain}", "*.${product.domain}"]
   rules:
 ${rules.join('\n')}
 `;
   const own = frontends.filter(app => app.product === product.key);
   const exact = [...apis.filter(app => app.product === product.key).map(app => rule(app.host, app.name)), ...own.flatMap(app => app.hosts.map(host => rule(host, app.name)))];
   const store = own.find(app => app.wildcard);
-  let out = header(`${product.label}'s routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml).`);
+  let out = header(`${product.label}'s routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml), which the Cloudflare Tunnel\n# feeds (deploy/k8s/shared/tunnel.yaml).`);
   out += ingress(`${product.key}-sites`, exact, 0);
   // Resellers' store subdomains: below every exact host, so shq.<domain> never reaches the store.
   out += ingress(`${product.key}-stores`, [rule(store.wildcard, store.name)], 2);
   const catchAll = own.find(app => app.catchAll);
   if (catchAll) {
     // Live stores on their own domains: any other host reaches the store app, which names the store from the host.
-    // Their certificates are Cloudflare for SaaS's at the edge; here they get Udozo's Origin CA certificate, Traefik's
-    // default (tls-store.yaml; deploy/k8s/README.md).
+    // Their certificates are Cloudflare for SaaS's at the edge, which reaches here through the tunnel
+    // (deploy/k8s/README.md).
     out += `---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ${product.key}-custom-domains
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+    traefik.ingress.kubernetes.io/router.entrypoints: web
     traefik.ingress.kubernetes.io/router.priority: "1"
 spec:
   ingressClassName: traefik
@@ -304,29 +300,10 @@ spec:
   return out;
 }
 
-/**
- * The product's Cloudflare Origin CA certificate as a TLS Secret (`<product>-tls`, which its Ingresses name): what
- * Cloudflare checks when it connects here (SSL/TLS mode Full (strict)), never what visitors see, which is Cloudflare's
- * own edge certificate. One per product, for its apex and wildcard; made by deploy/k8s/origin-cert.sh, the key never
- * leaving the machine that runs it. Udozo's is also Traefik's default (tls-store.yaml), for its resellers' own domains.
- */
-function tlsStore(product) {
-  return `${header(`Traefik's default certificate: ${product.label}'s Cloudflare Origin CA certificate, served to any host no route's TLS names
-# (resellers' own domains, reached through Cloudflare for SaaS; deploy/k8s/README.md).`)}---
-apiVersion: traefik.io/v1alpha1
-kind: TLSStore
-metadata:
-  name: default
-spec:
-  defaultCertificate:
-    secretName: ${product.key}-tls
-`;
-}
-
 function kustomization(product) {
   const own = [...apis, ...frontends].filter(app => app.product === product.key);
   const images = [...new Set(own.map(imageOf))].map(image => `  - { name: ${image}, newTag: latest }`).join('\n');
-  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends, routes and Origin CA certificate, in the namespace
+  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends and routes, in the namespace
 # \`${namespace}\`. Applied with the rest by \`kubectl apply -k deploy/k8s\`, or alone by \`kubectl apply -k deploy/k8s/${product.key}\`
 # (after deploy/k8s/shared once).
 #
@@ -342,8 +319,7 @@ labels:
 resources:
   - api.yaml
   - frontends.yaml
-  - ingress.yaml${product.key === 'udozo' ? `
-  - tls-store.yaml` : ''}
+  - ingress.yaml
 
 configMapGenerator:
   # The API's settings that are not secret (origins, cookies, rate limits, Redis's address).
@@ -358,13 +334,6 @@ secretGenerator:
     envs: [env/api.secret.env]
   - name: ${product.key}-web-secrets
     envs: [env/web.secret.env]
-  # Cloudflare's Origin CA certificate for ${product.domain} and *.${product.domain} (deploy/k8s/origin-cert.sh). Named
-  # exactly: the Ingresses${product.key === 'udozo' ? " and Traefik's default store" : ''} find it by name.
-  - name: ${product.key}-tls
-    type: kubernetes.io/tls
-    files: [tls.crt=env/origin.pem, tls.key=env/origin.key]
-    options:
-      disableNameSuffixHash: true
 
 # The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (\`kustomize edit set image\`).
 images:
@@ -404,7 +373,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     write(new URL('api.yaml', dir), header(`${product.label}'s API: its migrations, its Service and its scheduler.`) + apis.filter(app => app.product === product.key).map(api).join(''));
     write(new URL('frontends.yaml', dir), header(`${product.label}'s Next.js apps: a Deployment and a Service each.`) + frontends.filter(app => app.product === product.key).map(frontend).join(''));
     write(new URL('ingress.yaml', dir), ingresses(product));
-    if (product.key === 'udozo') write(new URL('tls-store.yaml', dir), tlsStore(product));
     write(new URL('kustomization.yaml', dir), kustomization(product));
   }
   write(new URL('images.json', here), `${JSON.stringify(imageBuilds(), null, 2)}\n`);

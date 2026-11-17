@@ -7,7 +7,7 @@ The databases stay on Neon and Redis on Upstash, as today.
 ```
 deploy/k8s/
   kustomization.yaml   everything: shared, bitocard, udozo
-  shared/              the namespace, the image pull secret, the apps' network policy
+  shared/              the namespace, the Cloudflare Tunnel, the image pull secret, the apps' network policy
   bitocard/            api.bitocard.com, bitocard.com (and resellers' store subdomains), shq, admin, legals, docs, verify
   udozo/               api.udozo.com, udozo.com (store subdomains and own domains), shq, admin, connect, pos, verify
   bootstrap/           Traefik (and its small size), once per cluster
@@ -16,11 +16,10 @@ deploy/k8s/
   web.Dockerfile       the image of any Next.js app (its standalone output: NEXT_OUTPUT=standalone)
   init-env.sh          copies each missing env file from its example
   deploy.sh            applies, pinned to one commit's images
-  origin-cert.sh       each product's Cloudflare Origin CA certificate, its key made locally
   affected.mjs         which images a push needs rebuilt (CI)
 ```
 
-Never edit the generated files by hand: `api.yaml`, `frontends.yaml`, `ingress.yaml`, `udozo/tls-store.yaml`,
+Never edit the generated files by hand: `api.yaml`, `frontends.yaml`, `ingress.yaml`,
 each product's `kustomization.yaml`, and `images.json`. Change `generate.mjs`, run `node deploy/k8s/generate.mjs`, and
 commit what it wrote.
 
@@ -30,37 +29,35 @@ Every value comes from kustomize generators over `<shared|bitocard|udozo>/env/*.
 
 | File | Becomes | Holds |
 |---|---|---|
+| `shared/env/tunnel.secret.env` | Secret `cloudflare-tunnel` | `TUNNEL_TOKEN`, the Cloudflare Tunnel's token |
 | `shared/env/registry.dockerconfigjson` | Secret `registry` | pulls the images from Docker Hub (`golojan`, a read-only access token) |
 | `<product>/env/api.config.env` | ConfigMap `<product>-api-config` | origins, cookies, rate limits |
 | `<product>/env/api.secret.env` | Secret `<product>-api-secrets` | `DATABASE_URL`, `ENCRYPTION_KEY`, `CRON_SECRET`, `STORE_SERVER_SECRET`, its Upstash `UPSTASH_REDIS_REST_URL` and `_TOKEN`… |
 | `<product>/env/web.config.env` | ConfigMap `<product>-web-config` | the addresses the frontends' servers use |
 | `<product>/env/web.secret.env` | Secret `<product>-web-secrets` | `STORE_SERVER_SECRET` |
-| `<product>/env/origin.key`, `origin.pem` | Secret `<product>-tls` (exact name) | its Cloudflare Origin CA certificate (`origin-cert.sh`) |
 
 - **Protected.** `.gitignore` keeps every `deploy/k8s/*/env/*` out of git except the `*.example` files.
   `init-env.sh` creates the real files readable by their owner only (`chmod 600`).
 - **Hashed names.** A product's generated names carry a hash of their contents, so a changed value rolls the pods
-  that use it. The pull secret and the TLS secrets keep their exact names, because every pod, Ingress and Traefik's default store
-  find them by name.
+  that use it. The shared ones keep their exact names, because the pods find them by name.
 - **Where the values come from:**
   - BitoCard's API: the droplet's `/etc/bitocard/api.env`, value for value.
   - Udozo's API: the Vercel project `udozo-api` (`vercel env pull`).
   - Never generate a new `ENCRYPTION_KEY`: it decrypts everything already stored.
-  - `deploy.sh` refuses while any file is missing or blank (commented lines are fine), or a certificate is missing.
+  - `deploy.sh` refuses while any file is missing or blank (commented lines are fine).
 
 ## One-time setup
 
 1. **Install Traefik:**
    `KUBECONFIG=terraform/golojancluster-kubeconfig.yaml sh deploy/k8s/bootstrap/install.sh`.
-   It prints the load balancer's address (`129.212.132.241`, `golojan-traefik`).
-   **Load balancers and volumes are managed only through kubectl:** the load balancer belongs to Traefik's Service
-   (`bootstrap/traefik-values.yaml` annotations, applied by `install.sh`). Never change it, or any volume, in
-   DigitalOcean's control panel: the cluster's reconciler reverts those changes, or they leave the cluster unusable.
-   Nothing here uses volumes (the databases are Neon, Redis is Upstash).
-2. **Fill in the settings:** run `sh deploy/k8s/init-env.sh`, then fill in every file it lists.
-3. **Make the two Origin CA certificates** (Certificates below): for each of `bitocard` and `udozo`,
-   `sh deploy/k8s/origin-cert.sh <product> csr`, sign it in that zone's Cloudflare dashboard, then
-   `sh deploy/k8s/origin-cert.sh <product> install`.
+   It runs inside the cluster only: **no load balancer**, so nothing extra to pay for.
+   **Load balancers and volumes are managed only through kubectl**, never DigitalOcean's control panel, whose
+   changes the cluster's reconciler reverts (or which leave it unusable). Nothing here uses either.
+2. **Create the Cloudflare Tunnel** (once, free): Cloudflare dashboard > Zero Trust > Networks > Tunnels > Create a
+   tunnel > Cloudflared, name it `golojancluster`. Copy the token from the install command it shows (the long value
+   after `--token`) into `shared/env/tunnel.secret.env`. Skip installing anything it offers: the cluster runs
+   `cloudflared` itself (`shared/tunnel.yaml`).
+3. **Fill in the settings:** run `sh deploy/k8s/init-env.sh`, then fill in every file it lists.
 4. **Set up CI/CD** (`.github/workflows/docker-images.yml`), in the GitHub repository's settings:
    - secrets `DOCKERHUB_USERNAME` (`golojan`) and `DOCKERHUB_TOKEN` (a Docker Hub access token, Read & Write);
    - an environment `production` with the secret `K8S_KUBECONFIG` (the kubeconfig's whole text);
@@ -97,59 +94,40 @@ stops two pods migrating at once. To roll back, run `deploy.sh` with an earlier 
 
 ## How requests arrive
 
-Cloudflare (proxied) sends requests to the DigitalOcean load balancer, then Traefik, then the app's Service.
+Visitor, then Cloudflare's edge (HTTPS, WAF, caching), then the **Cloudflare Tunnel**, then Traefik, then the app's
+Service. The cluster has no load balancer and no public address: the tunnel's `cloudflared` pods
+(`shared/tunnel.yaml`, two of them) connect *out* to Cloudflare, so nothing can reach the apps without going through
+Cloudflare. It costs nothing.
 
-- **Proxy protocol:** the load balancer passes the real sender's address to Traefik.
-- **Forwarded headers:** Traefik believes them only from Cloudflare's ranges (`bootstrap/traefik-values.yaml`). That
-  is why the APIs use `TRUST_PROXY=2`.
+- **HTTPS ends at Cloudflare.** Inside the cluster the tunnel brings plain HTTP to Traefik's `web` entry point, so
+  there are no certificates to make or renew. Turn on **Always Use HTTPS** in each zone (Edge Certificates); the
+  apps still see `X-Forwarded-Proto: https`.
+- **The visitor's address:** Cloudflare puts it in `X-Forwarded-For`, and Traefik believes forwarded headers only from
+  the cluster's own addresses (the tunnel's pods). The APIs count two hops (`TRUST_PROXY=2`: Traefik, then the tunnel).
 - **Route order:**
   - exact hosts come first;
   - each product's wildcard, for resellers' store subdomains, is below them;
   - Udozo's catch-all, for live stores on their own domains, is last.
-- **Certificates:** Cloudflare's Origin CA, below.
 
-## Certificates: Cloudflare Origin CA
+## The tunnel's public hostnames
 
-Visitors only ever see Cloudflare's own edge certificate. Between Cloudflare and Traefik, each product uses a
-Cloudflare **Origin CA** certificate. It is trusted only by Cloudflare, valid for 15 years, and needs nothing running
-on the cluster to renew it (no cert-manager, no Let's Encrypt, no DNS token).
+In Cloudflare: Zero Trust > Networks > Tunnels > `golojancluster` > Public hostnames. Four entries, each to the
+service **HTTP** `traefik.traefik.svc.cluster.local:80`, and Traefik sends each host to its app:
 
-| Product | Certificate covers | Secret | Also |
-|---|---|---|---|
-| BitoCard | `bitocard.com`, `*.bitocard.com` | `bitocard-tls` | |
-| Udozo | `udozo.com`, `*.udozo.com` | `udozo-tls` | Traefik's default certificate (`udozo/tls-store.yaml`), for hosts no route names |
+| Hostname | Covers |
+|---|---|
+| `bitocard.com` | the storefront |
+| `*.bitocard.com` | every BitoCard subdomain (api, shq, admin, legals, docs, verify) and resellers' stores |
+| `udozo.com` | udozo.com |
+| `*.udozo.com` | every Udozo subdomain (api, shq, admin, connect, pos, verify) and resellers' stores |
 
-`*.<domain>` covers one level, which is every host here, resellers' store subdomains included
-(`<store>.bitocard.com`, `<store>.udozo.com`). It does not cover two levels (`a.b.bitocard.com`): there are none.
-
-**Making one:**
-1. `sh deploy/k8s/origin-cert.sh bitocard csr` makes `bitocard/env/origin.key` (once; it never leaves this machine)
-   and prints a request.
-2. In Cloudflare, on the **bitocard.com** zone: SSL/TLS > Origin Server > Create Certificate > *Use my private key and
-   CSR*. Paste the request, keep the hostnames `bitocard.com, *.bitocard.com`, choose 15 years and create it.
-3. Copy the certificate into `sh deploy/k8s/origin-cert.sh bitocard install` (or save it and pass the file).
-   The script checks it matches the key, covers both names and is not about to expire.
-4. Do the same with `udozo` on the **udozo.com** zone.
-5. Apply with `deploy.sh`. `origin-cert.sh <product> show` prints what is installed.
-
-**Each zone's settings** (bitocard.com and udozo.com):
-- **SSL/TLS > Overview: Full (strict).** Cloudflare then refuses an origin whose certificate is not valid for the
-  host, so nobody can impersonate the load balancer.
-- **Edge Certificates: Always Use HTTPS on**, and minimum TLS 1.2.
-- **Every record that points here is proxied (orange cloud).** Browsers do not trust Origin CA certificates, so a
-  DNS-only (grey) record pointing at the load balancer would show visitors a certificate error.
-- **Optional, later: Authenticated Origin Pulls**, so that only Cloudflare can connect at all. Traefik must then ask
-  for Cloudflare's client certificate (a TLSOption), and both must be switched on together.
-
-**Resellers' own domains** (Cloudflare for SaaS on udozo.com, and later bitocard.com): give each custom hostname the
-custom origin SNI `origin.udozo.com` (covered by `*.udozo.com`, so Full (strict) holds). A custom hostname reached
-without it gets Traefik's default certificate, Udozo's.
+Adding a hostname does not move any traffic: a host moves only when its DNS record does (below).
 
 ## Hosts and DNS
 
-What Cloudflare serves now (checked 17 November 2026) and what each host becomes at the cut-over. At the cut-over,
-every row is a record **proxied** through Cloudflare to the load balancer's address (`bootstrap/install.sh` prints
-it): an `A` record, or a `CNAME` to one host that has the `A` record.
+What Cloudflare serves now (checked 17 November 2026) and what each host becomes. **At the cut-over each host's
+record becomes a proxied (orange) `CNAME` to the tunnel, `<tunnel id>.cfargotunnel.com`** (the tunnel's page shows
+its id). A record can only point at the tunnel when it is proxied.
 
 | Host | Today | Served here by |
 |---|---|---|
@@ -161,7 +139,7 @@ it): an `A` record, or a `CNAME` to one host that has the `A` record.
 | `legals.bitocard.com` | CNAME to Vercel, DNS only | legals |
 | `docs.bitocard.com` | CNAME to Vercel, DNS only | docs |
 | `verify.bitocard.com` | CNAME to Vercel, DNS only | verify |
-| `<store>.bitocard.com` | one DNS-only CNAME to Vercel per store (`StoreHostsService`) | storefront: one proxied `*.bitocard.com` replaces them |
+| `<store>.bitocard.com` | one DNS-only CNAME to Vercel per store (`StoreHostsService`) | storefront: one proxied `*.bitocard.com` CNAME to the tunnel replaces them |
 | `udozo.com` | A to Vercel, DNS only | udozo |
 | `www.udozo.com` | CNAME to Vercel, DNS only | udozo |
 | `api.udozo.com` | CNAME to Vercel, DNS only | udozo-api |
@@ -170,7 +148,9 @@ it): an `A` record, or a `CNAME` to one host that has the `A` record.
 | `connect.udozo.com` | CNAME to Vercel, DNS only | udozo-connect |
 | `pos.udozo.com` | CNAME to Vercel, DNS only | udozo-pos |
 | `verify.udozo.com` | CNAME to Vercel, DNS only | udozo-verify |
-| `<store>.udozo.com` | one DNS-only CNAME per store | udozo: one proxied `*.udozo.com` replaces them |
+| `<store>.udozo.com` | one DNS-only CNAME per store | udozo: one proxied `*.udozo.com` CNAME to the tunnel replaces them |
+
+The apex records (`bitocard.com`, `udozo.com`) become CNAMEs too: Cloudflare allows that at the apex (CNAME flattening).
 
 **Not moving** (they stay on Vercel; keep their records as they are):
 - `shop.bitocard.com`: a Vercel project with no app in this repository any more.
@@ -180,8 +160,7 @@ it): an `A` record, or a `CNAME` to one host that has the `A` record.
 else not in the table. The cut-over changes only the rows above.
 
 **Order:** switch one host at a time, starting with `legals.bitocard.com`, and check each before the next. Switch an
-API's host only once its pod is ready. A record turned orange before its Origin CA certificate is installed fails
-with Cloudflare's error 526.
+API's host only once its pod is ready. To move a host back, point its record where it was.
 
 ## Sized for a low-traffic start
 
@@ -192,7 +171,7 @@ Everything fits on the one node (2 vCPUs, 4 GiB, about 2.9 GiB allocatable):
 | DigitalOcean's own pods | about 580 MiB | |
 | 12 frontends (Node.js heap capped at 160 MB) | 96 MiB each | 320 MiB |
 | 2 APIs (heap 384 MB) with their schedulers beside them (heap 48 MB) | 216 MiB each | 736 MiB |
-| Traefik (1 replica) | about 50 MiB | |
+| Traefik (1 replica), the tunnel (2 `cloudflared`) | about 115 MiB | |
 | **Total** | **about 2.2 GiB** | |
 
 That leaves about 0.8 GiB for a deploy:
@@ -214,13 +193,13 @@ Each API keeps its own Upstash database, as on the droplet and Vercel. `UPSTASH_
 
 ## Moving over (still to do)
 
-1. **DNS** (Hosts and DNS above): each host proxied to the load balancer. Then replace each product's per-store
+1. **DNS** (Hosts and DNS above): each host a proxied CNAME to the tunnel. Then replace each product's per-store
    CNAMEs with one proxied wildcard, and stop the APIs adding each store to Vercel and Cloudflare
    (`StoreHostsService`).
 2. **Resellers' own domains.**
    - Udozo's live stores and BitoCard's connected domains are on Vercel today (`VERCEL_STOREFRONT_PROJECT`).
-   - The catch-all route serves them here. Their certificates need Cloudflare for SaaS: custom hostnames with this
-     load balancer as the fallback origin and `origin.udozo.com` as their origin SNI (Certificates above).
+   - The catch-all route serves them here. Their certificates need Cloudflare for SaaS: custom hostnames with the
+     tunnel's hostname as the fallback origin (a proxied record such as `fallback.udozo.com` pointing at the tunnel).
    - The domain integration still writes to Vercel until that is built.
 3. **Udozo's scheduled jobs.** Remove the Vercel project's crons once its API runs here. Every job is safe to run
    twice, but they should not run in both places for long.

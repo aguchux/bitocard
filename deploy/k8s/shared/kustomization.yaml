@@ -1,7 +1,7 @@
-# What BitoCard and Udozo share on the cluster: the namespace, the image pull secret and the apps' network policy.
+# What BitoCard and Udozo share on the cluster: the namespace, the Cloudflare Tunnel (the only way in), the image pull
+# secret and the apps' network policy.
 # Applied with the rest by `kubectl apply -k deploy/k8s`, or alone (first) by `kubectl apply -k deploy/k8s/shared`.
-# Its secret comes from env/, never committed: copy it from its *.example (deploy/k8s/init-env.sh).
-# (Each product's TLS certificate is its own: Cloudflare's Origin CA, in <product>/env, deploy/k8s/origin-cert.sh.)
+# Its secrets come from env/, never committed: copy each from its *.example (deploy/k8s/init-env.sh).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: bitocard
@@ -9,12 +9,17 @@ namespace: bitocard
 resources:
   - namespace.yaml
   - network-policy.yaml
+  - tunnel.yaml
 
-# Named exactly (no hash): every product's pods find it by this name.
+# Named exactly (no hash): every product's pods find them by these names.
 generatorOptions:
   disableNameSuffixHash: true
 
 secretGenerator:
+  # The tunnel's token (Cloudflare: Zero Trust > Networks > Tunnels > the tunnel's install command, the part after
+  # `--token`).
+  - name: cloudflare-tunnel
+    envs: [env/tunnel.secret.env]
   # Pulls the images from Docker Hub (golojan/bitocard_*): an access token of the golojan account, read only.
   - name: registry
     type: kubernetes.io/dockerconfigjson

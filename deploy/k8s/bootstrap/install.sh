@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# Once per cluster, before `kubectl apply -k deploy/k8s`: Traefik, the way in. (Certificates need nothing installed:
-# each product's is Cloudflare's Origin CA, a Secret from deploy/k8s/origin-cert.sh.) Safe to run again: it upgrades it.
+# Once per cluster, before `kubectl apply -k deploy/k8s`: Traefik, which routes by host. No load balancer: requests
+# arrive through the Cloudflare Tunnel (deploy/k8s/shared/tunnel.yaml). Safe to run again: it upgrades Traefik.
 # Needs kubectl and helm, with KUBECONFIG set to the cluster.
 #   KUBECONFIG=terraform/golojancluster-kubeconfig.yaml sh deploy/k8s/bootstrap/install.sh
 set -eu
@@ -23,5 +23,5 @@ if helm status cert-manager --namespace cert-manager >/dev/null 2>&1; then
 fi
 
 echo
-echo "The load balancer's address (point the DNS records at it, proxied through Cloudflare):"
-kubectl get service traefik --namespace traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}{"\n"}'
+echo "Traefik is ready, inside the cluster only (no load balancer):"
+kubectl get service traefik --namespace traefik

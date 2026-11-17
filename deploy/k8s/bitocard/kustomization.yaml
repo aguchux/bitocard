@@ -1,4 +1,4 @@
-# BitoCard on Kubernetes: its API and scheduler, frontends, routes and Origin CA certificate, in the namespace
+# BitoCard on Kubernetes: its API and scheduler, frontends and routes, in the namespace
 # `bitocard`. Applied with the rest by `kubectl apply -k deploy/k8s`, or alone by `kubectl apply -k deploy/k8s/bitocard`
 # (after deploy/k8s/shared once).
 #
@@ -31,13 +31,6 @@ secretGenerator:
     envs: [env/api.secret.env]
   - name: bitocard-web-secrets
     envs: [env/web.secret.env]
-  # Cloudflare's Origin CA certificate for bitocard.com and *.bitocard.com (deploy/k8s/origin-cert.sh). Named
-  # exactly: the Ingresses find it by name.
-  - name: bitocard-tls
-    type: kubernetes.io/tls
-    files: [tls.crt=env/origin.pem, tls.key=env/origin.key]
-    options:
-      disableNameSuffixHash: true
 
 # The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (`kustomize edit set image`).
 images:

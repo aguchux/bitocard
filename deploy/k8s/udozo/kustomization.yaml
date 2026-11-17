@@ -1,4 +1,4 @@
-# Udozo on Kubernetes: its API and scheduler, frontends, routes and Origin CA certificate, in the namespace
+# Udozo on Kubernetes: its API and scheduler, frontends and routes, in the namespace
 # `bitocard`. Applied with the rest by `kubectl apply -k deploy/k8s`, or alone by `kubectl apply -k deploy/k8s/udozo`
 # (after deploy/k8s/shared once).
 #
@@ -17,7 +17,6 @@ resources:
   - api.yaml
   - frontends.yaml
   - ingress.yaml
-  - tls-store.yaml
 
 configMapGenerator:
   # The API's settings that are not secret (origins, cookies, rate limits, Redis's address).
@@ -32,13 +31,6 @@ secretGenerator:
     envs: [env/api.secret.env]
   - name: udozo-web-secrets
     envs: [env/web.secret.env]
-  # Cloudflare's Origin CA certificate for udozo.com and *.udozo.com (deploy/k8s/origin-cert.sh). Named
-  # exactly: the Ingresses and Traefik's default store find it by name.
-  - name: udozo-tls
-    type: kubernetes.io/tls
-    files: [tls.crt=env/origin.pem, tls.key=env/origin.key]
-    options:
-      disableNameSuffixHash: true
 
 # The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (`kustomize edit set image`).
 images:
